@@ -132,23 +132,22 @@ function townhouse(accent: string): BuildingModel {
   }
 }
 
-// ── Worker: a factory with a sawtooth roof and smoking chimneys ─────────────
+// ── Worker: a brick factory with a loading bay, roof units and smoking chimneys ─────────────
 
 function factory(accent: string): BuildingModel {
   const W = 5 * CELL, D = 4 * CELL, FH = 1.6
-  const steel = flat('#7d8895'), band = flat('#eef1f4')
+  const brick = flat('#c99a54'), trim = flat('#f4ecd8'), band = flat('#f1ece0'), chim = flat('#a2503b')
   let activity = 0.4
   const smoke: THREE.Mesh[] = []
   for (let i = 0; i < 8; i++) {
     smoke.push(new THREE.Mesh(new THREE.IcosahedronGeometry(0.3, 0), new THREE.MeshStandardMaterial({ color: '#f4f4f4', transparent: true, opacity: 0.8, roughness: 1, flatShading: true })))
   }
-  const brick = flat('#a2503b')
+  const CHIMNEYS = [{ x: 1.9, h: 3.4 }, { x: 1.0, h: 2.6 }]
   const stack = (x: number, h: number) => group(
-    cyl(0.34, 0.46, h, brick, { x, z: -1.5 }, 10),
-    cyl(0.4, 0.4, 0.14, flat('#e8e0d0'), { x, y: h - 0.4, z: -1.5 }, 10),
-    cyl(0.44, 0.44, 0.14, flat('#e8e0d0'), { x, y: h, z: -1.5 }, 10),
+    cyl(0.34, 0.46, h, chim, { x, y: 0.14, z: -1.4 }, 10),
+    cyl(0.4, 0.4, 0.14, trim, { x, y: 0.14 + h - 0.4, z: -1.4 }, 10),
+    cyl(0.44, 0.44, 0.14, trim, { x, y: 0.14 + h, z: -1.4 }, 10),
   )
-  const chimneys = group(stack(2.1, 4.0), stack(1.2, 3.2), ...smoke)
   const hazard = canvasTexture(256, 16, (ctx) => {
     for (let i = 0; i < 16; i++) { ctx.fillStyle = i % 2 ? '#1f2328' : '#f2c230'; ctx.beginPath(); ctx.moveTo(i * 16, 16); ctx.lineTo(i * 16 + 8, 0); ctx.lineTo(i * 16 + 24, 0); ctx.lineTo(i * 16 + 16, 16); ctx.fill() }
   })
@@ -158,38 +157,45 @@ function factory(accent: string): BuildingModel {
     box(1.7, 0.12, 0.2, band, { x, y: 1.4, z: D / 2 + 0.1 }),
   )
   const base = group(
-    box(W + 0.2, 1.7, D + 0.2, steel),
+    box(W + 0.2, 1.7, D + 0.2, brick),
     box(W + 0.34, 0.14, D + 0.34, band, { y: 1.7 }),
     box(W + 0.22, 0.2, 0.02, new THREE.MeshStandardMaterial({ map: hazard, roughness: 0.9 }), { y: 0.05, z: D / 2 + 0.11 }),
     roller(-1.7), roller(-0.1),
     doorway(0.8, 1.25, D / 2 + 0.1, '#2f3a46'),
     awning(1.1, 1.3, D / 2 + 0.55, accent),
     box(W + 1.6, 0.08, 1.8, flat('#cfc8b8'), { z: D / 2 + 1.0 }),
-    chimneys,
   )
-  // sawtooth roof: three teeth, each a vertical glazed face and a sloped steel face
-  const prof = new THREE.Shape()
-  const tooth = D / 3, th = 1.1
-  prof.moveTo(-D / 2, 0)
-  for (let i = 0; i < 3; i++) { prof.lineTo(-D / 2 + i * tooth, th); prof.lineTo(-D / 2 + (i + 1) * tooth, 0) }
-  prof.closePath()
-  const sawGeo = new THREE.ExtrudeGeometry(prof, { depth: W - 0.2, bevelEnabled: false })
-  sawGeo.rotateY(Math.PI / 2)
-  sawGeo.translate(-(W - 0.2) / 2, 0.14, 0)
-  const saw = new THREE.Mesh(sawGeo, flat('#59656f', { roughness: 0.6, metalness: 0.2 }))
-  saw.castShadow = true
-  saw.receiveShadow = true
-  const roof = group(parapet(W, D), saw, at(mast(1.5), -2.3, 0.14, 1.3))
+  // a unit on the roof: a light grey box with a fan on top
+  const unit = (x: number, z: number) => group(
+    box(1.3, 0.55, 1.0, flat('#d4d9de'), { x, y: 0.14, z }),
+    cyl(0.36, 0.36, 0.06, flat('#8a949f'), { x, y: 0.72, z }, 14),
+  )
+  const sign = canvasTexture(512, 128, (ctx) => {
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, 512, 128)
+    ctx.fillStyle = '#26364f'; ctx.font = '800 76px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+    ctx.fillText('FACTORY', 256, 68)
+  })
+  const board = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 0.8), new THREE.MeshBasicMaterial({ map: sign, toneMapped: false }))
+  board.position.set(-0.6, 0.74, D / 2 - 0.41)
+  const roof = group(
+    parapet(W, D),
+    ...CHIMNEYS.map((c) => stack(c.x, c.h)),
+    unit(-0.4, -0.2), unit(-1.8, 0.7),
+    box(3.4, 1.2, 0.16, flat(accent), { x: -0.6, y: 0.14, z: D / 2 - 0.5 }),
+    board,
+    at(mast(1.5), 2.2, 0.14, 1.3),
+    ...smoke,
+  )
   return {
     base,
     baseHeight: 1.84,
     floorHeight: FH,
     makeFloor: () => {
-      const { material, uniforms } = makeWindowMaterial({ color: '#8e9aa8', trim: '#e9edf1', floorHeight: FH, width: W, depth: D, cell: CELL, win: [0.9, 0.6] })
+      const { material, uniforms } = makeWindowMaterial({ color: '#d6ad66', trim: '#f4ecd8', floorHeight: FH, width: W, depth: D, brick: true, cell: CELL })
       return { object: box(W, FH, D, material), uniforms }
     },
     roof,
-    beaconAt: v(-2.3, 1.7, 1.3),
+    beaconAt: v(2.2, 1.7, 1.3),
     door: v(0, 0, D / 2 + 1.7),
     doorDir: v(0, 0, 1),
     plaque: { position: v(W / 2 - 0.7, 0.55, D / 2 + 0.25), width: 1.5 },
@@ -199,9 +205,9 @@ function factory(accent: string): BuildingModel {
     animate: (time) => {
       const rate = 0.25 + 0.5 * activity
       smoke.forEach((p, i) => {
+        const c = CHIMNEYS[i % 2]
         const life = (time * rate + i / smoke.length) % 1
-        const x = i % 2 ? 2.1 : 1.2
-        p.position.set(x + Math.sin(i * 2.1 + time * 0.4) * 0.15 * life, (i % 2 ? 4.3 : 3.5) + life * 3.0, -1.5)
+        p.position.set(c.x + Math.sin(i * 2.1 + time * 0.4) * 0.15 * life, 0.14 + c.h + 0.3 + life * 3.0, -1.4)
         p.scale.setScalar((0.4 + life * 1.3) * (0.6 + 0.8 * activity))
         ;(p.material as THREE.MeshStandardMaterial).opacity = (0.35 + 0.55 * activity) * (1 - life)
       })

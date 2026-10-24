@@ -114,3 +114,8 @@ All 10 Phase 1 topics decided 2026-10-24.
 - Worker is a factory and database is a storage-units building.
 - Health is not only instances. Apps report CPU and memory. Databases report utilisation (like Cosmos RU %) and throttled requests, and show no instance floors. Thresholds (`resources`, `throttle`) cascade from defaults.yaml like the existing ones. Metrics are nullable: null means not reported, never zero. High resource use gives amber, throttling gives a red beacon and a lowered barrier gate.
 - New fake effects: High CPU, High memory, DB saturated.
+
+## Slice 1 look, round 5 (Dan, 2026-10-24)
+- All cars are the same size: each model is scaled to one length, and the grow-in at route ends is gone.
+- Boats stay on water. A bridge is a low road deck, so a boat cannot pass under it, and a lane round the hub would cross every bridge. Instead each island has a quay on the hub in the water gap beside its bridge, and a lane over open sea (grid search around land and bridges, scripts in web/src/scene/sea.ts) to the island's harbour.
+- Worker: a yellow-brick factory with chimneys and rooftop units on the roof (the sawtooth roof read as black blobs) and a FACTORY sign.

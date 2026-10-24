@@ -63,7 +63,7 @@ How to read the town, as built so far:
 | Lit windows | Load: how much of its capacity the building is using |
 | Dark, cracked floors and an amber plaque | Unhealthy instances ("5/10 healthy") |
 | Rooftop beacon: green, amber, red (red pulses) | Errors, throttling or resource pressure against the system's own thresholds. Amber is a warning (including high CPU, memory or database utilisation), red means errors or throttled requests |
-| Factory (workers) and storage units (databases) | Workers are factories and databases are storage buildings, next to the API office. Factory chimneys smoke harder as CPU climbs. Storage doors light up with database utilisation |
+| Factory (workers) and storage units (databases) | Workers are yellow-brick factories with a FACTORY sign and roof chimneys, databases are storage buildings with a STORAGE sign, both next to the API office. Chimney smoke thickens as CPU climbs. Storage doors light up with database utilisation |
 | Meter bars on the name board | Apps and workers show CPU and memory. Databases show utilisation (for example Cosmos RU %) and the share of throttled requests. Each bar turns amber then red against its thresholds |
 | Lowered barrier gate at a database | Requests are being throttled |
 | Cars on the streets | Requests. More cars means more requests, slower cars means higher latency against the SLA. Blue sedans are internal calls, yellow taxis external ones, red hatchbacks failed calls |
@@ -71,7 +71,7 @@ How to read the town, as built so far:
 | Name board above a building | System name and "N/M healthy". Fades out when the camera is far away, except for troubled buildings |
 | Bridges | One road bridge from the hub's plaza to each island's gate. All sync traffic between islands goes through the hub |
 | Harbour with crates and a crane | The island's port, where messaging boats dock |
-| Boats between ports and the hub | Asynchronous messaging. Busier queues send more boats. Bridges are synchronous calls, boats are asynchronous ones |
+| Boats between hub quays and island harbours | Asynchronous messaging. Busier queues send more boats. Bridges are synchronous calls, boats are asynchronous ones. Boats sail only on open water: each island has a quay on the hub in the water gap beside its bridge, and lanes are found around land and bridges |
 | "Closed for repairs" sign and a blackout | The system is down |
 | Grey building | No fresh data. Never shown as healthy |
 

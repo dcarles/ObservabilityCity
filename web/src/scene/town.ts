@@ -10,9 +10,11 @@ import { hashString } from './random'
 import { speedFactor } from '../visuals'
 import { CarSystem, type Route } from './cars'
 import { BoatSystem, type BoatRoute } from './boats'
+import { findLane, type SeaMap } from './sea'
 
 const HUB_RX = 22
 const HUB_RZ = 21
+const QUAY = 9
 const RING_R = 5.7
 const SLOT = 6.8 // width of the plot of one building along a pad
 const PAD_W = 3 * SLOT + 0.8 // a service pad holds up to three buildings side by side
@@ -91,6 +93,7 @@ export class Town {
     const pillars = s.groups.filter((g) => !g.isHub)
     const routes: Route[] = []
     const boatRoutes: BoatRoute[] = []
+    const bridges: [THREE.Vector2, THREE.Vector2][] = []
 
     // Islands sit on a ring around the hub, spread evenly but turned so their spokes miss the hub's own
     // buildings on the four main axes.
@@ -127,8 +130,44 @@ export class Town {
 
       const gate = island.root.localToWorld(new THREE.Vector3(0, GROUND, coastScan(island.outline, 'z') - 0.7))
       this.root.add(bridge({ from: hubCoasts[index].clone().setY(0), to: gate.clone().setY(0) }))
+      bridges.push([new THREE.Vector2(hubCoasts[index].x, hubCoasts[index].z), new THREE.Vector2(gate.x, gate.z)])
       routes.push(...this.islandRoutes(island, plan, ports[index], hubCoasts[index], gate))
-      boatRoutes.push(this.boatRoute(island, plan, angles[index], hubBuildings))
+    })
+
+    // ── Sea lanes: boats sail from a hub quay in the gap beside each bridge to the island's harbour ──
+    this.root.updateMatrixWorld(true)
+    const land = [this.hubOutline.points.map((p) => new THREE.Vector2(p.x, p.y))]
+    for (const isl of this.islands) land.push(isl.outline.points.map((p) => {
+      const w = isl.root.localToWorld(new THREE.Vector3(p.x, 0, p.y))
+      return new THREE.Vector2(w.x, w.z)
+    }))
+    const sea: SeaMap = { land, bridges }
+    const quays = new Map<number, THREE.Vector3>()
+    const quayAt = (a: number) => {
+      const key = Math.round(wrapAngle(a) * 100)
+      let q = quays.get(key)
+      if (!q) {
+        q = this.hubQuay(hubRoot, a)
+        quays.set(key, q)
+      }
+      return q
+    }
+    pillars.forEach((_g, index) => {
+      const n = pillars.length
+      const here = ports[index]
+      const sides = n > 1 ? [wrapAngle(ports[(index + 1) % n] - here) / 2, wrapAngle(ports[(index + n - 1) % n] - here) / 2] : [Math.PI / 2]
+      let best: THREE.Vector3[] | null = null
+      let bestAngle = 0
+      for (const half of sides) {
+        const a = here + half
+        const dir = dirOf(a)
+        const tip = coastPoint(this.hubOutline, dir, 1.6 - (QUAY + 3)).setY(0)
+        const lane = findLane(sea, tip, this.harbourWater(this.islands[index], plans[index]))
+        if (lane && (!best || laneLength(lane) < laneLength(best))) { best = lane; bestAngle = a }
+      }
+      if (!best) return
+      quayAt(bestAngle)
+      boatRoutes.push(this.boatRoute(this.islands[index], best, hubBuildings))
     })
 
     routes.push(...this.hubRoutes(hubBuildings, ports.map((a, i) => ({ angle: a, coast: hubCoasts[i] }))))
@@ -380,29 +419,30 @@ export class Town {
 
   // ── routes ──────────────────────────────────────────────────────────────
 
-  /** The sea lane from the hub's port round the hub to an island's harbour. */
-  private boatRoute(island: Island, plan: Plan, angle: number, hubBuildings: Building[]): BoatRoute {
-    const broker = hubBuildings.find((b) => b.kind === 'Broker')
-    const lane = HUB_RZ + 14
-    const at = (a: number, r: number) => new THREE.Vector3(Math.sin(a) * r, 0, -Math.cos(a) * r)
-    const dock = at(Math.PI / 2, 30).setZ(2)
-    const pts: THREE.Vector3[] = [dock, at(Math.PI / 2, lane).setZ(2)]
-    // round the hub the short way to the island's direction
-    const from = Math.PI / 2
-    let to = angle
-    while (to - from > Math.PI) to -= 2 * Math.PI
-    while (to - from < -Math.PI) to += 2 * Math.PI
-    const steps = Math.max(1, Math.ceil(Math.abs(to - from) / 0.35))
-    for (let i = 1; i <= steps; i++) pts.push(at(from + ((to - from) * i) / steps, lane))
-    // then out along the island's near side to its harbour
-    const rows = plan.rows
-    const harbourZ = plan.rowRoadZ[Math.floor((rows - 1) / 2)]
+  /** A wooden quay on the hub's coast where boats leave for one island. Returns the water point at its tip. */
+  private hubQuay(hubRoot: THREE.Group, angle: number): THREE.Vector3 {
+    const dir = new THREE.Vector3(Math.sin(angle), 0, -Math.cos(angle))
+    const coast = coastPoint(this.hubOutline, dir, 1.6)
+    const p = pier(QUAY)
+    p.position.copy(coast).setY(0)
+    p.rotation.y = Math.atan2(dir.x, dir.z)
+    const c = crates()
+    c.position.set(coast.x - dir.x * 1.2 - dir.z * 1.6, 0, coast.z - dir.z * 1.2 + dir.x * 1.6)
+    c.rotation.y = p.rotation.y
+    hubRoot.add(p, c)
+    return coast.clone().addScaledVector(dir, QUAY + 3).setY(0)
+  }
+
+  /** The open water beside an island's harbour pier, in world coordinates. */
+  private harbourWater(island: Island, plan: Plan): THREE.Vector3 {
+    const harbourZ = plan.rowRoadZ[Math.floor((plan.rows - 1) / 2)]
     const coast = coastScan(island.outline, 'x', harbourZ)
-    const xs = Math.max(plan.rx * 1.08, coast) + 7
-    for (const [x, z] of [[xs, plan.rz + 9], [xs, harbourZ + 3.4], [coast + 6.5, harbourZ + 3.4]] as const) {
-      pts.push(island.root.localToWorld(new THREE.Vector3(x, 0, z)).setY(0))
-    }
-    const path = new THREE.CatmullRomCurve3(pts, false, 'centripetal').getPoints(pts.length * 8)
+    return island.root.localToWorld(new THREE.Vector3(coast + 7, 0, harbourZ + 3.6)).setY(0)
+  }
+
+  /** The sea lane from a hub quay to an island's harbour, sailed there and back. */
+  private boatRoute(island: Island, path: THREE.Vector3[], hubBuildings: Building[]): BoatRoute {
+    const broker = hubBuildings.find((b) => b.kind === 'Broker')
     const workers = [...island.buildings.values()].filter((b) => b.kind === 'Worker')
     return {
       path,
@@ -567,6 +607,12 @@ function layoutKey(s: Snapshot): string {
 }
 
 /** Where a straight line from the hub's centre leaves the hub's coast (inset a little). */
+function laneLength(p: THREE.Vector3[]): number {
+  let l = 0
+  for (let i = 1; i < p.length; i++) l += p[i].distanceTo(p[i - 1])
+  return l
+}
+
 function coastPoint(outline: Outline, dir: THREE.Vector3, inset: number): THREE.Vector3 {
   let lo = 0, hi = 60
   for (let i = 0; i < 24; i++) {

@@ -29,10 +29,10 @@ interface Car {
 }
 
 const MODELS: KitName[] = ['car_sedan', 'car_taxi', 'car_hatchback'] // internal, external, failed
-const CAR_SCALE = 2.3
+/** Every car model is scaled to this length in metres, so the models all come out the same size. */
+const CAR_LENGTH = 2.2
 const BASE_SPEED = 4.2
 const LANE = 1.05
-const FADE = 1.6
 
 /**
  * Requests as cars. The number of cars follows the request rate, their speed follows latency against the
@@ -52,10 +52,14 @@ export class CarSystem {
   private readonly pos = new THREE.Vector3()
   private readonly dir = new THREE.Vector3()
   private readonly scaleV = new THREE.Vector3()
+  private readonly unit: number[] = []
 
   constructor(private readonly max = 420) {
     for (const name of MODELS) {
       const { geometry, material } = kitParts(name)
+      geometry.computeBoundingBox()
+      const size = geometry.boundingBox!.getSize(new THREE.Vector3())
+      this.unit.push(CAR_LENGTH / Math.max(size.x, size.z))
       const im = new THREE.InstancedMesh(geometry, material, max)
       im.count = 0
       im.castShadow = true
@@ -106,8 +110,7 @@ export class CarSystem {
       let d = target - c.yaw
       d = Math.atan2(Math.sin(d), Math.cos(d))
       c.yaw += d * Math.min(1, dt * 9)
-      const fade = clamp(Math.min(c.dist, c.total - c.dist) / FADE, 0, 1)
-      const s = CAR_SCALE * (0.3 + 0.7 * fade)
+      const s = this.unit[c.model]
       this.q.setFromAxisAngle(this.up, c.yaw)
       this.m.compose(this.pos, this.q, this.scaleV.set(s, s, s))
       this.meshes[c.model].setMatrixAt(counts[c.model]++, this.m)
