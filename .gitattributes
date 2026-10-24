@@ -1,0 +1,17 @@
+# Keep text files LF in the repo and in working copies on every OS
+* text=auto eol=lf
+
+# Binary files: never touch line endings
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.pdf binary
+*.glb binary
+*.gltf text
+*.ico binary
+
+# Windows-only scripts keep CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf

@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Island Shape Preview</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+  /* Layout: full-bleed 3D canvas with a floating control card (bottom sheet on phones) */
+  :root {
+    --bg: #0f1626;
+    --panel: rgba(250, 247, 240, 0.94);
+    --ink: #1c2233;
+    --muted: #5b6275;
+    --accent: #c4572e;
+    --line: rgba(28, 34, 51, 0.14);
+    --chip: #ece6d8;
+    --display: "Fraunces", Georgia, serif;
+    --body: "IBM Plex Sans", system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --panel: rgba(20, 26, 42, 0.92); --ink: #eef0f6; --muted: #a3abc0;
+      --accent: #f08a5d; --line: rgba(238, 240, 246, 0.14); --chip: #26304a; color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --panel: rgba(20, 26, 42, 0.92); --ink: #eef0f6; --muted: #a3abc0;
+    --accent: #f08a5d; --line: rgba(238, 240, 246, 0.14); --chip: #26304a; color-scheme: dark;
+  }
+  html, body { height: 100%; }
+  body { background: var(--bg); color: var(--ink); font-family: var(--body); overflow: hidden; }
+  #stage { position: fixed; inset: 0; }
+  #stage canvas { display: block; width: 100%; height: 100%; }
+  .card {
+    position: fixed;
+    top: calc(16px + env(safe-area-inset-top, 0px));
+    left: max(16px, env(safe-area-inset-left, 0px));
+    width: min(360px, calc(100% - 32px));
+    background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+    padding: 16px 18px; backdrop-filter: blur(6px);
+    display: flex; flex-direction: column; gap: 12px;
+    max-height: calc(100% - 32px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+    overflow-y: auto;
+  }
+  h1 { font-family: var(--display); font-weight: 600; font-size: 1.35rem; margin: 0; text-wrap: balance; }
+  .sub { margin: 0; color: var(--muted); font-size: 0.86rem; line-height: 1.45; }
+  .styles { display: flex; flex-direction: column; gap: 8px; }
+  .styles button {
+    text-align: left; font: inherit; color: inherit; cursor: pointer;
+    background: transparent; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px;
+    display: flex; flex-direction: column; gap: 2px;
+  }
+  .styles button strong { font-weight: 600; font-size: 0.95rem; }
+  .styles button span { color: var(--muted); font-size: 0.8rem; line-height: 1.35; }
+  .styles button[aria-pressed="true"] { border-color: var(--accent); background: var(--chip); box-shadow: inset 3px 0 0 var(--accent); }
+  .styles button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .legend { border-top: 1px solid var(--line); padding-top: 10px; }
+  .legend p { margin: 0 0 6px; font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  .legend ul { margin: 0; padding-left: 18px; font-size: 0.82rem; line-height: 1.5; }
+  .hint { font-size: 0.76rem; color: var(--muted); margin: 0; }
+  @media (max-width: 560px) {
+    .card { top: auto; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); max-height: 46%; }
+    .legend { display: none; }
+  }
+</style>
+
+<div id="stage" aria-label="3D preview of island shapes"></div>
+
+<section class="card">
+  <h1>Island shape preview</h1>
+  <p class="sub">The same hub and three pillar islands, built a few ways. Drag (or zoom in) to see the plots. to rotate and scroll to zoom.</p>
+  <div class="styles" role="group" aria-label="Island shape">
+    <button data-style="grid" aria-pressed="true"><strong>A1 · Organic + square plots</strong><span>Organic coastline with a town centre of square plots and streets, one building per plot. Spare plots stay as lawn.</span></button>
+    <button data-style="hexplots" aria-pressed="false"><strong>A2 · Organic + hex plots</strong><span>Same coastline, but buildings sit on hexagon pads with paths between them, like puzzle pieces.</span></button>
+    <button data-style="organic" aria-pressed="false"><strong>A · Organic, free placement</strong><span>The earlier version: buildings scattered without a grid.</span></button>
+    <button data-style="hex" aria-pressed="false"><strong>B · Hex tiles</strong><span>Islands made of hexagon tiles, board-game style. Matches the KayKit hex kits.</span></button>
+    <button data-style="round" aria-pressed="false"><strong>C · Round platforms</strong><span>Simple circular plateaus, all alike. Cleanest, but least like a place.</span></button>
+  </div>
+  <div class="legend">
+    <p>What you're looking at</p>
+    <ul>
+      <li><b>Middle:</b> the hub</li>
+      <li><b>Around it:</b> Accounts, Payments and Fraud, each with a bridge to the hub</li>
+      <li>Island size follows how many systems the pillar has</li>
+    </ul>
+  </div>
+  <p class="hint">Day lighting, placeholder buildings. Shapes are the point here, not the art.</p>
+</section>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const C = { sky: 0x9ed4ff, fog: 0xc2e6ff, water: 0x4aa6dc, shallow: 0x7cc9e8, grass: 0x83c45e, grass2: 0x6fb352, sand: 0xead9a3, rock: 0x9a958c, cliff: 0xb9a888, wall: 0xf3eee4, roof: 0x7a8090 };
+const stage = document.getElementById('stage');
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+stage.appendChild(renderer.domElement);
+
+const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 400);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true; controls.maxPolarAngle = 1.35; controls.minDistance = 15; controls.maxDistance = 120;
+controls.autoRotate = true; controls.autoRotateSpeed = 0.35;
+controls.addEventListener('start', () => { controls.autoRotate = false; controls.userMoved = true; });
+
+let scene;
+function seeded(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function hash(s) { let h = 2166136261; for (const c of s) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return h >>> 0; }
+const mat = (color, flat = true) => new THREE.MeshStandardMaterial({ color, flatShading: flat, roughness: 0.92, metalness: 0 });
+function add(parent, geo, material, x = 0, y = 0, z = 0) { const m = new THREE.Mesh(geo, material); m.position.set(x, y, z); m.castShadow = m.receiveShadow = true; parent.add(m); return m; }
+function label(text, h = 1.3) {
+  const c = document.createElement('canvas'); c.width = 360; c.height = 96; const g = c.getContext('2d');
+  g.fillStyle = 'rgba(20,24,36,0.82)'; g.beginPath(); g.roundRect(6, 6, 348, 84, 22); g.fill();
+  g.fillStyle = '#fdf6e8'; g.font = '600 46px "IBM Plex Sans", system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(text, 180, 50);
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false })); sp.scale.set(h * 3.75, h, 1); sp.renderOrder = 10; return sp;
+}
+
+const ISLANDS = [
+  { id: 'hub', name: 'Hub', x: 0, z: 0, r: 6, n: 3 },
+  { id: 'acc', name: 'Accounts', x: -18, z: 6, r: 5.5, n: 3 },
+  { id: 'pay', name: 'Payments', x: 16, z: 11, r: 7.5, n: 5 },
+  { id: 'frd', name: 'Fraud', x: 4, z: -18, r: 4.5, n: 2 },
+];
+
+function tree(parent, x, y, z, s = 1) {
+  const t = new THREE.Group(); t.position.set(x, y, z); t.scale.setScalar(s); parent.add(t);
+  add(t, new THREE.CylinderGeometry(0.08, 0.11, 0.45, 5), mat(0x6b4a2f), 0, 0.22, 0);
+  add(t, new THREE.ConeGeometry(0.45, 1.0, 6), mat(0x2f7a3f), 0, 0.9, 0);
+}
+function building(parent, x, y, z, floors, rnd) {
+  const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = Math.round(rnd() * 4) * Math.PI / 2; parent.add(g);
+  const h = floors * 0.7;
+  add(g, new THREE.BoxGeometry(1.5, h, 1.5), mat(C.wall), 0, h / 2, 0);
+  add(g, new THREE.BoxGeometry(1.62, 0.14, 1.62), mat(C.roof), 0, h + 0.07, 0);
+  add(g, new THREE.IcosahedronGeometry(0.22, 1), new THREE.MeshBasicMaterial({ color: 0x34c759 }), 0, h + 0.45, 0);
+}
+
+// Height used to place things: returns top y at local (x,z) or null if off-island.
+function placeOnIsland(g, isl, topAt, rnd, slots) {
+  const pts = [];
+  for (let k = 0; k < isl.n; k++) {
+    const a = (k / isl.n) * Math.PI * 2 + 0.5, d = isl.n > 1 ? isl.r * 0.38 : 0;
+    pts.push([Math.cos(a) * d, Math.sin(a) * d]);
+  }
+  pts.forEach(([x, z], k) => { const y = topAt(x, z); if (y != null) building(g, x, y, z, 2 + Math.floor(rnd() * 4), rnd); });
+  for (let i = 0; i < 40 && slots > 0; i++) {
+    const a = rnd() * Math.PI * 2, d = isl.r * (0.55 + rnd() * 0.35), x = Math.cos(a) * d, z = Math.sin(a) * d;
+    if (pts.some(([px, pz]) => Math.hypot(px - x, pz - z) < 1.6)) continue;
+    const y = topAt(x, z); if (y == null) continue;
+    tree(g, x, y, z, 0.8 + rnd() * 0.5); slots--;
+  }
+}
+
+// ---------- A: organic ----------
+function organic(isl, plotKind) {
+  const rnd = seeded(hash(isl.id)), g = new THREE.Group(); g.position.set(isl.x, 0, isl.z); scene.add(g);
+  const harm = [1, 2, 3, 5].map(k => ({ k, a: (0.16 / k) * (0.6 + rnd()), p: rnd() * 6.28 }));
+  const radius = (th, base) => base * (1 + harm.reduce((s, h) => s + h.a * Math.sin(h.k * th + h.p), 0));
+  const N = 72;
+  const layer = (base, y0, h, color, bevel) => {
+    const shape = new THREE.Shape();
+    for (let i = 0; i <= N; i++) { const th = i / N * Math.PI * 2, r = radius(th, base); const fn = i ? 'lineTo' : 'moveTo'; shape[fn](Math.cos(th) * r, Math.sin(th) * r); }
+    const geo = new THREE.ExtrudeGeometry(shape, { depth: h, bevelEnabled: true, bevelThickness: bevel, bevelSize: bevel, bevelSegments: 2, curveSegments: 4 });
+    geo.rotateX(-Math.PI / 2); geo.translate(0, y0, 0);
+    return add(g, geo, mat(color));
+  };
+  const sh = new THREE.Shape(); for (let i = 0; i <= N; i++) { const th = i / N * Math.PI * 2, r = radius(th, isl.r + 2.2); sh[i ? 'lineTo' : 'moveTo'](Math.cos(th) * r, Math.sin(th) * r); }
+  const shal = new THREE.Mesh(new THREE.ShapeGeometry(sh), new THREE.MeshStandardMaterial({ color: C.shallow, transparent: true, opacity: 0.55, roughness: 0.4 }));
+  shal.rotation.x = -Math.PI / 2; shal.position.y = 0.03; g.add(shal);
+  layer(isl.r + 1.0, -0.4, 0.55, C.sand, 0.25);
+  layer(isl.r, -0.2, 0.75, C.cliff, 0.12);
+  layer(isl.r - 0.15, 0.55, 0.12, C.grass, 0.1);
+  const TOP = 0.8;
+  // a hill on the far side
+  const ha = rnd() * 6.28, hd = isl.r * (plotKind ? 0.78 : 0.55);
+  const hill = add(g, new THREE.SphereGeometry(isl.r * (plotKind ? 0.28 : 0.38), 9, 6, 0, 6.29, 0, Math.PI / 2), mat(C.grass2), Math.cos(ha) * hd, TOP - 0.05, Math.sin(ha) * hd);
+  hill.scale.y = 0.45;
+  for (let i = 0; i < 4; i++) { const a = rnd() * 6.28, r = radius(a, isl.r + 0.8); const rk = add(g, new THREE.DodecahedronGeometry(0.3 + rnd() * 0.35, 0), mat(C.rock), Math.cos(a) * r, 0.05, Math.sin(a) * r); rk.rotation.set(rnd() * 3, rnd() * 3, 0); }
+  const topAt = (x, z) => { const th = Math.atan2(z, x); if (Math.hypot(x, z) > radius(th, isl.r) - 0.9) return null; if (Math.hypot(x - Math.cos(ha) * hd, z - Math.sin(ha) * hd) < isl.r * 0.42) return null; return TOP; };
+  if (plotKind) plots(g, isl, radius, ha, hd, plotKind, rnd, TOP); else placeOnIsland(g, isl, topAt, rnd, 10);
+  const s = label(isl.name); s.position.set(0, 7.5, 0); g.add(s);
+  return { edge: th => radius(th, isl.r) * 0.95, top: TOP };
+}
+
+function plots(g, isl, radius, ha, hd, kind, rnd, TOP) {
+  const hx = Math.cos(ha) * hd, hz = Math.sin(ha) * hd;
+  const inside = (x, z, m) => Math.hypot(x, z) < radius(Math.atan2(z, x), isl.r) - m && Math.hypot(x - hx, z - hz) > isl.r * 0.3 + m * 0.6;
+  const cells = [];
+  if (kind === 'grid') {
+    const c = 2.1;
+    for (let i = -5; i <= 5; i++) for (let j = -5; j <= 5; j++) {
+      const x = (i + 0.5) * c, z = (j + 0.5) * c;
+      if ([[-1,-1],[1,-1],[-1,1],[1,1]].every(([a, b]) => inside(x + a * c / 2, z + b * c / 2, 0.5))) cells.push({ x, z });
+    }
+  } else {
+    const r = 1.18, w = Math.sqrt(3) * r;
+    for (let q = -6; q <= 6; q++) for (let k = -6; k <= 6; k++) {
+      const x = w * (q + k / 2), z = 1.5 * r * k;
+      if (inside(x, z, r + 0.35)) cells.push({ x, z });
+    }
+  }
+  cells.sort((a, b) => Math.hypot(a.x, a.z) - Math.hypot(b.x, b.z));
+  const use = cells.slice(0, Math.max(isl.n + 3, Math.min(cells.length, isl.n * 2)));
+  const paving = mat(0xd9d4c7), street = mat(0x8d8a86), lawn = mat(0x9fd27a), path = mat(0xcdb98e);
+  if (kind === 'grid') {
+    const c = 2.1;
+    for (const cell of use) {
+      add(g, new THREE.BoxGeometry(c, 0.06, c), street, cell.x, TOP + 0.03, cell.z);
+      add(g, new THREE.BoxGeometry(c - 0.5, 0.12, c - 0.5), paving, cell.x, TOP + 0.08, cell.z);
+    }
+  } else {
+    for (const cell of use) {
+      add(g, new THREE.CylinderGeometry(1.18, 1.18, 0.06, 6), path, cell.x, TOP + 0.03, cell.z).rotation.y = Math.PI / 6;
+      add(g, new THREE.CylinderGeometry(0.98, 0.98, 0.14, 6), paving, cell.x, TOP + 0.09, cell.z).rotation.y = Math.PI / 6;
+    }
+  }
+  use.forEach((cell, k) => {
+    if (k < isl.n) building(g, cell.x, TOP + 0.15, cell.z, 2 + Math.floor(rnd() * 4), rnd);
+    else {
+      add(g, new THREE.BoxGeometry(kind === 'grid' ? 1.2 : 1.0, 0.04, kind === 'grid' ? 1.2 : 1.0), lawn, cell.x, TOP + 0.16, cell.z);
+      tree(g, cell.x + 0.3, TOP + 0.16, cell.z - 0.2, 0.6);
+    }
+  });
+  for (let i = 0, n = 0; i < 60 && n < 8; i++) {
+    const a = rnd() * 6.28, d = isl.r * (0.5 + rnd() * 0.45), x = Math.cos(a) * d, z = Math.sin(a) * d;
+    if (!inside(x, z, 0.7) || use.some(cl => Math.hypot(cl.x - x, cl.z - z) < 1.7)) continue;
+    tree(g, x, TOP, z, 0.8 + rnd() * 0.4); n++;
+  }
+}
+
+// ---------- B: hex ----------
+function hexIsl(isl) {
+  const rnd = seeded(hash(isl.id)), g = new THREE.Group(); g.position.set(isl.x, 0, isl.z); scene.add(g);
+  const s = 1.05, R = Math.round(isl.r / (s * 1.5)) + 1;
+  const tiles = new Map();
+  const toXZ = (q, r) => [s * Math.sqrt(3) * (q + r / 2), s * 1.5 * r];
+  for (let q = -R - 1; q <= R + 1; q++) for (let r = -R - 1; r <= R + 1; r++) {
+    const [x, z] = toXZ(q, r), d = Math.hypot(x, z), th = Math.atan2(z, x);
+    const edge = isl.r * (1 + 0.12 * Math.sin(3 * th + hash(isl.id) % 7) + 0.08 * Math.sin(5 * th));
+    if (d < edge) tiles.set(q + ',' + r, { q, r, x, z, land: d < edge - 1.8 });
+  }
+  const hexGeo = h => new THREE.CylinderGeometry(s * 0.98, s * 0.98, h, 6);
+  const tops = new Map();
+  for (const t of tiles.values()) {
+    let h = 0.5, color = C.sand;
+    if (t.land) { h = 0.9; color = rnd() < 0.18 ? C.grass2 : C.grass; if (rnd() < 0.1) { h = 1.4; color = C.grass2; } }
+    const m = add(g, hexGeo(h), mat(color), t.x, h / 2 - 0.1, t.z); m.rotation.y = Math.PI / 6;
+    add(g, hexGeo(0.18), mat(C.cliff), t.x, -0.05, t.z).rotation.y = Math.PI / 6;
+    tops.set(t.q + ',' + t.r, { y: h - 0.1, land: t.land, x: t.x, z: t.z, tall: h > 1 });
+  }
+  const topAt = (x, z) => {
+    let best = null, bd = 1e9;
+    for (const t of tops.values()) { const d = Math.hypot(t.x - x, t.z - z); if (d < bd) { bd = d; best = t; } }
+    return best && best.land && !best.tall ? best.y : null;
+  };
+  // snap buildings to tile centres
+  const landTiles = [...tops.values()].filter(t => t.land && !t.tall).sort((a, b) => Math.hypot(a.x, a.z) - Math.hypot(b.x, b.z));
+  const used = new Set();
+  for (let k = 0; k < isl.n && k < landTiles.length; k++) { const t = landTiles[k * 2 % landTiles.length]; used.add(t); building(g, t.x, t.y, t.z, 2 + Math.floor(rnd() * 4), rnd); }
+  for (const t of landTiles) if (!used.has(t) && rnd() < 0.3) tree(g, t.x + (rnd() - 0.5) * 0.6, t.y, t.z + (rnd() - 0.5) * 0.6, 0.9);
+  const lb = label(isl.name); lb.position.set(0, 7.5, 0); g.add(lb);
+  return { edge: () => isl.r * 0.82, top: 0.8 };
+}
+
+// ---------- C: round ----------
+function round(isl) {
+  const rnd = seeded(hash(isl.id)), g = new THREE.Group(); g.position.set(isl.x, 0, isl.z); scene.add(g);
+  add(g, new THREE.CylinderGeometry(isl.r + 0.6, isl.r + 1.1, 0.6, 40), mat(C.sand, false), 0, -0.05, 0);
+  add(g, new THREE.CylinderGeometry(isl.r, isl.r + 0.3, 1.2, 40), mat(C.grass, false), 0, 0.1, 0);
+  const TOP = 0.7;
+  placeOnIsland(g, isl, (x, z) => Math.hypot(x, z) < isl.r - 0.7 ? TOP : null, rnd, 8);
+  const lb = label(isl.name); lb.position.set(0, 7.5, 0); g.add(lb);
+  return { edge: () => isl.r, top: TOP };
+}
+
+function bridge(a, b, ea, eb, y) {
+  const dx = b.x - a.x, dz = b.z - a.z, th = Math.atan2(dz, dx), L = Math.hypot(dx, dz);
+  const da = ea.edge(th), db = eb.edge(th + Math.PI);
+  const len = L - da - db + 1.2, mid = (da - 0.6 + len / 2);
+  const g = new THREE.Group(); g.position.set(a.x + Math.cos(th) * mid, 0, a.z + Math.sin(th) * mid); g.rotation.y = -th; scene.add(g);
+  add(g, new THREE.BoxGeometry(len, 0.2, 1.1), mat(0x9c8f7c), 0, y, 0);
+  for (const z of [-0.55, 0.55]) add(g, new THREE.BoxGeometry(len, 0.16, 0.06), mat(0x6e6455), 0, y + 0.22, z);
+  for (let i = -1; i <= 1; i += 2) add(g, new THREE.CylinderGeometry(0.12, 0.12, y + 0.4, 6), mat(0x6e6455), i * len * 0.25, (y + 0.4) / 2 - 0.4, 0);
+}
+
+function build(kind) {
+  if (scene) scene.traverse(o => { o.geometry?.dispose(); if (o.material) [].concat(o.material).forEach(m => { m.map?.dispose(); m.dispose(); }); });
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(C.sky); scene.fog = new THREE.Fog(C.fog, 70, 180);
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x8fb070, 1.0));
+  const sun = new THREE.DirectionalLight(0xffffff, 2.3); sun.position.set(25, 40, 15); sun.castShadow = true;
+  sun.shadow.mapSize.set(2048, 2048); Object.assign(sun.shadow.camera, { left: -35, right: 35, top: 35, bottom: -35, near: 1, far: 120 }); sun.shadow.bias = -0.0005;
+  scene.add(sun);
+  const water = new THREE.Mesh(new THREE.CircleGeometry(220, 48), new THREE.MeshStandardMaterial({ color: C.water, roughness: 0.35, metalness: 0.1 }));
+  water.rotation.x = -Math.PI / 2; water.receiveShadow = true; scene.add(water);
+  const fn = { organic: i => organic(i), grid: i => organic(i, 'grid'), hexplots: i => organic(i, 'hex'), hex: hexIsl, round }[kind];
+  const e = ISLANDS.map(fn);
+  for (let i = 1; i < ISLANDS.length; i++) bridge(ISLANDS[0], ISLANDS[i], e[0], e[i], 0.72);
+  resize();
+}
+
+function resize() {
+  const w = stage.clientWidth, h = stage.clientHeight;
+  renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
+  if (!controls.userMoved) { const wide = w > 900; controls.target.set(wide ? -11 : 0, 0, -1); camera.position.set(wide ? -9 : 0, wide ? 38 : 46, wide ? 54 : 64); }
+}
+
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+if (reduce) controls.autoRotate = false;
+function tick() { controls.update(); renderer.render(scene, camera); requestAnimationFrame(tick); }
+
+const buttons = [...document.querySelectorAll('.styles button')];
+buttons.forEach(b => b.addEventListener('click', () => { buttons.forEach(x => x.setAttribute('aria-pressed', String(x === b))); build(b.dataset.style); }));
+window.addEventListener('resize', resize);
+build('grid'); tick();
+</script>
+
+</html>
