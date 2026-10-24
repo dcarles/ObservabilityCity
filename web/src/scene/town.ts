@@ -7,7 +7,9 @@ import { palette } from '../themes/harbour-town/palette'
 import { blockPad, bench, bridge, crates, fountain, junction, lamp, pier, prop, ring, roadBetween, ROAD_W, street, streetX } from './props'
 import { buildIslandBody, GROUND, makeOutline, scatterNature, type Outline, type Rect } from './island'
 import { hashString } from './random'
+import { speedFactor } from '../visuals'
 import { CarSystem, type Route } from './cars'
+import { BoatSystem, type BoatRoute } from './boats'
 
 const HUB_RX = 22
 const HUB_RZ = 21
@@ -16,7 +18,8 @@ const SLOT = 6.8 // width of the plot of one building along a pad
 const PAD_W = 3 * SLOT + 0.8 // a service pad holds up to three buildings side by side
 const PAD_D = 8.8
 const CURB = 3.0 // road centre line to the edge of the pavement
-const ROW = PAD_D + 2 * CURB + 1.2 // distance between two rows of pads
+const GAP = 9 // lawn between one row of pads and the road of the next, so the front row never hides the one behind
+const ROW = PAD_D + 2 * CURB + GAP // distance between two rows of pads
 const COL_X = CURB + 0.4 + PAD_W / 2 // pad centre from the spine's centre line
 const FRONT = 4.0 // building centre from the front edge of its pad
 
@@ -65,6 +68,7 @@ interface Island {
 export class Town {
   readonly root = new THREE.Group()
   readonly cars = new CarSystem()
+  readonly boats = new BoatSystem()
   readonly buildings = new Map<string, Building>()
   readonly islands: Island[] = []
   hubOutline!: Outline
@@ -73,7 +77,7 @@ export class Town {
   private snapshotId = ''
 
   constructor() {
-    this.root.add(this.cars.object)
+    this.root.add(this.cars.object, this.boats.object)
   }
 
   /** True once the layout matches this snapshot's groups and nodes. */
@@ -86,25 +90,32 @@ export class Town {
     const hub = s.groups.find((g) => g.isHub)
     const pillars = s.groups.filter((g) => !g.isHub)
     const routes: Route[] = []
+    const boatRoutes: BoatRoute[] = []
 
-    // Islands sit on a ring around the hub, clockwise from the north-east so their roads never run into the
-    // hub's own buildings on the four main axes.
-    const angles = pillars.map((_, i) => Math.PI / 4 + (i / pillars.length) * Math.PI * 2)
+    // Islands sit on a ring around the hub, spread evenly but turned so their spokes miss the hub's own
+    // buildings on the four main axes.
+    const { islandAngles: angles, portAngles: ports } = placeAround(pillars.length)
     const dirOf = (a: number) => new THREE.Vector3(Math.sin(a), 0, -Math.cos(a))
 
     // ── Hub ────────────────────────────────────────────────────────────────
     const hubRoot = new THREE.Group()
     this.hubOutline = makeOutline(hashString('hub'), HUB_RX, HUB_RZ, 0.05)
     hubRoot.add(buildIslandBody(this.hubOutline))
-    const hubCoasts = angles.map((a) => coastPoint(this.hubOutline, dirOf(a), 0.9))
-    const hubBuildings = this.buildHub(hubRoot, hub, angles.map((a, i) => ({ angle: a, coast: hubCoasts[i] })))
+    const hubCoasts = ports.map((a) => coastPoint(this.hubOutline, dirOf(a), 0.9))
+    const hubBuildings = this.buildHub(hubRoot, hub, ports.map((a, i) => ({ angle: a, coast: hubCoasts[i] })))
     this.root.add(hubRoot)
     this.expandBounds(this.hubOutline, new THREE.Vector3(), 0)
 
     // ── Islands on the ring ──────────────────────────────────────────────────
     const plans = pillars.map((g) => planIsland(g))
-    const reach = Math.max(0, ...plans.map((p) => p.rz))
-    const ringR = Math.max(HUB_RZ + 14 + reach, plans.reduce((acc, p) => acc + 2 * p.rx + 16, 0) / (2 * Math.PI))
+    // far enough out that the nearest coast clears the sea lane, and neighbours do not touch
+    let ringR = HUB_RZ + 22 + Math.max(0, ...plans.map((p) => p.rz))
+    angles.forEach((a, i) => {
+      const j = (i + 1) % angles.length
+      if (angles.length < 2) return
+      const gap = Math.abs(wrapAngle(angles[j] - a))
+      ringR = Math.max(ringR, (plans[i].rx + plans[j].rx + 12) / (2 * Math.sin(Math.max(0.2, gap) / 2)))
+    })
     pillars.forEach((g, index) => {
       const plan = plans[index]
       const dir = dirOf(angles[index])
@@ -116,11 +127,13 @@ export class Town {
 
       const gate = island.root.localToWorld(new THREE.Vector3(0, GROUND, coastScan(island.outline, 'z') - 0.7))
       this.root.add(bridge({ from: hubCoasts[index].clone().setY(0), to: gate.clone().setY(0) }))
-      routes.push(...this.islandRoutes(island, plan, angles[index], hubCoasts[index], gate))
+      routes.push(...this.islandRoutes(island, plan, ports[index], hubCoasts[index], gate))
+      boatRoutes.push(this.boatRoute(island, plan, angles[index], hubBuildings))
     })
 
-    routes.push(...this.hubRoutes(hubBuildings, angles.map((a, i) => ({ angle: a, coast: hubCoasts[i] }))))
+    routes.push(...this.hubRoutes(hubBuildings, ports.map((a, i) => ({ angle: a, coast: hubCoasts[i] }))))
     this.cars.setRoutes(routes)
+    this.boats.setRoutes(boatRoutes)
   }
 
   /** Feed a snapshot into the existing buildings. */
@@ -131,6 +144,7 @@ export class Town {
   update(dt: number, time: number, camera: THREE.Camera): void {
     for (const b of this.buildings.values()) b.update(dt, time, camera)
     this.cars.update(dt)
+    this.boats.update(dt)
   }
 
   /** Grow the camera framing box by an island's coast, pushed out a little to leave room for piers. */
@@ -247,6 +261,11 @@ export class Town {
       root.add(streetX(z, -edge, -half))
       root.add(streetX(z, half, r === harbourRow ? harbourCoast - 8.3 : edge))
       avoid.push({ x: 0, z, w: 2 * edge + 2, d: 2 * CURB + 1 })
+      // keep the lawn between rows clear of trees, so the front of every building stays in view
+      if (r < rows - 1) {
+        const back = z - CURB - PAD_D, next = rowRoadZ[r + 1] + CURB
+        avoid.push({ x: 0, z: (back + next) / 2, w: 2 * edge + 2, d: back - next })
+      }
     }
     avoid.push({ x: 0, z: (gateZ + rowRoadZ[rows - 1]) / 2, w: 7, d: gateZ - rowRoadZ[rows - 1] + 4 })
 
@@ -361,6 +380,42 @@ export class Town {
 
   // ── routes ──────────────────────────────────────────────────────────────
 
+  /** The sea lane from the hub's port round the hub to an island's harbour. */
+  private boatRoute(island: Island, plan: Plan, angle: number, hubBuildings: Building[]): BoatRoute {
+    const broker = hubBuildings.find((b) => b.kind === 'Broker')
+    const lane = HUB_RZ + 14
+    const at = (a: number, r: number) => new THREE.Vector3(Math.sin(a) * r, 0, -Math.cos(a) * r)
+    const dock = at(Math.PI / 2, 30).setZ(2)
+    const pts: THREE.Vector3[] = [dock, at(Math.PI / 2, lane).setZ(2)]
+    // round the hub the short way to the island's direction
+    const from = Math.PI / 2
+    let to = angle
+    while (to - from > Math.PI) to -= 2 * Math.PI
+    while (to - from < -Math.PI) to += 2 * Math.PI
+    const steps = Math.max(1, Math.ceil(Math.abs(to - from) / 0.35))
+    for (let i = 1; i <= steps; i++) pts.push(at(from + ((to - from) * i) / steps, lane))
+    // then out along the island's near side to its harbour
+    const rows = plan.rows
+    const harbourZ = plan.rowRoadZ[Math.floor((rows - 1) / 2)]
+    const coast = coastScan(island.outline, 'x', harbourZ)
+    const xs = Math.max(plan.rx * 1.08, coast) + 7
+    for (const [x, z] of [[xs, plan.rz + 9], [xs, harbourZ + 3.4], [coast + 6.5, harbourZ + 3.4]] as const) {
+      pts.push(island.root.localToWorld(new THREE.Vector3(x, 0, z)).setY(0))
+    }
+    const path = new THREE.CatmullRomCurve3(pts, false, 'centripetal').getPoints(pts.length * 8)
+    const workers = [...island.buildings.values()].filter((b) => b.kind === 'Worker')
+    return {
+      path,
+      rate: () => {
+        const bn = broker?.node
+        if (!bn || (bn.state !== 'Healthy' && bn.state !== 'Degraded')) return 0
+        const rps = workers.reduce((a, w) => a + (w.node && w.node.state !== 'Stale' && w.node.state !== 'Down' ? w.node.requestsPerSecond : 0), 0)
+        return rps <= 0 ? 0 : 0.016 * Math.sqrt(rps)
+      },
+      speed: () => (broker?.node ? speedFactor(broker.node.p99Ms, broker.node.slaP99Ms) : 1),
+    }
+  }
+
   private islandRoutes(island: Island, plan: Plan, angle: number, hubCoast: THREE.Vector3, gate: THREE.Vector3): Route[] {
     const routes: Route[] = []
     const w = (x: number, z: number) => island.root.localToWorld(new THREE.Vector3(x, GROUND, z))
@@ -399,6 +454,38 @@ export class Town {
   node(id: string): NodeSnapshot | null {
     return this.buildings.get(id)?.node ?? null
   }
+}
+
+const HUB_AXES = [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2]
+const KEEP_CLEAR = 0.46 // radians either side of a hub building's axis that a spoke must stay out of
+
+const wrapAngle = (a: number) => Math.atan2(Math.sin(a), Math.cos(a))
+
+function nudgeFromAxes(a: number): number {
+  let out = a
+  for (const axis of HUB_AXES) {
+    const d = wrapAngle(out - axis)
+    if (Math.abs(d) < KEEP_CLEAR) out = axis + (d < 0 ? -KEEP_CLEAR : KEEP_CLEAR)
+  }
+  return ((out % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)
+}
+
+/**
+ * Islands are spread evenly round the hub. The hub's spokes start at the same angles, except where one would run
+ * into a hub building, so the ring is turned to the offset that moves the fewest spokes. A bridge then runs from
+ * the spoke's end to the island, a little slanted where the spoke had to move.
+ */
+function placeAround(n: number): { islandAngles: number[]; portAngles: number[] } {
+  if (n === 0) return { islandAngles: [], portAngles: [] }
+  let best = { islandAngles: [] as number[], portAngles: [] as number[] }
+  let bestCost = Infinity
+  for (let off = 0; off < 360 / n; off += 1) {
+    const raw = Array.from({ length: n }, (_, i) => (off * Math.PI) / 180 + (i / n) * Math.PI * 2)
+    const nudged = raw.map(nudgeFromAxes)
+    const cost = nudged.reduce((acc, a, i) => acc + Math.abs(wrapAngle(a - raw[i])), 0)
+    if (cost < bestCost - 1e-9) { bestCost = cost; best = { islandAngles: raw, portAngles: nudged } }
+  }
+  return best
 }
 
 /** Services become pads (an API, its worker and its database side by side), lone buildings share pads, and pads fill a two-column grid. */

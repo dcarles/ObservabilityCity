@@ -23,7 +23,7 @@ async function start(): Promise<void> {
 
   function onSnapshot(s: Snapshot): void {
     if (!town.matches(s)) {
-      town.root.remove(...town.root.children.filter((c) => c !== town.cars.object))
+      town.root.remove(...town.root.children.filter((c) => c !== town.cars.object && c !== town.boats.object))
       town.buildings.clear()
       town.islands.length = 0
       town.build(s)

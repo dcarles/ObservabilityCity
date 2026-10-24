@@ -62,7 +62,18 @@ export class Stage {
   setHome(target: THREE.Vector3, distance: number): void {
     this.homeTarget.copy(target)
     this.homeDistance = distance
+    if (this.scene.fog instanceof THREE.Fog) {
+      // the haze starts beyond the town however big it is
+      this.scene.fog.near = Math.max(160, distance * 1.15)
+      this.scene.fog.far = Math.max(520, distance * 3.4)
+    }
     this.sun.target.position.copy(target)
+    this.sun.position.copy(target).add(new THREE.Vector3(-70, 110, 60))
+    // shadows cover the whole town, however big it is
+    const ext = Math.max(110, distance * 0.62)
+    const sc = this.sun.shadow.camera
+    sc.left = -ext; sc.right = ext; sc.top = ext; sc.bottom = -ext
+    sc.updateProjectionMatrix()
   }
 
   home(instant = false): void {
@@ -85,6 +96,12 @@ export class Stage {
 
   tick(dt: number, time: number): void {
     this.seaUniforms.uTime.value = time
+    // keep depth precision good when far out, or the sea-foam layers fight the grass
+    const near = THREE.MathUtils.clamp(this.camera.position.distanceTo(this.controls.target) * 0.04, 0.5, 12)
+    if (Math.abs(near - this.camera.near) > 0.1) {
+      this.camera.near = near
+      this.camera.updateProjectionMatrix()
+    }
     if (this.glide) {
       const g = this.glide
       g.t = Math.min(1, g.t + dt / 1.2)

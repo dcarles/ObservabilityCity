@@ -53,7 +53,7 @@ The browser app proxies `/api` and `/hubs` to the backend, so there is nothing t
 
 Hover a building for its numbers. Drag to orbit, scroll to zoom, right-drag to pan, **Home** frames the town.
 
-The **Try it** panel (temporary in this slice) pokes the fake data source: pick a target (the whole town, an island or one building), then press Traffic spike, Slow, Errors, Sick instances or Down. Effects stack, and each shows as a chip you can click to clear. **Calm** freezes the noise and the daily cycle.
+The **Try it** panel (temporary in this slice) pokes the fake data source: pick a target (the whole town, an island or one building), then press Traffic spike, Slow, Errors, Sick instances, High CPU, High memory, DB saturated or Down. Effects stack, and each shows as a chip you can click to clear. **Calm** freezes the noise and the daily cycle.
 
 How to read the town, as built so far:
 
@@ -62,12 +62,16 @@ How to read the town, as built so far:
 | Number of floors | Instance count on a doubling scale (1, 2, 3-4, 5-8 ... 65+ gives 1 to 8 floors) |
 | Lit windows | Load: how much of its capacity the building is using |
 | Dark, cracked floors and an amber plaque | Unhealthy instances ("5/10 healthy") |
-| Rooftop beacon: green, amber, red (red pulses) | Error rate against the system's own thresholds. Red only ever means errors |
+| Rooftop beacon: green, amber, red (red pulses) | Errors, throttling or resource pressure against the system's own thresholds. Amber is a warning (including high CPU, memory or database utilisation), red means errors or throttled requests |
+| Factory (workers) and storage units (databases) | Workers are factories and databases are storage buildings, next to the API office. Factory chimneys smoke harder as CPU climbs. Storage doors light up with database utilisation |
+| Meter bars on the name board | Apps and workers show CPU and memory. Databases show utilisation (for example Cosmos RU %) and the share of throttled requests. Each bar turns amber then red against its thresholds |
+| Lowered barrier gate at a database | Requests are being throttled |
 | Cars on the streets | Requests. More cars means more requests, slower cars means higher latency against the SLA. Blue sedans are internal calls, yellow taxis external ones, red hatchbacks failed calls |
 | API, worker and database side by side | One service. Systems that share a `service` in the registry stand next to each other on one pad, with their fronts toward the road. Pads sit on a grid, so every building's front is visible from the road side |
 | Name board above a building | System name and "N/M healthy". Fades out when the camera is far away, except for troubled buildings |
 | Bridges | One road bridge from the hub's plaza to each island's gate. All sync traffic between islands goes through the hub |
-| Harbour with crates and a crane | The island's port, where messaging boats will dock (boats come in a later slice) |
+| Harbour with crates and a crane | The island's port, where messaging boats dock |
+| Boats between ports and the hub | Asynchronous messaging. Busier queues send more boats. Bridges are synchronous calls, boats are asynchronous ones |
 | "Closed for repairs" sign and a blackout | The system is down |
 | Grey building | No fresh data. Never shown as healthy |
 

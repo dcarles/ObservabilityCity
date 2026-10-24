@@ -30,6 +30,10 @@ export interface BuildingModel {
   plaque: { position: THREE.Vector3; width: number; rotY?: number }
   /** Rough footprint radius, used for hit testing and labels. */
   radius: number
+  /** Floors are fixed instead of following the instance count (a data store is not measured in instances). */
+  fixedFloors?: number
+  /** How busy the building is (0 to 1, from CPU), for things like chimney smoke. */
+  setActivity?(level: number): void
   /** Per-frame animation (clock hands, cranes, smoke). */
   animate?(time: number, dt: number): void
   /** Optional hook when the building is closed for repairs or running. */

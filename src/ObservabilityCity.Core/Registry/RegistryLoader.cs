@@ -23,6 +23,8 @@ public static class RegistryLoader
     {
         SlaP99Ms = 1000,
         Errors = new ErrorThresholdsFile { Amber = 0.01, Red = 0.05 },
+        Resources = new ErrorThresholdsFile { Amber = 0.80, Red = 0.95 },
+        Throttle = new ErrorThresholdsFile { Amber = 0.001, Red = 0.02 },
     };
 
     public static Registry Load(string folder)
@@ -93,7 +95,11 @@ public static class RegistryLoader
             s.External ?? pillarExternal,
             Resolve(d => d?.SlaP99Ms, s.SlaP99Ms),
             Resolve(d => d?.Errors?.Amber, s.Errors?.Amber),
-            Resolve(d => d?.Errors?.Red, s.Errors?.Red));
+            Resolve(d => d?.Errors?.Red, s.Errors?.Red),
+            Resolve(d => d?.Resources?.Amber, s.Resources?.Amber),
+            Resolve(d => d?.Resources?.Red, s.Resources?.Red),
+            Resolve(d => d?.Throttle?.Amber, s.Throttle?.Amber),
+            Resolve(d => d?.Throttle?.Red, s.Throttle?.Red));
     }
 
     private static NodeKind ParseKind(string? role, string id, string fileName)

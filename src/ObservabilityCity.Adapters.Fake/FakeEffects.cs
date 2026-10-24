@@ -12,6 +12,12 @@ public enum FakeEffectKind
     UnhealthyInstances,
     /// <summary>Every instance down. Intensity is ignored.</summary>
     Down,
+    /// <summary>CPU raised by up to 55 points.</summary>
+    HighCpu,
+    /// <summary>Memory raised by up to 50 points, like a leak.</summary>
+    HighMemory,
+    /// <summary>A data store's utilisation pushed up by up to 60 points, so it starts throttling.</summary>
+    Saturate,
 }
 
 /// <summary>A scenario effect layered on the baseline. Target is a node id, a group id (a whole island) or "*".</summary>

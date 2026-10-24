@@ -34,6 +34,9 @@ public enum HealthState
 /// Service names the group of buildings that belong together (for example an API, its worker and its database), so they are drawn side by side.
 /// External marks systems that outside callers reach, which the renderer draws as a different kind of traffic.
 /// Load is the share of capacity in use (0 idle, 1 full, above 1 saturated); each source works it out its own way.
+/// Cpu and Memory are the share in use across a service's instances (0 to 1). Utilisation is the share of provisioned capacity a data store
+/// uses (for example request units consumed against the maximum set), and Throttled is the share of requests it turned away. A source leaves out
+/// what it cannot measure (null), and the renderer shows only what is there.
 /// </summary>
 public sealed record NodeSnapshot(
     string Id,
@@ -45,12 +48,20 @@ public sealed record NodeSnapshot(
     int InstancesTotal,
     int InstancesHealthy,
     double Load,
+    double? Cpu,
+    double? Memory,
+    double? Utilisation,
+    double? Throttled,
     double RequestsPerSecond,
     double ErrorRate,
     double P99Ms,
     double SlaP99Ms,
     double ErrorAmber,
     double ErrorRed,
+    double ResourceAmber,
+    double ResourceRed,
+    double ThrottleAmber,
+    double ThrottleRed,
     DateTimeOffset? LastUpdated);
 
 /// <summary>An island (a pillar, a team, ...) or the hub island.</summary>

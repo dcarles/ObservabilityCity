@@ -50,7 +50,7 @@ function flatLayer(points: THREE.Vector2[], color: string, opacity: number, y: n
   const g = new THREE.ShapeGeometry(shapeOf(points))
   g.rotateX(-Math.PI / 2)
   const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({
-    color, transparent: true, opacity, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -order, polygonOffsetUnits: -order,
+    color, transparent: true, opacity, depthWrite: false,
   }))
   m.position.y = y
   m.renderOrder = order
@@ -79,9 +79,9 @@ export function buildIslandBody(outline: Outline): THREE.Group {
   const c = palette.island
   const g = new THREE.Group()
   g.add(
-    flatLayer(offsetPolygon(outline.points, 6.5), palette.sea.shallow, 0.22, 0.01, 1),
-    flatLayer(offsetPolygon(outline.points, 3.6), '#8fe3ea', 0.34, 0.02, 2),
-    flatLayer(offsetPolygon(outline.points, 1.7), palette.sea.foam, 0.8, 0.03, 3),
+    flatLayer(offsetPolygon(outline.points, 6.5), palette.sea.shallow, 0.22, 0.05, 1),
+    flatLayer(offsetPolygon(outline.points, 3.6), '#8fe3ea', 0.34, 0.1, 2),
+    flatLayer(offsetPolygon(outline.points, 1.7), palette.sea.foam, 0.8, 0.15, 3),
     slab(offsetPolygon(outline.points, 1.15), 0.34, -1.2, c.sand, c.sand),
     slab(outline.points, GROUND, -1.6, c.grass, c.cliff),
   )

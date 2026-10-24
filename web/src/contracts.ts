@@ -49,6 +49,14 @@ export interface components {
             /** Format: double */
             load: number;
             /** Format: double */
+            cpu?: number | null;
+            /** Format: double */
+            memory?: number | null;
+            /** Format: double */
+            utilisation?: number | null;
+            /** Format: double */
+            throttled?: number | null;
+            /** Format: double */
             requestsPerSecond: number;
             /** Format: double */
             errorRate: number;
@@ -60,6 +68,14 @@ export interface components {
             errorAmber: number;
             /** Format: double */
             errorRed: number;
+            /** Format: double */
+            resourceAmber: number;
+            /** Format: double */
+            resourceRed: number;
+            /** Format: double */
+            throttleAmber: number;
+            /** Format: double */
+            throttleRed: number;
             /** Format: date-time */
             lastUpdated?: string | null;
         };

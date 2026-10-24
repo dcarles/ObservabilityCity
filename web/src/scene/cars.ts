@@ -45,6 +45,7 @@ export class CarSystem {
   private readonly cars: Car[] = []
   private readonly routes: Route[] = []
   private readonly acc = new Map<Route, number>()
+  private readonly lastOn = new Map<Route, Car>()
   private readonly m = new THREE.Matrix4()
   private readonly q = new THREE.Quaternion()
   private readonly up = new THREE.Vector3(0, 1, 0)
@@ -52,7 +53,7 @@ export class CarSystem {
   private readonly dir = new THREE.Vector3()
   private readonly scaleV = new THREE.Vector3()
 
-  constructor(private readonly max = 260) {
+  constructor(private readonly max = 420) {
     for (const name of MODELS) {
       const { geometry, material } = kitParts(name)
       const im = new THREE.InstancedMesh(geometry, material, max)
@@ -72,6 +73,7 @@ export class CarSystem {
       this.routes.push({ ...r, path: driveOnRight(path, LANE) })
     }
     this.acc.clear()
+    this.lastOn.clear()
   }
 
   update(dt: number): void {
@@ -81,7 +83,12 @@ export class CarSystem {
       const a = (this.acc.get(r) ?? Math.random()) + spawnRate(n.requestsPerSecond) * r.share * dt
       let whole = Math.floor(a)
       this.acc.set(r, a - whole)
-      while (whole-- > 0 && this.cars.length < this.max) this.spawn(r)
+      while (whole-- > 0 && this.cars.length < this.max) {
+        // keep a gap behind the car that just left on this route, so the road never turns into one long queue
+        const last = this.lastOn.get(r)
+        if (last && last.dist < 4.5 && this.cars.includes(last)) continue
+        this.spawn(r)
+      }
     }
 
     for (let i = this.cars.length - 1; i >= 0; i--) {
@@ -127,11 +134,13 @@ export class CarSystem {
     }
     const failed = Math.random() < (r.dest.node?.errorRate ?? 0)
     const first = points[1].clone().sub(points[0])
-    this.cars.push({
+    const car: Car = {
       points, lengths, total, dist: 0, dest: r.dest,
       model: failed ? 2 : r.origin === 'external' ? 1 : 0,
       yaw: Math.atan2(first.x, first.z),
-    })
+    }
+    this.cars.push(car)
+    this.lastOn.set(r, car)
   }
 
   private sample(c: Car, d: number): void {

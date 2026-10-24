@@ -47,16 +47,19 @@ public sealed class SnapshotBuilder(Registry.Registry registry, LatestState stat
         if (r is null || now - r.At > StaleAfter)
         {
             // No fresh data: keep the last numbers out of it. Grey, never green.
-            return new NodeSnapshot(n.Id, n.Name, n.Kind, n.Service, n.External, HealthState.Stale, 0, 0, 0, 0, 0, 0,
-                n.SlaP99Ms, n.ErrorAmber, n.ErrorRed, r?.At);
+            return new NodeSnapshot(n.Id, n.Name, n.Kind, n.Service, n.External, HealthState.Stale, 0, 0, 0, null, null, null, null, 0, 0, 0,
+                n.SlaP99Ms, n.ErrorAmber, n.ErrorRed, n.ResourceAmber, n.ResourceRed, n.ThrottleAmber, n.ThrottleRed, r?.At);
         }
 
+        // Degraded: errors, slow, unhealthy instances, a resource running hot, or a data store turning requests away.
+        var hot = Math.Max(Math.Max(r.Cpu ?? 0, r.Memory ?? 0), r.Utilisation ?? 0) >= n.ResourceAmber;
         var health = !r.Up ? HealthState.Down
-            : r.ErrorRate >= n.ErrorAmber || r.P99Ms > n.SlaP99Ms || r.InstancesHealthy < r.InstancesTotal
+            : r.ErrorRate >= n.ErrorAmber || r.P99Ms > n.SlaP99Ms || r.InstancesHealthy < r.InstancesTotal || hot || (r.Throttled ?? 0) >= n.ThrottleAmber
                 ? HealthState.Degraded
                 : HealthState.Healthy;
 
         return new NodeSnapshot(n.Id, n.Name, n.Kind, n.Service, n.External, health, r.InstancesTotal, r.InstancesHealthy,
-            r.Load, r.RequestsPerSecond, r.ErrorRate, r.P99Ms, n.SlaP99Ms, n.ErrorAmber, n.ErrorRed, r.At);
+            r.Load, r.Cpu, r.Memory, r.Utilisation, r.Throttled, r.RequestsPerSecond, r.ErrorRate, r.P99Ms, n.SlaP99Ms, n.ErrorAmber, n.ErrorRed,
+            n.ResourceAmber, n.ResourceRed, n.ThrottleAmber, n.ThrottleRed, r.At);
     }
 }

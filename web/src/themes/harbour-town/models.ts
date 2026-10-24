@@ -16,8 +16,8 @@ const CELL = 1.2
 export function buildModel(kind: NodeKind, accent: string): BuildingModel {
   switch (kind) {
     case 'Api': return townhouse(accent)
-    case 'Worker': return workshop(accent)
-    case 'Database': return archive()
+    case 'Worker': return factory(accent)
+    case 'Database': return storage(accent)
     case 'Cache': return waterTower()
     case 'Cron': return clockTower()
     case 'Gateway': return gateway(accent)
@@ -132,100 +132,125 @@ function townhouse(accent: string): BuildingModel {
   }
 }
 
-// ── Worker: a brick workshop with a hip roof and a smoking chimney ─────────
+// ── Worker: a factory with a sawtooth roof and smoking chimneys ─────────────
 
-function workshop(accent: string): BuildingModel {
-  const W = 5 * CELL, D = 4 * CELL, FH = 1.5
+function factory(accent: string): BuildingModel {
+  const W = 5 * CELL, D = 4 * CELL, FH = 1.6
+  const steel = flat('#7d8895'), band = flat('#eef1f4')
+  let activity = 0.4
   const smoke: THREE.Mesh[] = []
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < 8; i++) {
     smoke.push(new THREE.Mesh(new THREE.IcosahedronGeometry(0.3, 0), new THREE.MeshStandardMaterial({ color: '#f4f4f4', transparent: true, opacity: 0.8, roughness: 1, flatShading: true })))
   }
-  const chimney = group(
-    box(0.7, 3.4, 0.7, flat('#9a4a36'), { x: 1.9, z: -1.4 }),
-    box(0.85, 0.2, 0.85, flat('#d8d0c0'), { x: 1.9, y: 3.4, z: -1.4 }),
-    ...smoke,
+  const brick = flat('#a2503b')
+  const stack = (x: number, h: number) => group(
+    cyl(0.34, 0.46, h, brick, { x, z: -1.5 }, 10),
+    cyl(0.4, 0.4, 0.14, flat('#e8e0d0'), { x, y: h - 0.4, z: -1.5 }, 10),
+    cyl(0.44, 0.44, 0.14, flat('#e8e0d0'), { x, y: h, z: -1.5 }, 10),
+  )
+  const chimneys = group(stack(2.1, 4.0), stack(1.2, 3.2), ...smoke)
+  const hazard = canvasTexture(256, 16, (ctx) => {
+    for (let i = 0; i < 16; i++) { ctx.fillStyle = i % 2 ? '#1f2328' : '#f2c230'; ctx.beginPath(); ctx.moveTo(i * 16, 16); ctx.lineTo(i * 16 + 8, 0); ctx.lineTo(i * 16 + 24, 0); ctx.lineTo(i * 16 + 16, 16); ctx.fill() }
+  })
+  const roller = (x: number) => group(
+    box(1.5, 1.4, 0.14, flat('#c7ced6', { roughness: 0.5 }), { x, z: D / 2 + 0.1 }),
+    ...[0.25, 0.5, 0.75, 1.0, 1.25].map((y) => box(1.4, 0.03, 0.04, flat('#8f99a5'), { x, y, z: D / 2 + 0.2 })),
+    box(1.7, 0.12, 0.2, band, { x, y: 1.4, z: D / 2 + 0.1 }),
   )
   const base = group(
-    box(W + 0.2, 1.6, D + 0.2, flat('#9a4a36')),
-    box(W + 0.34, 0.14, D + 0.34, flat('#e8e0d0'), { y: 1.6 }),
-    // roller door and loading bay
-    box(2.2, 1.35, 0.14, flat('#6b7280', { roughness: 0.6 }), { x: -0.8, z: D / 2 + 0.1 }),
-    box(2.4, 0.12, 0.2, flat('#e8e0d0'), { x: -0.8, y: 1.35, z: D / 2 + 0.1 }),
-    ...[0.3, 0.6, 0.9, 1.2].map((y) => box(2.1, 0.03, 0.04, flat('#4b525c'), { x: -0.8, y, z: D / 2 + 0.2 })),
-    doorway(0.9, 1.25, D / 2 + 0.1),
-    awning(1.3, 1.3, D / 2 + 0.55, accent),
-    box(W + 1.6, 0.08, 1.6, flat('#cfc8b8'), { z: D / 2 + 0.9 }),
-    chimney,
+    box(W + 0.2, 1.7, D + 0.2, steel),
+    box(W + 0.34, 0.14, D + 0.34, band, { y: 1.7 }),
+    box(W + 0.22, 0.2, 0.02, new THREE.MeshStandardMaterial({ map: hazard, roughness: 0.9 }), { y: 0.05, z: D / 2 + 0.11 }),
+    roller(-1.7), roller(-0.1),
+    doorway(0.8, 1.25, D / 2 + 0.1, '#2f3a46'),
+    awning(1.1, 1.3, D / 2 + 0.55, accent),
+    box(W + 1.6, 0.08, 1.8, flat('#cfc8b8'), { z: D / 2 + 1.0 }),
+    chimneys,
   )
-  const roof = group(hipRoof(W, D, 1.9, '#8a3d2f'), at(mast(1.2), -1.3, 1.1, 0.4))
+  // sawtooth roof: three teeth, each a vertical glazed face and a sloped steel face
+  const prof = new THREE.Shape()
+  const tooth = D / 3, th = 1.1
+  prof.moveTo(-D / 2, 0)
+  for (let i = 0; i < 3; i++) { prof.lineTo(-D / 2 + i * tooth, th); prof.lineTo(-D / 2 + (i + 1) * tooth, 0) }
+  prof.closePath()
+  const sawGeo = new THREE.ExtrudeGeometry(prof, { depth: W - 0.2, bevelEnabled: false })
+  sawGeo.rotateY(Math.PI / 2)
+  sawGeo.translate(-(W - 0.2) / 2, 0.14, 0)
+  const saw = new THREE.Mesh(sawGeo, flat('#59656f', { roughness: 0.6, metalness: 0.2 }))
+  saw.castShadow = true
+  saw.receiveShadow = true
+  const roof = group(parapet(W, D), saw, at(mast(1.5), -2.3, 0.14, 1.3))
   return {
     base,
-    baseHeight: 1.74,
+    baseHeight: 1.84,
     floorHeight: FH,
     makeFloor: () => {
-      const { material, uniforms } = makeWindowMaterial({ color: '#b5533d', trim: '#f4eee0', floorHeight: FH, width: W, depth: D, brick: true, cell: CELL })
+      const { material, uniforms } = makeWindowMaterial({ color: '#8e9aa8', trim: '#e9edf1', floorHeight: FH, width: W, depth: D, cell: CELL, win: [0.9, 0.6] })
       return { object: box(W, FH, D, material), uniforms }
     },
     roof,
-    beaconAt: v(-1.3, 2.3, 0.4),
-    door: v(0, 0, D / 2 + 1.6),
+    beaconAt: v(-2.3, 1.7, 1.3),
+    door: v(0, 0, D / 2 + 1.7),
     doorDir: v(0, 0, 1),
     plaque: { position: v(W / 2 - 0.7, 0.55, D / 2 + 0.25), width: 1.5 },
     radius: 3.6,
+    // chimney smoke thickens with CPU
+    setActivity: (level) => { activity = level },
     animate: (time) => {
+      const rate = 0.25 + 0.5 * activity
       smoke.forEach((p, i) => {
-        const life = (time * 0.35 + i / smoke.length) % 1
-        p.position.set(1.9 + Math.sin(i * 2.1 + time * 0.4) * 0.15 * life, 3.7 + life * 3.0, -1.4)
-        p.scale.setScalar(0.5 + life * 1.4)
-        ;(p.material as THREE.MeshStandardMaterial).opacity = 0.85 * (1 - life)
+        const life = (time * rate + i / smoke.length) % 1
+        const x = i % 2 ? 2.1 : 1.2
+        p.position.set(x + Math.sin(i * 2.1 + time * 0.4) * 0.15 * life, (i % 2 ? 4.3 : 3.5) + life * 3.0, -1.5)
+        p.scale.setScalar((0.4 + life * 1.3) * (0.6 + 0.8 * activity))
+        ;(p.material as THREE.MeshStandardMaterial).opacity = (0.35 + 0.55 * activity) * (1 - life)
       })
     },
   }
 }
 
-// ── Database: a stone archive hall with columns and a copper dome ──────────
+// ── Database: storage units, each door a unit; lit doors are the share of capacity in use ─────
 
-function archive(): BuildingModel {
-  const W = 5 * CELL, D = 4 * CELL, FH = 1.5
-  const stone = flat('#e2d8c0')
-  const columns = [-2.3, -0.8, 0.8, 2.3].map((x) => cyl(0.2, 0.22, 1.7, stone, { x, y: 0.2, z: D / 2 + 0.7 }, 10))
+function storage(accent: string): BuildingModel {
+  const W = 5 * CELL, D = 4 * CELL, FH = 1.95
+  const trim = flat('#eef2f5')
+  const sign = canvasTexture(512, 128, (ctx) => {
+    ctx.fillStyle = accent; ctx.fillRect(0, 0, 512, 128)
+    ctx.fillStyle = '#ffffff'; ctx.font = '800 76px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+    ctx.fillText('STORAGE', 256, 68)
+  })
   const base = group(
-    box(W + 0.2, 1.8, D + 0.2, flat('#cdbf9f')),
-    box(W + 0.4, 0.14, D + 0.4, stone, { y: 1.8 }),
-    // portico: steps, columns and a pediment
-    box(W - 0.4, 0.2, 1.7, flat('#cfc8b8'), { y: 0, z: D / 2 + 0.7 }),
-    ...columns,
-    box(W - 0.2, 0.25, 1.6, stone, { y: 1.9, z: D / 2 + 0.7 }),
-    box(1.0, 1.3, 0.14, flat('#2f3a46', { roughness: 0.4 }), { y: 0.2, z: D / 2 + 0.1 }),
-    box(W + 1.6, 0.08, 1.8, flat('#cfc8b8'), { z: D / 2 + 1.9 }),
+    box(W + 0.2, 0.5, D + 0.2, flat('#7d8a97')),
+    box(W + 1.6, 0.08, 1.8, flat('#cfc8b8'), { z: D / 2 + 1.0 }),
+    // office door and canopy at the right end
+    box(0.9, 1.3, 0.14, flat('#2f3a46', { roughness: 0.4 }), { x: W / 2 - 1.0, y: 0.5, z: D / 2 + 0.1 }),
+    box(1.5, 0.12, 0.8, flat(accent), { x: W / 2 - 1.0, y: 1.9, z: D / 2 + 0.4 }),
+    box(0.1, 1.4, 0.1, trim, { x: W / 2 - 1.7, y: 0.5, z: D / 2 + 0.75 }),
+    box(0.1, 1.4, 0.1, trim, { x: W / 2 - 0.3, y: 0.5, z: D / 2 + 0.75 }),
   )
-  const pediment = new THREE.Shape()
-  pediment.moveTo(-(W - 0.2) / 2, 0); pediment.lineTo((W - 0.2) / 2, 0); pediment.lineTo(0, 0.9); pediment.closePath()
-  const pedGeo = new THREE.ExtrudeGeometry(pediment, { depth: 0.2, bevelEnabled: false })
-  const ped = new THREE.Mesh(pedGeo, stone)
-  ped.position.set(0, 2.15, D / 2 + 1.4)
-  ped.castShadow = true
-  base.add(ped)
-  const copper = flat('#5fae98', { roughness: 0.5 })
+  const board = new THREE.Mesh(new THREE.PlaneGeometry(3.6, 0.9), new THREE.MeshBasicMaterial({ map: sign, toneMapped: false }))
+  board.position.set(0, 0.95, D / 2 - 0.05)
   const roof = group(
-    parapet(W, D, '#d8cdb4'),
-    dome(1.7, copper, { y: 0.14 }),
-    cyl(0.35, 0.45, 0.5, flat('#e2d8c0'), { y: 1.7 }, 8),
-    at(mast(1.1), 0, 2.15, 0),
+    parapet(W, D, '#cfd6dd'),
+    box(3.8, 1.3, 0.16, flat(accent), { y: 0.14, z: D / 2 - 0.5 }),
+    board,
+    at(mast(1.2), 2.2, 0.14, -0.8),
   )
+  board.position.set(0, 0.8, D / 2 - 0.41)
   return {
     base,
-    baseHeight: 2.05,
+    baseHeight: 0.58,
     floorHeight: FH,
+    fixedFloors: 2,
     makeFloor: () => {
-      const { material, uniforms } = makeWindowMaterial({ color: '#e0d5b8', trim: '#f7f2e4', floorHeight: FH, width: W, depth: D, cell: CELL, win: [0.6, 0.85] })
+      const { material, uniforms } = makeWindowMaterial({ color: '#b3bfca', trim: '#f3f6f8', floorHeight: FH, width: W, depth: D, cell: CELL, win: [0.95, 1.6] })
       return { object: box(W, FH, D, material), uniforms }
     },
     roof,
-    beaconAt: v(0, 3.4, 0),
-    door: v(0, 0, D / 2 + 2.3),
+    beaconAt: v(2.2, 1.34, -0.8),
+    door: v(0, 0, D / 2 + 1.9),
     doorDir: v(0, 0, 1),
-    plaque: { position: v(W / 2 - 0.5, 0.55, D / 2 + 1.3), width: 1.5 },
+    plaque: { position: v(-W / 2 + 0.9, 0.5, D / 2 + 0.25), width: 1.5 },
     radius: 3.6,
   }
 }

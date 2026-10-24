@@ -27,12 +27,27 @@ export function litFraction(load: number): number {
 
 export type BeaconLevel = 'green' | 'amber' | 'red' | 'grey' | 'off'
 
-/** Rooftop beacon colour from the error rate and the system's own thresholds. Red only ever means errors. */
-export function beaconLevel(n: Pick<NodeSnapshot, 'state' | 'errorRate' | 'errorAmber' | 'errorRed'>): BeaconLevel {
+/** Share of capacity in use across CPU, memory and a data store's utilisation: the busiest one counts. */
+export function resourceUse(n: Pick<NodeSnapshot, 'cpu' | 'memory' | 'utilisation'>): number {
+  return Math.max(n.cpu ?? 0, n.memory ?? 0, n.utilisation ?? 0)
+}
+
+type BeaconInput = Pick<NodeSnapshot, 'state' | 'errorRate' | 'errorAmber' | 'errorRed'> &
+  Partial<Pick<NodeSnapshot, 'cpu' | 'memory' | 'utilisation' | 'throttled' | 'resourceAmber' | 'throttleAmber' | 'throttleRed'>>
+
+/**
+ * Rooftop beacon colour. Red means requests are failing: errors past the red threshold, or a data store
+ * turning requests away past its throttle threshold. Amber is the warning: errors, throttling or CPU,
+ * memory or utilisation past their amber thresholds.
+ */
+export function beaconLevel(n: BeaconInput): BeaconLevel {
   if (n.state === 'Stale') return 'grey'
   if (n.state === 'Down') return 'off'
-  if (n.errorRate >= n.errorRed) return 'red'
+  const throttled = n.throttled ?? 0
+  if (n.errorRate >= n.errorRed || (n.throttleRed !== undefined && throttled >= n.throttleRed)) return 'red'
   if (n.errorRate >= n.errorAmber) return 'amber'
+  if (n.throttleAmber !== undefined && throttled >= n.throttleAmber) return 'amber'
+  if (n.resourceAmber !== undefined && resourceUse(n) >= n.resourceAmber) return 'amber'
   return 'green'
 }
 
@@ -44,7 +59,7 @@ export function speedFactor(p99Ms: number, slaP99Ms: number): number {
 
 /** Walkers arriving per second at a building: grows with request rate, but gently so busy services stay readable. */
 export function spawnRate(rps: number): number {
-  return rps <= 0 ? 0 : 0.07 * Math.pow(rps, 0.6)
+  return rps <= 0 ? 0 : 0.1 * Math.pow(rps, 0.6)
 }
 
 export function plaqueText(n: Pick<NodeSnapshot, 'state' | 'instancesTotal' | 'instancesHealthy'>): string {

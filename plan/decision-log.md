@@ -106,3 +106,11 @@ All 10 Phase 1 topics decided 2026-10-24.
 - Distant windows blend to the wall's average colour instead of shimmering.
 - Bridges: stone and concrete road bridge with parapets, lamps and gate posts. Each island has one radial spoke road and bridge to the hub, so bridges never cross. Calls between islands go through the hub (hub and spoke), and the dependency overlay shows team-to-team links as arcs rather than extra bridges. Beyond about 12 islands use a second, staggered ring (already in the plan). Bridges are cheap to render (instanced road tiles); the limit is readability, not performance.
 - Second sample island: Payments (two services).
+
+## Slice 1 look, round 4 (Dan, 2026-10-24)
+- More cars (spawn rate scales with request rate, with a minimum gap so queues do not pile up) and boats for messaging between island ports and the hub.
+- Five sample islands around the hub (Core Ledger, Payments, Fraud, Customer, Collections) to see how several islands connect. Islands are evenly spaced on a ring and each gets one radial bridge. Spokes are nudged off the hub's axes.
+- Wider lawn between building rows so fronts are never hidden by the row in front.
+- Worker is a factory and database is a storage-units building.
+- Health is not only instances. Apps report CPU and memory. Databases report utilisation (like Cosmos RU %) and throttled requests, and show no instance floors. Thresholds (`resources`, `throttle`) cascade from defaults.yaml like the existing ones. Metrics are nullable: null means not reported, never zero. High resource use gives amber, throttling gives a red beacon and a lowered barrier gate.
+- New fake effects: High CPU, High memory, DB saturated.

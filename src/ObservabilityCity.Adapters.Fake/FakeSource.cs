@@ -89,7 +89,8 @@ public sealed class FakeSource(
             var rps = down ? 0 : p.Rps!.Value * cycle * noise * (1 + trafficFx);
 
             // Autoscale one step per poll toward what the load needs.
-            var wanted = (int)Math.Clamp(Math.Ceiling(rps / (p.PerInstanceRps!.Value * TargetUtilisation)), p.MinInstances!.Value, p.MaxInstances!.Value);
+            var isStore = node.Kind == NodeKind.Database;
+            var wanted = isStore ? p.MinInstances!.Value : (int)Math.Clamp(Math.Ceiling(rps / (p.PerInstanceRps!.Value * TargetUtilisation)), p.MinInstances!.Value, p.MaxInstances!.Value);
             var current = _instances.GetOrAdd(node.Id, _ => Math.Max(wanted, p.MinInstances.Value));
             if (!Calm) current += Math.Sign(wanted - current);
             else current = Math.Max(p.MinInstances.Value, (int)Math.Ceiling(p.Rps!.Value * 0.8 / (p.PerInstanceRps!.Value * TargetUtilisation)));
@@ -107,7 +108,28 @@ public sealed class FakeSource(
             var saturation = healthy > 0 ? Math.Min(2.0, rps / (healthy * p.PerInstanceRps.Value)) : 2.0;
             var p99 = p.P99Ms!.Value * (1 + latencyFx) * (0.9 + 0.2 * saturation) * (Calm ? 1 : 1 + 0.05 * Wobble(node.Id, t, 5));
 
-            result[node.Id] = new NodeReading(now, !down, current, healthy, down ? 0 : saturation, rps, errors, p99);
+            double? cpu = null, memory = null, utilisation = null, throttled = null;
+            double load = down ? 0 : saturation;
+            if (!down && isStore)
+            {
+                // A data store is provisioned for a ceiling, so what matters is how much of it is used and what gets turned away.
+                var provisioned = p.Rps!.Value * 1.6;
+                var saturate = fx.Where(e => e.Kind == FakeEffectKind.Saturate).Sum(e => 0.6 * e.Intensity);
+                utilisation = Math.Clamp(rps / provisioned + saturate, 0, 1.2);
+                throttled = utilisation > 0.95 ? Math.Min(0.6, (utilisation.Value - 0.95) * 2.4) : 0;
+                load = utilisation.Value;
+                errors = Math.Clamp(errors + throttled.Value * 0.2, 0, 1);
+            }
+            else if (!down)
+            {
+                var cpuFx = fx.Where(e => e.Kind == FakeEffectKind.HighCpu).Sum(e => 0.55 * e.Intensity);
+                var memFx = fx.Where(e => e.Kind == FakeEffectKind.HighMemory).Sum(e => 0.5 * e.Intensity);
+                var kindMem = node.Kind == NodeKind.Worker ? 0.46 : 0.38;
+                cpu = Math.Clamp(0.1 + 0.5 * saturation + cpuFx + (Calm ? 0 : 0.03 * Wobble(node.Id, t, 4.3)), 0.02, 1.0);
+                memory = Math.Clamp(kindMem + memFx + (Calm ? 0 : 0.05 * Wobble(node.Id, t, 53)), 0.05, 1.0);
+            }
+
+            result[node.Id] = new NodeReading(now, !down, current, healthy, load, rps, errors, p99, cpu, memory, utilisation, throttled);
         }
 
         return Task.FromResult<IReadOnlyDictionary<string, NodeReading>>(result);

@@ -95,8 +95,12 @@
           "name",
           "p99Ms",
           "requestsPerSecond",
+          "resourceAmber",
+          "resourceRed",
           "slaP99Ms",
-          "state"
+          "state",
+          "throttleAmber",
+          "throttleRed"
         ],
         "type": "object",
         "properties": {
@@ -131,6 +135,26 @@
             "type": "number",
             "format": "double"
           },
+          "cpu": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "memory": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "utilisation": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "throttled": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
           "requestsPerSecond": {
             "type": "number",
             "format": "double"
@@ -152,6 +176,22 @@
             "format": "double"
           },
           "errorRed": {
+            "type": "number",
+            "format": "double"
+          },
+          "resourceAmber": {
+            "type": "number",
+            "format": "double"
+          },
+          "resourceRed": {
+            "type": "number",
+            "format": "double"
+          },
+          "throttleAmber": {
+            "type": "number",
+            "format": "double"
+          },
+          "throttleRed": {
             "type": "number",
             "format": "double"
           },

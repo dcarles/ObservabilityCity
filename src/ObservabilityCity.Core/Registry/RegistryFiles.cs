@@ -20,6 +20,10 @@ internal sealed class RoleDefaultsFile
 {
     public double? SlaP99Ms { get; set; }
     public ErrorThresholdsFile? Errors { get; set; }
+    /// <summary>When CPU, memory or a data store's utilisation turns amber and red (0 to 1).</summary>
+    public ErrorThresholdsFile? Resources { get; set; }
+    /// <summary>The same for the share of throttled requests.</summary>
+    public ErrorThresholdsFile? Throttle { get; set; }
 }
 
 /// <summary>defaults.yaml and the "defaults" block of a pillar file: role name to defaults.</summary>
@@ -35,6 +39,8 @@ internal sealed class SystemFile
     public bool? External { get; set; }
     public double? SlaP99Ms { get; set; }
     public ErrorThresholdsFile? Errors { get; set; }
+    public ErrorThresholdsFile? Resources { get; set; }
+    public ErrorThresholdsFile? Throttle { get; set; }
 }
 
 internal sealed class PillarFile

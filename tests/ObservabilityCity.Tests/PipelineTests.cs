@@ -95,6 +95,39 @@ public class PipelineTests
     }
 
     [Fact]
+    public async Task A_saturated_database_reports_utilisation_and_throttles()
+    {
+        var rig = new Rig { Fake = { Calm = true } };
+        var calm = Node(await rig.Tick(), "cl.ledger-db");
+        Assert.InRange(calm.Utilisation!.Value, 0.2, 0.8);
+        Assert.Equal(0, calm.Throttled);
+        Assert.Equal(HealthState.Healthy, calm.State);
+        Assert.Null(calm.Cpu);
+
+        rig.Fake.Add("cl.ledger-db", FakeEffectKind.Saturate, 1);
+        var hot = Node(await rig.Tick(), "cl.ledger-db");
+        Assert.True(hot.Utilisation > 0.95);
+        Assert.True(hot.Throttled > hot.ThrottleAmber);
+        Assert.Equal(HealthState.Degraded, hot.State);
+    }
+
+    [Fact]
+    public async Task High_cpu_degrades_an_app_and_apps_report_cpu_and_memory()
+    {
+        var rig = new Rig { Fake = { Calm = true } };
+        var calm = Node(await rig.Tick(), "cl.ledger-api");
+        Assert.InRange(calm.Cpu!.Value, 0.1, 0.7);
+        Assert.InRange(calm.Memory!.Value, 0.1, 0.7);
+        Assert.Null(calm.Utilisation);
+        Assert.Equal(HealthState.Healthy, calm.State);
+
+        rig.Fake.Add("cl.ledger-api", FakeEffectKind.HighCpu, 1);
+        var hot = Node(await rig.Tick(), "cl.ledger-api");
+        Assert.True(hot.Cpu >= hot.ResourceAmber);
+        Assert.Equal(HealthState.Degraded, hot.State);
+    }
+
+    [Fact]
     public async Task Readings_that_stop_arriving_go_stale_not_green()
     {
         var rig = new Rig();

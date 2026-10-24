@@ -55,6 +55,8 @@ export class Building {
   private label: THREE.Sprite | null = null
   private labelKey = ''
   readonly hit: THREE.Mesh
+  private gate: { arm: THREE.Group } | null = null
+  private gateAngle = Math.PI / 2
 
   constructor(readonly id: string, readonly kind: NodeSnapshot['kind'], accent: string) {
     this.model = buildModel(kind, accent)
@@ -88,6 +90,8 @@ export class Building {
     this.closedSign.visible = false
     this.pivot.add(this.closedSign)
 
+    if (kind === 'Database') this.gate = this.makeGate()
+
     this.hit = new THREE.Mesh(new THREE.CylinderGeometry(m.radius, m.radius, 1, 8), new THREE.MeshBasicMaterial({ visible: false }))
     this.hit.userData.building = this
     this.pivot.add(this.hit)
@@ -111,11 +115,11 @@ export class Building {
   setNode(n: NodeSnapshot): void {
     const first = this.node === null
     this.node = n
-    this.floorsWanted = floorsFor(n.instancesTotal || 1)
+    this.floorsWanted = this.model.fixedFloors ?? floorsFor(n.instancesTotal || 1)
     this.darkWanted = n.state === 'Down' ? this.floorsWanted : darkFloorsFor(n.instancesTotal, n.instancesHealthy, this.floorsWanted)
     if (first) {
       // Appear fully formed on the first snapshot.
-      this.lit = n.state === 'Healthy' || n.state === 'Degraded' ? litFraction(n.load) : 0
+      this.lit = n.state === 'Healthy' || n.state === 'Degraded' ? this.litTarget(n) : 0
       this.errorRate = n.errorRate
       this.stale = n.state === 'Stale' ? 1 : 0
       this.floors.forEach((f, i) => {
@@ -136,7 +140,9 @@ export class Building {
     const ease = (rate: number) => 1 - Math.exp(-rate * dt)
 
     const live = n.state === 'Healthy' || n.state === 'Degraded'
-    this.lit = lerp(this.lit, live ? litFraction(n.load) : 0, ease(1.5))
+    this.lit = lerp(this.lit, live ? this.litTarget(n) : 0, ease(1.5))
+    this.model.setActivity?.(n.cpu ?? clamp(n.load * 0.6, 0, 1))
+    this.updateGate(n, dt)
     this.stale = lerp(this.stale, n.state === 'Stale' ? 1 : 0, ease(3))
     this.errorRate = lerp(this.errorRate, n.errorRate, ease(2))
 
@@ -171,6 +177,19 @@ export class Building {
     this.closedSign.visible = n.state === 'Down'
   }
 
+  /** Windows light with load; a data store's doors light with how much of its provisioned capacity is used. */
+  private litTarget(n: NodeSnapshot): number {
+    return n.utilisation != null ? clamp(n.utilisation, 0.05, 1) : litFraction(n.load)
+  }
+
+  /** A barrier across a data store's drive that comes down while it is turning requests away. */
+  private updateGate(n: NodeSnapshot, dt: number): void {
+    if (!this.gate) return
+    const closed = n.state !== 'Down' && (n.throttled ?? 0) >= n.throttleAmber
+    this.gateAngle = lerp(this.gateAngle, closed ? 0 : Math.PI / 2, 1 - Math.exp(-4 * dt))
+    this.gate.arm.rotation.z = this.gateAngle
+  }
+
   private updateBeacon(n: NodeSnapshot, time: number, camera: THREE.Camera): void {
     this.level = beaconLevel({ ...n, errorRate: this.errorRate })
     const color = new THREE.Color(palette.beacon[this.level])
@@ -188,7 +207,7 @@ export class Building {
     const world = this.beaconAnchor.getWorldPosition(new THREE.Vector3())
     const dist = camera.position.distanceTo(world)
     const bigger = this.level === 'red' ? 1.5 : this.level === 'amber' ? 1.2 : 1
-    const size = Math.max(1.6, dist * 0.032) * bigger
+    const size = Math.max(1.6, dist * 0.022) * bigger
     this.halo.scale.setScalar(size * (0.85 + 0.25 * pulse))
     // keep the bulb itself visible from afar too
     this.bulb.scale.setScalar(clamp(dist / 55, 1, 2.6))
@@ -230,6 +249,27 @@ export class Building {
     tex.needsUpdate = true
   }
 
+  /** Striped barrier arm hinged on a post beside the drive. Up when requests flow, down when they are throttled. */
+  private makeGate(): { arm: THREE.Group } {
+    const g = new THREE.Group()
+    const post = new THREE.Mesh(new THREE.BoxGeometry(0.24, 1.1, 0.24), new THREE.MeshStandardMaterial({ color: '#f2c230', flatShading: true }))
+    post.position.y = 0.55
+    post.castShadow = true
+    const arm = new THREE.Group()
+    arm.position.y = 0.95
+    for (let i = 0; i < 6; i++) {
+      const seg = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.14, 0.12), new THREE.MeshStandardMaterial({ color: i % 2 ? '#f5f5f5' : '#d63a2f', flatShading: true }))
+      seg.position.x = 0.3 + i * 0.5
+      seg.castShadow = true
+      arm.add(seg)
+    }
+    g.add(post, arm)
+    const d = this.model.door
+    g.position.set(d.x - 1.6, 0.08, d.z - 0.4)
+    this.pivot.add(g)
+    return { arm }
+  }
+
   private makeClosedSign(): THREE.Group {
     const g = new THREE.Group()
     const tex = canvasTexture(256, 128, (ctx) => {
@@ -258,33 +298,62 @@ export class Building {
     return g
   }
 
-  /** Every building carries a billboard with its name and instance count. It fades out when the camera is far away, except for troubled ones. */
+  /**
+   * Every building carries a billboard with its name and instance count, plus the meters that matter for its kind:
+   * CPU and memory for services, utilisation and throttling for data stores. It fades out when the camera is
+   * far away, except for troubled buildings.
+   */
   private updateLabel(): void {
     const n = this.node
     if (!n) return
     const text = plaqueText(n)
+    const pct = (v: number | null | undefined) => (v == null ? -1 : Math.round(v * 100))
     const warn = n.state === 'Down' ? 'down' : n.state === 'Stale' ? 'stale' : n.state !== 'Healthy' || n.instancesHealthy < n.instancesTotal ? 'warn' : 'ok'
-    const key = `${n.name}|${text}|${warn}`
+    const key = `${n.name}|${text}|${warn}|${pct(n.cpu)}|${pct(n.memory)}|${pct(n.utilisation)}|${Math.round((n.throttled ?? 0) * 1000)}`
+    const hasMeters = n.state !== 'Stale' && n.state !== 'Down' && (n.cpu != null || n.utilisation != null)
     if (!this.label) {
-      const tex = canvasTexture(512, 128, () => {})
+      const tex = canvasTexture(512, 176, () => {})
       this.label = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, toneMapped: false }))
       this.label.renderOrder = 10
-      this.label.scale.set(4.8, 1.2, 1)
+      this.label.scale.set(4.8, 1.65, 1)
+      this.label.center.set(0.5, 0)
       this.root.add(this.label)
     }
     if (key === this.labelKey) return
     this.labelKey = key
     const tex = (this.label.material as THREE.SpriteMaterial).map as THREE.CanvasTexture
     const ctx = (tex.image as HTMLCanvasElement).getContext('2d')!
-    ctx.clearRect(0, 0, 512, 128)
+    ctx.clearRect(0, 0, 512, 176)
     const color = { down: '#d63a2f', stale: '#8d949e', warn: '#e8a21a', ok: '#9fb4cc' }[warn]
-    ctx.fillStyle = 'rgba(20,28,40,0.9)'; roundRect(ctx, 4, 6, 504, 116, 24); ctx.fill()
+    const h = hasMeters ? 164 : 116
+    const y0 = 176 - h - 6
+    ctx.fillStyle = 'rgba(20,28,40,0.9)'; roundRect(ctx, 4, y0, 504, h, 24); ctx.fill()
     ctx.strokeStyle = color; ctx.lineWidth = 6; ctx.stroke()
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
     ctx.fillStyle = '#fff'; ctx.font = '700 46px system-ui, sans-serif'
-    ctx.fillText(n.name, 256, 48, 470)
-    ctx.fillStyle = warn === 'ok' ? '#b8c7da' : color; ctx.font = '600 34px system-ui, sans-serif'
-    ctx.fillText(text, 256, 92, 470)
+    ctx.fillText(n.name, 256, y0 + 42, 470)
+    ctx.fillStyle = warn === 'ok' ? '#b8c7da' : color; ctx.font = '600 32px system-ui, sans-serif'
+    ctx.fillText(text, 256, y0 + 84, 470)
+    if (hasMeters) {
+      const bar = (x: number, w: number, label: string, v: number, amber: number, red: number | null) => {
+        const top = y0 + 112
+        ctx.fillStyle = 'rgba(255,255,255,0.14)'; roundRect(ctx, x, top, w, 28, 10); ctx.fill()
+        const fill = clamp(v, 0, 1)
+        ctx.fillStyle = red !== null && v >= red ? '#ff5a4d' : v >= amber ? '#ffb830' : '#47e07a'
+        if (fill > 0.01) { roundRect(ctx, x, top, Math.max(14, w * fill), 28, 10); ctx.fill() }
+        ctx.fillStyle = '#fff'; ctx.font = '700 22px system-ui, sans-serif'; ctx.textAlign = 'left'
+        ctx.fillText(`${label} ${Math.round(v * 100)}%`, x + 12, top + 15)
+      }
+      if (n.utilisation != null) {
+        bar(24, 270, n.kind === 'Database' ? 'USED' : 'UTIL', n.utilisation, n.resourceAmber, n.resourceRed)
+        const t = n.throttled ?? 0
+        ctx.fillStyle = t >= n.throttleAmber ? '#ff5a4d' : '#b8c7da'; ctx.font = '700 22px system-ui, sans-serif'; ctx.textAlign = 'left'
+        ctx.fillText(t >= n.throttleAmber ? `THROTTLED ${(t * 100).toFixed(1)}%` : 'no throttling', 312, y0 + 127, 188)
+      } else {
+        bar(24, 224, 'CPU', n.cpu ?? 0, n.resourceAmber, n.resourceRed)
+        if (n.memory != null) bar(264, 224, 'MEM', n.memory, n.resourceAmber, n.resourceRed)
+      }
+    }
     tex.needsUpdate = true
   }
 

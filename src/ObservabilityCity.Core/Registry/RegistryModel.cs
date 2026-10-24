@@ -30,7 +30,11 @@ public sealed record RegistryNode(
     bool External,
     double SlaP99Ms,
     double ErrorAmber,
-    double ErrorRed);
+    double ErrorRed,
+    double ResourceAmber,
+    double ResourceRed,
+    double ThrottleAmber,
+    double ThrottleRed);
 
 /// <summary>Raised when a registry file is wrong. The message names the file and the id.</summary>
 public sealed class RegistryException(string message) : Exception(message);

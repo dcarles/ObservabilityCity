@@ -11,7 +11,11 @@ public sealed record NodeReading(
     double Load,
     double RequestsPerSecond,
     double ErrorRate,
-    double P99Ms);
+    double P99Ms,
+    double? Cpu = null,
+    double? Memory = null,
+    double? Utilisation = null,
+    double? Throttled = null);
 
 /// <summary>
 /// One data source behind the town. The renderer never knows which one produced a number.
