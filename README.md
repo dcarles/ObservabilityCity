@@ -2,7 +2,7 @@
 
 A browser app that shows system health as a living, animated 3D town instead of a dashboard. Each pillar (or team) is an island, each system is a building, and what is going on shows in the town itself: floors for instances, lit windows for load, rooftop beacons for errors, cars for traffic.
 
-**Status: Phase 1, slice 1.** The pipeline runs end to end on fake data (backend, live push, browser), and the hub island plus one sample island (Galactic Credit's "Core Ledger") are built. Everything else is in [plan/](plan/observability-city-plan.md).
+**Status: Phase 1, slice 1.** The pipeline runs end to end on fake data (backend, live push, browser), and the hub island plus two sample islands (Galactic Credit's "Core Ledger" and "Payments") are built. Everything else is in [plan/](plan/observability-city-plan.md).
 
 ## What you need installed
 
@@ -64,7 +64,9 @@ How to read the town, as built so far:
 | Dark, cracked floors and an amber plaque | Unhealthy instances ("5/10 healthy") |
 | Rooftop beacon: green, amber, red (red pulses) | Error rate against the system's own thresholds. Red only ever means errors |
 | Cars on the streets | Requests. More cars means more requests, slower cars means higher latency against the SLA. Blue sedans are internal calls, yellow taxis external ones, red hatchbacks failed calls |
-| API, worker and database side by side | One service. Systems that share a `service` in the registry are laid out next to each other on one pad |
+| API, worker and database side by side | One service. Systems that share a `service` in the registry stand next to each other on one pad, with their fronts toward the road. Pads sit on a grid, so every building's front is visible from the road side |
+| Name board above a building | System name and "N/M healthy". Fades out when the camera is far away, except for troubled buildings |
+| Bridges | One road bridge from the hub's plaza to each island's gate. All sync traffic between islands goes through the hub |
 | Harbour with crates and a crane | The island's port, where messaging boats will dock (boats come in a later slice) |
 | "Closed for repairs" sign and a blackout | The system is down |
 | Grey building | No fresh data. Never shown as healthy |

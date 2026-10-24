@@ -4,22 +4,51 @@ import { box, canvasTexture, cyl, flat, group, roundRect } from '../buildings/mk
 import { kit } from '../assets/kit'
 import type { GroupSnapshot, NodeSnapshot, Snapshot } from '../types'
 import { palette } from '../themes/harbour-town/palette'
-import { blockPad, bench, bridge, crates, fountain, lamp, pier, prop, ring, street, streetX } from './props'
-import { buildIslandBody, GROUND, hill, makeOutline, scatterNature, type Outline, type Rect } from './island'
+import { blockPad, bench, bridge, crates, fountain, junction, lamp, pier, prop, ring, roadBetween, ROAD_W, street, streetX } from './props'
+import { buildIslandBody, GROUND, makeOutline, scatterNature, type Outline, type Rect } from './island'
 import { hashString } from './random'
 import { CarSystem, type Route } from './cars'
 
 const HUB_RX = 22
 const HUB_RZ = 21
 const RING_R = 5.7
-const SLOT = 6.8 // street length per building
-const BLOCK_X = 6.3 // building centre from the street centre line
-const PAD_W = 8.6
+const SLOT = 6.8 // width of the plot of one building along a pad
+const PAD_W = 3 * SLOT + 0.8 // a service pad holds up to three buildings side by side
+const PAD_D = 8.8
+const CURB = 3.0 // road centre line to the edge of the pavement
+const ROW = PAD_D + 2 * CURB + 1.2 // distance between two rows of pads
+const COL_X = CURB + 0.4 + PAD_W / 2 // pad centre from the spine's centre line
+const FRONT = 4.0 // building centre from the front edge of its pad
 
-interface Slot {
-  node: NodeSnapshot
-  side: -1 | 1
+/** One service pad on the island's grid, with its buildings in a row and their fronts toward the road. */
+/** Where an island's road leaves the hub: the direction it lies in and the point on the hub's coast. */
+interface Port {
+  angle: number
+  coast: THREE.Vector3
+}
+
+interface Pad {
+  nodes: NodeSnapshot[]
+  col: 0 | 1
   row: number
+}
+
+interface Placed {
+  node: NodeSnapshot
+  pad: Pad
+  /** Island-local position of the building's centre and of the road in front of it. */
+  x: number
+  z: number
+  roadZ: number
+}
+
+interface Plan {
+  pads: Pad[]
+  placed: Placed[]
+  rows: number
+  rowRoadZ: number[]
+  rx: number
+  rz: number
 }
 
 interface Island {
@@ -58,36 +87,39 @@ export class Town {
     const pillars = s.groups.filter((g) => !g.isHub)
     const routes: Route[] = []
 
+    // Islands sit on a ring around the hub, clockwise from the north-east so their roads never run into the
+    // hub's own buildings on the four main axes.
+    const angles = pillars.map((_, i) => Math.PI / 4 + (i / pillars.length) * Math.PI * 2)
+    const dirOf = (a: number) => new THREE.Vector3(Math.sin(a), 0, -Math.cos(a))
+
     // ── Hub ────────────────────────────────────────────────────────────────
     const hubRoot = new THREE.Group()
     this.hubOutline = makeOutline(hashString('hub'), HUB_RX, HUB_RZ, 0.05)
     hubRoot.add(buildIslandBody(this.hubOutline))
-    const hubBuildings = this.buildHub(hubRoot, hub)
+    const hubCoasts = angles.map((a) => coastPoint(this.hubOutline, dirOf(a), 0.9))
+    const hubBuildings = this.buildHub(hubRoot, hub, angles.map((a, i) => ({ angle: a, coast: hubCoasts[i] })))
     this.root.add(hubRoot)
-    this.bounds.expandByPoint(new THREE.Vector3(-HUB_RX - 8, 0, -HUB_RZ - 4)).expandByPoint(new THREE.Vector3(HUB_RX + 14, 0, HUB_RZ + 4))
-    const hubCoast = coastPoint(this.hubOutline, new THREE.Vector3(0, 0, -1), 0.9)
+    this.expandBounds(this.hubOutline, new THREE.Vector3(), 0)
 
-    // ── Islands on a ring ────────────────────────────────────────────────────
+    // ── Islands on the ring ──────────────────────────────────────────────────
+    const plans = pillars.map((g) => planIsland(g))
+    const reach = Math.max(0, ...plans.map((p) => p.rz))
+    const ringR = Math.max(HUB_RZ + 14 + reach, plans.reduce((acc, p) => acc + 2 * p.rx + 16, 0) / (2 * Math.PI))
     pillars.forEach((g, index) => {
-      const { slots, rows } = planBlocks(g.nodes)
-      const rz = Math.max(21, (rows * SLOT) / 2 + 14)
-      const rx = 18
-      const ringR = HUB_RZ + 12 + rz
-      // Clockwise from the top (north, -z).
-      const angle = pillars.length === 1 ? 0 : (index / pillars.length) * Math.PI * 2
-      const center = new THREE.Vector3(Math.sin(angle) * ringR, 0, -Math.cos(angle) * ringR)
-      const island = this.buildIsland(g, slots, rows, center, rx, rz)
+      const plan = plans[index]
+      const dir = dirOf(angles[index])
+      const center = dir.clone().multiplyScalar(ringR)
+      const island = this.buildIsland(g, plan, center)
       this.islands.push(island)
       this.root.add(island.root)
-      this.bounds.expandByPoint(new THREE.Vector3(center.x - rx - 8, 0, center.z - rz - 6)).expandByPoint(new THREE.Vector3(center.x + rx + 30, 0, center.z + rz + 6))
+      this.expandBounds(island.outline, center, island.root.rotation.y, 12)
 
-      const gateLocal = new THREE.Vector3(0, GROUND, coastScan(island.outline, 'z') - 0.7)
-      const gate = island.root.localToWorld(gateLocal.clone())
-      this.root.add(bridge({ from: hubCoast.clone().setY(0), to: gate.clone().setY(0) }))
-      routes.push(...this.islandRoutes(island, slots, hubCoast, gate))
+      const gate = island.root.localToWorld(new THREE.Vector3(0, GROUND, coastScan(island.outline, 'z') - 0.7))
+      this.root.add(bridge({ from: hubCoasts[index].clone().setY(0), to: gate.clone().setY(0) }))
+      routes.push(...this.islandRoutes(island, plan, angles[index], hubCoasts[index], gate))
     })
 
-    routes.push(...this.hubRoutes(hubBuildings))
+    routes.push(...this.hubRoutes(hubBuildings, angles.map((a, i) => ({ angle: a, coast: hubCoasts[i] }))))
     this.cars.setRoutes(routes)
   }
 
@@ -101,9 +133,20 @@ export class Town {
     this.cars.update(dt)
   }
 
+  /** Grow the camera framing box by an island's coast, pushed out a little to leave room for piers. */
+  private expandBounds(outline: Outline, center: THREE.Vector3, yaw: number, extra = 0): void {
+    const c = Math.cos(yaw), sn = Math.sin(yaw)
+    for (let i = 0; i < outline.points.length; i += 3) {
+      const p = outline.points[i]
+      const len = Math.hypot(p.x, p.y) || 1
+      const x = p.x + (p.x / len) * extra, z = p.y + (p.y / len) * extra
+      this.bounds.expandByPoint(new THREE.Vector3(center.x + x * c + z * sn, 0, center.z - x * sn + z * c))
+    }
+  }
+
   // ── hub ─────────────────────────────────────────────────────────────────
 
-  private buildHub(hubRoot: THREE.Group, hub: GroupSnapshot | undefined): Building[] {
+  private buildHub(hubRoot: THREE.Group, hub: GroupSnapshot | undefined, ports: Port[]): Building[] {
     const out: Building[] = []
     const avoid: Rect[] = [{ x: 0, z: 2, w: 20, d: 20 }, { x: 0, z: -15, w: 6, d: 14 }]
     const plan: Record<string, { x: number; z: number; yaw: number }> = {
@@ -131,9 +174,16 @@ export class Town {
     fount.position.x = 0
     fount.position.z = 2
     hubRoot.add(paving, fount, ring(0, 2, 3.7 + 0.4, RING_R + 2.1))
-    hubRoot.add(street(0, -8.4, -5.8), street(0, -21, -13.7), street(0, 9.8, 11.4), streetX(2, 7.8, 11), streetX(2, -11.2, -7.8))
+    hubRoot.add(street(0, -8.4, -5.8), street(0, 9.8, 11.4), streetX(2, 7.8, 11), streetX(2, -11.2, -7.8))
+    // one spoke from the plaza to the coast for each island, where its bridge starts
+    for (const port of ports) {
+      const edge = new THREE.Vector3(Math.sin(port.angle) * (RING_R + 1.9), GROUND, 2 - Math.cos(port.angle) * (RING_R + 1.9))
+      hubRoot.add(roadBetween(edge, port.coast))
+      for (let r = 9; r < 30; r += 4) avoid.push({ x: Math.sin(port.angle) * r, z: 2 - Math.cos(port.angle) * r, w: 7, d: 7 })
+    }
     for (let i = 0; i < 8; i++) {
       const a = (i / 8) * Math.PI * 2 + 0.4
+      if (ports.some((p) => Math.abs(Math.atan2(Math.sin(a - p.angle), Math.cos(a - p.angle))) < 0.3)) continue
       hubRoot.add(lamp(Math.sin(a) * 8.6, 2 - Math.cos(a) * 8.6, Math.sin(a)))
     }
     hubRoot.add(bench(-6.0, -6.2, 0.6), bench(6.0, 9.6, 3.6), bench(-9.4, 8.2, 1.3))
@@ -141,95 +191,104 @@ export class Town {
     return out
   }
 
-  private hubRoutes(hubBuildings: Building[]): Route[] {
+  private hubRoutes(hubBuildings: Building[], ports: Port[]): Route[] {
     const routes: Route[] = []
     const ringPoint = (a: number) => new THREE.Vector3(Math.sin(a) * RING_R, GROUND, 2 - Math.cos(a) * RING_R)
     const arc = (from: number, to: number) => {
       const steps = Math.max(2, Math.ceil(Math.abs(to - from) / 0.25))
       return Array.from({ length: steps + 1 }, (_, i) => ringPoint(from + ((to - from) * i) / steps))
     }
-    const exits: Partial<Record<Building['kind'], number>> = { Broker: Math.PI / 2, Egress: -Math.PI / 2, Database: Math.PI }
+    const exits: Partial<Record<Building['kind'], number>> = { Gateway: 0, Broker: Math.PI / 2, Egress: -Math.PI / 2, Database: Math.PI }
     for (const b of hubBuildings) {
       const exit = exits[b.kind]
       if (exit === undefined) continue
       const door = b.doorWorld().setY(GROUND)
-      const toExit = exit > Math.PI * 0.99 ? exit - 2 * Math.PI : exit // go the short way round
-      routes.push({
-        dest: b, origin: b.kind === 'Egress' ? 'external' : 'internal', share: 1,
-        path: [new THREE.Vector3(0, GROUND, -12.6), new THREE.Vector3(0, GROUND, -8.4), ...arc(0, toExit), door],
-      })
+      // Callers come in from every island over its own bridge and spoke, round the plaza to the building's street.
+      for (const port of ports) {
+        const from = Math.atan2(Math.sin(port.angle), Math.cos(port.angle))
+        let to = exit
+        while (to - from > Math.PI) to -= 2 * Math.PI
+        while (to - from < -Math.PI) to += 2 * Math.PI
+        routes.push({
+          dest: b, origin: b.kind === 'Egress' ? 'external' : 'internal', share: 1 / ports.length,
+          path: [port.coast.clone().setY(GROUND), ...arc(from, to), door],
+        })
+      }
     }
     return routes
   }
 
   // ── pillar islands ──────────────────────────────────────────────────────
 
-  private buildIsland(g: GroupSnapshot, slots: Slot[], rows: number, center: THREE.Vector3, rx: number, rz: number): Island {
+  private buildIsland(g: GroupSnapshot, plan: Plan, center: THREE.Vector3): Island {
     const root = new THREE.Group()
     root.position.copy(center)
     // local +z points at the hub, where the gate is
     root.rotation.y = Math.atan2(-center.x, -center.z)
 
-    const outline = makeOutline(hashString(g.id), rx, rz, 0.06)
+    const outline = makeOutline(hashString(g.id), plan.rx, plan.rz, 0.06)
     root.add(buildIslandBody(outline))
 
+    const { rows, rowRoadZ } = plan
+    const edge = COL_X + PAD_W / 2 + 0.4
     const gateZ = coastScan(outline, 'z') - 0.6
-    const firstZ = gateZ - 6.5
-    const lastZ = firstZ - (rows - 1) * SLOT
-    const streetNorth = lastZ - SLOT / 2 - 1
-    const avoid: Rect[] = [{ x: 0, z: (gateZ + streetNorth) / 2, w: 6.5, d: Math.abs(gateZ - streetNorth) + 3 }]
-    root.add(street(0, streetNorth, gateZ + 0.2))
+    const harbourRow = Math.floor((rows - 1) / 2)
+    const harbourZ = rowRoadZ[harbourRow]
+    const harbourCoast = coastScan(outline, 'x', harbourZ)
+    const avoid: Rect[] = []
+
+    // Roads: one spine from the gate, and a road in front of every row of pads, with a junction where they meet.
+    const half = ROAD_W / 2
+    root.add(street(0, rowRoadZ[0] + half, gateZ + 0.2))
+    for (let r = 0; r < rows; r++) {
+      const z = rowRoadZ[r]
+      root.add(junction(0, z, r === rows - 1))
+      if (r < rows - 1) root.add(street(0, rowRoadZ[r + 1] + half, z - half))
+      root.add(streetX(z, -edge, -half))
+      root.add(streetX(z, half, r === harbourRow ? harbourCoast - 8.3 : edge))
+      avoid.push({ x: 0, z, w: 2 * edge + 2, d: 2 * CURB + 1 })
+    }
+    avoid.push({ x: 0, z: (gateZ + rowRoadZ[rows - 1]) / 2, w: 7, d: gateZ - rowRoadZ[rows - 1] + 4 })
 
     const buildings = new Map<string, Building>()
-    // one pad per service block so a service reads as a unit
-    for (const block of blocksOf(slots)) {
-      const zMax = firstZ - block.rowFrom * SLOT + SLOT / 2
-      const zMin = firstZ - block.rowTo * SLOT - SLOT / 2
-      root.add(blockPad(block.side * BLOCK_X, zMin, zMax, PAD_W))
-      avoid.push({ x: block.side * BLOCK_X, z: (zMin + zMax) / 2, w: PAD_W + 1, d: zMax - zMin + 1 })
+    for (const pad of plan.pads) {
+      const roadZ = rowRoadZ[pad.row]
+      const zf = roadZ - CURB
+      const cx = (pad.col === 0 ? -1 : 1) * COL_X
+      root.add(blockPad(cx, zf - PAD_D, zf, PAD_W))
+      avoid.push({ x: cx, z: zf - PAD_D / 2, w: PAD_W + 1, d: PAD_D + 1 })
+      for (const side of [-1, 1]) root.add(lamp(cx + side * (PAD_W / 2 - 3.4), zf + 0.45, 0, -Math.PI / 2))
     }
-    for (const slot of slots) {
-      const z = firstZ - slot.row * SLOT
-      const x = slot.side * BLOCK_X
-      const b = new Building(slot.node.id, slot.node.kind, g.color)
-      b.root.position.set(x, GROUND + 0.08, z)
-      b.root.rotation.y = slot.side < 0 ? Math.PI / 2 : -Math.PI / 2
+    for (const p of plan.placed) {
+      const b = new Building(p.node.id, p.node.kind, g.color)
+      b.root.position.set(p.x, GROUND + 0.08, p.z)
       root.add(b.root)
-      this.buildings.set(slot.node.id, b)
-      buildings.set(slot.node.id, b)
-      // street furniture in front of each building
-      root.add(prop('bush', slot.side * 3.35, z + 2.7, 0, 2.2))
-      if (slot.node.kind === 'Worker') root.add(prop('dumpster', slot.side * (BLOCK_X + 3.6), z - 1.6, slot.side < 0 ? 0.4 : -0.4))
-      if (slot.node.kind === 'Api') root.add(prop('firehydrant', slot.side * 3.45, z - 2.6, 0, 2.4))
+      this.buildings.set(p.node.id, b)
+      buildings.set(p.node.id, b)
+      const zf = p.roadZ - CURB
+      // a little garden in front of each building and the odd bit of street furniture
+      root.add(prop('bush', p.x - 2.2, zf - 0.9, 0, 2.2), prop('bush', p.x + 2.8, zf - 0.9, 0, 1.8))
+      if (p.node.kind === 'Worker') root.add(prop('dumpster', p.x + 2.4, p.z - 3.6, 0.2))
+      if (p.node.kind === 'Api') root.add(prop('firehydrant', p.x + 2.9, zf + 0.5, 0, 2.4))
     }
-    // spare plots on whichever side has fewer rows: a small park
-    for (const side of [-1, 1] as const) {
-      const used = Math.max(-1, ...slots.filter((s) => s.side === side).map((s) => s.row))
-      for (let row = used + 1; row < rows; row++) {
-        const z = firstZ - row * SLOT
-        root.add(...parkProps(side * BLOCK_X, z, side))
-        avoid.push({ x: side * BLOCK_X, z, w: 8, d: SLOT })
-      }
+    // a spare cell in the grid becomes a small park
+    if (plan.pads.length % 2 === 1) {
+      const row = rows - 1
+      const zf = rowRoadZ[row] - CURB
+      root.add(...parkProps(COL_X, zf - PAD_D / 2))
+      avoid.push({ x: COL_X, z: zf - PAD_D / 2, w: PAD_W + 1, d: PAD_D + 1 })
     }
-    // lamps along the street
-    for (let row = 0; row < rows; row++) {
-      const z = firstZ - row * SLOT + SLOT / 2
-      root.add(lamp(-3.55, z, 1), lamp(3.55, z, -1))
-    }
-    // the island's sign: one post, standing on land beside the street end
-    const signZ = gateZ - 2.2
-    root.add(this.islandSign(g, -6.4, signZ))
-    avoid.push({ x: -6.4, z: signZ, w: 5, d: 3 })
-    // the island's own harbour on the east coast, beside the middle of the town
-    const harbourZ = (firstZ + lastZ) / 2
-    const harbourCoast = coastScan(outline, 'x', harbourZ)
-    root.add(this.harbour(harbourCoast, harbourZ))
-    avoid.push({ x: harbourCoast - 3, z: harbourZ, w: 9, d: 10 })
 
-    const hillZ = streetNorth - 5
-    root.add(hill(-5, hillZ, 8, 3.2), hill(6, hillZ - 3, 5.5, 2.2))
-    avoid.push({ x: -5, z: hillZ, w: 10, d: 10 }, { x: 6, z: hillZ - 3, w: 6, d: 6 })
-    root.add(scatterNature(outline, avoid, hashString(g.id + '-nature'), { trees: 36, rocks: 14 }))
+    // the island's sign: one post, standing on land beside the gate
+    const signZ = gateZ - 2.4
+    root.add(this.islandSign(g, -6.4, signZ))
+    avoid.push({ x: -6.4, z: signZ, w: 6, d: 4 })
+    // the island's own harbour on the east coast, at the end of a road
+    root.add(this.harbour(harbourCoast, harbourZ))
+    avoid.push({ x: harbourCoast - 3, z: harbourZ, w: 11, d: 11 })
+
+    const trees = Math.min(110, Math.round(40 * (plan.rx * plan.rz) / (24 * 20)))
+    root.add(scatterNature(outline, avoid, hashString(g.id + '-nature'), { trees, rocks: Math.round(trees / 3) }))
     root.updateMatrixWorld(true)
     return { group: g, root, outline, buildings }
   }
@@ -302,52 +361,39 @@ export class Town {
 
   // ── routes ──────────────────────────────────────────────────────────────
 
-  private islandRoutes(island: Island, slots: Slot[], hubCoast: THREE.Vector3, gate: THREE.Vector3): Route[] {
+  private islandRoutes(island: Island, plan: Plan, angle: number, hubCoast: THREE.Vector3, gate: THREE.Vector3): Route[] {
     const routes: Route[] = []
     const w = (x: number, z: number) => island.root.localToWorld(new THREE.Vector3(x, GROUND, z))
-    const slotZ = (s: Slot) => this.rowZ(island, s.row)
-    const pullIn = (s: Slot) => w(s.side * 1.1, slotZ(s))
-    const street = (s: Slot) => w(0, slotZ(s))
-    const ringTop = new THREE.Vector3(0, GROUND, 2 - RING_R)
-    const fromRing = [
-      new THREE.Vector3(Math.sin(-0.7) * RING_R, GROUND, 2 - Math.cos(-0.7) * RING_R),
-      new THREE.Vector3(Math.sin(-0.35) * RING_R, GROUND, 2 - Math.cos(-0.35) * RING_R),
-      ringTop, new THREE.Vector3(0, GROUND, -9), hubCoast.clone().setY(GROUND), gate,
-    ]
+    const ringAt = (a: number) => new THREE.Vector3(Math.sin(a) * RING_R, GROUND, 2 - Math.cos(a) * RING_R)
+    const fromRing = [ringAt(angle - 0.4), ringAt(angle - 0.2), ringAt(angle), hubCoast.clone().setY(GROUND), gate]
+    // Cars park on the road in front of a building. Between rows they go via the spine.
+    const between = (from: Placed, to: Placed): THREE.Vector3[] => {
+      const out = [w(from.x, from.roadZ)]
+      if (from.roadZ !== to.roadZ) out.push(w(0, from.roadZ), w(0, to.roadZ))
+      out.push(w(to.x, to.roadZ))
+      return out
+    }
 
-    for (const dest of slots) {
+    for (const dest of plan.placed) {
       const b = island.buildings.get(dest.node.id)!
       if (dest.node.kind === 'Worker' || dest.node.kind === 'Cron' || dest.node.kind === 'Broker') continue
       const external = dest.node.external
-      // Callers from other islands arrive through the gate house, over the bridge and up the street.
-      routes.push({
-        dest: b, origin: external ? 'external' : 'internal', share: external ? 0.85 : dest.node.kind === 'Api' ? 0.35 : 0.08,
-        path: [...fromRing, w(0, slotZ(dest) + 3), pullIn(dest)],
-      })
+      const inbound = [...fromRing, w(0, dest.roadZ), w(dest.x, dest.roadZ)]
+      // Callers from other islands arrive through the gate house, over the bridge and up the spine.
+      routes.push({ dest: b, origin: external ? 'external' : 'internal', share: external ? 0.85 : dest.node.kind === 'Api' ? 0.35 : 0.08, path: inbound })
       // Neighbours on the same island call it from their own doors; the same service block most of all.
-      const callers = slots.filter((s) => s !== dest && (s.node.kind === 'Api' || s.node.kind === 'Worker'))
+      const callers = plan.placed.filter((s) => s !== dest && (s.node.kind === 'Api' || s.node.kind === 'Worker'))
       const sameService = callers.filter((s) => s.node.service && s.node.service === dest.node.service)
       const weights = callers.map((c) => (sameService.includes(c) ? 3 : 1))
       const total = weights.reduce((a, b2) => a + b2, 0) || 1
       callers.forEach((from, i) => {
         const share = (external ? 0.15 : dest.node.kind === 'Api' ? 0.65 : 0.92) * (weights[i] / total)
-        routes.push({
-          dest: b, origin: 'internal', share,
-          path: [pullIn(from), street(from), street(dest), pullIn(dest)],
-        })
+        routes.push({ dest: b, origin: 'internal', share, path: between(from, dest) })
       })
       // and the answers drive back out toward the gate
-      routes.push({
-        dest: b, origin: external ? 'external' : 'internal', share: external ? 0.4 : 0.15, leaving: true,
-        path: [...fromRing, w(0, slotZ(dest) + 3), pullIn(dest)],
-      })
+      routes.push({ dest: b, origin: external ? 'external' : 'internal', share: external ? 0.4 : 0.15, leaving: true, path: inbound })
     }
     return routes
-  }
-
-  private rowZ(island: Island, row: number): number {
-    const gateZ = coastScan(island.outline, 'z') - 0.6
-    return gateZ - 6.5 - row * SLOT
   }
 
   node(id: string): NodeSnapshot | null {
@@ -355,40 +401,62 @@ export class Town {
   }
 }
 
-/** Groups nodes into service blocks and deals blocks to the two sides of the street, keeping them balanced. */
-function planBlocks(nodes: NodeSnapshot[]): { slots: Slot[]; rows: number } {
-  const blocks: NodeSnapshot[][] = []
+/** Services become pads (an API, its worker and its database side by side), lone buildings share pads, and pads fill a two-column grid. */
+function planPads(nodes: NodeSnapshot[]): Pad[] {
+  const groups: NodeSnapshot[][] = []
   for (const n of nodes) {
-    const last = blocks[blocks.length - 1]
-    if (n.service && last && last[0].service === n.service) last.push(n)
-    else blocks.push([n])
+    const last = groups[groups.length - 1]
+    if (n.service && last && last[0].service === n.service && last.length < 3) last.push(n)
+    else groups.push([n])
   }
-  const rows = { '-1': 0, '1': 0 }
-  const slots: Slot[] = []
-  for (const block of blocks) {
-    const side: -1 | 1 = rows['-1'] <= rows['1'] ? -1 : 1
-    for (const node of block) slots.push({ node, side, row: rows[String(side) as '-1' | '1']++ })
+  const out: NodeSnapshot[][] = []
+  let loose: NodeSnapshot[] = []
+  for (const grp of groups) {
+    if (grp.length === 1 && !grp[0].service) {
+      loose.push(grp[0])
+      if (loose.length === 3) { out.push(loose); loose = [] }
+    } else out.push(grp)
   }
-  return { slots, rows: Math.max(rows['-1'], rows['1'], 1) }
+  if (loose.length) out.push(loose)
+  return out.map((ns, i) => ({ nodes: ns, col: (i % 2) as 0 | 1, row: Math.floor(i / 2) }))
 }
 
-/** The runs of rows that belong to one service block, per side. */
-function blocksOf(slots: Slot[]): { side: -1 | 1; rowFrom: number; rowTo: number }[] {
-  const out: { side: -1 | 1; rowFrom: number; rowTo: number; service: string }[] = []
-  for (const s of slots) {
-    const last = out[out.length - 1]
-    if (last && last.side === s.side && last.service === (s.node.service ?? s.node.id) && last.rowTo === s.row - 1) last.rowTo = s.row
-    else out.push({ side: s.side, rowFrom: s.row, rowTo: s.row, service: s.node.service ?? s.node.id })
+/** Lays out one island's grid and finds the smallest coast that holds it, with room for the gate and the harbour. */
+function planIsland(g: GroupSnapshot): Plan {
+  const pads = planPads(g.nodes)
+  const rows = Math.max(1, Math.ceil(pads.length / 2))
+  const span = (rows - 1) * ROW + 2 * CURB + PAD_D
+  const roadZ0 = span / 2 - CURB
+  const rowRoadZ = Array.from({ length: rows }, (_, r) => roadZ0 - r * ROW)
+  const placed: Placed[] = []
+  for (const pad of pads) {
+    const roadZ = rowRoadZ[pad.row]
+    const cx = (pad.col === 0 ? -1 : 1) * COL_X
+    pad.nodes.forEach((node, i) => placed.push({ node, pad, x: cx + (i - (pad.nodes.length - 1) / 2) * SLOT, z: roadZ - CURB - FRONT, roadZ }))
   }
-  return out
+  const edge = COL_X + PAD_W / 2 + 0.4
+  const southZ = roadZ0 + CURB
+  const northZ = rowRoadZ[rows - 1] - CURB - PAD_D
+  const harbourZ = rowRoadZ[Math.floor((rows - 1) / 2)]
+  const check: [number, number][] = [[-edge, southZ], [edge, southZ], [-edge, northZ], [edge, northZ], [edge + 11, harbourZ], [-edge - 2, harbourZ], [0, northZ - 4]]
+  let k = 1
+  let rx = 24, rz = 20
+  for (let i = 0; i < 200; i++) {
+    rx = 24 * k
+    rz = 20 * k
+    const o = makeOutline(hashString(g.id), rx, rz, 0.06)
+    if (check.every(([x, z]) => o.contains(x, z, 2)) && coastScan(o, 'z') - 0.6 - southZ >= 9) break
+    k *= 1.02
+  }
+  return { pads, placed, rows, rowRoadZ, rx, rz }
 }
 
-/** A couple of trees, flower beds and a bench for a spare plot. */
-function parkProps(x: number, z: number, side: -1 | 1): THREE.Object3D[] {
+/** A couple of trees, flower beds and benches for a spare pad. */
+function parkProps(x: number, z: number): THREE.Object3D[] {
   const out: THREE.Object3D[] = []
   const trunk = new THREE.MeshStandardMaterial({ color: palette.tree.trunk, flatShading: true })
   const leaf = new THREE.MeshStandardMaterial({ color: '#58b85a', flatShading: true })
-  for (const [dx, dz, s] of [[side * 0.8, -1.7, 1.25], [side * 1.9, 1.6, 0.95]] as const) {
+  for (const [dx, dz, s] of [[-6, -1.5, 1.35], [5.5, 1.2, 1.05], [-1, 2.2, 0.9], [8, -2, 1.2]] as const) {
     const t = new THREE.Group()
     const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.2, 1.1, 5), trunk); tr.position.y = 0.55; tr.castShadow = true
     const l = new THREE.Mesh(new THREE.IcosahedronGeometry(1.0, 0), leaf); l.position.y = 1.9; l.castShadow = true
@@ -397,11 +465,11 @@ function parkProps(x: number, z: number, side: -1 | 1): THREE.Object3D[] {
     t.position.set(x + dx, GROUND, z + dz)
     out.push(t)
   }
-  out.push(bench(x - side * 2.2, z, side < 0 ? Math.PI / 2 : -Math.PI / 2))
+  out.push(bench(x - 2.5, z + 2.6, 0), bench(x + 2, z - 2.8, Math.PI))
   const colors = ['#ff7a8a', '#ffd84d', '#ffffff', '#b58cff']
-  for (let i = 0; i < 8; i++) {
+  for (let i = 0; i < 14; i++) {
     const f = new THREE.Mesh(new THREE.IcosahedronGeometry(0.17, 0), new THREE.MeshStandardMaterial({ color: colors[i % 4], flatShading: true }))
-    f.position.set(x - side * (0.4 + (i % 4) * 0.5), GROUND + 0.18, z + 1.9 - Math.floor(i / 4) * 0.6)
+    f.position.set(x - 1.5 + (i % 7) * 0.5, GROUND + 0.18, z - 0.3 + Math.floor(i / 7) * 0.6)
     out.push(f)
   }
   return out

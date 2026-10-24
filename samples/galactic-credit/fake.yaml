@@ -14,3 +14,9 @@ cl.statements-worker:   { rps: 8,   p99Ms: 12000, minInstances: 1 }
 cl.statements-db:       { rps: 40,  p99Ms: 30,  minInstances: 1 }
 cl.statement-cron:      { rps: 0.2, p99Ms: 25000, minInstances: 1 }
 cl.session-cache:       { rps: 600, p99Ms: 2,   minInstances: 2 }
+pay.payments-api:       { rps: 210, p99Ms: 310, minInstances: 3 }
+pay.payments-worker:    { rps: 75,  p99Ms: 3500, minInstances: 2 }
+pay.payments-db:        { rps: 280, p99Ms: 26,  minInstances: 2 }
+pay.refunds-api:        { rps: 22,  p99Ms: 200, minInstances: 1 }
+pay.refunds-worker:     { rps: 6,   p99Ms: 8000, minInstances: 1 }
+pay.refunds-db:         { rps: 30,  p99Ms: 25,  minInstances: 1 }

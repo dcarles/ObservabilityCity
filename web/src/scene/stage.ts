@@ -34,7 +34,7 @@ export class Stage {
     this.controls.minPolarAngle = THREE.MathUtils.degToRad(25)
     this.controls.maxPolarAngle = THREE.MathUtils.degToRad(75)
     this.controls.minDistance = 12
-    this.controls.maxDistance = 260
+    this.controls.maxDistance = 520
     this.controls.screenSpacePanning = false
     this.controls.addEventListener('change', () => this.clampPan())
 

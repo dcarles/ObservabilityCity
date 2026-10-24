@@ -42,6 +42,17 @@ export function streetX(z: number, x0: number, x1: number): THREE.Group {
   return g
 }
 
+/** A road along any direction between two points. */
+export function roadBetween(from: THREE.Vector3, to: THREE.Vector3): THREE.Group {
+  const d = to.clone().sub(from)
+  const g = street(0, 0, d.length())
+  const wrap = new THREE.Group()
+  wrap.add(g)
+  wrap.position.set(from.x, 0, from.z)
+  wrap.rotation.y = Math.atan2(d.x, d.z)
+  return wrap
+}
+
 /** A ring road around a plaza. */
 export function ring(cx: number, cz: number, rIn: number, rOut: number): THREE.Group {
   const g = new THREE.Group()
@@ -68,13 +79,31 @@ export function blockPad(x: number, zMin: number, zMax: number, width: number): 
   return slabMesh(width, zMax - zMin, 0.1, '#ddd5c2', x, GROUND - 0.02, (zMin + zMax) / 2)
 }
 
-export function lamp(x: number, z: number, faceX: number): THREE.Object3D {
+/** A street lamp. Its arm points along +x unless a yaw is given. */
+export function lamp(x: number, z: number, faceX: number, yaw?: number): THREE.Object3D {
   const l = kit('streetlight')
   l.scale.setScalar(2.2)
   l.position.set(x, GROUND + 0.1, z)
-  l.rotation.y = faceX > 0 ? 0 : Math.PI
+  l.rotation.y = yaw ?? (faceX > 0 ? 0 : Math.PI)
   return l
 }
+
+/** A crossing of the spine and a side road. The last row has no road beyond it, so it is a T. */
+export function junction(x: number, z: number, tee: boolean): THREE.Group {
+  const g = new THREE.Group()
+  const t = kit(tee ? 'road_tsplit' : 'road_junction')
+  t.scale.set(ROAD_W / 2, 1.2, ROAD_W / 2)
+  t.position.set(x, ROAD_TOP - 0.12, z)
+  if (tee) t.rotation.y = TEE_YAW
+  g.add(t)
+  const o = ROAD_W / 2 + 0.45
+  const c = CURB_TOP - GROUND
+  const corners: [number, number][] = tee ? [[-1, 1], [1, 1]] : [[-1, 1], [1, 1], [-1, -1], [1, -1]]
+  for (const [sx, sz] of corners) g.add(slabMesh(0.9, 0.9, c, palette.island.pavement, x + sx * o, GROUND - 0.02, z + sz * o))
+  if (tee) g.add(slabMesh(ROAD_W + 1.8, 0.9, c, palette.island.pavement, x, GROUND - 0.02, z - o))
+  return g
+}
+const TEE_YAW = 0
 
 export function bench(x: number, z: number, ry: number): THREE.Object3D {
   const b = kit('bench')
@@ -115,46 +144,68 @@ export interface BridgeOpts {
   to: THREE.Vector3
 }
 
-/** A road bridge: asphalt on a wooden deck with rails, piers into the water and lamps. */
-export function bridge({ from, to }: BridgeOpts): THREE.Group {
+/** A road bridge: a stone and concrete deck on tapered piers, with parapets, lamps and gate posts at each end. */
+export function bridge(opts: BridgeOpts): THREE.Group {
   const g = new THREE.Group()
+  // run the deck a little onto both shores so it meets the roads without a seam
+  const unit = opts.to.clone().sub(opts.from).normalize()
+  const from = opts.from.clone().addScaledVector(unit, -1.4)
+  const to = opts.to.clone().addScaledVector(unit, 1.4)
   const dir = to.clone().sub(from)
   const len = dir.length()
   const mid = from.clone().add(to).multiplyScalar(0.5)
   const deck = new THREE.Group()
   deck.position.copy(mid)
   deck.rotation.y = Math.atan2(dir.x, dir.z)
-  const width = ROAD_W + 1.0
+  const width = ROAD_W + 2.0
 
-  const plankA = flat(palette.wood), plankB = flat(palette.woodDark)
-  const n = Math.max(2, Math.round(len / 0.9))
-  for (let i = 0; i < n; i++) {
-    const p = new THREE.Mesh(new THREE.BoxGeometry(width, 0.16, len / n - 0.04), i % 2 ? plankA : plankB)
-    p.position.set(0, GROUND - 0.02, -len / 2 + (i + 0.5) * (len / n))
-    p.castShadow = true; p.receiveShadow = true
-    deck.add(p)
+  const stone = flat('#e4ddcc'), cap = flat('#f4efe3'), concrete = flat('#bdb6a6'), under = flat('#8d8777')
+  deck.add(box(width, 0.34, len, concrete, { y: GROUND - 0.4 }), box(width - 0.5, 0.5, len, under, { y: GROUND - 0.88 }))
+  for (const side of [-1, 1]) {
+    // pavement, parapet and its cap
+    deck.add(box(0.95, 0.12, len, flat(palette.island.pavement), { x: side * (ROAD_W / 2 + 0.45), y: GROUND - 0.06 }))
+    deck.add(box(0.3, 0.8, len, stone, { x: side * (width / 2 - 0.15), y: GROUND - 0.06 }))
+    deck.add(box(0.46, 0.12, len + 0.02, cap, { x: side * (width / 2 - 0.15), y: GROUND + 0.74 }))
   }
   const tiles = Math.max(1, Math.round(len / ROAD_W))
   for (let i = 0; i < tiles; i++) {
     const t = kit('road_straight')
-    t.scale.set(ROAD_W / 2, 1.0, len / tiles / 2)
-    t.position.set(0, GROUND - 0.1, -len / 2 + (i + 0.5) * (len / tiles))
+    t.scale.set(ROAD_W / 2, 1.2, len / tiles / 2)
+    t.position.set(0, ROAD_TOP - 0.12, -len / 2 + (i + 0.5) * (len / tiles))
     deck.add(t)
   }
-  const rail = flat('#8d6a40')
-  for (const side of [-1, 1]) {
-    const x = side * (width / 2 - 0.08)
-    deck.add(box(0.12, 0.12, len, rail, { x, y: GROUND + 0.9 }), box(0.12, 0.12, len, rail, { x, y: GROUND + 0.45 }))
-    const posts = Math.max(2, Math.floor(len / 2.4))
-    for (let i = 0; i <= posts; i++) deck.add(box(0.16, 1.0, 0.16, rail, { x, y: GROUND - 0.1, z: -len / 2 + 0.2 + i * ((len - 0.4) / posts) }))
-  }
-  const pier = flat('#6b7280')
-  const piers = Math.floor(len / 5)
-  for (let i = 0; i < piers; i++) {
+  // lamps along the parapets, arms leaning over the road
+  const lamps = Math.max(1, Math.floor(len / 8))
+  for (let i = 0; i < lamps; i++) {
+    const z = -len / 2 + (i + 0.5) * (len / lamps)
     for (const side of [-1, 1]) {
-      const p = cyl(0.3, 0.36, 2.6, pier, { x: side * (width / 2 - 0.2), y: GROUND - 2.7, z: -len / 2 + (i + 1) * (len / (piers + 1)) })
-      deck.add(p)
+      const l = kit('streetlight')
+      l.scale.setScalar(2.0)
+      l.position.set(side * (width / 2 - 0.5), GROUND + 0.05, z)
+      l.rotation.y = side < 0 ? 0 : Math.PI
+      deck.add(l)
     }
+  }
+  // gate posts at both ends
+  for (const end of [-1, 1]) {
+    for (const side of [-1, 1]) {
+      const x = side * (width / 2 - 0.2), z = end * (len / 2 - 0.25)
+      deck.add(box(0.7, 1.9, 0.7, stone, { x, y: GROUND - 0.06, z }), box(0.9, 0.14, 0.9, cap, { x, y: GROUND + 1.84, z }))
+      const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.22, 10, 8), new THREE.MeshBasicMaterial({ color: '#ffe7a3', toneMapped: false }))
+      bulb.position.set(x, GROUND + 2.2, z)
+      deck.add(bulb)
+    }
+  }
+  // tapered piers into the water, with a rounded nose upstream and downstream
+  const piers = Math.floor(len / 9)
+  for (let i = 0; i < piers; i++) {
+    const z = -len / 2 + (i + 1) * (len / (piers + 1))
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.25, 3.6, 8), stone)
+    body.scale.set(1, 1, 1.5)
+    body.position.set(0, GROUND - 2.6, z)
+    body.castShadow = true
+    const crown = box(width - 0.8, 0.3, 1.9, cap, { y: GROUND - 0.9, z })
+    deck.add(body, crown)
   }
   g.add(deck)
   return g

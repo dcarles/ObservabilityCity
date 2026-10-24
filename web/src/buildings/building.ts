@@ -166,7 +166,8 @@ export class Building {
     this.model.animate?.(time, dt)
     this.hit.scale.y = y + 2
     this.hit.position.y = (y + 2) / 2
-    if (this.label) this.label.position.set(0, y + 3.0, 0)
+    if (this.label) this.label.position.set(0, y + 3.4, 0)
+    this.fadeLabel(camera)
     this.closedSign.visible = n.state === 'Down'
   }
 
@@ -257,34 +258,43 @@ export class Building {
     return g
   }
 
-  /** Troubled buildings get a name label so you can tell which one it is without hovering. */
+  /** Every building carries a billboard with its name and instance count. It fades out when the camera is far away, except for troubled ones. */
   private updateLabel(): void {
     const n = this.node
     if (!n) return
-    const troubled = n.state !== 'Healthy'
-    if (!troubled) {
-      if (this.label) this.label.visible = false
-      return
-    }
-    const key = `${n.name}|${n.state}`
+    const text = plaqueText(n)
+    const warn = n.state === 'Down' ? 'down' : n.state === 'Stale' ? 'stale' : n.state !== 'Healthy' || n.instancesHealthy < n.instancesTotal ? 'warn' : 'ok'
+    const key = `${n.name}|${text}|${warn}`
     if (!this.label) {
-      const tex = canvasTexture(512, 96, () => {})
+      const tex = canvasTexture(512, 128, () => {})
       this.label = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, toneMapped: false }))
       this.label.renderOrder = 10
-      this.label.scale.set(4.2, 0.8, 1)
+      this.label.scale.set(4.8, 1.2, 1)
       this.root.add(this.label)
     }
-    this.label.visible = true
     if (key === this.labelKey) return
     this.labelKey = key
     const tex = (this.label.material as THREE.SpriteMaterial).map as THREE.CanvasTexture
     const ctx = (tex.image as HTMLCanvasElement).getContext('2d')!
-    ctx.clearRect(0, 0, 512, 96)
-    const color = n.state === 'Down' ? '#d63a2f' : n.state === 'Stale' ? '#8d949e' : '#e8a21a'
-    ctx.fillStyle = 'rgba(20,28,40,0.88)'; roundRect(ctx, 4, 8, 504, 80, 20); ctx.fill()
+    ctx.clearRect(0, 0, 512, 128)
+    const color = { down: '#d63a2f', stale: '#8d949e', warn: '#e8a21a', ok: '#9fb4cc' }[warn]
+    ctx.fillStyle = 'rgba(20,28,40,0.9)'; roundRect(ctx, 4, 6, 504, 116, 24); ctx.fill()
     ctx.strokeStyle = color; ctx.lineWidth = 6; ctx.stroke()
-    ctx.fillStyle = '#fff'; ctx.font = '700 40px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-    ctx.fillText(n.name, 256, 50)
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+    ctx.fillStyle = '#fff'; ctx.font = '700 46px system-ui, sans-serif'
+    ctx.fillText(n.name, 256, 48, 470)
+    ctx.fillStyle = warn === 'ok' ? '#b8c7da' : color; ctx.font = '600 34px system-ui, sans-serif'
+    ctx.fillText(text, 256, 92, 470)
     tex.needsUpdate = true
+  }
+
+  private fadeLabel(camera: THREE.Camera): void {
+    if (!this.label || !this.node) return
+    const troubled = this.node.state !== 'Healthy' || this.node.instancesHealthy < this.node.instancesTotal
+    const d = camera.position.distanceTo(this.label.getWorldPosition(new THREE.Vector3()))
+    const far = clamp((d - 75) / 40, 0, 1)
+    const opacity = troubled ? 1 : 1 - far
+    ;(this.label.material as THREE.SpriteMaterial).opacity = opacity
+    this.label.visible = opacity > 0.02
   }
 }

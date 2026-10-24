@@ -99,3 +99,10 @@ All 10 Phase 1 topics decided 2026-10-24.
 - Buildings read as a town (brick, trim, awnings, pitched roofs), windows are square and sized in metres, signs stand on a single post on land.
 - A service is an API, a worker and a database placed side by side (registry `service` field). Each pillar island has a port.
 - Roads, cars and street props come from the CC0 KayKit City Builder Bits kit.
+
+## Slice 1 look, round 3 (Dan, 2026-10-24)
+- Layout: no more two rows facing a central street (fronts hidden). Each service is a pad (API, worker and DB side by side, fronts toward a road), pads sit on a grid of rows along side roads off one spine road from the gate. Lone systems share a pad. Islands are sized to fit their grid, so a pillar with 5 services is about three rows by two columns.
+- Every building has a name and "N/M healthy" board (fades out when far, always on when troubled).
+- Distant windows blend to the wall's average colour instead of shimmering.
+- Bridges: stone and concrete road bridge with parapets, lamps and gate posts. Each island has one radial spoke road and bridge to the hub, so bridges never cross. Calls between islands go through the hub (hub and spoke), and the dependency overlay shows team-to-team links as arcs rather than extra bridges. Beyond about 12 islands use a second, staggered ring (already in the plan). Bridges are cheap to render (instanced road tiles); the limit is readability, not performance.
+- Second sample island: Payments (two services).

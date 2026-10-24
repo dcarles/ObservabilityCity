@@ -1,0 +1,12 @@
+pillar: pay
+displayName: Payments
+color: "#f2994a"
+defaults:
+  api: { slaP99Ms: 500 }
+systems:
+  - { id: pay.payments-api, service: payments, name: Payments API, role: api, external: true }
+  - { id: pay.payments-worker, service: payments, name: Payments worker, role: worker }
+  - { id: pay.payments-db, service: payments, name: Payments DB, role: db }
+  - { id: pay.refunds-api, service: refunds, name: Refunds API, role: api }
+  - { id: pay.refunds-worker, service: refunds, name: Refunds worker, role: worker }
+  - { id: pay.refunds-db, service: refunds, name: Refunds DB, role: db }

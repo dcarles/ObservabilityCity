@@ -32,7 +32,7 @@ async function start(): Promise<void> {
       const center = box.getCenter(new THREE.Vector3())
       const fov = THREE.MathUtils.degToRad(stage.camera.fov)
       const fit = Math.max(size.z / 2 / Math.tan(fov / 2), size.x / 2 / (Math.tan(fov / 2) * stage.camera.aspect))
-      stage.setHome(new THREE.Vector3(center.x, 0, center.z + 5), Math.min(260, fit * 0.68 + 10))
+      stage.setHome(new THREE.Vector3(center.x, 0, center.z), Math.min(420, fit * 0.82 + 12))
       stage.home(true)
       void preview.refresh()
     }
@@ -67,7 +67,7 @@ async function start(): Promise<void> {
   }
 
   // Debug handle for automated screenshots and poking from the console.
-  ;(window as unknown as { city: unknown }).city = { stage, town }
+  ;(window as unknown as { city: unknown }).city = { stage, town, THREE }
 
   const clock = new THREE.Clock()
   function frame(): void {

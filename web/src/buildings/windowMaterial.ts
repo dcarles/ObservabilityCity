@@ -61,6 +61,8 @@ export function makeWindowMaterial(spec: WindowSpec): { material: THREE.MeshStan
       uOffZ: { value: odd(spec.depth) },
       uRadial: { value: spec.radial ?? 0 },
       uBrick: { value: spec.brick ? 1 : 0 },
+      uLodNear: { value: 0.07 },
+      uLodFar: { value: 0.3 },
       uGlass: { value: new THREE.Color(palette.window.glass) },
       uLitColor: { value: new THREE.Color(palette.window.lit) },
       uDeadColor: { value: new THREE.Color(palette.window.dead) },
@@ -76,7 +78,7 @@ export function makeWindowMaterial(spec: WindowSpec): { material: THREE.MeshStan
 varying vec3 vObjNormal;
 varying vec3 vLocal;
 varying vec2 vWinUv;
-uniform float uLit, uDark, uStale, uSeed, uOffX, uOffZ, uRadial, uBrick;
+uniform float uLit, uDark, uStale, uSeed, uOffX, uOffZ, uRadial, uBrick, uLodNear, uLodFar;
 uniform vec2 uCell, uWin;
 uniform vec3 uGlass, uLitColor, uDeadColor, uTrim;
 float hash21(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
@@ -122,6 +124,11 @@ float crack = 0.0;`,
   vec3 col = wall;
   col = mix(col, trim, clamp(inFrame + sill, 0.0, 1.0));
   col = mix(col, glassCol, inGlass);
+  // Far away a cell is only a few pixels and the grid shimmers, so blend toward the average colour of a wall.
+  float px = max(fwidth(cx), fwidth(cy));
+  float lod = smoothstep(uLodNear, uLodFar, px);
+  col = mix(col, mix(wall, glassCol, 0.3), lod);
+  winLit = mix(winLit, 0.3 * side * uLit * (1.0 - uDark) * (1.0 - uStale), lod);
   diffuseColor.rgb = col;
   // jagged cracks on dark floors
   float line1 = abs(fract(cx * 0.5 + 0.18 * sin(vLocal.y * 5.0 + uSeed)) - 0.5);
