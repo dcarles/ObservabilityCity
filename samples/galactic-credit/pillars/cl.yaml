@@ -1,0 +1,13 @@
+pillar: cl
+displayName: Core Ledger
+color: "#5aa9ff"
+defaults:
+  api: { slaP99Ms: 300 }
+systems:
+  - { id: cl.gateway-api, name: Ledger gateway, role: api, external: true, slaP99Ms: 800 }
+  - { id: cl.ledger-api, name: Ledger API, role: api }
+  - { id: cl.posting-worker, name: Posting worker, role: worker }
+  - { id: cl.report-exporter, name: Report exporter, role: worker }
+  - { id: cl.statement-cron, name: Statement run, role: cron }
+  - { id: cl.ledger-db, name: Ledger DB, role: db }
+  - { id: cl.session-cache, name: Session cache, role: cache }

@@ -1,0 +1,12 @@
+# Baseline numbers for the fake source only. Anything left out comes from the role.
+hub.apim:               { rps: 520, p99Ms: 80,  minInstances: 4 }
+hub.service-bus:        { rps: 300, p99Ms: 10,  minInstances: 2 }
+hub.egress:             { rps: 70,  p99Ms: 450 }
+hub.customer-db:        { rps: 260, p99Ms: 22,  minInstances: 3 }
+cl.gateway-api:         { rps: 180, p99Ms: 240, minInstances: 3 }
+cl.ledger-api:          { rps: 140, p99Ms: 120, minInstances: 2, perInstanceRps: 35 }
+cl.posting-worker:      { rps: 60,  p99Ms: 4500, minInstances: 2 }
+cl.report-exporter:     { rps: 8,   p99Ms: 12000, minInstances: 1 }
+cl.statement-cron:      { rps: 0.2, p99Ms: 25000, minInstances: 1 }
+cl.ledger-db:           { rps: 230, p99Ms: 28,  minInstances: 2 }
+cl.session-cache:       { rps: 600, p99Ms: 2,   minInstances: 2 }

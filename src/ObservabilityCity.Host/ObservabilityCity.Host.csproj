@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <ItemGroup>
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.9.0" />
+    <ProjectReference Include="..\ObservabilityCity.Core\ObservabilityCity.Core.csproj" />
+    <ProjectReference Include="..\ObservabilityCity.Adapters.Fake\ObservabilityCity.Adapters.Fake.csproj" />
+  </ItemGroup>
+</Project>

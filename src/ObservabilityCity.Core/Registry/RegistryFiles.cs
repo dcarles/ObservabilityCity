@@ -1,0 +1,53 @@
+namespace ObservabilityCity.Core.Registry;
+
+// Shapes of the YAML files, as read from disk. RegistryLoader turns them into the Registry model.
+
+internal sealed class TownFile
+{
+    public string Id { get; set; } = "";
+    public string Name { get; set; } = "";
+    public string GroupLabel { get; set; } = "Group";
+    public string Topology { get; set; } = "direct";
+}
+
+internal sealed class ErrorThresholdsFile
+{
+    public double? Amber { get; set; }
+    public double? Red { get; set; }
+}
+
+internal sealed class RoleDefaultsFile
+{
+    public double? SlaP99Ms { get; set; }
+    public ErrorThresholdsFile? Errors { get; set; }
+}
+
+/// <summary>defaults.yaml and the "defaults" block of a pillar file: role name to defaults.</summary>
+internal sealed class DefaultsFile : Dictionary<string, RoleDefaultsFile>;
+
+internal sealed class SystemFile
+{
+    public string Id { get; set; } = "";
+    public string? Name { get; set; }
+    public string? Role { get; set; }
+    public bool? External { get; set; }
+    public double? SlaP99Ms { get; set; }
+    public ErrorThresholdsFile? Errors { get; set; }
+}
+
+internal sealed class PillarFile
+{
+    public string Pillar { get; set; } = "";
+    public string DisplayName { get; set; } = "";
+    public string Color { get; set; } = "#8ab4ff";
+    public bool External { get; set; }
+    public DefaultsFile Defaults { get; set; } = new();
+    public List<SystemFile> Systems { get; set; } = [];
+}
+
+internal sealed class HubFile
+{
+    public string DisplayName { get; set; } = "Hub";
+    public string Color { get; set; } = "#f5c26b";
+    public List<SystemFile> Resources { get; set; } = [];
+}

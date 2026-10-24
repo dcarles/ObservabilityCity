@@ -1,0 +1,4 @@
+id: galactic-credit
+name: Galactic Credit
+groupLabel: Pillar        # what an island is called in this town
+topology: hub-and-spoke   # cross-group calls go through the hub gateway
