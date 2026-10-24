@@ -58,10 +58,11 @@ function flatLayer(points: THREE.Vector2[], color: string, opacity: number, y: n
 }
 
 function slab(points: THREE.Vector2[], top: number, bottom: number, capColor: string, sideColor: string): THREE.Mesh {
-  const depth = top - bottom
+  // The bevel adds 0.12 above and below the extrusion, so the visible top lands exactly on `top`.
+  const depth = top - bottom - 0.24
   const g = new THREE.ExtrudeGeometry(shapeOf(points), { depth, bevelEnabled: true, bevelThickness: 0.12, bevelSize: 0.12, bevelSegments: 1, curveSegments: 1 })
   g.rotateX(-Math.PI / 2)
-  g.translate(0, bottom, 0)
+  g.translate(0, bottom + 0.12, 0)
   const m = new THREE.Mesh(g, [
     new THREE.MeshStandardMaterial({ color: capColor, roughness: 0.95, flatShading: true }),
     new THREE.MeshStandardMaterial({ color: sideColor, roughness: 0.95, flatShading: true }),

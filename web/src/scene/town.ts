@@ -3,7 +3,7 @@ import { Building } from '../buildings/building'
 import { canvasTexture, roundRect } from '../buildings/mk'
 import type { GroupSnapshot, NodeSnapshot, Snapshot } from '../types'
 import { palette } from '../themes/harbour-town/palette'
-import { avenue, bench, bridge, fountain, lamp, path, plotPad } from './props'
+import { avenue, bench, bridge, fountain, lamp, plotPad } from './props'
 import { buildIslandBody, GROUND, hill, makeOutline, scatterNature, type Outline, type Rect } from './island'
 import { hashString } from './random'
 import { spreadLane, WalkerSystem, type Route } from './walkers'
@@ -147,7 +147,8 @@ export class Town {
     paving.position.set(0, GROUND + 0.02, 2)
     paving.receiveShadow = true
     const fount = fountain()
-    fount.position.set(0, 0, 2)
+    fount.position.x = 0
+    fount.position.z = 2
     hubRoot.add(paving, fount)
     for (let i = 0; i < 6; i++) {
       const a = (i / 6) * Math.PI * 2 + 0.5
@@ -193,7 +194,8 @@ export class Town {
       const node = g.nodes[slot]
       if (!node) {
         // a spare plot: lawn with a bench so new systems can slot in without moving anything
-        root.add(bench(x + (left ? 0.8 : -0.8), z, left ? Math.PI / 2 : -Math.PI / 2))
+        root.add(bench(x + (left ? -1.2 : 1.2), z, left ? Math.PI / 2 : -Math.PI / 2))
+        root.add(...parkTrees(x, z, left))
         continue
       }
       const b = new Building(node.id, node.kind, g.color)
@@ -234,9 +236,9 @@ export class Town {
     }
     const g2 = new THREE.Group()
     g2.add(sign, post(-3), post(3))
-    g2.position.set(0, GROUND, z + 3)
-    g2.rotation.y = Math.PI // read it when arriving from the hub
-    g2.position.x = 0
+    // beside the street end, facing the bridge so it reads on arrival
+    g2.position.set(-7.5, GROUND, z + 1.5)
+    g2.rotation.y = 0.35
     return g2
   }
 
@@ -288,6 +290,30 @@ export class Town {
   node(id: string): NodeSnapshot | null {
     return this.buildings.get(id)?.node ?? null
   }
+}
+
+/** A couple of trees and flower beds for a spare plot. */
+function parkTrees(x: number, z: number, left: boolean): THREE.Object3D[] {
+  const out: THREE.Object3D[] = []
+  const side = left ? -1 : 1
+  const trunk = new THREE.MeshStandardMaterial({ color: palette.tree.trunk, flatShading: true })
+  const leaf = new THREE.MeshStandardMaterial({ color: '#58b85a', flatShading: true })
+  for (const [dx, dz, s] of [[side * 1.0, -2, 1.2], [side * 2.4, 1.6, 0.95]] as const) {
+    const t = new THREE.Group()
+    const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.2, 1.1, 5), trunk); tr.position.y = 0.55; tr.castShadow = true
+    const l = new THREE.Mesh(new THREE.IcosahedronGeometry(1.0, 0), leaf); l.position.y = 1.9; l.castShadow = true
+    t.add(tr, l)
+    t.scale.setScalar(s)
+    t.position.set(x + dx, GROUND, z + dz)
+    out.push(t)
+  }
+  const colors = ['#ff7a8a', '#ffd84d', '#ffffff', '#b58cff']
+  for (let i = 0; i < 8; i++) {
+    const f = new THREE.Mesh(new THREE.IcosahedronGeometry(0.17, 0), new THREE.MeshStandardMaterial({ color: colors[i % 4], flatShading: true }))
+    f.position.set(x + side * (-1.5 + (i % 4) * 0.55), GROUND + 0.18, z + 1.8 - Math.floor(i / 4) * 0.6 - 1.4)
+    out.push(f)
+  }
+  return out
 }
 
 function isExternal(g: GroupSnapshot, id: string): boolean {

@@ -92,7 +92,7 @@ export class WalkerSystem {
       const { pos, dir } = this.sample(w, w.dist)
       const fade = clamp(Math.min(w.dist, w.total - w.dist) / FADE, 0, 1)
       const bob = Math.abs(Math.sin(w.dist * 3.2 + w.phase)) * 0.06
-      const s = 0.4 + 0.6 * fade
+      const s = (0.4 + 0.6 * fade) * 1.45
       this.q.setFromAxisAngle(this.up, Math.atan2(dir.x, dir.z))
       this.m.compose(this.tmp.set(pos.x, pos.y + bob, pos.z), this.q, new THREE.Vector3(s, s, s))
       this.bodies.setMatrixAt(i, this.m)

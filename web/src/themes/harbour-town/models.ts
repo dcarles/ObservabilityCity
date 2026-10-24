@@ -297,7 +297,7 @@ function gateway(accent: string): BuildingModel {
     ctx.fillText('API GATEWAY', 256, 50)
   })
   const signMesh = new THREE.Mesh(new THREE.PlaneGeometry(4.6, 0.86), new THREE.MeshBasicMaterial({ map: sign }))
-  signMesh.position.set(0, 2.95, 1.83)
+  signMesh.position.set(0, 2.95, 1.96)
   base.add(signMesh, ...flags)
   const roof = group(box(2.1, 0.2, 2.1, gold), box(1.5, 0.5, 1.5, stone, { y: 0.2 }), at(mast(1.2), 0, 0.7, 0))
   return {

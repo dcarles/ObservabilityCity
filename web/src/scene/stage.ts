@@ -162,13 +162,13 @@ float n2(vec2 p){ vec2 i = floor(p); vec2 f = fract(p); f = f*f*(3.0-2.0*f);
         .replace('#include <color_fragment>', `#include <color_fragment>
 {
   vec2 p = vSeaPos.xz;
-  float w1 = n2(p * 0.18 + vec2(uTime * 0.05, uTime * 0.03));
-  float w2 = n2(p * 0.45 - vec2(uTime * 0.07, uTime * 0.02));
-  float tone = w1 * 0.6 + w2 * 0.4;
-  vec3 col = mix(uDeep, uShallow, smoothstep(0.25, 0.85, tone) * 0.55);
-  // thin bright wave crests that drift
-  float crest = smoothstep(0.82, 0.92, n2(p * 0.9 + vec2(uTime * 0.12, -uTime * 0.08)) * 0.6 + w2 * 0.45);
-  col += crest * 0.18;
+  float w1 = n2(p * 0.05 + vec2(uTime * 0.02, uTime * 0.012));
+  float w2 = n2(p * 0.13 - vec2(uTime * 0.03, uTime * 0.01));
+  float tone = w1 * 0.65 + w2 * 0.35;
+  vec3 col = mix(uDeep, uShallow, smoothstep(0.3, 0.8, tone) * 0.35);
+  // faint, sparse sparkles that drift
+  float crest = smoothstep(0.86, 0.95, n2(p * 0.55 + vec2(uTime * 0.08, -uTime * 0.05)) * 0.7 + w2 * 0.35);
+  col += crest * 0.10;
   diffuseColor.rgb = col;
 }`)
     }

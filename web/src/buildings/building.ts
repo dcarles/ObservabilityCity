@@ -166,7 +166,7 @@ export class Building {
     this.model.animate?.(time, dt)
     this.hit.scale.y = y + 2
     this.hit.position.y = (y + 2) / 2
-    if (this.label) this.label.position.set(0, y + 3.4, 0)
+    if (this.label) this.label.position.set(0, y + 3.0, 0)
     this.closedSign.visible = n.state === 'Down'
   }
 
@@ -199,7 +199,7 @@ export class Building {
     const { position, width, rotY } = this.model.plaque
     const tex = canvasTexture(256, 96, () => {})
     const mesh = new THREE.Mesh(
-      new THREE.PlaneGeometry(width, width * (96 / 256)),
+      new THREE.PlaneGeometry(width * 1.35, width * 1.35 * (96 / 256)),
       new THREE.MeshBasicMaterial({ map: tex, transparent: true, toneMapped: false }),
     )
     mesh.position.copy(position)
@@ -271,7 +271,7 @@ export class Building {
       const tex = canvasTexture(512, 96, () => {})
       this.label = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, toneMapped: false }))
       this.label.renderOrder = 10
-      this.label.scale.set(5.6, 1.05, 1)
+      this.label.scale.set(4.2, 0.8, 1)
       this.root.add(this.label)
     }
     this.label.visible = true
