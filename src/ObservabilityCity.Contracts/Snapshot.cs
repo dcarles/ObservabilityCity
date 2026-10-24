@@ -31,12 +31,16 @@ public enum HealthState
 
 /// <summary>
 /// One building: a system or a hub resource, with the numbers the renderer turns into visuals.
+/// Service names the group of buildings that belong together (for example an API, its worker and its database), so they are drawn side by side.
+/// External marks systems that outside callers reach, which the renderer draws as a different kind of traffic.
 /// Load is the share of capacity in use (0 idle, 1 full, above 1 saturated); each source works it out its own way.
 /// </summary>
 public sealed record NodeSnapshot(
     string Id,
     string Name,
     NodeKind Kind,
+    string? Service,
+    bool External,
     HealthState State,
     int InstancesTotal,
     int InstancesHealthy,

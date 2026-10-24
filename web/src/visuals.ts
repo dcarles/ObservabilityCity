@@ -44,7 +44,7 @@ export function speedFactor(p99Ms: number, slaP99Ms: number): number {
 
 /** Walkers arriving per second at a building: grows with request rate, but gently so busy services stay readable. */
 export function spawnRate(rps: number): number {
-  return rps <= 0 ? 0 : 0.04 * Math.pow(rps, 0.6)
+  return rps <= 0 ? 0 : 0.07 * Math.pow(rps, 0.6)
 }
 
 export function plaqueText(n: Pick<NodeSnapshot, 'state' | 'instancesTotal' | 'instancesHealthy'>): string {

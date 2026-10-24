@@ -39,7 +39,7 @@ describe('signals', () => {
     expect(litFraction(2)).toBe(1)
   })
 
-  it('sends no walkers to an idle building and grows slowly with traffic', () => {
+  it('sends no cars to an idle building and grows slowly with traffic', () => {
     expect(spawnRate(0)).toBe(0)
     expect(spawnRate(1000)).toBeLessThan(spawnRate(100) * 4)
   })

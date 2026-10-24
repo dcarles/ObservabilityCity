@@ -16,13 +16,23 @@ public class RegistryTests
     }
 
     [Fact]
+    public void Systems_with_the_same_service_are_grouped()
+    {
+        var registry = RegistryLoader.Load(TestPaths.Registry);
+        var ledger = registry.AllNodes.Where(n => n.Service == "ledger").Select(n => n.Kind).ToList();
+
+        Assert.Equal([NodeKind.Api, NodeKind.Worker, NodeKind.Database], ledger);
+        Assert.Null(registry.AllNodes.Single(n => n.Id == "cl.session-cache").Service);
+    }
+
+    [Fact]
     public void Defaults_cascade_system_over_pillar_over_app()
     {
         var registry = RegistryLoader.Load(TestPaths.Registry);
         RegistryNode Node(string id) => registry.AllNodes.Single(n => n.Id == id);
 
-        Assert.Equal(800, Node("cl.gateway-api").SlaP99Ms); // system override
-        Assert.Equal(300, Node("cl.ledger-api").SlaP99Ms);  // pillar default for api
+        Assert.Equal(800, Node("cl.ledger-api").SlaP99Ms); // system override
+        Assert.Equal(300, Node("cl.posting-api").SlaP99Ms);  // pillar default for api
         Assert.Equal(30000, Node("cl.posting-worker").SlaP99Ms); // app default for worker
         Assert.Equal(0.005, Node("cl.ledger-db").ErrorAmber); // app default for db
     }

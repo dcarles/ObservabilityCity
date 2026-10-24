@@ -86,6 +86,7 @@
           "errorAmber",
           "errorRate",
           "errorRed",
+          "external",
           "id",
           "instancesHealthy",
           "instancesTotal",
@@ -107,6 +108,13 @@
           },
           "kind": {
             "$ref": "#/components/schemas/NodeKind"
+          },
+          "service": {
+            "type": "string",
+            "nullable": true
+          },
+          "external": {
+            "type": "boolean"
           },
           "state": {
             "$ref": "#/components/schemas/HealthState"

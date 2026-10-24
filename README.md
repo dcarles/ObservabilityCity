@@ -1,6 +1,6 @@
 # Observability City
 
-A browser app that shows system health as a living, animated 3D town instead of a dashboard. Each pillar (or team) is an island, each system is a building, and what is going on shows in the town itself: floors for instances, lit windows for load, rooftop beacons for errors, walkers for traffic.
+A browser app that shows system health as a living, animated 3D town instead of a dashboard. Each pillar (or team) is an island, each system is a building, and what is going on shows in the town itself: floors for instances, lit windows for load, rooftop beacons for errors, cars for traffic.
 
 **Status: Phase 1, slice 1.** The pipeline runs end to end on fake data (backend, live push, browser), and the hub island plus one sample island (Galactic Credit's "Core Ledger") are built. Everything else is in [plan/](plan/observability-city-plan.md).
 
@@ -63,7 +63,9 @@ How to read the town, as built so far:
 | Lit windows | Load: how much of its capacity the building is using |
 | Dark, cracked floors and an amber plaque | Unhealthy instances ("5/10 healthy") |
 | Rooftop beacon: green, amber, red (red pulses) | Error rate against the system's own thresholds. Red only ever means errors |
-| Walkers | Traffic. More walkers means more requests, slower walkers means higher latency against the SLA, red walkers are failed calls |
+| Cars on the streets | Requests. More cars means more requests, slower cars means higher latency against the SLA. Blue sedans are internal calls, yellow taxis external ones, red hatchbacks failed calls |
+| API, worker and database side by side | One service. Systems that share a `service` in the registry are laid out next to each other on one pad |
+| Harbour with crates and a crane | The island's port, where messaging boats will dock (boats come in a later slice) |
 | "Closed for repairs" sign and a blackout | The system is down |
 | Grey building | No fresh data. Never shown as healthy |
 
@@ -118,4 +120,4 @@ The core knows only generic concepts (groups, systems, resources, links). Everyt
 
 ## Assets and licences
 
-The harbour-town theme is built from code (procedural meshes), so there are no third-party model files in the repo yet. Free CC0 kits can be added later through the theme system. Commercial model packs belong in a private fork and are git-ignored (`themes-private/`).
+The harbour-town theme uses roads, cars and street props from the CC0 [KayKit City Builder Bits](https://kaylousberg.itch.io/city-builder-bits) pack by Kay Lousberg (only the files in use, with the pack's licence beside them in `web/public/themes/harbour-town/kaykit/`). The buildings themselves are built from code in the same style. More free CC0 kits can be added through the theme system. Commercial model packs belong in a private fork and are git-ignored (`themes-private/`).

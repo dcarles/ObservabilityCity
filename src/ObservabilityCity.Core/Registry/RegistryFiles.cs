@@ -30,6 +30,8 @@ internal sealed class SystemFile
     public string Id { get; set; } = "";
     public string? Name { get; set; }
     public string? Role { get; set; }
+    /// <summary>Systems that share a service name are drawn together as one block.</summary>
+    public string? Service { get; set; }
     public bool? External { get; set; }
     public double? SlaP99Ms { get; set; }
     public ErrorThresholdsFile? Errors { get; set; }

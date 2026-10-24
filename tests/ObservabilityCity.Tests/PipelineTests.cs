@@ -87,8 +87,8 @@ public class PipelineTests
     public async Task Unhealthy_instances_show_as_partly_healthy_fleet()
     {
         var rig = new Rig { Fake = { Calm = true } };
-        rig.Fake.Add("cl.gateway-api", FakeEffectKind.UnhealthyInstances, 0.5);
-        var n = Node(await rig.Tick(), "cl.gateway-api");
+        rig.Fake.Add("cl.posting-api", FakeEffectKind.UnhealthyInstances, 0.5);
+        var n = Node(await rig.Tick(), "cl.posting-api");
 
         Assert.Equal(HealthState.Degraded, n.State);
         Assert.InRange(n.InstancesHealthy, 1, n.InstancesTotal - 1);

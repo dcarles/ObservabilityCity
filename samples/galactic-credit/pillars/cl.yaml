@@ -4,10 +4,16 @@ color: "#5aa9ff"
 defaults:
   api: { slaP99Ms: 300 }
 systems:
-  - { id: cl.gateway-api, name: Ledger gateway, role: api, external: true, slaP99Ms: 800 }
-  - { id: cl.ledger-api, name: Ledger API, role: api }
-  - { id: cl.posting-worker, name: Posting worker, role: worker }
-  - { id: cl.report-exporter, name: Report exporter, role: worker }
+  # Most core credit apps are one API, one worker and one database. Systems that share a
+  # service name are drawn side by side as one block.
+  - { id: cl.ledger-api, service: ledger, name: Ledger API, role: api, external: true, slaP99Ms: 800 }
+  - { id: cl.ledger-worker, service: ledger, name: Ledger worker, role: worker }
+  - { id: cl.ledger-db, service: ledger, name: Ledger DB, role: db }
+  - { id: cl.posting-api, service: posting, name: Posting API, role: api }
+  - { id: cl.posting-worker, service: posting, name: Posting worker, role: worker }
+  - { id: cl.posting-db, service: posting, name: Posting DB, role: db }
+  - { id: cl.statements-api, service: statements, name: Statements API, role: api }
+  - { id: cl.statements-worker, service: statements, name: Statements worker, role: worker }
+  - { id: cl.statements-db, service: statements, name: Statements DB, role: db }
   - { id: cl.statement-cron, name: Statement run, role: cron }
-  - { id: cl.ledger-db, name: Ledger DB, role: db }
   - { id: cl.session-cache, name: Session cache, role: cache }

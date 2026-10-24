@@ -26,6 +26,7 @@ public sealed record RegistryNode(
     string Name,
     string GroupId,
     NodeKind Kind,
+    string? Service,
     bool External,
     double SlaP99Ms,
     double ErrorAmber,

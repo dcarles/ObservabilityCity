@@ -93,3 +93,9 @@ Topics: 1 sample towns, 2 generator realism, 3 scenario switcher UX, 4 art style
 - 9 DECIDED: game-style quality presets Low/Medium/High/Ultra + Wall (30 fps cap for TVs/mini PCs). Auto: initial guess from GPU string/screen/memory, then measure frame time and step down/up with hysteresis (r3f drei PerformanceMonitor + AdaptiveDpr). Manual override in settings, remembered per browser. Target: smooth on an ordinary office laptop at Medium; dev PCs with GPUs get High/Ultra. Presets toggle shadows, bloom, water effects, pixel ratio, walker count, far-detail distance.
 - 10 DECIDED: thin slice first, then widen. Slice 1 = hub + one island at final art quality, live fake data via the real pipeline (contract, generator, SignalR), 3 signals. Then add signals, islands, UI, scenarios/stories, second town in demoable slices.
 All 10 Phase 1 topics decided 2026-10-24.
+
+## Slice 1 look, round 2 (Dan, 2026-10-24)
+- Requests are cars, not pedestrians: sedan = internal, taxi = external, red hatchback = failed. Count follows request rate, speed follows p99 against the SLA. Replaces walkers wherever the plan says walkers.
+- Buildings read as a town (brick, trim, awnings, pitched roofs), windows are square and sized in metres, signs stand on a single post on land.
+- A service is an API, a worker and a database placed side by side (registry `service` field). Each pillar island has a port.
+- Roads, cars and street props come from the CC0 KayKit City Builder Bits kit.

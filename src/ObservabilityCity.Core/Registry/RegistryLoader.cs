@@ -89,6 +89,7 @@ public static class RegistryLoader
             s.Name ?? s.Id[(dot + 1)..],
             groupId,
             kind,
+            s.Service,
             s.External ?? pillarExternal,
             Resolve(d => d?.SlaP99Ms, s.SlaP99Ms),
             Resolve(d => d?.Errors?.Amber, s.Errors?.Amber),

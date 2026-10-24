@@ -39,6 +39,8 @@ export interface components {
             id: string;
             name: string;
             kind: components["schemas"]["NodeKind"];
+            service?: string | null;
+            external: boolean;
             state: components["schemas"]["HealthState"];
             /** Format: int32 */
             instancesTotal: number;
