@@ -1,4 +1,4 @@
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
 using Swashbuckle.AspNetCore.SwaggerGen;
 
 namespace ObservabilityCity.Host;
@@ -9,10 +9,11 @@ namespace ObservabilityCity.Host;
 /// </summary>
 public sealed class RequireAllPropertiesFilter : ISchemaFilter
 {
-    public void Apply(OpenApiSchema schema, SchemaFilterContext context)
+    public void Apply(IOpenApiSchema schema, SchemaFilterContext context)
     {
-        if (schema.Properties is null) return;
-        foreach (var (name, prop) in schema.Properties)
-            if (!prop.Nullable) schema.Required.Add(name);
+        if (schema is not OpenApiSchema concrete || concrete.Properties is null) return;
+        concrete.Required ??= new HashSet<string>();
+        foreach (var (name, prop) in concrete.Properties)
+            if (!(prop.Type?.HasFlag(JsonSchemaType.Null) ?? false)) concrete.Required.Add(name);
     }
 }
