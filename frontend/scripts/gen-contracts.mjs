@@ -22,7 +22,9 @@ const contracts = check ? join(out, 'contracts.ts') : join(webDir, 'src', 'contr
 
 const dll = join(hostProject, 'bin', 'Debug', 'net10.0', 'ObservabilityCity.Host.dll')
 run('dotnet', ['swagger', 'tofile', '--output', openapi, dll, 'v1'], backendDir)
-run('npx', ['openapi-typescript', openapi, '-o', contracts], webDir)
+// openapi-typescript drives the TypeScript 5 compiler API, which TypeScript 7 no longer has, so it runs in its own
+// throwaway install next to TypeScript 5 while the app itself builds with TypeScript 7.
+run('npx', ['--yes', '-p', 'typescript@5.9.3', '-p', 'openapi-typescript@7.13.0', 'openapi-typescript', openapi, '-o', contracts], webDir)
 
 if (check) {
   const same = (a, b) => readFileSync(a, 'utf8').replace(/\r\n/g, '\n') === readFileSync(b, 'utf8').replace(/\r\n/g, '\n')

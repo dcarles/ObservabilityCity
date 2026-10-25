@@ -9,7 +9,7 @@ A browser app that shows system health as a living, animated 3D town instead of 
 | Tool | Version | Why |
 | --- | --- | --- |
 | [.NET SDK](https://dotnet.microsoft.com/download/dotnet/10.0) | **10.0** (LTS; the .NET 10 SDK includes the runtime) | Backend and the Aspire app host |
-| [Node.js](https://nodejs.org) | **22 or 24 LTS** (includes npm; Vite 8 needs 20.19 or newer) | The browser app (Vite) |
+| [Node.js](https://nodejs.org) | **24 LTS** (includes npm) | The browser app (Vite) |
 | A browser with WebGL | Any current Chrome, Edge, Firefox or Safari | The 3D town |
 | Git | Any | To clone |
 
@@ -21,7 +21,7 @@ Check what you have:
 
 ```
 dotnet --list-sdks     # should include 10.0.x
-node --version         # v22 or v24
+node --version         # v24
 ```
 
 ## Run it
