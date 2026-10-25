@@ -167,7 +167,7 @@ public class ResilientLoadingTests
         var builder = new SnapshotBuilder(holder, state, clock);
 
         clock.Advance(TimeSpan.FromSeconds(1));
-        state.Update(await fake.PollAsync(holder.Current, default));
+        state.Update(await fake.PollAsync(holder.Current, TestContext.Current.CancellationToken));
         var snapshot = builder.Build();
 
         var bb = Group(snapshot, "bb");
@@ -188,9 +188,9 @@ public class ResilientLoadingTests
         var notifier = new FlakyNotifier();
         using var publisher = new SnapshotPublisher(builder, store, notifier, TimeSpan.FromMilliseconds(20));
 
-        await publisher.StartAsync(default);
+        await publisher.StartAsync(TestContext.Current.CancellationToken);
         await WaitFor(() => notifier.Published >= 3);
-        await publisher.StopAsync(default);
+        await publisher.StopAsync(TestContext.Current.CancellationToken);
 
         Assert.True(notifier.Failed >= 1);
         Assert.True(notifier.Published >= 3);

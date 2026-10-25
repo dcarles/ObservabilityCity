@@ -89,7 +89,7 @@ backend/                           .NET solution (ObservabilityCity.slnx)
   src/ObservabilityCity.Adapters.Fake  the fake source: noise, daily cycle, autoscaling, scenario effects
   src/ObservabilityCity.Host         ASP.NET Core: /api/snapshot/latest, SignalR hub /hubs/town, /api/fake
   src/ObservabilityCity.AppHost      .NET Aspire: starts the host and the frontend together
-  tests/ObservabilityCity.Tests      xunit tests
+  tests/ObservabilityCity.Tests      xunit v3 tests (Microsoft Testing Platform)
   tools/ObservabilityCity.Validate   registry checker
 frontend/                          Vite + TypeScript + three.js browser app
   src/                               app code
@@ -116,14 +116,14 @@ CI runs `npm run check:contracts` and fails if the generated files are out of da
 ### Tests
 
 ```
-dotnet test backend              # registry, resilient loading, validator, rules, fake source, 24-island backend load, golden fixtures
+dotnet test --solution backend/ObservabilityCity.slnx  # registry, resilient loading, validator, rules, fake source, 24-island backend load, golden fixtures
 cd frontend && npm test          # visual rules, snapshot guard, island layout (including 24 uneven islands), golden fixtures
 cd frontend && npm run e2e       # browser scenarios on a small town: break things, check the town, calm it down (about 1 minute)
 cd frontend && npm run e2e:slow  # 24-island stress town and the full sample town, with screenshots (about 1 minute)
 dotnet run --project backend/tools/ObservabilityCity.Validate -- --all   # check every registry folder in the repo
 ```
 
-To refresh the golden fixtures (calm town, a bad day across several islands, and the editor schemas) after an intended change: `UPDATE_GOLDEN=1 dotnet test backend`. The island layout golden is refreshed with `cd frontend && UPDATE_GOLDEN=1 npm test`.
+To refresh the golden fixtures (calm town, a bad day across several islands, and the editor schemas) after an intended change: `UPDATE_GOLDEN=1 dotnet test --solution backend/ObservabilityCity.slnx`. The island layout golden is refreshed with `cd frontend && UPDATE_GOLDEN=1 npm test`.
 
 **Browser tests** (`frontend/tests/e2e/`, Playwright) start the real backend with the fake source and the real page, steer the fake source through `/api/fake/effects`, and read the scene's state through `window.city` (beacon colour, dark floors, closed sign, queue warning, crates, dead-letter light) instead of pixels. With `?test=1` the page draws nothing on its own and time moves only when a test calls `city.step(seconds)`, so tests do not depend on a GPU. The first run needs the browser: `cd frontend && npx playwright install chromium`. Set `E2E_NO_BUILD=1` once the backend is built in Release.
 
