@@ -442,10 +442,11 @@ export class CarSystem {
   /** The "+N waiting" and "!" bubble over a bay. N is the requests in flight (rate times typical latency) that the lane has no room to draw, and "!" shows when p99 is well past the SLA. */
   private updateMarkers(): void {
     for (const plan of this.plans) {
-      const mk = this.markers.get(plan.route.dest)
-      if (!mk) continue
       const n = plan.route.dest.node
       const honk = !!n && n.slaP99Ms > 0 && n.p99Ms > n.slaP99Ms * 1.5 && this.cars.some((c) => c.plan.route.dest === plan.route.dest && c.committed && c.stage !== 'back')
+      // The "!" goes up as soon as a car is stuck behind a slow system, whether or not the lane has filled yet; the bubble is made on demand.
+      const mk = honk ? this.markerFor(plan) : this.markers.get(plan.route.dest)
+      if (!mk) continue
       let hidden = 0
       if (n && this.time - mk.full < 3) {
         const inFlight = n.requestsPerSecond * (n.p99Ms / 2000)

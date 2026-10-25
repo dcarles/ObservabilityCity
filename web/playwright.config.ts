@@ -65,7 +65,7 @@ export default defineConfig({
         // fast, steady numbers: a snapshot every half second, and a quiet source turns stale in 3 seconds
         Snapshot__IntervalSeconds: '0.5',
         Snapshot__StaleAfterSeconds: '3',
-        Fake__PollInterval: '00:00:00.5',
+        Fake__PollInterval: process.env.E2E_FAKE_POLL ?? '00:00:00.5',
         Registry__WatchSeconds: '1',
       },
     },

@@ -50,12 +50,19 @@ export class Town {
     await this.reset()
     await this.page.goto(`/?test=1&quality=low${query}`)
     await this.page.waitForFunction(() => (window as any).city?.seen.snapshots > 0)
+    // The first snapshot can predate the reset (a node still stale or down from the last test). Start from one that is calm.
+    await this.page.waitForFunction(
+      () => (window as any).city.seen.last.groups.flatMap((g: any) => g.nodes).every((n: any) => n.state === 'Healthy'),
+      null,
+      { timeout: 20_000, polling: 100 },
+    )
   }
 
   /** Back to a calm baseline: no effects, no backlog or dead letters left over, noise frozen. */
   async reset(): Promise<void> {
-    expect((await this.request.post(`${API}/api/fake/reset`)).ok()).toBe(true)
+    // calm first: a poll that lands between the two calls must not see the noisy baseline
     expect((await this.request.post(`${API}/api/fake/calm`, { data: { on: true } })).ok()).toBe(true)
+    expect((await this.request.post(`${API}/api/fake/reset`)).ok()).toBe(true)
   }
 
   async effect(target: string, kind: string, intensity = 1): Promise<string> {
