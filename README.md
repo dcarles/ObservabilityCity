@@ -55,6 +55,20 @@ Hover a building for its numbers. Drag to orbit, scroll to zoom, right-drag to p
 
 The **Try it** panel (temporary in this slice) pokes the fake data source: pick a target (the whole town, an island or one building), then press Traffic spike, Slow, Errors, Sick instances, High CPU, High memory, DB saturated, Queue backs up, Dead letters or Down. Effects stack, and each shows as a chip you can click to clear. **Calm** freezes the noise and the daily cycle.
 
+### Demo trouble from a script
+
+Until the Break things panel exists, `scripts/trouble.ps1` pokes the fake source with ready-made trouble (PowerShell 5.1 or 7, backend running on http://localhost:5080):
+
+```
+./scripts/trouble.ps1 list                  # the presets
+./scripts/trouble.ps1 high-cpu dlq-buildup  # presets stack
+./scripts/trouble.ps1 bad-day               # errors, slowness, dead letters and a throttled DB across Payments and Core Ledger
+./scripts/trouble.ps1 raw cl.ledger-api Errors 0.5
+./scripts/trouble.ps1 reset                 # back to a calm baseline
+```
+
+`scripts/trouble.http` has the same calls for VS Code, Visual Studio or Rider. Both use real Galactic Credit ids, so they only fit that town; edit the targets for another.
+
 How to read the town, as built so far:
 
 | You see | It means |
