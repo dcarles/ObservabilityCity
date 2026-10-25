@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { beaconLevel, darkFloorsFor, floorsFor, litFraction, speedFactor, spawnRate } from './visuals'
+import { beaconLevel, darkFloorsFor, floorsFor, formatAge, litFraction, speedFactor, spawnRate } from './visuals'
 import type { Snapshot } from './types'
 
 describe('floors', () => {
@@ -42,6 +42,22 @@ describe('signals', () => {
   it('sends no cars to an idle building and grows slowly with traffic', () => {
     expect(spawnRate(0)).toBe(0)
     expect(spawnRate(1000)).toBeLessThan(spawnRate(100) * 4)
+  })
+})
+
+describe('queue age', () => {
+  it('reads as seconds, minutes or hours', () => {
+    expect(formatAge(45)).toBe('45s')
+    expect(formatAge(240)).toBe('4m')
+    expect(formatAge(7200)).toBe('2.0h')
+  })
+
+  it('the calm fixture shows no dead letters and no late consumers', () => {
+    const fx = JSON.parse(readFileSync(resolve(__dirname, '../../tests/fixtures/snapshots/calm.json'), 'utf8')) as Snapshot
+    for (const n of fx.groups.flatMap((g) => g.nodes).filter((x) => x.kind === 'Worker')) {
+      expect(n.deadLetters).toBe(0)
+      expect(n.oldestMessageSeconds ?? 0).toBeLessThan(n.backlogAmber)
+    }
   })
 })
 

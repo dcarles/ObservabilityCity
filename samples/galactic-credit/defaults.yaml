@@ -1,6 +1,6 @@
 # App-wide defaults per role. Pillar files and single systems override these.
 api:      { slaP99Ms: 1000, errors: { amber: 0.01, red: 0.05 } }
-worker:   { slaP99Ms: 30000, errors: { amber: 0.01, red: 0.05 } }
+worker:   { slaP99Ms: 30000, errors: { amber: 0.01, red: 0.05 }, backlog: { amber: 60, red: 300 } }
 db:       { slaP99Ms: 100, errors: { amber: 0.005, red: 0.02 } }
 cache:    { slaP99Ms: 20, errors: { amber: 0.005, red: 0.02 } }
 cron:     { slaP99Ms: 60000, errors: { amber: 0.01, red: 0.05 } }

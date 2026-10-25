@@ -26,6 +26,9 @@ public sealed class FakeSource(
 
     private readonly DateTimeOffset _start = clock.GetUtcNow();
     private readonly ConcurrentDictionary<string, int> _instances = new();
+    private readonly ConcurrentDictionary<string, double> _backlog = new(); // messages a consumer has fallen behind by
+    private readonly ConcurrentDictionary<string, double> _deadLetters = new();
+    private DateTimeOffset _lastPoll;
     private readonly object _gate = new();
     private readonly List<FakeEffect> _effects = [];
     private int _nextId;
@@ -74,6 +77,8 @@ public sealed class FakeSource(
         var t = (now - _start).TotalSeconds;
         var effects = Effects;
         var result = new Dictionary<string, NodeReading>();
+        var dt = _lastPoll == default ? 0 : Math.Clamp((now - _lastPoll).TotalSeconds, 0, 5);
+        _lastPoll = now;
 
         foreach (var node in registry.AllNodes)
         {
@@ -129,7 +134,28 @@ public sealed class FakeSource(
                 memory = Math.Clamp(kindMem + memFx + (Calm ? 0 : 0.05 * Wobble(node.Id, t, 53)), 0.05, 1.0);
             }
 
-            result[node.Id] = new NodeReading(now, !down, current, healthy, load, rps, errors, p99, cpu, memory, utilisation, throttled);
+            double? queueDepth = null, oldest = null, deadLetters = null;
+            if (node.Kind == NodeKind.Worker)
+            {
+                // A consumer: messages arrive at the request rate and leave at what its healthy instances can take.
+                var slow = fx.Where(e => e.Kind == FakeEffectKind.Backlog).Sum(e => 0.95 * e.Intensity);
+                var serviceRate = down ? 0 : healthy * p.PerInstanceRps!.Value * (1 - Math.Clamp(slow, 0, 0.95));
+                var arrival = down ? p.Rps!.Value * cycle : rps;
+                var behind = _backlog.GetValueOrDefault(node.Id);
+                behind = Math.Clamp(behind + (arrival - serviceRate) * dt, 0, 250_000);
+                if (arrival <= serviceRate) behind = Math.Max(0, behind - 0.05 * behind * dt); // catches up faster once it can
+                _backlog[node.Id] = behind;
+                queueDepth = Math.Round(behind + arrival * 0.04);
+                oldest = Math.Round(behind / Math.Max(1.0, serviceRate), 1);
+
+                var poison = fx.Where(e => e.Kind == FakeEffectKind.Poison).Sum(e => 8 * e.Intensity);
+                var dead = _deadLetters.GetValueOrDefault(node.Id);
+                dead = Math.Max(0, dead * (1 - 0.004 * dt) + (poison + errors * rps * 0.02) * dt);
+                _deadLetters[node.Id] = dead;
+                deadLetters = Math.Round(dead);
+            }
+
+            result[node.Id] = new NodeReading(now, !down, current, healthy, load, rps, errors, p99, cpu, memory, utilisation, throttled, queueDepth, oldest, deadLetters);
         }
 
         return Task.FromResult<IReadOnlyDictionary<string, NodeReading>>(result);

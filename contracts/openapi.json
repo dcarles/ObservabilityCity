@@ -83,6 +83,8 @@
       },
       "NodeSnapshot": {
         "required": [
+          "backlogAmber",
+          "backlogRed",
           "errorAmber",
           "errorRate",
           "errorRed",
@@ -155,6 +157,21 @@
             "format": "double",
             "nullable": true
           },
+          "queueDepth": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "oldestMessageSeconds": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "deadLetters": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
           "requestsPerSecond": {
             "type": "number",
             "format": "double"
@@ -192,6 +209,14 @@
             "format": "double"
           },
           "throttleRed": {
+            "type": "number",
+            "format": "double"
+          },
+          "backlogAmber": {
+            "type": "number",
+            "format": "double"
+          },
+          "backlogRed": {
             "type": "number",
             "format": "double"
           },

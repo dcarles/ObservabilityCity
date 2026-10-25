@@ -10,6 +10,8 @@ export interface BoatRoute {
   rate: () => number
   /** Sailing speed multiplier from the broker's latency against its SLA. */
   speed: () => number
+  /** How full the boats are, 0 to 1: the island's message rate on a log scale. */
+  load: () => number
 }
 
 interface Boat {
@@ -25,6 +27,7 @@ interface Boat {
 
 const BASE_SPEED = 4.4
 const SEA = 0.12
+const BOAT_SCALE = 0.7
 const CRATE_COLORS = ['#e0573f', '#3f8fd9', '#f2b632', '#4fb37a', '#8e6bd9']
 
 /** One cargo boat: a pointed hull, a wheelhouse and a deck load of crates. */
@@ -51,12 +54,12 @@ function makeBoat(seed: number): { object: THREE.Group; cargo: THREE.Group } {
     box(1.3, 0.12, 1.3, flat('#c0483f'), { y: 1.35, z: -L / 2 + 0.9 }),
   )
   const cargo = new THREE.Group()
-  for (let i = 0; i < 4; i++) {
-    cargo.add(box(0.75, 0.7, 0.75, flat(CRATE_COLORS[(seed + i) % CRATE_COLORS.length]), { x: i % 2 ? 0.42 : -0.42, y: 0.46, z: 0.7 + Math.floor(i / 2) * 0.95 }))
+  for (let i = 0; i < 6; i++) {
+    cargo.add(box(0.75, 0.7, 0.75, flat(CRATE_COLORS[(seed + i) % CRATE_COLORS.length]), { x: i % 2 ? 0.42 : -0.42, y: 0.46, z: 1.2 - Math.floor(i / 2) * 0.9 }))
   }
   const object = new THREE.Group()
   object.add(hull, stripe, deck, house, cargo)
-  object.scale.setScalar(1.15)
+  object.scale.setScalar(BOAT_SCALE)
   return { object, cargo }
 }
 
@@ -126,6 +129,9 @@ export class BoatSystem {
     for (let i = 1; i < points.length; i++) { const l = points[i].distanceTo(points[i - 1]); lengths.push(l); total += l }
     const slot = this.free.pop()!
     slot.object.visible = true
+    // a fuller load for busier traffic: 1 to 6 crates on deck
+    const crates = 1 + Math.round(clamp(r.load(), 0, 1) * 5)
+    slot.cargo.children.forEach((c, i) => { c.visible = i < crates })
     this.boats.push({ object: slot.object, cargo: slot.cargo, points, lengths, total, dist: 0, route: r, phase: Math.random() * 6 })
   }
 
@@ -147,6 +153,6 @@ export class BoatSystem {
     b.cargo.visible = b.dist < b.total / 2
     // ease in and out at the quays
     const fade = clamp(Math.min(b.dist, b.total - b.dist) / 4, 0, 1)
-    o.scale.setScalar(1.15 * (0.4 + 0.6 * fade))
+    o.scale.setScalar(BOAT_SCALE * (0.4 + 0.6 * fade))
   }
 }

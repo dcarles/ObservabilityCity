@@ -37,6 +37,9 @@ public enum HealthState
 /// Cpu and Memory are the share in use across a service's instances (0 to 1). Utilisation is the share of provisioned capacity a data store
 /// uses (for example request units consumed against the maximum set), and Throttled is the share of requests it turned away. A source leaves out
 /// what it cannot measure (null), and the renderer shows only what is there.
+/// ErrorRate is the share of failed requests: 5xx responses, timeouts and unhandled exceptions. Client errors (4xx) are not failures, and 429 is counted as throttling.
+/// For a message consumer, QueueDepth is the messages waiting, OldestMessageSeconds the age of the oldest one (how late the consumer is), and DeadLetters the
+/// messages parked in the dead-letter queue. Sources that cannot tell leave them null.
 /// </summary>
 public sealed record NodeSnapshot(
     string Id,
@@ -52,6 +55,9 @@ public sealed record NodeSnapshot(
     double? Memory,
     double? Utilisation,
     double? Throttled,
+    double? QueueDepth,
+    double? OldestMessageSeconds,
+    double? DeadLetters,
     double RequestsPerSecond,
     double ErrorRate,
     double P99Ms,
@@ -62,6 +68,8 @@ public sealed record NodeSnapshot(
     double ResourceRed,
     double ThrottleAmber,
     double ThrottleRed,
+    double BacklogAmber,
+    double BacklogRed,
     DateTimeOffset? LastUpdated);
 
 /// <summary>An island (a pillar, a team, ...) or the hub island.</summary>

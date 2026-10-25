@@ -18,7 +18,7 @@ function slabMesh(w: number, d: number, h: number, color: string, x: number, y: 
 }
 
 /** Kit road tiles laid end to end between two points along z, with pavements on both sides. */
-export function street(x: number, z0: number, z1: number): THREE.Group {
+export function street(x: number, z0: number, z1: number, sides: (-1 | 1)[] = [-1, 1]): THREE.Group {
   const g = new THREE.Group()
   const len = Math.abs(z1 - z0)
   const zMid = (z0 + z1) / 2
@@ -30,13 +30,13 @@ export function street(x: number, z0: number, z1: number): THREE.Group {
     t.position.set(x, ROAD_TOP - 0.12, Math.min(z0, z1) + (i + 0.5) * tileLen)
     g.add(t)
   }
-  for (const side of [-1, 1]) g.add(slabMesh(0.9, len, CURB_TOP - GROUND, palette.island.pavement, x + side * (ROAD_W / 2 + 0.45), GROUND - 0.02, zMid))
+  for (const side of sides) g.add(slabMesh(0.9, len, CURB_TOP - GROUND, palette.island.pavement, x + side * (ROAD_W / 2 + 0.45), GROUND - 0.02, zMid))
   return g
 }
 
 /** The same along x, for side roads. */
-export function streetX(z: number, x0: number, x1: number): THREE.Group {
-  const g = street(0, 0, Math.abs(x1 - x0))
+export function streetX(z: number, x0: number, x1: number, sides: (-1 | 1)[] = [-1, 1]): THREE.Group {
+  const g = street(0, 0, Math.abs(x1 - x0), sides)
   g.rotation.y = Math.PI / 2
   g.position.set(Math.min(x0, x1), 0, z)
   return g
@@ -209,6 +209,13 @@ export function bridge(opts: BridgeOpts): THREE.Group {
   }
   g.add(deck)
   return g
+}
+
+/** The strip of asphalt in front of a pad where cars pull in and wait. */
+export function serviceLane(x: number, z: number, length: number, width: number): THREE.Mesh {
+  const m = slabMesh(length, width, 0.1, palette.island.road, x, ROAD_TOP - 0.095, z)
+  m.receiveShadow = true
+  return m
 }
 
 /** A short wooden pier reaching out from the coast, with posts and crates. */

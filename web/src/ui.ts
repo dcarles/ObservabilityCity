@@ -112,6 +112,8 @@ export class PreviewPanel {
         <button data-fx="HighCpu" data-i="1">High CPU</button>
         <button data-fx="HighMemory" data-i="1">High memory</button>
         <button data-fx="Saturate" data-i="1">DB saturated</button>
+        <button data-fx="Backlog" data-i="1">Queue backs up</button>
+        <button data-fx="Poison" data-i="1">Dead letters</button>
         <button data-fx="Down" data-i="1">Down</button>
         <button id="reset">Reset all</button>
       </div>

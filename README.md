@@ -53,25 +53,27 @@ The browser app proxies `/api` and `/hubs` to the backend, so there is nothing t
 
 Hover a building for its numbers. Drag to orbit, scroll to zoom, right-drag to pan, **Home** frames the town.
 
-The **Try it** panel (temporary in this slice) pokes the fake data source: pick a target (the whole town, an island or one building), then press Traffic spike, Slow, Errors, Sick instances, High CPU, High memory, DB saturated or Down. Effects stack, and each shows as a chip you can click to clear. **Calm** freezes the noise and the daily cycle.
+The **Try it** panel (temporary in this slice) pokes the fake data source: pick a target (the whole town, an island or one building), then press Traffic spike, Slow, Errors, Sick instances, High CPU, High memory, DB saturated, Queue backs up, Dead letters or Down. Effects stack, and each shows as a chip you can click to clear. **Calm** freezes the noise and the daily cycle.
 
 How to read the town, as built so far:
 
 | You see | It means |
 | --- | --- |
 | Number of floors | Instance count on a doubling scale (1, 2, 3-4, 5-8 ... 65+ gives 1 to 8 floors) |
-| Lit windows | Load: how much of its capacity the building is using |
+| Lit windows | Lights switch on floor by floor from the ground up. Apps and workers: CPU. Databases: share of provisioned capacity used (for example Cosmos RU %) |
 | Dark, cracked floors and an amber plaque | Unhealthy instances ("5/10 healthy") |
 | Rooftop beacon: green, amber, red (red pulses) | Errors, throttling or resource pressure against the system's own thresholds. Amber is a warning (including high CPU, memory or database utilisation), red means errors or throttled requests |
 | Factory (workers) and storage units (databases) | Workers are yellow-brick factories with a FACTORY sign and roof chimneys, databases are storage buildings with a STORAGE sign, both next to the API office. Chimney smoke thickens as CPU climbs. Storage doors light up with database utilisation |
-| Meter bars on the name board | Apps and workers show CPU and memory. Databases show utilisation (for example Cosmos RU %) and the share of throttled requests. Each bar turns amber then red against its thresholds |
+| Meter bars on the name board | Apps and workers show CPU and memory. Databases show utilisation (for example Cosmos RU %) and the share of throttled requests. An ERR bar shows the failure share (5xx, timeouts and unhandled exceptions; 4xx are not failures and 429 counts as throttling) and a line shows p99 against the SLA. Workers also show queue depth and oldest message, and dead letters. Each bar turns amber then red against its thresholds |
 | Lowered barrier gate at a database | Requests are being throttled |
-| Cars on the streets | Requests. More cars means more requests, slower cars means higher latency against the SLA. Blue sedans are internal calls, yellow taxis external ones, red hatchbacks failed calls |
+| Cars on the streets | Requests, drawn as a sample, not a count (at 200 requests a second only a few cars are shown, so more cars means more requests, not an exact number). Blue sedans are internal calls, yellow taxis external ones, all the same size. Cars never touch: in a lane each brakes for the car ahead, and at crossings a car keeps out of any older car's path |
+| Service lane beside a building, with cars waiting | Each building has a lane holding up to three cars. Time at the door is the latency, so a slow system builds a queue. Over the SLA the queued cars blink amber hazard lights, a "!" bubble honks over the lane and the name board shows p99 against the SLA. A car that finds the lane full turns round and a "+N waiting" marker counts those turned away. A served car drives into the building |
+| Car with a red flag on its roof | A failed request. It is turned away at the door and drives back the way it came. Its colour stays blue or yellow |
 | API, worker and database side by side | One service. Systems that share a `service` in the registry stand next to each other on one pad, with their fronts toward the road. Pads sit on a grid, so every building's front is visible from the road side |
 | Name board above a building | System name and "N/M healthy". Fades out when the camera is far away, except for troubled buildings |
 | Bridges | One road bridge from the hub's plaza to each island's gate. All sync traffic between islands goes through the hub |
-| Harbour with crates and a crane | The island's port, where messaging boats dock |
-| Boats between hub quays and island harbours | Asynchronous messaging. Busier queues send more boats. Bridges are synchronous calls, boats are asynchronous ones. Boats sail only on open water: each island has a quay on the hub in the water gap beside its bridge, and lanes are found around land and bridges |
+| Harbour with crates and a crane | The island's port, where messaging boats dock. Messages waiting pile up as crates on the quay with a "waiting N, oldest" sign. Dead letters sit in a pen of broken crates with a "DLQ N" badge and a sweeping red light. The hub shows the DLQ total |
+| Boats between hub quays and island harbours | Asynchronous messaging. Busier queues send more boats, smaller than before, and the crates on a boat show how loaded it is. Bridges are synchronous calls, boats are asynchronous ones. Boats sail only on open water: each island has a quay on the hub in the water gap beside its bridge, and lanes are found around land and bridges |
 | "Closed for repairs" sign and a blackout | The system is down |
 | Grey building | No fresh data. Never shown as healthy |
 

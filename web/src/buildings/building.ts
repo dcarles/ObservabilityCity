@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import type { NodeSnapshot } from '../types'
-import { beaconLevel, clamp, darkFloorsFor, floorsFor, lerp, litFraction, MAX_FLOORS, plaqueText, type BeaconLevel } from '../visuals'
+import { beaconLevel, clamp, darkFloorsFor, floorsFor, formatAge, formatMs, formatRate, lerp, MAX_FLOORS, plaqueText, type BeaconLevel } from '../visuals'
 import { palette } from '../themes/harbour-town/palette'
 import { buildModel } from '../themes/harbour-town/models'
 import type { BuildingModel, FloorModule } from './model'
@@ -162,7 +162,8 @@ export class Building {
       obj.position.y = y
       y += fh * f.height
       const u = f.module.uniforms
-      u.uLit.value = this.lit
+      // lights come on one floor at a time from the bottom, as the busy share climbs
+      u.uLit.value = clamp(this.lit * Math.max(1, this.floorsWanted) - i, 0, 1)
       u.uDark.value = f.dark
       u.uStale.value = this.stale
     })
@@ -177,9 +178,9 @@ export class Building {
     this.closedSign.visible = n.state === 'Down'
   }
 
-  /** Windows light with load; a data store's doors light with how much of its provisioned capacity is used. */
+  /** How busy the building is, 0 to 1: CPU for apps, utilisation for data stores, load for the rest. Lights switch on floor by floor to match. */
   private litTarget(n: NodeSnapshot): number {
-    return n.utilisation != null ? clamp(n.utilisation, 0.05, 1) : litFraction(n.load)
+    return clamp(n.cpu ?? n.utilisation ?? n.load * 0.6, 0.06, 1)
   }
 
   /** A barrier across a data store's drive that comes down while it is turning requests away. */
@@ -309,13 +310,16 @@ export class Building {
     const text = plaqueText(n)
     const pct = (v: number | null | undefined) => (v == null ? -1 : Math.round(v * 100))
     const warn = n.state === 'Down' ? 'down' : n.state === 'Stale' ? 'stale' : n.state !== 'Healthy' || n.instancesHealthy < n.instancesTotal ? 'warn' : 'ok'
-    const key = `${n.name}|${text}|${warn}|${pct(n.cpu)}|${pct(n.memory)}|${pct(n.utilisation)}|${Math.round((n.throttled ?? 0) * 1000)}`
-    const hasMeters = n.state !== 'Stale' && n.state !== 'Down' && (n.cpu != null || n.utilisation != null)
+    const live = n.state !== 'Stale' && n.state !== 'Down'
+    const key = [n.name, text, warn, pct(n.cpu), pct(n.memory), pct(n.utilisation), Math.round((n.throttled ?? 0) * 1000),
+      Math.round(n.errorRate * 1000), Math.round(n.p99Ms / 10), Math.round((n.queueDepth ?? -1) / 5), Math.round((n.oldestMessageSeconds ?? -1) / 2), n.deadLetters ?? -1].join('|')
+    const hasMeters = live && (n.cpu != null || n.utilisation != null)
+    const hasQueue = live && n.queueDepth != null
     if (!this.label) {
-      const tex = canvasTexture(512, 176, () => {})
+      const tex = canvasTexture(512, 256, () => {})
       this.label = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, toneMapped: false }))
       this.label.renderOrder = 10
-      this.label.scale.set(4.8, 1.65, 1)
+      this.label.scale.set(4.8, 2.4, 1)
       this.label.center.set(0.5, 0)
       this.root.add(this.label)
     }
@@ -323,10 +327,11 @@ export class Building {
     this.labelKey = key
     const tex = (this.label.material as THREE.SpriteMaterial).map as THREE.CanvasTexture
     const ctx = (tex.image as HTMLCanvasElement).getContext('2d')!
-    ctx.clearRect(0, 0, 512, 176)
+    ctx.clearRect(0, 0, 512, 256)
     const color = { down: '#d63a2f', stale: '#8d949e', warn: '#e8a21a', ok: '#9fb4cc' }[warn]
-    const h = hasMeters ? 164 : 116
-    const y0 = 176 - h - 6
+    const rows = (hasMeters ? 1 : 0) + (live ? 1 : 0) + (hasQueue ? 1 : 0)
+    const h = 116 + rows * 38
+    const y0 = 256 - h - 6
     ctx.fillStyle = 'rgba(20,28,40,0.9)'; roundRect(ctx, 4, y0, 504, h, 24); ctx.fill()
     ctx.strokeStyle = color; ctx.lineWidth = 6; ctx.stroke()
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
@@ -334,25 +339,40 @@ export class Building {
     ctx.fillText(n.name, 256, y0 + 42, 470)
     ctx.fillStyle = warn === 'ok' ? '#b8c7da' : color; ctx.font = '600 32px system-ui, sans-serif'
     ctx.fillText(text, 256, y0 + 84, 470)
+    let top = y0 + 110
+    const bar = (x: number, w: number, label: string, v: number, shown: string, amber: number, red: number | null) => {
+      ctx.fillStyle = 'rgba(255,255,255,0.14)'; roundRect(ctx, x, top, w, 28, 10); ctx.fill()
+      const fill = clamp(v, 0, 1)
+      ctx.fillStyle = red !== null && v >= red ? '#ff5a4d' : v >= amber ? '#ffb830' : '#47e07a'
+      if (fill > 0.01) { roundRect(ctx, x, top, Math.max(14, w * fill), 28, 10); ctx.fill() }
+      ctx.fillStyle = '#fff'; ctx.font = '700 22px system-ui, sans-serif'; ctx.textAlign = 'left'
+      ctx.fillText(`${label} ${shown}`, x + 12, top + 15, w - 16)
+    }
+    const note = (x: number, text2: string, hot: boolean) => {
+      ctx.fillStyle = hot ? '#ff5a4d' : '#b8c7da'; ctx.font = '700 22px system-ui, sans-serif'; ctx.textAlign = 'left'
+      ctx.fillText(text2, x, top + 15, 190)
+    }
     if (hasMeters) {
-      const bar = (x: number, w: number, label: string, v: number, amber: number, red: number | null) => {
-        const top = y0 + 112
-        ctx.fillStyle = 'rgba(255,255,255,0.14)'; roundRect(ctx, x, top, w, 28, 10); ctx.fill()
-        const fill = clamp(v, 0, 1)
-        ctx.fillStyle = red !== null && v >= red ? '#ff5a4d' : v >= amber ? '#ffb830' : '#47e07a'
-        if (fill > 0.01) { roundRect(ctx, x, top, Math.max(14, w * fill), 28, 10); ctx.fill() }
-        ctx.fillStyle = '#fff'; ctx.font = '700 22px system-ui, sans-serif'; ctx.textAlign = 'left'
-        ctx.fillText(`${label} ${Math.round(v * 100)}%`, x + 12, top + 15)
-      }
       if (n.utilisation != null) {
-        bar(24, 270, n.kind === 'Database' ? 'USED' : 'UTIL', n.utilisation, n.resourceAmber, n.resourceRed)
         const t = n.throttled ?? 0
-        ctx.fillStyle = t >= n.throttleAmber ? '#ff5a4d' : '#b8c7da'; ctx.font = '700 22px system-ui, sans-serif'; ctx.textAlign = 'left'
-        ctx.fillText(t >= n.throttleAmber ? `THROTTLED ${(t * 100).toFixed(1)}%` : 'no throttling', 312, y0 + 127, 188)
+        bar(24, 270, n.kind === 'Database' ? 'USED' : 'UTIL', n.utilisation, `${Math.round(n.utilisation * 100)}%`, n.resourceAmber, n.resourceRed)
+        note(312, t >= n.throttleAmber ? `THROTTLED ${(t * 100).toFixed(1)}%` : 'no throttling', t >= n.throttleAmber)
       } else {
-        bar(24, 224, 'CPU', n.cpu ?? 0, n.resourceAmber, n.resourceRed)
-        if (n.memory != null) bar(264, 224, 'MEM', n.memory, n.resourceAmber, n.resourceRed)
+        bar(24, 224, 'CPU', n.cpu ?? 0, `${Math.round((n.cpu ?? 0) * 100)}%`, n.resourceAmber, n.resourceRed)
+        if (n.memory != null) bar(264, 224, 'MEM', n.memory, `${Math.round(n.memory * 100)}%`, n.resourceAmber, n.resourceRed)
       }
+      top += 38
+    }
+    if (live) {
+      // errors (5xx, timeouts) as a share of requests, and how the slowest requests compare with the target
+      bar(24, 224, 'ERR', n.errorRate / Math.max(n.errorRed * 1.5, 0.001), `${(n.errorRate * 100).toFixed(n.errorRate < 0.1 ? 1 : 0)}%`, n.errorAmber / Math.max(n.errorRed * 1.5, 0.001), n.errorRed / Math.max(n.errorRed * 1.5, 0.001))
+      note(264, `p99 ${formatMs(n.p99Ms)} / ${formatMs(n.slaP99Ms)}`, n.p99Ms > n.slaP99Ms)
+      top += 38
+    }
+    if (hasQueue) {
+      const late = (n.oldestMessageSeconds ?? 0) >= n.backlogAmber
+      note(24, `QUEUE ${formatRate(n.queueDepth ?? 0)}${n.oldestMessageSeconds ? ` · oldest ${formatAge(n.oldestMessageSeconds)}` : ''}`, late)
+      note(300, `DLQ ${formatRate(n.deadLetters ?? 0)}`, (n.deadLetters ?? 0) > 0)
     }
     tex.needsUpdate = true
   }

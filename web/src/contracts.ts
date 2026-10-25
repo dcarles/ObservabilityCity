@@ -57,6 +57,12 @@ export interface components {
             /** Format: double */
             throttled?: number | null;
             /** Format: double */
+            queueDepth?: number | null;
+            /** Format: double */
+            oldestMessageSeconds?: number | null;
+            /** Format: double */
+            deadLetters?: number | null;
+            /** Format: double */
             requestsPerSecond: number;
             /** Format: double */
             errorRate: number;
@@ -76,6 +82,10 @@ export interface components {
             throttleAmber: number;
             /** Format: double */
             throttleRed: number;
+            /** Format: double */
+            backlogAmber: number;
+            /** Format: double */
+            backlogRed: number;
             /** Format: date-time */
             lastUpdated?: string | null;
         };

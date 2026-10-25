@@ -119,3 +119,18 @@ All 10 Phase 1 topics decided 2026-10-24.
 - All cars are the same size: each model is scaled to one length, and the grow-in at route ends is gone.
 - Boats stay on water. A bridge is a low road deck, so a boat cannot pass under it, and a lane round the hub would cross every bridge. Instead each island has a quay on the hub in the water gap beside its bridge, and a lane over open sea (grid search around land and bridges, scripts in web/src/scene/sea.ts) to the island's harbour.
 - Worker: a yellow-brick factory with chimneys and rooftop units on the roof (the sawtooth roof read as black blobs) and a FACTORY sign.
+
+## Data rule: metrics first (Dan, 2026-10-24)
+- Health and every visual come from metrics, never from logs or traces, because companies often sample those heavily. Adapters read pre-aggregated platform or OpenTelemetry metrics (not sampled log-based counts).
+- Traces or dependency data may only help discover which systems call which (existence of a link, not counts). Links stay declared in the registry first.
+- Logs are an on-demand view in a building's panel and never decide a colour.
+- Missing data shows as unknown (null), never as healthy.
+
+## Slice 1 look, round 6 (Dan, 2026-10-25)
+- Lights come on floor by floor from the ground up: CPU for apps and workers, percent of provisioned capacity (RU style) for databases.
+- Every building has a service lane beside the road, three cars long, so a queue never clogs the island road. Dwell time at the door is the latency. SLA breach shows as the queue, amber hazard lights, a "!" honk bubble and a p99 against SLA line on the name board. A car that finds the lane full turns round, counted by a "+N waiting" marker. Served cars drive into the building (no return trip, which also removed most junction jams).
+- Failed requests are cars with a red flag on the roof, turned away at the door and driving back. Colour stays internal blue or external yellow, and the red hatchback is gone.
+- Cars are a sample, not a count (a few cars stand for many requests; README notes it). Name board gets ERR and SLA rows.
+- Errors mean 5xx, timeouts and unhandled exceptions. 4xx are not failures. 429 is throttling.
+- Boats are smaller and their crates show load. A backlog is crates piled on the island quay with a "waiting N, oldest" sign (queue depth and oldest message age, from broker metrics). Dead letters are a pen of broken crates with a "DLQ N" badge and a sweeping red light. The hub shows the total DLQ. New contract fields: queue depth, oldest message seconds, dead letters, backlog thresholds (amber 60 s, red 300 s, cascading).
+- Cars never overlap. Rules: in a lane brake for the car ahead whatever its age. At crossings and merges a car keeps out of any older car's body and swept path (four points ahead) and out of any younger car's body, so waiting mostly depends on older cars. Known limit: when two cars still end up waiting for each other for over a second and a half, the younger one dissolves from the sample. About one car in seven does this at the busiest junctions in the sample town. A reservation scheme at junctions would remove that and is the next step if it is noticeable.

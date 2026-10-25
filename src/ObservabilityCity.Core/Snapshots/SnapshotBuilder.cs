@@ -47,19 +47,19 @@ public sealed class SnapshotBuilder(Registry.Registry registry, LatestState stat
         if (r is null || now - r.At > StaleAfter)
         {
             // No fresh data: keep the last numbers out of it. Grey, never green.
-            return new NodeSnapshot(n.Id, n.Name, n.Kind, n.Service, n.External, HealthState.Stale, 0, 0, 0, null, null, null, null, 0, 0, 0,
-                n.SlaP99Ms, n.ErrorAmber, n.ErrorRed, n.ResourceAmber, n.ResourceRed, n.ThrottleAmber, n.ThrottleRed, r?.At);
+            return new NodeSnapshot(n.Id, n.Name, n.Kind, n.Service, n.External, HealthState.Stale, 0, 0, 0, null, null, null, null, null, null, null, 0, 0, 0,
+                n.SlaP99Ms, n.ErrorAmber, n.ErrorRed, n.ResourceAmber, n.ResourceRed, n.ThrottleAmber, n.ThrottleRed, n.BacklogAmber, n.BacklogRed, r?.At);
         }
 
-        // Degraded: errors, slow, unhealthy instances, a resource running hot, or a data store turning requests away.
+        // Degraded: errors, slow, unhealthy instances, a resource running hot, a data store turning requests away, or a consumer running late.
         var hot = Math.Max(Math.Max(r.Cpu ?? 0, r.Memory ?? 0), r.Utilisation ?? 0) >= n.ResourceAmber;
         var health = !r.Up ? HealthState.Down
-            : r.ErrorRate >= n.ErrorAmber || r.P99Ms > n.SlaP99Ms || r.InstancesHealthy < r.InstancesTotal || hot || (r.Throttled ?? 0) >= n.ThrottleAmber
+            : r.ErrorRate >= n.ErrorAmber || r.P99Ms > n.SlaP99Ms || r.InstancesHealthy < r.InstancesTotal || hot || (r.Throttled ?? 0) >= n.ThrottleAmber || (r.OldestMessageSeconds ?? 0) >= n.BacklogAmber
                 ? HealthState.Degraded
                 : HealthState.Healthy;
 
         return new NodeSnapshot(n.Id, n.Name, n.Kind, n.Service, n.External, health, r.InstancesTotal, r.InstancesHealthy,
-            r.Load, r.Cpu, r.Memory, r.Utilisation, r.Throttled, r.RequestsPerSecond, r.ErrorRate, r.P99Ms, n.SlaP99Ms, n.ErrorAmber, n.ErrorRed,
-            n.ResourceAmber, n.ResourceRed, n.ThrottleAmber, n.ThrottleRed, r.At);
+            r.Load, r.Cpu, r.Memory, r.Utilisation, r.Throttled, r.QueueDepth, r.OldestMessageSeconds, r.DeadLetters, r.RequestsPerSecond, r.ErrorRate, r.P99Ms, n.SlaP99Ms, n.ErrorAmber, n.ErrorRed,
+            n.ResourceAmber, n.ResourceRed, n.ThrottleAmber, n.ThrottleRed, n.BacklogAmber, n.BacklogRed, r.At);
     }
 }

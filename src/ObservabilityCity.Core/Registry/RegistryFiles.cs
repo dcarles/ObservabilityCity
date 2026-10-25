@@ -24,6 +24,8 @@ internal sealed class RoleDefaultsFile
     public ErrorThresholdsFile? Resources { get; set; }
     /// <summary>The same for the share of throttled requests.</summary>
     public ErrorThresholdsFile? Throttle { get; set; }
+    /// <summary>When the oldest waiting message of a consumer turns amber and red, in seconds.</summary>
+    public ErrorThresholdsFile? Backlog { get; set; }
 }
 
 /// <summary>defaults.yaml and the "defaults" block of a pillar file: role name to defaults.</summary>
@@ -41,6 +43,7 @@ internal sealed class SystemFile
     public ErrorThresholdsFile? Errors { get; set; }
     public ErrorThresholdsFile? Resources { get; set; }
     public ErrorThresholdsFile? Throttle { get; set; }
+    public ErrorThresholdsFile? Backlog { get; set; }
 }
 
 internal sealed class PillarFile

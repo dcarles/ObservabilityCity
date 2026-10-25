@@ -79,6 +79,11 @@ export function formatRate(v: number): string {
   return v >= 1000 ? `${(v / 1000).toFixed(1)}k` : v >= 10 ? v.toFixed(0) : v.toFixed(1)
 }
 
+/** Age of the oldest waiting message: seconds, minutes or hours. */
+export function formatAge(seconds: number): string {
+  return seconds < 90 ? `${Math.round(seconds)}s` : seconds < 5400 ? `${Math.round(seconds / 60)}m` : `${(seconds / 3600).toFixed(1)}h`
+}
+
 export function formatMs(ms: number): string {
   return ms >= 1000 ? `${(ms / 1000).toFixed(1)} s` : `${ms.toFixed(0)} ms`
 }

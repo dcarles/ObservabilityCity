@@ -18,6 +18,10 @@ public enum FakeEffectKind
     HighMemory,
     /// <summary>A data store's utilisation pushed up by up to 60 points, so it starts throttling.</summary>
     Saturate,
+    /// <summary>A consumer slows to a crawl, so its queue grows and its oldest message ages.</summary>
+    Backlog,
+    /// <summary>Poison messages: up to 8 a second go to the dead-letter queue.</summary>
+    Poison,
 }
 
 /// <summary>A scenario effect layered on the baseline. Target is a node id, a group id (a whole island) or "*".</summary>

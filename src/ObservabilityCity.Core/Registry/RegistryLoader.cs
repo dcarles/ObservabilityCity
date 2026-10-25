@@ -25,6 +25,7 @@ public static class RegistryLoader
         Errors = new ErrorThresholdsFile { Amber = 0.01, Red = 0.05 },
         Resources = new ErrorThresholdsFile { Amber = 0.80, Red = 0.95 },
         Throttle = new ErrorThresholdsFile { Amber = 0.001, Red = 0.02 },
+        Backlog = new ErrorThresholdsFile { Amber = 60, Red = 300 },
     };
 
     public static Registry Load(string folder)
@@ -99,7 +100,9 @@ public static class RegistryLoader
             Resolve(d => d?.Resources?.Amber, s.Resources?.Amber),
             Resolve(d => d?.Resources?.Red, s.Resources?.Red),
             Resolve(d => d?.Throttle?.Amber, s.Throttle?.Amber),
-            Resolve(d => d?.Throttle?.Red, s.Throttle?.Red));
+            Resolve(d => d?.Throttle?.Red, s.Throttle?.Red),
+            Resolve(d => d?.Backlog?.Amber, s.Backlog?.Amber),
+            Resolve(d => d?.Backlog?.Red, s.Backlog?.Red));
     }
 
     private static NodeKind ParseKind(string? role, string id, string fileName)

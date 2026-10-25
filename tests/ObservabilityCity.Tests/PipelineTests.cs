@@ -128,6 +128,35 @@ public class PipelineTests
     }
 
     [Fact]
+    public async Task A_stalled_consumer_builds_a_backlog_and_degrades()
+    {
+        var rig = new Rig { Fake = { Calm = true } };
+        var calm = Node(await rig.Tick(), "cl.ledger-worker");
+        Assert.InRange(calm.QueueDepth!.Value, 0, 100);
+        Assert.Equal(0, calm.DeadLetters);
+        Assert.Null(Node(await rig.Tick(), "cl.ledger-db").QueueDepth);
+
+        rig.Fake.Add("cl.ledger-worker", FakeEffectKind.Backlog, 1);
+        Snapshot s = null!;
+        for (var i = 0; i < 30; i++) s = await rig.Tick();
+        var late = Node(s, "cl.ledger-worker");
+        Assert.True(late.QueueDepth > 500);
+        Assert.True(late.OldestMessageSeconds >= late.BacklogAmber);
+        Assert.Equal(HealthState.Degraded, late.State);
+    }
+
+    [Fact]
+    public async Task Poison_messages_fill_the_dead_letter_queue()
+    {
+        var rig = new Rig { Fake = { Calm = true } };
+        rig.Fake.Add("cl.ledger-worker", FakeEffectKind.Poison, 1);
+        Snapshot s = null!;
+        for (var i = 0; i < 10; i++) s = await rig.Tick();
+
+        Assert.True(Node(s, "cl.ledger-worker").DeadLetters > 40);
+    }
+
+    [Fact]
     public async Task Readings_that_stop_arriving_go_stale_not_green()
     {
         var rig = new Rig();

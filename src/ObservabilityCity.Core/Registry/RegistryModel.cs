@@ -34,7 +34,9 @@ public sealed record RegistryNode(
     double ResourceAmber,
     double ResourceRed,
     double ThrottleAmber,
-    double ThrottleRed);
+    double ThrottleRed,
+    double BacklogAmber,
+    double BacklogRed);
 
 /// <summary>Raised when a registry file is wrong. The message names the file and the id.</summary>
 public sealed class RegistryException(string message) : Exception(message);
