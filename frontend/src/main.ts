@@ -4,7 +4,8 @@ import { Stage } from './scene/stage'
 import { Town } from './scene/town'
 import { loadKit } from './assets/kit'
 import { Connection } from './connection'
-import { NoticesPanel, PreviewPanel, Search, showTooltip, TopBar, type SearchItem } from './ui'
+import { NoticesPanel, PreviewPanel, Search, showTooltip, StateList, TopBar, type SearchItem } from './ui'
+import type { PickItem } from './picker'
 import type { Snapshot } from './types'
 import { checkSnapshot } from './snapshotGuard'
 import { Building } from './buildings/building'
@@ -28,25 +29,37 @@ async function start(): Promise<void> {
     window.setTimeout(() => { banner.hidden = true }, 9000)
   }
 
-  const topbar = new TopBar(() => stage.home())
-  const notices = new NoticesPanel()
-  const preview = new PreviewPanel(() =>
-    [...town.buildings.values()].map((b) => ({ id: b.id, name: b.node?.name ?? b.id, group: b.id.split('.')[0] })))
+  /** Glides the camera to an island or a building and keeps its name board up. */
+  function goTo(item: PickItem): void {
+    const focus = item.kind === 'island' ? town.islandFocusOf(item.id) : town.focusOf(item.id)
+    town.select(item.kind === 'building' ? item.id : null)
+    if (focus) stage.focus(focus.target, focus.distance)
+  }
 
-  const search = new Search(
-    () => {
-      const items: SearchItem[] = town.islands.map((i) => ({ kind: 'island', id: i.group.id, name: i.group.displayName, where: i.group.displayName }))
-      for (const isl of town.islands)
-        for (const [id, b] of isl.buildings) items.push({ kind: 'building', id, name: b.node?.name ?? id, where: isl.group.displayName })
-      for (const [id, b] of town.buildings) if (id.startsWith('hub.')) items.push({ kind: 'building', id, name: b.node?.name ?? id, where: 'Platform hub' })
-      return items
+  const stateList = new StateList(
+    (state) => {
+      const groups = seen.last?.groups ?? []
+      return groups.flatMap((g) => g.nodes.filter((n) => n.state === state).map<PickItem>((n) => ({ kind: 'building', id: n.id, name: n.name, where: g.displayName, state: n.state })))
     },
-    (item) => {
-      const focus = item.kind === 'island' ? town.islandFocusOf(item.id) : town.focusOf(item.id)
-      town.select(item.kind === 'building' ? item.id : null)
-      if (focus) stage.focus(focus.target, focus.distance)
-    },
+    goTo,
   )
+  const topbar = new TopBar(() => stage.home(), (state, anchor) => stateList.toggle(state, anchor))
+  const notices = new NoticesPanel()
+  const buildingItems = (): SearchItem[] => {
+    const items: SearchItem[] = []
+    for (const isl of town.islands)
+      for (const [id, b] of isl.buildings) items.push({ kind: 'building', id, name: b.node?.name ?? id, where: isl.group.displayName })
+    for (const [id, b] of town.buildings) if (id.startsWith('hub.')) items.push({ kind: 'building', id, name: b.node?.name ?? id, where: 'Platform hub' })
+    return items
+  }
+  const islandItems = (): SearchItem[] => town.islands.map((i) => ({ kind: 'island', id: i.group.id, name: i.group.displayName, where: i.group.displayName }))
+  const preview = new PreviewPanel(() => [
+    { kind: 'town', id: '*', name: 'Whole town', where: '' },
+    ...islandItems().map((i) => ({ ...i, name: `Island: ${i.name}` })),
+    ...buildingItems(),
+  ])
+
+  const search = new Search(() => [...islandItems(), ...buildingItems()], goTo)
   void search
 
   // What the page has shown so far, for tests and for poking from the console.
@@ -93,6 +106,7 @@ async function start(): Promise<void> {
     seen.last = s
     topbar.setStatus('live') // a good snapshot just arrived, whatever the last bad one said
     topbar.setSnapshot(s)
+    stateList.refresh()
     notices.show(s.notices)
   }
 

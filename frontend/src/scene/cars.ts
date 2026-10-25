@@ -21,6 +21,8 @@ export interface Bay {
 /** A way requests reach a building: the road they take and whether they come from inside or outside. */
 export interface Route {
   dest: Building
+  /** The building the cars drive out of: they appear at its front and never anywhere else. */
+  source: Building
   origin: Origin
   /** Road centre line from where cars appear to the point where they turn into the bay (or stop, without a bay). */
   path: THREE.Vector3[]
@@ -72,6 +74,8 @@ interface Car {
   pace: number
   /** Seconds spent waiting for a gap to turn round into. */
   wait: number
+  /** Seconds since it appeared. A new car grows out of its building's front for a moment, so it never pops into view. */
+  age: number
 }
 
 interface Marker {
@@ -98,6 +102,10 @@ const TOUCH_YOUNGER = 1.1
 const REACH = 11
 const CROWD_R = 9
 const CROWD_MAX = 3
+/** Seconds a new car takes to grow to full size. */
+const GROW = 0.5
+/** Seconds a failed request stays at the door, flag up, before it is turned away. */
+const FAIL_HOLD = 0.8
 const TRAFFIC = 0.4 // every car now drives there and back, so fewer need to leave
 
 /**
@@ -126,6 +134,12 @@ export class CarSystem {
   private readonly unit: number[] = []
   private nextId = 1
   private time = 0
+  /** Failed requests that stopped at the door and drove back the way they came, since the town was built. For tests. */
+  turnedAway = 0
+  /** Cars drawn with a red flag right now. For tests. */
+  get flagged(): number {
+    return this.flags.count
+  }
 
   constructor(private readonly max = 420) {
     for (const name of MODELS) {
@@ -142,10 +156,10 @@ export class CarSystem {
       this.object.add(im)
     }
     // a small red flag on the roof marks a failed request
-    const pole = new THREE.BoxGeometry(0.05, 0.9, 0.05)
-    pole.translate(0, 0.45, 0)
-    const cloth = new THREE.BoxGeometry(0.62, 0.38, 0.04)
-    cloth.translate(0.33, 0.78, 0)
+    const pole = new THREE.BoxGeometry(0.09, 1.3, 0.09)
+    pole.translate(0, 0.65, 0)
+    const cloth = new THREE.BoxGeometry(1.0, 0.62, 0.06)
+    cloth.translate(0.5, 1.0, 0)
     this.flags = new THREE.InstancedMesh(mergeGeometries([pole, cloth])!, new THREE.MeshBasicMaterial({ color: '#ff3d3d', toneMapped: false }), max)
     this.flags.count = 0
     this.flags.frustumCulled = false
@@ -274,8 +288,8 @@ export class CarSystem {
           const n = c.plan.route.dest.node
           const ratio = n && n.slaP99Ms > 0 ? n.p99Ms / n.slaP99Ms : 0
           c.stage = 'serving'
-          // time at the door is the latency: brief inside the SLA, longer as p99 passes it. Failed requests are turned away quickly.
-          c.timer = c.failed ? 0.25 : Math.min(6, 0.3 + 1.6 * Math.max(0, ratio - 0.5))
+          // time at the door is the latency: brief inside the SLA, longer as p99 passes it. Failed requests are turned away after a short stop.
+          c.timer = c.failed ? FAIL_HOLD : Math.min(6, 0.3 + 1.6 * Math.max(0, ratio - 0.5))
         }
       } else if (c.stage === 'back' && c.dist >= c.total - 2.5 && c.fade < 0) {
         c.fade = 0.4 // gone from the sample just before the start of the road, where new cars appear
@@ -292,11 +306,12 @@ export class CarSystem {
       let d = target - c.yaw
       d = Math.atan2(Math.sin(d), Math.cos(d))
       c.yaw += d * Math.min(1, dt * 9)
-      const s = this.unit[c.model] * (c.fade >= 0 ? Math.max(0.01, c.fade / 0.5) : 1)
+      c.age += dt
+      const s = this.unit[c.model] * (c.fade >= 0 ? Math.max(0.01, c.fade / 0.5) : Math.min(1, 0.05 + c.age / GROW))
       this.q.setFromAxisAngle(this.up, c.yaw)
       this.m.compose(this.pos, this.q, this.scaleV.set(s, s, s))
       this.meshes[c.model].setMatrixAt(counts[c.model]++, this.m)
-      if (c.failed && c.stage !== 'back') {
+      if (c.failed) {
         this.m.compose(this.pos.clone().setY(this.pos.y + 0.78), this.q, this.one)
         this.flags.setMatrixAt(flagN++, this.m)
       }
@@ -316,6 +331,11 @@ export class CarSystem {
     this.lights.count = lightN
     this.lights.instanceMatrix.needsUpdate = true
     this.updateMarkers()
+  }
+
+  /** Every road cars can take, for tests. */
+  get routeList(): readonly Route[] {
+    return this.plans.map((p) => p.route)
   }
 
   get count(): number {
@@ -347,7 +367,7 @@ export class CarSystem {
       stage: 'there', committed: false, timer: 0,
       model: plan.route.origin === 'external' ? 1 : 0, failed,
       yaw: Math.atan2(first.x, first.z), x: start.x, z: start.z, dx: first.x, dz: first.z,
-      speed: 0, stuck: 0, standoff: 0, fade: -1, lookX: new Array(LOOK).fill(start.x), lookZ: new Array(LOOK).fill(start.z), pace: 0.95 + Math.random() * 0.1, wait: 0,
+      speed: 0, stuck: 0, standoff: 0, fade: -1, lookX: new Array(LOOK).fill(start.x), lookZ: new Array(LOOK).fill(start.z), pace: 0.95 + Math.random() * 0.1, wait: 0, age: 0,
     }
     const len = Math.hypot(car.dx, car.dz) || 1
     car.dx /= len; car.dz /= len
@@ -388,6 +408,7 @@ export class CarSystem {
     c.dist = 0
     c.stage = 'back'
     c.committed = false
+    this.turnedAway++
     return true
   }
 

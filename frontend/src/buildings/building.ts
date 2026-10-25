@@ -12,6 +12,8 @@ export interface BuildingStatus {
   kind: NodeSnapshot['kind']
   state: NodeSnapshot['state']
   beacon: BeaconLevel
+  /** True while the beacon shows a steady light instead of pulsing: a system that is down. */
+  beaconSteady: boolean
   floors: number
   darkFloors: number
   litFloors: number
@@ -207,6 +209,7 @@ export class Building {
       kind: this.kind,
       state: n.state,
       beacon: this.level,
+      beaconSteady: n.state === 'Down',
       floors: this.floorsWanted,
       darkFloors: this.darkWanted,
       litFloors: Math.round(this.lit * this.floorsWanted * 100) / 100,
@@ -233,14 +236,15 @@ export class Building {
     this.level = beaconLevel({ ...n, errorRate: this.errorRate })
     const color = new THREE.Color(palette.beacon[this.level])
     let pulse = 1
-    if (this.level === 'red') pulse = 0.65 + 0.35 * Math.sin(time * 7 + this.pulsePhase)
+    if (n.state === 'Down') pulse = 1 // down is a steady red: it is not an alarm that flickers, the building is shut
+    else if (this.level === 'red') pulse = 0.65 + 0.35 * Math.sin(time * 7 + this.pulsePhase)
     else if (this.level === 'amber') pulse = 0.8 + 0.2 * Math.sin(time * 2.5 + this.pulsePhase)
     else if (this.level === 'green') pulse = 0.9
 
-    ;(this.bulb.material as THREE.MeshBasicMaterial).color.copy(color).multiplyScalar(this.level === 'off' ? 1 : 0.55 + 0.9 * pulse)
+    ;(this.bulb.material as THREE.MeshBasicMaterial).color.copy(color).multiplyScalar(0.55 + 0.9 * pulse)
     const haloMat = this.halo.material as THREE.SpriteMaterial
     haloMat.color.copy(color)
-    haloMat.opacity = this.level === 'off' || this.level === 'grey' ? 0 : 0.35 + 0.5 * pulse
+    haloMat.opacity = this.level === 'grey' ? 0 : 0.35 + 0.5 * pulse
 
     // Keep the halo readable from far away: a minimum size on screen, bigger for the alarming colours.
     const world = this.beaconAnchor.getWorldPosition(new THREE.Vector3())
