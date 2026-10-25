@@ -19,7 +19,7 @@ const out = check ? mkdtempSync(join(tmpdir(), 'oc-contracts-')) : null
 const openapi = check ? join(out, 'openapi.json') : join(repoRoot, 'contracts', 'openapi.json')
 const contracts = check ? join(out, 'contracts.ts') : join(webDir, 'src', 'contracts.ts')
 
-const dll = join(hostProject, 'bin', 'Debug', 'net8.0', 'ObservabilityCity.Host.dll')
+const dll = join(hostProject, 'bin', 'Debug', 'net10.0', 'ObservabilityCity.Host.dll')
 run('dotnet', ['swagger', 'tofile', '--output', openapi, dll, 'v1'], repoRoot)
 run('npx', ['openapi-typescript', openapi, '-o', contracts], webDir)
 
