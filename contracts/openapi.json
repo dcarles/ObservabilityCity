@@ -85,6 +85,7 @@
         "required": [
           "backlogAmber",
           "backlogRed",
+          "calls",
           "errorAmber",
           "errorRate",
           "errorRed",
@@ -219,6 +220,12 @@
           "backlogRed": {
             "type": "number",
             "format": "double"
+          },
+          "calls": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           },
           "lastUpdated": {
             "type": "string",

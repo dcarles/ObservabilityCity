@@ -44,6 +44,8 @@ internal sealed class SystemFile
     public ErrorThresholdsFile? Resources { get; set; }
     public ErrorThresholdsFile? Throttle { get; set; }
     public ErrorThresholdsFile? Backlog { get; set; }
+    /// <summary>Ids of the systems this one calls directly. Cars drive only along declared links.</summary>
+    public List<string> Calls { get; set; } = [];
 }
 
 internal sealed class PillarFile

@@ -66,6 +66,16 @@ public static class RegistryLoader
             }
         }
 
+        // every declared call must point at a system in this town, and not at itself
+        foreach (var node in groups.SelectMany(g => g.Nodes))
+            foreach (var callee in node.Calls)
+            {
+                if (callee == node.Id)
+                    throw new RegistryException($"'{node.Id}' lists itself under calls");
+                if (!ids.Contains(callee))
+                    throw new RegistryException($"'{node.Id}' calls '{callee}', which is not in this town");
+            }
+
         return new Registry(new TownInfo(town.Id, town.Name, town.GroupLabel, town.Topology), groups);
     }
 
@@ -102,7 +112,8 @@ public static class RegistryLoader
             Resolve(d => d?.Throttle?.Amber, s.Throttle?.Amber),
             Resolve(d => d?.Throttle?.Red, s.Throttle?.Red),
             Resolve(d => d?.Backlog?.Amber, s.Backlog?.Amber),
-            Resolve(d => d?.Backlog?.Red, s.Backlog?.Red));
+            Resolve(d => d?.Backlog?.Red, s.Backlog?.Red),
+            s.Calls);
     }
 
     private static NodeKind ParseKind(string? role, string id, string fileName)

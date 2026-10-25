@@ -86,6 +86,7 @@ export interface components {
             backlogAmber: number;
             /** Format: double */
             backlogRed: number;
+            calls: string[];
             /** Format: date-time */
             lastUpdated?: string | null;
         };

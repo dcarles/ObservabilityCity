@@ -24,6 +24,7 @@ const CURB = 5.6 // road centre line to the front of a pad: half the road, the s
 const SPINE_CURB = 6.6 // spine centre line to the nearest pad, which leaves room for cars to turn into the service lanes
 const LANE_Z = 3.5 // road centre line to the middle of the service lane
 const QUEUE_GAP = 2.5 // spacing of the cars waiting in a service lane
+const LANE_SLOTS = 5 // cars a service lane holds when it is long enough
 const GAP = 9 // lawn between one row of pads and the road of the next, so the front row never hides the one behind
 const ROW = PAD_D + 2 * CURB + GAP // distance between two rows of pads
 const COL_X = SPINE_CURB + 0.4 + PAD_W / 2 // pad centre from the spine's centre line
@@ -519,14 +520,16 @@ export class Town {
     const toDest = (dest: Placed, head: THREE.Vector3[], startX: number | null): Pick<Route, 'path' | 'bay'> | null => {
       const out = dest.pad.col === 0 ? -1 : 1
       const slot = (k: number) => w(dest.x - out * QUEUE_GAP * k, dest.roadZ - LANE_Z)
-      const tailX = dest.x - out * (2 * QUEUE_GAP)
+      // five cars wait where the lane is long enough, three beside the spine
+      const n = Math.max(3, Math.min(LANE_SLOTS, Math.floor((Math.abs(dest.x) - 5) / QUEUE_GAP) + 1))
+      const tailX = dest.x - out * ((n - 1) * QUEUE_GAP)
       let mergeX = tailX - out * 3.6
       if (Math.abs(mergeX) < 2.8) mergeX = out * 2.8
       if (startX !== null) {
         if ((tailX - startX) * out < 1.5) return null // the caller stands past the lane's far end: it cannot get there
         if ((mergeX - startX) * out < 0.5) mergeX = startX + out * 0.5
       }
-      return { path: [...head, w(mergeX, dest.roadZ)], bay: { drive: [slot(2), slot(1), slot(0)], slots: 3, marker: slot(1) } }
+      return { path: [...head, w(mergeX, dest.roadZ)], bay: { drive: Array.from({ length: n }, (_, i) => slot(n - 1 - i)), slots: n, marker: slot(1) } }
     }
 
     for (const dest of plan.placed) {
@@ -536,13 +539,11 @@ export class Town {
       // Callers from other islands arrive through the gate house, over the bridge and up the spine.
       const inbound = toDest(dest, [...fromRing, w(0, dest.roadZ)], null)!
       routes.push({ dest: b, origin: external ? 'external' : 'internal', share: external ? 0.85 : dest.node.kind === 'Api' ? 0.35 : 0.08, ...inbound })
-      // Neighbours on the same island call it from their own doors; the same service block most of all.
-      const callers = plan.placed.filter((s) => s !== dest && (s.node.kind === 'Api' || s.node.kind === 'Worker'))
-      const sameService = callers.filter((s) => s.node.service && s.node.service === dest.node.service)
-      const weights = callers.map((c) => (sameService.includes(c) ? 3 : 1))
-      const total = weights.reduce((a, b2) => a + b2, 0) || 1
-      callers.forEach((from, i) => {
-        const share = (external ? 0.15 : dest.node.kind === 'Api' ? 0.65 : 0.92) * (weights[i] / total)
+      // Systems on the same island that declare a call to it drive over from their own doors. Without a declared
+      // caller there is no such traffic. The callee's rate is shared evenly between its callers until a source reports each link's own rate.
+      const callers = plan.placed.filter((s) => s !== dest && s.node.calls.includes(dest.node.id))
+      callers.forEach((from) => {
+        const share = (external ? 0.15 : dest.node.kind === 'Api' ? 0.65 : 0.92) / callers.length
         const head = from.roadZ !== dest.roadZ ? [w(from.x, from.roadZ), w(0, from.roadZ), w(0, dest.roadZ)] : [w(from.x, from.roadZ)]
         const same = from.roadZ === dest.roadZ && from.pad.col === dest.pad.col
         const r = toDest(dest, head, same ? from.x : null)
@@ -664,7 +665,7 @@ function parkProps(x: number, z: number): THREE.Object3D[] {
 }
 
 function layoutKey(s: Snapshot): string {
-  return `${s.townId}|${s.groups.map((g) => `${g.id}:${g.nodes.map((n) => `${n.id}/${n.kind}/${n.service ?? ''}`).join(',')}`).join(';')}`
+  return `${s.townId}|${s.groups.map((g) => `${g.id}:${g.nodes.map((n) => `${n.id}/${n.kind}/${n.service ?? ''}/${n.calls.join('+')}`).join(',')}`).join(';')}`
 }
 
 /** Where a straight line from the hub's centre leaves the hub's coast (inset a little). */

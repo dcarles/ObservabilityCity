@@ -48,6 +48,7 @@
           "throttleRed": 0.02,
           "backlogAmber": 60,
           "backlogRed": 300,
+          "calls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -79,6 +80,7 @@
           "throttleRed": 0.02,
           "backlogAmber": 60,
           "backlogRed": 300,
+          "calls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -110,6 +112,7 @@
           "throttleRed": 0.02,
           "backlogAmber": 60,
           "backlogRed": 300,
+          "calls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -141,6 +144,7 @@
           "throttleRed": 0.02,
           "backlogAmber": 60,
           "backlogRed": 300,
+          "calls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         }
       ]
@@ -180,6 +184,11 @@
           "throttleRed": 0.02,
           "backlogAmber": 60,
           "backlogRed": 300,
+          "calls": [
+            "cl.ledger-db",
+            "cl.session-cache",
+            "cl.posting-api"
+          ],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -211,6 +220,9 @@
           "throttleRed": 0.02,
           "backlogAmber": 60,
           "backlogRed": 300,
+          "calls": [
+            "cl.ledger-db"
+          ],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -242,6 +254,7 @@
           "throttleRed": 0.02,
           "backlogAmber": 60,
           "backlogRed": 300,
+          "calls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -273,6 +286,10 @@
           "throttleRed": 0.02,
           "backlogAmber": 60,
           "backlogRed": 300,
+          "calls": [
+            "cl.posting-db",
+            "cl.session-cache"
+          ],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -304,6 +321,10 @@
           "throttleRed": 0.02,
           "backlogAmber": 60,
           "backlogRed": 300,
+          "calls": [
+            "cl.posting-db",
+            "cl.statements-api"
+          ],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -335,6 +356,7 @@
           "throttleRed": 0.02,
           "backlogAmber": 60,
           "backlogRed": 300,
+          "calls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -366,6 +388,10 @@
           "throttleRed": 0.02,
           "backlogAmber": 60,
           "backlogRed": 300,
+          "calls": [
+            "cl.statements-db",
+            "cl.ledger-api"
+          ],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -397,6 +423,9 @@
           "throttleRed": 0.02,
           "backlogAmber": 60,
           "backlogRed": 300,
+          "calls": [
+            "cl.statements-db"
+          ],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -428,6 +457,7 @@
           "throttleRed": 0.02,
           "backlogAmber": 60,
           "backlogRed": 300,
+          "calls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -459,6 +489,9 @@
           "throttleRed": 0.02,
           "backlogAmber": 60,
           "backlogRed": 300,
+          "calls": [
+            "cl.statements-api"
+          ],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -490,6 +523,7 @@
           "throttleRed": 0.02,
           "backlogAmber": 60,
           "backlogRed": 300,
+          "calls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         }
       ]
@@ -529,6 +563,11 @@
           "throttleRed": 0.02,
           "backlogAmber": 60,
           "backlogRed": 300,
+          "calls": [
+            "col.cases-db",
+            "col.queue-cache",
+            "col.dunning-api"
+          ],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -560,6 +599,9 @@
           "throttleRed": 0.02,
           "backlogAmber": 60,
           "backlogRed": 300,
+          "calls": [
+            "col.cases-db"
+          ],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -591,6 +633,7 @@
           "throttleRed": 0.02,
           "backlogAmber": 60,
           "backlogRed": 300,
+          "calls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -622,6 +665,11 @@
           "throttleRed": 0.02,
           "backlogAmber": 60,
           "backlogRed": 300,
+          "calls": [
+            "col.dunning-db",
+            "col.queue-cache",
+            "col.agency-api"
+          ],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -653,6 +701,9 @@
           "throttleRed": 0.02,
           "backlogAmber": 60,
           "backlogRed": 300,
+          "calls": [
+            "col.dunning-db"
+          ],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -684,6 +735,7 @@
           "throttleRed": 0.02,
           "backlogAmber": 60,
           "backlogRed": 300,
+          "calls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -715,6 +767,9 @@
           "throttleRed": 0.02,
           "backlogAmber": 60,
           "backlogRed": 300,
+          "calls": [
+            "col.agency-db"
+          ],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -746,6 +801,10 @@
           "throttleRed": 0.02,
           "backlogAmber": 60,
           "backlogRed": 300,
+          "calls": [
+            "col.agency-db",
+            "col.queue-cache"
+          ],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -777,6 +836,7 @@
           "throttleRed": 0.02,
           "backlogAmber": 60,
           "backlogRed": 300,
+          "calls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -808,6 +868,9 @@
           "throttleRed": 0.02,
           "backlogAmber": 60,
           "backlogRed": 300,
+          "calls": [
+            "col.dunning-api"
+          ],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -839,6 +902,7 @@
           "throttleRed": 0.02,
           "backlogAmber": 60,
           "backlogRed": 300,
+          "calls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         }
       ]
@@ -878,6 +942,11 @@
           "throttleRed": 0.02,
           "backlogAmber": 60,
           "backlogRed": 300,
+          "calls": [
+            "cus.profile-db",
+            "cus.consent-api",
+            "cus.kyc-api"
+          ],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -909,6 +978,9 @@
           "throttleRed": 0.02,
           "backlogAmber": 60,
           "backlogRed": 300,
+          "calls": [
+            "cus.profile-db"
+          ],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -940,6 +1012,7 @@
           "throttleRed": 0.02,
           "backlogAmber": 60,
           "backlogRed": 300,
+          "calls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -971,6 +1044,9 @@
           "throttleRed": 0.02,
           "backlogAmber": 60,
           "backlogRed": 300,
+          "calls": [
+            "cus.consent-db"
+          ],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -1002,6 +1078,9 @@
           "throttleRed": 0.02,
           "backlogAmber": 60,
           "backlogRed": 300,
+          "calls": [
+            "cus.consent-db"
+          ],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -1033,6 +1112,7 @@
           "throttleRed": 0.02,
           "backlogAmber": 60,
           "backlogRed": 300,
+          "calls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -1064,6 +1144,9 @@
           "throttleRed": 0.02,
           "backlogAmber": 60,
           "backlogRed": 300,
+          "calls": [
+            "cus.kyc-db"
+          ],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -1095,6 +1178,7 @@
           "throttleRed": 0.02,
           "backlogAmber": 60,
           "backlogRed": 300,
+          "calls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -1126,6 +1210,9 @@
           "throttleRed": 0.02,
           "backlogAmber": 60,
           "backlogRed": 300,
+          "calls": [
+            "cus.profile-api"
+          ],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         }
       ]
@@ -1165,6 +1252,11 @@
           "throttleRed": 0.02,
           "backlogAmber": 60,
           "backlogRed": 300,
+          "calls": [
+            "frd.screening-db",
+            "frd.rules-cache",
+            "frd.cases-api"
+          ],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -1196,6 +1288,9 @@
           "throttleRed": 0.02,
           "backlogAmber": 60,
           "backlogRed": 300,
+          "calls": [
+            "frd.screening-db"
+          ],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -1227,6 +1322,7 @@
           "throttleRed": 0.02,
           "backlogAmber": 60,
           "backlogRed": 300,
+          "calls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -1258,6 +1354,9 @@
           "throttleRed": 0.02,
           "backlogAmber": 60,
           "backlogRed": 300,
+          "calls": [
+            "frd.cases-db"
+          ],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -1289,6 +1388,7 @@
           "throttleRed": 0.02,
           "backlogAmber": 60,
           "backlogRed": 300,
+          "calls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -1320,6 +1420,7 @@
           "throttleRed": 0.02,
           "backlogAmber": 60,
           "backlogRed": 300,
+          "calls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         }
       ]
@@ -1359,6 +1460,10 @@
           "throttleRed": 0.02,
           "backlogAmber": 60,
           "backlogRed": 300,
+          "calls": [
+            "pay.payments-db",
+            "pay.refunds-api"
+          ],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -1390,6 +1495,9 @@
           "throttleRed": 0.02,
           "backlogAmber": 60,
           "backlogRed": 300,
+          "calls": [
+            "pay.payments-db"
+          ],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -1421,6 +1529,7 @@
           "throttleRed": 0.02,
           "backlogAmber": 60,
           "backlogRed": 300,
+          "calls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -1452,6 +1561,9 @@
           "throttleRed": 0.02,
           "backlogAmber": 60,
           "backlogRed": 300,
+          "calls": [
+            "pay.refunds-db"
+          ],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -1483,6 +1595,9 @@
           "throttleRed": 0.02,
           "backlogAmber": 60,
           "backlogRed": 300,
+          "calls": [
+            "pay.refunds-db"
+          ],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -1514,6 +1629,7 @@
           "throttleRed": 0.02,
           "backlogAmber": 60,
           "backlogRed": 300,
+          "calls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         }
       ]
