@@ -33,7 +33,7 @@ jobs:
           key: nuget-${{ runner.os }}-${{ hashFiles('backend/**/*.csproj', 'backend/Directory.Packages.props', 'backend/.config/dotnet-tools.json') }}
           restore-keys: nuget-${{ runner.os }}-
       - run: dotnet build backend/ObservabilityCity.slnx -c Release
-      - run: dotnet test backend/ObservabilityCity.slnx -c Release --no-build
+      - run: dotnet test --solution backend/ObservabilityCity.slnx -c Release --no-build
 
   frontend:
     name: Frontend tests and build
