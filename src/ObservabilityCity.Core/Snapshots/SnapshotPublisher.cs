@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace ObservabilityCity.Core.Snapshots;
 
@@ -7,16 +8,25 @@ public sealed class SnapshotPublisher(
     SnapshotBuilder builder,
     SnapshotStore store,
     ISnapshotNotifier notifier,
-    TimeSpan interval) : BackgroundService
+    TimeSpan interval,
+    ILogger<SnapshotPublisher>? log = null) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken ct)
     {
         using var timer = new PeriodicTimer(interval);
         do
         {
-            var snapshot = builder.Build();
-            store.Set(snapshot);
-            await notifier.PublishAsync(snapshot, ct);
+            // One bad tick must not stop the publisher: the viewers would be left looking at a frozen town.
+            try
+            {
+                var snapshot = builder.Build();
+                store.Set(snapshot);
+                await notifier.PublishAsync(snapshot, ct);
+            }
+            catch (Exception e) when (e is not OperationCanceledException)
+            {
+                log?.LogWarning(e, "Could not publish a snapshot; trying again on the next tick");
+            }
         }
         while (await WaitNext(timer, ct));
     }

@@ -1,0 +1,7 @@
+pillar: cc
+displayName: Gamma
+color: "#f2994a"
+systems:
+  - { id: cc.notify-api, service: notify, name: Notify API, role: api, external: true, calls: [cc.notify-db] }
+  - { id: cc.notify-worker, service: notify, name: Notify worker, role: worker, calls: [cc.notify-db] }
+  - { id: cc.notify-db, service: notify, name: Notify DB, role: db }

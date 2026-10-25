@@ -74,13 +74,18 @@ public sealed record NodeSnapshot(
     IReadOnlyList<string> Calls,
     DateTimeOffset? LastUpdated);
 
-/// <summary>An island (a pillar, a team, ...) or the hub island. IsLostFound marks the island that collects systems no group owns.</summary>
+/// <summary>
+/// An island (a pillar, a team, ...) or the hub island. IsLostFound marks the island that collects systems no group owns.
+/// ConfigError is set when the group's registry file is broken and was skipped: the island is drawn as a "config error" island
+/// with no buildings, and the text says what is wrong. It is null for every healthy island.
+/// </summary>
 public sealed record GroupSnapshot(
     string Id,
     string DisplayName,
     string Color,
     bool IsHub,
     bool IsLostFound,
+    string? ConfigError,
     IReadOnlyList<NodeSnapshot> Nodes);
 
 public sealed record TownTotals(
@@ -90,7 +95,11 @@ public sealed record TownTotals(
     int Degraded,
     int Down);
 
-/// <summary>The whole town at one moment. This is what is pushed to the browser.</summary>
+/// <summary>
+/// The whole town at one moment. This is what is pushed to the browser.
+/// Notices are problems with the configuration that did not stop the town: a reload that failed (the last good registry is still shown),
+/// a call link that points nowhere and was dropped. The renderer lists them in the top bar.
+/// </summary>
 public sealed record Snapshot(
     string TownId,
     string TownName,
@@ -99,4 +108,5 @@ public sealed record Snapshot(
     DateTimeOffset GeneratedAt,
     double DayFraction,
     TownTotals Totals,
+    IReadOnlyList<string> Notices,
     IReadOnlyList<GroupSnapshot> Groups);

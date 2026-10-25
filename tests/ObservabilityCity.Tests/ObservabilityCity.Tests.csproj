@@ -12,5 +12,6 @@
     <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" Version="8.10.0" />
     <ProjectReference Include="..\..\src\ObservabilityCity.Core\ObservabilityCity.Core.csproj" />
     <ProjectReference Include="..\..\src\ObservabilityCity.Adapters.Fake\ObservabilityCity.Adapters.Fake.csproj" />
+    <ProjectReference Include="..\..\tools\ObservabilityCity.Validate\ObservabilityCity.Validate.csproj" />
   </ItemGroup>
 </Project>

@@ -1,0 +1,10 @@
+pillar: p21
+displayName: Pillar 21 (6)
+color: "#9b51e0"
+systems:
+  - { id: p21.s1-api, service: s1, name: S1 API, role: api, external: true, calls: [p21.s1-db, p21.s2-api] }
+  - { id: p21.s1-worker, service: s1, name: S1 worker, role: worker, calls: [p21.s1-db] }
+  - { id: p21.s1-db, service: s1, name: S1 DB, role: db }
+  - { id: p21.s2-api, service: s2, name: S2 API, role: api, calls: [p21.s2-db] }
+  - { id: p21.s2-worker, service: s2, name: S2 worker, role: worker, calls: [p21.s2-db] }
+  - { id: p21.s2-db, service: s2, name: S2 DB, role: db }

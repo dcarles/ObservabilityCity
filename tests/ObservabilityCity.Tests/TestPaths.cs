@@ -5,6 +5,8 @@ internal static class TestPaths
     public static string RepoRoot { get; } = FindRoot();
 
     public static string Registry => Path.Combine(RepoRoot, "samples", "galactic-credit");
+    public static string MiniTown => Path.Combine(RepoRoot, "tests", "fixtures", "registries", "mini-town");
+    public static string Stress24 => Path.Combine(RepoRoot, "tests", "fixtures", "registries", "stress-24");
     public static string Fixtures => Path.Combine(RepoRoot, "tests", "fixtures", "snapshots");
 
     private static string FindRoot()
