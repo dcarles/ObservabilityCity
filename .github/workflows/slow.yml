@@ -29,18 +29,18 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: web/package-lock.json
+          cache-dependency-path: frontend/package-lock.json
       - uses: actions/cache@v6
         with:
           path: ~/.nuget/packages
-          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'Directory.Packages.props', '.config/dotnet-tools.json') }}
+          key: nuget-${{ runner.os }}-${{ hashFiles('backend/**/*.csproj', 'backend/Directory.Packages.props', 'backend/.config/dotnet-tools.json') }}
           restore-keys: nuget-${{ runner.os }}-
       - run: npm ci
-        working-directory: web
+        working-directory: frontend
       - name: Playwright version
         id: pw
         run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
-        working-directory: web
+        working-directory: frontend
       - name: Cache the browser
         id: browser
         uses: actions/cache@v6
@@ -50,21 +50,21 @@ jobs:
       - name: Install the browser
         if: steps.browser.outputs.cache-hit != 'true'
         run: npx playwright install --with-deps chromium
-        working-directory: web
+        working-directory: frontend
       - name: Install the browser's system libraries
         if: steps.browser.outputs.cache-hit == 'true'
         run: npx playwright install-deps chromium
-        working-directory: web
-      - run: dotnet build src/ObservabilityCity.Host -c Release
+        working-directory: frontend
+      - run: dotnet build backend/src/ObservabilityCity.Host -c Release
       - name: 24-island stress town
         run: npm run e2e:stress
-        working-directory: web
+        working-directory: frontend
         env:
           E2E_NO_BUILD: '1'
       - name: Full sample town, with screenshots
         if: success() || failure()
         run: npm run e2e:town
-        working-directory: web
+        working-directory: frontend
         env:
           E2E_NO_BUILD: '1'
       - name: Keep the reports and screenshots
@@ -73,6 +73,6 @@ jobs:
         with:
           name: slow-checks-report
           path: |
-            web/playwright-report
-            web/test-results
+            frontend/playwright-report
+            frontend/test-results
           retention-days: 14

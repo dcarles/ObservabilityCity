@@ -30,13 +30,13 @@ jobs:
       - uses: actions/cache@v6
         with:
           path: ~/.nuget/packages
-          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'Directory.Packages.props', '.config/dotnet-tools.json') }}
+          key: nuget-${{ runner.os }}-${{ hashFiles('backend/**/*.csproj', 'backend/Directory.Packages.props', 'backend/.config/dotnet-tools.json') }}
           restore-keys: nuget-${{ runner.os }}-
-      - run: dotnet build ObservabilityCity.sln -c Release
-      - run: dotnet test ObservabilityCity.sln -c Release --no-build
+      - run: dotnet build backend/ObservabilityCity.slnx -c Release
+      - run: dotnet test backend/ObservabilityCity.slnx -c Release --no-build
 
-  web:
-    name: Web tests and build
+  frontend:
+    name: Frontend tests and build
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -48,26 +48,26 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: web/package-lock.json
+          cache-dependency-path: frontend/package-lock.json
       - uses: actions/cache/restore@v6
         with:
           path: ~/.nuget/packages
-          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'Directory.Packages.props', '.config/dotnet-tools.json') }}
+          key: nuget-${{ runner.os }}-${{ hashFiles('backend/**/*.csproj', 'backend/Directory.Packages.props', 'backend/.config/dotnet-tools.json') }}
           restore-keys: nuget-${{ runner.os }}-
       - run: npm ci
-        working-directory: web
+        working-directory: frontend
       - name: Contracts match the C# records
         run: npm run check:contracts
-        working-directory: web
+        working-directory: frontend
       - name: Typecheck
         run: npm run typecheck
-        working-directory: web
+        working-directory: frontend
       - name: Unit tests (includes the 24-island layout)
         run: npm test
-        working-directory: web
+        working-directory: frontend
       - name: Build
         run: npm run build
-        working-directory: web
+        working-directory: frontend
 
   ui-scenarios:
     name: UI scenario tests
@@ -82,18 +82,18 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: web/package-lock.json
+          cache-dependency-path: frontend/package-lock.json
       - uses: actions/cache/restore@v6
         with:
           path: ~/.nuget/packages
-          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'Directory.Packages.props', '.config/dotnet-tools.json') }}
+          key: nuget-${{ runner.os }}-${{ hashFiles('backend/**/*.csproj', 'backend/Directory.Packages.props', 'backend/.config/dotnet-tools.json') }}
           restore-keys: nuget-${{ runner.os }}-
       - run: npm ci
-        working-directory: web
+        working-directory: frontend
       - name: Playwright version
         id: pw
         run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
-        working-directory: web
+        working-directory: frontend
       - name: Cache the browser
         id: browser
         uses: actions/cache@v6
@@ -103,16 +103,16 @@ jobs:
       - name: Install the browser
         if: steps.browser.outputs.cache-hit != 'true'
         run: npx playwright install --with-deps chromium
-        working-directory: web
+        working-directory: frontend
       - name: Install the browser's system libraries
         if: steps.browser.outputs.cache-hit == 'true'
         run: npx playwright install-deps chromium
-        working-directory: web
+        working-directory: frontend
       - name: Build the backend
-        run: dotnet build src/ObservabilityCity.Host -c Release
+        run: dotnet build backend/src/ObservabilityCity.Host -c Release
       - name: UI scenarios
         run: npm run e2e
-        working-directory: web
+        working-directory: frontend
         env:
           E2E_NO_BUILD: '1'
       - name: Keep the report when something fails
@@ -121,8 +121,8 @@ jobs:
         with:
           name: ui-scenarios-report
           path: |
-            web/playwright-report
-            web/test-results
+            frontend/playwright-report
+            frontend/test-results
           retention-days: 7
 
   registries:
@@ -140,12 +140,12 @@ jobs:
       - uses: actions/cache/restore@v6
         with:
           path: ~/.nuget/packages
-          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'Directory.Packages.props', '.config/dotnet-tools.json') }}
+          key: nuget-${{ runner.os }}-${{ hashFiles('backend/**/*.csproj', 'backend/Directory.Packages.props', 'backend/.config/dotnet-tools.json') }}
           restore-keys: nuget-${{ runner.os }}-
       - name: Check every registry folder in the repo
         id: validate
         continue-on-error: true
-        run: dotnet run --project tools/ObservabilityCity.Validate -c Release -- --all --github --markdown "$RUNNER_TEMP/registry-report.md"
+        run: dotnet run --project backend/tools/ObservabilityCity.Validate -c Release -- --all --github --markdown "$RUNNER_TEMP/registry-report.md"
       - name: Show the result on the pull request
         # Fork pull requests get a read-only token and cannot comment; the annotations on the files still appear.
         if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
@@ -170,7 +170,7 @@ jobs:
   checks:
     name: PR checks
     if: always()
-    needs: [backend, web, ui-scenarios, registries]
+    needs: [backend, frontend, ui-scenarios, registries]
     runs-on: ubuntu-latest
     steps:
       - name: All checks passed

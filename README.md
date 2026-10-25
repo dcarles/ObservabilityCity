@@ -2,7 +2,7 @@
 
 A browser app that shows system health as a living, animated 3D town instead of a dashboard. Each pillar (or team) is an island, each system is a building, and what is going on shows in the town itself: floors for instances, lit windows for load, rooftop beacons for errors, cars for traffic.
 
-**Status: Phase 1, slice 2.** The pipeline runs end to end on fake data (backend, live push, browser), and the whole sample town is built: the hub, 14 pillar islands and a Lost & found island. Everything else is in [plan/](plan/observability-city-plan.md).
+**Status: Phase 1, slice 2.** The pipeline runs end to end on fake data (backend, live push, browser), and the whole sample town is built: the hub, 14 pillar islands and a Lost & found island. Everything else is in [docs/](docs/observability-city-plan.md).
 
 ## What you need installed
 
@@ -27,8 +27,8 @@ node --version         # v20 or v22
 ```
 git clone https://github.com/dcarles/ObservabilityCity.git
 cd ObservabilityCity
-cd web && npm install && cd ..
-dotnet run --project src/ObservabilityCity.AppHost
+cd frontend && npm install && cd ..
+dotnet run --project backend/src/ObservabilityCity.AppHost
 ```
 
 The first run downloads NuGet packages, so give it a minute. When it is up:
@@ -43,8 +43,8 @@ In Visual Studio or Rider you can instead set `ObservabilityCity.AppHost` as the
 Two terminals, if you prefer:
 
 ```
-dotnet run --project src/ObservabilityCity.Host     # backend on http://localhost:5080
-cd web && npm run dev                               # town on http://localhost:5173
+dotnet run --project backend/src/ObservabilityCity.Host     # backend on http://localhost:5080
+cd frontend && npm run dev                                  # town on http://localhost:5173
 ```
 
 The browser app proxies `/api` and `/hubs` to the backend, so there is nothing to configure.
@@ -83,25 +83,32 @@ How to read the town, as built so far:
 ## How it fits together
 
 ```
-samples/galactic-credit/   registry (YAML): town, defaults, hub, layout, pillars, schemas, fake-data baselines
-src/ObservabilityCity.Contracts    Snapshot records: the source of truth for the wire format
-src/ObservabilityCity.Core         registry loader, source interface, snapshot builder and rules
-src/ObservabilityCity.Adapters.Fake  the fake source: noise, daily cycle, autoscaling, scenario effects
-src/ObservabilityCity.Host         ASP.NET Core: /api/snapshot/latest, SignalR hub /hubs/town, /api/fake
-src/ObservabilityCity.AppHost      .NET Aspire: starts the host and the web app together
-web/                               Vite + TypeScript + three.js browser app
+backend/                           .NET solution (ObservabilityCity.slnx)
+  src/ObservabilityCity.Contracts    Snapshot records: the source of truth for the wire format
+  src/ObservabilityCity.Core         registry loader, source interface, snapshot builder and rules
+  src/ObservabilityCity.Adapters.Fake  the fake source: noise, daily cycle, autoscaling, scenario effects
+  src/ObservabilityCity.Host         ASP.NET Core: /api/snapshot/latest, SignalR hub /hubs/town, /api/fake
+  src/ObservabilityCity.AppHost      .NET Aspire: starts the host and the frontend together
+  tests/ObservabilityCity.Tests      xunit tests
+  tools/ObservabilityCity.Validate   registry checker
+frontend/                          Vite + TypeScript + three.js browser app
+  src/                               app code
+  tests/unit/                        Vitest unit tests
+  tests/e2e/                         Playwright browser tests
+config/galactic-credit/            registry (YAML): town, defaults, hub, layout, pillars, schemas, fake-data baselines
 contracts/openapi.json             generated from the C# records
-tests/                             xunit tests and golden snapshot fixtures
+shared-test-data/                  fixtures used by both sides: registries, golden snapshots, layout golden
+docs/                              plan, decision log, previews
 ```
 
 Data flows one way: a source writes readings, the snapshot builder joins them with the registry and applies the rules (stale is never green, down beats degraded), and one snapshot is pushed over SignalR every two seconds. The browser invents all motion from the numbers in the snapshot. It never knows which source produced them, so real adapters later replace the fake one without touching the town.
 
 ### The contract
 
-`contracts/openapi.json` and `web/src/contracts.ts` are generated from the C# `Snapshot` records. After changing a record:
+`contracts/openapi.json` and `frontend/src/contracts.ts` are generated from the C# `Snapshot` records. After changing a record:
 
 ```
-cd web && npm run gen:contracts
+cd frontend && npm run gen:contracts
 ```
 
 CI runs `npm run check:contracts` and fails if the generated files are out of date, so the two sides cannot drift.
@@ -109,18 +116,18 @@ CI runs `npm run check:contracts` and fails if the generated files are out of da
 ### Tests
 
 ```
-dotnet test                       # registry, resilient loading, validator, rules, fake source, 24-island backend load, golden fixtures
-cd web && npm test                # visual rules, snapshot guard, island layout (including 24 uneven islands), golden fixtures
-cd web && npm run e2e             # browser scenarios on a small town: break things, check the town, calm it down (about 1 minute)
-cd web && npm run e2e:slow        # 24-island stress town and the full sample town, with screenshots (about 1 minute)
-dotnet run --project tools/ObservabilityCity.Validate -- --all   # check every registry folder in the repo
+dotnet test backend              # registry, resilient loading, validator, rules, fake source, 24-island backend load, golden fixtures
+cd frontend && npm test          # visual rules, snapshot guard, island layout (including 24 uneven islands), golden fixtures
+cd frontend && npm run e2e       # browser scenarios on a small town: break things, check the town, calm it down (about 1 minute)
+cd frontend && npm run e2e:slow  # 24-island stress town and the full sample town, with screenshots (about 1 minute)
+dotnet run --project backend/tools/ObservabilityCity.Validate -- --all   # check every registry folder in the repo
 ```
 
-To refresh the golden fixtures (calm town, a bad day across several islands, and the editor schemas) after an intended change: `UPDATE_GOLDEN=1 dotnet test`. The island layout golden is refreshed with `cd web && UPDATE_GOLDEN=1 npm test`.
+To refresh the golden fixtures (calm town, a bad day across several islands, and the editor schemas) after an intended change: `UPDATE_GOLDEN=1 dotnet test backend`. The island layout golden is refreshed with `cd frontend && UPDATE_GOLDEN=1 npm test`.
 
-**Browser tests** (`web/e2e/`, Playwright) start the real backend with the fake source and the real page, steer the fake source through `/api/fake/effects`, and read the scene's state through `window.city` (beacon colour, dark floors, closed sign, queue warning, crates, dead-letter light) instead of pixels. With `?test=1` the page draws nothing on its own and time moves only when a test calls `city.step(seconds)`, so tests do not depend on a GPU. The first run needs the browser: `cd web && npx playwright install chromium`. Set `E2E_NO_BUILD=1` once the backend is built in Release.
+**Browser tests** (`frontend/tests/e2e/`, Playwright) start the real backend with the fake source and the real page, steer the fake source through `/api/fake/effects`, and read the scene's state through `window.city` (beacon colour, dark floors, closed sign, queue warning, crates, dead-letter light) instead of pixels. With `?test=1` the page draws nothing on its own and time moves only when a test calls `city.step(seconds)`, so tests do not depend on a GPU. The first run needs the browser: `cd frontend && npx playwright install chromium`. Set `E2E_NO_BUILD=1` once the backend is built in Release.
 
-**Registry checks** (`tools/ObservabilityCity.Validate`) go beyond what loading needs. Errors fail CI, warnings are listed and do not:
+**Registry checks** (`backend/tools/ObservabilityCity.Validate`) go beyond what loading needs. Errors fail CI, warnings are listed and do not:
 
 | Rule | Severity |
 | --- | --- |
@@ -137,13 +144,13 @@ On a pull request the check writes annotations on the files and posts one commen
 
 **A broken pillar file does not stop the town.** The running app skips a pillar file with problems and draws its island as a *config error* island (a board saying what is wrong), drops call links that point nowhere, and lists everything it worked around in a small panel under the top bar. The registry folder is watched: a reload that fails keeps the last good registry and says so in the panel. If `town.yaml`, `defaults.yaml`, `hub.yaml` or `layout.yaml` is unreadable at start-up the app does not start, since there is nothing to show. The page also refuses a snapshot it cannot draw and keeps the last good town.
 
-**Pull request checks.** `.github/workflows/ci.yml` runs four jobs side by side (backend tests, web tests and build, UI scenarios, registry checks) and a final job called `PR checks` that passes only when all of them did. `.github/workflows/slow.yml` runs the stress town and the full sample town on merge to main and every night.
+**Pull request checks.** `.github/workflows/ci.yml` runs four jobs side by side (backend tests, frontend tests and build, UI scenarios, registry checks) and a final job called `PR checks` that passes only when all of them did. `.github/workflows/slow.yml` runs the stress town and the full sample town on merge to main and every night.
 
 To make it required on `main`: GitHub, Settings, Branches, Add branch protection rule (or Rulesets, New branch ruleset), branch name pattern `main`, tick *Require a pull request before merging* and *Require status checks to pass before merging*, search for and add **PR checks**, save. Run CI once first, or the check name will not be offered in the search.
 
 ### The registry
 
-One folder describes a town. The sample is `samples/galactic-credit/`:
+One folder describes a town. The sample is `config/galactic-credit/`:
 
 | File | What it holds |
 | --- | --- |
@@ -162,7 +169,7 @@ The loader checks everything and reports all problems at once, each with its fil
 **Editor help.** Each YAML file starts with a `# yaml-language-server: $schema=...` line, so an editor with the YAML extension (VS Code: Red Hat YAML) completes keys and roles and checks them as you type. `calls` and `layout.yaml` complete from the town's real ids, which live in `schema/system-ids.schema.json`. After adding systems, refresh it:
 
 ```
-dotnet run --project src/ObservabilityCity.Host -- --write-schema
+dotnet run --project backend/src/ObservabilityCity.Host -- --write-schema
 ```
 
 A test fails if the committed schema files are out of date.
@@ -175,7 +182,7 @@ The sample town has 15 islands, about 110 buildings and up to 420 cars. Roads, l
 
 | Setting | Default | What it does |
 | --- | --- | --- |
-| `Registry:Path` | `samples/galactic-credit` | Folder with the registry YAML files |
+| `Registry:Path` | `config/galactic-credit` | Folder with the registry YAML files |
 | `Fake:DayLengthSeconds` | `120` | Real seconds per simulated day |
 | `Snapshot:IntervalSeconds` | `2` | How often a snapshot is pushed |
 | `Snapshot:StaleAfterSeconds` | `30` | Readings older than this are shown as stale |
@@ -185,8 +192,8 @@ Set them with environment variables (`Registry__Path=...`) or in `appsettings.js
 
 ## Using it at your own organisation
 
-The core knows only generic concepts (groups, systems, resources, links). Everything specific to an organisation is configuration: copy `samples/` into your own `config/` folder, point `Registry:Path` at it, and add company-only adapters under `extensions/`. Never edit the core files, so `git pull upstream` stays clean. Details are in the [plan](plan/observability-city-plan.md).
+The core knows only generic concepts (groups, systems, resources, links). Everything specific to an organisation is configuration: add your own town folder next to the sample in `config/`, point `Registry:Path` at it, and add company-only adapters under `extensions/`. Never edit the core files, so `git pull upstream` stays clean. Details are in the [plan](docs/observability-city-plan.md).
 
 ## Assets and licences
 
-The harbour-town theme uses roads, cars and street props from the CC0 [KayKit City Builder Bits](https://kaylousberg.itch.io/city-builder-bits) pack by Kay Lousberg (only the files in use, with the pack's licence beside them in `web/public/themes/harbour-town/kaykit/`). The buildings themselves are built from code in the same style. More free CC0 kits can be added through the theme system. Commercial model packs belong in a private fork and are git-ignored (`themes-private/`).
+The harbour-town theme uses roads, cars and street props from the CC0 [KayKit City Builder Bits](https://kaylousberg.itch.io/city-builder-bits) pack by Kay Lousberg (only the files in use, with the pack's licence beside them in `frontend/public/themes/harbour-town/kaykit/`). The buildings themselves are built from code in the same style. More free CC0 kits can be added through the theme system. Commercial model packs belong in a private fork and are git-ignored (`themes-private/`).
