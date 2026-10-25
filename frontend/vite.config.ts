@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite'
+import { defineConfig } from 'vitest/config'
 
 // Under Aspire the backend address arrives as services__host__http__0; otherwise the Host project's default port.
 const backend = process.env.services__host__http__0 ?? 'http://localhost:5080'
