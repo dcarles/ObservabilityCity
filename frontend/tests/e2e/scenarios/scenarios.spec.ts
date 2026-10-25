@@ -50,7 +50,8 @@ test.describe('trouble shows up, and goes away', () => {
 
     const down = await town.inspect('bb.ledger-api')
     expect(down.closedSign).toBe(true)
-    expect(down.beacon).toBe('off')
+    expect(down.beacon).toBe('red')
+    expect(down.beaconSteady).toBe(true)
     expect(down.darkFloors).toBe(down.floors)
     // its neighbours are not dragged down with it
     for (const id of ['bb.ledger-db', 'aa.orders-api', 'cc.notify-api']) expect((await town.inspect(id)).closedSign, id).toBe(false)
@@ -341,3 +342,132 @@ function fixtureDir(): string {
   return join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..', 'shared-test-data', 'registries', 'mini-town')
 }
 
+
+test.describe('cars', () => {
+  /** Every car appears at the front of a building, or comes over a bridge from one: never out of thin air. */
+  test('every road starts at the front of a building, and every car appears there', async ({ town }) => {
+    await town.open()
+    await town.effect('*', 'Traffic')
+    await town.step(5)
+    const result = await town.page.evaluate(() => {
+      const city = (window as any).city
+      const cars = city.town.cars
+      const doorOf = (b: any) => b.doorWorld()
+      const far = (x: number, z: number, b: any) => Math.hypot(x - doorOf(b).x, z - doorOf(b).z)
+      const bad: string[] = []
+      for (const r of cars.routeList) if (far(r.path[0].x, r.path[0].z, r.source) > 8) bad.push(`route ${r.source.id} > ${r.dest.id}`)
+      // and the cars themselves, the moment they first show
+      const seen = new Set<number>(cars.cars.map((c: any) => c.id))
+      let spawned = 0
+      for (let i = 0; i < 300; i++) {
+        city.step(0.1)
+        for (const c of cars.cars) {
+          if (seen.has(c.id)) continue
+          seen.add(c.id)
+          spawned++
+          if (far(c.x, c.z, c.plan.route.source) > 8) bad.push(`car ${c.id} from ${c.plan.route.source.id} appeared ${far(c.x, c.z, c.plan.route.source).toFixed(1)} m away`)
+        }
+      }
+      // cross-island roads go over both bridges: they start on another island than they end on
+      const crossing = cars.routeList.filter((r: any) => r.source.id.split('.')[0] !== r.dest.id.split('.')[0]).length
+      return { bad, spawned, routes: cars.routeList.length, crossing }
+    })
+    expect(result.bad).toEqual([])
+    expect(result.spawned).toBeGreaterThan(20)
+    expect(result.crossing).toBeGreaterThan(0)
+  })
+
+  test('failed requests carry a red flag, stop at the door and drive back the way they came', async ({ town }) => {
+    await town.open()
+    await town.effect('aa.orders-api', 'Traffic')
+    await town.effect('aa.orders-api', 'Errors', 0.8)
+    await town.until('aa.orders-api', (n) => n.errorRate > 0.1)
+    const result = await town.page.evaluate(() => {
+      const city = (window as any).city
+      const cars = city.town.cars
+      let flagged = 0, back = 0, lost = 0
+      let before = new Map<number, string>()
+      for (let i = 0; i < 900; i++) {
+        city.step(0.1)
+        flagged = Math.max(flagged, cars.flagged)
+        const now = new Map<number, string>()
+        for (const c of cars.cars) {
+          if (c.failed && c.stage === 'back') back++
+          now.set(c.id, c.failed ? c.stage : '')
+        }
+        // a failed car that was being served and is gone the next moment vanished at the door
+        for (const [id, stage] of before) if (stage === 'serving' && !now.has(id)) lost++
+        before = now
+      }
+      return { flagged, back, lost, turned: cars.turnedAway }
+    })
+    expect(result.flagged).toBeGreaterThan(0)
+    expect(result.turned).toBeGreaterThan(0)
+    expect(result.back).toBeGreaterThan(0)
+    expect(result.lost).toBe(0)
+  })
+})
+
+test.describe('finding things', () => {
+  test('the Try it target is a dropdown you can type into, and what you pick is what the buttons hit', async ({ town, page }) => {
+    await town.open()
+    const target = page.locator('#target')
+    await expect(target).toHaveValue('Whole town')
+
+    // opening it lists the whole town, and typing narrows it down
+    await target.click()
+    await expect(page.locator('#target-results .hit').first()).toContainText('Whole town')
+    expect(await page.locator('#target-results .hit').count()).toBeGreaterThan(10)
+    await target.fill('ledger')
+    await expect(page.locator('#target-results .hit').first()).toContainText('Ledger')
+    expect(await page.locator('#target-results .hit').count()).toBeLessThan(8)
+    await page.locator('#target-results .hit', { hasText: 'Ledger API' }).first().click()
+    await expect(target).toHaveValue('Ledger API')
+
+    await page.locator('[data-fx="Traffic"]').click()
+    await expect(page.locator('.fxchip')).toHaveText(/Traffic · bb\.ledger-api/)
+    await town.removeEffects()
+
+    // an island is a target too, and Escape puts the picked name back
+    await target.click()
+    await target.fill('island: beta')
+    await page.keyboard.press('Enter')
+    await expect(target).toHaveValue('Island: Beta')
+    await target.click()
+    await target.fill('zzz')
+    await page.keyboard.press('Escape')
+    await expect(target).toHaveValue('Island: Beta')
+  })
+
+  test('the degraded and down counters list those systems, and a click glides to one', async ({ town, page }) => {
+    await town.open()
+    await town.effect('bb.ledger-api', 'Down')
+    await town.effect('aa.orders-api', 'UnhealthyInstances', 0.5)
+    await town.until('bb.ledger-api', (n) => n.state === 'Down')
+    await expect(page.locator('[data-list="Down"] b')).toHaveText('1')
+
+    await page.locator('[data-list="Down"]').click()
+    const list = page.locator('#state-list')
+    await expect(list).toBeVisible()
+    await expect(list.locator('.hit')).toHaveCount(1)
+    await expect(list.locator('.hit').first()).toContainText('Ledger API')
+    await expect(list.locator('.hit').first()).toContainText('Beta')
+
+    // the same counter closes it; the other one lists the degraded systems
+    await page.locator('[data-list="Down"]').click()
+    await expect(list).toBeHidden()
+    await page.locator('[data-list="Degraded"]').click()
+    await expect(list.locator('.hit')).toContainText(['Orders API'])
+
+    await page.locator('[data-list="Down"]').click()
+    await list.locator('.hit').first().click()
+    await expect(list).toBeHidden()
+    await town.step(8) // the glide runs on the scene's clock
+    const near = await page.evaluate(() => {
+      const city = (window as any).city
+      const focus = city.town.focusOf('bb.ledger-api')
+      return city.stage.controls.target.distanceTo(focus.target)
+    })
+    expect(near, 'camera target to the building (m)').toBeLessThan(3)
+  })
+})

@@ -26,7 +26,9 @@ describe('signals', () => {
     expect(beaconLevel({ ...base, errorRate: 0.02 })).toBe('amber')
     expect(beaconLevel({ ...base, errorRate: 0.2 })).toBe('red')
     expect(beaconLevel({ ...base, errorRate: 0, state: 'Stale' })).toBe('grey')
-    expect(beaconLevel({ ...base, errorRate: 0, state: 'Down' })).toBe('off')
+    // down is solid red whatever the error rate says
+    expect(beaconLevel({ ...base, errorRate: 0, state: 'Down' })).toBe('red')
+    expect(beaconLevel({ ...base, errorRate: 0.002, state: 'Down' })).toBe('red')
   })
 
   it('slows walkers as p99 nears the SLA', () => {

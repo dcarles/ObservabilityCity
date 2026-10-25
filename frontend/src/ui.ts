@@ -1,15 +1,24 @@
 import type { Snapshot, NodeSnapshot } from './types'
 import type { ConnectionState } from './connection'
 import { formatMs, formatRate } from './visuals'
+import { escapeHtml, Picker, type PickItem } from './picker'
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T
+
+/** The states the top bar's counters can list. */
+export type ListedState = 'Degraded' | 'Down'
 
 export class TopBar {
   private readonly el = $('topbar')
   private status: ConnectionState = 'connecting'
   private snap: Snapshot | null = null
 
-  constructor(private readonly onHome: () => void) {
+  constructor(private readonly onHome: () => void, private readonly onList: (state: ListedState, anchor: DOMRect) => void) {
+    // the bar is redrawn with every snapshot, so one listener on the bar itself serves the chips
+    this.el.addEventListener('click', (e) => {
+      const chip = (e.target as HTMLElement).closest<HTMLElement>('[data-list]')
+      if (chip) this.onList(chip.dataset.list as ListedState, chip.getBoundingClientRect())
+    })
     this.render()
   }
 
@@ -37,8 +46,8 @@ export class TopBar {
         <div class="chip"><b>${formatRate(t.requestsPerSecond)}</b><span>req/s</span></div>
         <div class="chip ${t.errorRate >= 0.05 ? 'bad' : t.errorRate >= 0.01 ? 'warn' : ''}"><b>${(t.errorRate * 100).toFixed(1)}%</b><span>errors</span></div>
         <div class="chip"><b>${formatMs(t.p99Ms)}</b><span>p99</span></div>
-        <div class="chip ${t.degraded ? 'warn' : ''}"><b>${t.degraded}</b><span>degraded</span></div>
-        <div class="chip ${t.down ? 'bad' : ''}"><b>${t.down}</b><span>down</span></div>
+        <button class="chip clickable ${t.degraded ? 'warn' : ''}" data-list="Degraded" title="Show the degraded systems"><b>${t.degraded}</b><span>degraded</span></button>
+        <button class="chip clickable ${t.down ? 'bad' : ''}" data-list="Down" title="Show the systems that are down"><b>${t.down}</b><span>down</span></button>
         <div class="chip"><b>${day}</b><span>town time</span></div>` : ''}
       <span class="status"><i class="dot ${dot}"></i>${label}</span>
       <button id="home" title="Frame the whole town">Home</button>`
@@ -70,10 +79,6 @@ export class NoticesPanel {
       <ul ${this.open ? '' : 'hidden'}>${this.notices.map((t) => `<li>${escapeHtml(t)}</li>`).join('')}</ul>`
     this.el.querySelector('#notices-toggle')!.addEventListener('click', () => { this.open = !this.open; this.render() })
   }
-}
-
-function escapeHtml(s: string): string {
-  return s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!)
 }
 
 function clock(fraction: number): string {
@@ -112,7 +117,7 @@ export class PreviewPanel {
   private state: FxState = { calm: false, effects: [] }
   private target = '*'
 
-  constructor(private nodes: () => { id: string; name: string; group: string }[]) {}
+  constructor(private targets: () => PickItem[]) {}
 
   async refresh(): Promise<void> {
     try {
@@ -127,13 +132,12 @@ export class PreviewPanel {
   }
 
   render(): void {
-    const options = [{ id: '*', name: 'Whole town' }, ...[...new Set(this.nodes().map((n) => n.group))].map((g) => ({ id: g, name: `Island: ${g}` })), ...this.nodes().map((n) => ({ id: n.id, name: n.name }))]
     this.el.dataset.collapsed = String(this.collapsed)
     this.el.innerHTML = `
       <div class="head"><h3>Try it (preview)</h3><button id="fold">${this.collapsed ? '▾' : '▴'}</button></div>
       <p class="note">Temporary controls for this slice. The final Break things panel comes later.</p>
       <label>Target</label>
-      <select id="target">${options.map((o) => `<option value="${o.id}" ${o.id === this.target ? 'selected' : ''}>${o.name}</option>`).join('')}</select>
+      <div class="combo"><input id="target" type="text" placeholder="Type to find a target" autocomplete="off" spellcheck="false" /><div id="target-results" class="picker-results" hidden></div></div>
       <div class="grid">
         <button data-fx="Traffic" data-i="0.8">Traffic spike</button>
         <button data-fx="Latency" data-i="0.6">Slow</button>
@@ -151,7 +155,10 @@ export class PreviewPanel {
       <button class="wide ${this.state.calm ? 'on' : ''}" id="calm">Calm (freeze noise and day)</button>
       <div class="chips">${this.state.effects.map((e) => `<span class="fxchip" data-id="${e.id}" title="Click to clear">${e.kind} · ${e.target} ✕</span>`).join('')}</div>`
     this.el.querySelector('#fold')!.addEventListener('click', () => { this.collapsed = !this.collapsed; this.render() })
-    this.el.querySelector('#target')!.addEventListener('change', (ev) => { this.target = (ev.target as HTMLSelectElement).value })
+    const named = () => this.targets().find((t) => t.id === this.target)?.name ?? 'Whole town'
+    new Picker(this.el.querySelector<HTMLInputElement>('#target')!, this.el.querySelector<HTMLElement>('#target-results')!, {
+      items: () => this.targets(), limit: 200, showAll: true, label: named, onPick: (t) => { this.target = t.id },
+    })
     this.el.querySelectorAll<HTMLButtonElement>('[data-fx]').forEach((b) =>
       b.addEventListener('click', () => void this.send('/effects', 'POST', { target: this.target, kind: b.dataset.fx, intensity: Number(b.dataset.i) })))
     this.el.querySelector('#reset')!.addEventListener('click', () => void this.send('/effects', 'DELETE'))
@@ -160,14 +167,7 @@ export class PreviewPanel {
   }
 }
 
-export interface SearchItem {
-  kind: 'island' | 'building'
-  id: string
-  name: string
-  /** The island's name, or the island a building stands on. */
-  where: string
-  state?: string
-}
+export type SearchItem = PickItem
 
 /**
  * Search box over every island and building. Typing filters, arrow keys and Enter pick, "/" focuses it. It lives outside the
@@ -175,63 +175,67 @@ export interface SearchItem {
  */
 export class Search {
   private readonly input = $<HTMLInputElement>('search-input')
-  private readonly list = $('search-results')
-  private matches: SearchItem[] = []
-  private active = 0
 
-  constructor(private readonly items: () => SearchItem[], private readonly onPick: (item: SearchItem) => void) {
-    this.input.addEventListener('input', () => this.update())
-    this.input.addEventListener('focus', () => this.update())
-    this.input.addEventListener('blur', () => window.setTimeout(() => this.close(), 120))
-    this.input.addEventListener('keydown', (e) => {
-      if (e.key === 'ArrowDown') { this.active = Math.min(this.matches.length - 1, this.active + 1); this.draw(); e.preventDefault() }
-      else if (e.key === 'ArrowUp') { this.active = Math.max(0, this.active - 1); this.draw(); e.preventDefault() }
-      else if (e.key === 'Enter' && this.matches[this.active]) this.pick(this.matches[this.active])
-      else if (e.key === 'Escape') { this.input.value = ''; this.close(); this.input.blur() }
-    })
+  constructor(items: () => SearchItem[], onPick: (item: SearchItem) => void) {
+    new Picker(this.input, $('search-results'), { items, onPick, limit: 8 })
     window.addEventListener('keydown', (e) => {
       if (e.key === '/' && document.activeElement !== this.input) { e.preventDefault(); this.input.focus() }
     })
   }
+}
 
-  private update(): void {
-    const q = this.input.value.trim().toLowerCase()
-    if (!q) { this.close(); return }
-    const words = q.split(/\s+/)
-    const score = (i: SearchItem) => {
-      const hay = `${i.name} ${i.id} ${i.where}`.toLowerCase()
-      if (!words.every((w) => hay.includes(w))) return -1
-      const own = `${i.name} ${i.id}`.toLowerCase()
-      return (own.startsWith(q) ? 4 : 0) + (words.every((w) => own.includes(w)) ? 2 : 0) + (i.kind === 'island' ? 1 : 0)
+/**
+ * The list under a top bar counter: the systems in that state right now. Clicking one picks it, and the page glides to it.
+ * It stays up, and follows the numbers, until it is closed or something is picked.
+ */
+export class StateList {
+  private readonly el = $('state-list')
+  private state: ListedState | null = null
+  private key = ''
+  private anchor: DOMRect | null = null
+
+  constructor(private readonly systems: (state: ListedState) => PickItem[], private readonly onPick: (item: PickItem) => void) {
+    document.addEventListener('pointerdown', (e) => {
+      const t = e.target as HTMLElement
+      if (!this.el.hidden && !t.closest('#state-list') && !t.closest('[data-list]')) this.close()
+    })
+    window.addEventListener('keydown', (e) => { if (e.key === 'Escape') this.close() })
+  }
+
+  /** Opens the list for a state, or closes it if that one is already open. */
+  toggle(state: ListedState, anchor: DOMRect): void {
+    if (this.state === state && !this.el.hidden) { this.close(); return }
+    this.state = state
+    this.anchor = anchor
+    this.key = ''
+    this.refresh()
+  }
+
+  /** Redraws the list when the systems in that state have changed. */
+  refresh(): void {
+    if (!this.state) return
+    const items = this.systems(this.state).sort((a, b) => a.name.localeCompare(b.name))
+    const key = `${this.state}|${items.map((i) => i.id).join(',')}`
+    if (key === this.key) return
+    this.key = key
+    const word = this.state === 'Down' ? 'down' : 'degraded'
+    this.el.innerHTML = `
+      <div class="head"><b>${items.length} ${word}</b><button id="state-list-close" title="Close">✕</button></div>
+      ${items.length === 0 ? `<p class="none">Nothing is ${word} right now.</p>` : items.map((m, i) => `<div class="hit" data-i="${i}"><b>${escapeHtml(m.name)}</b><span>${escapeHtml(m.where)}</span></div>`).join('')}`
+    this.el.querySelector('#state-list-close')!.addEventListener('click', () => this.close())
+    this.el.querySelectorAll<HTMLElement>('.hit').forEach((row) =>
+      row.addEventListener('click', () => { const item = items[Number(row.dataset.i)]; this.close(); this.onPick(item) }))
+    this.el.hidden = false
+    if (this.anchor) {
+      const w = this.el.offsetWidth
+      this.el.style.left = `${Math.max(8, Math.min(this.anchor.left, window.innerWidth - w - 8))}px`
+      this.el.style.top = `${this.anchor.bottom + 8}px`
     }
-    this.matches = this.items()
-      .map((i) => ({ i, s: score(i) }))
-      .filter((x) => x.s >= 0)
-      .sort((a, b) => b.s - a.s || a.i.name.localeCompare(b.i.name))
-      .slice(0, 8)
-      .map((x) => x.i)
-    this.active = 0
-    this.draw()
   }
 
-  private draw(): void {
-    this.list.hidden = this.matches.length === 0
-    this.list.innerHTML = this.matches
-      .map((m, i) => `<div class="hit ${i === this.active ? 'active' : ''}" data-i="${i}"><b>${m.name}</b><span>${m.kind === 'island' ? 'island' : m.where}</span></div>`)
-      .join('')
-    this.list.querySelectorAll<HTMLElement>('.hit').forEach((el) =>
-      el.addEventListener('mousedown', (e) => { e.preventDefault(); this.pick(this.matches[Number(el.dataset.i)]) }))
-  }
-
-  private close(): void {
-    this.matches = []
-    this.list.hidden = true
-  }
-
-  private pick(item: SearchItem): void {
-    this.input.value = ''
-    this.close()
-    this.input.blur()
-    this.onPick(item)
+  close(): void {
+    this.state = null
+    this.key = ''
+    this.el.hidden = true
   }
 }

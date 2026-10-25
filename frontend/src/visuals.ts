@@ -25,7 +25,7 @@ export function litFraction(load: number): number {
   return clamp(load * 1.25, 0.1, 1)
 }
 
-export type BeaconLevel = 'green' | 'amber' | 'red' | 'grey' | 'off'
+export type BeaconLevel = 'green' | 'amber' | 'red' | 'grey'
 
 /** Share of capacity in use across CPU, memory and a data store's utilisation: the busiest one counts. */
 export function resourceUse(n: Pick<NodeSnapshot, 'cpu' | 'memory' | 'utilisation'>): number {
@@ -36,13 +36,13 @@ type BeaconInput = Pick<NodeSnapshot, 'state' | 'errorRate' | 'errorAmber' | 'er
   Partial<Pick<NodeSnapshot, 'cpu' | 'memory' | 'utilisation' | 'throttled' | 'resourceAmber' | 'throttleAmber' | 'throttleRed'>>
 
 /**
- * Rooftop beacon colour. Red means requests are failing: errors past the red threshold, or a data store
- * turning requests away past its throttle threshold. Amber is the warning: errors, throttling or CPU,
+ * Rooftop beacon colour. Red means requests are failing: a system that is down (the beacon then stays on, steady), errors
+ * past the red threshold, or a data store turning requests away past its throttle threshold. Amber is the warning: errors, throttling or CPU,
  * memory or utilisation past their amber thresholds.
  */
 export function beaconLevel(n: BeaconInput): BeaconLevel {
   if (n.state === 'Stale') return 'grey'
-  if (n.state === 'Down') return 'off'
+  if (n.state === 'Down') return 'red' // a system that is down is red whatever its error rate or silence says
   const throttled = n.throttled ?? 0
   if (n.errorRate >= n.errorRed || (n.throttleRed !== undefined && throttled >= n.throttleRed)) return 'red'
   if (n.errorRate >= n.errorAmber) return 'amber'

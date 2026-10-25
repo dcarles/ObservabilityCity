@@ -5,13 +5,14 @@ import { expect, type APIRequestContext, type Page } from '@playwright/test'
 
 export const API = `http://127.0.0.1:${process.env.E2E_API_PORT ?? 5290}`
 
-export type BeaconLevel = 'green' | 'amber' | 'red' | 'grey' | 'off'
+export type BeaconLevel = 'green' | 'amber' | 'red' | 'grey'
 
 export interface Status {
   id: string
   kind: string
   state: 'Healthy' | 'Degraded' | 'Down' | 'Stale'
   beacon: BeaconLevel
+  beaconSteady: boolean
   floors: number
   darkFloors: number
   litFloors: number
