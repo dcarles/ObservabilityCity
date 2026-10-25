@@ -1,12 +1,13 @@
+# yaml-language-server: $schema=../schema/pillar.schema.json
 pillar: pay
 displayName: Payments
 color: "#f2994a"
 defaults:
   api: { slaP99Ms: 500 }
 systems:
-  - { id: pay.payments-api, service: payments, name: Payments API, role: api, external: true }
-  - { id: pay.payments-worker, service: payments, name: Payments worker, role: worker }
+  - { id: pay.payments-api, service: payments, name: Payments API, role: api, external: true, calls: [pay.payments-db, pay.refunds-api] }
+  - { id: pay.payments-worker, service: payments, name: Payments worker, role: worker, calls: [pay.payments-db] }
   - { id: pay.payments-db, service: payments, name: Payments DB, role: db }
-  - { id: pay.refunds-api, service: refunds, name: Refunds API, role: api }
-  - { id: pay.refunds-worker, service: refunds, name: Refunds worker, role: worker }
+  - { id: pay.refunds-api, service: refunds, name: Refunds API, role: api, calls: [pay.refunds-db] }
+  - { id: pay.refunds-worker, service: refunds, name: Refunds worker, role: worker, calls: [pay.refunds-db] }
   - { id: pay.refunds-db, service: refunds, name: Refunds DB, role: db }

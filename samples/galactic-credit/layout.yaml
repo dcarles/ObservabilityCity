@@ -1,0 +1,4 @@
+# yaml-language-server: $schema=schema/layout.schema.json
+# Islands in the order they stand round the hub. Pillars not listed follow in file order, and
+# Lost & found always comes last. A ring holds 12 islands; the rest stand in a staggered outer ring.
+islands: [cl, acc, pay, frd, cus, acq, dec, bil, col, dsp, rwd, obk, ntf, dat]

@@ -1,0 +1,6 @@
+pillar: p23
+displayName: Pillar 23 (2)
+color: "#e07a5f"
+systems:
+  - { id: p23.s1-api, service: s1, name: S1 API, role: api, external: true, calls: [p23.s1-db] }
+  - { id: p23.s1-db, service: s1, name: S1 DB, role: db }

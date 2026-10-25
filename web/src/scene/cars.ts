@@ -12,7 +12,7 @@ export type Origin = 'internal' | 'external'
 export interface Bay {
   /** Points in drive order, already placed (no lane offset): the last one is the door, where the car is served. */
   drive: THREE.Vector3[]
-  /** How many cars the lane holds. A car that finds it full drives on and is counted as turned away. */
+  /** How many cars the lane holds. Once that many are on their way or waiting, no more cars appear for the building. */
   slots: number
   /** Where the "waiting" marker floats. */
   marker: THREE.Vector3
@@ -77,7 +77,8 @@ interface Car {
 interface Marker {
   sprite: THREE.Sprite
   key: string
-  turned: number[]
+  /** When the lane was last full and a car was held back. */
+  full: number
 }
 
 const MODELS: KitName[] = ['car_sedan', 'car_taxi'] // internal, external
@@ -268,7 +269,7 @@ export class CarSystem {
 
     for (const c of this.cars) {
       if (c.stage === 'there') {
-        if (!c.committed && c.dist >= c.plan.decision) this.decide(c)
+        if (!c.committed && c.dist >= c.plan.decision) c.committed = true
         if (c.stage === 'there' && c.dist >= c.total) {
           const n = c.plan.route.dest.node
           const ratio = n && n.slaP99Ms > 0 ? n.p99Ms / n.slaP99Ms : 0
@@ -324,6 +325,13 @@ export class CarSystem {
   private spawn(plan: Planned): boolean {
     const points = plan.there
     if (points.length < 2) return false
+    // a full lane means no more cars appear for this building (nothing turns round: that would read as a rejection)
+    let heading = 0
+    for (const o of this.cars) if (o.plan.route.dest === plan.route.dest && o.stage !== 'back' && o.fade < 0) heading++
+    if (heading >= plan.slots) {
+      this.markerFor(plan).full = this.time
+      return false
+    }
     // never appear on top of another car
     const start = points[0]
     if (this.cars.some((o) => Math.hypot(o.x - start.x, o.z - start.z) < HALT)) return false
@@ -345,15 +353,6 @@ export class CarSystem {
     car.dx /= len; car.dz /= len
     this.cars.push(car)
     return true
-  }
-
-  /** At the bay's mouth a car checks for room: a full lane means it turns round and the marker counts it as turned away. */
-  private decide(c: Car): void {
-    const waiting = this.cars.filter((o) => o !== c && o.plan.route.dest === c.plan.route.dest && o.committed && o.stage !== 'back').length
-    if (waiting < c.plan.slots) { c.committed = true; return }
-    // full: turn round as soon as the way back is clear (until then it carries on toward the bay)
-    c.wait += 1 / 10
-    if (this.turnAround(c, c.wait > 1.5)) this.markerFor(c.plan).turned.push(this.time)
   }
 
   /** Leave the door (or the road) by a smooth U-turn onto the way home, once the lane there is clear. Returns false if it must wait. */
@@ -426,23 +425,35 @@ export class CarSystem {
       sprite.visible = false
       sprite.position.copy(plan.marker).setY(plan.marker.y + 2.6)
       this.object.add(sprite)
-      mk = { sprite, key: '', turned: [] }
+      mk = { sprite, key: '', full: -100 }
       this.markers.set(b, mk)
     }
     return mk
   }
 
-  /** The "+N waiting" and "!" bubble over a bay: N is cars turned away in the last ten seconds, "!" shows when p99 is well past the SLA. */
+  /** What the bubble over a building's service lane shows, for tests: whether it is up, the "!" and the "+N waiting" count. */
+  bubbleOf(b: Building): { visible: boolean; honk: boolean; waiting: number } | null {
+    const mk = this.markers.get(b)
+    if (!mk) return null
+    const [honk, hidden] = mk.key.split('|')
+    return { visible: mk.sprite.visible, honk: honk === 'true', waiting: Number(hidden) || 0 }
+  }
+
+  /** The "+N waiting" and "!" bubble over a bay. N is the requests in flight (rate times typical latency) that the lane has no room to draw, and "!" shows when p99 is well past the SLA. */
   private updateMarkers(): void {
     for (const plan of this.plans) {
-      const mk = this.markers.get(plan.route.dest)
-      if (!mk) continue
-      while (mk.turned.length > 0 && this.time - mk.turned[0] > 10) mk.turned.shift()
       const n = plan.route.dest.node
       const honk = !!n && n.slaP99Ms > 0 && n.p99Ms > n.slaP99Ms * 1.5 && this.cars.some((c) => c.plan.route.dest === plan.route.dest && c.committed && c.stage !== 'back')
-      const turned = mk.turned.length
-      const key = `${honk}|${turned}`
-      mk.sprite.visible = honk || turned > 0
+      // The "!" goes up as soon as a car is stuck behind a slow system, whether or not the lane has filled yet; the bubble is made on demand.
+      const mk = honk ? this.markerFor(plan) : this.markers.get(plan.route.dest)
+      if (!mk) continue
+      let hidden = 0
+      if (n && this.time - mk.full < 3) {
+        const inFlight = n.requestsPerSecond * (n.p99Ms / 2000)
+        hidden = Math.max(1, Math.round(inFlight - plan.slots))
+      }
+      const key = `${honk}|${hidden}`
+      mk.sprite.visible = honk || hidden > 0
       if (key === mk.key) continue
       mk.key = key
       const tex = (mk.sprite.material as THREE.SpriteMaterial).map as THREE.CanvasTexture
@@ -458,9 +469,9 @@ export class CarSystem {
         ctx.fillText('!', 52, 50)
         x = 94
       }
-      if (turned > 0) {
+      if (hidden > 0) {
         ctx.fillStyle = '#fff'; ctx.font = '700 34px system-ui, sans-serif'; ctx.textAlign = 'left'
-        ctx.fillText(`+${turned} waiting`, x, 50, 300 - x)
+        ctx.fillText(`+${hidden} waiting`, x, 50, 300 - x)
       }
       tex.needsUpdate = true
     }

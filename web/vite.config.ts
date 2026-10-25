@@ -12,4 +12,6 @@ export default defineConfig({
     },
   },
   build: { chunkSizeWarningLimit: 1200 },
+  // the browser tests in e2e/ run under Playwright, not Vitest
+  test: { include: ['src/**/*.test.ts'] },
 })

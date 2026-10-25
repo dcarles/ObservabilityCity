@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=schema/town.schema.json
 id: galactic-credit
 name: Galactic Credit
 groupLabel: Pillar        # what an island is called in this town

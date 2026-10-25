@@ -26,8 +26,8 @@ export class TopBar {
   private render(): void {
     const s = this.snap
     const t = s?.totals
-    const label = { connecting: 'Connecting…', live: 'Live (demo data)', reconnecting: 'Reconnecting…', offline: 'Backend offline' }[this.status]
-    const dot = this.status === 'live' ? 'live' : this.status === 'offline' ? '' : 'wait'
+    const label = { connecting: 'Connecting…', live: 'Live (demo data)', reconnecting: 'Reconnecting…', offline: 'Backend offline', badData: 'Bad data, showing the last good town' }[this.status]
+    const dot = this.status === 'live' ? 'live' : this.status === 'offline' || this.status === 'badData' ? '' : 'wait'
     const day = s ? clock(s.dayFraction) : ''
     this.el.innerHTML = `
       <span class="brand">Observability City</span>
@@ -44,6 +44,36 @@ export class TopBar {
       <button id="home" title="Frame the whole town">Home</button>`
     this.el.querySelector('#home')!.addEventListener('click', this.onHome)
   }
+}
+
+/**
+ * Configuration problems that did not stop the town: a pillar file that was skipped, a reload that failed. They sit in a small
+ * panel under the top bar, so a broken file is noticed without opening the logs.
+ */
+export class NoticesPanel {
+  private readonly el = $('notices')
+  private open = false
+  private notices: string[] = []
+
+  show(notices: string[]): void {
+    const same = notices.length === this.notices.length && notices.every((n, i) => n === this.notices[i])
+    if (same) return
+    this.notices = notices
+    this.render()
+  }
+
+  private render(): void {
+    this.el.hidden = this.notices.length === 0
+    const n = this.notices.length
+    this.el.innerHTML = `
+      <button id="notices-toggle">${n} config problem${n === 1 ? '' : 's'} ${this.open ? '▴' : '▾'}</button>
+      <ul ${this.open ? '' : 'hidden'}>${this.notices.map((t) => `<li>${escapeHtml(t)}</li>`).join('')}</ul>`
+    this.el.querySelector('#notices-toggle')!.addEventListener('click', () => { this.open = !this.open; this.render() })
+  }
+}
+
+function escapeHtml(s: string): string {
+  return s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!)
 }
 
 function clock(fraction: number): string {
@@ -115,6 +145,7 @@ export class PreviewPanel {
         <button data-fx="Backlog" data-i="1">Queue backs up</button>
         <button data-fx="Poison" data-i="1">Dead letters</button>
         <button data-fx="Down" data-i="1">Down</button>
+        <button data-fx="Stale" data-i="1">Go quiet</button>
         <button id="reset">Reset all</button>
       </div>
       <button class="wide ${this.state.calm ? 'on' : ''}" id="calm">Calm (freeze noise and day)</button>
@@ -126,5 +157,81 @@ export class PreviewPanel {
     this.el.querySelector('#reset')!.addEventListener('click', () => void this.send('/effects', 'DELETE'))
     this.el.querySelector('#calm')!.addEventListener('click', () => void this.send('/calm', 'POST', { on: !this.state.calm }))
     this.el.querySelectorAll<HTMLElement>('.fxchip').forEach((c) => c.addEventListener('click', () => void this.send(`/effects/${c.dataset.id}`, 'DELETE')))
+  }
+}
+
+export interface SearchItem {
+  kind: 'island' | 'building'
+  id: string
+  name: string
+  /** The island's name, or the island a building stands on. */
+  where: string
+  state?: string
+}
+
+/**
+ * Search box over every island and building. Typing filters, arrow keys and Enter pick, "/" focuses it. It lives outside the
+ * top bar, which redraws with every snapshot and would take focus away.
+ */
+export class Search {
+  private readonly input = $<HTMLInputElement>('search-input')
+  private readonly list = $('search-results')
+  private matches: SearchItem[] = []
+  private active = 0
+
+  constructor(private readonly items: () => SearchItem[], private readonly onPick: (item: SearchItem) => void) {
+    this.input.addEventListener('input', () => this.update())
+    this.input.addEventListener('focus', () => this.update())
+    this.input.addEventListener('blur', () => window.setTimeout(() => this.close(), 120))
+    this.input.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowDown') { this.active = Math.min(this.matches.length - 1, this.active + 1); this.draw(); e.preventDefault() }
+      else if (e.key === 'ArrowUp') { this.active = Math.max(0, this.active - 1); this.draw(); e.preventDefault() }
+      else if (e.key === 'Enter' && this.matches[this.active]) this.pick(this.matches[this.active])
+      else if (e.key === 'Escape') { this.input.value = ''; this.close(); this.input.blur() }
+    })
+    window.addEventListener('keydown', (e) => {
+      if (e.key === '/' && document.activeElement !== this.input) { e.preventDefault(); this.input.focus() }
+    })
+  }
+
+  private update(): void {
+    const q = this.input.value.trim().toLowerCase()
+    if (!q) { this.close(); return }
+    const words = q.split(/\s+/)
+    const score = (i: SearchItem) => {
+      const hay = `${i.name} ${i.id} ${i.where}`.toLowerCase()
+      if (!words.every((w) => hay.includes(w))) return -1
+      const own = `${i.name} ${i.id}`.toLowerCase()
+      return (own.startsWith(q) ? 4 : 0) + (words.every((w) => own.includes(w)) ? 2 : 0) + (i.kind === 'island' ? 1 : 0)
+    }
+    this.matches = this.items()
+      .map((i) => ({ i, s: score(i) }))
+      .filter((x) => x.s >= 0)
+      .sort((a, b) => b.s - a.s || a.i.name.localeCompare(b.i.name))
+      .slice(0, 8)
+      .map((x) => x.i)
+    this.active = 0
+    this.draw()
+  }
+
+  private draw(): void {
+    this.list.hidden = this.matches.length === 0
+    this.list.innerHTML = this.matches
+      .map((m, i) => `<div class="hit ${i === this.active ? 'active' : ''}" data-i="${i}"><b>${m.name}</b><span>${m.kind === 'island' ? 'island' : m.where}</span></div>`)
+      .join('')
+    this.list.querySelectorAll<HTMLElement>('.hit').forEach((el) =>
+      el.addEventListener('mousedown', (e) => { e.preventDefault(); this.pick(this.matches[Number(el.dataset.i)]) }))
+  }
+
+  private close(): void {
+    this.matches = []
+    this.list.hidden = true
+  }
+
+  private pick(item: SearchItem): void {
+    this.input.value = ''
+    this.close()
+    this.input.blur()
+    this.onPick(item)
   }
 }

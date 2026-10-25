@@ -1,0 +1,14 @@
+# yaml-language-server: $schema=../schema/pillar.schema.json
+pillar: acc
+displayName: Accounts
+color: "#4dc3c9"
+defaults:
+  api: { slaP99Ms: 400 }
+systems:
+  - { id: acc.accounts-api, service: accounts, name: Accounts API, role: api, external: true, calls: [acc.accounts-db, acc.accounts-cache, acc.limits-api] }
+  - { id: acc.accounts-worker, service: accounts, name: Accounts worker, role: worker, calls: [acc.accounts-db] }
+  - { id: acc.accounts-db, service: accounts, name: Accounts DB, role: db }
+  - { id: acc.limits-api, service: limits, name: Limits API, role: api, calls: [acc.limits-db, acc.accounts-cache] }
+  - { id: acc.limits-db, service: limits, name: Limits DB, role: db }
+  - { id: acc.interest-cron, name: Interest run, role: cron, calls: [acc.accounts-api] }
+  - { id: acc.accounts-cache, name: Accounts cache, role: cache }

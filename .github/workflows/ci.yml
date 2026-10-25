@@ -1,34 +1,179 @@
 name: CI
 
+# The checks that block a pull request. They run side by side, so the wait is the slowest job, not the sum.
+# The slow checks (24-island stress town, full sample town with screenshots) are in slow.yml: they run on merge to main and nightly.
+
 on:
   push:
     branches: [main]
   pull_request:
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
 jobs:
-  build:
+  backend:
+    name: Backend tests
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 8.0.x
-      - uses: actions/setup-node@v4
+      # Only this job saves the NuGet cache; the other jobs run side by side and only restore it (two jobs saving one key collide).
+      - uses: actions/cache@v6
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', '.config/dotnet-tools.json') }}
+          restore-keys: nuget-${{ runner.os }}-
+      - run: dotnet build ObservabilityCity.sln -c Release
+      - run: dotnet test ObservabilityCity.sln -c Release --no-build
+
+  web:
+    name: Web tests and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 8.0.x
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: web/package-lock.json
-      - name: Backend tests
-        run: dotnet test ObservabilityCity.sln
-      - name: Web install
-        run: npm ci
+      - uses: actions/cache/restore@v6
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', '.config/dotnet-tools.json') }}
+          restore-keys: nuget-${{ runner.os }}-
+      - run: npm ci
         working-directory: web
       - name: Contracts match the C# records
         run: npm run check:contracts
         working-directory: web
-      - name: Web typecheck, tests and build
-        run: |
-          npm run typecheck
-          npm test
-          npm run build
+      - name: Typecheck
+        run: npm run typecheck
         working-directory: web
+      - name: Unit tests (includes the 24-island layout)
+        run: npm test
+        working-directory: web
+      - name: Build
+        run: npm run build
+        working-directory: web
+
+  ui-scenarios:
+    name: UI scenario tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 8.0.x
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - uses: actions/cache/restore@v6
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', '.config/dotnet-tools.json') }}
+          restore-keys: nuget-${{ runner.os }}-
+      - run: npm ci
+        working-directory: web
+      - name: Playwright version
+        id: pw
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+        working-directory: web
+      - name: Cache the browser
+        id: browser
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
+      - name: Install the browser
+        if: steps.browser.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+        working-directory: web
+      - name: Install the browser's system libraries
+        if: steps.browser.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+        working-directory: web
+      - name: Build the backend
+        run: dotnet build src/ObservabilityCity.Host -c Release
+      - name: UI scenarios
+        run: npm run e2e
+        working-directory: web
+        env:
+          E2E_NO_BUILD: '1'
+      - name: Keep the report when something fails
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ui-scenarios-report
+          path: |
+            web/playwright-report
+            web/test-results
+          retention-days: 7
+
+  registries:
+    name: Registry checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 8.0.x
+      - uses: actions/cache/restore@v6
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', '.config/dotnet-tools.json') }}
+          restore-keys: nuget-${{ runner.os }}-
+      - name: Check every registry folder in the repo
+        id: validate
+        continue-on-error: true
+        run: dotnet run --project tools/ObservabilityCity.Validate -c Release -- --all --github --markdown "$RUNNER_TEMP/registry-report.md"
+      - name: Show the result on the pull request
+        # Fork pull requests get a read-only token and cannot comment; the annotations on the files still appear.
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const fs = require('fs');
+            const body = fs.readFileSync(`${process.env.RUNNER_TEMP}/registry-report.md`, 'utf8');
+            const clear = body.includes('all clear');
+            const { data: comments } = await github.rest.issues.listComments({ ...context.repo, issue_number: context.issue.number, per_page: 100 });
+            const existing = comments.find(c => c.body.startsWith('<!-- registry-validation -->'));
+            if (existing) {
+              await github.rest.issues.updateComment({ ...context.repo, comment_id: existing.id, body });
+            } else if (!clear) {
+              await github.rest.issues.createComment({ ...context.repo, issue_number: context.issue.number, body });
+            }
+      - name: Fail when a registry has errors
+        if: steps.validate.outcome == 'failure'
+        run: exit 1
+
+  # One name for branch protection to require. It passes only when every check above passed.
+  checks:
+    name: PR checks
+    if: always()
+    needs: [backend, web, ui-scenarios, registries]
+    runs-on: ubuntu-latest
+    steps:
+      - name: All checks passed
+        run: |
+          echo '${{ toJSON(needs) }}'
+          if [ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped') }}" = "true" ]; then exit 1; fi

@@ -34,6 +34,7 @@
           "displayName",
           "id",
           "isHub",
+          "isLostFound",
           "nodes"
         ],
         "type": "object",
@@ -49,6 +50,13 @@
           },
           "isHub": {
             "type": "boolean"
+          },
+          "isLostFound": {
+            "type": "boolean"
+          },
+          "configError": {
+            "type": "string",
+            "nullable": true
           },
           "nodes": {
             "type": "array",
@@ -85,6 +93,7 @@
         "required": [
           "backlogAmber",
           "backlogRed",
+          "calls",
           "errorAmber",
           "errorRate",
           "errorRed",
@@ -220,6 +229,12 @@
             "type": "number",
             "format": "double"
           },
+          "calls": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "lastUpdated": {
             "type": "string",
             "format": "date-time",
@@ -235,6 +250,7 @@
           "generatedAt",
           "groupLabel",
           "groups",
+          "notices",
           "totals",
           "townId",
           "townName"
@@ -263,6 +279,12 @@
           },
           "totals": {
             "$ref": "#/components/schemas/TownTotals"
+          },
+          "notices": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           },
           "groups": {
             "type": "array",

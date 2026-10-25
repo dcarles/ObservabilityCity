@@ -1,0 +1,13 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Town file",
+  "type": "object",
+  "required": ["id", "name"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "$ref": "defs.schema.json#/$defs/kebabName" },
+    "name": { "type": "string" },
+    "groupLabel": { "type": "string", "description": "What an island is called in this town (Pillar, Team, ...)." },
+    "topology": { "enum": ["hub-and-spoke", "direct"], "description": "Whether calls between islands go through the hub." }
+  }
+}

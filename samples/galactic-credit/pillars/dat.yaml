@@ -1,0 +1,15 @@
+# yaml-language-server: $schema=../schema/pillar.schema.json
+pillar: dat
+displayName: Data Platform
+color: "#8d99ae"
+defaults:
+  api: { slaP99Ms: 2000 }
+systems:
+  - { id: dat.ingest-api, service: ingest, name: Ingest API, role: api, calls: [dat.ingest-db] }
+  - { id: dat.ingest-worker, service: ingest, name: Ingest worker, role: worker, calls: [dat.ingest-db] }
+  - { id: dat.ingest-db, service: ingest, name: Ingest DB, role: db }
+  - { id: dat.reports-api, service: reports, name: Reports API, role: api, external: true, calls: [dat.reports-db, dat.reports-cache] }
+  - { id: dat.reports-worker, service: reports, name: Reports worker, role: worker, calls: [dat.reports-db] }
+  - { id: dat.reports-db, service: reports, name: Reports DB, role: db }
+  - { id: dat.refresh-cron, name: Warehouse refresh, role: cron, calls: [dat.ingest-api] }
+  - { id: dat.reports-cache, name: Reports cache, role: cache }

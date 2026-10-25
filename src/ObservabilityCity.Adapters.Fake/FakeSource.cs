@@ -60,6 +60,14 @@ public sealed class FakeSource(
         lock (_gate) _effects.Clear();
     }
 
+    public void Reset()
+    {
+        lock (_gate) _effects.Clear();
+        _backlog.Clear();
+        _deadLetters.Clear();
+        _instances.Clear();
+    }
+
     /// <summary>Position in the simulated day, 0 to 1. Frozen while Calm.</summary>
     public double DayFraction
     {
@@ -84,6 +92,7 @@ public sealed class FakeSource(
         {
             var p = FakeProfiles.Fill(profiles.GetValueOrDefault(node.Id), node.Kind);
             var fx = effects.Where(e => Applies(e, node)).ToList();
+            if (fx.Any(e => e.Kind == FakeEffectKind.Stale)) continue; // the source says nothing about this node
 
             // Daily cycle: quiet at night, busy mid-afternoon.
             var cycle = Calm ? 0.8 : 0.55 + 0.45 * (0.5 - 0.5 * Math.Cos(2 * Math.PI * (DayFraction - 0.2)));

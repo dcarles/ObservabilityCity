@@ -1,0 +1,42 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Hub file: shared resources and outside callers",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "displayName": { "type": "string" },
+    "color": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+    "resources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "role"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "pattern": "^hub\\.[a-z0-9]+(-[a-z0-9]+)*$", "description": "hub.resource-name" },
+          "name": { "type": "string" },
+          "role": { "$ref": "defs.schema.json#/$defs/role" },
+          "slaP99Ms": { "type": "number" },
+          "errors": { "$ref": "defs.schema.json#/$defs/thresholds" },
+          "resources": { "$ref": "defs.schema.json#/$defs/thresholds" },
+          "throttle": { "$ref": "defs.schema.json#/$defs/thresholds" },
+          "backlog": { "$ref": "defs.schema.json#/$defs/thresholds" },
+          "aliases": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "externalCallers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "$ref": "defs.schema.json#/$defs/kebabName" },
+          "name": { "type": "string" },
+          "calls": { "type": "array", "description": "External systems this caller reaches.", "items": { "$ref": "system-ids.schema.json#/$defs/systemId" } }
+        }
+      }
+    }
+  }
+}

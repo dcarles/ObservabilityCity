@@ -44,6 +44,10 @@ internal sealed class SystemFile
     public ErrorThresholdsFile? Resources { get; set; }
     public ErrorThresholdsFile? Throttle { get; set; }
     public ErrorThresholdsFile? Backlog { get; set; }
+    /// <summary>Ids of the systems this one calls directly. Cars drive only along declared links.</summary>
+    public List<string> Calls { get; set; } = [];
+    /// <summary>Former ids of this system. Other files may still call it by one of them.</summary>
+    public List<string> Aliases { get; set; } = [];
 }
 
 internal sealed class PillarFile
@@ -61,4 +65,18 @@ internal sealed class HubFile
     public string DisplayName { get; set; } = "Hub";
     public string Color { get; set; } = "#f5c26b";
     public List<SystemFile> Resources { get; set; } = [];
+    public List<ExternalCallerFile> ExternalCallers { get; set; } = [];
+}
+
+internal sealed class ExternalCallerFile
+{
+    public string Id { get; set; } = "";
+    public string? Name { get; set; }
+    public List<string> Calls { get; set; } = [];
+}
+
+/// <summary>layout.yaml: the order of the islands round the hub.</summary>
+internal sealed class LayoutFile
+{
+    public List<string> Islands { get; set; } = [];
 }

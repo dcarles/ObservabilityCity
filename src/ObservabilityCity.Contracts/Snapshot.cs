@@ -33,6 +33,7 @@ public enum HealthState
 /// One building: a system or a hub resource, with the numbers the renderer turns into visuals.
 /// Service names the group of buildings that belong together (for example an API, its worker and its database), so they are drawn side by side.
 /// External marks systems that outside callers reach, which the renderer draws as a different kind of traffic.
+/// Calls lists the ids of the systems this one calls directly, as declared in the registry.
 /// Load is the share of capacity in use (0 idle, 1 full, above 1 saturated); each source works it out its own way.
 /// Cpu and Memory are the share in use across a service's instances (0 to 1). Utilisation is the share of provisioned capacity a data store
 /// uses (for example request units consumed against the maximum set), and Throttled is the share of requests it turned away. A source leaves out
@@ -70,14 +71,21 @@ public sealed record NodeSnapshot(
     double ThrottleRed,
     double BacklogAmber,
     double BacklogRed,
+    IReadOnlyList<string> Calls,
     DateTimeOffset? LastUpdated);
 
-/// <summary>An island (a pillar, a team, ...) or the hub island.</summary>
+/// <summary>
+/// An island (a pillar, a team, ...) or the hub island. IsLostFound marks the island that collects systems no group owns.
+/// ConfigError is set when the group's registry file is broken and was skipped: the island is drawn as a "config error" island
+/// with no buildings, and the text says what is wrong. It is null for every healthy island.
+/// </summary>
 public sealed record GroupSnapshot(
     string Id,
     string DisplayName,
     string Color,
     bool IsHub,
+    bool IsLostFound,
+    string? ConfigError,
     IReadOnlyList<NodeSnapshot> Nodes);
 
 public sealed record TownTotals(
@@ -87,7 +95,11 @@ public sealed record TownTotals(
     int Degraded,
     int Down);
 
-/// <summary>The whole town at one moment. This is what is pushed to the browser.</summary>
+/// <summary>
+/// The whole town at one moment. This is what is pushed to the browser.
+/// Notices are problems with the configuration that did not stop the town: a reload that failed (the last good registry is still shown),
+/// a call link that points nowhere and was dropped. The renderer lists them in the top bar.
+/// </summary>
 public sealed record Snapshot(
     string TownId,
     string TownName,
@@ -96,4 +108,5 @@ public sealed record Snapshot(
     DateTimeOffset GeneratedAt,
     double DayFraction,
     TownTotals Totals,
+    IReadOnlyList<string> Notices,
     IReadOnlyList<GroupSnapshot> Groups);

@@ -1,0 +1,8 @@
+pillar: p19
+displayName: Pillar 19 (4)
+color: "#f2c94c"
+systems:
+  - { id: p19.s1-api, service: s1, name: S1 API, role: api, external: true, calls: [p19.s1-db, p19.session-cache] }
+  - { id: p19.s1-worker, service: s1, name: S1 worker, role: worker, calls: [p19.s1-db] }
+  - { id: p19.s1-db, service: s1, name: S1 DB, role: db }
+  - { id: p19.session-cache, name: Session cache, role: cache }

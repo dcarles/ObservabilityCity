@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=schema/hub.schema.json
 displayName: Platform hub
 color: "#f5c26b"
 resources:
@@ -5,3 +6,9 @@ resources:
   - { id: hub.service-bus, name: Service Bus, role: broker }
   - { id: hub.egress, name: Central egress, role: egress }
   - { id: hub.customer-db, name: Shared customer DB, role: db }
+# Outside callers of the town (apps, partners, vendors' webhooks). Each lists the external systems it reaches.
+externalCallers:
+  - { id: mobile-app, name: Mobile app, calls: [cl.ledger-api, pay.payments-api, rwd.points-api] }
+  - { id: partner-portal, name: Partner portal, calls: [acq.applications-api, bil.invoices-api] }
+  - { id: open-banking-tpp, name: Third-party providers, calls: [obk.consents-api, obk.data-api] }
+  - { id: merchant-systems, name: Merchant systems, calls: [pay.payments-api, dsp.disputes-api] }

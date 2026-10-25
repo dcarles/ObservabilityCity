@@ -1,0 +1,11 @@
+# yaml-language-server: $schema=../schema/pillar.schema.json
+pillar: rwd
+displayName: Rewards
+color: "#c77dff"
+systems:
+  - { id: rwd.points-api, service: points, name: Points API, role: api, external: true, calls: [rwd.points-db, rwd.points-cache, rwd.catalog-api] }
+  - { id: rwd.points-worker, service: points, name: Points worker, role: worker, calls: [rwd.points-db] }
+  - { id: rwd.points-db, service: points, name: Points DB, role: db }
+  - { id: rwd.catalog-api, service: catalog, name: Catalog API, role: api, calls: [rwd.catalog-db] }
+  - { id: rwd.catalog-db, service: catalog, name: Catalog DB, role: db }
+  - { id: rwd.points-cache, name: Points cache, role: cache }

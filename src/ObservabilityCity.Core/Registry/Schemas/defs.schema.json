@@ -1,0 +1,37 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "defs.schema.json",
+  "title": "Shared definitions of the registry files",
+  "$defs": {
+    "role": {
+      "description": "What a system is. It decides the building that stands for it.",
+      "enum": ["api", "worker", "db", "cache", "cron", "gateway", "broker", "egress"]
+    },
+    "thresholds": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "amber": { "type": "number", "description": "Turns amber at or above this value." },
+        "red": { "type": "number", "description": "Turns red at or above this value." }
+      }
+    },
+    "roleDefaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "slaP99Ms": { "type": "number", "description": "p99 latency the system should stay under, in milliseconds." },
+        "errors": { "$ref": "#/$defs/thresholds", "description": "Share of failed requests (0 to 1)." },
+        "resources": { "$ref": "#/$defs/thresholds", "description": "CPU, memory or data store utilisation (0 to 1)." },
+        "throttle": { "$ref": "#/$defs/thresholds", "description": "Share of throttled requests (0 to 1)." },
+        "backlog": { "$ref": "#/$defs/thresholds", "description": "Age of the oldest waiting message, in seconds." }
+      }
+    },
+    "defaults": {
+      "type": "object",
+      "description": "Defaults per role.",
+      "propertyNames": { "$ref": "#/$defs/role" },
+      "additionalProperties": { "$ref": "#/$defs/roleDefaults" }
+    },
+    "kebabName": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" }
+  }
+}

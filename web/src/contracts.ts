@@ -29,6 +29,8 @@ export interface components {
             displayName: string;
             color: string;
             isHub: boolean;
+            isLostFound: boolean;
+            configError?: string | null;
             nodes: components["schemas"]["NodeSnapshot"][];
         };
         /** @enum {string} */
@@ -86,6 +88,7 @@ export interface components {
             backlogAmber: number;
             /** Format: double */
             backlogRed: number;
+            calls: string[];
             /** Format: date-time */
             lastUpdated?: string | null;
         };
@@ -99,6 +102,7 @@ export interface components {
             /** Format: double */
             dayFraction: number;
             totals: components["schemas"]["TownTotals"];
+            notices: string[];
             groups: components["schemas"]["GroupSnapshot"][];
         };
         TownTotals: {

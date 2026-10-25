@@ -6,6 +6,21 @@ import { buildModel } from '../themes/harbour-town/models'
 import type { BuildingModel, FloorModule } from './model'
 import { canvasTexture, roundRect } from './mk'
 
+/** What a building shows, for tests. See Building.status. */
+export interface BuildingStatus {
+  id: string
+  kind: NodeSnapshot['kind']
+  state: NodeSnapshot['state']
+  beacon: BeaconLevel
+  floors: number
+  darkFloors: number
+  litFloors: number
+  closedSign: boolean
+  /** Only data stores have a barrier: down while they turn requests away. */
+  barrierDown: boolean | null
+  plaque: string
+}
+
 interface FloorState {
   module: FloorModule
   /** 0 = not built, 1 = full height. Eased, so floors rise and sink instead of popping. */
@@ -55,6 +70,8 @@ export class Building {
   private label: THREE.Sprite | null = null
   private labelKey = ''
   readonly hit: THREE.Mesh
+  /** True while the building is selected: its name board stays readable from any distance. */
+  pinned = false
   private gate: { arm: THREE.Group } | null = null
   private gateAngle = Math.PI / 2
 
@@ -176,6 +193,27 @@ export class Building {
     if (this.label) this.label.position.set(0, y + 3.4, 0)
     this.fadeLabel(camera)
     this.closedSign.visible = n.state === 'Down'
+  }
+
+  /**
+   * What the building shows right now, as plain values: the beacon colour, how many floors are dark, whether the closed
+   * sign is up and the barrier is down. Automated tests read this instead of pixels.
+   */
+  status(): BuildingStatus | null {
+    const n = this.node
+    if (!n) return null
+    return {
+      id: this.id,
+      kind: this.kind,
+      state: n.state,
+      beacon: this.level,
+      floors: this.floorsWanted,
+      darkFloors: this.darkWanted,
+      litFloors: Math.round(this.lit * this.floorsWanted * 100) / 100,
+      closedSign: this.closedSign.visible,
+      barrierDown: this.gate ? this.gateAngle < 0.4 : null,
+      plaque: plaqueText(n),
+    }
   }
 
   /** How busy the building is, 0 to 1: CPU for apps, utilisation for data stores, load for the rest. Lights switch on floor by floor to match. */
@@ -382,7 +420,7 @@ export class Building {
     const troubled = this.node.state !== 'Healthy' || this.node.instancesHealthy < this.node.instancesTotal
     const d = camera.position.distanceTo(this.label.getWorldPosition(new THREE.Vector3()))
     const far = clamp((d - 75) / 40, 0, 1)
-    const opacity = troubled ? 1 : 1 - far
+    const opacity = troubled || this.pinned ? 1 : 1 - far
     ;(this.label.material as THREE.SpriteMaterial).opacity = opacity
     this.label.visible = opacity > 0.02
   }

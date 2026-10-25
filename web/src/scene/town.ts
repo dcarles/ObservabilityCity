@@ -1,63 +1,27 @@
 import * as THREE from 'three'
-import { Building } from '../buildings/building'
+import { Building, type BuildingStatus } from '../buildings/building'
 import { box, canvasTexture, cyl, flat, group, roundRect } from '../buildings/mk'
 import { kit } from '../assets/kit'
 import type { GroupSnapshot, NodeSnapshot, Snapshot } from '../types'
 import { palette } from '../themes/harbour-town/palette'
 import { blockPad, bench, bridge, crates, fountain, junction, lamp, pier, prop, ring, roadBetween, ROAD_W, serviceLane, street, streetX } from './props'
 import { buildIslandBody, GROUND, makeOutline, scatterNature, type Outline, type Rect } from './island'
+import { COL_X, CURB, LANE_SLOTS, LANE_Z, PAD_D, PAD_W, QUEUE_GAP, coastScan, planIsland, type Placed, type Plan } from './plan'
 import { hashString } from './random'
 import { clamp, formatRate, speedFactor } from '../visuals'
 import { CarSystem, type Route } from './cars'
 import { BoatSystem, type BoatRoute } from './boats'
 import { HarbourStatus, messagingOf, type Messaging } from './harbour'
 import { findLane, type SeaMap } from './sea'
+import { mergeStatic } from './merge'
+import { hubGeometry, layoutTown, wrapAngle, type HubGeometry } from './layout'
 
-const HUB_RX = 22
-const HUB_RZ = 21
 const QUAY = 9
-const RING_R = 5.7
-const SLOT = 7.6 // width of the plot of one building along a pad
-const PAD_W = 3 * SLOT + 0.8 // a service pad holds up to three buildings side by side
-const PAD_D = 8.8
-const CURB = 5.6 // road centre line to the front of a pad: half the road, the service lane where cars wait, and a verge
-const SPINE_CURB = 6.6 // spine centre line to the nearest pad, which leaves room for cars to turn into the service lanes
-const LANE_Z = 3.5 // road centre line to the middle of the service lane
-const QUEUE_GAP = 2.5 // spacing of the cars waiting in a service lane
-const GAP = 9 // lawn between one row of pads and the road of the next, so the front row never hides the one behind
-const ROW = PAD_D + 2 * CURB + GAP // distance between two rows of pads
-const COL_X = SPINE_CURB + 0.4 + PAD_W / 2 // pad centre from the spine's centre line
-const FRONT = 4.0 // building centre from the front edge of its pad
 
-/** One service pad on the island's grid, with its buildings in a row and their fronts toward the road. */
 /** Where an island's road leaves the hub: the direction it lies in and the point on the hub's coast. */
 interface Port {
   angle: number
   coast: THREE.Vector3
-}
-
-interface Pad {
-  nodes: NodeSnapshot[]
-  col: 0 | 1
-  row: number
-}
-
-interface Placed {
-  node: NodeSnapshot
-  pad: Pad
-  /** Island-local position of the building's centre and of the road in front of it. */
-  x: number
-  z: number
-  roadZ: number
-}
-
-interface Plan {
-  pads: Pad[]
-  placed: Placed[]
-  rows: number
-  rowRoadZ: number[]
-  rx: number
-  rz: number
 }
 
 interface Island {
@@ -80,8 +44,13 @@ export class Town {
   readonly buildings = new Map<string, Building>()
   readonly islands: Island[] = []
   hubOutline!: Outline
+  /** Size of the hub for this town. It grows with the number of islands. */
+  private hubGeo: HubGeometry = hubGeometry(0)
+  private hubDecor = new THREE.Group()
   /** Extent used to frame the camera. */
   readonly bounds = new THREE.Box3()
+  /** Points along every coast, for working out how far back the camera must stand to show the whole town. */
+  readonly extent: THREE.Vector3[] = []
   private snapshotId = ''
   private hubDeadLetters = 0
   private hubBoard: { sprite: THREE.Sprite; key: string } | null = null
@@ -95,22 +64,31 @@ export class Town {
     return this.snapshotId === layoutKey(s)
   }
 
+  /** Forget the layout, so the next snapshot builds the town again. Used after a build that failed half way. */
+  invalidate(): void {
+    this.snapshotId = ''
+  }
+
   build(s: Snapshot): void {
-    this.snapshotId = layoutKey(s)
+    this.snapshotId = ''
     const hub = s.groups.find((g) => g.isHub)
     const pillars = s.groups.filter((g) => !g.isHub)
     const routes: Route[] = []
     const boatRoutes: BoatRoute[] = []
     const bridges: [THREE.Vector2, THREE.Vector2][] = []
 
-    // Islands sit on a ring around the hub, spread evenly but turned so their spokes miss the hub's own
-    // buildings on the four main axes.
-    const { islandAngles: angles, portAngles: ports } = placeAround(pillars.length)
+    // Islands stand round the hub in registry order, twelve to a ring and the rest in a staggered outer ring. The hub
+    // grows with their number, so every spoke road has room where it leaves the plaza.
+    const plans = pillars.map((g) => planIsland(g))
+    const layout = layoutTown(plans.map((p) => ({ rx: p.rx, rz: p.rz })))
+    this.hubGeo = layout.hub
+    const angles = layout.islands.map((i) => i.angle)
+    const ports = layout.islands.map((i) => i.portAngle)
     const dirOf = (a: number) => new THREE.Vector3(Math.sin(a), 0, -Math.cos(a))
 
     // ── Hub ────────────────────────────────────────────────────────────────
     const hubRoot = new THREE.Group()
-    this.hubOutline = makeOutline(hashString('hub'), HUB_RX, HUB_RZ, 0.05)
+    this.hubOutline = makeOutline(hashString('hub'), this.hubGeo.rx, this.hubGeo.rz, 0.05)
     hubRoot.add(buildIslandBody(this.hubOutline))
     const hubCoasts = ports.map((a) => coastPoint(this.hubOutline, dirOf(a), 0.9))
     const hubBuildings = this.buildHub(hubRoot, hub, ports.map((a, i) => ({ angle: a, coast: hubCoasts[i] })))
@@ -127,27 +105,20 @@ export class Town {
       this.hubBoard = { sprite, key: '' }
     }
 
-    // ── Islands on the ring ──────────────────────────────────────────────────
-    const plans = pillars.map((g) => planIsland(g))
-    // far enough out that the nearest coast clears the sea lane, and neighbours do not touch
-    let ringR = HUB_RZ + 22 + Math.max(0, ...plans.map((p) => p.rz))
-    angles.forEach((a, i) => {
-      const j = (i + 1) % angles.length
-      if (angles.length < 2) return
-      const gap = Math.abs(wrapAngle(angles[j] - a))
-      ringR = Math.max(ringR, (plans[i].rx + plans[j].rx + 12) / (2 * Math.sin(Math.max(0.2, gap) / 2)))
-    })
+    // ── Islands ──────────────────────────────────────────────────────────────
+    const bridgeDecor = new THREE.Group()
+    this.root.add(bridgeDecor)
     pillars.forEach((g, index) => {
       const plan = plans[index]
       const dir = dirOf(angles[index])
-      const center = dir.clone().multiplyScalar(ringR)
+      const center = dir.clone().multiplyScalar(layout.islands[index].radius)
       const island = this.buildIsland(g, plan, center)
       this.islands.push(island)
       this.root.add(island.root)
       this.expandBounds(island.outline, center, island.root.rotation.y, 12)
 
       const gate = island.root.localToWorld(new THREE.Vector3(0, GROUND, coastScan(island.outline, 'z') - 0.7))
-      this.root.add(bridge({ from: hubCoasts[index].clone().setY(0), to: gate.clone().setY(0) }))
+      bridgeDecor.add(bridge({ from: hubCoasts[index].clone().setY(0), to: gate.clone().setY(0) }))
       bridges.push([new THREE.Vector2(hubCoasts[index].x, hubCoasts[index].z), new THREE.Vector2(gate.x, gate.z)])
       routes.push(...this.islandRoutes(island, plan, ports[index], hubCoasts[index], gate))
     })
@@ -165,7 +136,7 @@ export class Town {
       const key = Math.round(wrapAngle(a) * 100)
       let q = quays.get(key)
       if (!q) {
-        q = this.hubQuay(hubRoot, a)
+        q = this.hubQuay(a)
         quays.set(key, q)
       }
       return q
@@ -188,9 +159,12 @@ export class Town {
       boatRoutes.push(this.boatRoute(this.islands[index], best, hubBuildings))
     })
 
+    mergeStatic(bridgeDecor)
+    mergeStatic(this.hubDecor)
     routes.push(...this.hubRoutes(hubBuildings, ports.map((a, i) => ({ angle: a, coast: hubCoasts[i] }))))
     this.cars.setRoutes(routes)
     this.boats.setRoutes(boatRoutes)
+    this.snapshotId = layoutKey(s)
   }
 
   /** The Service Bus port's board: dead letters across every island. */
@@ -217,20 +191,47 @@ export class Town {
 
   /** Feed a snapshot into the existing buildings. */
   apply(s: Snapshot): void {
-    for (const g of s.groups) for (const n of g.nodes) this.buildings.get(n.id)?.setNode(n)
+    // One building that cannot take its numbers must not stop the others from taking theirs.
+    for (const g of s.groups) for (const n of g.nodes) this.guard(`apply ${n.id}`, () => this.buildings.get(n.id)?.setNode(n))
     for (const isl of this.islands) {
       const g = s.groups.find((x) => x.id === isl.group.id)
-      if (g) isl.messaging = messagingOf([...g.nodes])
+      if (g) this.guard(`messaging ${g.id}`, () => { isl.messaging = messagingOf([...g.nodes]) })
     }
     this.hubDeadLetters = this.islands.reduce((a, i) => a + (i.messaging.deadLetters ?? 0), 0)
   }
 
   update(dt: number, time: number, camera: THREE.Camera): void {
-    for (const b of this.buildings.values()) b.update(dt, time, camera)
-    for (const isl of this.islands) isl.harbour.update(isl.messaging, time, camera)
-    this.updateHubBoard(camera)
-    this.cars.update(dt)
-    this.boats.update(dt)
+    for (const [id, b] of this.buildings) this.guard(`update ${id}`, () => b.update(dt, time, camera))
+    for (const isl of this.islands) this.guard(`harbour ${isl.group.id}`, () => isl.harbour.update(isl.messaging, time, camera))
+    this.guard('hub board', () => this.updateHubBoard(camera))
+    this.guard('cars', () => this.cars.update(dt))
+    this.guard('boats', () => this.boats.update(dt))
+  }
+
+  private readonly reported = new Set<string>()
+
+  /** Runs one piece of per-frame work. If it throws, the error is logged once and the rest of the town carries on. */
+  private guard(what: string, work: () => void): void {
+    try {
+      work()
+    } catch (e) {
+      if (this.reported.has(what)) return
+      this.reported.add(what)
+      console.error(`Could not ${what}:`, e)
+    }
+  }
+
+  /** What one building shows right now, as plain values. For tests. */
+  inspect(id: string): (BuildingStatus & { bubble: { visible: boolean; honk: boolean; waiting: number } | null }) | null {
+    const b = this.buildings.get(id)
+    const st = b?.status()
+    return b && st ? { ...st, bubble: this.cars.bubbleOf(b) } : null
+  }
+
+  /** What an island's harbour shows, and whether the island is a config error island. For tests. */
+  inspectIsland(groupId: string): { id: string; buildings: number; configError: string | null; crates: number; brokenCrates: number; alarm: boolean } | null {
+    const isl = this.islands.find((i) => i.group.id === groupId)
+    return isl ? { id: groupId, buildings: isl.buildings.size, configError: isl.group.configError ?? null, ...isl.harbour.status() } : null
   }
 
   /** Grow the camera framing box by an island's coast, pushed out a little to leave room for piers. */
@@ -240,7 +241,9 @@ export class Town {
       const p = outline.points[i]
       const len = Math.hypot(p.x, p.y) || 1
       const x = p.x + (p.x / len) * extra, z = p.y + (p.y / len) * extra
-      this.bounds.expandByPoint(new THREE.Vector3(center.x + x * c + z * sn, 0, center.z - x * sn + z * c))
+      const pt = new THREE.Vector3(center.x + x * c + z * sn, 0, center.z - x * sn + z * c)
+      this.bounds.expandByPoint(pt)
+      this.extent.push(pt)
     }
   }
 
@@ -248,16 +251,29 @@ export class Town {
 
   private buildHub(hubRoot: THREE.Group, hub: GroupSnapshot | undefined, ports: Port[]): Building[] {
     const out: Building[] = []
-    const avoid: Rect[] = [{ x: 0, z: 2, w: 20, d: 20 }, { x: 0, z: -15, w: 6, d: 14 }]
-    const plan: Record<string, { x: number; z: number; yaw: number }> = {
-      Gateway: { x: 0, z: -11.5, yaw: 0 },
-      Broker: { x: 14.5, z: 2, yaw: Math.PI / 2 },
-      Egress: { x: -14.5, z: 2, yaw: Math.PI / 2 },
-      Database: { x: 0, z: 16, yaw: Math.PI },
+    const decor = new THREE.Group()
+    hubRoot.add(decor)
+    this.hubDecor = decor
+    const f = this.hubGeo.scale
+    const ringR = this.hubGeo.ringR
+    const CZ = 2 // the plaza's centre sits a little south of the hub's
+    // The four main buildings stand on the axes, scaled out with the hub. Each is [distance from the centre, yaw].
+    const spots: Record<string, { x: number; z: number; yaw: number }> = {
+      Gateway: { x: 0, z: CZ - 13.5 * f, yaw: 0 },
+      Broker: { x: 14.5 * f, z: CZ, yaw: Math.PI / 2 },
+      Egress: { x: -14.5 * f, z: CZ, yaw: Math.PI / 2 },
+      Database: { x: 0, z: CZ + 14 * f, yaw: Math.PI },
     }
+    const avoid: Rect[] = [{ x: 0, z: CZ, w: 20 * f, d: 20 * f }, { x: 0, z: CZ - 15 * f, w: 6, d: 14 }]
+    const seen = new Set<string>()
     for (const n of hub?.nodes ?? []) {
-      const spot = plan[n.kind]
-      if (!spot) continue
+      const spot = spots[n.kind]
+      if (!spot || seen.has(n.kind)) {
+        // the hub has one slot for each of gateway, broker, egress and database
+        console.warn(`Hub resource ${n.id} has no free slot and is not drawn`)
+        continue
+      }
+      seen.add(n.kind)
       const b = new Building(n.id, n.kind, hub?.color ?? palette.flagFallback)
       b.root.position.set(spot.x, GROUND, spot.z)
       b.root.rotation.y = spot.yaw
@@ -267,33 +283,41 @@ export class Town {
       avoid.push({ x: spot.x, z: spot.z, w: 12, d: 12 })
     }
     // plaza: paved centre with a fountain inside a ring road, and the roads out to each building
-    const paving = new THREE.Mesh(new THREE.CylinderGeometry(3.7, 3.8, 0.14, 40), new THREE.MeshStandardMaterial({ color: palette.island.pavement, roughness: 0.95, flatShading: true }))
-    paving.position.set(0, GROUND + 0.02, 2)
+    const paving = new THREE.Mesh(new THREE.CylinderGeometry(3.7 * f, 3.8 * f, 0.14, 48), new THREE.MeshStandardMaterial({ color: palette.island.pavement, roughness: 0.95, flatShading: true }))
+    paving.position.set(0, GROUND + 0.02, CZ)
     paving.receiveShadow = true
     const fount = fountain()
     fount.position.x = 0
-    fount.position.z = 2
-    hubRoot.add(paving, fount, ring(0, 2, 3.7 + 0.4, RING_R + 2.1))
-    hubRoot.add(street(0, -8.4, -5.8), street(0, 9.8, 11.4), streetX(2, 7.8, 11), streetX(2, -11.2, -7.8))
+    fount.position.z = CZ
+    fount.scale.setScalar(Math.min(1.8, f))
+    decor.add(paving, fount, ring(0, CZ, 3.7 * f + 0.4, ringR + 2.1))
+    // a short street from the ring road to the front of each building
+    const reach = (d: number) => d - 3.1
+    decor.add(
+      street(0, CZ - reach(13.5 * f), CZ - (ringR + 2.1)), street(0, CZ + (ringR + 2.1), CZ + reach(14 * f) - 1.5),
+      streetX(CZ, ringR + 2.1, reach(14.5 * f) - 0.4), streetX(CZ, -reach(14.5 * f) + 0.4, -(ringR + 2.1)),
+    )
     // one spoke from the plaza to the coast for each island, where its bridge starts
     for (const port of ports) {
-      const edge = new THREE.Vector3(Math.sin(port.angle) * (RING_R + 1.9), GROUND, 2 - Math.cos(port.angle) * (RING_R + 1.9))
-      hubRoot.add(roadBetween(edge, port.coast))
-      for (let r = 9; r < 30; r += 4) avoid.push({ x: Math.sin(port.angle) * r, z: 2 - Math.cos(port.angle) * r, w: 7, d: 7 })
+      const edge = new THREE.Vector3(Math.sin(port.angle) * (ringR + 1.9), GROUND, CZ - Math.cos(port.angle) * (ringR + 1.9))
+      decor.add(roadBetween(edge, port.coast))
+      for (let r = 9 * f; r < 30 * f; r += 4) avoid.push({ x: Math.sin(port.angle) * r, z: CZ - Math.cos(port.angle) * r, w: 7, d: 7 })
     }
-    for (let i = 0; i < 8; i++) {
-      const a = (i / 8) * Math.PI * 2 + 0.4
-      if (ports.some((p) => Math.abs(Math.atan2(Math.sin(a - p.angle), Math.cos(a - p.angle))) < 0.3)) continue
-      hubRoot.add(lamp(Math.sin(a) * 8.6, 2 - Math.cos(a) * 8.6, Math.sin(a)))
+    const lamps = Math.round(8 * f)
+    for (let i = 0; i < lamps; i++) {
+      const a = (i / lamps) * Math.PI * 2 + 0.4
+      if (ports.some((p) => Math.abs(wrapAngle(a - p.angle)) < 0.3 / f)) continue
+      decor.add(lamp(Math.sin(a) * (ringR + 2.9), CZ - Math.cos(a) * (ringR + 2.9), Math.sin(a)))
     }
-    hubRoot.add(bench(-6.0, -6.2, 0.6), bench(6.0, 9.6, 3.6), bench(-9.4, 8.2, 1.3))
-    hubRoot.add(scatterNature(this.hubOutline, avoid, hashString('hub-trees'), { trees: 26, rocks: 12 }))
+    decor.add(bench(-6.0 * f, CZ - 8.2 * f, 0.6), bench(6.0 * f, CZ + 7.6 * f, 3.6), bench(-9.4 * f, CZ + 6.2 * f, 1.3))
+    hubRoot.add(scatterNature(this.hubOutline, avoid, hashString('hub-trees'), { trees: Math.round(26 * f * f), rocks: Math.round(12 * f) }))
     return out
   }
 
   private hubRoutes(hubBuildings: Building[], ports: Port[]): Route[] {
     const routes: Route[] = []
-    const ringPoint = (a: number) => new THREE.Vector3(Math.sin(a) * RING_R, GROUND, 2 - Math.cos(a) * RING_R)
+    const ringR = this.hubGeo.ringR
+    const ringPoint = (a: number) => new THREE.Vector3(Math.sin(a) * ringR, GROUND, 2 - Math.cos(a) * ringR)
     const arc = (from: number, to: number) => {
       const steps = Math.max(2, Math.ceil(Math.abs(to - from) / 0.25))
       return Array.from({ length: steps + 1 }, (_, i) => ringPoint(from + ((to - from) * i) / steps))
@@ -328,6 +352,9 @@ export class Town {
 
     const outline = makeOutline(hashString(g.id), plan.rx, plan.rz, 0.06)
     root.add(buildIslandBody(outline))
+    // everything that never changes goes in here, and is merged into a few meshes once the island is built
+    const decor = new THREE.Group()
+    root.add(decor)
 
     const { rows, rowRoadZ } = plan
     const edge = COL_X + PAD_W / 2 + 0.4
@@ -339,14 +366,14 @@ export class Town {
 
     // Roads: one spine from the gate, and a road in front of every row of pads, with a junction where they meet.
     const half = ROAD_W / 2
-    root.add(street(0, rowRoadZ[0] + half, gateZ + 0.2))
+    decor.add(street(0, rowRoadZ[0] + half, gateZ + 0.2))
     for (let r = 0; r < rows; r++) {
       const z = rowRoadZ[r]
-      root.add(junction(0, z, r === rows - 1))
-      if (r < rows - 1) root.add(street(0, rowRoadZ[r + 1] + half, z - half))
+      decor.add(junction(0, z, r === rows - 1))
+      if (r < rows - 1) decor.add(street(0, rowRoadZ[r + 1] + half, z - half))
       // no pavement on the pad side: that edge is the service lane, where cars pull in
-      root.add(streetX(z, -edge, -half, [-1]))
-      root.add(streetX(z, half, r === harbourRow ? harbourCoast - 8.3 : edge, [-1]))
+      decor.add(streetX(z, -edge, -half, [-1]))
+      decor.add(streetX(z, half, r === harbourRow ? harbourCoast - 8.3 : edge, [-1]))
       avoid.push({ x: 0, z, w: 2 * edge + 2, d: 2 * CURB + 1 })
       // keep the lawn between rows clear of trees, so the front of every building stays in view
       if (r < rows - 1) {
@@ -361,13 +388,13 @@ export class Town {
       const roadZ = rowRoadZ[pad.row]
       const zf = roadZ - CURB
       const cx = (pad.col === 0 ? -1 : 1) * COL_X
-      root.add(blockPad(cx, zf - PAD_D, zf, PAD_W))
+      decor.add(blockPad(cx, zf - PAD_D, zf, PAD_W))
       // the service lane in front of the pad: where cars pull in, wait their turn and are served
       const out = pad.col === 0 ? -1 : 1
       const laneFrom = out * 3.0, laneTo = cx + out * (PAD_W / 2 + 0.4)
-      root.add(serviceLane((laneFrom + laneTo) / 2, roadZ - LANE_Z, Math.abs(laneTo - laneFrom), CURB - 2.1 - 0.7))
+      decor.add(serviceLane((laneFrom + laneTo) / 2, roadZ - LANE_Z, Math.abs(laneTo - laneFrom), CURB - 2.1 - 0.7))
       avoid.push({ x: cx, z: zf - PAD_D / 2, w: PAD_W + 1, d: PAD_D + 1 })
-      for (const side of [-1, 1]) root.add(lamp(cx + side * (PAD_W / 2 - 3.4), zf + 0.45, 0, -Math.PI / 2))
+      for (const side of [-1, 1]) decor.add(lamp(cx + side * (PAD_W / 2 - 3.4), zf + 0.45, 0, -Math.PI / 2))
     }
     for (const p of plan.placed) {
       const b = new Building(p.node.id, p.node.kind, g.color)
@@ -377,30 +404,42 @@ export class Town {
       buildings.set(p.node.id, b)
       const zf = p.roadZ - CURB
       // a little garden in front of each building and the odd bit of street furniture
-      root.add(prop('bush', p.x - 2.2, zf - 0.9, 0, 2.2), prop('bush', p.x + 2.8, zf - 0.9, 0, 1.8))
-      if (p.node.kind === 'Worker') root.add(prop('dumpster', p.x + 2.4, p.z - 3.6, 0.2))
-      if (p.node.kind === 'Api') root.add(prop('firehydrant', p.x + 2.9, zf + 0.5, 0, 2.4))
+      decor.add(prop('bush', p.x - 2.2, zf - 0.9, 0, 2.2), prop('bush', p.x + 2.8, zf - 0.9, 0, 1.8))
+      if (p.node.kind === 'Worker') decor.add(prop('dumpster', p.x + 2.4, p.z - 3.6, 0.2))
+      if (p.node.kind === 'Api') decor.add(prop('firehydrant', p.x + 2.9, zf + 0.5, 0, 2.4))
     }
     // a spare cell in the grid becomes a small park
     if (plan.pads.length % 2 === 1) {
       const row = rows - 1
       const zf = rowRoadZ[row] - CURB
-      root.add(...parkProps(COL_X, zf - PAD_D / 2))
+      decor.add(...parkProps(COL_X, zf - PAD_D / 2))
       avoid.push({ x: COL_X, z: zf - PAD_D / 2, w: PAD_W + 1, d: PAD_D + 1 })
     }
 
     // the island's sign: one post, standing on land beside the gate
     const signZ = gateZ - 2.4
-    root.add(this.islandSign(g, -8.5, signZ))
+    decor.add(this.islandSign(g, -8.5, signZ))
     avoid.push({ x: -8.5, z: signZ, w: 12, d: 5 })
+    // A pillar whose registry file is broken: the island stays on the map, empty, with the problem written on a board
+    if (g.configError) decor.add(this.configErrorBoard(g.configError))
+    // Lost & found: a heap of boxes and bins by the gate, for the systems nobody has claimed
+    if (g.isLostFound) {
+      const pile: [Parameters<typeof prop>[0], number, number, number, number][] = [
+        ['box_A', 7.5, signZ + 0.4, 0.3, 9], ['box_B', 10.5, signZ - 0.5, 1.1, 8], ['box_A', 9, signZ + 2.4, 2.0, 7],
+        ['box_B', 13, signZ + 0.8, 0.6, 7.5], ['trash_A', 15.2, signZ - 0.6, 0, 6], ['dumpster', 12, signZ - 3.2, 0.1, 5],
+      ]
+      for (const [name, x, z, rot, scale] of pile) decor.add(prop(name, x, z, rot, scale))
+      avoid.push({ x: 11, z: signZ, w: 10, d: 7 })
+    }
     // the island's own harbour on the east coast, at the end of a road
-    root.add(this.harbour(harbourCoast, harbourZ))
+    decor.add(this.harbour(harbourCoast, harbourZ))
     const status = new HarbourStatus(harbourCoast, harbourZ)
     root.add(status.group)
     avoid.push({ x: harbourCoast - 4, z: harbourZ - 2, w: 13, d: 16 })
 
     const trees = Math.min(110, Math.round(40 * (plan.rx * plan.rz) / (24 * 20)))
     root.add(scatterNature(outline, avoid, hashString(g.id + '-nature'), { trees, rocks: Math.round(trees / 3) }))
+    mergeStatic(decor)
     root.updateMatrixWorld(true)
     return { group: g, root, outline, buildings, harbour: status, messaging: messagingOf([]) }
   }
@@ -443,6 +482,33 @@ export class Town {
     return g
   }
 
+  /** A big warning board in the middle of an island whose registry file could not be used, saying what is wrong. */
+  private configErrorBoard(message: string): THREE.Group {
+    const lines = wrapText(message, 30).slice(0, 7)
+    const tex = canvasTexture(512, 320, (ctx) => {
+      ctx.fillStyle = '#fff4d6'; roundRect(ctx, 4, 4, 504, 312, 26); ctx.fill()
+      ctx.strokeStyle = '#d63a2f'; ctx.lineWidth = 10; ctx.stroke()
+      ctx.fillStyle = '#d63a2f'; ctx.fillRect(14, 14, 484, 62)
+      ctx.fillStyle = '#fff'; ctx.font = '800 44px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+      ctx.fillText('CONFIG ERROR', 256, 46)
+      ctx.fillStyle = '#26364f'; ctx.font = '600 25px system-ui, sans-serif'; ctx.textAlign = 'left'
+      lines.forEach((l, i) => ctx.fillText(l, 28, 108 + i * 31, 460))
+    })
+    const g = new THREE.Group()
+    const face = new THREE.Mesh(new THREE.PlaneGeometry(9, 5.625), new THREE.MeshBasicMaterial({ map: tex, toneMapped: false, side: THREE.DoubleSide }))
+    face.position.y = 4.6
+    const postMat = new THREE.MeshStandardMaterial({ color: palette.woodDark, flatShading: true })
+    for (const x of [-3.6, 3.6]) {
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.2, 4.4, 7), postMat)
+      post.position.set(x, 2.2, -0.1)
+      g.add(post)
+    }
+    g.add(face)
+    g.position.set(0, GROUND, -4)
+    g.userData.configError = true
+    return g
+  }
+
   /** One thick post with a board on it, standing on the ground. */
   private islandSign(g: GroupSnapshot, x: number, z: number): THREE.Group {
     const tex = canvasTexture(512, 128, (ctx) => {
@@ -472,7 +538,7 @@ export class Town {
   // ── routes ──────────────────────────────────────────────────────────────
 
   /** A wooden quay on the hub's coast where boats leave for one island. Returns the water point at its tip. */
-  private hubQuay(hubRoot: THREE.Group, angle: number): THREE.Vector3 {
+  private hubQuay(angle: number): THREE.Vector3 {
     const dir = new THREE.Vector3(Math.sin(angle), 0, -Math.cos(angle))
     const coast = coastPoint(this.hubOutline, dir, 1.6)
     const p = pier(QUAY)
@@ -481,7 +547,7 @@ export class Town {
     const c = crates()
     c.position.set(coast.x - dir.x * 1.2 - dir.z * 1.6, 0, coast.z - dir.z * 1.2 + dir.x * 1.6)
     c.rotation.y = p.rotation.y
-    hubRoot.add(p, c)
+    this.hubDecor.add(p, c)
     return coast.clone().addScaledVector(dir, QUAY + 3).setY(0)
   }
 
@@ -512,21 +578,24 @@ export class Town {
   private islandRoutes(island: Island, plan: Plan, angle: number, hubCoast: THREE.Vector3, gate: THREE.Vector3): Route[] {
     const routes: Route[] = []
     const w = (x: number, z: number) => island.root.localToWorld(new THREE.Vector3(x, GROUND, z))
-    const ringAt = (a: number) => new THREE.Vector3(Math.sin(a) * RING_R, GROUND, 2 - Math.cos(a) * RING_R)
+    const ringR = this.hubGeo.ringR
+    const ringAt = (a: number) => new THREE.Vector3(Math.sin(a) * ringR, GROUND, 2 - Math.cos(a) * ringR)
     const fromRing = [ringAt(angle - 0.4), ringAt(angle - 0.2), ringAt(angle), hubCoast.clone().setY(GROUND), gate]
     // Where a car turns off the road for a destination, and the service lane it then waits in: first slot at
     // the door, the others behind it toward the spine.
     const toDest = (dest: Placed, head: THREE.Vector3[], startX: number | null): Pick<Route, 'path' | 'bay'> | null => {
       const out = dest.pad.col === 0 ? -1 : 1
       const slot = (k: number) => w(dest.x - out * QUEUE_GAP * k, dest.roadZ - LANE_Z)
-      const tailX = dest.x - out * (2 * QUEUE_GAP)
+      // five cars wait where the lane is long enough, three beside the spine
+      const n = Math.max(3, Math.min(LANE_SLOTS, Math.floor((Math.abs(dest.x) - 5) / QUEUE_GAP) + 1))
+      const tailX = dest.x - out * ((n - 1) * QUEUE_GAP)
       let mergeX = tailX - out * 3.6
       if (Math.abs(mergeX) < 2.8) mergeX = out * 2.8
       if (startX !== null) {
         if ((tailX - startX) * out < 1.5) return null // the caller stands past the lane's far end: it cannot get there
         if ((mergeX - startX) * out < 0.5) mergeX = startX + out * 0.5
       }
-      return { path: [...head, w(mergeX, dest.roadZ)], bay: { drive: [slot(2), slot(1), slot(0)], slots: 3, marker: slot(1) } }
+      return { path: [...head, w(mergeX, dest.roadZ)], bay: { drive: Array.from({ length: n }, (_, i) => slot(n - 1 - i)), slots: n, marker: slot(1) } }
     }
 
     for (const dest of plan.placed) {
@@ -536,13 +605,11 @@ export class Town {
       // Callers from other islands arrive through the gate house, over the bridge and up the spine.
       const inbound = toDest(dest, [...fromRing, w(0, dest.roadZ)], null)!
       routes.push({ dest: b, origin: external ? 'external' : 'internal', share: external ? 0.85 : dest.node.kind === 'Api' ? 0.35 : 0.08, ...inbound })
-      // Neighbours on the same island call it from their own doors; the same service block most of all.
-      const callers = plan.placed.filter((s) => s !== dest && (s.node.kind === 'Api' || s.node.kind === 'Worker'))
-      const sameService = callers.filter((s) => s.node.service && s.node.service === dest.node.service)
-      const weights = callers.map((c) => (sameService.includes(c) ? 3 : 1))
-      const total = weights.reduce((a, b2) => a + b2, 0) || 1
-      callers.forEach((from, i) => {
-        const share = (external ? 0.15 : dest.node.kind === 'Api' ? 0.65 : 0.92) * (weights[i] / total)
+      // Systems on the same island that declare a call to it drive over from their own doors. Without a declared
+      // caller there is no such traffic. The callee's rate is shared evenly between its callers until a source reports each link's own rate.
+      const callers = plan.placed.filter((s) => s !== dest && s.node.calls.includes(dest.node.id))
+      callers.forEach((from) => {
+        const share = (external ? 0.15 : dest.node.kind === 'Api' ? 0.65 : 0.92) / callers.length
         const head = from.roadZ !== dest.roadZ ? [w(from.x, from.roadZ), w(0, from.roadZ), w(0, dest.roadZ)] : [w(from.x, from.roadZ)]
         const same = from.roadZ === dest.roadZ && from.pad.col === dest.pad.col
         const r = toDest(dest, head, same ? from.x : null)
@@ -552,91 +619,49 @@ export class Town {
     return routes
   }
 
+  /** What the camera should look at to show one building: its place in the world and how far back to stand. */
+  focusOf(id: string): { target: THREE.Vector3; distance: number } | null {
+    const b = this.buildings.get(id)
+    if (!b) return null
+    b.root.updateWorldMatrix(true, false)
+    return { target: b.root.getWorldPosition(new THREE.Vector3()).setY(2), distance: 46 }
+  }
+
+  /** The same for a whole island, standing back far enough to show it. */
+  islandFocusOf(groupId: string): { target: THREE.Vector3; distance: number } | null {
+    const isl = this.islands.find((i) => i.group.id === groupId)
+    if (!isl) return null
+    let reach = 0
+    for (const p of isl.outline.points) reach = Math.max(reach, Math.hypot(p.x, p.y))
+    return { target: isl.root.getWorldPosition(new THREE.Vector3()).setY(0), distance: reach * 2.1 }
+  }
+
+  /** Marks one building as selected, so its name board stays visible. */
+  select(id: string | null): void {
+    for (const b of this.buildings.values()) b.pinned = b.id === id
+  }
+
   node(id: string): NodeSnapshot | null {
     return this.buildings.get(id)?.node ?? null
   }
 }
 
-const HUB_AXES = [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2]
-const KEEP_CLEAR = 0.46 // radians either side of a hub building's axis that a spoke must stay out of
-
-const wrapAngle = (a: number) => Math.atan2(Math.sin(a), Math.cos(a))
-
-function nudgeFromAxes(a: number): number {
-  let out = a
-  for (const axis of HUB_AXES) {
-    const d = wrapAngle(out - axis)
-    if (Math.abs(d) < KEEP_CLEAR) out = axis + (d < 0 ? -KEEP_CLEAR : KEEP_CLEAR)
+/** Breaks text into lines of at most `width` characters at word boundaries; a word longer than a line is cut. */
+export function wrapText(text: string, width: number): string[] {
+  const lines: string[] = []
+  let line = ''
+  for (const raw of text.split(/\s+/).filter(Boolean)) {
+    let word = raw
+    while (word.length > width) {
+      if (line) { lines.push(line); line = '' }
+      lines.push(word.slice(0, width))
+      word = word.slice(width)
+    }
+    if (line && line.length + 1 + word.length > width) { lines.push(line); line = word }
+    else line = line ? `${line} ${word}` : word
   }
-  return ((out % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)
-}
-
-/**
- * Islands are spread evenly round the hub. The hub's spokes start at the same angles, except where one would run
- * into a hub building, so the ring is turned to the offset that moves the fewest spokes. A bridge then runs from
- * the spoke's end to the island, a little slanted where the spoke had to move.
- */
-function placeAround(n: number): { islandAngles: number[]; portAngles: number[] } {
-  if (n === 0) return { islandAngles: [], portAngles: [] }
-  let best = { islandAngles: [] as number[], portAngles: [] as number[] }
-  let bestCost = Infinity
-  for (let off = 0; off < 360 / n; off += 1) {
-    const raw = Array.from({ length: n }, (_, i) => (off * Math.PI) / 180 + (i / n) * Math.PI * 2)
-    const nudged = raw.map(nudgeFromAxes)
-    const cost = nudged.reduce((acc, a, i) => acc + Math.abs(wrapAngle(a - raw[i])), 0)
-    if (cost < bestCost - 1e-9) { bestCost = cost; best = { islandAngles: raw, portAngles: nudged } }
-  }
-  return best
-}
-
-/** Services become pads (an API, its worker and its database side by side), lone buildings share pads, and pads fill a two-column grid. */
-function planPads(nodes: NodeSnapshot[]): Pad[] {
-  const groups: NodeSnapshot[][] = []
-  for (const n of nodes) {
-    const last = groups[groups.length - 1]
-    if (n.service && last && last[0].service === n.service && last.length < 3) last.push(n)
-    else groups.push([n])
-  }
-  const out: NodeSnapshot[][] = []
-  let loose: NodeSnapshot[] = []
-  for (const grp of groups) {
-    if (grp.length === 1 && !grp[0].service) {
-      loose.push(grp[0])
-      if (loose.length === 3) { out.push(loose); loose = [] }
-    } else out.push(grp)
-  }
-  if (loose.length) out.push(loose)
-  return out.map((ns, i) => ({ nodes: ns, col: (i % 2) as 0 | 1, row: Math.floor(i / 2) }))
-}
-
-/** Lays out one island's grid and finds the smallest coast that holds it, with room for the gate and the harbour. */
-function planIsland(g: GroupSnapshot): Plan {
-  const pads = planPads(g.nodes)
-  const rows = Math.max(1, Math.ceil(pads.length / 2))
-  const span = (rows - 1) * ROW + 2 * CURB + PAD_D
-  const roadZ0 = span / 2 - CURB
-  const rowRoadZ = Array.from({ length: rows }, (_, r) => roadZ0 - r * ROW)
-  const placed: Placed[] = []
-  for (const pad of pads) {
-    const roadZ = rowRoadZ[pad.row]
-    const cx = (pad.col === 0 ? -1 : 1) * COL_X
-    pad.nodes.forEach((node, i) => placed.push({ node, pad, x: cx + (i - (pad.nodes.length - 1) / 2) * SLOT, z: roadZ - CURB - FRONT, roadZ }))
-  }
-  const edge = COL_X + PAD_W / 2 + 0.4
-  const southZ = roadZ0 + CURB
-  const northZ = rowRoadZ[rows - 1] - CURB - PAD_D
-  const harbourZ = rowRoadZ[Math.floor((rows - 1) / 2)]
-  const check: [number, number][] = [[-edge, southZ], [edge, southZ], [-edge, northZ], [edge, northZ], [edge + 11, harbourZ], [-edge - 2, harbourZ], [0, northZ - 4]]
-  let k = 1
-  let rx = 24, rz = 20
-  for (let i = 0; i < 200; i++) {
-    rx = 24 * k
-    rz = 20 * k
-    const o = makeOutline(hashString(g.id), rx, rz, 0.06)
-    if (check.every(([x, z]) => o.contains(x, z, 2)) && coastScan(o, 'z') - 0.6 - southZ >= 9) break
-    k *= 1.02
-  }
-  return { pads, placed, rows, rowRoadZ, rx, rz }
+  if (line) lines.push(line)
+  return lines
 }
 
 /** A couple of trees, flower beds and benches for a spare pad. */
@@ -664,7 +689,7 @@ function parkProps(x: number, z: number): THREE.Object3D[] {
 }
 
 function layoutKey(s: Snapshot): string {
-  return `${s.townId}|${s.groups.map((g) => `${g.id}:${g.nodes.map((n) => `${n.id}/${n.kind}/${n.service ?? ''}`).join(',')}`).join(';')}`
+  return `${s.townId}|${s.groups.map((g) => `${g.id}${g.configError ? '!' : ''}:${g.nodes.map((n) => `${n.id}/${n.kind}/${n.service ?? ''}/${n.calls.join('+')}`).join(',')}`).join(';')}`
 }
 
 /** Where a straight line from the hub's centre leaves the hub's coast (inset a little). */
@@ -675,23 +700,11 @@ function laneLength(p: THREE.Vector3[]): number {
 }
 
 function coastPoint(outline: Outline, dir: THREE.Vector3, inset: number): THREE.Vector3 {
-  let lo = 0, hi = 60
+  let lo = 0, hi = 140
   for (let i = 0; i < 24; i++) {
     const mid = (lo + hi) / 2
     if (outline.contains(dir.x * mid, dir.z * mid)) lo = mid
     else hi = mid
   }
   return new THREE.Vector3(dir.x * (lo - inset), GROUND, dir.z * (lo - inset))
-}
-
-/** Island-local coast: the far +z edge at x=0 (for 'z'), or the +x edge at the given z (for 'x'). */
-function coastScan(outline: Outline, axis: 'z' | 'x', at = 0): number {
-  let lo = 0, hi = 90
-  for (let i = 0; i < 26; i++) {
-    const mid = (lo + hi) / 2
-    const inside = axis === 'z' ? outline.contains(0, mid) : outline.contains(mid, at)
-    if (inside) lo = mid
-    else hi = mid
-  }
-  return lo
 }

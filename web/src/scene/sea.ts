@@ -25,33 +25,66 @@ function inPolygon(poly: THREE.Vector2[], x: number, y: number): boolean {
   return inside
 }
 
-/** Finds a sea lane between two points that never touches land or passes under a bridge. Null when there is none. */
-export function findLane(map: SeaMap, from: THREE.Vector3, to: THREE.Vector3): THREE.Vector3[] | null {
-  const pts = map.land.flat()
-  if (pts.length === 0) return null
+interface Grid {
+  minX: number
+  minZ: number
+  w: number
+  h: number
+  blocked: Uint8Array
+}
+
+const grids = new WeakMap<SeaMap, Grid>()
+
+/** Which sea cells are land, shore or under a bridge. Worked out once per map, since every island's lane uses the same one. */
+function gridOf(map: SeaMap, pts: THREE.Vector2[]): Grid {
+  const cached = grids.get(map)
+  if (cached) return cached
   let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity
-  for (const p of [...pts, new THREE.Vector2(from.x, from.z), new THREE.Vector2(to.x, to.z)]) {
+  for (const p of pts) {
     minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x); minZ = Math.min(minZ, p.y); maxZ = Math.max(maxZ, p.y)
   }
   minX -= 60; minZ -= 60; maxX += 60; maxZ += 60
   const w = Math.ceil((maxX - minX) / CELL), h = Math.ceil((maxZ - minZ) / CELL)
   const blocked = new Uint8Array(w * h)
-  const probe = new THREE.Vector2()
-  for (let j = 0; j < h; j++) {
-    for (let i = 0; i < w; i++) {
-      probe.set(minX + (i + 0.5) * CELL, minZ + (j + 0.5) * CELL)
-      let b = false
-      for (const poly of map.land) {
-        if (inPolygon(poly, probe.x, probe.y)) { b = true; break }
-        for (let k = 0, m = poly.length - 1; k < poly.length; m = k++) {
-          if (distToSegment(probe, poly[m], poly[k]) < LAND_MARGIN) { b = true; break }
+  const cell = (v: number, min: number) => Math.floor((v - min) / CELL)
+  const mark = (i: number, j: number) => { if (i >= 0 && j >= 0 && i < w && j < h) blocked[j * w + i] = 1 }
+  // Each coast marks the cells inside it and within a margin of its edge, looking only at the cells near that coast.
+  for (const poly of map.land) {
+    let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity
+    for (const p of poly) { x0 = Math.min(x0, p.x); x1 = Math.max(x1, p.x); z0 = Math.min(z0, p.y); z1 = Math.max(z1, p.y) }
+    for (let j = cell(z0, minZ); j <= cell(z1, minZ); j++)
+      for (let i = cell(x0, minX); i <= cell(x1, minX); i++)
+        if (inPolygon(poly, minX + (i + 0.5) * CELL, minZ + (j + 0.5) * CELL)) mark(i, j)
+    const probe = new THREE.Vector2()
+    for (let k = 0, m = poly.length - 1; k < poly.length; m = k++) {
+      const a = poly[m], c = poly[k]
+      const reach = Math.ceil(LAND_MARGIN / CELL) + 1
+      for (let j = cell(Math.min(a.y, c.y), minZ) - reach; j <= cell(Math.max(a.y, c.y), minZ) + reach; j++)
+        for (let i = cell(Math.min(a.x, c.x), minX) - reach; i <= cell(Math.max(a.x, c.x), minX) + reach; i++) {
+          probe.set(minX + (i + 0.5) * CELL, minZ + (j + 0.5) * CELL)
+          if (distToSegment(probe, a, c) < LAND_MARGIN) mark(i, j)
         }
-        if (b) break
-      }
-      if (!b) for (const [a, c] of map.bridges) if (distToSegment(probe, a, c) < BRIDGE_MARGIN) { b = true; break }
-      blocked[j * w + i] = b ? 1 : 0
     }
   }
+  const probe = new THREE.Vector2()
+  for (const [a, c] of map.bridges) {
+    const reach = Math.ceil(BRIDGE_MARGIN / CELL) + 1
+    for (let j = cell(Math.min(a.y, c.y), minZ) - reach; j <= cell(Math.max(a.y, c.y), minZ) + reach; j++)
+      for (let i = cell(Math.min(a.x, c.x), minX) - reach; i <= cell(Math.max(a.x, c.x), minX) + reach; i++) {
+        probe.set(minX + (i + 0.5) * CELL, minZ + (j + 0.5) * CELL)
+        if (distToSegment(probe, a, c) < BRIDGE_MARGIN) mark(i, j)
+      }
+  }
+  const grid = { minX, minZ, w, h, blocked }
+  grids.set(map, grid)
+  return grid
+}
+
+/** Finds a sea lane between two points that never touches land or passes under a bridge. Null when there is none. */
+export function findLane(map: SeaMap, from: THREE.Vector3, to: THREE.Vector3): THREE.Vector3[] | null {
+  const pts = map.land.flat()
+  if (pts.length === 0) return null
+  const { minX, minZ, w, h, blocked } = gridOf(map, pts)
   const cellOf = (x: number, z: number) => [Math.floor((x - minX) / CELL), Math.floor((z - minZ) / CELL)] as const
   const free = (i: number, j: number) => i >= 0 && j >= 0 && i < w && j < h && !blocked[j * w + i]
   const nearestFree = (x: number, z: number): [number, number] | null => {
@@ -72,7 +105,7 @@ export function findLane(map: SeaMap, from: THREE.Vector3, to: THREE.Vector3): T
   if (!s || !e) return null
 
   // A* over the free sea cells, eight ways
-  const g = new Float32Array(w * h).fill(Infinity)
+  const g = new Float64Array(w * h).fill(Infinity)
   const prev = new Int32Array(w * h).fill(-1)
   const open: [number, number][] = [] // [f, index], a plain binary heap
   const push = (f: number, idx: number) => {
@@ -107,9 +140,12 @@ export function findLane(map: SeaMap, from: THREE.Vector3, to: THREE.Vector3): T
   g[startIdx] = 0
   push(Math.hypot(s[0] - e[0], s[1] - e[1]), startIdx)
   const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]
+  const closed = new Uint8Array(w * h)
   while (open.length > 0) {
     const cur = pop()
     if (cur === endIdx) break
+    if (closed[cur]) continue // an older, worse entry for a cell already settled
+    closed[cur] = 1
     const ci = cur % w, cj = (cur - ci) / w
     for (const [di, dj] of dirs) {
       const ni = ci + di, nj = cj + dj

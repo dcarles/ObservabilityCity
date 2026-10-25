@@ -2,6 +2,13 @@ import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { palette } from '../themes/harbour-town/palette'
 
+export type Quality = 'high' | 'medium' | 'low'
+
+const QUALITY_STEPS: Quality[] = ['high', 'medium', 'low']
+/** Average frame time (ms) over the sample window above which quality steps down one level. About 30 frames a second. */
+const SLOW_FRAME_MS = 33
+const SAMPLE_FRAMES = 90
+
 /** Renderer, camera, sky, sea and light: everything that is the same whatever town is shown. */
 export class Stage {
   readonly renderer: THREE.WebGLRenderer
@@ -9,10 +16,20 @@ export class Stage {
   readonly camera: THREE.PerspectiveCamera
   readonly controls: OrbitControls
   readonly sun: THREE.DirectionalLight
+  quality: Quality = 'high'
+  /** Called when quality steps down on its own, so the page can say so. */
+  onQualityStep: ((to: Quality) => void) | null = null
+  private autoQuality = true
+  private frameTimes: number[] = []
+  private lastFrame = 0
+  private warmup = 150
+  private sinceShadow = 0
   private readonly seaUniforms = { uTime: { value: 0 } }
   private homeTarget = new THREE.Vector3(0, 0, -30)
   private homeDistance = 105
   private homeAzimuth = 0
+  /** How far the view may be panned from the town's centre. Grows with the town, so the outermost island stays reachable. */
+  private panLimit = 120
   private homePolar = THREE.MathUtils.degToRad(52)
 
   constructor(readonly canvas: HTMLCanvasElement) {
@@ -25,7 +42,7 @@ export class Stage {
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap
 
     this.scene.fog = new THREE.Fog(palette.fog, 160, 520)
-    this.camera = new THREE.PerspectiveCamera(38, 1, 1, 1500)
+    this.camera = new THREE.PerspectiveCamera(38, 1, 1, 4000)
 
     this.controls = new OrbitControls(this.camera, canvas)
     this.controls.enableDamping = true
@@ -34,7 +51,7 @@ export class Stage {
     this.controls.minPolarAngle = THREE.MathUtils.degToRad(25)
     this.controls.maxPolarAngle = THREE.MathUtils.degToRad(75)
     this.controls.minDistance = 12
-    this.controls.maxDistance = 520
+    this.controls.maxDistance = 900
     this.controls.screenSpacePanning = false
     this.controls.addEventListener('change', () => this.clampPan())
 
@@ -53,6 +70,13 @@ export class Stage {
     this.sun.target.position.set(0, 0, -30)
     this.scene.add(this.sun, this.sun.target)
 
+    // ?quality=high|medium|low pins the level and turns the automatic step-down off
+    const asked = new URLSearchParams(window.location.search).get('quality')
+    if (asked === 'high' || asked === 'medium' || asked === 'low') {
+      this.autoQuality = false
+      this.setQuality(asked)
+    }
+
     this.home(true)
     window.addEventListener('resize', () => this.resize())
     this.resize()
@@ -62,6 +86,9 @@ export class Stage {
   setHome(target: THREE.Vector3, distance: number): void {
     this.homeTarget.copy(target)
     this.homeDistance = distance
+    this.panLimit = Math.max(120, distance * 0.7)
+    // never zoom out further than a comfortable view of the whole town, but always far enough to reach Home
+    this.controls.maxDistance = Math.max(300, distance * 1.35)
     if (this.scene.fog instanceof THREE.Fog) {
       // the haze starts beyond the town however big it is
       this.scene.fog.near = Math.max(160, distance * 1.15)
@@ -76,6 +103,35 @@ export class Stage {
     sc.updateProjectionMatrix()
   }
 
+  /**
+   * Sets Home to show every point, standing as close as the view allows. The top bar and the panel on the left take
+   * a share of the screen, so points are kept clear of them.
+   */
+  frame(points: THREE.Vector3[], reserve = { top: 0.16, side: 0.06 }): void {
+    if (points.length === 0) return
+    const box = new THREE.Box3().setFromPoints(points)
+    const target = box.getCenter(new THREE.Vector3()).setY(0)
+    const probe = this.camera.clone()
+    const fits = (distance: number) => {
+      probe.position.copy(target).add(new THREE.Vector3().setFromSphericalCoords(distance, this.homePolar, this.homeAzimuth))
+      probe.up.set(0, 1, 0)
+      probe.lookAt(target)
+      probe.updateMatrixWorld(true)
+      probe.updateProjectionMatrix()
+      return points.every((p) => {
+        const v = p.clone().project(probe)
+        return v.z < 1 && Math.abs(v.x) <= 1 - reserve.side && v.y <= 1 - reserve.top && v.y >= -(1 - reserve.side)
+      })
+    }
+    let lo = 40, hi = 2000
+    for (let i = 0; i < 30; i++) {
+      const mid = (lo + hi) / 2
+      if (fits(mid)) hi = mid
+      else lo = mid
+    }
+    this.setHome(target, hi)
+  }
+
   home(instant = false): void {
     const offset = new THREE.Vector3().setFromSphericalCoords(this.homeDistance, this.homePolar, this.homeAzimuth)
     const pos = this.homeTarget.clone().add(offset)
@@ -86,6 +142,15 @@ export class Stage {
     } else {
       this.glideTo(this.homeTarget, pos)
     }
+  }
+
+  /** Glides to look at a point from the current side, standing `distance` away at a comfortable angle. */
+  focus(target: THREE.Vector3, distance: number): void {
+    const offset = this.camera.position.clone().sub(this.controls.target)
+    const sph = new THREE.Spherical().setFromVector3(offset)
+    sph.radius = THREE.MathUtils.clamp(distance, this.controls.minDistance, this.controls.maxDistance)
+    sph.phi = THREE.MathUtils.clamp(sph.phi, THREE.MathUtils.degToRad(40), THREE.MathUtils.degToRad(62))
+    this.glideTo(target, target.clone().add(new THREE.Vector3().setFromSpherical(sph)))
   }
 
   private glide: { fromPos: THREE.Vector3; toPos: THREE.Vector3; fromT: THREE.Vector3; toT: THREE.Vector3; t: number } | null = null
@@ -120,7 +185,7 @@ export class Stage {
 
   private clampPan(): void {
     const t = this.controls.target
-    const limit = 120
+    const limit = this.panLimit
     t.x = THREE.MathUtils.clamp(t.x, this.homeTarget.x - limit, this.homeTarget.x + limit)
     t.z = THREE.MathUtils.clamp(t.z, this.homeTarget.z - limit, this.homeTarget.z + limit)
     t.y = 0
@@ -134,12 +199,51 @@ export class Stage {
     this.camera.updateProjectionMatrix()
   }
 
+  /**
+   * High: full resolution and shadows redrawn every frame. Medium: slightly lower resolution, and shadows redrawn a few times
+   * a second (buildings never move, so only the cars' shadows lag). Low: normal resolution and no shadows.
+   */
+  setQuality(q: Quality): void {
+    this.quality = q
+    const dpr = window.devicePixelRatio
+    this.renderer.setPixelRatio(q === 'high' ? Math.min(dpr, 2) : q === 'medium' ? Math.min(dpr, 1.5) : 1)
+    this.renderer.shadowMap.autoUpdate = q === 'high'
+    this.renderer.shadowMap.needsUpdate = true
+    this.sun.castShadow = q !== 'low'
+    this.resize()
+  }
+
   render(): void {
+    this.watchFrameTime()
     this.renderer.render(this.scene, this.camera)
   }
 
+  /** Steps quality down once when the town cannot keep up, and never back up on its own, so it cannot flicker. */
+  private watchFrameTime(): void {
+    const now = performance.now()
+    const dt = now - this.lastFrame
+    this.lastFrame = now
+    if (this.quality === 'medium') {
+      this.sinceShadow += dt
+      if (this.sinceShadow > 160) { this.renderer.shadowMap.needsUpdate = true; this.sinceShadow = 0 }
+    }
+    if (!this.autoQuality || this.quality === 'low') return
+    if (this.warmup > 0) { this.warmup--; return } // the first frames compile shaders and always run long
+    if (dt > 400) return // a hidden tab or a pause, not slowness
+    this.frameTimes.push(dt)
+    if (this.frameTimes.length < SAMPLE_FRAMES) return
+    const avg = this.frameTimes.reduce((a, b) => a + b, 0) / this.frameTimes.length
+    this.frameTimes = []
+    if (avg > SLOW_FRAME_MS) {
+      const next = QUALITY_STEPS[QUALITY_STEPS.indexOf(this.quality) + 1]
+      this.setQuality(next)
+      this.warmup = 30
+      this.onQualityStep?.(next)
+    }
+  }
+
   private sky(): void {
-    const geo = new THREE.SphereGeometry(900, 24, 16)
+    const geo = new THREE.SphereGeometry(2600, 24, 16)
     const mat = new THREE.ShaderMaterial({
       side: THREE.BackSide,
       depthWrite: false,
@@ -158,7 +262,7 @@ export class Stage {
   }
 
   private sea(): void {
-    const geo = new THREE.CircleGeometry(900, 64)
+    const geo = new THREE.CircleGeometry(2800, 64)
     geo.rotateX(-Math.PI / 2)
     const mat = new THREE.MeshStandardMaterial({ color: palette.sea.deep, roughness: 0.35, metalness: 0.0 })
     const deep = new THREE.Color(palette.sea.deep)

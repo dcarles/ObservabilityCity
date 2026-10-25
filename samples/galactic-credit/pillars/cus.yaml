@@ -1,13 +1,14 @@
+# yaml-language-server: $schema=../schema/pillar.schema.json
 pillar: cus
 displayName: Customers
 color: "#3fb68b"
 systems:
-  - { id: cus.profile-api, service: profile, name: Profile API, role: api, external: true }
-  - { id: cus.profile-worker, service: profile, name: Profile worker, role: worker }
+  - { id: cus.profile-api, service: profile, name: Profile API, role: api, external: true, calls: [cus.profile-db, cus.consent-api, cus.kyc-api] }
+  - { id: cus.profile-worker, service: profile, name: Profile worker, role: worker, calls: [cus.profile-db] }
   - { id: cus.profile-db, service: profile, name: Profile DB, role: db }
-  - { id: cus.consent-api, service: consent, name: Consent API, role: api }
-  - { id: cus.consent-worker, service: consent, name: Consent worker, role: worker }
+  - { id: cus.consent-api, service: consent, name: Consent API, role: api, calls: [cus.consent-db] }
+  - { id: cus.consent-worker, service: consent, name: Consent worker, role: worker, calls: [cus.consent-db] }
   - { id: cus.consent-db, service: consent, name: Consent DB, role: db }
-  - { id: cus.kyc-api, service: kyc, name: KYC API, role: api }
+  - { id: cus.kyc-api, service: kyc, name: KYC API, role: api, calls: [cus.kyc-db] }
   - { id: cus.kyc-db, service: kyc, name: KYC DB, role: db }
-  - { id: cus.archive-cron, name: Archive run, role: cron }
+  - { id: cus.archive-cron, name: Archive run, role: cron, calls: [cus.profile-api] }

@@ -73,4 +73,33 @@ public class RegistryTests
         }
         finally { Directory.Delete(dir, true); }
     }
+
+    [Fact]
+    public void Declared_calls_are_read_from_the_pillar_file()
+    {
+        var registry = RegistryLoader.Load(TestPaths.Registry);
+        var calls = registry.AllNodes.Single(n => n.Id == "cl.ledger-api").Calls;
+
+        Assert.Contains("cl.ledger-db", calls);
+        Assert.Empty(registry.AllNodes.Single(n => n.Id == "cl.ledger-db").Calls);
+    }
+
+    [Fact]
+    public void A_call_to_an_unknown_system_names_both_ends()
+    {
+        var dir = Directory.CreateTempSubdirectory().FullName;
+        try
+        {
+            Directory.CreateDirectory(Path.Combine(dir, "pillars"));
+            File.WriteAllText(Path.Combine(dir, "town.yaml"), "id: t\nname: T\n");
+            File.WriteAllText(Path.Combine(dir, "hub.yaml"), "resources: []\n");
+            File.WriteAllText(Path.Combine(dir, "pillars", "aa.yaml"),
+                "pillar: aa\ndisplayName: A\nsystems:\n  - { id: aa.thing, role: api, calls: [aa.missing] }\n");
+
+            var e = Assert.Throws<RegistryException>(() => RegistryLoader.Load(dir));
+            Assert.Contains("aa.thing", e.Message);
+            Assert.Contains("aa.missing", e.Message);
+        }
+        finally { Directory.Delete(dir, true); }
+    }
 }

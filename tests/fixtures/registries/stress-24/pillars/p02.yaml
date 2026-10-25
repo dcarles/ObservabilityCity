@@ -1,0 +1,29 @@
+pillar: p02
+displayName: Pillar 02 (25)
+color: "#4dc3c9"
+systems:
+  - { id: p02.s1-api, service: s1, name: S1 API, role: api, external: true, calls: [p02.s1-db, p02.s2-api, p02.s3-api, p02.s4-api, p02.s5-api, p02.s6-api, p02.s7-api, p02.s8-api, p02.session-cache] }
+  - { id: p02.s1-worker, service: s1, name: S1 worker, role: worker, calls: [p02.s1-db] }
+  - { id: p02.s1-db, service: s1, name: S1 DB, role: db }
+  - { id: p02.s2-api, service: s2, name: S2 API, role: api, calls: [p02.s2-db] }
+  - { id: p02.s2-worker, service: s2, name: S2 worker, role: worker, calls: [p02.s2-db] }
+  - { id: p02.s2-db, service: s2, name: S2 DB, role: db }
+  - { id: p02.s3-api, service: s3, name: S3 API, role: api, calls: [p02.s3-db] }
+  - { id: p02.s3-worker, service: s3, name: S3 worker, role: worker, calls: [p02.s3-db] }
+  - { id: p02.s3-db, service: s3, name: S3 DB, role: db }
+  - { id: p02.s4-api, service: s4, name: S4 API, role: api, calls: [p02.s4-db] }
+  - { id: p02.s4-worker, service: s4, name: S4 worker, role: worker, calls: [p02.s4-db] }
+  - { id: p02.s4-db, service: s4, name: S4 DB, role: db }
+  - { id: p02.s5-api, service: s5, name: S5 API, role: api, calls: [p02.s5-db] }
+  - { id: p02.s5-worker, service: s5, name: S5 worker, role: worker, calls: [p02.s5-db] }
+  - { id: p02.s5-db, service: s5, name: S5 DB, role: db }
+  - { id: p02.s6-api, service: s6, name: S6 API, role: api, calls: [p02.s6-db] }
+  - { id: p02.s6-worker, service: s6, name: S6 worker, role: worker, calls: [p02.s6-db] }
+  - { id: p02.s6-db, service: s6, name: S6 DB, role: db }
+  - { id: p02.s7-api, service: s7, name: S7 API, role: api, calls: [p02.s7-db] }
+  - { id: p02.s7-worker, service: s7, name: S7 worker, role: worker, calls: [p02.s7-db] }
+  - { id: p02.s7-db, service: s7, name: S7 DB, role: db }
+  - { id: p02.s8-api, service: s8, name: S8 API, role: api, calls: [p02.s8-db] }
+  - { id: p02.s8-worker, service: s8, name: S8 worker, role: worker, calls: [p02.s8-db] }
+  - { id: p02.s8-db, service: s8, name: S8 DB, role: db }
+  - { id: p02.session-cache, name: Session cache, role: cache }

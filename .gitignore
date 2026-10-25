@@ -9,3 +9,5 @@ web/dist/
 secrets.json
 # Commercial or private model packs live here, never in the public repo
 themes-private/
+web/test-results/
+web/playwright-report/
