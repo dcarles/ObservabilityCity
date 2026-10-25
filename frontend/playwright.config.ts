@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 
 // Browser tests against the real backend (fake source) and the real page.
 //   npm run e2e          the fast set: UI scenarios on a small town. Runs on every pull request.
-//   npm run e2e:slow     the slow set: the 24-island stress town and the full sample town, with screenshots. Runs on merge to main and nightly.
+//   npm run e2e:slow     the slow set: the 23-island and 35-island stress towns and the full sample town, with screenshots. Runs on merge to main and nightly.
 // Set E2E_NO_BUILD=1 when the backend is already built in Release (CI does this).
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -14,7 +14,8 @@ const repo = resolve(here, '..')
 const suite = process.env.E2E_SUITE ?? 'scenarios'
 const registries: Record<string, string> = {
   scenarios: 'shared-test-data/registries/mini-town',
-  stress: 'shared-test-data/registries/stress-24',
+  stress: 'shared-test-data/registries/stress-23',
+  stress35: 'shared-test-data/registries/stress-35',
   town: 'config/galactic-credit',
 }
 const fixture = resolve(repo, registries[suite])
@@ -34,7 +35,7 @@ const api = `http://127.0.0.1:${API_PORT}`
 
 export default defineConfig({
   testDir: './tests/e2e',
-  testMatch: suite === 'scenarios' ? 'scenarios/**/*.spec.ts' : `${suite}/**/*.spec.ts`,
+  testMatch: suite === 'scenarios' ? 'scenarios/**/*.spec.ts' : `${suite.replace('stress35', 'stress')}/**/*.spec.ts`,
   // one backend, one fake source: tests steer shared state, so they take turns
   workers: 1,
   fullyParallel: false,

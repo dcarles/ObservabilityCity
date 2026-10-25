@@ -1,7 +1,7 @@
 name: CI
 
 # The checks that block a pull request. They run side by side, so the wait is the slowest job, not the sum.
-# The slow checks (24-island stress town, full sample town with screenshots) are in slow.yml: they run on merge to main and nightly.
+# The slow checks (23-island stress town, full sample town with screenshots) are in slow.yml: they run on merge to main and nightly.
 
 on:
   push:
@@ -62,7 +62,7 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
         working-directory: frontend
-      - name: Unit tests (includes the 24-island layout)
+      - name: Unit tests (includes the 23-island layout)
         run: npm test
         working-directory: frontend
       - name: Build

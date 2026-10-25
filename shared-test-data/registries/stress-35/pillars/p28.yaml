@@ -1,0 +1,9 @@
+pillar: p28
+displayName: Pillar 28 (5)
+color: "#bb6bd9"
+systems:
+  - { id: p28.s1-api, service: s1, name: S1 API, role: api, external: true, calls: [p28.s1-db, p28.s2-api] }
+  - { id: p28.s1-worker, service: s1, name: S1 worker, role: worker, calls: [p28.s1-db] }
+  - { id: p28.s1-db, service: s1, name: S1 DB, role: db }
+  - { id: p28.s2-api, service: s2, name: S2 API, role: api, calls: [p28.s2-db] }
+  - { id: p28.s2-db, service: s2, name: S2 DB, role: db }

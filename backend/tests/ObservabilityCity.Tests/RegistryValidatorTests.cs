@@ -12,7 +12,8 @@ public class RegistryValidatorTests
     [Theory]
     [InlineData("config/galactic-credit")]
     [InlineData("shared-test-data/registries/mini-town")]
-    [InlineData("shared-test-data/registries/stress-24")]
+    [InlineData("shared-test-data/registries/stress-23")]
+    [InlineData("shared-test-data/registries/stress-35")]
     public void Every_registry_in_the_repo_is_clean(string folder)
     {
         var r = RegistryValidator.Validate(Path.Combine(TestPaths.RepoRoot, folder));
@@ -27,7 +28,8 @@ public class RegistryValidatorTests
 
         Assert.Contains("config/galactic-credit", found);
         Assert.Contains("shared-test-data/registries/mini-town", found);
-        Assert.Contains("shared-test-data/registries/stress-24", found);
+        Assert.Contains("shared-test-data/registries/stress-23", found);
+        Assert.Contains("shared-test-data/registries/stress-35", found);
     }
 
     [Fact]
@@ -260,15 +262,14 @@ public class RegistryValidatorTests
     [Fact]
     public void A_town_too_big_for_its_ring_capacity_is_an_error_that_names_the_fix()
     {
-        using var f = new RegistryCopy(TestPaths.Stress24);
-        f.Write("pillars/p25.yaml", "pillar: p25\ndisplayName: One more\ncolor: \"#5aa9ff\"\nsystems:\n  - { id: p25.api, name: API, role: api, external: true }\n");
-        f.Replace("layout.yaml", "p24]", "p24, p25]");
-        f.Replace("layout.yaml", "ringCapacity: 13", "ringCapacity: 12");
+        using var f = new RegistryCopy(TestPaths.Stress23);
+        f.Write("pillars/p24.yaml", "pillar: p24\ndisplayName: One more\ncolor: \"#5aa9ff\"\nsystems:\n  - { id: p24.api, name: API, role: api, external: true }\n");
+        f.Replace("layout.yaml", "p23]", "p23, p24]");
 
         var r = Check(f);
 
         Assert.True(r.Errors > 0);
-        Assert.Contains(r.Findings, x => x.Message.Contains("25 pillars do not fit on two rings of 12: at most 23") && x.Message.Contains("ringCapacity to 13 or more"));
+        Assert.Contains(r.Findings, x => x.Message.Contains("24 pillars do not fit on two rings of 12: at most 23") && x.Message.Contains("ringCapacity to 13 or more"));
     }
 
     [Fact]

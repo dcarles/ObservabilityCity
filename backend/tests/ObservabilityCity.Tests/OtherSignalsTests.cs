@@ -287,6 +287,7 @@ public class OtherSignalsTests
         var s = await new Rig().Run();
 
         Assert.Equal(12, s.RingCapacity);
-        Assert.Equal(13, RegistryLoader.Load(TestPaths.Stress24).RingCapacity);
+        Assert.Equal(12, RegistryLoader.Load(TestPaths.Stress23).RingCapacity);
+        Assert.Equal(18, RegistryLoader.Load(TestPaths.Stress35).RingCapacity);
     }
 }

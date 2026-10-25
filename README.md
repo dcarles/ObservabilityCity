@@ -133,10 +133,10 @@ CI runs `npm run check:contracts` and fails if the generated files are out of da
 ### Tests
 
 ```
-dotnet test --solution backend/ObservabilityCity.slnx  # registry, resilient loading, validator, rules, fake source, 24-island backend load, golden fixtures
+dotnet test --solution backend/ObservabilityCity.slnx  # registry, resilient loading, validator, rules, fake source, 23- and 35-island backend load, golden fixtures
 cd frontend && npm test          # visual rules, snapshot guard, island layout (including 24 uneven islands), golden fixtures
 cd frontend && npm run e2e       # browser scenarios on a small town: break things, check the town, calm it down (about 1 minute)
-cd frontend && npm run e2e:slow  # 24-island stress town and the full sample town, with screenshots (about 1 minute)
+cd frontend && npm run e2e:slow  # 23- and 35-island stress towns and the full sample town, with screenshots (a few minutes)
 dotnet run --project backend/tools/ObservabilityCity.Validate -- --all   # check every registry folder in the repo
 ```
 
@@ -155,7 +155,7 @@ To refresh the golden fixtures (calm town, a bad day across several islands, and
 | Thresholds make sense: ranges, and amber below red, also after the defaults are applied | error |
 | Colours are hex, pillars have a display name, the hub has one gateway, broker, egress and database at most | error |
 | `fake.yaml` names real systems and its numbers make sense | error |
-| A worker has a database, a system has a caller, no `layout.yaml`, an empty pillar, more than 24 islands | warning |
+| A worker has a database, a system has a caller, no `layout.yaml`, an empty pillar | warning |
 
 On a pull request the check writes annotations on the files and posts one comment listing every finding with file and line (the same comment is updated on each push).
 
