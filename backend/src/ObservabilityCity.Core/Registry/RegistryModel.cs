@@ -10,6 +10,16 @@ public sealed record Registry(
 {
     public IEnumerable<RegistryNode> AllNodes => Groups.SelectMany(g => g.Nodes);
 
+    /// <summary>How many islands fit on the first ring (layout.yaml ringCapacity). The town holds up to <see cref="MaxPillars"/> pillars on two rings.</summary>
+    public int RingCapacity { get; init; } = DefaultRingCapacity;
+
+    public const int DefaultRingCapacity = 12;
+    public const int MinRingCapacity = 6;
+    public const int MaxRingCapacity = 18;
+
+    /// <summary>Two rings of <paramref name="ringCapacity"/>, less the place the airport takes in the second.</summary>
+    public static int MaxPillars(int ringCapacity) => ringCapacity * 2 - 1;
+
     /// <summary>Third parties outside the town. They are not part of any group: they stand on offshore islands.</summary>
     public IReadOnlyList<RegistryVendor> Vendors { get; init; } = [];
 

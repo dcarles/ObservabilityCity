@@ -137,6 +137,7 @@ public static class RegistryLoader
 
         var groups = new List<RegistryGroup> { hubGroup };
         groups.AddRange(Order(pillars, layout, Problem));
+        var ringCapacity = CheckRingCapacity(layout, pillars.Count, errors);
 
         // every declared call must point at a system in this town (by id or by an old alias), and not at itself
         var resolved = new Dictionary<string, IReadOnlyList<string>>();
@@ -230,7 +231,7 @@ public static class RegistryLoader
             throw new RegistryException($"The registry has {errors.Count} problems:\n" + string.Join("\n", errors.Select(e => "  - " + e)));
 
         var final = groups.Select(g => g with { Nodes = g.Nodes.Select(n => n with { Calls = resolved[n.Id], GatewayCalls = resolvedGateway[n.Id] }).ToList() }).ToList();
-        return new Registry(new TownInfo(town.Id, town.Name, town.GroupLabel, town.Topology), final, callers) { Notices = notices, Problems = problems, Vendors = vendors };
+        return new Registry(new TownInfo(town.Id, town.Name, town.GroupLabel, town.Topology), final, callers) { Notices = notices, Problems = problems, Vendors = vendors, RingCapacity = ringCapacity };
     }
 
     /// <summary>Reads one pillar file. Problems found in it go to <paramref name="errors"/>; the ids and aliases it would add are returned, so a caller can drop them with the file.</summary>
@@ -271,6 +272,30 @@ public static class RegistryLoader
         }
         ordered.AddRange(pillars.Where(p => !seen.Contains(p.Id)));
         return ordered.Where(p => !p.IsLostFound).Concat(ordered.Where(p => p.IsLostFound));
+    }
+
+    /// <summary>
+    /// The ring capacity from layout.yaml, within its limits, and the pillar count it allows. These are errors even in a resilient load:
+    /// a town that does not fit on two rings cannot be drawn at all.
+    /// </summary>
+    private static int CheckRingCapacity(LayoutFile layout, int pillarCount, List<string> errors)
+    {
+        var capacity = layout.RingCapacity ?? Registry.DefaultRingCapacity;
+        if (capacity is < Registry.MinRingCapacity or > Registry.MaxRingCapacity)
+        {
+            errors.Add($"layout.yaml: ringCapacity must be between {Registry.MinRingCapacity} and {Registry.MaxRingCapacity}, not {capacity}");
+            return Registry.DefaultRingCapacity;
+        }
+        var max = Registry.MaxPillars(capacity);
+        if (pillarCount > max)
+        {
+            var needed = (pillarCount + 2) / 2;
+            var hint = needed <= Registry.MaxRingCapacity
+                ? $"set ringCapacity to {needed} or more in layout.yaml"
+                : $"{Registry.MaxPillars(Registry.MaxRingCapacity)} is the most a town can hold (ringCapacity {Registry.MaxRingCapacity})";
+            errors.Add($"layout.yaml: {pillarCount} pillars do not fit on two rings of {capacity}: at most {max}. {hint}. Lost & found counts as a pillar");
+        }
+        return capacity;
     }
 
     private static void CheckRoleKeys(DefaultsFile defaults, string fileName, List<string> errors)

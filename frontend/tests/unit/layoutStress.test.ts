@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { planIsland } from '../../src/scene/plan'
-import { layoutTown, RING_CAPACITY } from '../../src/scene/layout'
-import { layoutInvariants } from './layout.testutil'
+import { layoutTown } from '../../src/scene/layout'
+import { AIRPORT, layoutInvariants } from './layout.testutil'
 import { makeOutline } from '../../src/scene/island'
 import { hashString } from '../../src/scene/random'
 import type { GroupSnapshot, NodeSnapshot } from '../../src/types'
@@ -50,18 +50,30 @@ describe('the 24-island stress town', () => {
     })
   })
 
-  it('stands twelve islands on the first ring and twelve on the second', () => {
-    const layout = layoutTown(sizes)
-    expect(layout.islands.filter((x) => x.ring === 1)).toHaveLength(RING_CAPACITY)
-    expect(layout.islands.filter((x) => x.ring === 2)).toHaveLength(24 - RING_CAPACITY)
+  it('stands thirteen islands on the first ring and eleven on the second, with the airport between', () => {
+    const layout = layoutTown(sizes, 13, AIRPORT)
+    expect(layout.islands.filter((x) => x.ring === 1)).toHaveLength(13)
+    expect(layout.islands.filter((x) => x.ring === 2)).toHaveLength(11)
+    expect(layout.airport?.ring).toBe(2)
   })
 
-  it('keeps the town to a size one camera can frame', () => {
-    const layout = layoutTown(sizes)
+  it('keeps the town, its ring road and its third parties to a size one view can show', () => {
+    const layout = layoutTown(sizes, 13, AIRPORT)
     const reach = Math.max(...layout.islands.map((x, i) => x.radius + Math.max(sizes[i].rx, sizes[i].rz)))
-    expect(reach).toBeLessThan(900) // the orbit camera's default maximum distance
+    expect(reach + 120).toBeLessThan(1000) // the ring road and a vendor add about 120 m beyond the islands
   })
 })
 
 // the same rules as every other layout, with the stress sizes
-layoutInvariants('layout of the 24-island stress town', sizes)
+layoutInvariants('layout of the 24-island stress town', sizes, 13)
+
+// the biggest town there is: two rings of eighteen, less the airport's place
+const BIGGEST = Array.from({ length: 35 }, (_, i) => plans[i % plans.length].rx > 0 ? { rx: plans[i % plans.length].rx, rz: plans[i % plans.length].rz } : { rx: 24, rz: 20 })
+describe('the biggest town', () => {
+  it('still fits one view', () => {
+    const layout = layoutTown(BIGGEST, 18, AIRPORT)
+    const reach = Math.max(...layout.islands.map((x, i) => x.radius + Math.max(BIGGEST[i].rx, BIGGEST[i].rz)))
+    expect(reach + 120).toBeLessThan(1000) // 820 m at the time of writing, with the biggest islands
+  })
+})
+layoutInvariants('layout of the 35-island biggest town', BIGGEST, 18)

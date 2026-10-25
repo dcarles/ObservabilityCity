@@ -142,6 +142,8 @@ export function fountain(): THREE.Group {
 export interface BridgeOpts {
   from: THREE.Vector3
   to: THREE.Vector3
+  /** Gate posts and a little overrun at both ends. Off for a piece of a longer causeway, which has no ends of its own. */
+  ends?: boolean
 }
 
 /** A road bridge: a stone and concrete deck on tapered piers, with parapets, lamps and gate posts at each end. */
@@ -149,8 +151,9 @@ export function bridge(opts: BridgeOpts): THREE.Group {
   const g = new THREE.Group()
   // run the deck a little onto both shores so it meets the roads without a seam
   const unit = opts.to.clone().sub(opts.from).normalize()
-  const from = opts.from.clone().addScaledVector(unit, -1.4)
-  const to = opts.to.clone().addScaledVector(unit, 1.4)
+  const overrun = opts.ends === false ? 0.15 : 1.4
+  const from = opts.from.clone().addScaledVector(unit, -overrun)
+  const to = opts.to.clone().addScaledVector(unit, overrun)
   const dir = to.clone().sub(from)
   const len = dir.length()
   const mid = from.clone().add(to).multiplyScalar(0.5)
@@ -187,7 +190,7 @@ export function bridge(opts: BridgeOpts): THREE.Group {
     }
   }
   // gate posts at both ends
-  for (const end of [-1, 1]) {
+  for (const end of opts.ends === false ? [] : [-1, 1]) {
     for (const side of [-1, 1]) {
       const x = side * (width / 2 - 0.2), z = end * (len / 2 - 0.25)
       deck.add(box(0.7, 1.9, 0.7, stone, { x, y: GROUND - 0.06, z }), box(0.9, 0.14, 0.9, cap, { x, y: GROUND + 1.84, z }))

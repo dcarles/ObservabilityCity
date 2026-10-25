@@ -1,4 +1,4 @@
 # yaml-language-server: $schema=schema/layout.schema.json
 # Islands in the order they stand round the hub. Pillars not listed follow in file order, and
-# Lost & found always comes last. A ring holds 12 islands; the rest stand in a staggered outer ring.
+# Lost & found always comes last. ringCapacity (6 to 18, default 12) is how many islands stand on the first ring; the rest stand in a staggered second ring.
 islands: [cl, acc, pay, frd, cus, acq, dec, bil, col, dsp, rwd, obk, ntf, dat]

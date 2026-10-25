@@ -342,6 +342,7 @@
           "groupLabel",
           "groups",
           "notices",
+          "ringCapacity",
           "totals",
           "townId",
           "townName",
@@ -401,6 +402,10 @@
             "items": {
               "$ref": "#/components/schemas/DependencySnapshot"
             }
+          },
+          "ringCapacity": {
+            "type": "integer",
+            "format": "int32"
           }
         },
         "additionalProperties": false

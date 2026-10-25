@@ -4324,5 +4324,6 @@
       "to": "ext.snowflake",
       "requestsPerSecond": 4.800000000000001
     }
-  ]
+  ],
+  "ringCapacity": 12
 }

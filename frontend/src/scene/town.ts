@@ -16,17 +16,13 @@ import { findLane, type SeaMap } from './sea'
 import { mergeStatic } from './merge'
 import { bayTo } from './bay'
 import { islandSign } from './sign'
-import { hubGeometry, layoutTown, placeAirport, placeVendors, wrapAngle, type Disc, type HubGeometry, type VendorSpec } from './layout'
+import { backBridgeClear, hubGeometry, layoutTown, loopArc, placeVendorsOnRing, ringRoadRadius, wrapAngle, type Disc, type HubGeometry, type VendorSpec } from './layout'
 import { Weather, type SkyStatus } from './weather'
 import { Airport, type AirportStatus } from './airport'
 import { VendorIsland, VENDOR_COLOR } from './vendors'
 import { DependencyOverlay } from './overlay'
 
 const QUAY = 9
-/** Where the airport's road joins the plaza's ring road, as an angle clockwise from north. */
-const AIRPORT_JOIN = 0.55
-/** How far either side of the gateway the airport's road runs: past the building's plot and its clearance. */
-const AIRPORT_ROAD_X = 8.4
 /** Traffic that crosses the hub drives a long way, so fewer cars are drawn for it than a short trip would need. */
 const REMOTE_TRAFFIC = 0.5
 
@@ -57,15 +53,17 @@ interface Island {
   backGateZ: number | null
 }
 
-/** An island's bridge to one third party, and the systems on it that call that vendor. */
+/** An island's road to one third party: out of its back gate, over its bridge to the ring road, round the loop and down the vendor's spur. */
 interface VendorLink {
   group: number
   vendor: VendorIsland
   /** Ids of the systems on that island that call the vendor. */
   callers: string[]
-  /** How many islands have a bridge to this vendor. The vendor's traffic is shared between them. */
+  /** How many islands have a road to this vendor. The vendor's traffic is shared between them. */
   of: number
-  back: THREE.Vector3
+  /** Direction of the island and of the vendor from the hub, where each one's road meets the ring road. */
+  islandAngle: number
+  vendorAngle: number
 }
 
 /**
@@ -123,39 +121,48 @@ export class Town {
     const boatRoutes: BoatRoute[] = []
     const bridges: [THREE.Vector2, THREE.Vector2][] = []
 
-    // Islands stand round the hub in registry order, twelve to a ring and the rest in a staggered outer ring. The hub
-    // grows with their number, so every spoke road has room where it leaves the plaza.
+    // Islands stand round the hub in registry order, `ringCapacity` to a ring and the rest in a staggered second ring, with the airport
+    // in the second ring's northernmost place. The hub grows with their number, so every spoke road has room where it leaves the plaza.
+    const airport = new Airport()
     const plans = pillars.map((g) => planIsland(g))
-    const layout = layoutTown(plans.map((p) => ({ rx: p.rx, rz: p.rz })))
+    const layout = layoutTown(plans.map((p) => ({ rx: p.rx, rz: p.rz })), s.ringCapacity, { rx: airport.rx, rz: airport.rz })
     this.hubGeo = layout.hub
-    const angles = layout.islands.map((i) => i.angle)
-    const ports = layout.islands.map((i) => i.portAngle)
+    const airportPlace = layout.airport!
+    // pillars first, then the airport: one entry for everything that has a spoke to the hub
+    const places = [...layout.islands, airportPlace]
+    const angles = places.map((i) => i.angle)
+    const ports = places.map((i) => i.portAngle)
     const dirOf = (a: number) => new THREE.Vector3(Math.sin(a), 0, -Math.cos(a))
 
-    // ── Third parties and the airport are planned first: the hub and the islands need to know which roads and bridges they get ──
+    // ── Third parties are planned first: the islands need to know which of them get a back gate ──
     this.vendors.clear()
     this.vendorBridges.clear()
     this.airport = null
     this.airportPath = null
-    const centres = layout.islands.map((l, i) => dirOf(angles[i]).multiplyScalar(l.radius))
-    const discs: Disc[] = pillars.map((g, i) => ({ id: g.id, x: centres[i].x, z: centres[i].z, r: Math.max(plans[i].rx, plans[i].rz) * 0.95 + 3, back: plans[i].rz }))
-    const hubDisc: Disc = { id: 'hub', x: 0, z: 0, r: Math.max(this.hubGeo.rx, this.hubGeo.rz) }
+    const centres = places.map((l) => dirOf(l.angle).multiplyScalar(l.radius))
+    const discs: Disc[] = pillars.map((g, i) => ({ id: g.id, x: centres[i].x, z: centres[i].z, r: Math.max(plans[i].rx, plans[i].rz) * 0.95 + 3 }))
+    const airportDisc: Disc = { id: 'airport', x: centres[pillars.length].x, z: centres[pillars.length].z, r: Math.max(airport.rx, airport.rz) * 0.95 + 3 }
     const groupOfNode = new Map(s.groups.flatMap((g) => g.nodes.map((n) => [n.id, g.id] as const)))
     const vendorIslands = s.vendors.map((v) => new VendorIsland(v.node.id, v.node.name, v.node))
     const order = pillars.map((g) => g.id)
-    const specs: VendorSpec[] = s.vendors.map((v, i) => {
-      const counts = new Map<string, number>()
-      for (const id of v.calledBy) {
-        const g = groupOfNode.get(id)
-        if (g && g !== 'hub') counts.set(g, (counts.get(g) ?? 0) + 1)
+    const callerIslands = (calledBy: string[]) => [...new Set(calledBy.map((id) => groupOfNode.get(id)).filter((g): g is string => !!g && g !== 'hub' && order.includes(g)))]
+    const loopR = vendorIslands.length > 0 ? ringRoadRadius([...discs, airportDisc]) : 0
+    const specs: VendorSpec[] = s.vendors.map((v, i) => ({
+      id: v.node.id,
+      callerAngles: callerIslands(v.calledBy).map((g) => angles[order.indexOf(g)]),
+      front: vendorIslands[i].gateZ,
+    }))
+    const spots = placeVendorsOnRing(loopR, specs)
+    // an island that calls a third party gets a back gate and a bridge to the ring road, unless a neighbour stands in the way
+    const bridgedIslands = new Set<string>()
+    for (const v of s.vendors) {
+      for (const g of callerIslands(v.calledBy)) {
+        const i = order.indexOf(g)
+        if (bridgedIslands.has(g)) continue
+        const back = coastScan(makeOutline(hashString(g), plans[i].rx, plans[i].rz, 0.06), '-z') - 0.7
+        if (backBridgeClear(discs[i], back, [...discs, airportDisc], loopR)) bridgedIslands.add(g)
       }
-      const callers = [...counts.keys()].sort((a, b) => counts.get(b)! - counts.get(a)! || order.indexOf(a) - order.indexOf(b))
-      return { id: v.node.id, callers, front: vendorIslands[i].rz, r: Math.max(vendorIslands[i].rx, vendorIslands[i].rz) * 0.95 + 3 }
-    })
-    const spots = placeVendors(discs, hubDisc, specs)
-    const bridgedIslands = new Set(spots.flatMap((p) => p.bridges))
-    const airport = new Airport()
-    const airportSpot = placeAirport([...discs, ...spots.map((p, i) => ({ id: p.id, x: p.x, z: p.z, r: specs[i].r }))], hubDisc, -this.hubGeo.rz, airport.rz)
+    }
 
     // ── Hub ────────────────────────────────────────────────────────────────
     const hubRoot = new THREE.Group()
@@ -164,7 +171,7 @@ export class Town {
     this.hubWeather = new Weather('hub', this.hubGeo.rx, this.hubGeo.rz, new THREE.Vector3(0, 0, 2))
     hubRoot.add(this.hubWeather.object)
     const hubCoasts = ports.map((a) => coastPoint(this.hubOutline, dirOf(a), 0.9))
-    const hubBuildings = this.buildHub(hubRoot, hub, ports.map((a, i) => ({ angle: a, coast: hubCoasts[i] })), airportSpot.connected)
+    const hubBuildings = this.buildHub(hubRoot, hub, ports.map((a, i) => ({ angle: a, coast: hubCoasts[i] })))
     this.root.add(hubRoot)
     this.expandBounds(this.hubOutline, new THREE.Vector3(), 0)
     const broker = hubBuildings.find((b) => b.kind === 'Broker')
@@ -184,8 +191,7 @@ export class Town {
     const gates: Gate[] = []
     pillars.forEach((g, index) => {
       const plan = plans[index]
-      const dir = dirOf(angles[index])
-      const center = dir.clone().multiplyScalar(layout.islands[index].radius)
+      const center = centres[index].clone()
       const island = this.buildIsland(g, plan, center, bridgedIslands.has(g.id))
       this.islands.push(island)
       this.root.add(island.root)
@@ -197,48 +203,71 @@ export class Town {
       gates.push({ island, plan, gate, coast: hubCoasts[index].clone().setY(GROUND), angle: ports[index] })
     })
 
-    // ── Third parties offshore, each with a bridge from the back gate of every island that calls it ──
+    // ── The ring road outside every island, a bridge to it from each calling island's back gate, and the third parties on spurs beyond it ──
     this.root.updateMatrixWorld(true)
     const vendorLinks: VendorLink[] = []
+    const backGate = (id: string) => {
+      const isl = this.islands[order.indexOf(id)]
+      return isl.root.localToWorld(new THREE.Vector3(0, GROUND, isl.backGateZ!))
+    }
+    const loopPoint = (a: number) => dirOf(a).multiplyScalar(loopR)
+    const landed = new Set<string>() // islands whose bridge to the ring road is already built
     spots.forEach((spot, i) => {
       const vi = vendorIslands[i]
       const vendor = s.vendors[i]
-      const backGate = (id: string) => {
-        const isl = this.islands[order.indexOf(id)]
-        return isl.root.localToWorld(new THREE.Vector3(0, GROUND, isl.backGateZ!))
-      }
-      const towards = spot.primary ? backGate(spot.primary) : new THREE.Vector3()
       vi.root.position.set(spot.x, 0, spot.z)
-      vi.root.rotation.y = Math.atan2(towards.x - spot.x, towards.z - spot.z)
+      vi.root.rotation.y = Math.atan2(spot.loopX - spot.x, spot.loopZ - spot.z) // local +z faces the ring road
       this.root.add(vi.root)
       vi.root.updateMatrixWorld(true)
       this.expandBounds(vi.outline, vi.root.position, vi.root.rotation.y, 12)
       this.vendors.set(vendor.node.id, vi)
-      this.vendorBridges.set(vendor.node.id, spot.bridges.length)
       this.buildings.set(vendor.node.id, vi.building)
-      for (const id of spot.bridges) {
-        const back = backGate(id)
-        const gate = vi.gate()
-        bridgeDecor.add(bridge({ from: back.clone().setY(0), to: gate.clone().setY(0) }))
-        bridges.push([new THREE.Vector2(back.x, back.z), new THREE.Vector2(gate.x, gate.z)])
+      const gate = vi.gate()
+      bridgeDecor.add(bridge({ from: new THREE.Vector3(spot.loopX, 0, spot.loopZ), to: gate.clone().setY(0) }))
+      bridges.push([new THREE.Vector2(spot.loopX, spot.loopZ), new THREE.Vector2(gate.x, gate.z)])
+      const links = callerIslands(vendor.calledBy).filter((g) => bridgedIslands.has(g))
+      this.vendorBridges.set(vendor.node.id, links.length)
+      for (const id of links) {
         const index = order.indexOf(id)
-        vendorLinks.push({ group: index, vendor: vi, callers: vendor.calledBy.filter((c) => groupOfNode.get(c) === id), of: spot.bridges.length, back })
+        const back = backGate(id)
+        const land = loopPoint(angles[index])
+        if (!landed.has(id)) {
+          landed.add(id)
+          bridgeDecor.add(bridge({ from: back.clone().setY(0), to: land.clone().setY(0) }))
+          bridges.push([new THREE.Vector2(back.x, back.z), new THREE.Vector2(land.x, land.z)])
+        }
+        vendorLinks.push({ group: index, vendor: vi, callers: vendor.calledBy.filter((c) => groupOfNode.get(c) === id), of: links.length, islandAngle: angles[index], vendorAngle: spot.angle })
       }
     })
+    if (spots.length > 0) {
+      // the ring road is one causeway all the way round, built in short pieces
+      const pieces = Math.max(24, Math.ceil((2 * Math.PI * loopR) / 36))
+      for (let k = 0; k < pieces; k++) {
+        const a0 = (k / pieces) * Math.PI * 2, a1 = ((k + 1) / pieces) * Math.PI * 2
+        bridgeDecor.add(bridge({ from: loopPoint(a0).setY(0), to: loopPoint(a1).setY(0), ends: false }))
+      }
+      for (let k = 0; k < 72; k++) {
+        const p = dirOf((k / 72) * Math.PI * 2).multiplyScalar(loopR + 14)
+        this.bounds.expandByPoint(p)
+        this.extent.push(p)
+      }
+    }
 
-    // ── The airport, due north of the hub ──
+    // ── The airport: an island in the second ring, due north, with a spoke to the hub like any other ──
     this.airport = airport
-    airport.root.position.set(airportSpot.x, 0, airportSpot.z)
+    const airportCentre = centres[pillars.length]
+    airport.root.position.copy(airportCentre)
+    airport.root.rotation.y = Math.atan2(-airportCentre.x, -airportCentre.z)
     this.root.add(airport.root)
     airport.root.updateMatrixWorld(true)
-    this.expandBounds(airport.outline, airport.root.position, 0, 12)
-    if (airportSpot.connected) {
-      const road = this.airportRoad()
+    this.expandBounds(airport.outline, airport.root.position, airport.root.rotation.y, 12)
+    {
       const gate = airport.gate()
-      bridgeDecor.add(bridge({ from: road[0].clone().setY(0), to: gate.clone().setY(0) }))
-      bridges.push([new THREE.Vector2(road[0].x, road[0].z), new THREE.Vector2(gate.x, gate.z)])
-      this.airportPath = [airport.doorWorld(), gate.setY(GROUND), ...road.map((p) => p.clone().setY(GROUND))]
-      this.airportJoin = AIRPORT_JOIN
+      const coast = hubCoasts[pillars.length].clone().setY(0)
+      bridgeDecor.add(bridge({ from: coast, to: gate.clone().setY(0) }))
+      bridges.push([new THREE.Vector2(coast.x, coast.z), new THREE.Vector2(gate.x, gate.z)])
+      this.airportPath = [airport.doorWorld(), gate.setY(GROUND), coast.clone().setY(GROUND)]
+      this.airportJoin = ports[pillars.length]
     }
 
     // ── Sea lanes: boats sail from a hub quay in the gap beside each bridge to the island's harbour ──
@@ -291,7 +320,7 @@ export class Town {
     this.root.updateMatrixWorld(true)
     const gateway = hubBuildings.find((b) => b.kind === 'Gateway')
     gates.forEach((_g, index) => routes.push(...this.islandRoutes(index, gates, gateway)))
-    for (const link of vendorLinks) routes.push(...this.vendorRoutes(link, gates))
+    for (const link of vendorLinks) routes.push(...this.vendorRoutes(link, gates, loopR))
     routes.push(...this.hubRoutes(hubBuildings, gates))
     this.cars.setRoutes(routes)
     this.boats.setRoutes(boatRoutes)
@@ -407,7 +436,7 @@ export class Town {
 
   // ── hub ─────────────────────────────────────────────────────────────────
 
-  private buildHub(hubRoot: THREE.Group, hub: GroupSnapshot | undefined, ports: Port[], airportBridge: boolean): Building[] {
+  private buildHub(hubRoot: THREE.Group, hub: GroupSnapshot | undefined, ports: Port[]): Building[] {
     const out: Building[] = []
     const decor = new THREE.Group()
     hubRoot.add(decor)
@@ -461,18 +490,6 @@ export class Town {
       decor.add(roadBetween(edge, port.coast))
       for (let r = 9 * f; r < 30 * f; r += 4) avoid.push({ x: Math.sin(port.angle) * r, z: CZ - Math.cos(port.angle) * r, w: 7, d: 7 })
     }
-    // the airport's road: from the north coast, past the gateway's plot on its east side, and onto the ring road
-    if (airportBridge) {
-      const road = this.airportRoad()
-      for (let i = 0; i + 1 < road.length; i++) {
-        decor.add(roadBetween(road[i].clone().setY(GROUND), road[i + 1].clone().setY(GROUND)))
-        const len = road[i].distanceTo(road[i + 1])
-        for (let d = 0; d <= len; d += 3) {
-          const k = len === 0 ? 0 : d / len
-          avoid.push({ x: road[i].x + (road[i + 1].x - road[i].x) * k, z: road[i].z + (road[i + 1].z - road[i].z) * k, w: 7, d: 7 })
-        }
-      }
-    }
     const lamps = Math.round(8 * f)
     for (let i = 0; i < lamps; i++) {
       const a = (i / lamps) * Math.PI * 2 + 0.4
@@ -484,25 +501,11 @@ export class Town {
     return out
   }
 
-  /** The points of the airport's road on the hub, from the north coast to the ring road. World coordinates, y = 0. */
-  private airportRoad(): THREE.Vector3[] {
-    const f = this.hubGeo.scale
-    const CZ = 2
-    const coast = coastPoint(this.hubOutline, new THREE.Vector3(0, 0, -1), 0.9).setY(0)
-    const behind = CZ - 13.5 * f - 8 // behind the gateway's plot
-    const abreast = CZ - 13.5 * f + 7 // level with its front
-    const x = AIRPORT_ROAD_X
-    return [
-      coast,
-      new THREE.Vector3(0, 0, Math.max(coast.z + 3, behind)),
-      new THREE.Vector3(x, 0, behind + 1),
-      new THREE.Vector3(x, 0, abreast),
-      this.ringPoint(AIRPORT_JOIN).setY(0),
-    ]
-  }
-
-  /** Cars from the systems on one island to a third party: out of the caller's door, up the spine to the back gate, over the bridge and into the vendor's lane. */
-  private vendorRoutes(link: VendorLink, gates: Gate[]): Route[] {
+  /**
+   * Cars from the systems on one island to a third party: out of the caller's door, up the spine to the back gate, over the island's bridge
+   * to the ring road, the short way round it, and down the vendor's spur into its lane. Nothing touches the hub or crosses another island.
+   */
+  private vendorRoutes(link: VendorLink, gates: Gate[], loopR: number): Route[] {
     const { island, plan } = gates[link.group]
     const callers = link.callers.map((id) => plan.placed.find((p) => p.node.id === id)).filter((p): p is Placed => !!p)
     const from = callers.find((p) => p.node.kind === 'Api') ?? callers[0]
@@ -510,7 +513,9 @@ export class Town {
     const w = (x: number, z: number) => island.root.localToWorld(new THREE.Vector3(x, GROUND, z))
     const head = [w(from.x, from.roadZ)]
     if (Math.abs(from.x) > 0.5) head.push(w(0, from.roadZ))
-    head.push(w(0, island.backGateZ!), link.vendor.gate())
+    head.push(w(0, island.backGateZ!))
+    for (const p of loopArc(loopR, link.islandAngle, link.vendorAngle, GROUND)) head.push(new THREE.Vector3(p.x, p.y, p.z))
+    head.push(link.vendor.gate().setY(GROUND))
     const lane = link.vendor.into(head)
     return [{ dest: link.vendor.building, source: island.buildings.get(from.node.id)!, origin: 'internal', share: 1 / link.of, ...lane }]
   }

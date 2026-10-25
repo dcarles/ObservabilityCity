@@ -273,8 +273,20 @@ public class OtherSignalsTests
     [Fact]
     public void A_town_without_third_parties_yaml_has_no_vendors()
     {
-        var registry = RegistryLoader.Load(TestPaths.Stress24);
+        using var copy = new RegistryCopy(TestPaths.MiniTown);
+        File.Delete(copy.FilePath("third-parties.yaml"));
+
+        var registry = RegistryLoader.Load(copy.Path);
 
         Assert.Empty(registry.Vendors);
+    }
+
+    [Fact]
+    public async Task The_snapshot_carries_the_ring_capacity_the_layout_file_sets()
+    {
+        var s = await new Rig().Run();
+
+        Assert.Equal(12, s.RingCapacity);
+        Assert.Equal(13, RegistryLoader.Load(TestPaths.Stress24).RingCapacity);
     }
 }

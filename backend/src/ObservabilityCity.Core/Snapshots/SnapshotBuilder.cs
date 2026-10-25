@@ -49,7 +49,7 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
 
         var byId = nodes.Concat(vendors.Select(v => v.Node)).ToDictionary(n => n.Id);
         return new Snapshot(registry.Town.Id, registry.Town.Name, registry.Town.GroupLabel, Environment, now, DayFraction(), totals, registries.Notices, groups,
-            vendors, ExternalCallers(registry, byId), Dependencies(registry, byId));
+            vendors, ExternalCallers(registry, byId), Dependencies(registry, byId), registry.RingCapacity);
     }
 
     /// <summary>Open incidents per group, worst first. Incidents for a group the registry lacks are dropped.</summary>

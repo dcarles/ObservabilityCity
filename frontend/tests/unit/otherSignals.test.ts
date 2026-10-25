@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { distanceToSegment, placeAirport, placeVendors, type Disc } from '../../src/scene/layout'
+import { backBridgeClear, distanceToSegment, loopArc, meanDirection, placeVendorsOnRing, ringRoadRadius, VENDOR_SPUR, type Disc } from '../../src/scene/layout'
 import { worstSeverity } from '../../src/scene/weather'
 import { arcWidth } from '../../src/scene/overlay'
 import { planeRate } from '../../src/scene/airport'
@@ -11,11 +11,10 @@ import type { Snapshot } from '../../src/types'
 
 const calm = () => JSON.parse(readFileSync(resolve(__dirname, '../../../shared-test-data/snapshots/calm.json'), 'utf8')) as Snapshot
 
-const hub: Disc = { id: 'hub', x: 0, z: 0, r: 40 }
 const ring = (n: number, radius = 150): Disc[] =>
   Array.from({ length: n }, (_, i) => {
     const a = (i / n) * Math.PI * 2 - Math.PI / 2
-    return { id: `p${i}`, x: Math.cos(a) * radius, z: Math.sin(a) * radius, r: 30, back: 28 }
+    return { id: `p${i}`, x: Math.cos(a) * radius, z: Math.sin(a) * radius, r: 30 }
   })
 
 describe('worstSeverity', () => {
@@ -51,57 +50,76 @@ describe('distanceToSegment', () => {
   })
 })
 
-describe('placeVendors', () => {
-  const specs = [
-    { id: 'v1', callers: ['p0', 'p3'], front: 15, r: 18 },
-    { id: 'v2', callers: ['p0'], front: 15, r: 18 },
-    { id: 'v3', callers: ['p5'], front: 15, r: 18 },
-    { id: 'v4', callers: [], front: 15, r: 18 },
-  ]
-
-  it('stands every vendor clear of every island, the hub and the other vendors', () => {
+describe('the ring road', () => {
+  it('circles outside every island with room for the landings', () => {
     const islands = ring(8)
-    const out = placeVendors(islands, hub, specs)
-    expect(out).toHaveLength(specs.length)
-    const discs = [hub, ...islands, ...out.map((o) => ({ id: o.id, x: o.x, z: o.z, r: 18 }))]
-    for (const a of discs) for (const b of discs) if (a.id < b.id) expect(Math.hypot(a.x - b.x, a.z - b.z), `${a.id} / ${b.id}`).toBeGreaterThan(a.r + b.r)
+    const r = ringRoadRadius(islands)
+    for (const i of islands) expect(Math.hypot(i.x, i.z) + i.r).toBeLessThan(r)
+    expect(r).toBeGreaterThan(150 + 30 + 20)
   })
 
-  it('puts a vendor outward of its main caller and gives that caller the bridge', () => {
+  it('lets an island build a bridge straight out to it unless a neighbour stands in the way', () => {
     const islands = ring(8)
-    const [v1] = placeVendors(islands, hub, specs)
-    expect(v1.primary).toBe('p0')
-    expect(v1.bridges[0]).toBe('p0')
-    expect(Math.hypot(v1.x, v1.z)).toBeGreaterThan(150 + 30)
-  })
-
-  it('leaves a vendor nobody with an island calls without a primary or bridge', () => {
-    const v4 = placeVendors(ring(8), hub, specs).find((o) => o.id === 'v4')!
-    expect(v4.primary).toBeNull()
-    expect(v4.bridges).toEqual([])
-  })
-
-  it('still places everything in a crowded 24-island town', () => {
-    const inner = ring(12, 220), outer = ring(12, 380).map((d) => ({ ...d, id: `o${d.id}` }))
-    const islands = [...inner, ...outer]
-    const many = islands.slice(0, 10).map((d, i) => ({ id: `v${i}`, callers: [d.id], front: 15, r: 18 }))
-    const out = placeVendors(islands, hub, many)
-    expect(out).toHaveLength(10)
-    for (const o of out) for (const i of islands) expect(Math.hypot(o.x - i.x, o.z - i.z)).toBeGreaterThan(i.r + 18)
+    const loopR = ringRoadRadius(islands)
+    expect(backBridgeClear(islands[0], 28, islands, loopR)).toBe(true)
+    // an island parked right behind it blocks the bridge
+    const blocker: Disc = { id: 'b', x: islands[0].x * 1.35, z: islands[0].z * 1.35, r: 30 }
+    expect(backBridgeClear(islands[0], 28, [...islands, blocker], loopR)).toBe(false)
   })
 })
 
-describe('placeAirport', () => {
-  it('stands north of everything and connects when the corridor is clear', () => {
-    const a = placeAirport(ring(6).filter((d) => d.x !== 0 && Math.abs(d.x) > 60), hub, -40, 20)
-    expect(a.z).toBeLessThan(-150)
-    expect(a.connected).toBe(true)
+describe('meanDirection', () => {
+  it('is the side most directions lie on, and null when they cancel out', () => {
+    expect(meanDirection([0.1, -0.1, 0])).toBeCloseTo(0)
+    expect(meanDirection([Math.PI / 2, Math.PI / 2])).toBeCloseTo(Math.PI / 2)
+    expect(meanDirection([0, Math.PI])).toBeNull()
+  })
+})
+
+describe('placeVendorsOnRing', () => {
+  const specs = [
+    { id: 'v1', callerAngles: [0.1, 0.3, -0.2], front: 15 },
+    { id: 'v2', callerAngles: [Math.PI, Math.PI - 0.3], front: 15 },
+    { id: 'v3', callerAngles: [], front: 15 },
+    { id: 'v4', callerAngles: [-Math.PI / 2, -2], front: 15 },
+  ]
+
+  it('stands every vendor outside the loop, on a spur the length of the spur road', () => {
+    const out = placeVendorsOnRing(500, specs)
+    expect(out.map((v) => v.id)).toEqual(['v1', 'v2', 'v3', 'v4'])
+    for (const v of out) {
+      expect(Math.hypot(v.loopX, v.loopZ)).toBeCloseTo(500)
+      expect(Math.hypot(v.x, v.z)).toBeCloseTo(500 + VENDOR_SPUR + 15)
+    }
   })
 
-  it('has no bridge when an island stands in the corridor, but is still placed', () => {
-    const a = placeAirport([{ id: 'n', x: 0, z: -140, r: 30 }], hub, -40, 20)
-    expect(a.connected).toBe(false)
-    expect(a.z).toBeLessThan(-170)
+  it('gives each vendor a place of its own, spread round the loop', () => {
+    const out = placeVendorsOnRing(500, specs)
+    for (let a = 0; a < out.length; a++)
+      for (let b = a + 1; b < out.length; b++) expect(Math.hypot(out[a].x - out[b].x, out[a].z - out[b].z)).toBeGreaterThan(300)
+  })
+
+  it('puts a vendor on the side its callers are on', () => {
+    const out = placeVendorsOnRing(500, specs)
+    const side = (id: string) => out.find((v) => v.id === id)!.angle
+    expect(Math.abs(side('v1'))).toBeLessThan(1.2)
+    expect(Math.abs(Math.abs(side('v2')) - Math.PI)).toBeLessThan(1.2)
+  })
+
+  it('places nothing for no vendors', () => {
+    expect(placeVendorsOnRing(500, [])).toEqual([])
+  })
+})
+
+describe('loopArc', () => {
+  it('goes the short way round, on the loop, from one direction to the other', () => {
+    const arc = loopArc(400, 0.2, -0.4)
+    expect(arc[0].x).toBeCloseTo(Math.sin(0.2) * 400)
+    expect(arc[arc.length - 1].z).toBeCloseTo(-Math.cos(-0.4) * 400)
+    for (const p of arc) expect(Math.hypot(p.x, p.z)).toBeCloseTo(400)
+    // across the seam at south the short way is through +-pi, not the long way round
+    const seam = loopArc(400, 3, -3)
+    expect(seam.length).toBeLessThan(10)
   })
 })
 

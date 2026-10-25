@@ -2,6 +2,7 @@
 // safe (a missing list becomes an empty one, a number that is not a number becomes 0) and dropped where it is not (a building
 // with no id), and a snapshot with nothing usable in it is refused so the town keeps showing the last good one.
 
+import { DEFAULT_RING_CAPACITY, MAX_RING_CAPACITY, MIN_RING_CAPACITY, maxPillars } from './scene/layout'
 import type { DependencySnapshot, ExternalCallerSnapshot, GroupSnapshot, IncidentSnapshot, NodeSnapshot, Snapshot, VendorSnapshot } from './types'
 
 const KINDS = ['Api', 'Worker', 'Database', 'Cache', 'Cron', 'Gateway', 'Broker', 'Egress']
@@ -39,6 +40,13 @@ export function checkSnapshot(raw: unknown): Checked {
   }
   if (groups.every((g) => g.nodes.length === 0)) return { snapshot: null, problems: [...problems, 'no system in the snapshot can be drawn'] }
 
+  // the layout needs a ring capacity it can use and a town that fits on two rings of it
+  const declared = raw.ringCapacity
+  const ringCapacity = Number.isInteger(declared) && (declared as number) >= MIN_RING_CAPACITY && (declared as number) <= MAX_RING_CAPACITY ? (declared as number) : DEFAULT_RING_CAPACITY
+  if (declared !== undefined && ringCapacity !== declared) problems.push(`ringCapacity ${String(declared)} is outside ${MIN_RING_CAPACITY} to ${MAX_RING_CAPACITY}; using ${ringCapacity}`)
+  const pillarCount = groups.filter((g) => !g.isHub).length
+  if (pillarCount > maxPillars(ringCapacity)) return { snapshot: null, problems: [...problems, `${pillarCount} pillars do not fit on two rings of ${ringCapacity} (at most ${maxPillars(ringCapacity)})`] }
+
   const totals = isObject(raw.totals) ? raw.totals : {}
   const num = (v: unknown) => (isFiniteNumber(v) ? v : 0)
   const groupIds = new Set(groups.map((g) => g.id))
@@ -51,6 +59,7 @@ export function checkSnapshot(raw: unknown): Checked {
   }
   const snapshot: Snapshot = {
     townId: str(raw.townId),
+    ringCapacity,
     townName: str(raw.townName) || str(raw.townId),
     groupLabel: str(raw.groupLabel) || 'Group',
     environment: str(raw.environment),

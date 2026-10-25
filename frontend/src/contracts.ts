@@ -130,6 +130,8 @@ export interface components {
             vendors: components["schemas"]["VendorSnapshot"][];
             externalCallers: components["schemas"]["ExternalCallerSnapshot"][];
             dependencies: components["schemas"]["DependencySnapshot"][];
+            /** Format: int32 */
+            ringCapacity: number;
         };
         TownTotals: {
             /** Format: double */

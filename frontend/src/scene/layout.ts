@@ -1,10 +1,11 @@
 /**
  * Where everything stands, worked out from sizes alone so it can be tested without a renderer.
  *
- * The hub is in the middle. Islands stand round it on a ring in registry order. A ring holds RING_CAPACITY islands;
- * any more stand in a second, staggered ring: each one sits in the gap between two islands of the first ring, further
- * out, with its bridge passing between them. The hub grows with the number of islands so every island's spoke road
- * has room where it leaves the hub's coast.
+ * The hub is in the middle. Islands stand round it on a ring in registry order. A ring holds `capacity` islands (layout.yaml
+ * ringCapacity, 6 to 18); any more stand in a second, staggered ring: each one sits in the gap between two islands of the
+ * first ring, further out, with its bridge passing between them. The airport takes the second ring's northernmost place, so a
+ * town holds at most 2 x capacity - 1 pillars, and it gets a spoke to the hub like any island. There is no third ring: its
+ * bridges would have nowhere to pass. The hub grows with the number of spokes so every road has room where it leaves the hub's coast.
  */
 
 /** Half extents of an island's coast. x runs along the coast (tangential), z points at the hub (radial). */
@@ -37,9 +38,15 @@ export interface IslandPlacement {
 export interface TownLayout {
   hub: HubGeometry
   islands: IslandPlacement[]
+  /** The airport's place in the second ring, due north. Null when the town has none. */
+  airport: IslandPlacement | null
 }
 
-export const RING_CAPACITY = 12
+export const DEFAULT_RING_CAPACITY = 12
+export const MIN_RING_CAPACITY = 6
+export const MAX_RING_CAPACITY = 18
+/** Most pillars a town holds on two rings of `capacity`: the airport takes one place in the second. */
+export const maxPillars = (capacity: number) => 2 * capacity - 1
 
 const BASE_HUB_RX = 22
 const BASE_HUB_RZ = 21
@@ -108,59 +115,74 @@ function spokeAngles(islandAngles: number[], clear: number): number[] {
   return best
 }
 
-/** Even angles for the first ring and the midpoints for the second. */
-function angles(n: number): { angle: number; ring: 1 | 2 }[] {
-  const first = Math.min(n, RING_CAPACITY)
+/**
+ * Even angles for the first ring and the gap midpoints for the second. The gap that faces north is kept for the airport, so the
+ * second ring's islands spread over the other gaps. The airport, when there is one, is last.
+ */
+function angles(n: number, capacity: number, airport: boolean): { angle: number; ring: 1 | 2 }[] {
+  const first = Math.min(n, capacity)
   const second = n - first
   const step = (Math.PI * 2) / first
   // start at the angle that suits the hub's four axes: islands then sit between them
   const start = first > 1 ? step / 2 : Math.PI / 4
   const out: { angle: number; ring: 1 | 2 }[] = Array.from({ length: first }, (_, i) => ({ angle: start + i * step, ring: 1 }))
   for (let k = 0; k < second; k++) {
-    const gap = Math.floor(((k + 0.5) * first) / second) // spread over the gaps of the first ring
+    const gap = secondRingGap(k, first, second)
     out.push({ angle: out[gap].angle + step / 2, ring: 2 })
   }
+  if (airport) out.push({ angle: 0, ring: 2 })
   return out
 }
 
-export function layoutTown(sizes: IslandSize[]): TownLayout {
-  const n = sizes.length
-  const hub = hubGeometry(n)
-  if (n === 0) return { hub, islands: [] }
+/** The gap of the first ring (between islands `gap` and `gap + 1`) that the k-th second-ring island stands in. The north gap, the last one, is the airport's. */
+function secondRingGap(k: number, first: number, second: number): number {
+  return Math.floor(((k + 0.5) * (first - 1)) / second)
+}
 
-  const placed = angles(n)
+export function layoutTown(sizes: IslandSize[], capacity = DEFAULT_RING_CAPACITY, airportSize: IslandSize | null = null): TownLayout {
+  const pillars = sizes.length
+  const hasAirport = airportSize !== null
+  if (capacity < MIN_RING_CAPACITY || capacity > MAX_RING_CAPACITY) throw new Error(`ring capacity ${capacity} is outside ${MIN_RING_CAPACITY} to ${MAX_RING_CAPACITY}`)
+  if (pillars > maxPillars(capacity)) throw new Error(`${pillars} pillars do not fit on two rings of ${capacity} (at most ${maxPillars(capacity)})`)
+  const hub = hubGeometry(pillars + (hasAirport ? 1 : 0))
+  if (pillars === 0) return { hub, islands: [], airport: null }
+
+  const all = hasAirport ? [...sizes, airportSize] : sizes
+  const n = all.length
+  const placed = angles(pillars, capacity, hasAirport)
   const ports = spokeAngles(placed.map((p) => p.angle), keepClear(hub.buildingR))
   const spots = placed.map((p, i) => ({ ...p, port: ports[i] }))
-  const first = Math.min(n, RING_CAPACITY)
-  const second = n - first
+  const first = Math.min(pillars, capacity)
+  const second = pillars - first
   const rho = (s: IslandSize) => Math.max(s.rx, s.rz) * 0.95 + 3 // a round stand-in for an island, for spacing
   const centre = (angle: number, r: number) => ({ x: Math.sin(angle) * r, z: -Math.cos(angle) * r })
 
   // first ring: far enough out that the nearest coast clears the sea lane, and neighbours do not touch
-  let r1 = hub.rz + SEA_LANE + Math.max(...sizes.slice(0, first).map((s) => s.rz))
+  let r1 = hub.rz + SEA_LANE + Math.max(...all.slice(0, first).map((s) => s.rz))
   const step = (Math.PI * 2) / first
-  const twoRings = second > 0
-  const hasBridgeBetween = new Set<number>() // gaps of the first ring that a second-ring bridge passes through
-  for (let k = 0; k < second; k++) hasBridgeBetween.add(Math.floor(((k + 0.5) * first) / second))
+  const outerCount = n - first // second-ring islands and the airport
+  const hasBridgeBetween = new Set<number>() // gaps of the first ring that an outer bridge passes through
+  for (let k = 0; k < second; k++) hasBridgeBetween.add(secondRingGap(k, first, second))
+  if (hasAirport && first > 1) hasBridgeBetween.add(first - 1)
   if (first > 1) {
     for (let i = 0; i < first; i++) {
       const j = (i + 1) % first
-      r1 = Math.max(r1, (sizes[i].rx + sizes[j].rx + ISLAND_GAP) / (2 * Math.sin(step / 2)))
-      if (twoRings && hasBridgeBetween.has(i))
-        r1 = Math.max(r1, (Math.max(sizes[i].rx, sizes[j].rx) + BRIDGE_CLEARANCE) / Math.sin(step / 2))
+      r1 = Math.max(r1, (all[i].rx + all[j].rx + ISLAND_GAP) / (2 * Math.sin(step / 2)))
+      if (outerCount > 0 && hasBridgeBetween.has(i))
+        r1 = Math.max(r1, (Math.max(all[i].rx, all[j].rx) + BRIDGE_CLEARANCE) / Math.sin(step / 2))
     }
   }
 
   const radii: number[] = Array.from({ length: n }, (_, i) => (i < first ? r1 : 0))
   // second ring: out until it clears the first ring and its own neighbours
-  const outer = spots.slice(first).map((s, k) => ({ ...s, size: sizes[first + k], index: first + k }))
+  const outer = spots.slice(first).map((s, k) => ({ ...s, size: all[first + k], index: first + k }))
   let r2 = r1 + 10
-  for (let guard = 0; twoRings && guard < 600; guard++, r2 += 2) {
+  for (let guard = 0; outerCount > 0 && guard < 900; guard++, r2 += 2) {
     const clear = outer.every((o) => {
       const c = centre(o.angle, r2)
       const awayFromFirst = spots.slice(0, first).every((s, j) => {
         const p = centre(s.angle, r1)
-        return Math.hypot(c.x - p.x, c.z - p.z) >= rho(o.size) + rho(sizes[j]) + ISLAND_GAP
+        return Math.hypot(c.x - p.x, c.z - p.z) >= rho(o.size) + rho(all[j]) + ISLAND_GAP
       })
       const awayFromEachOther = outer.every((q) => {
         if (q === o) return true
@@ -173,13 +195,11 @@ export function layoutTown(sizes: IslandSize[]): TownLayout {
   }
   for (const o of outer) radii[o.index] = r2
 
-  return {
-    hub,
-    islands: spots.map((s, i) => ({ angle: s.angle, radius: radii[i], portAngle: s.port, ring: s.ring })),
-  }
+  const placements = spots.map((s, i) => ({ angle: s.angle, radius: radii[i], portAngle: s.port, ring: s.ring }))
+  return { hub, islands: placements.slice(0, pillars), airport: hasAirport ? placements[pillars] : null }
 }
 
-// ── offshore places: third-party islands and the airport ───────────────────────────────────────────────
+// ── the outer ring road and the third parties outside it ──────────────────────────────────────────────
 
 /** A round stand-in for something on the map, for working out where there is room. */
 export interface Disc {
@@ -187,34 +207,36 @@ export interface Disc {
   x: number
   z: number
   r: number
-  /** How far its back coast is from its centre, along the line away from the hub. Only islands that can have a bridge to a vendor need it. */
-  back?: number
 }
 
 export interface VendorSpec {
   id: string
-  /** Ids of the islands whose systems call this vendor, the one that calls it most first. */
-  callers: string[]
+  /** Directions (radians clockwise from north) of the islands whose systems call this vendor, so it stands on the side most of them are. */
+  callerAngles: number[]
   /** Half the depth of the vendor's island, which is how far its gate is from its centre. */
   front: number
-  r: number
 }
 
 export interface VendorPlacement {
   id: string
+  /** Direction of the vendor from the hub's centre. */
+  angle: number
+  /** The vendor island's centre. */
   x: number
   z: number
-  /** The island the vendor stands off. Null when none of its callers has an island of its own (the hub, say). */
-  primary: string | null
-  /** The islands that have a bridge to it, the primary first. Others call it through the overlay's arcs alone. */
-  bridges: string[]
+  /** Where its spur leaves the ring road. */
+  loopX: number
+  loopZ: number
 }
 
-export const VENDOR_BRIDGE = 12 // open water between an island's back gate and its vendor's gate
-const VENDOR_GAP = 8 // clear water kept between a vendor and anything else
+/** Sea kept between the outermost coast and the ring road, for the bridges' landings. */
+export const LOOP_MARGIN = 40
+/** Open water between the ring road and a vendor's gate. */
+export const VENDOR_SPUR = 14
 const BRIDGE_MARGIN = 7 // a bridge must pass this far (plus the island's radius) from every other island
 
 const dist = (ax: number, az: number, bx: number, bz: number) => Math.hypot(ax - bx, az - bz)
+const direction = (a: number) => ({ x: Math.sin(a), z: -Math.cos(a) })
 
 /** Distance from a point to a segment. */
 export function distanceToSegment(px: number, pz: number, ax: number, az: number, bx: number, bz: number): number {
@@ -224,78 +246,61 @@ export function distanceToSegment(px: number, pz: number, ax: number, az: number
   return dist(px, pz, ax + t * dx, az + t * dz)
 }
 
+/** The ring road circles the hub outside every island (and the airport), with room for the bridges' landings. */
+export function ringRoadRadius(discs: Disc[]): number {
+  return Math.max(0, ...discs.map((d) => Math.hypot(d.x, d.z) + d.r)) + LOOP_MARGIN
+}
+
 /**
- * Third-party islands stand offshore: each directly outside the back of the island that calls it most, with a short bridge out of that island's
- * back gate. Several vendors off one island fan out sideways. A vendor is pushed further out until it clears everything else. Other islands that
- * call it get a bridge too, when a straight one would leave their back gate heading away from the hub and clear every other island.
- * Pure geometry, so it is tested without a renderer.
+ * Whether a straight bridge from an island's back gate, directly away from the hub, to the ring road passes clear of every other island.
+ * It always does when the rings are staggered evenly; a very wide neighbour in the other ring can block it, and that island then
+ * reaches third parties through the dependency overlay alone.
  */
-export function placeVendors(islands: Disc[], hub: Disc, vendors: VendorSpec[]): VendorPlacement[] {
-  const byId = new Map(islands.map((i) => [i.id, i]))
-  const placed: Disc[] = []
-  const out: VendorPlacement[] = []
-  const fan = new Map<string, number>() // vendors already standing off each island
-  const obstacles = () => [hub, ...islands, ...placed]
+export function backBridgeClear(island: Disc, back: number, others: Disc[], loopR: number): boolean {
+  const d = Math.hypot(island.x, island.z) || 1
+  const ux = island.x / d, uz = island.z / d
+  const ax = island.x + ux * back, az = island.z + uz * back
+  const bx = ux * loopR, bz = uz * loopR
+  return others.every((o) => o.id === island.id || distanceToSegment(o.x, o.z, ax, az, bx, bz) >= o.r * 0.85 + BRIDGE_MARGIN)
+}
 
-  for (const v of vendors) {
-    const callers = v.callers.map((id) => byId.get(id)).filter((i): i is Disc => !!i)
-    const primary = callers[0] ?? null
-    let x: number, z: number
-    if (primary) {
-      const d = dist(primary.x, primary.z, hub.x, hub.z) || 1
-      const ux = (primary.x - hub.x) / d, uz = (primary.z - hub.z) / d
-      const k = fan.get(primary.id) ?? 0
-      fan.set(primary.id, k + 1)
-      // vendors off one island alternate to either side: 0, +1, -1, +2 ...
-      const side = k === 0 ? 0 : (k % 2 === 1 ? 1 : -1) * Math.ceil(k / 2)
-      let out_ = (primary.back ?? primary.r) + VENDOR_BRIDGE + v.front
-      const tx = -uz, tz = ux
-      const at = (o: number) => ({ x: primary.x + ux * o + tx * side * (v.r * 2 + VENDOR_GAP), z: primary.z + uz * o + tz * side * (v.r * 2 + VENDOR_GAP) })
-      let p = at(out_)
-      for (let guard = 0; guard < 60 && obstacles().some((o) => dist(o.x, o.z, p.x, p.z) < o.r + v.r + VENDOR_GAP); guard++) p = at((out_ += 4))
-      x = p.x; z = p.z
-    } else {
-      // nobody with an island calls it: it stands off the hub's east side, beyond the outermost island
-      const reach = Math.max(0, ...islands.map((i) => dist(i.x, i.z, hub.x, hub.z) + i.r)) + v.r + VENDOR_GAP + 20
-      const k = placed.filter((p) => p.id.startsWith('~')).length
-      x = hub.x + reach
-      z = hub.z + (k % 2 === 0 ? 1 : -1) * Math.ceil(k / 2) * (v.r * 2 + VENDOR_GAP)
-    }
-    placed.push({ id: primary ? v.id : `~${v.id}`, x, z, r: v.r })
+/** Direction of the vector sum of some directions: the side they mostly lie on. Null when they cancel out. */
+export function meanDirection(angles: number[]): number | null {
+  const x = angles.reduce((a, t) => a + Math.sin(t), 0), z = angles.reduce((a, t) => a - Math.cos(t), 0)
+  return Math.hypot(x, z) < 1e-6 ? null : Math.atan2(x, -z)
+}
 
-    const bridges: string[] = primary ? [primary.id] : []
-    // other callers: a straight bridge from their back gate, if it heads away from the hub and nothing is in the way
-    for (const c of callers.slice(1)) {
-      const d = dist(c.x, c.z, hub.x, hub.z) || 1
-      const ux = (c.x - hub.x) / d, uz = (c.z - hub.z) / d
-      const gx = c.x + ux * (c.back ?? c.r), gz = c.z + uz * (c.back ?? c.r)
-      const dx = x - gx, dz = z - gz
-      const len = Math.hypot(dx, dz) || 1
-      if ((dx * ux + dz * uz) / len < 0.3) continue
-      const clear = obstacles().every((o) => o.id === c.id || o.id === v.id || o.id === `~${v.id}` || distanceToSegment(o.x, o.z, gx, gz, x - (dx / len) * v.front, z - (dz / len) * v.front) >= o.r * 0.85 + BRIDGE_MARGIN)
-      if (clear) bridges.push(c.id)
-    }
-    out.push({ id: v.id, x, z, primary: primary?.id ?? null, bridges })
+/**
+ * Third parties stand outside the ring road, each on a short spur. The places are spread evenly round the loop, and each vendor takes the
+ * free place nearest the side most of its callers are on, so the busiest links are the shortest drives. Pure geometry, tested without a renderer.
+ */
+export function placeVendorsOnRing(loopR: number, vendors: VendorSpec[]): VendorPlacement[] {
+  const n = vendors.length
+  if (n === 0) return []
+  const offset = Math.PI / n // keeps the first place off due north, where the airport stands inside the loop
+  const slots = Array.from({ length: n }, (_, i) => wrapAngle(offset + (i * 2 * Math.PI) / n))
+  const free = new Set(slots.keys())
+  const out = new Map<string, VendorPlacement>()
+  // vendors with the most decisive preference choose first
+  const wanted = vendors.map((v) => ({ v, want: meanDirection(v.callerAngles) })).sort((a, b) => Number(b.want !== null) - Number(a.want !== null))
+  for (const { v, want } of wanted) {
+    let best = -1
+    for (const k of free) if (best < 0 || (want !== null ? Math.abs(wrapAngle(slots[k] - want)) < Math.abs(wrapAngle(slots[best] - want)) : k < best)) best = k
+    free.delete(best)
+    const angle = slots[best]
+    const d = direction(angle)
+    const centre = loopR + VENDOR_SPUR + v.front
+    out.set(v.id, { id: v.id, angle, x: d.x * centre, z: d.z * centre, loopX: d.x * loopR, loopZ: d.z * loopR })
   }
-  return out
+  return vendors.map((v) => out.get(v.id)!)
 }
 
-export interface AirportPlacement {
-  x: number
-  z: number
-  /** True when the corridor from the hub's north coast to the airport is free of islands, so the airport can have its bridge. */
-  connected: boolean
-}
-
-export const AIRPORT_CLEAR = 12 // an island must stand at least this far from the airport's bridge, beyond its own radius
-
-/**
- * The airport stands due north of the hub, beyond everything else, with a bridge straight down to the hub's north coast. If an island or a
- * vendor stands in that corridor, the airport is still drawn but has no bridge, and outside callers come in at the gateway as before.
- */
-export function placeAirport(others: Disc[], hub: Disc, hubNorth: number, rz: number, gap = 26): AirportPlacement {
-  const farthest = Math.min(hub.z - hub.r, ...others.map((o) => o.z - o.r))
-  const z = farthest - gap - rz
-  const blocked = others.some((o) => Math.abs(o.x - hub.x) < o.r * 0.85 + AIRPORT_CLEAR && o.z - o.r < hubNorth && o.z + o.r > z)
-  return { x: hub.x, z, connected: !blocked }
+/** Points round the ring road from one direction to another, the short way. */
+export function loopArc(loopR: number, from: number, to: number, y = 0, maxStep = 0.06): { x: number; y: number; z: number }[] {
+  const delta = wrapAngle(to - from)
+  const steps = Math.max(1, Math.ceil(Math.abs(delta) / maxStep))
+  return Array.from({ length: steps + 1 }, (_, i) => {
+    const d = direction(from + (delta * i) / steps)
+    return { x: d.x * loopR, y, z: d.z * loopR }
+  })
 }

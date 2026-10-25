@@ -1,7 +1,8 @@
 import { test, expect } from '../support/test'
 import { frameCost, note } from '../support/perf'
 
-// The biggest town the design allows: 24 islands, from 2 systems to 25 on one island (shared-test-data/registries/stress-24).
+// A big town: 24 islands on two rings of 13 (ringCapacity 13), from 2 systems to 25 on one island, plus 4 vendors on spurs outside the
+// ring road (shared-test-data/registries/stress-24).
 // Runs in the slow set, on merge to main and nightly. No GPU in CI, so the frame budget is for software rendering (SwiftShader):
 // it catches a change that makes the town many times heavier, not a few percent. Measured at the time of writing: about 10,300 draw calls,
 // 1.5 s a frame and 2 s to build, so the budgets leave 20% to 4x of headroom. Set E2E_MAX_FRAME_MS lower on a machine with a GPU.
@@ -32,10 +33,10 @@ test('all 24 islands render, within the frame-rate and draw-call budgets', async
   note(info, 'build ms', built.buildMs.toFixed(0))
   expect(built.buildMs, 'building the whole town').toBeLessThan(MAX_BUILD_MS)
 
-  // every one of the 249 + 4 buildings takes its numbers and is healthy
+  // every one of the 249 + 4 hub + 4 vendor buildings takes its numbers and is healthy
   await town.step(10)
   const all = await town.allBuildings()
-  expect(all).toHaveLength(SIZES.reduce((a, b) => a + b, 0) + 4)
+  expect(all).toHaveLength(SIZES.reduce((a, b) => a + b, 0) + 4 + 4)
   expect(all.filter((b) => b.state !== 'Healthy').map((b) => b.id)).toEqual([])
 
   const cost = await frameCost(page)
@@ -45,6 +46,20 @@ test('all 24 islands render, within the frame-rate and draw-call budgets', async
   note(info, 'frames per second (software rendering)', (1000 / cost.ms).toFixed(2))
   expect(cost.calls, 'draw calls for one frame').toBeLessThan(MAX_DRAW_CALLS)
   expect(cost.ms, 'time to draw one frame').toBeLessThan(MAX_FRAME_MS)
+})
+
+test('vendors stand outside the ring road, farther out than every island, each with bridges', async ({ town, page }) => {
+  await town.open()
+  const t = await page.evaluate(() => {
+    const c = (window as any).city
+    const reach = Math.max(...c.town.islands.map((i: any) => Math.hypot(i.root.position.x, i.root.position.z)))
+    return { reach, vendors: c.inspectVendors().map((v: any) => ({ id: v.id, d: Math.hypot(v.x, v.z), bridges: v.bridges })) }
+  })
+  expect(t.vendors).toHaveLength(4)
+  for (const v of t.vendors) {
+    expect(v.d, `${v.id} distance`).toBeGreaterThan(t.reach)
+    expect(v.bridges, `${v.id} bridges`).toBeGreaterThan(0)
+  }
 })
 
 test('trouble on the biggest and the smallest island stays on those islands', async ({ town }) => {

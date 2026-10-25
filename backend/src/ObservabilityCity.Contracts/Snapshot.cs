@@ -141,6 +141,7 @@ public sealed record TownTotals(
 /// The whole town at one moment. This is what is pushed to the browser.
 /// Notices are problems with the configuration that did not stop the town: a reload that failed (the last good registry is still shown),
 /// a call link that points nowhere and was dropped. The renderer lists them in the top bar.
+/// RingCapacity is how many islands stand on the first ring (layout.yaml), which the renderer lays the two rings out from.
 /// Vendors are the third parties, ExternalCallers feed the airport, and Dependencies are the cross-group traffic the overlay draws.
 /// </summary>
 public sealed record Snapshot(
@@ -155,4 +156,5 @@ public sealed record Snapshot(
     IReadOnlyList<GroupSnapshot> Groups,
     IReadOnlyList<VendorSnapshot> Vendors,
     IReadOnlyList<ExternalCallerSnapshot> ExternalCallers,
-    IReadOnlyList<DependencySnapshot> Dependencies);
+    IReadOnlyList<DependencySnapshot> Dependencies,
+    int RingCapacity);

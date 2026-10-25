@@ -77,10 +77,12 @@ internal sealed class ExternalCallerFile
     public List<string> Calls { get; set; } = [];
 }
 
-/// <summary>layout.yaml: the order of the islands round the hub.</summary>
+/// <summary>layout.yaml: the order of the islands round the hub, and how many fit on a ring.</summary>
 internal sealed class LayoutFile
 {
     public List<string> Islands { get; set; } = [];
+    /// <summary>Islands on the first ring. The second ring holds up to one fewer, since the airport takes a place there.</summary>
+    public int? RingCapacity { get; set; }
 }
 
 /// <summary>third-parties.yaml: the vendors outside the town and which of our systems call each one.</summary>
