@@ -1,0 +1,15 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/ObservabilityCity.Adapters.Fake/ObservabilityCity.Adapters.Fake.csproj" />
+    <Project Path="src/ObservabilityCity.AppHost/ObservabilityCity.AppHost.csproj" />
+    <Project Path="src/ObservabilityCity.Contracts/ObservabilityCity.Contracts.csproj" />
+    <Project Path="src/ObservabilityCity.Core/ObservabilityCity.Core.csproj" />
+    <Project Path="src/ObservabilityCity.Host/ObservabilityCity.Host.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/ObservabilityCity.Tests/ObservabilityCity.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/ObservabilityCity.Validate/ObservabilityCity.Validate.csproj" />
+  </Folder>
+</Solution>
