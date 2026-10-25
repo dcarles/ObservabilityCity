@@ -1,0 +1,11 @@
+# Still reads the hub's egress topic instead of a pillar's outbox: a pier with an amber pennant.
+pillar: leg
+displayName: Legacy feed
+color: "#c8a2c8"
+systems:
+  - { id: leg.feed-api, service: feed, name: Feed API, role: api, external: true, calls: [leg.feed-db] }
+  - { id: leg.feed-worker, service: feed, name: Feed worker, role: worker, calls: [leg.feed-db] }
+  - { id: leg.feed-db, service: feed, name: Feed DB, role: db }
+messaging:
+  subscriptions:
+    - { topic: hub-egress, consumer: leg.feed-worker, legacy: true }

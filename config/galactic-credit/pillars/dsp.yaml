@@ -10,3 +10,9 @@ systems:
   - { id: dsp.disputes-db, service: disputes, name: Disputes DB, role: db }
   - { id: dsp.evidence-api, service: evidence, name: Evidence API, role: api, calls: [dsp.evidence-db] }
   - { id: dsp.evidence-db, service: evidence, name: Evidence DB, role: db }
+
+# Messaging: the outboxes this pillar publishes (dsp-<service>-outbox) and the topics its workers consume.
+messaging:
+  topics: [disputes]
+  subscriptions:
+    - { topic: pay-payments-outbox, consumer: dsp.disputes-worker }

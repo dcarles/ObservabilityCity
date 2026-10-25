@@ -53,6 +53,7 @@ export class TopBar {
         <div class="chip"><b>${formatRate(t.requestsPerSecond)}</b><span>req/s</span></div>
         <div class="chip ${t.errorRate >= 0.05 ? 'bad' : t.errorRate >= 0.01 ? 'warn' : ''}"><b>${(t.errorRate * 100).toFixed(1)}%</b><span>errors</span></div>
         <div class="chip p99"><b>${formatMs(t.p99Ms)}</b><span>p99</span></div>
+        <div class="chip dlq ${t.deadLetters > 0 ? 'bad' : ''}" title="Messages in dead-letter queues, town-wide"><b>${formatRate(t.deadLetters)}</b><span>DLQ</span></div>
         <button class="chip clickable ${t.degraded ? 'warn' : ''}" data-list="Degraded" title="Show the degraded systems"><b>${t.degraded}</b><span>degraded</span></button>
         <button class="chip clickable ${t.down ? 'bad' : ''}" data-list="Down" title="Show the systems that are down"><b>${t.down}</b><span>down</span></button>
         <button class="chip clickable ${stale ? 'stale' : ''}" data-list="Stale" title="Show the systems with no fresh data"><b>${stale}</b><span>no data</span></button>

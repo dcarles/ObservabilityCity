@@ -1,0 +1,7 @@
+# No messaging: an API (so a bridge) and a cache, with no worker and no database of its own, so no factory, no storage and no pier.
+pillar: nom
+displayName: No messaging
+color: "#f2994a"
+systems:
+  - { id: nom.catalog-api, service: catalog, name: Catalog API, role: api, external: true, calls: [nom.catalog-cache] }
+  - { id: nom.catalog-cache, service: catalog, name: Catalog cache, role: cache }

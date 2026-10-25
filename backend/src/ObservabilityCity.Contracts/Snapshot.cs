@@ -85,11 +85,28 @@ public sealed record IncidentSnapshot(
     int Severity,
     DateTimeOffset StartedAt);
 
+/// <summary>A Service Bus topic: Name is the full topic name, Service the service (or hub resource name) that publishes it.</summary>
+public sealed record TopicSnapshot(string Name, string Service);
+
+/// <summary>
+/// A worker reading a topic. Publisher is the id of the island that owns the topic, Consumer the id of the worker. Legacy marks a pillar reading
+/// the hub's egress topic, the old way, which the renderer flags with an amber pennant.
+/// </summary>
+public sealed record SubscriptionSnapshot(string Topic, string Publisher, string Consumer, bool Legacy);
+
+/// <summary>The topics an island publishes and the subscriptions its workers hold. Both empty means the island has no messaging, and no pier.</summary>
+public sealed record MessagingSnapshot(
+    IReadOnlyList<TopicSnapshot> Topics,
+    IReadOnlyList<SubscriptionSnapshot> Subscriptions);
+
 /// <summary>
 /// An island (a pillar, a team, ...) or the hub island. IsLostFound marks the island that collects systems no group owns.
 /// ConfigError is set when the group's registry file is broken and was skipped: the island is drawn as a "config error" island
 /// with no buildings, and the text says what is wrong. It is null for every healthy island.
 /// Incidents are the open incidents assigned to this group (empty when the sky is clear).
+/// HasBridge says whether a bridge joins the island to the hub: it has an API, or a call link crosses its coast. Without one the island is
+/// reached only by boat (or by nothing at all). Messaging lists its topics and subscriptions; an island with neither has no pier. The renderer
+/// builds only the connectors that these say exist.
 /// </summary>
 public sealed record GroupSnapshot(
     string Id,
@@ -99,6 +116,8 @@ public sealed record GroupSnapshot(
     bool IsLostFound,
     string? ConfigError,
     IReadOnlyList<IncidentSnapshot> Incidents,
+    bool HasBridge,
+    MessagingSnapshot Messaging,
     IReadOnlyList<NodeSnapshot> Nodes);
 
 /// <summary>
@@ -129,13 +148,15 @@ public sealed record DependencySnapshot(
     string To,
     double RequestsPerSecond);
 
+/// <summary>The town's headline numbers. DeadLetters adds up the dead-letter queues of every consumer that reports one.</summary>
 public sealed record TownTotals(
     double RequestsPerSecond,
     double ErrorRate,
     double P99Ms,
     int Degraded,
     int Down,
-    int Incidents);
+    int Incidents,
+    double DeadLetters);
 
 /// <summary>
 /// The whole town at one moment. This is what is pushed to the browser.

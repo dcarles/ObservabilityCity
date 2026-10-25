@@ -28,9 +28,11 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
         var now = clock.GetUtcNow();
         var registry = registries.Current;
         var incidents = OpenIncidents(registry);
+        var links = TownLinks.Of(registry);
         var groups = registry.Groups
             .Select(g => new GroupSnapshot(g.Id, g.DisplayName, g.Color, g.IsHub, g.IsLostFound, g.ConfigError,
-                incidents.GetValueOrDefault(g.Id) ?? [], g.Nodes.Select(n => ToNode(n, now)).ToList()))
+                incidents.GetValueOrDefault(g.Id) ?? [], links[g.Id].HasBridge, MessagingOf(registry, g),
+                g.Nodes.Select(n => ToNode(n, now)).ToList()))
             .ToList();
         var vendors = registry.Vendors.Select(v => new VendorSnapshot(ToNode(v.Node, now), v.CalledBy)).ToList();
 
@@ -45,12 +47,17 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
             RequestWeightedP99(live),
             live.Concat(liveVendors).Count(n => n.State == HealthState.Degraded),
             live.Concat(liveVendors).Count(n => n.State == HealthState.Down),
-            groups.Sum(g => g.Incidents.Count));
+            groups.Sum(g => g.Incidents.Count),
+            live.Where(n => registry.ConsumerIds.Contains(n.Id)).Sum(n => n.DeadLetters ?? 0));
 
         var byId = nodes.Concat(vendors.Select(v => v.Node)).ToDictionary(n => n.Id);
         return new Snapshot(registry.Town.Id, registry.Town.Name, registry.Town.GroupLabel, Environment, now, DayFraction(), totals, registries.Notices, groups,
             vendors, ExternalCallers(registry, byId), Dependencies(registry, byId), registry.RingCapacity);
     }
+
+    private static MessagingSnapshot MessagingOf(Registry.Registry registry, RegistryGroup g) => new(
+        registry.Topics.Where(t => t.GroupId == g.Id).Select(t => new TopicSnapshot(t.Name, t.Service)).ToList(),
+        registry.Subscriptions.Where(s => s.ConsumerGroupId == g.Id).Select(s => new SubscriptionSnapshot(s.Topic, s.PublisherGroupId, s.ConsumerId, s.Legacy)).ToList());
 
     /// <summary>Open incidents per group, worst first. Incidents for a group the registry lacks are dropped.</summary>
     private Dictionary<string, IReadOnlyList<IncidentSnapshot>> OpenIncidents(Registry.Registry registry)

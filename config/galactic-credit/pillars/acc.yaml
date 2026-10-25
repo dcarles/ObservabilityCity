@@ -12,3 +12,10 @@ systems:
   - { id: acc.limits-db, service: limits, name: Limits DB, role: db }
   - { id: acc.interest-cron, name: Interest run, role: cron, calls: [acc.accounts-api] }
   - { id: acc.accounts-cache, name: Accounts cache, role: cache }
+
+# Messaging: the outboxes this pillar publishes (acc-<service>-outbox) and the topics its workers consume.
+messaging:
+  topics: [accounts]
+  subscriptions:
+    - { topic: acq-applications-outbox, consumer: acc.accounts-worker }
+    - { topic: cl-ledger-outbox, consumer: acc.accounts-worker }

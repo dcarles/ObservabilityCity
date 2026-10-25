@@ -20,3 +20,9 @@ systems:
   - { id: p27.s6-api, service: s6, name: S6 API, role: api, calls: [p27.s6-db] }
   - { id: p27.s6-worker, service: s6, name: S6 worker, role: worker, calls: [p27.s6-db] }
   - { id: p27.s6-db, service: s6, name: S6 DB, role: db }
+messaging:
+  topics: [s1]
+  subscriptions:
+    - { topic: p26-s1-outbox, consumer: p27.s1-worker }
+    - { topic: p26-s1-outbox, consumer: p27.s2-worker }
+    - { topic: p26-s1-outbox, consumer: p27.s3-worker }

@@ -19,3 +19,13 @@ systems:
   - { id: cl.statements-db, service: statements, name: Statements DB, role: db }
   - { id: cl.statement-cron, name: Statement run, role: cron, calls: [cl.statements-api] }
   - { id: cl.session-cache, name: Session cache, role: cache }
+
+# Messaging: the outboxes this pillar publishes (cl-<service>-outbox) and the topics its workers consume.
+messaging:
+  topics: [ledger, posting, statements]
+  subscriptions:
+    - { topic: pay-payments-outbox, consumer: cl.ledger-worker }
+    - { topic: bil-invoices-outbox, consumer: cl.ledger-worker }
+    - { topic: pay-payments-outbox, consumer: cl.posting-worker }
+    - { topic: pay-refunds-outbox, consumer: cl.posting-worker }
+    - { topic: cl-ledger-outbox, consumer: cl.statements-worker }

@@ -10,6 +10,7 @@
     "color": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$", "description": "Accent colour of the island." },
     "external": { "type": "boolean", "description": "Every system here is reached by outside callers, unless it says otherwise." },
     "defaults": { "$ref": "defs.schema.json#/$defs/defaults" },
+    "messaging": { "$ref": "defs.schema.json#/$defs/messaging" },
     "systems": {
       "type": "array",
       "items": {

@@ -25,6 +25,7 @@
         }
       }
     },
+    "messaging": { "$ref": "defs.schema.json#/$defs/messaging" },
     "externalCallers": {
       "type": "array",
       "items": {

@@ -73,6 +73,24 @@ Content-Type: application/json
 
 { "target": "frd", "kind": "Stale", "intensity": 1 }
 
+### Backlog on the worker-only pillar's pier (crates pile on the quay, no bridge needed)
+POST {{host}}/api/fake/effects
+Content-Type: application/json
+
+{ "target": "rcn.matching-worker", "kind": "Backlog", "intensity": 1 }
+
+### Dead letters on the worker-only pillar's pier (broken crates, red beam, hub lighthouse)
+POST {{host}}/api/fake/effects
+Content-Type: application/json
+
+{ "target": "rcn.matching-worker", "kind": "Poison", "intensity": 1 }
+
+### Dead letters on the legacy egress reader in Lost & found (amber pennant on its pier)
+POST {{host}}/api/fake/effects
+Content-Type: application/json
+
+{ "target": "lost-found.batch-gateway-worker", "kind": "Poison", "intensity": 1 }
+
 ### What is active
 GET {{host}}/api/fake
 

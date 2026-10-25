@@ -8,7 +8,7 @@ public interface IRegistryProvider
 {
     Registry Current { get; }
 
-    /// <summary>Configuration problems that did not stop the town: skipped files, dropped links, a failed reload.</summary>
+    /// <summary>Configuration problems that did not stop the town: skipped files, dropped links, a failed reload, and warnings such as an island nothing connects to.</summary>
     IReadOnlyList<string> Notices { get; }
 }
 
@@ -21,7 +21,7 @@ public sealed class RegistryHolder(Registry initial) : IRegistryProvider
     public Registry Current => _current;
 
     public IReadOnlyList<string> Notices =>
-        _reloadFailure is null ? _current.Notices : [_reloadFailure, .. _current.Notices];
+        _reloadFailure is null ? [.. _current.Notices, .. _current.Warnings] : [_reloadFailure, .. _current.Notices, .. _current.Warnings];
 
     public void Replace(Registry registry)
     {

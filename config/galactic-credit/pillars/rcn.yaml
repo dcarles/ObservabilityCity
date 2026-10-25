@@ -1,0 +1,15 @@
+# yaml-language-server: $schema=../schema/pillar.schema.json
+# A worker-only pillar: batch matching that lives on messaging alone. No API, so no bridge to the hub; boats are its only road.
+pillar: rcn
+displayName: Reconciliation
+color: "#b08968"
+systems:
+  - { id: rcn.matching-worker, service: matching, name: Matching worker, role: worker, calls: [rcn.matching-db] }
+  - { id: rcn.matching-db, service: matching, name: Matching DB, role: db }
+  - { id: rcn.settlement-cron, name: Nightly settlement, role: cron, calls: [rcn.matching-db] }
+
+messaging:
+  topics: [matching]
+  subscriptions:
+    - { topic: pay-payments-outbox, consumer: rcn.matching-worker }
+    - { topic: cl-posting-outbox, consumer: rcn.matching-worker }

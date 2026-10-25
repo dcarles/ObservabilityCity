@@ -7,3 +7,7 @@ systems:
   - { id: p05.s1-db, service: s1, name: S1 DB, role: db }
   - { id: p05.s2-api, service: s2, name: S2 API, role: api, calls: [p05.s2-db] }
   - { id: p05.s2-db, service: s2, name: S2 DB, role: db }
+messaging:
+  topics: [s1]
+  subscriptions:
+    - { topic: p04-s1-outbox, consumer: p05.s1-worker }

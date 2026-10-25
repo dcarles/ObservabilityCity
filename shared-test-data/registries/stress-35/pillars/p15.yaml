@@ -5,3 +5,7 @@ systems:
   - { id: p15.s1-api, service: s1, name: S1 API, role: api, external: true, calls: [p15.s1-db] }
   - { id: p15.s1-worker, service: s1, name: S1 worker, role: worker, calls: [p15.s1-db] }
   - { id: p15.s1-db, service: s1, name: S1 DB, role: db }
+messaging:
+  topics: [s1]
+  subscriptions:
+    - { topic: p14-s1-outbox, consumer: p15.s1-worker }

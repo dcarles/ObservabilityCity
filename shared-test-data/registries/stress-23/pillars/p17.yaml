@@ -10,3 +10,8 @@ systems:
   - { id: p17.s2-db, service: s2, name: S2 DB, role: db }
   - { id: p17.s3-api, service: s3, name: S3 API, role: api, calls: [p17.s3-db] }
   - { id: p17.s3-db, service: s3, name: S3 DB, role: db }
+messaging:
+  topics: [s1]
+  subscriptions:
+    - { topic: p16-s1-outbox, consumer: p17.s1-worker }
+    - { topic: p16-s1-outbox, consumer: p17.s2-worker }

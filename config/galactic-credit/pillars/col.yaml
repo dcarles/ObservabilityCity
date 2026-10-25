@@ -16,3 +16,11 @@ systems:
   - { id: col.agency-db, service: agency, name: Agency DB, role: db }
   - { id: col.letters-cron, name: Letter run, role: cron, calls: [col.dunning-api, col.cases-api] }
   - { id: col.queue-cache, name: Work queue cache, role: cache }
+
+# Messaging: the outboxes this pillar publishes (col-<service>-outbox) and the topics its workers consume.
+messaging:
+  topics: [cases, dunning]
+  subscriptions:
+    - { topic: bil-invoices-outbox, consumer: col.cases-worker }
+    - { topic: col-cases-outbox, consumer: col.dunning-worker }
+    - { topic: col-dunning-outbox, consumer: col.agency-worker }

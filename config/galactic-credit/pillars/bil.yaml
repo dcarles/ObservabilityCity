@@ -9,3 +9,9 @@ systems:
   - { id: bil.rating-api, service: rating, name: Rating API, role: api, calls: [bil.rating-db] }
   - { id: bil.rating-db, service: rating, name: Rating DB, role: db }
   - { id: bil.billing-cron, name: Billing run, role: cron, calls: [bil.invoices-api] }
+
+# Messaging: the outboxes this pillar publishes (bil-<service>-outbox) and the topics its workers consume.
+messaging:
+  topics: [invoices]
+  subscriptions:
+    - { topic: cl-posting-outbox, consumer: bil.invoices-worker }

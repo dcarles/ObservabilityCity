@@ -5,3 +5,7 @@ systems:
   - { id: aa.orders-api, service: orders, name: Orders API, role: api, external: true, calls: [aa.orders-db] }
   - { id: aa.orders-worker, service: orders, name: Orders worker, role: worker, calls: [aa.orders-db] }
   - { id: aa.orders-db, service: orders, name: Orders DB, role: db }
+messaging:
+  topics: [orders]
+  subscriptions:
+    - { topic: bb-ledger-outbox, consumer: aa.orders-worker }

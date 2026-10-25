@@ -1,0 +1,6 @@
+# Nothing connects this island: no API, no messaging, no call to or from another island. A registry warning says so.
+pillar: sta
+displayName: Standalone
+color: "#9aa3ad"
+systems:
+  - { id: sta.idle-cron, name: Idle job, role: cron }

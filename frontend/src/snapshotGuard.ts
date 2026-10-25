@@ -3,7 +3,7 @@
 // with no id), and a snapshot with nothing usable in it is refused so the town keeps showing the last good one.
 
 import { DEFAULT_RING_CAPACITY, MAX_RING_CAPACITY, MIN_RING_CAPACITY, maxPillars } from './scene/layout'
-import type { DependencySnapshot, ExternalCallerSnapshot, GroupSnapshot, IncidentSnapshot, NodeSnapshot, Snapshot, VendorSnapshot } from './types'
+import type { DependencySnapshot, ExternalCallerSnapshot, GroupSnapshot, IncidentSnapshot, MessagingSnapshot, NodeSnapshot, Snapshot, VendorSnapshot } from './types'
 
 const KINDS = ['Api', 'Worker', 'Database', 'Cache', 'Cron', 'Gateway', 'Broker', 'Egress']
 const STATES = ['Healthy', 'Degraded', 'Down', 'Stale']
@@ -72,6 +72,7 @@ export function checkSnapshot(raw: unknown): Checked {
       degraded: num(totals.degraded),
       down: num(totals.down),
       incidents: num(totals.incidents),
+      deadLetters: num(totals.deadLetters),
     },
     notices: Array.isArray(raw.notices) ? raw.notices.filter((n): n is string => typeof n === 'string') : [],
     groups,
@@ -118,7 +119,21 @@ function checkGroup(g: unknown, seen: Set<string>, problems: string[]): GroupSna
       severity: isFiniteNumber(i.severity) && i.severity >= 1 && i.severity <= 4 ? Math.round(i.severity) : 4,
       startedAt: str(i.startedAt),
     })).sort((a, b) => a.severity - b.severity),
+    // a snapshot that does not say keeps the bridge it always had; one with no messaging block has no pier
+    hasBridge: g.hasBridge !== false,
+    messaging: checkMessaging(g.messaging),
     nodes,
+  }
+}
+
+function checkMessaging(m: unknown): MessagingSnapshot {
+  const raw = isObject(m) ? m : {}
+  return {
+    topics: (Array.isArray(raw.topics) ? raw.topics : []).filter(isObject).filter((t) => typeof t.name === 'string' && t.name !== '')
+      .map((t) => ({ name: t.name as string, service: str(t.service) })),
+    subscriptions: (Array.isArray(raw.subscriptions) ? raw.subscriptions : []).filter(isObject)
+      .filter((x) => typeof x.topic === 'string' && typeof x.consumer === 'string' && x.consumer !== '')
+      .map((x) => ({ topic: x.topic as string, publisher: str(x.publisher), consumer: x.consumer as string, legacy: x.legacy === true })),
   }
 }
 

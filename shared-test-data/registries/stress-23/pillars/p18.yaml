@@ -27,3 +27,9 @@ systems:
   - { id: p18.s8-worker, service: s8, name: S8 worker, role: worker, calls: [p18.s8-db] }
   - { id: p18.s8-db, service: s8, name: S8 DB, role: db }
   - { id: p18.session-cache, name: Session cache, role: cache }
+messaging:
+  topics: [s1]
+  subscriptions:
+    - { topic: p17-s1-outbox, consumer: p18.s1-worker }
+    - { topic: p17-s1-outbox, consumer: p18.s2-worker }
+    - { topic: p17-s1-outbox, consumer: p18.s3-worker }

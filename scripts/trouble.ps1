@@ -38,6 +38,10 @@ $presets = [ordered]@{
   'vendor-errors' = @(, @('ext.sms-email', 'Errors', 0.7))
   'airport-rush' = @(, @('hub.apim', 'Traffic', 0.9))
   'stale-island' = @(, @('frd', 'Stale', 1))
+  'pier-backlog' = @(, @('rcn.matching-worker', 'Backlog', 1))
+  'pier-dlq'     = @(, @('rcn.matching-worker', 'Poison', 1))
+  'legacy-dlq'   = @(, @('lost-found.batch-gateway-worker', 'Poison', 1))
+  'dlq-everywhere' = @(@('rcn.matching-worker', 'Poison', 1), @('pay.payments-worker', 'Poison', 1), @('cl.ledger-worker', 'Poison', 0.6), @('lost-found.batch-gateway-worker', 'Poison', 0.4))
   'bad-day'      = @(@('pay', 'Errors', 0.6), @('pay', 'Latency', 0.7), @('pay.payments-worker', 'Poison', 1), @('cl.ledger-db', 'Saturate', 0.8))
 }
 

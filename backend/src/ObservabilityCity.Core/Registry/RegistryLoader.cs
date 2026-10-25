@@ -28,7 +28,7 @@ public static class RegistryLoader
     [
         "id", "name", "groupLabel", "topology", "pillar", "displayName", "color", "external", "defaults", "systems", "resources",
         "externalCallers", "islands", "role", "service", "slaP99Ms", "errors", "resources", "throttle", "backlog", "calls", "aliases",
-        "amber", "red", "vendors", "calledBy", "gatewayCalls",
+        "amber", "red", "vendors", "calledBy", "gatewayCalls", "messaging", "topics", "subscriptions", "topic", "consumer", "legacy",
     ];
 
     // Last resort when defaults.yaml is missing or silent about a role.
@@ -86,7 +86,11 @@ public static class RegistryLoader
             .Select(r => ToNode(r, "hub", "hub.yaml", "hub", defaults, new DefaultsFile(), false, ids, aliases, errors))
             .OfType<RegistryNode>()
             .ToList();
-        var hubGroup = new RegistryGroup("hub", hub.DisplayName, hub.Color, true, hubNodes);
+        var hubGroup = new RegistryGroup("hub", hub.DisplayName, hub.Color, true, hubNodes) { TopicServices = hub.Messaging?.Topics ?? [] };
+        if (hub.Messaging is { Subscriptions.Count: > 0 })
+            errors.Add("hub.yaml: the hub has no workers, so it cannot subscribe to topics. Subscriptions belong in the pillar file of the worker that reads them");
+        foreach (var topic in hubGroup.TopicServices.Where(t => !KebabId.IsMatch(t)))
+            errors.Add($"hub.yaml: topic '{topic}' must be lowercase kebab-case");
 
         var pillars = new List<RegistryGroup>();
         var brokenPillars = new HashSet<string>();
@@ -226,12 +230,67 @@ public static class RegistryLoader
             vendors.Add(new RegistryVendor(node, calledBy.Distinct().ToList()));
         }
 
+        var (topics, subscriptions) = ResolveMessaging(groups, brokenPillars, resilient, Problem);
+
         if (errors.Count == 1) throw new RegistryException(errors[0]);
         if (errors.Count > 1)
             throw new RegistryException($"The registry has {errors.Count} problems:\n" + string.Join("\n", errors.Select(e => "  - " + e)));
 
         var final = groups.Select(g => g with { Nodes = g.Nodes.Select(n => n with { Calls = resolved[n.Id], GatewayCalls = resolvedGateway[n.Id] }).ToList() }).ToList();
-        return new Registry(new TownInfo(town.Id, town.Name, town.GroupLabel, town.Topology), final, callers) { Notices = notices, Problems = problems, Vendors = vendors, RingCapacity = ringCapacity };
+        var registry = new Registry(new TownInfo(town.Id, town.Name, town.GroupLabel, town.Topology), final, callers)
+        {
+            Notices = notices, Problems = problems, Vendors = vendors, RingCapacity = ringCapacity, Topics = topics, Subscriptions = subscriptions,
+        };
+        return registry with { Warnings = TownLinks.Warnings(registry).ToList() };
+    }
+
+    /// <summary>
+    /// Turns the declared topics and subscriptions into the town's topic list and the subscriptions that point at a real topic.
+    /// A pillar publishes {pillar}-{service}-outbox for each service it lists. A subscription names the full topic and a worker of its own pillar.
+    /// Reading the hub's egress topic is the old way for a pillar to hear from another one, so it must say so with legacy: true.
+    /// </summary>
+    private static (List<RegistryTopic>, List<RegistrySubscription>) ResolveMessaging(List<RegistryGroup> groups, HashSet<string> brokenPillars, bool resilient, Action<string> problem)
+    {
+        var topics = new List<RegistryTopic>();
+        foreach (var g in groups)
+            foreach (var service in g.TopicServices.Distinct())
+                topics.Add(new RegistryTopic(g.IsHub ? $"hub-{service}" : $"{g.Id}-{service}-outbox", g.Id, service));
+
+        var byName = topics.ToDictionary(t => t.Name);
+        var subscriptions = new List<RegistrySubscription>();
+        var seen = new HashSet<(string, string)>();
+        foreach (var g in groups.Where(g => !g.IsHub))
+        {
+            var file = $"{g.Id}.yaml";
+            foreach (var (topicName, consumer, legacy) in g.SubscriptionDecls)
+            {
+                if (!byName.TryGetValue(topicName, out var topic))
+                {
+                    // a topic of a pillar that was skipped is that pillar's problem
+                    if (resilient && brokenPillars.Any(b => topicName.StartsWith(b + "-"))) continue;
+                    problem($"{file}: '{consumer}' subscribes to topic '{topicName}', which no pillar publishes.{DidYouMean.Hint(topicName, byName.Keys)}");
+                    continue;
+                }
+                var fromHub = topic.GroupId == "hub";
+                if (fromHub && !legacy)
+                {
+                    problem($"{file}: '{consumer}' reads '{topicName}' from the hub. Pillars subscribe to each other's outboxes directly; if this is the old egress route, say so with legacy: true");
+                    continue;
+                }
+                if (!fromHub && legacy)
+                {
+                    problem($"{file}: the subscription of '{consumer}' to '{topicName}' is marked legacy, but only the hub's egress topic is");
+                    continue;
+                }
+                if (!seen.Add((topicName, consumer)))
+                {
+                    problem($"{file}: '{consumer}' subscribes to '{topicName}' twice");
+                    continue;
+                }
+                subscriptions.Add(new RegistrySubscription(topicName, topic.GroupId, consumer, g.Id, legacy));
+            }
+        }
+        return (topics, subscriptions);
     }
 
     /// <summary>Reads one pillar file. Problems found in it go to <paramref name="errors"/>; the ids and aliases it would add are returned, so a caller can drop them with the file.</summary>
@@ -252,7 +311,36 @@ public static class RegistryLoader
             .Select(s => ToNode(s, p.Pillar, name, p.Pillar, defaults, p.Defaults, p.External, ids, aliases, errors))
             .OfType<RegistryNode>()
             .ToList();
-        return new RegistryGroup(p.Pillar, p.DisplayName, p.Color, false, nodes);
+        var group = new RegistryGroup(p.Pillar, p.DisplayName, p.Color, false, nodes)
+        {
+            TopicServices = p.Messaging?.Topics ?? [],
+            SubscriptionDecls = (p.Messaging?.Subscriptions ?? []).Select(x => (x.Topic, x.Consumer, x.Legacy)).ToList(),
+        };
+        CheckMessaging(group, p.Systems.Select(x => x.Id).ToHashSet(), name, errors);
+        return group;
+    }
+
+    /// <summary>The parts of a pillar's messaging block that can be checked from its own file alone.</summary>
+    private static void CheckMessaging(RegistryGroup g, HashSet<string> declaredIds, string fileName, List<string> errors)
+    {
+        var services = g.Nodes.Select(n => n.Service).OfType<string>().Distinct().ToList();
+        foreach (var service in g.TopicServices)
+        {
+            if (!services.Contains(service))
+                errors.Add($"{fileName}: topic '{service}' is not a service of this pillar, so there is nothing to publish it.{DidYouMean.Hint(service, services)} Topics are service names; the topic is {g.Id}-{service}-outbox");
+        }
+        if (g.TopicServices.Count != g.TopicServices.Distinct().Count())
+            errors.Add($"{fileName}: a topic is listed twice");
+        foreach (var (topic, consumer, _) in g.SubscriptionDecls)
+        {
+            if (string.IsNullOrWhiteSpace(topic)) errors.Add($"{fileName}: a subscription needs a topic");
+            var node = g.Nodes.FirstOrDefault(n => n.Id == consumer);
+            if (node is null && declaredIds.Contains(consumer)) continue; // the system itself has a problem, which is already reported
+            if (node is null)
+                errors.Add($"{fileName}: '{consumer}' subscribes to '{topic}', but is not a system of this pillar.{DidYouMean.Hint(consumer, g.Nodes.Select(n => n.Id))}");
+            else if (node.Kind != NodeKind.Worker)
+                errors.Add($"{fileName}: '{consumer}' subscribes to '{topic}', but a {node.Kind.ToString().ToLowerInvariant()} cannot consume messages: only workers do");
+        }
     }
 
     /// <summary>Pillars in layout.yaml order, then any that it does not list in file order. Lost &amp; found is always last.</summary>

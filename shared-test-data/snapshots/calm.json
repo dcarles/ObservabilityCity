@@ -6,12 +6,13 @@
   "generatedAt": "2026-10-24T12:00:01+00:00",
   "dayFraction": 0.5,
   "totals": {
-    "requestsPerSecond": 10950.32,
-    "errorRate": 0.001999999999999999,
-    "p99Ms": 212.46125647832136,
+    "requestsPerSecond": 11144.8,
+    "errorRate": 0.0019999999999999996,
+    "p99Ms": 214.8446456643401,
     "degraded": 0,
     "down": 0,
-    "incidents": 0
+    "incidents": 0,
+    "deadLetters": 0
   },
   "notices": [],
   "groups": [
@@ -23,6 +24,16 @@
       "isLostFound": false,
       "configError": null,
       "incidents": [],
+      "hasBridge": false,
+      "messaging": {
+        "topics": [
+          {
+            "name": "hub-egress",
+            "service": "egress"
+          }
+        ],
+        "subscriptions": []
+      },
       "nodes": [
         {
           "id": "hub.apim",
@@ -166,6 +177,55 @@
       "isLostFound": false,
       "configError": null,
       "incidents": [],
+      "hasBridge": true,
+      "messaging": {
+        "topics": [
+          {
+            "name": "cl-ledger-outbox",
+            "service": "ledger"
+          },
+          {
+            "name": "cl-posting-outbox",
+            "service": "posting"
+          },
+          {
+            "name": "cl-statements-outbox",
+            "service": "statements"
+          }
+        ],
+        "subscriptions": [
+          {
+            "topic": "pay-payments-outbox",
+            "publisher": "pay",
+            "consumer": "cl.ledger-worker",
+            "legacy": false
+          },
+          {
+            "topic": "bil-invoices-outbox",
+            "publisher": "bil",
+            "consumer": "cl.ledger-worker",
+            "legacy": false
+          },
+          {
+            "topic": "pay-payments-outbox",
+            "publisher": "pay",
+            "consumer": "cl.posting-worker",
+            "legacy": false
+          },
+          {
+            "topic": "pay-refunds-outbox",
+            "publisher": "pay",
+            "consumer": "cl.posting-worker",
+            "legacy": false
+          },
+          {
+            "topic": "cl-ledger-outbox",
+            "publisher": "cl",
+            "consumer": "cl.statements-worker",
+            "legacy": false
+          }
+        ]
+      },
       "nodes": [
         {
           "id": "cl.ledger-api",
@@ -561,6 +621,29 @@
       "isLostFound": false,
       "configError": null,
       "incidents": [],
+      "hasBridge": true,
+      "messaging": {
+        "topics": [
+          {
+            "name": "acc-accounts-outbox",
+            "service": "accounts"
+          }
+        ],
+        "subscriptions": [
+          {
+            "topic": "acq-applications-outbox",
+            "publisher": "acq",
+            "consumer": "acc.accounts-worker",
+            "legacy": false
+          },
+          {
+            "topic": "cl-ledger-outbox",
+            "publisher": "cl",
+            "consumer": "acc.accounts-worker",
+            "legacy": false
+          }
+        ]
+      },
       "nodes": [
         {
           "id": "acc.accounts-api",
@@ -816,6 +899,39 @@
       "isLostFound": false,
       "configError": null,
       "incidents": [],
+      "hasBridge": true,
+      "messaging": {
+        "topics": [
+          {
+            "name": "pay-payments-outbox",
+            "service": "payments"
+          },
+          {
+            "name": "pay-refunds-outbox",
+            "service": "refunds"
+          }
+        ],
+        "subscriptions": [
+          {
+            "topic": "frd-screening-outbox",
+            "publisher": "frd",
+            "consumer": "pay.payments-worker",
+            "legacy": false
+          },
+          {
+            "topic": "dec-decision-outbox",
+            "publisher": "dec",
+            "consumer": "pay.payments-worker",
+            "legacy": false
+          },
+          {
+            "topic": "dsp-disputes-outbox",
+            "publisher": "dsp",
+            "consumer": "pay.refunds-worker",
+            "legacy": false
+          }
+        ]
+      },
       "nodes": [
         {
           "id": "pay.payments-api",
@@ -1039,6 +1155,23 @@
       "isLostFound": false,
       "configError": null,
       "incidents": [],
+      "hasBridge": true,
+      "messaging": {
+        "topics": [
+          {
+            "name": "frd-screening-outbox",
+            "service": "screening"
+          }
+        ],
+        "subscriptions": [
+          {
+            "topic": "pay-payments-outbox",
+            "publisher": "pay",
+            "consumer": "frd.screening-worker",
+            "legacy": false
+          }
+        ]
+      },
       "nodes": [
         {
           "id": "frd.screening-api",
@@ -1258,6 +1391,33 @@
       "isLostFound": false,
       "configError": null,
       "incidents": [],
+      "hasBridge": true,
+      "messaging": {
+        "topics": [
+          {
+            "name": "cus-profile-outbox",
+            "service": "profile"
+          },
+          {
+            "name": "cus-consent-outbox",
+            "service": "consent"
+          }
+        ],
+        "subscriptions": [
+          {
+            "topic": "acq-applications-outbox",
+            "publisher": "acq",
+            "consumer": "cus.profile-worker",
+            "legacy": false
+          },
+          {
+            "topic": "obk-data-outbox",
+            "publisher": "obk",
+            "consumer": "cus.consent-worker",
+            "legacy": false
+          }
+        ]
+      },
       "nodes": [
         {
           "id": "cus.profile-api",
@@ -1582,6 +1742,29 @@
       "isLostFound": false,
       "configError": null,
       "incidents": [],
+      "hasBridge": true,
+      "messaging": {
+        "topics": [
+          {
+            "name": "acq-applications-outbox",
+            "service": "applications"
+          }
+        ],
+        "subscriptions": [
+          {
+            "topic": "dec-decision-outbox",
+            "publisher": "dec",
+            "consumer": "acq.applications-worker",
+            "legacy": false
+          },
+          {
+            "topic": "cus-profile-outbox",
+            "publisher": "cus",
+            "consumer": "acq.leads-worker",
+            "legacy": false
+          }
+        ]
+      },
       "nodes": [
         {
           "id": "acq.applications-api",
@@ -1874,6 +2057,23 @@
       "isLostFound": false,
       "configError": null,
       "incidents": [],
+      "hasBridge": true,
+      "messaging": {
+        "topics": [
+          {
+            "name": "dec-decision-outbox",
+            "service": "decision"
+          }
+        ],
+        "subscriptions": [
+          {
+            "topic": "acq-applications-outbox",
+            "publisher": "acq",
+            "consumer": "dec.decision-worker",
+            "legacy": false
+          }
+        ]
+      },
       "nodes": [
         {
           "id": "dec.decision-api",
@@ -2095,6 +2295,23 @@
       "isLostFound": false,
       "configError": null,
       "incidents": [],
+      "hasBridge": true,
+      "messaging": {
+        "topics": [
+          {
+            "name": "bil-invoices-outbox",
+            "service": "invoices"
+          }
+        ],
+        "subscriptions": [
+          {
+            "topic": "cl-posting-outbox",
+            "publisher": "cl",
+            "consumer": "bil.invoices-worker",
+            "legacy": false
+          }
+        ]
+      },
       "nodes": [
         {
           "id": "bil.invoices-api",
@@ -2316,6 +2533,39 @@
       "isLostFound": false,
       "configError": null,
       "incidents": [],
+      "hasBridge": true,
+      "messaging": {
+        "topics": [
+          {
+            "name": "col-cases-outbox",
+            "service": "cases"
+          },
+          {
+            "name": "col-dunning-outbox",
+            "service": "dunning"
+          }
+        ],
+        "subscriptions": [
+          {
+            "topic": "bil-invoices-outbox",
+            "publisher": "bil",
+            "consumer": "col.cases-worker",
+            "legacy": false
+          },
+          {
+            "topic": "col-cases-outbox",
+            "publisher": "col",
+            "consumer": "col.dunning-worker",
+            "legacy": false
+          },
+          {
+            "topic": "col-dunning-outbox",
+            "publisher": "col",
+            "consumer": "col.agency-worker",
+            "legacy": false
+          }
+        ]
+      },
       "nodes": [
         {
           "id": "col.cases-api",
@@ -2715,6 +2965,23 @@
       "isLostFound": false,
       "configError": null,
       "incidents": [],
+      "hasBridge": true,
+      "messaging": {
+        "topics": [
+          {
+            "name": "dsp-disputes-outbox",
+            "service": "disputes"
+          }
+        ],
+        "subscriptions": [
+          {
+            "topic": "pay-payments-outbox",
+            "publisher": "pay",
+            "consumer": "dsp.disputes-worker",
+            "legacy": false
+          }
+        ]
+      },
       "nodes": [
         {
           "id": "dsp.disputes-api",
@@ -2901,6 +3168,23 @@
       "isLostFound": false,
       "configError": null,
       "incidents": [],
+      "hasBridge": true,
+      "messaging": {
+        "topics": [
+          {
+            "name": "rwd-points-outbox",
+            "service": "points"
+          }
+        ],
+        "subscriptions": [
+          {
+            "topic": "pay-payments-outbox",
+            "publisher": "pay",
+            "consumer": "rwd.points-worker",
+            "legacy": false
+          }
+        ]
+      },
       "nodes": [
         {
           "id": "rwd.points-api",
@@ -3120,6 +3404,23 @@
       "isLostFound": false,
       "configError": null,
       "incidents": [],
+      "hasBridge": true,
+      "messaging": {
+        "topics": [
+          {
+            "name": "obk-data-outbox",
+            "service": "data"
+          }
+        ],
+        "subscriptions": [
+          {
+            "topic": "acc-accounts-outbox",
+            "publisher": "acc",
+            "consumer": "obk.data-worker",
+            "legacy": false
+          }
+        ]
+      },
       "nodes": [
         {
           "id": "obk.consents-api",
@@ -3341,6 +3642,35 @@
       "isLostFound": false,
       "configError": null,
       "incidents": [],
+      "hasBridge": true,
+      "messaging": {
+        "topics": [
+          {
+            "name": "ntf-dispatch-outbox",
+            "service": "dispatch"
+          }
+        ],
+        "subscriptions": [
+          {
+            "topic": "cl-posting-outbox",
+            "publisher": "cl",
+            "consumer": "ntf.dispatch-worker",
+            "legacy": false
+          },
+          {
+            "topic": "col-dunning-outbox",
+            "publisher": "col",
+            "consumer": "ntf.dispatch-worker",
+            "legacy": false
+          },
+          {
+            "topic": "dsp-disputes-outbox",
+            "publisher": "dsp",
+            "consumer": "ntf.dispatch-worker",
+            "legacy": false
+          }
+        ]
+      },
       "nodes": [
         {
           "id": "ntf.dispatch-api",
@@ -3559,6 +3889,41 @@
       "isLostFound": false,
       "configError": null,
       "incidents": [],
+      "hasBridge": true,
+      "messaging": {
+        "topics": [
+          {
+            "name": "dat-ingest-outbox",
+            "service": "ingest"
+          }
+        ],
+        "subscriptions": [
+          {
+            "topic": "pay-payments-outbox",
+            "publisher": "pay",
+            "consumer": "dat.ingest-worker",
+            "legacy": false
+          },
+          {
+            "topic": "cl-ledger-outbox",
+            "publisher": "cl",
+            "consumer": "dat.ingest-worker",
+            "legacy": false
+          },
+          {
+            "topic": "rcn-matching-outbox",
+            "publisher": "rcn",
+            "consumer": "dat.ingest-worker",
+            "legacy": false
+          },
+          {
+            "topic": "dat-ingest-outbox",
+            "publisher": "dat",
+            "consumer": "dat.reports-worker",
+            "legacy": false
+          }
+        ]
+      },
       "nodes": [
         {
           "id": "dat.ingest-api",
@@ -3841,6 +4206,228 @@
       ]
     },
     {
+      "id": "rcn",
+      "displayName": "Reconciliation",
+      "color": "#b08968",
+      "isHub": false,
+      "isLostFound": false,
+      "configError": null,
+      "incidents": [],
+      "hasBridge": false,
+      "messaging": {
+        "topics": [
+          {
+            "name": "rcn-matching-outbox",
+            "service": "matching"
+          }
+        ],
+        "subscriptions": [
+          {
+            "topic": "pay-payments-outbox",
+            "publisher": "pay",
+            "consumer": "rcn.matching-worker",
+            "legacy": false
+          },
+          {
+            "topic": "cl-posting-outbox",
+            "publisher": "cl",
+            "consumer": "rcn.matching-worker",
+            "legacy": false
+          }
+        ]
+      },
+      "nodes": [
+        {
+          "id": "rcn.matching-worker",
+          "name": "Matching worker",
+          "kind": "Worker",
+          "service": "matching",
+          "external": false,
+          "state": "Healthy",
+          "instancesTotal": 5,
+          "instancesHealthy": 5,
+          "load": 0.6,
+          "cpu": 0.4,
+          "memory": 0.46,
+          "utilisation": null,
+          "throttled": null,
+          "queueDepth": 1,
+          "oldestMessageSeconds": 0,
+          "deadLetters": 0,
+          "requestsPerSecond": 36,
+          "errorRate": 0.002,
+          "p99Ms": 6120,
+          "slaP99Ms": 30000,
+          "errorAmber": 0.01,
+          "errorRed": 0.05,
+          "resourceAmber": 0.8,
+          "resourceRed": 0.95,
+          "throttleAmber": 0.001,
+          "throttleRed": 0.02,
+          "backlogAmber": 60,
+          "backlogRed": 300,
+          "calls": [
+            "rcn.matching-db"
+          ],
+          "gatewayCalls": [],
+          "lastUpdated": "2026-10-24T12:00:01+00:00"
+        },
+        {
+          "id": "rcn.matching-db",
+          "name": "Matching DB",
+          "kind": "Database",
+          "service": "matching",
+          "external": false,
+          "state": "Healthy",
+          "instancesTotal": 1,
+          "instancesHealthy": 1,
+          "load": 0.5,
+          "cpu": null,
+          "memory": null,
+          "utilisation": 0.5,
+          "throttled": 0,
+          "queueDepth": null,
+          "oldestMessageSeconds": null,
+          "deadLetters": null,
+          "requestsPerSecond": 48,
+          "errorRate": 0.002,
+          "p99Ms": 23.52,
+          "slaP99Ms": 100,
+          "errorAmber": 0.005,
+          "errorRed": 0.02,
+          "resourceAmber": 0.8,
+          "resourceRed": 0.95,
+          "throttleAmber": 0.001,
+          "throttleRed": 0.02,
+          "backlogAmber": 60,
+          "backlogRed": 300,
+          "calls": [],
+          "gatewayCalls": [],
+          "lastUpdated": "2026-10-24T12:00:01+00:00"
+        },
+        {
+          "id": "rcn.settlement-cron",
+          "name": "Nightly settlement",
+          "kind": "Cron",
+          "service": null,
+          "external": false,
+          "state": "Healthy",
+          "instancesTotal": 1,
+          "instancesHealthy": 1,
+          "load": 0.08000000000000002,
+          "cpu": 0.14,
+          "memory": 0.38,
+          "utilisation": null,
+          "throttled": null,
+          "queueDepth": null,
+          "oldestMessageSeconds": null,
+          "deadLetters": null,
+          "requestsPerSecond": 0.08000000000000002,
+          "errorRate": 0.002,
+          "p99Ms": 45800,
+          "slaP99Ms": 60000,
+          "errorAmber": 0.01,
+          "errorRed": 0.05,
+          "resourceAmber": 0.8,
+          "resourceRed": 0.95,
+          "throttleAmber": 0.001,
+          "throttleRed": 0.02,
+          "backlogAmber": 60,
+          "backlogRed": 300,
+          "calls": [
+            "rcn.matching-db"
+          ],
+          "gatewayCalls": [],
+          "lastUpdated": "2026-10-24T12:00:01+00:00"
+        }
+      ]
+    },
+    {
+      "id": "reg",
+      "displayName": "Regulatory Reporting",
+      "color": "#6d9dc5",
+      "isHub": false,
+      "isLostFound": false,
+      "configError": null,
+      "incidents": [],
+      "hasBridge": true,
+      "messaging": {
+        "topics": [],
+        "subscriptions": []
+      },
+      "nodes": [
+        {
+          "id": "reg.reports-api",
+          "name": "Reports API",
+          "kind": "Api",
+          "service": "reporting",
+          "external": true,
+          "state": "Healthy",
+          "instancesTotal": 1,
+          "instancesHealthy": 1,
+          "load": 0.36,
+          "cpu": 0.28,
+          "memory": 0.38,
+          "utilisation": null,
+          "throttled": null,
+          "queueDepth": null,
+          "oldestMessageSeconds": null,
+          "deadLetters": null,
+          "requestsPerSecond": 14.4,
+          "errorRate": 0.002,
+          "p99Ms": 680.4,
+          "slaP99Ms": 1500,
+          "errorAmber": 0.01,
+          "errorRed": 0.05,
+          "resourceAmber": 0.8,
+          "resourceRed": 0.95,
+          "throttleAmber": 0.001,
+          "throttleRed": 0.02,
+          "backlogAmber": 60,
+          "backlogRed": 300,
+          "calls": [
+            "hub.customer-db",
+            "reg.rules-cache"
+          ],
+          "gatewayCalls": [],
+          "lastUpdated": "2026-10-24T12:00:01+00:00"
+        },
+        {
+          "id": "reg.rules-cache",
+          "name": "Rules cache",
+          "kind": "Cache",
+          "service": "reporting",
+          "external": false,
+          "state": "Healthy",
+          "instancesTotal": 1,
+          "instancesHealthy": 1,
+          "load": 0.32,
+          "cpu": 0.26,
+          "memory": 0.38,
+          "utilisation": null,
+          "throttled": null,
+          "queueDepth": null,
+          "oldestMessageSeconds": null,
+          "deadLetters": null,
+          "requestsPerSecond": 96,
+          "errorRate": 0.002,
+          "p99Ms": 1.928,
+          "slaP99Ms": 20,
+          "errorAmber": 0.005,
+          "errorRed": 0.02,
+          "resourceAmber": 0.8,
+          "resourceRed": 0.95,
+          "throttleAmber": 0.001,
+          "throttleRed": 0.02,
+          "backlogAmber": 60,
+          "backlogRed": 300,
+          "calls": [],
+          "gatewayCalls": [],
+          "lastUpdated": "2026-10-24T12:00:01+00:00"
+        }
+      ]
+    },
+    {
       "id": "lost-found",
       "displayName": "Lost \u0026 found",
       "color": "#9aa3ad",
@@ -3848,6 +4435,18 @@
       "isLostFound": true,
       "configError": null,
       "incidents": [],
+      "hasBridge": true,
+      "messaging": {
+        "topics": [],
+        "subscriptions": [
+          {
+            "topic": "hub-egress",
+            "publisher": "hub",
+            "consumer": "lost-found.batch-gateway-worker",
+            "legacy": true
+          }
+        ]
+      },
       "nodes": [
         {
           "id": "lost-found.batch-gateway-api",
@@ -4158,10 +4757,11 @@
     {
       "id": "partner-portal",
       "name": "Partner portal",
-      "requestsPerSecond": 104,
+      "requestsPerSecond": 118.4,
       "calls": [
         "acq.applications-api",
-        "bil.invoices-api"
+        "bil.invoices-api",
+        "reg.reports-api"
       ]
     },
     {
@@ -4184,6 +4784,11 @@
     }
   ],
   "dependencies": [
+    {
+      "from": "reg",
+      "to": "hub",
+      "requestsPerSecond": 208
+    },
     {
       "from": "dec",
       "to": "frd",

@@ -109,6 +109,11 @@
             "pay.refunds-api",
             "pay.refunds-db",
             "pay.refunds-worker",
+            "rcn.matching-db",
+            "rcn.matching-worker",
+            "rcn.settlement-cron",
+            "reg.reports-api",
+            "reg.rules-cache",
             "rwd.catalog-api",
             "rwd.catalog-db",
             "rwd.points-api",
@@ -141,6 +146,8 @@
             "obk",
             "ntf",
             "dat",
+            "rcn",
+            "reg",
             "lost-found"
           ]
         },

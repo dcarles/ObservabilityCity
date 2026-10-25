@@ -7,6 +7,32 @@
       "description": "What a system is. It decides the building that stands for it.",
       "enum": ["api", "worker", "db", "cache", "cron", "gateway", "broker", "egress"]
     },
+    "messaging": {
+      "description": "Service Bus topics and subscriptions. A pillar with neither has no pier, and no boats sail to it.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "topics": {
+          "type": "array",
+          "description": "Services whose outbox this publishes. Each becomes the topic {pillar}-{service}-outbox (in hub.yaml, hub-{name}).",
+          "items": { "type": "string" }
+        },
+        "subscriptions": {
+          "type": "array",
+          "description": "Topics the pillar's workers consume. Only a worker with a subscription has a queue and a dead-letter queue.",
+          "items": {
+            "type": "object",
+            "required": ["topic", "consumer"],
+            "additionalProperties": false,
+            "properties": {
+              "topic": { "type": "string", "description": "The full topic name, for example frd-screening-outbox. Another pillar's outbox is read directly." },
+              "consumer": { "type": "string", "description": "The worker in this pillar that reads it." },
+              "legacy": { "type": "boolean", "description": "The old route: reading the hub's egress topic (hub-egress) instead of a pillar's outbox. Required for a hub topic, and only allowed there." }
+            }
+          }
+        }
+      }
+    },
     "thresholds": {
       "type": "object",
       "additionalProperties": false,

@@ -9,3 +9,8 @@ systems:
   - { id: p13.s2-worker, service: s2, name: S2 worker, role: worker, calls: [p13.s2-db] }
   - { id: p13.s2-db, service: s2, name: S2 DB, role: db }
   - { id: p13.session-cache, name: Session cache, role: cache }
+messaging:
+  topics: [s1]
+  subscriptions:
+    - { topic: p12-s1-outbox, consumer: p13.s1-worker }
+    - { topic: p12-s1-outbox, consumer: p13.s2-worker }

@@ -24,3 +24,9 @@ systems:
   - { id: p31.s7-worker, service: s7, name: S7 worker, role: worker, calls: [p31.s7-db] }
   - { id: p31.s7-db, service: s7, name: S7 DB, role: db }
   - { id: p31.session-cache, name: Session cache, role: cache }
+messaging:
+  topics: [s1]
+  subscriptions:
+    - { topic: p30-s1-outbox, consumer: p31.s1-worker }
+    - { topic: p30-s1-outbox, consumer: p31.s2-worker }
+    - { topic: p30-s1-outbox, consumer: p31.s3-worker }

@@ -104,6 +104,11 @@ dat.reports-worker:     { rps: 6,   p99Ms: 30000, minInstances: 1 }
 dat.reports-db:         { rps: 24,  p99Ms: 60,  minInstances: 1 }
 dat.refresh-cron:       { rps: 0.1, p99Ms: 55000, minInstances: 1 }
 dat.reports-cache:      { rps: 90,  p99Ms: 3,   minInstances: 1 }
+rcn.matching-worker:    { rps: 45,  p99Ms: 6000, minInstances: 2 }
+rcn.matching-db:        { rps: 60,  p99Ms: 24,  minInstances: 1 }
+rcn.settlement-cron:    { rps: 0.1, p99Ms: 50000, minInstances: 1 }
+reg.reports-api:        { rps: 18,  p99Ms: 700, minInstances: 1 }
+reg.rules-cache:        { rps: 120, p99Ms: 2,   minInstances: 1 }
 lost-found.batch-gateway-api:    { rps: 12, p99Ms: 500, minInstances: 1 }
 lost-found.batch-gateway-worker: { rps: 4,  p99Ms: 20000, minInstances: 1 }
 lost-found.batch-gateway-db:     { rps: 16, p99Ms: 40,  minInstances: 1 }

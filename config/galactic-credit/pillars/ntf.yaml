@@ -9,3 +9,11 @@ systems:
   - { id: ntf.templates-api, service: templates, name: Templates API, role: api, calls: [ntf.templates-db] }
   - { id: ntf.templates-db, service: templates, name: Templates DB, role: db }
   - { id: ntf.digest-cron, name: Digest run, role: cron, calls: [ntf.dispatch-api] }
+
+# Messaging: the outboxes this pillar publishes (ntf-<service>-outbox) and the topics its workers consume.
+messaging:
+  topics: [dispatch]
+  subscriptions:
+    - { topic: cl-posting-outbox, consumer: ntf.dispatch-worker }
+    - { topic: col-dunning-outbox, consumer: ntf.dispatch-worker }
+    - { topic: dsp-disputes-outbox, consumer: ntf.dispatch-worker }

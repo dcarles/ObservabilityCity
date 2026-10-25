@@ -60,6 +60,25 @@ internal sealed class PillarFile
     public bool External { get; set; }
     public DefaultsFile Defaults { get; set; } = new();
     public List<SystemFile> Systems { get; set; } = [];
+    public MessagingFile? Messaging { get; set; }
+}
+
+/// <summary>The "messaging" block of a pillar file (or hub.yaml): the outboxes it publishes and the topics its workers consume.</summary>
+internal sealed class MessagingFile
+{
+    /// <summary>Pillar files: service names, each published as the topic {pillar}-{service}-outbox. hub.yaml: free names, each published as hub-{name}.</summary>
+    public List<string> Topics { get; set; } = [];
+    public List<SubscriptionFile> Subscriptions { get; set; } = [];
+}
+
+internal sealed class SubscriptionFile
+{
+    /// <summary>The full topic name, for example frd-screening-outbox.</summary>
+    public string Topic { get; set; } = "";
+    /// <summary>A worker in this pillar.</summary>
+    public string Consumer { get; set; } = "";
+    /// <summary>Marks a read of the hub's egress topic by another pillar, the old way. Drawn with an amber pennant.</summary>
+    public bool Legacy { get; set; }
 }
 
 internal sealed class HubFile
@@ -68,6 +87,7 @@ internal sealed class HubFile
     public string Color { get; set; } = "#f5c26b";
     public List<SystemFile> Resources { get; set; } = [];
     public List<ExternalCallerFile> ExternalCallers { get; set; } = [];
+    public MessagingFile? Messaging { get; set; }
 }
 
 internal sealed class ExternalCallerFile
