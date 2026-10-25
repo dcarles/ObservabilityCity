@@ -22,11 +22,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 8.0.x
-      - uses: actions/cache@v4
+      # Only this job saves the NuGet cache; the other jobs run side by side and only restore it (two jobs saving one key collide).
+      - uses: actions/cache@v6
         with:
           path: ~/.nuget/packages
           key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', '.config/dotnet-tools.json') }}
@@ -39,16 +40,16 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 8.0.x
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: web/package-lock.json
-      - uses: actions/cache@v4
+      - uses: actions/cache/restore@v6
         with:
           path: ~/.nuget/packages
           key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', '.config/dotnet-tools.json') }}
@@ -73,16 +74,16 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 8.0.x
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: web/package-lock.json
-      - uses: actions/cache@v4
+      - uses: actions/cache/restore@v6
         with:
           path: ~/.nuget/packages
           key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', '.config/dotnet-tools.json') }}
@@ -95,7 +96,7 @@ jobs:
         working-directory: web
       - name: Cache the browser
         id: browser
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
@@ -116,7 +117,7 @@ jobs:
           E2E_NO_BUILD: '1'
       - name: Keep the report when something fails
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ui-scenarios-report
           path: |
@@ -132,11 +133,11 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 8.0.x
-      - uses: actions/cache@v4
+      - uses: actions/cache/restore@v6
         with:
           path: ~/.nuget/packages
           key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', '.config/dotnet-tools.json') }}
@@ -148,7 +149,7 @@ jobs:
       - name: Show the result on the pull request
         # Fork pull requests get a read-only token and cannot comment; the annotations on the files still appear.
         if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const fs = require('fs');
