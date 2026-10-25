@@ -1,0 +1,50 @@
+### Trouble for the fake data source (VS Code REST Client, Visual Studio, Rider). Backend: dotnet run --project backend/src/ObservabilityCity.Host
+@host = http://localhost:5080
+
+### High CPU on the Ledger API
+POST {{host}}/api/fake/effects
+Content-Type: application/json
+
+{ "target": "cl.ledger-api", "kind": "HighCpu", "intensity": 0.9 }
+
+### Dead letters building up in the Payments worker
+POST {{host}}/api/fake/effects
+Content-Type: application/json
+
+{ "target": "pay.payments-worker", "kind": "Poison", "intensity": 1 }
+
+### Payments queue backs up
+POST {{host}}/api/fake/effects
+Content-Type: application/json
+
+{ "target": "pay.payments-worker", "kind": "Backlog", "intensity": 1 }
+
+### Ledger API down
+POST {{host}}/api/fake/effects
+Content-Type: application/json
+
+{ "target": "cl.ledger-api", "kind": "Down", "intensity": 1 }
+
+### Screening API goes stale
+POST {{host}}/api/fake/effects
+Content-Type: application/json
+
+{ "target": "frd.screening-api", "kind": "Stale", "intensity": 1 }
+
+### Errors across the whole Payments island
+POST {{host}}/api/fake/effects
+Content-Type: application/json
+
+{ "target": "pay", "kind": "Errors", "intensity": 0.6 }
+
+### Ledger DB throttling
+POST {{host}}/api/fake/effects
+Content-Type: application/json
+
+{ "target": "cl.ledger-db", "kind": "Saturate", "intensity": 1 }
+
+### What is active
+GET {{host}}/api/fake
+
+### Reset everything
+POST {{host}}/api/fake/reset
