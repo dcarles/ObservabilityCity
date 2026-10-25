@@ -28,13 +28,13 @@ public class RegistryValidationTests
         $"pillar: {code}\ndisplayName: {code.ToUpperInvariant()}\nsystems:\n" + string.Join("\n", systems.Select(s => "  - " + s)) + "\n";
 
     [Fact]
-    public void Sample_town_has_fourteen_pillars_and_lost_and_found_last()
+    public void Sample_town_has_sixteen_pillars_and_lost_and_found_last()
     {
         var registry = RegistryLoader.Load(TestPaths.Registry);
         var pillars = registry.Groups.Where(g => !g.IsHub).ToList();
 
-        Assert.Equal(15, pillars.Count);
-        Assert.Equal(14, pillars.Count(p => !p.IsLostFound));
+        Assert.Equal(17, pillars.Count);
+        Assert.Equal(16, pillars.Count(p => !p.IsLostFound));
         Assert.True(pillars[^1].IsLostFound);
         Assert.Equal("cl", pillars[0].Id); // layout.yaml order, not file-name order
         Assert.True(registry.AllNodes.Count() >= 100);

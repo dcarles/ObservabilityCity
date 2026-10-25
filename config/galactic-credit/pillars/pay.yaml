@@ -11,3 +11,11 @@ systems:
   - { id: pay.refunds-api, service: refunds, name: Refunds API, role: api, calls: [pay.refunds-db], gatewayCalls: [cl.posting-api] }
   - { id: pay.refunds-worker, service: refunds, name: Refunds worker, role: worker, calls: [pay.refunds-db] }
   - { id: pay.refunds-db, service: refunds, name: Refunds DB, role: db }
+
+# Messaging: the outboxes this pillar publishes (pay-<service>-outbox) and the topics its workers consume.
+messaging:
+  topics: [payments, refunds]
+  subscriptions:
+    - { topic: frd-screening-outbox, consumer: pay.payments-worker }
+    - { topic: dec-decision-outbox, consumer: pay.payments-worker }
+    - { topic: dsp-disputes-outbox, consumer: pay.refunds-worker }

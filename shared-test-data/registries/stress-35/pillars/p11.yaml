@@ -4,3 +4,5 @@ color: "#e07a5f"
 systems:
   - { id: p11.s1-api, service: s1, name: S1 API, role: api, external: true, calls: [p11.s1-db] }
   - { id: p11.s1-db, service: s1, name: S1 DB, role: db }
+messaging:
+  topics: [s1]

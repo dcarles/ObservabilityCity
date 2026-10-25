@@ -11,3 +11,9 @@ systems:
   - { id: dec.scorecards-api, service: scorecards, name: Scorecards API, role: api, calls: [dec.scorecards-db] }
   - { id: dec.scorecards-db, service: scorecards, name: Scorecards DB, role: db }
   - { id: dec.features-cache, name: Features cache, role: cache }
+
+# Messaging: the outboxes this pillar publishes (dec-<service>-outbox) and the topics its workers consume.
+messaging:
+  topics: [decision]
+  subscriptions:
+    - { topic: acq-applications-outbox, consumer: dec.decision-worker }

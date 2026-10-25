@@ -22,3 +22,9 @@ systems:
   - { id: p14.s6-db, service: s6, name: S6 DB, role: db }
   - { id: p14.s7-api, service: s7, name: S7 API, role: api, calls: [p14.s7-db] }
   - { id: p14.s7-db, service: s7, name: S7 DB, role: db }
+messaging:
+  topics: [s1]
+  subscriptions:
+    - { topic: p13-s1-outbox, consumer: p14.s1-worker }
+    - { topic: p13-s1-outbox, consumer: p14.s2-worker }
+    - { topic: p13-s1-outbox, consumer: p14.s3-worker }

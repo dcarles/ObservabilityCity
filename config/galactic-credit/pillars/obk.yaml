@@ -12,3 +12,9 @@ systems:
   - { id: obk.data-worker, service: data, name: Data worker, role: worker, calls: [obk.data-db] }
   - { id: obk.data-db, service: data, name: Data DB, role: db }
   - { id: obk.tokens-cache, name: Tokens cache, role: cache }
+
+# Messaging: the outboxes this pillar publishes (obk-<service>-outbox) and the topics its workers consume.
+messaging:
+  topics: [data]
+  subscriptions:
+    - { topic: acc-accounts-outbox, consumer: obk.data-worker }

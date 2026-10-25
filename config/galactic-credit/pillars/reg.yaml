@@ -1,0 +1,11 @@
+# yaml-language-server: $schema=../schema/pillar.schema.json
+# A pillar with no messaging: a reporting API with a cache that reads the shared customer DB on the hub. No worker, no database of its own,
+# no pier. The bridge exists because it has an API and a link to the hub's database.
+pillar: reg
+displayName: Regulatory Reporting
+color: "#6d9dc5"
+defaults:
+  api: { slaP99Ms: 1500 }
+systems:
+  - { id: reg.reports-api, service: reporting, name: Reports API, role: api, external: true, calls: [hub.customer-db, reg.rules-cache] }
+  - { id: reg.rules-cache, service: reporting, name: Rules cache, role: cache }

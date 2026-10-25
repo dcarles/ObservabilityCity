@@ -109,6 +109,7 @@ public sealed class FakeSource(
         var vendorTrouble = registry.Vendors.ToDictionary(v => v.Node.Id, v => VendorTrouble(effects.Where(e => Applies(e, v.Node)).ToList()));
         double CallerTrouble(string id) => registry.Vendors.Where(v => v.CalledBy.Contains(id)).Select(v => 0.4 * vendorTrouble[v.Node.Id]).DefaultIfEmpty(0).Max();
 
+        var consumers = registry.ConsumerIds;
         foreach (var node in registry.AllNodes.Concat(registry.Vendors.Select(v => v.Node)))
         {
             var isVendor = node.GroupId == RegistryVendor.GroupId;
@@ -172,7 +173,7 @@ public sealed class FakeSource(
             }
 
             double? queueDepth = null, oldest = null, deadLetters = null;
-            if (node.Kind == NodeKind.Worker)
+            if (node.Kind == NodeKind.Worker && consumers.Contains(node.Id))
             {
                 // A consumer: messages arrive at the request rate and leave at what its healthy instances can take.
                 var slow = fx.Where(e => e.Kind == FakeEffectKind.Backlog).Sum(e => 0.95 * e.Intensity);

@@ -11,3 +11,9 @@ systems:
   - { id: p10.s3-api, service: s3, name: S3 API, role: api, calls: [p10.s3-db] }
   - { id: p10.s3-worker, service: s3, name: S3 worker, role: worker, calls: [p10.s3-db] }
   - { id: p10.s3-db, service: s3, name: S3 DB, role: db }
+messaging:
+  topics: [s1]
+  subscriptions:
+    - { topic: p09-s1-outbox, consumer: p10.s1-worker }
+    - { topic: p09-s1-outbox, consumer: p10.s2-worker }
+    - { topic: p09-s1-outbox, consumer: p10.s3-worker }

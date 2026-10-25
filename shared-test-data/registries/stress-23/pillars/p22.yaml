@@ -12,3 +12,9 @@ systems:
   - { id: p22.s3-worker, service: s3, name: S3 worker, role: worker, calls: [p22.s3-db] }
   - { id: p22.s3-db, service: s3, name: S3 DB, role: db }
   - { id: p22.session-cache, name: Session cache, role: cache }
+messaging:
+  topics: [s1]
+  subscriptions:
+    - { topic: p21-s1-outbox, consumer: p22.s1-worker }
+    - { topic: p21-s1-outbox, consumer: p22.s2-worker }
+    - { topic: p21-s1-outbox, consumer: p22.s3-worker }

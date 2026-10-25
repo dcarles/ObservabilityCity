@@ -9,3 +9,9 @@ systems:
   - { id: rwd.catalog-api, service: catalog, name: Catalog API, role: api, calls: [rwd.catalog-db] }
   - { id: rwd.catalog-db, service: catalog, name: Catalog DB, role: db }
   - { id: rwd.points-cache, name: Points cache, role: cache }
+
+# Messaging: the outboxes this pillar publishes (rwd-<service>-outbox) and the topics its workers consume.
+messaging:
+  topics: [points]
+  subscriptions:
+    - { topic: pay-payments-outbox, consumer: rwd.points-worker }

@@ -13,3 +13,12 @@ systems:
   - { id: dat.reports-db, service: reports, name: Reports DB, role: db }
   - { id: dat.refresh-cron, name: Warehouse refresh, role: cron, calls: [dat.ingest-api] }
   - { id: dat.reports-cache, name: Reports cache, role: cache }
+
+# Messaging: the outboxes this pillar publishes (dat-<service>-outbox) and the topics its workers consume.
+messaging:
+  topics: [ingest]
+  subscriptions:
+    - { topic: pay-payments-outbox, consumer: dat.ingest-worker }
+    - { topic: cl-ledger-outbox, consumer: dat.ingest-worker }
+    - { topic: rcn-matching-outbox, consumer: dat.ingest-worker }
+    - { topic: dat-ingest-outbox, consumer: dat.reports-worker }

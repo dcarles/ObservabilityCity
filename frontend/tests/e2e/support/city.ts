@@ -25,10 +25,30 @@ export interface Status {
 export interface IslandStatus {
   id: string
   buildings: number
+  /** The kind of every building on the island (Api, Worker, Database, ...). */
+  kinds: string[]
   configError: string | null
+  /** A bridge to the hub, a pier, and a sea lane for boats from the Service Bus port. */
+  bridge: boolean
+  pier: boolean
+  lane: boolean
+  /** How many car routes cross the island's bridge. */
+  crossings: number
   crates: number
   brokenCrates: number
   alarm: boolean
+  /** The amber pennant: a worker here still reads the hub's egress topic. */
+  pennant: boolean
+}
+
+export interface HubStatus {
+  topics: number
+  subscriptions: number
+  piers: number
+  legacy: number
+  /** Islands with a sea lane. */
+  boats: number
+  lighthouse: { total: number; alarm: boolean } | null
 }
 
 export interface NodeView {
@@ -93,6 +113,21 @@ export class Town {
     const s = await this.page.evaluate((i) => (window as any).city.inspectIsland(i), id)
     expect(s, `no island ${id}`).not.toBeNull()
     return s as IslandStatus
+  }
+
+  /** What the Service Bus port and the lighthouse show. */
+  async hub(): Promise<HubStatus> {
+    return (await this.page.evaluate(() => (window as any).city.town.inspectHub())) as HubStatus
+  }
+
+  /** The greatest number of boats at sea at any moment while the clock runs the given seconds. */
+  async mostBoats(seconds: number): Promise<number> {
+    return await this.page.evaluate((total) => {
+      const c = (window as any).city
+      let most = 0
+      for (let t = 0; t < total; t += 2) { c.step(2); most = Math.max(most, c.town.boats.count) }
+      return most
+    }, seconds)
   }
 
   /** The newest snapshot the page accepted, or the part of it a test asks for. */

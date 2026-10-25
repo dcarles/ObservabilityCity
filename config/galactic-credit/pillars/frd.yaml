@@ -11,3 +11,9 @@ systems:
   - { id: frd.cases-api, service: cases, name: Cases API, role: api, calls: [frd.cases-db], gatewayCalls: [cus.profile-api] }
   - { id: frd.cases-db, service: cases, name: Cases DB, role: db }
   - { id: frd.rules-cache, name: Rules cache, role: cache }
+
+# Messaging: the outboxes this pillar publishes (frd-<service>-outbox) and the topics its workers consume.
+messaging:
+  topics: [screening]
+  subscriptions:
+    - { topic: pay-payments-outbox, consumer: frd.screening-worker }

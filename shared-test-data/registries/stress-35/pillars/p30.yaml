@@ -6,3 +6,7 @@ systems:
   - { id: p30.s1-worker, service: s1, name: S1 worker, role: worker, calls: [p30.s1-db] }
   - { id: p30.s1-db, service: s1, name: S1 DB, role: db }
   - { id: p30.session-cache, name: Session cache, role: cache }
+messaging:
+  topics: [s1]
+  subscriptions:
+    - { topic: p29-s1-outbox, consumer: p30.s1-worker }

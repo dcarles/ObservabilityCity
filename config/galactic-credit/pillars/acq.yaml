@@ -14,3 +14,10 @@ systems:
   - { id: acq.leads-api, service: leads, name: Leads API, role: api, calls: [acq.leads-db, acq.applications-api], gatewayCalls: [cus.profile-api] }
   - { id: acq.leads-worker, service: leads, name: Leads worker, role: worker, calls: [acq.leads-db] }
   - { id: acq.leads-db, service: leads, name: Leads DB, role: db }
+
+# Messaging: the outboxes this pillar publishes (acq-<service>-outbox) and the topics its workers consume.
+messaging:
+  topics: [applications]
+  subscriptions:
+    - { topic: dec-decision-outbox, consumer: acq.applications-worker }
+    - { topic: cus-profile-outbox, consumer: acq.leads-worker }

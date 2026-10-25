@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { box, canvasTexture, cyl, flat, roundRect } from '../buildings/mk'
-import type { NodeSnapshot } from '../types'
+import type { MessagingSnapshot, NodeSnapshot } from '../types'
 import { palette } from '../themes/harbour-town/palette'
 import { clamp, formatAge, formatRate } from '../visuals'
 import { GROUND } from './island'
@@ -15,11 +15,27 @@ export interface Messaging {
   deadLetters: number | null
   amber: number
   red: number
+  /** Topics the island publishes and subscriptions its workers hold, for the board. */
+  topics: number
+  subscriptions: number
+  /** True when a worker still reads the hub's egress topic, the old route. */
+  legacy: boolean
 }
 
-/** Adds up the island's workers: the rate, the queue behind them, the oldest message and the dead-letter queue. */
-export function messagingOf(nodes: NodeSnapshot[]): Messaging {
-  const workers = nodes.filter((n) => n.kind === 'Worker' && n.state !== 'Stale')
+/** The ids of the island's workers that consume a topic. Only these have a queue and a dead-letter queue. */
+export function consumersOf(messaging: MessagingSnapshot | undefined): Set<string> {
+  return new Set((messaging?.subscriptions ?? []).map((s) => s.consumer))
+}
+
+/** An island has a pier when it publishes a topic or has a worker that subscribes to one. */
+export function hasMessaging(messaging: MessagingSnapshot | undefined): boolean {
+  return !!messaging && (messaging.topics.length > 0 || messaging.subscriptions.length > 0)
+}
+
+/** Adds up the island's consumers: the rate, the queue behind them, the oldest message and the dead-letter queue. */
+export function messagingOf(nodes: NodeSnapshot[], messaging?: MessagingSnapshot): Messaging {
+  const consumers = consumersOf(messaging)
+  const workers = nodes.filter((n) => n.kind === 'Worker' && n.state !== 'Stale' && consumers.has(n.id))
   const sum = (pick: (n: NodeSnapshot) => number | null | undefined) => {
     const v = workers.map(pick).filter((x): x is number => x != null)
     return v.length ? v.reduce((a, b) => a + b, 0) : null
@@ -32,10 +48,13 @@ export function messagingOf(nodes: NodeSnapshot[]): Messaging {
     deadLetters: sum((n) => n.deadLetters),
     amber: workers[0]?.backlogAmber ?? 60,
     red: workers[0]?.backlogRed ?? 300,
+    topics: messaging?.topics.length ?? 0,
+    subscriptions: messaging?.subscriptions.length ?? 0,
+    legacy: messaging?.subscriptions.some((x) => x.legacy) ?? false,
   }
 }
 
-const halo = (() => {
+export const halo = (() => {
   let t: THREE.CanvasTexture | null = null
   return () => t ??= canvasTexture(64, 64, (ctx) => {
     const g = ctx.createRadialGradient(32, 32, 0, 32, 32, 32)
@@ -45,7 +64,7 @@ const halo = (() => {
 })()
 
 /**
- * The messaging end of an island's harbour: crates pile up on the quay as the queue grows, a fenced pen holds the
+ * The messaging end of an island's pier: crates pile up on the quay as the queue grows, a fenced pen holds the
  * broken crates of the dead-letter queue (with a red light that sweeps while it is not empty), and a board reads out
  * the numbers. Everything here comes from the island's consumers; the boats are only a picture of traffic.
  */
@@ -57,6 +76,8 @@ export class HarbourStatus {
   private readonly bulb: THREE.Mesh
   private readonly glow: THREE.Sprite
   private readonly label: THREE.Sprite
+  private readonly pennant: THREE.Group
+  private legacy = false
   private labelKey = ''
   private lit = false
   private visibleCrates = 0
@@ -120,10 +141,20 @@ export class HarbourStatus {
     this.beam.visible = false
     this.group.add(this.bulb, this.glow, this.beam)
 
+    // an amber pennant on a pole at the pier head: a worker here still reads the hub's egress topic (the old route)
+    this.pennant = new THREE.Group()
+    const pole = cyl(0.07, 0.09, 4.2, flat('#5a626d'), { y: 2.1 }, 6)
+    const cloth = new THREE.Mesh(new THREE.ShapeGeometry(new THREE.Shape([new THREE.Vector2(0, 0), new THREE.Vector2(0, -0.9), new THREE.Vector2(1.9, -0.45)])), new THREE.MeshBasicMaterial({ color: '#ffb830', side: THREE.DoubleSide, toneMapped: false }))
+    cloth.position.set(0.05, 4.1, 0)
+    this.pennant.add(pole, cloth)
+    this.pennant.position.set(coastX - 1.4, GROUND, z + 2.4)
+    this.pennant.visible = false
+    this.group.add(this.pennant)
+
     // the board
-    this.label = new THREE.Sprite(new THREE.SpriteMaterial({ map: canvasTexture(448, 150, () => {}), transparent: true, depthTest: false, toneMapped: false }))
+    this.label = new THREE.Sprite(new THREE.SpriteMaterial({ map: canvasTexture(448, 190, () => {}), transparent: true, depthTest: false, toneMapped: false }))
     this.label.renderOrder = 10
-    this.label.scale.set(4.9, 1.64, 1)
+    this.label.scale.set(4.9, 2.08, 1)
     this.label.center.set(0.5, 0)
     this.label.position.set(coastX - 4.6, GROUND + 4.6, z - 1.2)
     this.group.add(this.label)
@@ -150,6 +181,9 @@ export class HarbourStatus {
       this.beam.rotation.y = time * 1.8 + this.phase
       ;(this.glow.material as THREE.SpriteMaterial).opacity = 0.55 + 0.4 * Math.sin(time * 6 + this.phase)
     }
+    this.legacy = m.legacy
+    this.pennant.visible = m.legacy
+    if (m.legacy) this.pennant.rotation.y = Math.sin(time * 1.6 + this.phase) * 0.25
     this.draw(m)
     const trouble = alarm || (m.oldestSeconds ?? 0) >= m.amber
     const d = camera.position.distanceTo(this.label.getWorldPosition(new THREE.Vector3()))
@@ -159,28 +193,31 @@ export class HarbourStatus {
   }
 
   private draw(m: Messaging): void {
-    const key = `${Math.round(m.perSecond)}|${m.waiting == null ? -1 : Math.round(m.waiting / 5)}|${m.oldestSeconds == null ? -1 : Math.round(m.oldestSeconds / 2)}|${m.deadLetters ?? -1}`
+    const key = `${m.topics}/${m.subscriptions}/${m.legacy ? 1 : 0}|${Math.round(m.perSecond)}|${m.waiting == null ? -1 : Math.round(m.waiting / 5)}|${m.oldestSeconds == null ? -1 : Math.round(m.oldestSeconds / 2)}|${m.deadLetters ?? -1}`
     if (key === this.labelKey) return
     this.labelKey = key
     const tex = (this.label.material as THREE.SpriteMaterial).map as THREE.CanvasTexture
     const ctx = (tex.image as HTMLCanvasElement).getContext('2d')!
-    ctx.clearRect(0, 0, 448, 150)
+    ctx.clearRect(0, 0, 448, 190)
     const late = m.oldestSeconds != null && m.oldestSeconds >= m.amber
     const veryLate = m.oldestSeconds != null && m.oldestSeconds >= m.red
     const dead = (m.deadLetters ?? 0) > 0
     const edge = veryLate || dead ? '#ff5a4d' : late ? '#ffb830' : '#9fb4cc'
-    const rows = 1 + (m.waiting != null ? 1 : 0) + (m.deadLetters != null ? 1 : 0)
+    const rows = 2 + (m.waiting != null ? 1 : 0) + (m.deadLetters != null ? 1 : 0)
     const h = 18 + rows * 38
-    const y0 = 150 - h - 6
+    const y0 = 190 - h - 6
     ctx.fillStyle = 'rgba(20,28,40,0.92)'; roundRect(ctx, 4, y0, 440, h, 22); ctx.fill()
     ctx.strokeStyle = edge; ctx.lineWidth = 6; ctx.stroke()
     ctx.textBaseline = 'middle'; ctx.textAlign = 'left'
     let y = y0 + 32
     ctx.fillStyle = '#fff'; ctx.font = '800 30px system-ui, sans-serif'
-    ctx.fillText('HARBOUR', 24, y)
+    ctx.fillText('PIER', 24, y)
     ctx.fillStyle = '#b8c7da'; ctx.font = '700 26px system-ui, sans-serif'; ctx.textAlign = 'right'
     ctx.fillText(`${formatRate(m.perSecond)} msg/s`, 424, y)
     ctx.textAlign = 'left'
+    y += 38
+    ctx.fillStyle = m.legacy ? '#ffb830' : '#b8c7da'; ctx.font = '700 26px system-ui, sans-serif'
+    ctx.fillText(`${m.topics} topic${m.topics === 1 ? '' : 's'} · reads ${m.subscriptions}${m.legacy ? ' · legacy' : ''}`, 24, y, 400)
     if (m.waiting != null) {
       y += 38
       ctx.fillStyle = veryLate ? '#ff5a4d' : late ? '#ffb830' : '#b8c7da'; ctx.font = '700 26px system-ui, sans-serif'
@@ -199,7 +236,7 @@ export class HarbourStatus {
   }
 
   /** What the harbour shows, for tests: crates on the quay, broken crates in the pen, and whether the red light sweeps. */
-  status(): { crates: number; brokenCrates: number; alarm: boolean } {
-    return { crates: this.visibleCrates, brokenCrates: this.visibleBroken, alarm: this.lit }
+  status(): { crates: number; brokenCrates: number; alarm: boolean; pennant: boolean } {
+    return { crates: this.visibleCrates, brokenCrates: this.visibleBroken, alarm: this.lit, pennant: this.legacy }
   }
 }

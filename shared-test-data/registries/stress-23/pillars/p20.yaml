@@ -16,3 +16,9 @@ systems:
   - { id: p20.s4-db, service: s4, name: S4 DB, role: db }
   - { id: p20.s5-api, service: s5, name: S5 API, role: api, calls: [p20.s5-db] }
   - { id: p20.s5-db, service: s5, name: S5 DB, role: db }
+messaging:
+  topics: [s1]
+  subscriptions:
+    - { topic: p19-s1-outbox, consumer: p20.s1-worker }
+    - { topic: p19-s1-outbox, consumer: p20.s2-worker }
+    - { topic: p19-s1-outbox, consumer: p20.s3-worker }

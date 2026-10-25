@@ -45,6 +45,8 @@ export interface components {
             isLostFound: boolean;
             configError?: string | null;
             incidents: components["schemas"]["IncidentSnapshot"][];
+            hasBridge: boolean;
+            messaging: components["schemas"]["MessagingSnapshot"];
             nodes: components["schemas"]["NodeSnapshot"][];
         };
         /** @enum {string} */
@@ -56,6 +58,10 @@ export interface components {
             severity: number;
             /** Format: date-time */
             startedAt: string;
+        };
+        MessagingSnapshot: {
+            topics: components["schemas"]["TopicSnapshot"][];
+            subscriptions: components["schemas"]["SubscriptionSnapshot"][];
         };
         /** @enum {string} */
         NodeKind: "Api" | "Worker" | "Database" | "Cache" | "Cron" | "Gateway" | "Broker" | "Egress";
@@ -133,6 +139,16 @@ export interface components {
             /** Format: int32 */
             ringCapacity: number;
         };
+        SubscriptionSnapshot: {
+            topic: string;
+            publisher: string;
+            consumer: string;
+            legacy: boolean;
+        };
+        TopicSnapshot: {
+            name: string;
+            service: string;
+        };
         TownTotals: {
             /** Format: double */
             requestsPerSecond: number;
@@ -146,6 +162,8 @@ export interface components {
             down: number;
             /** Format: int32 */
             incidents: number;
+            /** Format: double */
+            deadLetters: number;
         };
         VendorSnapshot: {
             node: components["schemas"]["NodeSnapshot"];

@@ -8,3 +8,8 @@ systems:
   - { id: lost-found.batch-gateway-worker, service: batch-gateway, name: Batch gateway worker, role: worker, calls: [lost-found.batch-gateway-db] }
   - { id: lost-found.batch-gateway-db, service: batch-gateway, name: Batch gateway DB, role: db }
   - { id: lost-found.legacy-ftp-api, name: Legacy file drop, role: api }
+
+# The old way: this worker still reads the hub's egress topic instead of a pillar's outbox. Flagged legacy.
+messaging:
+  subscriptions:
+    - { topic: hub-egress, consumer: lost-found.batch-gateway-worker, legacy: true }

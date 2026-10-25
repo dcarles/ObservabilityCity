@@ -6,9 +6,12 @@ resources:
   - { id: hub.service-bus, name: Service Bus, role: broker }
   - { id: hub.egress, name: Central egress, role: egress }
   - { id: hub.customer-db, name: Shared customer DB, role: db }
+# The egress topic: for external destinations (Snowflake) and the old pillar-to-pillar route. Published as hub-egress.
+messaging:
+  topics: [egress]
 # Outside callers of the town (apps, partners, vendors' webhooks). Each lists the external systems it reaches.
 externalCallers:
   - { id: mobile-app, name: Mobile app, calls: [cl.ledger-api, pay.payments-api, rwd.points-api] }
-  - { id: partner-portal, name: Partner portal, calls: [acq.applications-api, bil.invoices-api] }
+  - { id: partner-portal, name: Partner portal, calls: [acq.applications-api, bil.invoices-api, reg.reports-api] }
   - { id: open-banking-tpp, name: Third-party providers, calls: [obk.consents-api, obk.data-api] }
   - { id: merchant-systems, name: Merchant systems, calls: [pay.payments-api, dsp.disputes-api] }

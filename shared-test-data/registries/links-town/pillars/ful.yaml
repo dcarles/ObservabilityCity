@@ -1,0 +1,12 @@
+# Everything: an API (so a bridge), a worker that consumes (so a pier), a database and a topic of its own.
+pillar: ful
+displayName: Full
+color: "#5aa9ff"
+systems:
+  - { id: ful.orders-api, service: orders, name: Orders API, role: api, external: true, calls: [ful.orders-db] }
+  - { id: ful.orders-worker, service: orders, name: Orders worker, role: worker, calls: [ful.orders-db] }
+  - { id: ful.orders-db, service: orders, name: Orders DB, role: db }
+messaging:
+  topics: [orders]
+  subscriptions:
+    - { topic: wrk-batch-outbox, consumer: ful.orders-worker }

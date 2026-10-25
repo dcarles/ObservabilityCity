@@ -81,10 +81,12 @@
         "required": [
           "color",
           "displayName",
+          "hasBridge",
           "id",
           "incidents",
           "isHub",
           "isLostFound",
+          "messaging",
           "nodes"
         ],
         "type": "object",
@@ -113,6 +115,12 @@
             "items": {
               "$ref": "#/components/schemas/IncidentSnapshot"
             }
+          },
+          "hasBridge": {
+            "type": "boolean"
+          },
+          "messaging": {
+            "$ref": "#/components/schemas/MessagingSnapshot"
           },
           "nodes": {
             "type": "array",
@@ -154,6 +162,28 @@
           "startedAt": {
             "type": "string",
             "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "MessagingSnapshot": {
+        "required": [
+          "subscriptions",
+          "topics"
+        ],
+        "type": "object",
+        "properties": {
+          "topics": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TopicSnapshot"
+            }
+          },
+          "subscriptions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SubscriptionSnapshot"
+            }
           }
         },
         "additionalProperties": false
@@ -410,8 +440,49 @@
         },
         "additionalProperties": false
       },
+      "SubscriptionSnapshot": {
+        "required": [
+          "consumer",
+          "legacy",
+          "publisher",
+          "topic"
+        ],
+        "type": "object",
+        "properties": {
+          "topic": {
+            "type": "string"
+          },
+          "publisher": {
+            "type": "string"
+          },
+          "consumer": {
+            "type": "string"
+          },
+          "legacy": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "TopicSnapshot": {
+        "required": [
+          "name",
+          "service"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "service": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
       "TownTotals": {
         "required": [
+          "deadLetters",
           "degraded",
           "down",
           "errorRate",
@@ -444,6 +515,10 @@
           "incidents": {
             "type": "integer",
             "format": "int32"
+          },
+          "deadLetters": {
+            "type": "number",
+            "format": "double"
           }
         },
         "additionalProperties": false

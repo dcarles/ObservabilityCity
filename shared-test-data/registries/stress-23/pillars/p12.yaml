@@ -17,3 +17,9 @@ systems:
   - { id: p12.s5-api, service: s5, name: S5 API, role: api, calls: [p12.s5-db] }
   - { id: p12.s5-worker, service: s5, name: S5 worker, role: worker, calls: [p12.s5-db] }
   - { id: p12.s5-db, service: s5, name: S5 DB, role: db }
+messaging:
+  topics: [s1]
+  subscriptions:
+    - { topic: p11-s1-outbox, consumer: p12.s1-worker }
+    - { topic: p11-s1-outbox, consumer: p12.s2-worker }
+    - { topic: p11-s1-outbox, consumer: p12.s3-worker }

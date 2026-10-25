@@ -1,0 +1,11 @@
+# Messaging only: no API and no link to another island, so a pier and no bridge.
+pillar: wrk
+displayName: Worker only
+color: "#4dc3c9"
+systems:
+  - { id: wrk.batch-worker, service: batch, name: Batch worker, role: worker, calls: [wrk.batch-db] }
+  - { id: wrk.batch-db, service: batch, name: Batch DB, role: db }
+messaging:
+  topics: [batch]
+  subscriptions:
+    - { topic: ful-orders-outbox, consumer: wrk.batch-worker }

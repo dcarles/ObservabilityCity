@@ -16,15 +16,15 @@ const layout = layoutTown(plans.map((p) => ({ rx: p.rx, rz: p.rz })), snapshot.r
 const r = (v: number) => Math.round(v * 10) / 10
 
 describe('the sample town', () => {
-  it('has fourteen pillars and Lost & found, which stands last', () => {
-    expect(pillars).toHaveLength(15)
+  it('has sixteen pillars and Lost & found, which stands last', () => {
+    expect(pillars).toHaveLength(17)
     expect(pillars.filter((g) => g.isLostFound)).toHaveLength(1)
     expect(pillars[pillars.length - 1].isLostFound).toBe(true)
   })
 
   it('stands twelve islands on the first ring and the rest on a second ring', () => {
     expect(layout.islands.filter((i) => i.ring === 1)).toHaveLength(12)
-    expect(layout.islands.filter((i) => i.ring === 2)).toHaveLength(3)
+    expect(layout.islands.filter((i) => i.ring === 2)).toHaveLength(5)
   })
 
   it('puts every system on its island grid exactly once', () => {

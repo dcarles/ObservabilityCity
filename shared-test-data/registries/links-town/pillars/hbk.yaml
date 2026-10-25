@@ -1,0 +1,6 @@
+# No API and no messaging, but a job that reads the shared customer database on the hub: that link alone is enough for a bridge.
+pillar: hbk
+displayName: Hub link only
+color: "#b08968"
+systems:
+  - { id: hbk.sync-cron, name: Customer sync, role: cron, calls: [hub.customer-db] }

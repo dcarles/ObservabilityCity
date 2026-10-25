@@ -5,3 +5,7 @@ systems:
   - { id: bb.ledger-api, service: ledger, name: Ledger API, role: api, external: true, calls: [bb.ledger-db] }
   - { id: bb.ledger-worker, service: ledger, name: Ledger worker, role: worker, calls: [bb.ledger-db] }
   - { id: bb.ledger-db, service: ledger, name: Ledger DB, role: db }
+messaging:
+  topics: [ledger]
+  subscriptions:
+    - { topic: aa-orders-outbox, consumer: bb.ledger-worker }

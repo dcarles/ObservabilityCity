@@ -51,6 +51,7 @@ public static class RegistryValidator
         CheckExternalCallers(ctx, registry);
         CheckWorkersHaveDatabases(ctx, registry);
         CheckUncalled(ctx, registry);
+        CheckStandalone(ctx, registry);
         CheckFake(ctx, registry);
         return ctx.Result();
     }
@@ -247,6 +248,12 @@ public static class RegistryValidator
                 var at = c.Locate(n.Id);
                 c.Warn(at.File, at.Line, "uncalled", $"Nothing calls '{n.Id}': no system lists it under calls and it is not external. It will sit idle on the map; add the caller or mark it external.");
             }
+    }
+
+    private static void CheckStandalone(Context c, Registry registry)
+    {
+        foreach (var g in registry.Groups.Where(g => !g.IsHub && g.ConfigError is null && g.Nodes.Count > 0 && TownLinks.Of(registry)[g.Id].Standalone))
+            c.Warn(c.PillarFile(g.Id), 1, "standalone", $"Island '{g.Id}' stands alone: it has no API, no topics or subscriptions, no calls to or from other islands and no third party, so nothing connects it to the town. Add an API, a messaging block or a calls link.");
     }
 
     // ── fake data ───────────────────────────────────────────────────────────

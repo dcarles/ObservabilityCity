@@ -8,3 +8,8 @@ systems:
   - { id: p21.s2-api, service: s2, name: S2 API, role: api, calls: [p21.s2-db] }
   - { id: p21.s2-worker, service: s2, name: S2 worker, role: worker, calls: [p21.s2-db] }
   - { id: p21.s2-db, service: s2, name: S2 DB, role: db }
+messaging:
+  topics: [s1]
+  subscriptions:
+    - { topic: p20-s1-outbox, consumer: p21.s1-worker }
+    - { topic: p20-s1-outbox, consumer: p21.s2-worker }
