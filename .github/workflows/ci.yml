@@ -30,7 +30,7 @@ jobs:
       - uses: actions/cache@v6
         with:
           path: ~/.nuget/packages
-          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', '.config/dotnet-tools.json') }}
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'Directory.Packages.props', '.config/dotnet-tools.json') }}
           restore-keys: nuget-${{ runner.os }}-
       - run: dotnet build ObservabilityCity.sln -c Release
       - run: dotnet test ObservabilityCity.sln -c Release --no-build
@@ -52,7 +52,7 @@ jobs:
       - uses: actions/cache/restore@v6
         with:
           path: ~/.nuget/packages
-          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', '.config/dotnet-tools.json') }}
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'Directory.Packages.props', '.config/dotnet-tools.json') }}
           restore-keys: nuget-${{ runner.os }}-
       - run: npm ci
         working-directory: web
@@ -86,7 +86,7 @@ jobs:
       - uses: actions/cache/restore@v6
         with:
           path: ~/.nuget/packages
-          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', '.config/dotnet-tools.json') }}
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'Directory.Packages.props', '.config/dotnet-tools.json') }}
           restore-keys: nuget-${{ runner.os }}-
       - run: npm ci
         working-directory: web
@@ -140,7 +140,7 @@ jobs:
       - uses: actions/cache/restore@v6
         with:
           path: ~/.nuget/packages
-          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', '.config/dotnet-tools.json') }}
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'Directory.Packages.props', '.config/dotnet-tools.json') }}
           restore-keys: nuget-${{ runner.os }}-
       - name: Check every registry folder in the repo
         id: validate
