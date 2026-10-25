@@ -2,7 +2,7 @@
 // safe (a missing list becomes an empty one, a number that is not a number becomes 0) and dropped where it is not (a building
 // with no id), and a snapshot with nothing usable in it is refused so the town keeps showing the last good one.
 
-import type { GroupSnapshot, NodeSnapshot, Snapshot } from './types'
+import type { DependencySnapshot, ExternalCallerSnapshot, GroupSnapshot, IncidentSnapshot, NodeSnapshot, Snapshot, VendorSnapshot } from './types'
 
 const KINDS = ['Api', 'Worker', 'Database', 'Cache', 'Cron', 'Gateway', 'Broker', 'Egress']
 const STATES = ['Healthy', 'Degraded', 'Down', 'Stale']
@@ -41,6 +41,14 @@ export function checkSnapshot(raw: unknown): Checked {
 
   const totals = isObject(raw.totals) ? raw.totals : {}
   const num = (v: unknown) => (isFiniteNumber(v) ? v : 0)
+  const groupIds = new Set(groups.map((g) => g.id))
+  const vendors: VendorSnapshot[] = []
+  const vendorIds = new Set<string>()
+  for (const v of Array.isArray(raw.vendors) ? raw.vendors : []) {
+    const node = isObject(v) ? checkNode(v.node, 'third parties', vendorIds, problems) : null
+    if (!node) { problems.push('dropped a third party that cannot be drawn'); continue }
+    vendors.push({ node, calledBy: strings((v as Record<string, unknown>).calledBy) })
+  }
   const snapshot: Snapshot = {
     townId: str(raw.townId),
     townName: str(raw.townName) || str(raw.townId),
@@ -54,9 +62,18 @@ export function checkSnapshot(raw: unknown): Checked {
       p99Ms: num(totals.p99Ms),
       degraded: num(totals.degraded),
       down: num(totals.down),
+      incidents: num(totals.incidents),
     },
     notices: Array.isArray(raw.notices) ? raw.notices.filter((n): n is string => typeof n === 'string') : [],
     groups,
+    vendors,
+    externalCallers: (Array.isArray(raw.externalCallers) ? raw.externalCallers : []).filter(isObject).filter((c) => typeof c.id === 'string' && c.id !== '').map<ExternalCallerSnapshot>((c) => ({
+      id: c.id as string, name: str(c.name) || (c.id as string), requestsPerSecond: num(c.requestsPerSecond), calls: strings(c.calls),
+    })),
+    // a link to a group or vendor that is not in the snapshot cannot be drawn
+    dependencies: (Array.isArray(raw.dependencies) ? raw.dependencies : []).filter(isObject)
+      .filter((d) => typeof d.from === 'string' && typeof d.to === 'string' && groupIds.has(d.from) && (groupIds.has(d.to) || vendorIds.has(d.to)) && d.from !== d.to)
+      .map<DependencySnapshot>((d) => ({ from: d.from as string, to: d.to as string, requestsPerSecond: num(d.requestsPerSecond) })),
   }
   return { snapshot, problems }
 }
@@ -85,6 +102,13 @@ function checkGroup(g: unknown, seen: Set<string>, problems: string[]): GroupSna
     isHub: g.isHub === true,
     isLostFound: g.isLostFound === true,
     configError: typeof g.configError === 'string' && g.configError !== '' ? g.configError : null,
+    incidents: (Array.isArray(g.incidents) ? g.incidents : []).filter(isObject).map<IncidentSnapshot>((i, k) => ({
+      id: str(i.id) || `${g.id}-${k}`,
+      title: str(i.title) || 'Incident',
+      // 1 is the worst; anything else becomes the mildest, so a bad value never hides an incident
+      severity: isFiniteNumber(i.severity) && i.severity >= 1 && i.severity <= 4 ? Math.round(i.severity) : 4,
+      startedAt: str(i.startedAt),
+    })).sort((a, b) => a.severity - b.severity),
     nodes,
   }
 }
@@ -114,7 +138,8 @@ function checkNode(n: unknown, groupId: string, ids: Set<string>, problems: stri
     service: typeof n.service === 'string' ? n.service : null,
     external: n.external === true,
     state,
-    calls: Array.isArray(n.calls) ? n.calls.filter((c): c is string => typeof c === 'string') : [],
+    calls: strings(n.calls),
+    gatewayCalls: strings(n.gatewayCalls),
     lastUpdated: typeof n.lastUpdated === 'string' ? n.lastUpdated : null,
   }
   for (const key of REQUIRED_NUMBERS) {
@@ -127,4 +152,8 @@ function checkNode(n: unknown, groupId: string, ids: Set<string>, problems: stri
 
 function str(v: unknown): string {
   return typeof v === 'string' ? v : ''
+}
+
+function strings(v: unknown): string[] {
+  return Array.isArray(v) ? v.filter((c): c is string => typeof c === 'string') : []
 }

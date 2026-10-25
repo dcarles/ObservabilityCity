@@ -3,7 +3,7 @@ pillar: bil
 displayName: Billing
 color: "#e5b13a"
 systems:
-  - { id: bil.invoices-api, service: invoices, name: Invoices API, role: api, external: true, calls: [bil.invoices-db, bil.rating-api] }
+  - { id: bil.invoices-api, service: invoices, name: Invoices API, role: api, external: true, calls: [bil.invoices-db, bil.rating-api], gatewayCalls: [pay.payments-api, acc.accounts-api] }
   - { id: bil.invoices-worker, service: invoices, name: Invoices worker, role: worker, calls: [bil.invoices-db] }
   - { id: bil.invoices-db, service: invoices, name: Invoices DB, role: db }
   - { id: bil.rating-api, service: rating, name: Rating API, role: api, calls: [bil.rating-db] }

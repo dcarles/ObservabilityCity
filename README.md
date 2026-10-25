@@ -55,7 +55,7 @@ The browser app proxies `/api` and `/hubs` to the backend, so there is nothing t
 
 Hover a building for its numbers. Drag to orbit, scroll to zoom, right-drag to pan, **Home** frames the whole town. Click a building, or pick one in the search box (press `/` to focus it), and the camera glides to it and keeps its name board readable. Search also finds islands. Any drag cancels a glide.
 
-The **Try it** panel (temporary in this slice) pokes the fake data source: pick a target (the whole town, an island or one building), then press Traffic spike, Slow, Errors, Sick instances, High CPU, High memory, DB saturated, Queue backs up, Dead letters or Down. Effects stack, and each shows as a chip you can click to clear. **Calm** freezes the noise and the daily cycle.
+The **Try it** panel (temporary in this slice) pokes the fake data source: pick a target (the whole town, an island or one building), then press Traffic spike, Slow, Errors, Sick instances, High CPU, High memory, DB saturated, Queue backs up, Dead letters, Down, or an Incident (Sev 1 to 4, which brings weather over the island). Pick a third party as the target to take a vendor offline or slow. Effects stack, and each shows as a chip you can click to clear. **Calm** freezes the noise and the daily cycle.
 
 ### Demo trouble from a script
 
@@ -65,6 +65,7 @@ Until the Break things panel exists, `scripts/trouble.ps1` pokes the fake source
 ./scripts/trouble.ps1 list                  # the presets
 ./scripts/trouble.ps1 high-cpu dlq-buildup  # presets stack
 ./scripts/trouble.ps1 bad-day               # errors, slowness, dead letters and a throttled DB across Payments and Core Ledger
+./scripts/trouble.ps1 rain vendor-down      # incident weather over Payments, a third party offline
 ./scripts/trouble.ps1 raw cl.ledger-api Errors 0.5
 ./scripts/trouble.ps1 reset                 # back to a calm baseline
 ```

@@ -22,7 +22,7 @@ function island(code: string, n: number): GroupSnapshot {
     nodes.push(node(`${code}.s${i}-api`, 'Api', `s${i}`), node(`${code}.s${i}-worker`, 'Worker', `s${i}`), node(`${code}.s${i}-db`, 'Database', `s${i}`))
   if (n % 3 === 1) nodes.push(node(`${code}.session-cache`, 'Cache', null))
   if (n % 3 === 2) nodes.push(node(`${code}.s${full + 1}-api`, 'Api', `s${full + 1}`), node(`${code}.s${full + 1}-db`, 'Database', `s${full + 1}`))
-  return { id: code, displayName: code, color: '#5aa9ff', isHub: false, isLostFound: false, configError: null, nodes }
+  return { id: code, displayName: code, color: '#5aa9ff', isHub: false, isLostFound: false, configError: null, incidents: [], nodes }
 }
 
 const groups = SIZES.map((n, i) => island(`p${String(i + 1).padStart(2, '0')}`, n))

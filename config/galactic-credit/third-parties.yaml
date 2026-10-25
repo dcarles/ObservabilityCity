@@ -1,0 +1,7 @@
+# yaml-language-server: $schema=schema/third-parties.schema.json
+# Vendors outside the town. Each stands on a small island of its own, and its health is read from the calls our systems make to it.
+vendors:
+  - { id: ext.credit-bureau, name: Credit bureau, calledBy: [dec.decision-api, acq.applications-api], slaP99Ms: 1500 }
+  - { id: ext.card-network, name: Card network, calledBy: [pay.payments-api], slaP99Ms: 900 }
+  - { id: ext.sms-email, name: SMS and email, calledBy: [ntf.dispatch-worker], slaP99Ms: 2500, errors: { amber: 0.03, red: 0.1 } }
+  - { id: ext.snowflake, name: Snowflake, calledBy: [dat.ingest-worker, hub.egress], slaP99Ms: 4000 }

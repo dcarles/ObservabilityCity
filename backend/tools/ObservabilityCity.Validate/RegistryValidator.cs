@@ -20,7 +20,7 @@ public static class RegistryValidator
     private static readonly Regex Colour = new("^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$", RegexOptions.Compiled);
     private static readonly Regex Quoted = new("'([^']+)'", RegexOptions.Compiled);
     private static readonly Regex CallsMessage = new("^'([^']+)' calls '([^']+)'", RegexOptions.Compiled);
-    private static readonly string[] TopLevel = ["town.yaml", "defaults.yaml", "hub.yaml", "layout.yaml", "fake.yaml"];
+    private static readonly string[] TopLevel = ["town.yaml", "defaults.yaml", "hub.yaml", "layout.yaml", "fake.yaml", "third-parties.yaml"];
     private static readonly string[] Topologies = ["hub-and-spoke", "direct"];
     private static readonly string[] Blocks = ["errors", "resources", "throttle", "backlog"];
 
@@ -272,7 +272,7 @@ public static class RegistryValidator
             return;
         }
 
-        var ids = registry.AllNodes.Select(n => n.Id).ToHashSet();
+        var ids = registry.AllNodes.Concat(registry.Vendors.Select(v => v.Node)).Select(n => n.Id).ToHashSet(); // vendors have fake profiles too
         var aliases = c.Aliases();
         var raw = c.Raw("fake.yaml");
         if (raw.Root is null) return;

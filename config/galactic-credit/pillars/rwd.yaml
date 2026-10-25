@@ -3,7 +3,7 @@ pillar: rwd
 displayName: Rewards
 color: "#c77dff"
 systems:
-  - { id: rwd.points-api, service: points, name: Points API, role: api, external: true, calls: [rwd.points-db, rwd.points-cache, rwd.catalog-api] }
+  - { id: rwd.points-api, service: points, name: Points API, role: api, external: true, calls: [rwd.points-db, rwd.points-cache, rwd.catalog-api], gatewayCalls: [cl.ledger-api] }
   - { id: rwd.points-worker, service: points, name: Points worker, role: worker, calls: [rwd.points-db] }
   - { id: rwd.points-db, service: points, name: Points DB, role: db }
   - { id: rwd.catalog-api, service: catalog, name: Catalog API, role: api, calls: [rwd.catalog-db] }

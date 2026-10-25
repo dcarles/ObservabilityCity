@@ -22,7 +22,7 @@ export interface Bay {
 export interface Route {
   dest: Building
   /** The building the cars drive out of: they appear at its front and never anywhere else. */
-  source: Building
+  source: Pick<Building, 'doorWorld'>
   origin: Origin
   /** Road centre line from where cars appear to the point where they turn into the bay (or stop, without a bay). */
   path: THREE.Vector3[]

@@ -8,7 +8,7 @@ defaults:
 systems:
   - { id: obk.consents-api, service: consents, name: Consents API, role: api, calls: [obk.consents-db, obk.tokens-cache] }
   - { id: obk.consents-db, service: consents, name: Consents DB, role: db }
-  - { id: obk.data-api, service: data, name: Data API, role: api, calls: [obk.data-db, obk.consents-api, obk.tokens-cache] }
+  - { id: obk.data-api, service: data, name: Data API, role: api, calls: [obk.data-db, obk.consents-api, obk.tokens-cache], gatewayCalls: [acc.accounts-api, cus.consent-api] }
   - { id: obk.data-worker, service: data, name: Data worker, role: worker, calls: [obk.data-db] }
   - { id: obk.data-db, service: data, name: Data DB, role: db }
   - { id: obk.tokens-cache, name: Tokens cache, role: cache }

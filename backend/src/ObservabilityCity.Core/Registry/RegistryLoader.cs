@@ -28,7 +28,7 @@ public static class RegistryLoader
     [
         "id", "name", "groupLabel", "topology", "pillar", "displayName", "color", "external", "defaults", "systems", "resources",
         "externalCallers", "islands", "role", "service", "slaP99Ms", "errors", "resources", "throttle", "backlog", "calls", "aliases",
-        "amber", "red",
+        "amber", "red", "vendors", "calledBy", "gatewayCalls",
     ];
 
     // Last resort when defaults.yaml is missing or silent about a role.
@@ -75,6 +75,9 @@ public static class RegistryLoader
         var hub = Read<HubFile>(Path.Combine(folder, "hub.yaml"));
         var layoutPath = Path.Combine(folder, "layout.yaml");
         var layout = File.Exists(layoutPath) ? Read<LayoutFile>(layoutPath) : new LayoutFile();
+
+        var thirdPartiesPath = Path.Combine(folder, "third-parties.yaml");
+        var thirdParties = File.Exists(thirdPartiesPath) ? Read<ThirdPartiesFile>(thirdPartiesPath) : new ThirdPartiesFile();
 
         var ids = new HashSet<string>();
         var aliases = new Dictionary<string, string>(); // old id to current id
@@ -157,6 +160,28 @@ public static class RegistryLoader
             resolved[node.Id] = calls.Distinct().ToList();
         }
 
+        // gateway calls: systems on other islands, reached through the API gateway
+        var groupOfNode = groups.SelectMany(g => g.Nodes.Select(n => (Id: n.Id, Group: g.Id))).ToDictionary(x => x.Id, x => x.Group);
+        var resolvedGateway = new Dictionary<string, IReadOnlyList<string>>();
+        foreach (var node in groups.SelectMany(g => g.Nodes))
+        {
+            var calls = new List<string>();
+            foreach (var callee in node.GatewayCalls)
+            {
+                var target = ids.Contains(callee) ? callee : aliases.GetValueOrDefault(callee);
+                if (target is null)
+                {
+                    if (resilient && brokenPillars.Contains(callee.Split('.')[0])) continue;
+                    Problem($"'{node.Id}' reaches '{callee}' through the gateway (gatewayCalls), which is not in this town.{DidYouMean.Hint(callee, ids.Concat(aliases.Keys))}");
+                }
+                else if (groupOfNode[target] == node.GroupId)
+                    Problem($"'{node.Id}' lists '{target}' under gatewayCalls, but it is on the same island: use calls");
+                else
+                    calls.Add(target);
+            }
+            resolvedGateway[node.Id] = calls.Distinct().ToList();
+        }
+
         var byId = groups.SelectMany(g => g.Nodes).ToDictionary(n => n.Id);
         var callers = new List<ExternalCaller>();
         foreach (var c in hub.ExternalCallers)
@@ -178,12 +203,34 @@ public static class RegistryLoader
             callers.Add(new ExternalCaller(c.Id, c.Name ?? c.Id, calls));
         }
 
+        var vendors = new List<RegistryVendor>();
+        foreach (var v in thirdParties.Vendors)
+        {
+            var node = ToNode(new SystemFile { Id = v.Id, Name = v.Name, Role = "api", SlaP99Ms = v.SlaP99Ms, Errors = v.Errors }, RegistryVendor.GroupId,
+                "third-parties.yaml", RegistryVendor.GroupId, defaults, new DefaultsFile(), false, ids, aliases, errors);
+            if (node is null) continue;
+            var calledBy = new List<string>();
+            foreach (var caller in v.CalledBy)
+            {
+                var target = ids.Contains(caller) ? caller : aliases.GetValueOrDefault(caller);
+                if (target is null)
+                {
+                    if (resilient && brokenPillars.Contains(caller.Split('.')[0])) continue;
+                    Problem($"third-parties.yaml: '{v.Id}' is called by '{caller}', which is not in this town.{DidYouMean.Hint(caller, ids.Concat(aliases.Keys))}");
+                }
+                else if (target.StartsWith(RegistryVendor.GroupId + ".")) Problem($"third-parties.yaml: '{v.Id}' is called by '{target}', which is another third party");
+                else calledBy.Add(target);
+            }
+            if (v.CalledBy.Count == 0) Problem($"third-parties.yaml: '{v.Id}' needs calledBy: the systems whose calls show how it is doing");
+            vendors.Add(new RegistryVendor(node, calledBy.Distinct().ToList()));
+        }
+
         if (errors.Count == 1) throw new RegistryException(errors[0]);
         if (errors.Count > 1)
             throw new RegistryException($"The registry has {errors.Count} problems:\n" + string.Join("\n", errors.Select(e => "  - " + e)));
 
-        var final = groups.Select(g => g with { Nodes = g.Nodes.Select(n => n with { Calls = resolved[n.Id] }).ToList() }).ToList();
-        return new Registry(new TownInfo(town.Id, town.Name, town.GroupLabel, town.Topology), final, callers) { Notices = notices, Problems = problems };
+        var final = groups.Select(g => g with { Nodes = g.Nodes.Select(n => n with { Calls = resolved[n.Id], GatewayCalls = resolvedGateway[n.Id] }).ToList() }).ToList();
+        return new Registry(new TownInfo(town.Id, town.Name, town.GroupLabel, town.Topology), final, callers) { Notices = notices, Problems = problems, Vendors = vendors };
     }
 
     /// <summary>Reads one pillar file. Problems found in it go to <paramref name="errors"/>; the ids and aliases it would add are returned, so a caller can drop them with the file.</summary>
@@ -282,7 +329,10 @@ public static class RegistryLoader
             Resolve(d => d?.Throttle?.Red, s.Throttle?.Red),
             Resolve(d => d?.Backlog?.Amber, s.Backlog?.Amber),
             Resolve(d => d?.Backlog?.Red, s.Backlog?.Red),
-            s.Calls);
+            s.Calls)
+        {
+            GatewayCalls = s.GatewayCalls,
+        };
     }
 
     private static bool TryParseKind(string? role, string id, string fileName, List<string> errors, out NodeKind kind)

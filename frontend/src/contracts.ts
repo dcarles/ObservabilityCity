@@ -24,6 +24,19 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        DependencySnapshot: {
+            from: string;
+            to: string;
+            /** Format: double */
+            requestsPerSecond: number;
+        };
+        ExternalCallerSnapshot: {
+            id: string;
+            name: string;
+            /** Format: double */
+            requestsPerSecond: number;
+            calls: string[];
+        };
         GroupSnapshot: {
             id: string;
             displayName: string;
@@ -31,10 +44,19 @@ export interface components {
             isHub: boolean;
             isLostFound: boolean;
             configError?: string | null;
+            incidents: components["schemas"]["IncidentSnapshot"][];
             nodes: components["schemas"]["NodeSnapshot"][];
         };
         /** @enum {string} */
         HealthState: "Healthy" | "Degraded" | "Down" | "Stale";
+        IncidentSnapshot: {
+            id: string;
+            title: string;
+            /** Format: int32 */
+            severity: number;
+            /** Format: date-time */
+            startedAt: string;
+        };
         /** @enum {string} */
         NodeKind: "Api" | "Worker" | "Database" | "Cache" | "Cron" | "Gateway" | "Broker" | "Egress";
         NodeSnapshot: {
@@ -89,6 +111,7 @@ export interface components {
             /** Format: double */
             backlogRed: number;
             calls: string[];
+            gatewayCalls: string[];
             /** Format: date-time */
             lastUpdated?: string | null;
         };
@@ -104,6 +127,9 @@ export interface components {
             totals: components["schemas"]["TownTotals"];
             notices: string[];
             groups: components["schemas"]["GroupSnapshot"][];
+            vendors: components["schemas"]["VendorSnapshot"][];
+            externalCallers: components["schemas"]["ExternalCallerSnapshot"][];
+            dependencies: components["schemas"]["DependencySnapshot"][];
         };
         TownTotals: {
             /** Format: double */
@@ -116,6 +142,12 @@ export interface components {
             degraded: number;
             /** Format: int32 */
             down: number;
+            /** Format: int32 */
+            incidents: number;
+        };
+        VendorSnapshot: {
+            node: components["schemas"]["NodeSnapshot"];
+            calledBy: string[];
         };
     };
     responses: never;

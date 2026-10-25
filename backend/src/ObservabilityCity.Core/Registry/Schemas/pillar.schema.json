@@ -32,6 +32,11 @@
             "description": "Systems this one calls directly. Cars drive only along these links.",
             "items": { "$ref": "system-ids.schema.json#/$defs/systemId" }
           },
+          "gatewayCalls": {
+            "type": "array",
+            "description": "Systems on other islands this one reaches through the API gateway. They draw the dependency overlay and decide where the cars come from.",
+            "items": { "$ref": "system-ids.schema.json#/$defs/systemId" }
+          },
           "aliases": {
             "type": "array",
             "description": "Former ids of this system, so files that still use them keep working after a rename.",

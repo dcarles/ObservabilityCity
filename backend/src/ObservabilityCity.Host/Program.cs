@@ -35,10 +35,12 @@ builder.Services.AddSingleton<SnapshotStore>();
 builder.Services.AddSingleton(fake);
 builder.Services.AddSingleton<IFakeControl>(fake);
 builder.Services.AddSingleton<IMetricSource>(fake);
+builder.Services.AddSingleton<IIncidentSource>(fake);
 builder.Services.AddSingleton<ISnapshotNotifier, SignalRSnapshotNotifier>();
 builder.Services.AddSingleton(sp => new SnapshotBuilder(
     sp.GetRequiredService<IRegistryProvider>(), sp.GetRequiredService<LatestState>(), sp.GetRequiredService<TimeProvider>())
 {
+    IncidentSources = sp.GetServices<IIncidentSource>().ToList(),
     Environment = "demo",
     StaleAfter = TimeSpan.FromSeconds(builder.Configuration.GetValue("Snapshot:StaleAfterSeconds", 30.0)),
     DayFraction = () => fake.DayFraction,

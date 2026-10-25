@@ -92,12 +92,12 @@ export function planIsland(g: GroupSnapshot): Plan {
   return { pads, placed, rows, rowRoadZ, rx, rz }
 }
 
-/** Island-local coast: the far +z edge at x=0 (for 'z'), or the +x edge at the given z (for 'x'). */
-export function coastScan(outline: Outline, axis: 'z' | 'x', at = 0): number {
+/** Island-local coast: the far +z edge at x=0 (for 'z'), the far -z edge at x=0 as a distance (for '-z'), or the +x edge at the given z (for 'x'). */
+export function coastScan(outline: Outline, axis: 'z' | '-z' | 'x', at = 0): number {
   let lo = 0, hi = 90
   for (let i = 0; i < 26; i++) {
     const mid = (lo + hi) / 2
-    const inside = axis === 'z' ? outline.contains(0, mid) : outline.contains(mid, at)
+    const inside = axis === 'z' ? outline.contains(0, mid) : axis === '-z' ? outline.contains(0, -mid) : outline.contains(mid, at)
     if (inside) lo = mid
     else hi = mid
   }

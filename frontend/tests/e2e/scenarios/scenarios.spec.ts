@@ -13,7 +13,7 @@ import type { Town } from '../support/city'
 async function expectCalm(town: Town): Promise<void> {
   await town.step(20)
   const buildings = await town.allBuildings()
-  expect(buildings.length).toBe(13)
+  expect(buildings.length).toBe(15) // 13 on the islands and the hub, 2 third parties
   for (const b of buildings) {
     expect.soft(b.state, `${b.id} state`).toBe('Healthy')
     expect.soft(b.beacon, `${b.id} beacon`).toBe('green')
@@ -321,7 +321,7 @@ test.describe('bad configuration and bad data', () => {
       // nothing about the town changed
       await town.step(10)
       expect(await page.evaluate(() => (window as any).city.town.islands.length)).toBe(3)
-      expect((await town.allBuildings()).length).toBe(13)
+      expect((await town.allBuildings()).length).toBe(15) // 13 on the islands and the hub, 2 third parties
       await town.until('aa.orders-api', (n) => n.state === 'Healthy')
     } finally {
       writeFileSync(file, original)
@@ -355,7 +355,7 @@ test.describe('cars', () => {
       const doorOf = (b: any) => b.doorWorld()
       const far = (x: number, z: number, b: any) => Math.hypot(x - doorOf(b).x, z - doorOf(b).z)
       const bad: string[] = []
-      for (const r of cars.routeList) if (far(r.path[0].x, r.path[0].z, r.source) > 8) bad.push(`route ${r.source.id} > ${r.dest.id}`)
+      for (const r of cars.routeList) if (far(r.path[0].x, r.path[0].z, r.source) > 8) bad.push(`route ${r.source.id ?? "airport"} > ${r.dest.id}`)
       // and the cars themselves, the moment they first show
       const seen = new Set<number>(cars.cars.map((c: any) => c.id))
       let spawned = 0
@@ -365,11 +365,11 @@ test.describe('cars', () => {
           if (seen.has(c.id)) continue
           seen.add(c.id)
           spawned++
-          if (far(c.x, c.z, c.plan.route.source) > 8) bad.push(`car ${c.id} from ${c.plan.route.source.id} appeared ${far(c.x, c.z, c.plan.route.source).toFixed(1)} m away`)
+          if (far(c.x, c.z, c.plan.route.source) > 8) bad.push(`car ${c.id} from ${c.plan.route.source.id ?? "airport"} appeared ${far(c.x, c.z, c.plan.route.source).toFixed(1)} m away`)
         }
       }
       // cross-island roads go over both bridges: they start on another island than they end on
-      const crossing = cars.routeList.filter((r: any) => r.source.id.split('.')[0] !== r.dest.id.split('.')[0]).length
+      const crossing = cars.routeList.filter((r: any) => r.source.id && r.source.id.split('.')[0] !== r.dest.id.split('.')[0]).length
       return { bad, spawned, routes: cars.routeList.length, crossing }
     })
     expect(result.bad).toEqual([])
@@ -469,5 +469,88 @@ test.describe('finding things', () => {
       return city.stage.controls.target.distanceTo(focus.target)
     })
     expect(near, 'camera target to the building (m)').toBeLessThan(3)
+  })
+})
+
+test.describe('the other signals', () => {
+  test('an incident brings weather over the assigned island only, by severity, and clears with it', async ({ town }) => {
+    await town.open()
+    const sky = (id: string) => town.page.evaluate((i) => (window as any).city.inspectIsland(i).sky, id)
+    expect((await sky('aa')).severity).toBeNull()
+
+    const id = await town.effect('aa', 'Incident', 0.9)
+    await town.page.waitForFunction(() => (window as any).city.seen.last.groups.find((g: any) => g.id === 'aa').incidents.length > 0, null, { timeout: 20_000 })
+    await town.step(10)
+    const storm = await sky('aa')
+    expect(storm.severity).toBe(1)
+    expect(storm.stormy).toBe(true)
+    expect((await sky('bb')).severity).toBeNull()
+    expect((await sky('cc')).severity).toBeNull()
+    await expect(town.page.locator('[data-list="Incidents"] b')).toHaveText('1')
+
+    await town.removeEffects(id)
+    await town.page.waitForFunction(() => (window as any).city.seen.last.groups.every((g: any) => g.incidents.length === 0), null, { timeout: 20_000 })
+    await town.step(10)
+    expect((await sky('aa')).severity).toBeNull()
+  })
+
+  test('the incidents counter lists the islands with open incidents', async ({ town, page }) => {
+    await town.open()
+    await town.effect('bb', 'Incident', 0.6)
+    await page.waitForFunction(() => (window as any).city.seen.last.groups.find((g: any) => g.id === 'bb').incidents.length > 0, null, { timeout: 20_000 })
+    await page.locator('[data-list="Incidents"]').click()
+    const list = page.locator('#state-list')
+    await expect(list.locator('.hit')).toHaveCount(1)
+    await expect(list.locator('.hit').first()).toContainText('Beta')
+    await expect(list.locator('.hit').first()).toContainText('sev 2')
+  })
+
+  test('a third party that goes down is closed, is listed as down, and reopens', async ({ town, page }) => {
+    await town.open()
+    const vendors = await page.evaluate(() => (window as any).city.inspectVendors())
+    expect(vendors.map((v: any) => v.id).sort()).toEqual(['ext.bureau', 'ext.mailer'])
+    expect(vendors.find((v: any) => v.id === 'ext.bureau').bridges).toBeGreaterThan(0)
+
+    await town.effect('ext.bureau', 'Down')
+    await page.waitForFunction(() => (window as any).city.seen.last.vendors.find((v: any) => v.node.id === 'ext.bureau')?.node.state === 'Down', null, { timeout: 30_000 })
+    await town.step(20)
+    const closed = await town.inspect('ext.bureau')
+    expect(closed.closedSign).toBe(true)
+    expect(closed.beacon).toBe('red')
+    await page.locator('[data-list="Down"]').click()
+    await expect(page.locator('#state-list .hit')).toContainText(['Credit bureau'])
+
+    await town.removeEffects()
+    await page.waitForFunction(() => (window as any).city.seen.last.vendors.every((v: any) => v.node.state === 'Healthy'), null, { timeout: 30_000 })
+    await town.step(20)
+    expect((await town.inspect('ext.bureau')).closedSign).toBe(false)
+  })
+
+  test('the airport shows outside traffic and has a board', async ({ town, page }) => {
+    await town.open()
+    await town.step(5)
+    const a = await page.evaluate(() => (window as any).city.inspectAirport())
+    expect(a).not.toBeNull()
+    expect(a.board.length).toBeGreaterThan(0)
+  })
+
+  test('the dependency switch shows dashed arcs between callers and what they call, and hides them again', async ({ town, page }) => {
+    await town.open()
+    expect(await page.evaluate(() => (window as any).city.overlay().visible)).toBe(false)
+    await page.locator('#deps').click()
+    await town.step(1)
+    const on = await page.evaluate(() => (window as any).city.overlay())
+    expect(on.visible).toBe(true)
+    expect(on.arcs.length).toBeGreaterThan(0)
+    await page.locator('#deps').click()
+    expect((await page.evaluate(() => (window as any).city.overlay())).visible).toBe(false)
+  })
+
+  test('stale systems are counted and listed in grey', async ({ town, page }) => {
+    await town.open()
+    await town.effect('cc.notify-api', 'Stale')
+    await town.until('cc.notify-api', (n) => n.state === 'Stale')
+    await page.locator('[data-list="Stale"]').click()
+    await expect(page.locator('#state-list .hit')).toContainText(['Notify API'])
   })
 })

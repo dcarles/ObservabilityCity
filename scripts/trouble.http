@@ -43,6 +43,36 @@ Content-Type: application/json
 
 { "target": "cl.ledger-db", "kind": "Saturate", "intensity": 1 }
 
+### Rain over Payments (a sev 2 incident; intensity 0.9 is sev 1 and a storm, 0.4 overcast, 0.1 clouds)
+POST {{host}}/api/fake/effects
+Content-Type: application/json
+
+{ "target": "pay", "kind": "Incident", "intensity": 0.6 }
+
+### Credit bureau (third party) down
+POST {{host}}/api/fake/effects
+Content-Type: application/json
+
+{ "target": "ext.credit-bureau", "kind": "Down", "intensity": 1 }
+
+### Card network slow
+POST {{host}}/api/fake/effects
+Content-Type: application/json
+
+{ "target": "ext.card-network", "kind": "Latency", "intensity": 0.9 }
+
+### Airport rush (more outside callers through the gateway)
+POST {{host}}/api/fake/effects
+Content-Type: application/json
+
+{ "target": "hub.apim", "kind": "Traffic", "intensity": 0.9 }
+
+### Whole Fraud island goes grey
+POST {{host}}/api/fake/effects
+Content-Type: application/json
+
+{ "target": "frd", "kind": "Stale", "intensity": 1 }
+
 ### What is active
 GET {{host}}/api/fake
 

@@ -14,7 +14,7 @@ systems:
   - { id: cl.posting-api, service: posting, name: Posting API, role: api, calls: [cl.posting-db, cl.session-cache] }
   - { id: cl.posting-worker, service: posting, name: Posting worker, role: worker, calls: [cl.posting-db, cl.statements-api] }
   - { id: cl.posting-db, service: posting, name: Posting DB, role: db }
-  - { id: cl.statements-api, service: statements, name: Statements API, role: api, calls: [cl.statements-db, cl.ledger-api] }
+  - { id: cl.statements-api, service: statements, name: Statements API, role: api, calls: [cl.statements-db, cl.ledger-api], gatewayCalls: [ntf.dispatch-api] }
   - { id: cl.statements-worker, service: statements, name: Statements worker, role: worker, calls: [cl.statements-db] }
   - { id: cl.statements-db, service: statements, name: Statements DB, role: db }
   - { id: cl.statement-cron, name: Statement run, role: cron, calls: [cl.statements-api] }

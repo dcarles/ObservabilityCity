@@ -10,7 +10,8 @@
     "errorRate": 0.001999999999999999,
     "p99Ms": 212.46125647832136,
     "degraded": 0,
-    "down": 0
+    "down": 0,
+    "incidents": 0
   },
   "notices": [],
   "groups": [
@@ -21,6 +22,7 @@
       "isHub": true,
       "isLostFound": false,
       "configError": null,
+      "incidents": [],
       "nodes": [
         {
           "id": "hub.apim",
@@ -52,6 +54,7 @@
           "backlogAmber": 60,
           "backlogRed": 300,
           "calls": [],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -84,6 +87,7 @@
           "backlogAmber": 60,
           "backlogRed": 300,
           "calls": [],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -116,6 +120,7 @@
           "backlogAmber": 60,
           "backlogRed": 300,
           "calls": [],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -148,6 +153,7 @@
           "backlogAmber": 60,
           "backlogRed": 300,
           "calls": [],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         }
       ]
@@ -159,6 +165,7 @@
       "isHub": false,
       "isLostFound": false,
       "configError": null,
+      "incidents": [],
       "nodes": [
         {
           "id": "cl.ledger-api",
@@ -194,6 +201,7 @@
             "cl.session-cache",
             "cl.posting-api"
           ],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -228,6 +236,7 @@
           "calls": [
             "cl.ledger-db"
           ],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -260,6 +269,7 @@
           "backlogAmber": 60,
           "backlogRed": 300,
           "calls": [],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -295,6 +305,7 @@
             "cl.posting-db",
             "cl.session-cache"
           ],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -330,6 +341,7 @@
             "cl.posting-db",
             "cl.statements-api"
           ],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -362,6 +374,7 @@
           "backlogAmber": 60,
           "backlogRed": 300,
           "calls": [],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -397,6 +410,9 @@
             "cl.statements-db",
             "cl.ledger-api"
           ],
+          "gatewayCalls": [
+            "ntf.dispatch-api"
+          ],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -431,6 +447,7 @@
           "calls": [
             "cl.statements-db"
           ],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -463,6 +480,7 @@
           "backlogAmber": 60,
           "backlogRed": 300,
           "calls": [],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -497,6 +515,7 @@
           "calls": [
             "cl.statements-api"
           ],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -529,6 +548,7 @@
           "backlogAmber": 60,
           "backlogRed": 300,
           "calls": [],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         }
       ]
@@ -540,6 +560,7 @@
       "isHub": false,
       "isLostFound": false,
       "configError": null,
+      "incidents": [],
       "nodes": [
         {
           "id": "acc.accounts-api",
@@ -575,6 +596,9 @@
             "acc.accounts-cache",
             "acc.limits-api"
           ],
+          "gatewayCalls": [
+            "cl.ledger-api"
+          ],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -609,6 +633,7 @@
           "calls": [
             "acc.accounts-db"
           ],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -641,6 +666,7 @@
           "backlogAmber": 60,
           "backlogRed": 300,
           "calls": [],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -676,6 +702,7 @@
             "acc.limits-db",
             "acc.accounts-cache"
           ],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -708,6 +735,7 @@
           "backlogAmber": 60,
           "backlogRed": 300,
           "calls": [],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -742,6 +770,7 @@
           "calls": [
             "acc.accounts-api"
           ],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -774,6 +803,7 @@
           "backlogAmber": 60,
           "backlogRed": 300,
           "calls": [],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         }
       ]
@@ -785,6 +815,7 @@
       "isHub": false,
       "isLostFound": false,
       "configError": null,
+      "incidents": [],
       "nodes": [
         {
           "id": "pay.payments-api",
@@ -818,6 +849,10 @@
           "calls": [
             "pay.payments-db",
             "pay.refunds-api"
+          ],
+          "gatewayCalls": [
+            "frd.screening-api",
+            "cl.posting-api"
           ],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
@@ -853,6 +888,7 @@
           "calls": [
             "pay.payments-db"
           ],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -885,6 +921,7 @@
           "backlogAmber": 60,
           "backlogRed": 300,
           "calls": [],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -918,6 +955,9 @@
           "backlogRed": 300,
           "calls": [
             "pay.refunds-db"
+          ],
+          "gatewayCalls": [
+            "cl.posting-api"
           ],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
@@ -953,6 +993,7 @@
           "calls": [
             "pay.refunds-db"
           ],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -985,6 +1026,7 @@
           "backlogAmber": 60,
           "backlogRed": 300,
           "calls": [],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         }
       ]
@@ -996,6 +1038,7 @@
       "isHub": false,
       "isLostFound": false,
       "configError": null,
+      "incidents": [],
       "nodes": [
         {
           "id": "frd.screening-api",
@@ -1031,6 +1074,7 @@
             "frd.rules-cache",
             "frd.cases-api"
           ],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -1065,6 +1109,7 @@
           "calls": [
             "frd.screening-db"
           ],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -1097,6 +1142,7 @@
           "backlogAmber": 60,
           "backlogRed": 300,
           "calls": [],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -1131,6 +1177,9 @@
           "calls": [
             "frd.cases-db"
           ],
+          "gatewayCalls": [
+            "cus.profile-api"
+          ],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -1163,6 +1212,7 @@
           "backlogAmber": 60,
           "backlogRed": 300,
           "calls": [],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -1195,6 +1245,7 @@
           "backlogAmber": 60,
           "backlogRed": 300,
           "calls": [],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         }
       ]
@@ -1206,6 +1257,7 @@
       "isHub": false,
       "isLostFound": false,
       "configError": null,
+      "incidents": [],
       "nodes": [
         {
           "id": "cus.profile-api",
@@ -1241,6 +1293,9 @@
             "cus.consent-api",
             "cus.kyc-api"
           ],
+          "gatewayCalls": [
+            "ntf.dispatch-api"
+          ],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -1275,6 +1330,7 @@
           "calls": [
             "cus.profile-db"
           ],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -1307,6 +1363,7 @@
           "backlogAmber": 60,
           "backlogRed": 300,
           "calls": [],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -1341,6 +1398,7 @@
           "calls": [
             "cus.consent-db"
           ],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -1375,6 +1433,7 @@
           "calls": [
             "cus.consent-db"
           ],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -1407,6 +1466,7 @@
           "backlogAmber": 60,
           "backlogRed": 300,
           "calls": [],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -1441,6 +1501,7 @@
           "calls": [
             "cus.kyc-db"
           ],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -1473,6 +1534,7 @@
           "backlogAmber": 60,
           "backlogRed": 300,
           "calls": [],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -1507,6 +1569,7 @@
           "calls": [
             "cus.profile-api"
           ],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         }
       ]
@@ -1518,6 +1581,7 @@
       "isHub": false,
       "isLostFound": false,
       "configError": null,
+      "incidents": [],
       "nodes": [
         {
           "id": "acq.applications-api",
@@ -1551,6 +1615,10 @@
           "calls": [
             "acq.applications-db",
             "acq.offers-api"
+          ],
+          "gatewayCalls": [
+            "dec.decision-api",
+            "cus.kyc-api"
           ],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
@@ -1586,6 +1654,7 @@
           "calls": [
             "acq.applications-db"
           ],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -1618,6 +1687,7 @@
           "backlogAmber": 60,
           "backlogRed": 300,
           "calls": [],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -1652,6 +1722,7 @@
           "calls": [
             "acq.offers-db"
           ],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -1684,6 +1755,7 @@
           "backlogAmber": 60,
           "backlogRed": 300,
           "calls": [],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -1719,6 +1791,9 @@
             "acq.leads-db",
             "acq.applications-api"
           ],
+          "gatewayCalls": [
+            "cus.profile-api"
+          ],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -1753,6 +1828,7 @@
           "calls": [
             "acq.leads-db"
           ],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -1785,6 +1861,7 @@
           "backlogAmber": 60,
           "backlogRed": 300,
           "calls": [],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         }
       ]
@@ -1796,6 +1873,7 @@
       "isHub": false,
       "isLostFound": false,
       "configError": null,
+      "incidents": [],
       "nodes": [
         {
           "id": "dec.decision-api",
@@ -1830,6 +1908,10 @@
             "dec.decision-db",
             "dec.features-cache",
             "dec.scorecards-api"
+          ],
+          "gatewayCalls": [
+            "frd.screening-api",
+            "cus.profile-api"
           ],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
@@ -1866,6 +1948,7 @@
             "dec.decision-db",
             "dec.scorecards-api"
           ],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -1898,6 +1981,7 @@
           "backlogAmber": 60,
           "backlogRed": 300,
           "calls": [],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -1932,6 +2016,7 @@
           "calls": [
             "dec.scorecards-db"
           ],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -1964,6 +2049,7 @@
           "backlogAmber": 60,
           "backlogRed": 300,
           "calls": [],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -1996,6 +2082,7 @@
           "backlogAmber": 60,
           "backlogRed": 300,
           "calls": [],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         }
       ]
@@ -2007,6 +2094,7 @@
       "isHub": false,
       "isLostFound": false,
       "configError": null,
+      "incidents": [],
       "nodes": [
         {
           "id": "bil.invoices-api",
@@ -2040,6 +2128,10 @@
           "calls": [
             "bil.invoices-db",
             "bil.rating-api"
+          ],
+          "gatewayCalls": [
+            "pay.payments-api",
+            "acc.accounts-api"
           ],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
@@ -2075,6 +2167,7 @@
           "calls": [
             "bil.invoices-db"
           ],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -2107,6 +2200,7 @@
           "backlogAmber": 60,
           "backlogRed": 300,
           "calls": [],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -2141,6 +2235,7 @@
           "calls": [
             "bil.rating-db"
           ],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -2173,6 +2268,7 @@
           "backlogAmber": 60,
           "backlogRed": 300,
           "calls": [],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -2207,6 +2303,7 @@
           "calls": [
             "bil.invoices-api"
           ],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         }
       ]
@@ -2218,6 +2315,7 @@
       "isHub": false,
       "isLostFound": false,
       "configError": null,
+      "incidents": [],
       "nodes": [
         {
           "id": "col.cases-api",
@@ -2253,6 +2351,10 @@
             "col.queue-cache",
             "col.dunning-api"
           ],
+          "gatewayCalls": [
+            "bil.invoices-api",
+            "cus.profile-api"
+          ],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -2287,6 +2389,7 @@
           "calls": [
             "col.cases-db"
           ],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -2319,6 +2422,7 @@
           "backlogAmber": 60,
           "backlogRed": 300,
           "calls": [],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -2355,6 +2459,9 @@
             "col.queue-cache",
             "col.agency-api"
           ],
+          "gatewayCalls": [
+            "ntf.dispatch-api"
+          ],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -2389,6 +2496,7 @@
           "calls": [
             "col.dunning-db"
           ],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -2421,6 +2529,7 @@
           "backlogAmber": 60,
           "backlogRed": 300,
           "calls": [],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -2455,6 +2564,7 @@
           "calls": [
             "col.agency-db"
           ],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -2490,6 +2600,7 @@
             "col.agency-db",
             "col.queue-cache"
           ],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -2522,6 +2633,7 @@
           "backlogAmber": 60,
           "backlogRed": 300,
           "calls": [],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -2557,6 +2669,7 @@
             "col.dunning-api",
             "col.cases-api"
           ],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -2589,6 +2702,7 @@
           "backlogAmber": 60,
           "backlogRed": 300,
           "calls": [],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         }
       ]
@@ -2600,6 +2714,7 @@
       "isHub": false,
       "isLostFound": false,
       "configError": null,
+      "incidents": [],
       "nodes": [
         {
           "id": "dsp.disputes-api",
@@ -2633,6 +2748,10 @@
           "calls": [
             "dsp.disputes-db",
             "dsp.evidence-api"
+          ],
+          "gatewayCalls": [
+            "pay.payments-api",
+            "frd.cases-api"
           ],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
@@ -2668,6 +2787,7 @@
           "calls": [
             "dsp.disputes-db"
           ],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -2700,6 +2820,7 @@
           "backlogAmber": 60,
           "backlogRed": 300,
           "calls": [],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -2734,6 +2855,7 @@
           "calls": [
             "dsp.evidence-db"
           ],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -2766,6 +2888,7 @@
           "backlogAmber": 60,
           "backlogRed": 300,
           "calls": [],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         }
       ]
@@ -2777,6 +2900,7 @@
       "isHub": false,
       "isLostFound": false,
       "configError": null,
+      "incidents": [],
       "nodes": [
         {
           "id": "rwd.points-api",
@@ -2812,6 +2936,9 @@
             "rwd.points-cache",
             "rwd.catalog-api"
           ],
+          "gatewayCalls": [
+            "cl.ledger-api"
+          ],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -2846,6 +2973,7 @@
           "calls": [
             "rwd.points-db"
           ],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -2878,6 +3006,7 @@
           "backlogAmber": 60,
           "backlogRed": 300,
           "calls": [],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -2912,6 +3041,7 @@
           "calls": [
             "rwd.catalog-db"
           ],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -2944,6 +3074,7 @@
           "backlogAmber": 60,
           "backlogRed": 300,
           "calls": [],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -2976,6 +3107,7 @@
           "backlogAmber": 60,
           "backlogRed": 300,
           "calls": [],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         }
       ]
@@ -2987,6 +3119,7 @@
       "isHub": false,
       "isLostFound": false,
       "configError": null,
+      "incidents": [],
       "nodes": [
         {
           "id": "obk.consents-api",
@@ -3021,6 +3154,7 @@
             "obk.consents-db",
             "obk.tokens-cache"
           ],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -3053,6 +3187,7 @@
           "backlogAmber": 60,
           "backlogRed": 300,
           "calls": [],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -3089,6 +3224,10 @@
             "obk.consents-api",
             "obk.tokens-cache"
           ],
+          "gatewayCalls": [
+            "acc.accounts-api",
+            "cus.consent-api"
+          ],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -3123,6 +3262,7 @@
           "calls": [
             "obk.data-db"
           ],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -3155,6 +3295,7 @@
           "backlogAmber": 60,
           "backlogRed": 300,
           "calls": [],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -3187,6 +3328,7 @@
           "backlogAmber": 60,
           "backlogRed": 300,
           "calls": [],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         }
       ]
@@ -3198,6 +3340,7 @@
       "isHub": false,
       "isLostFound": false,
       "configError": null,
+      "incidents": [],
       "nodes": [
         {
           "id": "ntf.dispatch-api",
@@ -3232,6 +3375,7 @@
             "ntf.dispatch-db",
             "ntf.templates-api"
           ],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -3266,6 +3410,7 @@
           "calls": [
             "ntf.dispatch-db"
           ],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -3298,6 +3443,7 @@
           "backlogAmber": 60,
           "backlogRed": 300,
           "calls": [],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -3332,6 +3478,7 @@
           "calls": [
             "ntf.templates-db"
           ],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -3364,6 +3511,7 @@
           "backlogAmber": 60,
           "backlogRed": 300,
           "calls": [],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -3398,6 +3546,7 @@
           "calls": [
             "ntf.dispatch-api"
           ],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         }
       ]
@@ -3409,6 +3558,7 @@
       "isHub": false,
       "isLostFound": false,
       "configError": null,
+      "incidents": [],
       "nodes": [
         {
           "id": "dat.ingest-api",
@@ -3441,6 +3591,10 @@
           "backlogRed": 300,
           "calls": [
             "dat.ingest-db"
+          ],
+          "gatewayCalls": [
+            "cl.ledger-api",
+            "pay.payments-api"
           ],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
@@ -3476,6 +3630,7 @@
           "calls": [
             "dat.ingest-db"
           ],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -3508,6 +3663,7 @@
           "backlogAmber": 60,
           "backlogRed": 300,
           "calls": [],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -3543,6 +3699,7 @@
             "dat.reports-db",
             "dat.reports-cache"
           ],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -3577,6 +3734,7 @@
           "calls": [
             "dat.reports-db"
           ],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -3609,6 +3767,7 @@
           "backlogAmber": 60,
           "backlogRed": 300,
           "calls": [],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -3643,6 +3802,7 @@
           "calls": [
             "dat.ingest-api"
           ],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -3675,6 +3835,7 @@
           "backlogAmber": 60,
           "backlogRed": 300,
           "calls": [],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         }
       ]
@@ -3686,6 +3847,7 @@
       "isHub": false,
       "isLostFound": true,
       "configError": null,
+      "incidents": [],
       "nodes": [
         {
           "id": "lost-found.batch-gateway-api",
@@ -3719,6 +3881,7 @@
           "calls": [
             "lost-found.batch-gateway-db"
           ],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -3753,6 +3916,7 @@
           "calls": [
             "lost-found.batch-gateway-db"
           ],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -3785,6 +3949,7 @@
           "backlogAmber": 60,
           "backlogRed": 300,
           "calls": [],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         },
         {
@@ -3817,9 +3982,347 @@
           "backlogAmber": 60,
           "backlogRed": 300,
           "calls": [],
+          "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00"
         }
       ]
+    }
+  ],
+  "vendors": [
+    {
+      "node": {
+        "id": "ext.credit-bureau",
+        "name": "Credit bureau",
+        "kind": "Api",
+        "service": null,
+        "external": false,
+        "state": "Healthy",
+        "instancesTotal": 1,
+        "instancesHealthy": 1,
+        "load": 0.4,
+        "cpu": null,
+        "memory": null,
+        "utilisation": null,
+        "throttled": null,
+        "queueDepth": null,
+        "oldestMessageSeconds": null,
+        "deadLetters": null,
+        "requestsPerSecond": 22.400000000000002,
+        "errorRate": 0.004,
+        "p99Ms": 686,
+        "slaP99Ms": 1500,
+        "errorAmber": 0.01,
+        "errorRed": 0.05,
+        "resourceAmber": 0.8,
+        "resourceRed": 0.95,
+        "throttleAmber": 0.001,
+        "throttleRed": 0.02,
+        "backlogAmber": 60,
+        "backlogRed": 300,
+        "calls": [],
+        "gatewayCalls": [],
+        "lastUpdated": "2026-10-24T12:00:01+00:00"
+      },
+      "calledBy": [
+        "dec.decision-api",
+        "acq.applications-api"
+      ]
+    },
+    {
+      "node": {
+        "id": "ext.card-network",
+        "name": "Card network",
+        "kind": "Api",
+        "service": null,
+        "external": false,
+        "state": "Healthy",
+        "instancesTotal": 1,
+        "instancesHealthy": 1,
+        "load": 0.4,
+        "cpu": null,
+        "memory": null,
+        "utilisation": null,
+        "throttled": null,
+        "queueDepth": null,
+        "oldestMessageSeconds": null,
+        "deadLetters": null,
+        "requestsPerSecond": 76,
+        "errorRate": 0.003,
+        "p99Ms": 411.59999999999997,
+        "slaP99Ms": 900,
+        "errorAmber": 0.01,
+        "errorRed": 0.05,
+        "resourceAmber": 0.8,
+        "resourceRed": 0.95,
+        "throttleAmber": 0.001,
+        "throttleRed": 0.02,
+        "backlogAmber": 60,
+        "backlogRed": 300,
+        "calls": [],
+        "gatewayCalls": [],
+        "lastUpdated": "2026-10-24T12:00:01+00:00"
+      },
+      "calledBy": [
+        "pay.payments-api"
+      ]
+    },
+    {
+      "node": {
+        "id": "ext.sms-email",
+        "name": "SMS and email",
+        "kind": "Api",
+        "service": null,
+        "external": false,
+        "state": "Healthy",
+        "instancesTotal": 1,
+        "instancesHealthy": 1,
+        "load": 0.4,
+        "cpu": null,
+        "memory": null,
+        "utilisation": null,
+        "throttled": null,
+        "queueDepth": null,
+        "oldestMessageSeconds": null,
+        "deadLetters": null,
+        "requestsPerSecond": 32,
+        "errorRate": 0.01,
+        "p99Ms": 1078,
+        "slaP99Ms": 2500,
+        "errorAmber": 0.03,
+        "errorRed": 0.1,
+        "resourceAmber": 0.8,
+        "resourceRed": 0.95,
+        "throttleAmber": 0.001,
+        "throttleRed": 0.02,
+        "backlogAmber": 60,
+        "backlogRed": 300,
+        "calls": [],
+        "gatewayCalls": [],
+        "lastUpdated": "2026-10-24T12:00:01+00:00"
+      },
+      "calledBy": [
+        "ntf.dispatch-worker"
+      ]
+    },
+    {
+      "node": {
+        "id": "ext.snowflake",
+        "name": "Snowflake",
+        "kind": "Api",
+        "service": null,
+        "external": false,
+        "state": "Healthy",
+        "instancesTotal": 1,
+        "instancesHealthy": 1,
+        "load": 0.4000000000000001,
+        "cpu": null,
+        "memory": null,
+        "utilisation": null,
+        "throttled": null,
+        "queueDepth": null,
+        "oldestMessageSeconds": null,
+        "deadLetters": null,
+        "requestsPerSecond": 9.600000000000001,
+        "errorRate": 0.002,
+        "p99Ms": 1764,
+        "slaP99Ms": 4000,
+        "errorAmber": 0.01,
+        "errorRed": 0.05,
+        "resourceAmber": 0.8,
+        "resourceRed": 0.95,
+        "throttleAmber": 0.001,
+        "throttleRed": 0.02,
+        "backlogAmber": 60,
+        "backlogRed": 300,
+        "calls": [],
+        "gatewayCalls": [],
+        "lastUpdated": "2026-10-24T12:00:01+00:00"
+      },
+      "calledBy": [
+        "dat.ingest-worker",
+        "hub.egress"
+      ]
+    }
+  ],
+  "externalCallers": [
+    {
+      "id": "mobile-app",
+      "name": "Mobile app",
+      "requestsPerSecond": 332,
+      "calls": [
+        "cl.ledger-api",
+        "pay.payments-api",
+        "rwd.points-api"
+      ]
+    },
+    {
+      "id": "partner-portal",
+      "name": "Partner portal",
+      "requestsPerSecond": 104,
+      "calls": [
+        "acq.applications-api",
+        "bil.invoices-api"
+      ]
+    },
+    {
+      "id": "open-banking-tpp",
+      "name": "Third-party providers",
+      "requestsPerSecond": 92,
+      "calls": [
+        "obk.consents-api",
+        "obk.data-api"
+      ]
+    },
+    {
+      "id": "merchant-systems",
+      "name": "Merchant systems",
+      "requestsPerSecond": 100,
+      "calls": [
+        "pay.payments-api",
+        "dsp.disputes-api"
+      ]
+    }
+  ],
+  "dependencies": [
+    {
+      "from": "dec",
+      "to": "frd",
+      "requestsPerSecond": 128
+    },
+    {
+      "from": "pay",
+      "to": "frd",
+      "requestsPerSecond": 128
+    },
+    {
+      "from": "acq",
+      "to": "dec",
+      "requestsPerSecond": 120
+    },
+    {
+      "from": "pay",
+      "to": "ext.card-network",
+      "requestsPerSecond": 76
+    },
+    {
+      "from": "pay",
+      "to": "cl",
+      "requestsPerSecond": 74.66666666666667
+    },
+    {
+      "from": "bil",
+      "to": "acc",
+      "requestsPerSecond": 64
+    },
+    {
+      "from": "obk",
+      "to": "acc",
+      "requestsPerSecond": 64
+    },
+    {
+      "from": "bil",
+      "to": "pay",
+      "requestsPerSecond": 56
+    },
+    {
+      "from": "dat",
+      "to": "pay",
+      "requestsPerSecond": 56
+    },
+    {
+      "from": "dsp",
+      "to": "pay",
+      "requestsPerSecond": 56
+    },
+    {
+      "from": "acq",
+      "to": "cus",
+      "requestsPerSecond": 48.800000000000004
+    },
+    {
+      "from": "col",
+      "to": "cus",
+      "requestsPerSecond": 41.6
+    },
+    {
+      "from": "dec",
+      "to": "cus",
+      "requestsPerSecond": 41.6
+    },
+    {
+      "from": "frd",
+      "to": "cus",
+      "requestsPerSecond": 41.6
+    },
+    {
+      "from": "acc",
+      "to": "cl",
+      "requestsPerSecond": 36
+    },
+    {
+      "from": "dat",
+      "to": "cl",
+      "requestsPerSecond": 36
+    },
+    {
+      "from": "rwd",
+      "to": "cl",
+      "requestsPerSecond": 36
+    },
+    {
+      "from": "ntf",
+      "to": "ext.sms-email",
+      "requestsPerSecond": 32
+    },
+    {
+      "from": "col",
+      "to": "bil",
+      "requestsPerSecond": 24
+    },
+    {
+      "from": "obk",
+      "to": "cus",
+      "requestsPerSecond": 24
+    },
+    {
+      "from": "cl",
+      "to": "ntf",
+      "requestsPerSecond": 20
+    },
+    {
+      "from": "col",
+      "to": "ntf",
+      "requestsPerSecond": 20
+    },
+    {
+      "from": "cus",
+      "to": "ntf",
+      "requestsPerSecond": 20
+    },
+    {
+      "from": "acq",
+      "to": "ext.credit-bureau",
+      "requestsPerSecond": 11.200000000000001
+    },
+    {
+      "from": "dec",
+      "to": "ext.credit-bureau",
+      "requestsPerSecond": 11.200000000000001
+    },
+    {
+      "from": "dsp",
+      "to": "frd",
+      "requestsPerSecond": 10
+    },
+    {
+      "from": "dat",
+      "to": "ext.snowflake",
+      "requestsPerSecond": 4.800000000000001
+    },
+    {
+      "from": "hub",
+      "to": "ext.snowflake",
+      "requestsPerSecond": 4.800000000000001
     }
   ]
 }

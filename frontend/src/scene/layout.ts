@@ -178,3 +178,124 @@ export function layoutTown(sizes: IslandSize[]): TownLayout {
     islands: spots.map((s, i) => ({ angle: s.angle, radius: radii[i], portAngle: s.port, ring: s.ring })),
   }
 }
+
+// ── offshore places: third-party islands and the airport ───────────────────────────────────────────────
+
+/** A round stand-in for something on the map, for working out where there is room. */
+export interface Disc {
+  id: string
+  x: number
+  z: number
+  r: number
+  /** How far its back coast is from its centre, along the line away from the hub. Only islands that can have a bridge to a vendor need it. */
+  back?: number
+}
+
+export interface VendorSpec {
+  id: string
+  /** Ids of the islands whose systems call this vendor, the one that calls it most first. */
+  callers: string[]
+  /** Half the depth of the vendor's island, which is how far its gate is from its centre. */
+  front: number
+  r: number
+}
+
+export interface VendorPlacement {
+  id: string
+  x: number
+  z: number
+  /** The island the vendor stands off. Null when none of its callers has an island of its own (the hub, say). */
+  primary: string | null
+  /** The islands that have a bridge to it, the primary first. Others call it through the overlay's arcs alone. */
+  bridges: string[]
+}
+
+export const VENDOR_BRIDGE = 12 // open water between an island's back gate and its vendor's gate
+const VENDOR_GAP = 8 // clear water kept between a vendor and anything else
+const BRIDGE_MARGIN = 7 // a bridge must pass this far (plus the island's radius) from every other island
+
+const dist = (ax: number, az: number, bx: number, bz: number) => Math.hypot(ax - bx, az - bz)
+
+/** Distance from a point to a segment. */
+export function distanceToSegment(px: number, pz: number, ax: number, az: number, bx: number, bz: number): number {
+  const dx = bx - ax, dz = bz - az
+  const len2 = dx * dx + dz * dz
+  const t = len2 === 0 ? 0 : Math.max(0, Math.min(1, ((px - ax) * dx + (pz - az) * dz) / len2))
+  return dist(px, pz, ax + t * dx, az + t * dz)
+}
+
+/**
+ * Third-party islands stand offshore: each directly outside the back of the island that calls it most, with a short bridge out of that island's
+ * back gate. Several vendors off one island fan out sideways. A vendor is pushed further out until it clears everything else. Other islands that
+ * call it get a bridge too, when a straight one would leave their back gate heading away from the hub and clear every other island.
+ * Pure geometry, so it is tested without a renderer.
+ */
+export function placeVendors(islands: Disc[], hub: Disc, vendors: VendorSpec[]): VendorPlacement[] {
+  const byId = new Map(islands.map((i) => [i.id, i]))
+  const placed: Disc[] = []
+  const out: VendorPlacement[] = []
+  const fan = new Map<string, number>() // vendors already standing off each island
+  const obstacles = () => [hub, ...islands, ...placed]
+
+  for (const v of vendors) {
+    const callers = v.callers.map((id) => byId.get(id)).filter((i): i is Disc => !!i)
+    const primary = callers[0] ?? null
+    let x: number, z: number
+    if (primary) {
+      const d = dist(primary.x, primary.z, hub.x, hub.z) || 1
+      const ux = (primary.x - hub.x) / d, uz = (primary.z - hub.z) / d
+      const k = fan.get(primary.id) ?? 0
+      fan.set(primary.id, k + 1)
+      // vendors off one island alternate to either side: 0, +1, -1, +2 ...
+      const side = k === 0 ? 0 : (k % 2 === 1 ? 1 : -1) * Math.ceil(k / 2)
+      let out_ = (primary.back ?? primary.r) + VENDOR_BRIDGE + v.front
+      const tx = -uz, tz = ux
+      const at = (o: number) => ({ x: primary.x + ux * o + tx * side * (v.r * 2 + VENDOR_GAP), z: primary.z + uz * o + tz * side * (v.r * 2 + VENDOR_GAP) })
+      let p = at(out_)
+      for (let guard = 0; guard < 60 && obstacles().some((o) => dist(o.x, o.z, p.x, p.z) < o.r + v.r + VENDOR_GAP); guard++) p = at((out_ += 4))
+      x = p.x; z = p.z
+    } else {
+      // nobody with an island calls it: it stands off the hub's east side, beyond the outermost island
+      const reach = Math.max(0, ...islands.map((i) => dist(i.x, i.z, hub.x, hub.z) + i.r)) + v.r + VENDOR_GAP + 20
+      const k = placed.filter((p) => p.id.startsWith('~')).length
+      x = hub.x + reach
+      z = hub.z + (k % 2 === 0 ? 1 : -1) * Math.ceil(k / 2) * (v.r * 2 + VENDOR_GAP)
+    }
+    placed.push({ id: primary ? v.id : `~${v.id}`, x, z, r: v.r })
+
+    const bridges: string[] = primary ? [primary.id] : []
+    // other callers: a straight bridge from their back gate, if it heads away from the hub and nothing is in the way
+    for (const c of callers.slice(1)) {
+      const d = dist(c.x, c.z, hub.x, hub.z) || 1
+      const ux = (c.x - hub.x) / d, uz = (c.z - hub.z) / d
+      const gx = c.x + ux * (c.back ?? c.r), gz = c.z + uz * (c.back ?? c.r)
+      const dx = x - gx, dz = z - gz
+      const len = Math.hypot(dx, dz) || 1
+      if ((dx * ux + dz * uz) / len < 0.3) continue
+      const clear = obstacles().every((o) => o.id === c.id || o.id === v.id || o.id === `~${v.id}` || distanceToSegment(o.x, o.z, gx, gz, x - (dx / len) * v.front, z - (dz / len) * v.front) >= o.r * 0.85 + BRIDGE_MARGIN)
+      if (clear) bridges.push(c.id)
+    }
+    out.push({ id: v.id, x, z, primary: primary?.id ?? null, bridges })
+  }
+  return out
+}
+
+export interface AirportPlacement {
+  x: number
+  z: number
+  /** True when the corridor from the hub's north coast to the airport is free of islands, so the airport can have its bridge. */
+  connected: boolean
+}
+
+export const AIRPORT_CLEAR = 12 // an island must stand at least this far from the airport's bridge, beyond its own radius
+
+/**
+ * The airport stands due north of the hub, beyond everything else, with a bridge straight down to the hub's north coast. If an island or a
+ * vendor stands in that corridor, the airport is still drawn but has no bridge, and outside callers come in at the gateway as before.
+ */
+export function placeAirport(others: Disc[], hub: Disc, hubNorth: number, rz: number, gap = 26): AirportPlacement {
+  const farthest = Math.min(hub.z - hub.r, ...others.map((o) => o.z - o.r))
+  const z = farthest - gap - rz
+  const blocked = others.some((o) => Math.abs(o.x - hub.x) < o.r * 0.85 + AIRPORT_CLEAR && o.z - o.r < hubNorth && o.z + o.r > z)
+  return { x: hub.x, z, connected: !blocked }
+}

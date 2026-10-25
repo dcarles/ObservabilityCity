@@ -6,14 +6,19 @@ import { escapeHtml, Picker, type PickItem } from './picker'
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T
 
 /** The states the top bar's counters can list. */
-export type ListedState = 'Degraded' | 'Down'
+export type ListedState = 'Degraded' | 'Down' | 'Stale' | 'Incidents'
 
 export class TopBar {
   private readonly el = $('topbar')
   private status: ConnectionState = 'connecting'
   private snap: Snapshot | null = null
+  private deps = false
 
-  constructor(private readonly onHome: () => void, private readonly onList: (state: ListedState, anchor: DOMRect) => void) {
+  constructor(
+    private readonly onHome: () => void,
+    private readonly onList: (state: ListedState, anchor: DOMRect) => void,
+    private readonly onDependencies: (on: boolean) => void,
+  ) {
     // the bar is redrawn with every snapshot, so one listener on the bar itself serves the chips
     this.el.addEventListener('click', (e) => {
       const chip = (e.target as HTMLElement).closest<HTMLElement>('[data-list]')
@@ -38,20 +43,30 @@ export class TopBar {
     const label = { connecting: 'Connecting…', live: 'Live (demo data)', reconnecting: 'Reconnecting…', offline: 'Backend offline', badData: 'Bad data, showing the last good town' }[this.status]
     const dot = this.status === 'live' ? 'live' : this.status === 'offline' || this.status === 'badData' ? '' : 'wait'
     const day = s ? clock(s.dayFraction) : ''
-    this.el.innerHTML = `
+    const stale = s ? staleCount(s) : 0
+    $('topbar-left').innerHTML = `
       <span class="brand">Observability City</span>
-      ${s ? `<span class="town">${s.townName}</span>` : ''}
+      ${s ? `<span class="town">${escapeHtml(s.townName)}</span>` : ''}`
+    $('topbar-right').innerHTML = `
       <span class="spacer"></span>
       ${t ? `
         <div class="chip"><b>${formatRate(t.requestsPerSecond)}</b><span>req/s</span></div>
         <div class="chip ${t.errorRate >= 0.05 ? 'bad' : t.errorRate >= 0.01 ? 'warn' : ''}"><b>${(t.errorRate * 100).toFixed(1)}%</b><span>errors</span></div>
-        <div class="chip"><b>${formatMs(t.p99Ms)}</b><span>p99</span></div>
+        <div class="chip p99"><b>${formatMs(t.p99Ms)}</b><span>p99</span></div>
         <button class="chip clickable ${t.degraded ? 'warn' : ''}" data-list="Degraded" title="Show the degraded systems"><b>${t.degraded}</b><span>degraded</span></button>
         <button class="chip clickable ${t.down ? 'bad' : ''}" data-list="Down" title="Show the systems that are down"><b>${t.down}</b><span>down</span></button>
-        <div class="chip"><b>${day}</b><span>town time</span></div>` : ''}
-      <span class="status"><i class="dot ${dot}"></i>${label}</span>
+        <button class="chip clickable ${stale ? 'stale' : ''}" data-list="Stale" title="Show the systems with no fresh data"><b>${stale}</b><span>no data</span></button>
+        <button class="chip clickable ${t.incidents ? 'warn' : ''}" data-list="Incidents" title="Show the islands with open incidents"><b>${t.incidents}</b><span>incidents</span></button>
+        <div class="chip time"><b>${day}</b><span>town time</span></div>` : ''}
+      <span class="status" title="${label}"><i class="dot ${dot}"></i><span class="label">${label}</span></span>
+      <button id="deps" class="${this.deps ? 'on' : ''}" title="Draw an arc between islands that call each other, thicker for more traffic">Dependencies</button>
       <button id="home" title="Frame the whole town">Home</button>`
     this.el.querySelector('#home')!.addEventListener('click', this.onHome)
+    this.el.querySelector('#deps')!.addEventListener('click', () => {
+      this.deps = !this.deps
+      this.onDependencies(this.deps)
+      this.render()
+    })
   }
 }
 
@@ -79,6 +94,11 @@ export class NoticesPanel {
       <ul ${this.open ? '' : 'hidden'}>${this.notices.map((t) => `<li>${escapeHtml(t)}</li>`).join('')}</ul>`
     this.el.querySelector('#notices-toggle')!.addEventListener('click', () => { this.open = !this.open; this.render() })
   }
+}
+
+/** Systems (and third parties) whose readings are too old or missing: shown grey, never healthy. */
+export function staleCount(s: Snapshot): number {
+  return s.groups.reduce((a, g) => a + g.nodes.filter((n) => n.state === 'Stale').length, 0) + s.vendors.filter((v) => v.node.state === 'Stale').length
 }
 
 function clock(fraction: number): string {
@@ -150,6 +170,10 @@ export class PreviewPanel {
         <button data-fx="Poison" data-i="1">Dead letters</button>
         <button data-fx="Down" data-i="1">Down</button>
         <button data-fx="Stale" data-i="1">Go quiet</button>
+        <button data-fx="Incident" data-i="1" title="Storm over the island">Sev 1 storm</button>
+        <button data-fx="Incident" data-i="0.7" title="Rain over the island">Sev 2 rain</button>
+        <button data-fx="Incident" data-i="0.45" title="Overcast over the island">Sev 3 overcast</button>
+        <button data-fx="Incident" data-i="0.2" title="A few light clouds over the island">Sev 4 clouds</button>
         <button id="reset">Reset all</button>
       </div>
       <button class="wide ${this.state.calm ? 'on' : ''}" id="calm">Calm (freeze noise and day)</button>
@@ -218,10 +242,11 @@ export class StateList {
     const key = `${this.state}|${items.map((i) => i.id).join(',')}`
     if (key === this.key) return
     this.key = key
-    const word = this.state === 'Down' ? 'down' : 'degraded'
+    const word = { Down: 'down', Degraded: 'degraded', Stale: 'with no data', Incidents: 'with open incidents' }[this.state]
+    const none = this.state === 'Incidents' ? 'No incidents are open right now.' : `Nothing is ${word} right now.`
     this.el.innerHTML = `
       <div class="head"><b>${items.length} ${word}</b><button id="state-list-close" title="Close">✕</button></div>
-      ${items.length === 0 ? `<p class="none">Nothing is ${word} right now.</p>` : items.map((m, i) => `<div class="hit" data-i="${i}"><b>${escapeHtml(m.name)}</b><span>${escapeHtml(m.where)}</span></div>`).join('')}`
+      ${items.length === 0 ? `<p class="none">${none}</p>` : items.map((m, i) => `<div class="hit" data-i="${i}"><b>${escapeHtml(m.name)}</b><span>${escapeHtml(m.where)}</span></div>`).join('')}`
     this.el.querySelector('#state-list-close')!.addEventListener('click', () => this.close())
     this.el.querySelectorAll<HTMLElement>('.hit').forEach((row) =>
       row.addEventListener('click', () => { const item = items[Number(row.dataset.i)]; this.close(); this.onPick(item) }))

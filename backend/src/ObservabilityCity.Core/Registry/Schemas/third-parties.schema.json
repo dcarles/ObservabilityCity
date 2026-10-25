@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Third parties: vendors outside the town",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "vendors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "calledBy"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "pattern": "^ext\\.[a-z0-9]+(-[a-z0-9]+)*$", "description": "ext.vendor-name" },
+          "name": { "type": "string" },
+          "calledBy": { "type": "array", "description": "Our systems that call this vendor. Its health is read from the errors and latency of those calls.", "items": { "$ref": "system-ids.schema.json#/$defs/systemId" } },
+          "slaP99Ms": { "type": "number", "description": "How slow the vendor may get before it counts as degraded." },
+          "errors": { "$ref": "defs.schema.json#/$defs/thresholds" }
+        }
+      }
+    }
+  }
+}

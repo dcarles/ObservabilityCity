@@ -46,6 +46,8 @@ internal sealed class SystemFile
     public ErrorThresholdsFile? Backlog { get; set; }
     /// <summary>Ids of the systems this one calls directly. Cars drive only along declared links.</summary>
     public List<string> Calls { get; set; } = [];
+    /// <summary>Ids of systems on other islands this one reaches through the API gateway (the way calls between islands go in a hub-and-spoke town).</summary>
+    public List<string> GatewayCalls { get; set; } = [];
     /// <summary>Former ids of this system. Other files may still call it by one of them.</summary>
     public List<string> Aliases { get; set; } = [];
 }
@@ -79,4 +81,20 @@ internal sealed class ExternalCallerFile
 internal sealed class LayoutFile
 {
     public List<string> Islands { get; set; } = [];
+}
+
+/// <summary>third-parties.yaml: the vendors outside the town and which of our systems call each one.</summary>
+internal sealed class ThirdPartiesFile
+{
+    public List<VendorFile> Vendors { get; set; } = [];
+}
+
+internal sealed class VendorFile
+{
+    public string Id { get; set; } = "";
+    public string? Name { get; set; }
+    /// <summary>Ids of our systems that call this vendor. Its health is read from those calls.</summary>
+    public List<string> CalledBy { get; set; } = [];
+    public double? SlaP99Ms { get; set; }
+    public ErrorThresholdsFile? Errors { get; set; }
 }
