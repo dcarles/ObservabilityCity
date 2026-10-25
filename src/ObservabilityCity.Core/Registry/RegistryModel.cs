@@ -9,6 +9,12 @@ public sealed record Registry(
     IReadOnlyList<ExternalCaller> ExternalCallers)
 {
     public IEnumerable<RegistryNode> AllNodes => Groups.SelectMany(g => g.Nodes);
+
+    /// <summary>Problems a resilient load worked around (a skipped pillar file, a dropped call link). Always empty after a strict load.</summary>
+    public IReadOnlyList<string> Notices { get; init; } = [];
+
+    /// <summary>Every individual problem a resilient load worked around, in full (Notices keeps one line per skipped file). Empty exactly when a strict load would succeed.</summary>
+    public IReadOnlyList<string> Problems { get; init; } = [];
 }
 
 public sealed record TownInfo(string Id, string Name, string GroupLabel, string Topology);
@@ -19,7 +25,8 @@ public sealed record RegistryGroup(
     string DisplayName,
     string Color,
     bool IsHub,
-    IReadOnlyList<RegistryNode> Nodes)
+    IReadOnlyList<RegistryNode> Nodes,
+    string? ConfigError = null)
 {
     /// <summary>The pillar id of the island that collects systems no pillar owns.</summary>
     public const string LostFoundId = "lost-found";

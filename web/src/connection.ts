@@ -1,7 +1,6 @@
 import * as signalR from '@microsoft/signalr'
-import type { Snapshot } from './types'
 
-export type ConnectionState = 'connecting' | 'live' | 'reconnecting' | 'offline'
+export type ConnectionState = 'connecting' | 'live' | 'reconnecting' | 'offline' | 'badData'
 
 /**
  * Receives snapshots from the backend over SignalR. If the socket cannot be opened (a proxy in the way,
@@ -12,7 +11,7 @@ export class Connection {
   private poll: number | undefined
 
   constructor(
-    private readonly onSnapshot: (s: Snapshot) => void,
+    private readonly onSnapshot: (s: unknown) => void,
     private readonly onState: (s: ConnectionState) => void,
   ) {}
 
@@ -23,7 +22,7 @@ export class Connection {
       .configureLogging(signalR.LogLevel.Warning)
       .build()
 
-    hub.on('snapshot', (s: Snapshot) => {
+    hub.on('snapshot', (s: unknown) => {
       this.set('live')
       this.onSnapshot(s)
     })
@@ -47,7 +46,7 @@ export class Connection {
         const r = await fetch('/api/snapshot/latest')
         if (r.ok) {
           this.set('live')
-          this.onSnapshot((await r.json()) as Snapshot)
+          this.onSnapshot(await r.json())
         }
       } catch {
         this.set('offline')

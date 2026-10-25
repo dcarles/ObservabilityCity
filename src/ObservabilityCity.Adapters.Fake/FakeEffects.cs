@@ -22,6 +22,8 @@ public enum FakeEffectKind
     Backlog,
     /// <summary>Poison messages: up to 8 a second go to the dead-letter queue.</summary>
     Poison,
+    /// <summary>The source stops answering for the target, so its readings age into the stale state. Intensity is ignored.</summary>
+    Stale,
 }
 
 /// <summary>A scenario effect layered on the baseline. Target is a node id, a group id (a whole island) or "*".</summary>
@@ -35,4 +37,6 @@ public interface IFakeControl
     FakeEffect Add(string target, FakeEffectKind kind, double intensity);
     bool Remove(string id);
     void Clear();
+    /// <summary>Removes every effect and forgets the backlog, dead letters and autoscaling the effects left behind, back to a calm baseline.</summary>
+    void Reset();
 }

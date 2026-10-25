@@ -9,7 +9,7 @@ namespace ObservabilityCity.Core.Sources;
 /// </summary>
 public sealed class SourcePoller(
     IEnumerable<IMetricSource> sources,
-    Registry.Registry registry,
+    Registry.IRegistryProvider registries,
     LatestState state,
     ILogger<SourcePoller> log) : BackgroundService
 {
@@ -25,7 +25,7 @@ public sealed class SourcePoller(
             {
                 using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
                 timeout.CancelAfter(TimeSpan.FromSeconds(10));
-                state.Update(await source.PollAsync(registry, timeout.Token));
+                state.Update(await source.PollAsync(registries.Current, timeout.Token));
             }
             catch (Exception e) when (e is not OperationCanceledException || !ct.IsCancellationRequested)
             {

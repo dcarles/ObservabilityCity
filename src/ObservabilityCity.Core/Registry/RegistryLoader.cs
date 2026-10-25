@@ -41,12 +41,32 @@ public static class RegistryLoader
         Backlog = new ErrorThresholdsFile { Amber = 60, Red = 300 },
     };
 
-    public static Registry Load(string folder)
+    /// <summary>Strict load: any problem in any file fails the whole load, with every problem listed. This is what CI and the validator use.</summary>
+    public static Registry Load(string folder) => Build(folder, resilient: false);
+
+    /// <summary>
+    /// Resilient load, for a running app. A pillar file that cannot be read, or has problems of its own, is skipped and its island
+    /// is returned empty with a ConfigError, so the rest of the town still renders. Call links that point nowhere are dropped.
+    /// Everything worked around is listed in Registry.Notices. The files every pillar depends on (town, defaults, hub, layout)
+    /// still have to be sound: when they are not this throws, and the caller keeps the registry it already has.
+    /// </summary>
+    public static Registry LoadResilient(string folder) => Build(folder, resilient: true);
+
+    private static Registry Build(string folder, bool resilient)
     {
         if (!Directory.Exists(folder))
             throw new RegistryException($"Registry folder not found: {folder}");
 
         var errors = new List<string>();
+        var notices = new List<string>();
+        var problems = new List<string>(); // every individual problem a resilient load worked around
+        // Problems that are not in a pillar's own file: errors in a strict load, notices in a resilient one.
+        void Problem(string message)
+        {
+            if (!resilient) { errors.Add(message); return; }
+            notices.Add(message);
+            problems.Add(message);
+        }
         var town = Read<TownFile>(Path.Combine(folder, "town.yaml"));
         var defaults = File.Exists(Path.Combine(folder, "defaults.yaml"))
             ? Read<DefaultsFile>(Path.Combine(folder, "defaults.yaml"))
@@ -66,29 +86,54 @@ public static class RegistryLoader
         var hubGroup = new RegistryGroup("hub", hub.DisplayName, hub.Color, true, hubNodes);
 
         var pillars = new List<RegistryGroup>();
+        var brokenPillars = new HashSet<string>();
         var pillarDir = Path.Combine(folder, "pillars");
         if (Directory.Exists(pillarDir))
         {
             foreach (var file in Directory.GetFiles(pillarDir, "*.yaml").OrderBy(f => f, StringComparer.Ordinal))
             {
-                var p = Read<PillarFile>(file);
                 var name = Path.GetFileName(file);
-                CheckRoleKeys(p.Defaults, name, errors);
-                if (!KebabId.IsMatch(p.Pillar))
-                    errors.Add($"{name}: pillar '{p.Pillar}' must be lowercase kebab-case");
-                else if (Path.GetFileNameWithoutExtension(file) != p.Pillar)
-                    errors.Add($"{name}: pillar '{p.Pillar}' must match the file name");
+                var stem = Path.GetFileNameWithoutExtension(file);
+                var own = new List<string>();
+                RegistryGroup? group = null;
+                try
+                {
+                    group = LoadPillar(file, name, defaults, resilient ? new HashSet<string>(ids) : ids, resilient ? new Dictionary<string, string>(aliases) : aliases, own, out var pillarIds, out var pillarAliases);
+                    if (resilient && own.Count == 0)
+                    {
+                        ids = pillarIds;
+                        foreach (var (old, current) in pillarAliases) aliases[old] = current;
+                    }
+                }
+                catch (RegistryException e) when (resilient)
+                {
+                    own.Add(e.Message);
+                }
 
-                var nodes = p.Systems
-                    .Select(s => ToNode(s, p.Pillar, name, p.Pillar, defaults, p.Defaults, p.External, ids, aliases, errors))
-                    .OfType<RegistryNode>()
-                    .ToList();
-                pillars.Add(new RegistryGroup(p.Pillar, p.DisplayName, p.Color, false, nodes));
+                if (own.Count == 0 && group is not null)
+                {
+                    pillars.Add(group);
+                    continue;
+                }
+                if (!resilient)
+                {
+                    errors.AddRange(own);
+                    if (group is not null) pillars.Add(group);
+                    continue;
+                }
+                // Skipped: the island stays on the map, empty, saying what is wrong.
+                var id = KebabId.IsMatch(stem) ? stem : group?.Id ?? "broken-" + pillars.Count;
+                brokenPillars.Add(id);
+                var shown = group is { DisplayName.Length: > 0 } ? group.DisplayName : stem;
+                var detail = own.Count == 1 ? own[0] : $"{own[0]} (and {own.Count - 1} more)";
+                pillars.Add(new RegistryGroup(id, shown, group?.Color ?? "#d63a2f", false, [], ConfigError: detail));
+                notices.Add($"{name} was skipped: {detail}");
+                problems.AddRange(own);
             }
         }
 
         var groups = new List<RegistryGroup> { hubGroup };
-        groups.AddRange(Order(pillars, layout, errors));
+        groups.AddRange(Order(pillars, layout, Problem));
 
         // every declared call must point at a system in this town (by id or by an old alias), and not at itself
         var resolved = new Dictionary<string, IReadOnlyList<string>>();
@@ -99,9 +144,13 @@ public static class RegistryLoader
             {
                 var target = ids.Contains(callee) ? callee : aliases.GetValueOrDefault(callee);
                 if (target is null)
-                    errors.Add($"'{node.Id}' calls '{callee}', which is not in this town.{DidYouMean.Hint(callee, ids.Concat(aliases.Keys))}");
+                {
+                    // a call into a pillar that was skipped is the skipped pillar's problem, not this one's
+                    if (resilient && brokenPillars.Contains(callee.Split('.')[0])) continue;
+                    Problem($"'{node.Id}' calls '{callee}', which is not in this town.{DidYouMean.Hint(callee, ids.Concat(aliases.Keys))}");
+                }
                 else if (target == node.Id)
-                    errors.Add($"'{node.Id}' lists itself under calls");
+                    Problem($"'{node.Id}' lists itself under calls");
                 else
                     calls.Add(target);
             }
@@ -112,14 +161,18 @@ public static class RegistryLoader
         var callers = new List<ExternalCaller>();
         foreach (var c in hub.ExternalCallers)
         {
-            if (!KebabId.IsMatch(c.Id)) errors.Add($"hub.yaml: external caller '{c.Id}' must be lowercase kebab-case");
-            if (callers.Any(x => x.Id == c.Id)) errors.Add($"hub.yaml: external caller '{c.Id}' is listed twice");
+            if (!KebabId.IsMatch(c.Id)) Problem($"hub.yaml: external caller '{c.Id}' must be lowercase kebab-case");
+            if (callers.Any(x => x.Id == c.Id)) { Problem($"hub.yaml: external caller '{c.Id}' is listed twice"); if (resilient) continue; }
             var calls = new List<string>();
             foreach (var callee in c.Calls)
             {
                 var target = ids.Contains(callee) ? callee : aliases.GetValueOrDefault(callee);
-                if (target is null) errors.Add($"hub.yaml: external caller '{c.Id}' calls '{callee}', which is not in this town.{DidYouMean.Hint(callee, ids.Concat(aliases.Keys))}");
-                else if (!byId[target].External) errors.Add($"hub.yaml: external caller '{c.Id}' calls '{target}', which is not marked external");
+                if (target is null)
+                {
+                    if (resilient && brokenPillars.Contains(callee.Split('.')[0])) continue;
+                    Problem($"hub.yaml: external caller '{c.Id}' calls '{callee}', which is not in this town.{DidYouMean.Hint(callee, ids.Concat(aliases.Keys))}");
+                }
+                else if (!byId[target].External) Problem($"hub.yaml: external caller '{c.Id}' calls '{target}', which is not marked external");
                 else calls.Add(target);
             }
             callers.Add(new ExternalCaller(c.Id, c.Name ?? c.Id, calls));
@@ -130,11 +183,32 @@ public static class RegistryLoader
             throw new RegistryException($"The registry has {errors.Count} problems:\n" + string.Join("\n", errors.Select(e => "  - " + e)));
 
         var final = groups.Select(g => g with { Nodes = g.Nodes.Select(n => n with { Calls = resolved[n.Id] }).ToList() }).ToList();
-        return new Registry(new TownInfo(town.Id, town.Name, town.GroupLabel, town.Topology), final, callers);
+        return new Registry(new TownInfo(town.Id, town.Name, town.GroupLabel, town.Topology), final, callers) { Notices = notices, Problems = problems };
+    }
+
+    /// <summary>Reads one pillar file. Problems found in it go to <paramref name="errors"/>; the ids and aliases it would add are returned, so a caller can drop them with the file.</summary>
+    private static RegistryGroup LoadPillar(
+        string file, string name, DefaultsFile defaults, HashSet<string> ids, Dictionary<string, string> aliases, List<string> errors,
+        out HashSet<string> pillarIds, out Dictionary<string, string> pillarAliases)
+    {
+        pillarIds = ids;
+        pillarAliases = aliases;
+        var p = Read<PillarFile>(file);
+        CheckRoleKeys(p.Defaults, name, errors);
+        if (!KebabId.IsMatch(p.Pillar))
+            errors.Add($"{name}: pillar '{p.Pillar}' must be lowercase kebab-case");
+        else if (Path.GetFileNameWithoutExtension(file) != p.Pillar)
+            errors.Add($"{name}: pillar '{p.Pillar}' must match the file name");
+
+        var nodes = p.Systems
+            .Select(s => ToNode(s, p.Pillar, name, p.Pillar, defaults, p.Defaults, p.External, ids, aliases, errors))
+            .OfType<RegistryNode>()
+            .ToList();
+        return new RegistryGroup(p.Pillar, p.DisplayName, p.Color, false, nodes);
     }
 
     /// <summary>Pillars in layout.yaml order, then any that it does not list in file order. Lost &amp; found is always last.</summary>
-    private static IEnumerable<RegistryGroup> Order(List<RegistryGroup> pillars, LayoutFile layout, List<string> errors)
+    private static IEnumerable<RegistryGroup> Order(List<RegistryGroup> pillars, LayoutFile layout, Action<string> problem)
     {
         var byId = pillars.ToDictionary(p => p.Id, p => p);
         var seen = new HashSet<string>();
@@ -142,9 +216,9 @@ public static class RegistryLoader
         foreach (var id in layout.Islands)
         {
             if (!byId.TryGetValue(id, out var g))
-                errors.Add($"layout.yaml: island '{id}' has no pillar file.{DidYouMean.Hint(id, byId.Keys)}");
+                problem($"layout.yaml: island '{id}' has no pillar file.{DidYouMean.Hint(id, byId.Keys)}");
             else if (!seen.Add(id))
-                errors.Add($"layout.yaml: island '{id}' is listed twice");
+                problem($"layout.yaml: island '{id}' is listed twice");
             else
                 ordered.Add(g);
         }

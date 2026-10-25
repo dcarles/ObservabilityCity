@@ -5,8 +5,14 @@ using ObservabilityCity.Core.Sources;
 namespace ObservabilityCity.Core.Snapshots;
 
 /// <summary>Joins the registry with the latest readings and applies the rules that decide each node's state.</summary>
-public sealed class SnapshotBuilder(Registry.Registry registry, LatestState state, TimeProvider clock)
+public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState state, TimeProvider clock)
 {
+    /// <summary>A builder for a registry that never changes.</summary>
+    public SnapshotBuilder(Registry.Registry registry, LatestState state, TimeProvider clock)
+        : this(new RegistryHolder(registry), state, clock)
+    {
+    }
+
     /// <summary>Readings older than this are shown as stale, never as healthy.</summary>
     public TimeSpan StaleAfter { get; init; } = TimeSpan.FromSeconds(30);
 
@@ -17,8 +23,9 @@ public sealed class SnapshotBuilder(Registry.Registry registry, LatestState stat
     public Snapshot Build()
     {
         var now = clock.GetUtcNow();
+        var registry = registries.Current;
         var groups = registry.Groups
-            .Select(g => new GroupSnapshot(g.Id, g.DisplayName, g.Color, g.IsHub, g.IsLostFound, g.Nodes.Select(n => ToNode(n, now)).ToList()))
+            .Select(g => new GroupSnapshot(g.Id, g.DisplayName, g.Color, g.IsHub, g.IsLostFound, g.ConfigError, g.Nodes.Select(n => ToNode(n, now)).ToList()))
             .ToList();
 
         var live = groups.SelectMany(g => g.Nodes).Where(n => n.State != HealthState.Stale).ToList();
@@ -30,7 +37,7 @@ public sealed class SnapshotBuilder(Registry.Registry registry, LatestState stat
             live.Count(n => n.State == HealthState.Degraded),
             live.Count(n => n.State == HealthState.Down));
 
-        return new Snapshot(registry.Town.Id, registry.Town.Name, registry.Town.GroupLabel, Environment, now, DayFraction(), totals, groups);
+        return new Snapshot(registry.Town.Id, registry.Town.Name, registry.Town.GroupLabel, Environment, now, DayFraction(), totals, registries.Notices, groups);
     }
 
     /// <summary>Headline latency: p99 averaged over request-serving nodes, weighted by traffic. Workers and crons are left out.</summary>

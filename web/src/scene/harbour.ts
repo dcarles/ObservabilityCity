@@ -197,4 +197,9 @@ export class HarbourStatus {
   get alarming(): boolean {
     return this.lit
   }
+
+  /** What the harbour shows, for tests: crates on the quay, broken crates in the pen, and whether the red light sweeps. */
+  status(): { crates: number; brokenCrates: number; alarm: boolean } {
+    return { crates: this.visibleCrates, brokenCrates: this.visibleBroken, alarm: this.lit }
+  }
 }

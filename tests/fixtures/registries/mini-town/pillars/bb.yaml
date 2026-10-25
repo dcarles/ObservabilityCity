@@ -1,0 +1,7 @@
+pillar: bb
+displayName: Beta
+color: "#4dc3c9"
+systems:
+  - { id: bb.ledger-api, service: ledger, name: Ledger API, role: api, external: true, calls: [bb.ledger-db] }
+  - { id: bb.ledger-worker, service: ledger, name: Ledger worker, role: worker, calls: [bb.ledger-db] }
+  - { id: bb.ledger-db, service: ledger, name: Ledger DB, role: db }

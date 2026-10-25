@@ -12,6 +12,7 @@
     "degraded": 0,
     "down": 0
   },
+  "notices": [],
   "groups": [
     {
       "id": "hub",
@@ -19,6 +20,7 @@
       "color": "#f5c26b",
       "isHub": true,
       "isLostFound": false,
+      "configError": null,
       "nodes": [
         {
           "id": "hub.apim",
@@ -156,6 +158,7 @@
       "color": "#5aa9ff",
       "isHub": false,
       "isLostFound": false,
+      "configError": null,
       "nodes": [
         {
           "id": "cl.ledger-api",
@@ -536,6 +539,7 @@
       "color": "#4dc3c9",
       "isHub": false,
       "isLostFound": false,
+      "configError": null,
       "nodes": [
         {
           "id": "acc.accounts-api",
@@ -780,6 +784,7 @@
       "color": "#f2994a",
       "isHub": false,
       "isLostFound": false,
+      "configError": null,
       "nodes": [
         {
           "id": "pay.payments-api",
@@ -990,6 +995,7 @@
       "color": "#e0566e",
       "isHub": false,
       "isLostFound": false,
+      "configError": null,
       "nodes": [
         {
           "id": "frd.screening-api",
@@ -1199,6 +1205,7 @@
       "color": "#3fb68b",
       "isHub": false,
       "isLostFound": false,
+      "configError": null,
       "nodes": [
         {
           "id": "cus.profile-api",
@@ -1510,6 +1517,7 @@
       "color": "#ef8354",
       "isHub": false,
       "isLostFound": false,
+      "configError": null,
       "nodes": [
         {
           "id": "acq.applications-api",
@@ -1787,6 +1795,7 @@
       "color": "#7b8cde",
       "isHub": false,
       "isLostFound": false,
+      "configError": null,
       "nodes": [
         {
           "id": "dec.decision-api",
@@ -1997,6 +2006,7 @@
       "color": "#e5b13a",
       "isHub": false,
       "isLostFound": false,
+      "configError": null,
       "nodes": [
         {
           "id": "bil.invoices-api",
@@ -2207,6 +2217,7 @@
       "color": "#9b6bd6",
       "isHub": false,
       "isLostFound": false,
+      "configError": null,
       "nodes": [
         {
           "id": "col.cases-api",
@@ -2588,6 +2599,7 @@
       "color": "#d1495b",
       "isHub": false,
       "isLostFound": false,
+      "configError": null,
       "nodes": [
         {
           "id": "dsp.disputes-api",
@@ -2764,6 +2776,7 @@
       "color": "#c77dff",
       "isHub": false,
       "isLostFound": false,
+      "configError": null,
       "nodes": [
         {
           "id": "rwd.points-api",
@@ -2973,6 +2986,7 @@
       "color": "#2ec4b6",
       "isHub": false,
       "isLostFound": false,
+      "configError": null,
       "nodes": [
         {
           "id": "obk.consents-api",
@@ -3183,6 +3197,7 @@
       "color": "#ff9f1c",
       "isHub": false,
       "isLostFound": false,
+      "configError": null,
       "nodes": [
         {
           "id": "ntf.dispatch-api",
@@ -3393,6 +3408,7 @@
       "color": "#8d99ae",
       "isHub": false,
       "isLostFound": false,
+      "configError": null,
       "nodes": [
         {
           "id": "dat.ingest-api",
@@ -3669,6 +3685,7 @@
       "color": "#9aa3ad",
       "isHub": false,
       "isLostFound": true,
+      "configError": null,
       "nodes": [
         {
           "id": "lost-found.batch-gateway-api",
