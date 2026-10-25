@@ -26,8 +26,8 @@ export class TopBar {
   private render(): void {
     const s = this.snap
     const t = s?.totals
-    const label = { connecting: 'Connecting…', live: 'Live (demo data)', reconnecting: 'Reconnecting…', offline: 'Backend offline' }[this.status]
-    const dot = this.status === 'live' ? 'live' : this.status === 'offline' ? '' : 'wait'
+    const label = { connecting: 'Connecting…', live: 'Live (demo data)', reconnecting: 'Reconnecting…', offline: 'Backend offline', badData: 'Bad data, showing the last good town' }[this.status]
+    const dot = this.status === 'live' ? 'live' : this.status === 'offline' || this.status === 'badData' ? '' : 'wait'
     const day = s ? clock(s.dayFraction) : ''
     this.el.innerHTML = `
       <span class="brand">Observability City</span>
@@ -44,6 +44,36 @@ export class TopBar {
       <button id="home" title="Frame the whole town">Home</button>`
     this.el.querySelector('#home')!.addEventListener('click', this.onHome)
   }
+}
+
+/**
+ * Configuration problems that did not stop the town: a pillar file that was skipped, a reload that failed. They sit in a small
+ * panel under the top bar, so a broken file is noticed without opening the logs.
+ */
+export class NoticesPanel {
+  private readonly el = $('notices')
+  private open = false
+  private notices: string[] = []
+
+  show(notices: string[]): void {
+    const same = notices.length === this.notices.length && notices.every((n, i) => n === this.notices[i])
+    if (same) return
+    this.notices = notices
+    this.render()
+  }
+
+  private render(): void {
+    this.el.hidden = this.notices.length === 0
+    const n = this.notices.length
+    this.el.innerHTML = `
+      <button id="notices-toggle">${n} config problem${n === 1 ? '' : 's'} ${this.open ? '▴' : '▾'}</button>
+      <ul ${this.open ? '' : 'hidden'}>${this.notices.map((t) => `<li>${escapeHtml(t)}</li>`).join('')}</ul>`
+    this.el.querySelector('#notices-toggle')!.addEventListener('click', () => { this.open = !this.open; this.render() })
+  }
+}
+
+function escapeHtml(s: string): string {
+  return s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!)
 }
 
 function clock(fraction: number): string {
@@ -115,6 +145,7 @@ export class PreviewPanel {
         <button data-fx="Backlog" data-i="1">Queue backs up</button>
         <button data-fx="Poison" data-i="1">Dead letters</button>
         <button data-fx="Down" data-i="1">Down</button>
+        <button data-fx="Stale" data-i="1">Go quiet</button>
         <button id="reset">Reset all</button>
       </div>
       <button class="wide ${this.state.calm ? 'on' : ''}" id="calm">Calm (freeze noise and day)</button>

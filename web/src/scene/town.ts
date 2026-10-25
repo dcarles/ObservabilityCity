@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { Building } from '../buildings/building'
+import { Building, type BuildingStatus } from '../buildings/building'
 import { box, canvasTexture, cyl, flat, group, roundRect } from '../buildings/mk'
 import { kit } from '../assets/kit'
 import type { GroupSnapshot, NodeSnapshot, Snapshot } from '../types'
@@ -64,8 +64,13 @@ export class Town {
     return this.snapshotId === layoutKey(s)
   }
 
+  /** Forget the layout, so the next snapshot builds the town again. Used after a build that failed half way. */
+  invalidate(): void {
+    this.snapshotId = ''
+  }
+
   build(s: Snapshot): void {
-    this.snapshotId = layoutKey(s)
+    this.snapshotId = ''
     const hub = s.groups.find((g) => g.isHub)
     const pillars = s.groups.filter((g) => !g.isHub)
     const routes: Route[] = []
@@ -159,6 +164,7 @@ export class Town {
     routes.push(...this.hubRoutes(hubBuildings, ports.map((a, i) => ({ angle: a, coast: hubCoasts[i] }))))
     this.cars.setRoutes(routes)
     this.boats.setRoutes(boatRoutes)
+    this.snapshotId = layoutKey(s)
   }
 
   /** The Service Bus port's board: dead letters across every island. */
@@ -185,20 +191,47 @@ export class Town {
 
   /** Feed a snapshot into the existing buildings. */
   apply(s: Snapshot): void {
-    for (const g of s.groups) for (const n of g.nodes) this.buildings.get(n.id)?.setNode(n)
+    // One building that cannot take its numbers must not stop the others from taking theirs.
+    for (const g of s.groups) for (const n of g.nodes) this.guard(`apply ${n.id}`, () => this.buildings.get(n.id)?.setNode(n))
     for (const isl of this.islands) {
       const g = s.groups.find((x) => x.id === isl.group.id)
-      if (g) isl.messaging = messagingOf([...g.nodes])
+      if (g) this.guard(`messaging ${g.id}`, () => { isl.messaging = messagingOf([...g.nodes]) })
     }
     this.hubDeadLetters = this.islands.reduce((a, i) => a + (i.messaging.deadLetters ?? 0), 0)
   }
 
   update(dt: number, time: number, camera: THREE.Camera): void {
-    for (const b of this.buildings.values()) b.update(dt, time, camera)
-    for (const isl of this.islands) isl.harbour.update(isl.messaging, time, camera)
-    this.updateHubBoard(camera)
-    this.cars.update(dt)
-    this.boats.update(dt)
+    for (const [id, b] of this.buildings) this.guard(`update ${id}`, () => b.update(dt, time, camera))
+    for (const isl of this.islands) this.guard(`harbour ${isl.group.id}`, () => isl.harbour.update(isl.messaging, time, camera))
+    this.guard('hub board', () => this.updateHubBoard(camera))
+    this.guard('cars', () => this.cars.update(dt))
+    this.guard('boats', () => this.boats.update(dt))
+  }
+
+  private readonly reported = new Set<string>()
+
+  /** Runs one piece of per-frame work. If it throws, the error is logged once and the rest of the town carries on. */
+  private guard(what: string, work: () => void): void {
+    try {
+      work()
+    } catch (e) {
+      if (this.reported.has(what)) return
+      this.reported.add(what)
+      console.error(`Could not ${what}:`, e)
+    }
+  }
+
+  /** What one building shows right now, as plain values. For tests. */
+  inspect(id: string): (BuildingStatus & { bubble: { visible: boolean; honk: boolean; waiting: number } | null }) | null {
+    const b = this.buildings.get(id)
+    const st = b?.status()
+    return b && st ? { ...st, bubble: this.cars.bubbleOf(b) } : null
+  }
+
+  /** What an island's harbour shows, and whether the island is a config error island. For tests. */
+  inspectIsland(groupId: string): { id: string; buildings: number; configError: string | null; crates: number; brokenCrates: number; alarm: boolean } | null {
+    const isl = this.islands.find((i) => i.group.id === groupId)
+    return isl ? { id: groupId, buildings: isl.buildings.size, configError: isl.group.configError ?? null, ...isl.harbour.status() } : null
   }
 
   /** Grow the camera framing box by an island's coast, pushed out a little to leave room for piers. */
@@ -387,6 +420,8 @@ export class Town {
     const signZ = gateZ - 2.4
     decor.add(this.islandSign(g, -8.5, signZ))
     avoid.push({ x: -8.5, z: signZ, w: 12, d: 5 })
+    // A pillar whose registry file is broken: the island stays on the map, empty, with the problem written on a board
+    if (g.configError) decor.add(this.configErrorBoard(g.configError))
     // Lost & found: a heap of boxes and bins by the gate, for the systems nobody has claimed
     if (g.isLostFound) {
       const pile: [Parameters<typeof prop>[0], number, number, number, number][] = [
@@ -444,6 +479,33 @@ export class Town {
     c2.scale.setScalar(2.4)
     c2.position.set(coastX - 3.2, GROUND + 0.05, z - 1.8)
     g.add(quay, house, p, c2, lamp(coastX - 2.6, z - 2.6, 1), cyl(0.16, 0.2, 0.8, flat(palette.woodDark), { x: coastX - 1.6, y: GROUND, z: z + 1.9 }, 8))
+    return g
+  }
+
+  /** A big warning board in the middle of an island whose registry file could not be used, saying what is wrong. */
+  private configErrorBoard(message: string): THREE.Group {
+    const lines = wrapText(message, 30).slice(0, 7)
+    const tex = canvasTexture(512, 320, (ctx) => {
+      ctx.fillStyle = '#fff4d6'; roundRect(ctx, 4, 4, 504, 312, 26); ctx.fill()
+      ctx.strokeStyle = '#d63a2f'; ctx.lineWidth = 10; ctx.stroke()
+      ctx.fillStyle = '#d63a2f'; ctx.fillRect(14, 14, 484, 62)
+      ctx.fillStyle = '#fff'; ctx.font = '800 44px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+      ctx.fillText('CONFIG ERROR', 256, 46)
+      ctx.fillStyle = '#26364f'; ctx.font = '600 25px system-ui, sans-serif'; ctx.textAlign = 'left'
+      lines.forEach((l, i) => ctx.fillText(l, 28, 108 + i * 31, 460))
+    })
+    const g = new THREE.Group()
+    const face = new THREE.Mesh(new THREE.PlaneGeometry(9, 5.625), new THREE.MeshBasicMaterial({ map: tex, toneMapped: false, side: THREE.DoubleSide }))
+    face.position.y = 4.6
+    const postMat = new THREE.MeshStandardMaterial({ color: palette.woodDark, flatShading: true })
+    for (const x of [-3.6, 3.6]) {
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.2, 4.4, 7), postMat)
+      post.position.set(x, 2.2, -0.1)
+      g.add(post)
+    }
+    g.add(face)
+    g.position.set(0, GROUND, -4)
+    g.userData.configError = true
     return g
   }
 
@@ -584,6 +646,24 @@ export class Town {
   }
 }
 
+/** Breaks text into lines of at most `width` characters at word boundaries; a word longer than a line is cut. */
+export function wrapText(text: string, width: number): string[] {
+  const lines: string[] = []
+  let line = ''
+  for (const raw of text.split(/\s+/).filter(Boolean)) {
+    let word = raw
+    while (word.length > width) {
+      if (line) { lines.push(line); line = '' }
+      lines.push(word.slice(0, width))
+      word = word.slice(width)
+    }
+    if (line && line.length + 1 + word.length > width) { lines.push(line); line = word }
+    else line = line ? `${line} ${word}` : word
+  }
+  if (line) lines.push(line)
+  return lines
+}
+
 /** A couple of trees, flower beds and benches for a spare pad. */
 function parkProps(x: number, z: number): THREE.Object3D[] {
   const out: THREE.Object3D[] = []
@@ -609,7 +689,7 @@ function parkProps(x: number, z: number): THREE.Object3D[] {
 }
 
 function layoutKey(s: Snapshot): string {
-  return `${s.townId}|${s.groups.map((g) => `${g.id}:${g.nodes.map((n) => `${n.id}/${n.kind}/${n.service ?? ''}/${n.calls.join('+')}`).join(',')}`).join(';')}`
+  return `${s.townId}|${s.groups.map((g) => `${g.id}${g.configError ? '!' : ''}:${g.nodes.map((n) => `${n.id}/${n.kind}/${n.service ?? ''}/${n.calls.join('+')}`).join(',')}`).join(';')}`
 }
 
 /** Where a straight line from the hub's centre leaves the hub's coast (inset a little). */

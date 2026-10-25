@@ -431,6 +431,14 @@ export class CarSystem {
     return mk
   }
 
+  /** What the bubble over a building's service lane shows, for tests: whether it is up, the "!" and the "+N waiting" count. */
+  bubbleOf(b: Building): { visible: boolean; honk: boolean; waiting: number } | null {
+    const mk = this.markers.get(b)
+    if (!mk) return null
+    const [honk, hidden] = mk.key.split('|')
+    return { visible: mk.sprite.visible, honk: honk === 'true', waiting: Number(hidden) || 0 }
+  }
+
   /** The "+N waiting" and "!" bubble over a bay. N is the requests in flight (rate times typical latency) that the lane has no room to draw, and "!" shows when p99 is well past the SLA. */
   private updateMarkers(): void {
     for (const plan of this.plans) {

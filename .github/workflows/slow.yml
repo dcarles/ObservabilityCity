@@ -1,0 +1,78 @@
+name: Slow checks
+
+# The checks that take too long to wait for on every pull request: the 24-island stress town in a browser (draw calls,
+# frame time, build time) and the full sample town with screenshots. They run when something is merged to main and every
+# night, and can be started by hand from the Actions tab.
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  browser:
+    name: Stress town and full town
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', '.config/dotnet-tools.json') }}
+          restore-keys: nuget-${{ runner.os }}-
+      - run: npm ci
+        working-directory: web
+      - name: Playwright version
+        id: pw
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+        working-directory: web
+      - name: Cache the browser
+        id: browser
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
+      - name: Install the browser
+        if: steps.browser.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+        working-directory: web
+      - name: Install the browser's system libraries
+        if: steps.browser.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+        working-directory: web
+      - run: dotnet build src/ObservabilityCity.Host -c Release
+      - name: 24-island stress town
+        run: npm run e2e:stress
+        working-directory: web
+        env:
+          E2E_NO_BUILD: '1'
+      - name: Full sample town, with screenshots
+        if: success() || failure()
+        run: npm run e2e:town
+        working-directory: web
+        env:
+          E2E_NO_BUILD: '1'
+      - name: Keep the reports and screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: slow-checks-report
+          path: |
+            web/playwright-report
+            web/test-results
+          retention-days: 14

@@ -7,9 +7,13 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p e2e",
     "test": "vitest run",
     "gen:contracts": "node scripts/gen-contracts.mjs",
+    "e2e": "playwright test",
+    "e2e:slow": "npm run e2e:stress && npm run e2e:town",
+    "e2e:stress": "cross-env E2E_SUITE=stress playwright test",
+    "e2e:town": "cross-env E2E_SUITE=town playwright test",
     "check:contracts": "node scripts/gen-contracts.mjs --check"
   },
   "dependencies": {
@@ -17,8 +21,10 @@
     "three": "^0.170.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@types/node": "^26.6.5",
     "@types/three": "^0.170.0",
+    "cross-env": "^7.0.3",
     "openapi-typescript": "^7.4.4",
     "typescript": "^5.6.3",
     "vite": "^5.4.11",

@@ -4,8 +4,9 @@ import { Stage } from './scene/stage'
 import { Town } from './scene/town'
 import { loadKit } from './assets/kit'
 import { Connection } from './connection'
-import { PreviewPanel, Search, showTooltip, TopBar, type SearchItem } from './ui'
+import { NoticesPanel, PreviewPanel, Search, showTooltip, TopBar, type SearchItem } from './ui'
 import type { Snapshot } from './types'
+import { checkSnapshot } from './snapshotGuard'
 import { Building } from './buildings/building'
 
 void start()
@@ -28,6 +29,7 @@ async function start(): Promise<void> {
   }
 
   const topbar = new TopBar(() => stage.home())
+  const notices = new NoticesPanel()
   const preview = new PreviewPanel(() =>
     [...town.buildings.values()].map((b) => ({ id: b.id, name: b.node?.name ?? b.id, group: b.id.split('.')[0] })))
 
@@ -47,20 +49,51 @@ async function start(): Promise<void> {
   )
   void search
 
-  function onSnapshot(s: Snapshot): void {
-    if (!town.matches(s)) {
-      town.root.remove(...town.root.children.filter((c) => c !== town.cars.object && c !== town.boats.object))
-      town.buildings.clear()
-      town.islands.length = 0
-      town.extent.length = 0
-      town.bounds.makeEmpty()
-      town.build(s)
-      stage.frame(town.extent)
-      stage.home(true)
-      void preview.refresh()
+  // What the page has shown so far, for tests and for poking from the console.
+  const seen = { snapshots: 0, rejected: 0, buildErrors: 0, buildMs: 0, last: null as Snapshot | null }
+  const reportedProblems = new Set<string>()
+
+  function onSnapshot(raw: unknown): void {
+    // A snapshot that cannot be drawn is dropped and the town keeps showing the last good one.
+    const { snapshot: s, problems } = checkSnapshot(raw)
+    for (const p of problems) {
+      if (reportedProblems.has(p)) continue
+      reportedProblems.add(p)
+      console.warn(`Snapshot problem: ${p}`)
     }
-    town.apply(s)
+    if (!s) {
+      seen.rejected++
+      topbar.setStatus('badData')
+      return
+    }
+    try {
+      if (!town.matches(s)) {
+        const started = performance.now()
+        town.root.remove(...town.root.children.filter((c) => c !== town.cars.object && c !== town.boats.object))
+        town.buildings.clear()
+        town.islands.length = 0
+        town.extent.length = 0
+        town.bounds.makeEmpty()
+        town.build(s)
+        seen.buildMs = performance.now() - started
+        stage.frame(town.extent)
+        stage.home(true)
+        void preview.refresh()
+      }
+      town.apply(s)
+    } catch (e) {
+      // the layout could not be built: try again with the next snapshot instead of leaving a half-built town for good
+      seen.buildErrors++
+      town.invalidate()
+      console.error('Could not draw the town from this snapshot:', e)
+      topbar.setStatus('badData')
+      return
+    }
+    seen.snapshots++
+    seen.last = s
+    topbar.setStatus('live') // a good snapshot just arrived, whatever the last bad one said
     topbar.setSnapshot(s)
+    notices.show(s.notices)
   }
 
   const connection = new Connection(onSnapshot, (st) => topbar.setStatus(st))
@@ -102,18 +135,54 @@ async function start(): Promise<void> {
     canvas.style.cursor = b ? 'pointer' : 'grab'
   }
 
-  // Debug handle for automated screenshots and poking from the console.
-  ;(window as unknown as { city: unknown }).city = { stage, town, THREE }
+  // ?test=1 is for automated tests: nothing is drawn on its own, and time moves only when the test calls city.step(seconds).
+  // Software rendering draws a frame in seconds, so tests read the scene's state instead of waiting for frames.
+  const testMode = new URLSearchParams(window.location.search).has('test')
+  let simTime = 0
+  function step(seconds: number, dt = 0.1): void {
+    for (let t = 0; t < seconds - 1e-9; t += dt) {
+      simTime += dt
+      stage.tick(dt, simTime)
+      town.update(dt, simTime, stage.camera)
+    }
+  }
+
+  // Debug handle for automated tests, screenshots and poking from the console.
+  ;(window as unknown as { city: unknown }).city = {
+    stage, town, THREE, seen, step,
+    /** Hand the page a snapshot as if the server had sent it. */
+    feed: (raw: unknown) => onSnapshot(raw),
+    inspect: (id: string) => town.inspect(id),
+    inspectIsland: (id: string) => town.inspectIsland(id),
+    /** Draw once and say how much that took: draw calls, triangles and milliseconds. */
+    measureFrame: () => {
+      const t0 = performance.now()
+      stage.render()
+      const ms = performance.now() - t0
+      const info = stage.renderer.info.render
+      return { ms, calls: info.calls, triangles: info.triangles }
+    },
+  }
 
   const clock = new THREE.Clock()
+  const failed = new Set<string>()
   function frame(): void {
+    // schedule the next frame first, so an error below can never stop the loop
+    requestAnimationFrame(frame)
     const dt = Math.min(clock.getDelta(), 0.1)
     const time = clock.elapsedTime
-    stage.tick(dt, time)
-    town.update(dt, time, stage.camera)
-    hover()
-    stage.render()
-    requestAnimationFrame(frame)
+    try {
+      stage.tick(dt, time)
+      town.update(dt, time, stage.camera)
+      hover()
+      stage.render()
+    } catch (e) {
+      const key = String(e)
+      if (!failed.has(key)) {
+        failed.add(key)
+        console.error('Frame failed, carrying on:', e)
+      }
+    }
   }
-  frame()
+  if (!testMode) frame()
 }
