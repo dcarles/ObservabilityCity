@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=../schema/pillar.schema.json
 pillar: cl
 displayName: Core Ledger
 color: "#5aa9ff"

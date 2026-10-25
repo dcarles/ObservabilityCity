@@ -1,0 +1,95 @@
+import { describe, expect, it } from 'vitest'
+import { hubGeometry, layoutTown, RING_CAPACITY, wrapAngle, type IslandSize, type TownLayout } from './layout'
+
+// sizes like the sample town's islands: a few big ones, many small
+const sizes = (n: number): IslandSize[] =>
+  Array.from({ length: n }, (_, i) => ({ rx: 24 + ((i * 7) % 5) * 3.5, rz: 20 + ((i * 3) % 4) * 2.5 }))
+
+/** Points on an island's coast, treating it as an ellipse turned to face the hub. */
+function coast(l: TownLayout, s: IslandSize[], i: number, grow = 0): { x: number; z: number }[] {
+  const p = l.islands[i]
+  const cx = Math.sin(p.angle) * p.radius, cz = -Math.cos(p.angle) * p.radius
+  const yaw = Math.atan2(-cx, -cz)
+  return Array.from({ length: 48 }, (_, k) => {
+    const t = (k / 48) * Math.PI * 2
+    const lx = (s[i].rx + grow) * Math.cos(t), lz = (s[i].rz + grow) * Math.sin(t)
+    return { x: cx + lx * Math.cos(yaw) + lz * Math.sin(yaw), z: cz - lx * Math.sin(yaw) + lz * Math.cos(yaw) }
+  })
+}
+
+function inside(l: TownLayout, s: IslandSize[], i: number, pt: { x: number; z: number }, grow = 0): boolean {
+  const p = l.islands[i]
+  const cx = Math.sin(p.angle) * p.radius, cz = -Math.cos(p.angle) * p.radius
+  const yaw = Math.atan2(-cx, -cz)
+  const dx = pt.x - cx, dz = pt.z - cz
+  const lx = dx * Math.cos(yaw) - dz * Math.sin(yaw)
+  const lz = dx * Math.sin(yaw) + dz * Math.cos(yaw)
+  return (lx / (s[i].rx + grow)) ** 2 + (lz / (s[i].rz + grow)) ** 2 < 1
+}
+
+describe('hub', () => {
+  it('grows with the number of islands and never shrinks below the base hub', () => {
+    expect(hubGeometry(1).scale).toBeGreaterThanOrEqual(1.25)
+    expect(hubGeometry(15).scale).toBeGreaterThan(hubGeometry(5).scale)
+    expect(hubGeometry(30).rx).toBeGreaterThan(hubGeometry(15).rx)
+  })
+})
+
+describe.each([1, 2, 5, 11, 12, 13, 15, 20, 24])('layout of %i islands', (n) => {
+  const s = sizes(n)
+  const l = layoutTown(s)
+
+  it('puts at most twelve islands in the first ring and the rest in a second ring further out', () => {
+    expect(l.islands.filter((i) => i.ring === 1)).toHaveLength(Math.min(n, RING_CAPACITY))
+    const r1 = Math.max(...l.islands.filter((i) => i.ring === 1).map((i) => i.radius))
+    for (const i of l.islands.filter((x) => x.ring === 2)) expect(i.radius).toBeGreaterThan(r1)
+  })
+
+  it('keeps every island clear of every other, with open sea between', () => {
+    for (let a = 0; a < n; a++)
+      for (let b = a + 1; b < n; b++)
+        expect(coast(l, s, a).some((pt) => inside(l, s, b, pt, 6)), `islands ${a} and ${b} touch`).toBe(false)
+  })
+
+  it('keeps every island off the hub', () => {
+    for (let a = 0; a < n; a++)
+      for (const pt of coast(l, s, a)) expect(Math.hypot(pt.x, pt.z)).toBeGreaterThan(l.hub.rx + 12)
+  })
+
+  it('lets every bridge reach its island without crossing another island', () => {
+    for (let a = 0; a < n; a++) {
+      const p = l.islands[a]
+      for (let b = 0; b < n; b++) {
+        if (a === b) continue
+        // walk the straight road from the hub's coast to the island's gate
+        for (let t = 0; t <= 1; t += 0.01) {
+          const r = l.hub.rx + (p.radius - s[a].rz - l.hub.rx) * t
+          const pt = { x: Math.sin(p.angle) * r, z: -Math.cos(p.angle) * r }
+          expect(inside(l, s, b, pt, 5), `bridge to island ${a} crosses island ${b}`).toBe(false)
+        }
+      }
+    }
+  })
+
+  it('leaves room between the spoke roads where they meet the hub', () => {
+    const ports = l.islands.map((i) => i.portAngle).sort((x, y) => x - y)
+    for (let k = 0; k < ports.length && ports.length > 1; k++) {
+      const gap = Math.abs(wrapAngle(ports[(k + 1) % ports.length] - ports[k]))
+      expect(gap * l.hub.rx * 0.9).toBeGreaterThan(8)
+    }
+  })
+
+  it('keeps spokes away from the hub buildings on the four axes', () => {
+    for (const i of l.islands)
+      for (const axis of [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2]) {
+        const lateral = Math.abs(Math.sin(wrapAngle(i.portAngle - axis))) * l.hub.buildingR
+        expect(Math.abs(wrapAngle(i.portAngle - axis)) > 1.2 || lateral >= 8.5).toBe(true)
+      }
+  })
+})
+
+describe('layout is deterministic', () => {
+  it('gives the same answer twice', () => {
+    expect(layoutTown(sizes(15))).toEqual(layoutTown(sizes(15)))
+  })
+})

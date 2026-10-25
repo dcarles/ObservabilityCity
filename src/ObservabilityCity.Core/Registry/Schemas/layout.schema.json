@@ -1,0 +1,13 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Layout file: the order of the islands",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "islands": {
+      "type": "array",
+      "description": "Pillar codes in the order they stand round the hub. A ring holds 12; the rest stand in a staggered outer ring.",
+      "items": { "$ref": "system-ids.schema.json#/$defs/pillarId" }
+    }
+  }
+}

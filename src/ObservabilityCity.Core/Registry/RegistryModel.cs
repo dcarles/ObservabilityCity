@@ -5,7 +5,8 @@ namespace ObservabilityCity.Core.Registry;
 /// <summary>Everything the registry folder says about one town.</summary>
 public sealed record Registry(
     TownInfo Town,
-    IReadOnlyList<RegistryGroup> Groups)
+    IReadOnlyList<RegistryGroup> Groups,
+    IReadOnlyList<ExternalCaller> ExternalCallers)
 {
     public IEnumerable<RegistryNode> AllNodes => Groups.SelectMany(g => g.Nodes);
 }
@@ -18,7 +19,16 @@ public sealed record RegistryGroup(
     string DisplayName,
     string Color,
     bool IsHub,
-    IReadOnlyList<RegistryNode> Nodes);
+    IReadOnlyList<RegistryNode> Nodes)
+{
+    /// <summary>The pillar id of the island that collects systems no pillar owns.</summary>
+    public const string LostFoundId = "lost-found";
+
+    public bool IsLostFound => Id == LostFoundId;
+}
+
+/// <summary>Someone outside the town (an app, a partner) and the external systems it calls.</summary>
+public sealed record ExternalCaller(string Id, string Name, IReadOnlyList<string> Calls);
 
 /// <summary>A building with its settings already resolved through the defaults cascade.</summary>
 public sealed record RegistryNode(

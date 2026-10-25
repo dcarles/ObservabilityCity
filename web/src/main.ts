@@ -26,13 +26,10 @@ async function start(): Promise<void> {
       town.root.remove(...town.root.children.filter((c) => c !== town.cars.object && c !== town.boats.object))
       town.buildings.clear()
       town.islands.length = 0
+      town.extent.length = 0
+      town.bounds.makeEmpty()
       town.build(s)
-      const box = town.bounds
-      const size = box.getSize(new THREE.Vector3())
-      const center = box.getCenter(new THREE.Vector3())
-      const fov = THREE.MathUtils.degToRad(stage.camera.fov)
-      const fit = Math.max(size.z / 2 / Math.tan(fov / 2), size.x / 2 / (Math.tan(fov / 2) * stage.camera.aspect))
-      stage.setHome(new THREE.Vector3(center.x, 0, center.z), Math.min(420, fit * 0.82 + 12))
+      stage.frame(town.extent)
       stage.home(true)
       void preview.refresh()
     }

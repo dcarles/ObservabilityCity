@@ -10,6 +10,14 @@ var builder = WebApplication.CreateBuilder(args);
 var registryPath = RegistryPath.Resolve(builder.Configuration);
 var registry = RegistryLoader.Load(registryPath);
 
+// `dotnet run --project src/ObservabilityCity.Host -- --write-schema` refreshes the registry's editor schemas and exits.
+if (args.Contains("--write-schema"))
+{
+    RegistrySchema.Write(registry, registryPath);
+    Console.WriteLine($"Schemas written to {Path.Combine(registryPath, RegistrySchema.FolderName)}");
+    return;
+}
+
 var fakeOptions = builder.Configuration.GetSection("Fake").Get<FakeOptions>() ?? new FakeOptions();
 var fake = new FakeSource(FakeProfiles.Load(registryPath), fakeOptions, TimeProvider.System);
 var snapshotInterval = TimeSpan.FromSeconds(builder.Configuration.GetValue("Snapshot:IntervalSeconds", 2.0));

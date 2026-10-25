@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=../schema/pillar.schema.json
 pillar: cus
 displayName: Customers
 color: "#3fb68b"

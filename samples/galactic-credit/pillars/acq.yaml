@@ -1,0 +1,16 @@
+# yaml-language-server: $schema=../schema/pillar.schema.json
+pillar: acq
+displayName: Acquisition
+color: "#ef8354"
+external: true
+defaults:
+  api: { slaP99Ms: 700 }
+systems:
+  - { id: acq.applications-api, service: applications, name: Applications API, role: api, calls: [acq.applications-db, acq.offers-api] }
+  - { id: acq.applications-worker, service: applications, name: Applications worker, role: worker, calls: [acq.applications-db] }
+  - { id: acq.applications-db, service: applications, name: Applications DB, role: db }
+  - { id: acq.offers-api, service: offers, name: Offers API, role: api, calls: [acq.offers-db] }
+  - { id: acq.offers-db, service: offers, name: Offers DB, role: db }
+  - { id: acq.leads-api, service: leads, name: Leads API, role: api, calls: [acq.leads-db, acq.applications-api] }
+  - { id: acq.leads-worker, service: leads, name: Leads worker, role: worker, calls: [acq.leads-db] }
+  - { id: acq.leads-db, service: leads, name: Leads DB, role: db }

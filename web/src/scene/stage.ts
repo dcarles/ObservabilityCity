@@ -13,6 +13,8 @@ export class Stage {
   private homeTarget = new THREE.Vector3(0, 0, -30)
   private homeDistance = 105
   private homeAzimuth = 0
+  /** How far the view may be panned from the town's centre. Grows with the town, so the outermost island stays reachable. */
+  private panLimit = 120
   private homePolar = THREE.MathUtils.degToRad(52)
 
   constructor(readonly canvas: HTMLCanvasElement) {
@@ -25,7 +27,7 @@ export class Stage {
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap
 
     this.scene.fog = new THREE.Fog(palette.fog, 160, 520)
-    this.camera = new THREE.PerspectiveCamera(38, 1, 1, 1500)
+    this.camera = new THREE.PerspectiveCamera(38, 1, 1, 4000)
 
     this.controls = new OrbitControls(this.camera, canvas)
     this.controls.enableDamping = true
@@ -34,7 +36,7 @@ export class Stage {
     this.controls.minPolarAngle = THREE.MathUtils.degToRad(25)
     this.controls.maxPolarAngle = THREE.MathUtils.degToRad(75)
     this.controls.minDistance = 12
-    this.controls.maxDistance = 520
+    this.controls.maxDistance = 900
     this.controls.screenSpacePanning = false
     this.controls.addEventListener('change', () => this.clampPan())
 
@@ -62,6 +64,9 @@ export class Stage {
   setHome(target: THREE.Vector3, distance: number): void {
     this.homeTarget.copy(target)
     this.homeDistance = distance
+    this.panLimit = Math.max(120, distance * 0.7)
+    // never zoom out further than a comfortable view of the whole town, but always far enough to reach Home
+    this.controls.maxDistance = Math.max(300, distance * 1.35)
     if (this.scene.fog instanceof THREE.Fog) {
       // the haze starts beyond the town however big it is
       this.scene.fog.near = Math.max(160, distance * 1.15)
@@ -74,6 +79,35 @@ export class Stage {
     const sc = this.sun.shadow.camera
     sc.left = -ext; sc.right = ext; sc.top = ext; sc.bottom = -ext
     sc.updateProjectionMatrix()
+  }
+
+  /**
+   * Sets Home to show every point, standing as close as the view allows. The top bar and the panel on the left take
+   * a share of the screen, so points are kept clear of them.
+   */
+  frame(points: THREE.Vector3[], reserve = { top: 0.16, side: 0.06 }): void {
+    if (points.length === 0) return
+    const box = new THREE.Box3().setFromPoints(points)
+    const target = box.getCenter(new THREE.Vector3()).setY(0)
+    const probe = this.camera.clone()
+    const fits = (distance: number) => {
+      probe.position.copy(target).add(new THREE.Vector3().setFromSphericalCoords(distance, this.homePolar, this.homeAzimuth))
+      probe.up.set(0, 1, 0)
+      probe.lookAt(target)
+      probe.updateMatrixWorld(true)
+      probe.updateProjectionMatrix()
+      return points.every((p) => {
+        const v = p.clone().project(probe)
+        return v.z < 1 && Math.abs(v.x) <= 1 - reserve.side && v.y <= 1 - reserve.top && v.y >= -(1 - reserve.side)
+      })
+    }
+    let lo = 40, hi = 2000
+    for (let i = 0; i < 30; i++) {
+      const mid = (lo + hi) / 2
+      if (fits(mid)) hi = mid
+      else lo = mid
+    }
+    this.setHome(target, hi)
   }
 
   home(instant = false): void {
@@ -120,7 +154,7 @@ export class Stage {
 
   private clampPan(): void {
     const t = this.controls.target
-    const limit = 120
+    const limit = this.panLimit
     t.x = THREE.MathUtils.clamp(t.x, this.homeTarget.x - limit, this.homeTarget.x + limit)
     t.z = THREE.MathUtils.clamp(t.z, this.homeTarget.z - limit, this.homeTarget.z + limit)
     t.y = 0
@@ -139,7 +173,7 @@ export class Stage {
   }
 
   private sky(): void {
-    const geo = new THREE.SphereGeometry(900, 24, 16)
+    const geo = new THREE.SphereGeometry(2600, 24, 16)
     const mat = new THREE.ShaderMaterial({
       side: THREE.BackSide,
       depthWrite: false,
@@ -158,7 +192,7 @@ export class Stage {
   }
 
   private sea(): void {
-    const geo = new THREE.CircleGeometry(900, 64)
+    const geo = new THREE.CircleGeometry(2800, 64)
     geo.rotateX(-Math.PI / 2)
     const mat = new THREE.MeshStandardMaterial({ color: palette.sea.deep, roughness: 0.35, metalness: 0.0 })
     const deep = new THREE.Color(palette.sea.deep)

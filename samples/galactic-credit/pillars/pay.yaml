@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=../schema/pillar.schema.json
 pillar: pay
 displayName: Payments
 color: "#f2994a"

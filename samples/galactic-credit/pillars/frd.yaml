@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=../schema/pillar.schema.json
 pillar: frd
 displayName: Fraud
 color: "#e0566e"

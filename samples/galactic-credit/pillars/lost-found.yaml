@@ -1,0 +1,10 @@
+# yaml-language-server: $schema=../schema/pillar.schema.json
+# Systems that carry no pillar tag and no pillar.code attribute end up here, so nothing is silently dropped.
+pillar: lost-found
+displayName: Lost & found
+color: "#9aa3ad"
+systems:
+  - { id: lost-found.batch-gateway-api, service: batch-gateway, name: Batch gateway API, role: api, calls: [lost-found.batch-gateway-db] }
+  - { id: lost-found.batch-gateway-worker, service: batch-gateway, name: Batch gateway worker, role: worker, calls: [lost-found.batch-gateway-db] }
+  - { id: lost-found.batch-gateway-db, service: batch-gateway, name: Batch gateway DB, role: db }
+  - { id: lost-found.legacy-ftp-api, name: Legacy file drop, role: api }

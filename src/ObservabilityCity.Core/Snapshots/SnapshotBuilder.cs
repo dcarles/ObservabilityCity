@@ -18,7 +18,7 @@ public sealed class SnapshotBuilder(Registry.Registry registry, LatestState stat
     {
         var now = clock.GetUtcNow();
         var groups = registry.Groups
-            .Select(g => new GroupSnapshot(g.Id, g.DisplayName, g.Color, g.IsHub, g.Nodes.Select(n => ToNode(n, now)).ToList()))
+            .Select(g => new GroupSnapshot(g.Id, g.DisplayName, g.Color, g.IsHub, g.IsLostFound, g.Nodes.Select(n => ToNode(n, now)).ToList()))
             .ToList();
 
         var live = groups.SelectMany(g => g.Nodes).Where(n => n.State != HealthState.Stale).ToList();

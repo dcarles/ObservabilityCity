@@ -1,0 +1,5 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "App-wide defaults per role",
+  "$ref": "defs.schema.json#/$defs/defaults"
+}

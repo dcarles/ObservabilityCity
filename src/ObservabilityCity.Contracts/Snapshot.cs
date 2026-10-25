@@ -74,12 +74,13 @@ public sealed record NodeSnapshot(
     IReadOnlyList<string> Calls,
     DateTimeOffset? LastUpdated);
 
-/// <summary>An island (a pillar, a team, ...) or the hub island.</summary>
+/// <summary>An island (a pillar, a team, ...) or the hub island. IsLostFound marks the island that collects systems no group owns.</summary>
 public sealed record GroupSnapshot(
     string Id,
     string DisplayName,
     string Color,
     bool IsHub,
+    bool IsLostFound,
     IReadOnlyList<NodeSnapshot> Nodes);
 
 public sealed record TownTotals(

@@ -1,0 +1,13 @@
+# yaml-language-server: $schema=../schema/pillar.schema.json
+pillar: dec
+displayName: Decisioning
+color: "#7b8cde"
+defaults:
+  api: { slaP99Ms: 1500 }
+systems:
+  - { id: dec.decision-api, service: decision, name: Decision API, role: api, external: true, calls: [dec.decision-db, dec.features-cache, dec.scorecards-api] }
+  - { id: dec.decision-worker, service: decision, name: Decision worker, role: worker, calls: [dec.decision-db, dec.scorecards-api] }
+  - { id: dec.decision-db, service: decision, name: Decision DB, role: db }
+  - { id: dec.scorecards-api, service: scorecards, name: Scorecards API, role: api, calls: [dec.scorecards-db] }
+  - { id: dec.scorecards-db, service: scorecards, name: Scorecards DB, role: db }
+  - { id: dec.features-cache, name: Features cache, role: cache }

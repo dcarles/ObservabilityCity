@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=../schema/pillar.schema.json
 pillar: col
 displayName: Collections
 color: "#9b6bd6"
@@ -13,5 +14,5 @@ systems:
   - { id: col.agency-api, service: agency, name: Agency API, role: api, external: true, calls: [col.agency-db] }
   - { id: col.agency-worker, service: agency, name: Agency worker, role: worker, calls: [col.agency-db, col.queue-cache] }
   - { id: col.agency-db, service: agency, name: Agency DB, role: db }
-  - { id: col.letters-cron, name: Letter run, role: cron, calls: [col.dunning-api] }
+  - { id: col.letters-cron, name: Letter run, role: cron, calls: [col.dunning-api, col.cases-api] }
   - { id: col.queue-cache, name: Work queue cache, role: cache }
