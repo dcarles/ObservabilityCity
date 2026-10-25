@@ -49,11 +49,9 @@ jobs:
           key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
       - name: Install the browser
         if: steps.browser.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps chromium
-        working-directory: frontend
-      - name: Install the browser's system libraries
-        if: steps.browser.outputs.cache-hit == 'true'
-        run: npx playwright install-deps chromium
+        # No --with-deps: the runner image already has Chromium's libraries, and install-deps
+        # also pulls fonts and Xvfb through a slow apt mirror (minutes, sometimes a stall).
+        run: npx playwright install chromium
         working-directory: frontend
       - run: dotnet build backend/src/ObservabilityCity.Host -c Release
       - name: 24-island stress town
