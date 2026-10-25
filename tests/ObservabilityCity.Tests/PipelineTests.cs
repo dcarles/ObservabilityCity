@@ -49,8 +49,41 @@ public class PipelineTests
 
         Assert.All(snapshot.Groups.SelectMany(g => g.Nodes), n => Assert.Equal(HealthState.Healthy, n.State));
 
+        AssertMatchesGolden(snapshot, "calm.json");
+    }
+
+    [Fact]
+    public async Task A_bad_day_across_several_islands_matches_the_golden_fixture()
+    {
+        var rig = new Rig { Fake = { Calm = true } };
+        rig.Fake.Add("pay.payments-api", FakeEffectKind.Errors, 0.6);
+        rig.Fake.Add("frd", FakeEffectKind.Latency, 0.7);
+        rig.Fake.Add("obk.data-db", FakeEffectKind.Saturate, 1);
+        rig.Fake.Add("col.cases-worker", FakeEffectKind.Poison, 1);
+        rig.Fake.Add("dsp", FakeEffectKind.Down, 1);
+        rig.Fake.Add("lost-found.legacy-ftp-api", FakeEffectKind.HighCpu, 1);
+        var snapshot = await rig.Tick();
+
+        Assert.Equal(HealthState.Down, Node(snapshot, "dsp.disputes-api").State);
+        Assert.Equal(HealthState.Healthy, Node(snapshot, "rwd.points-api").State);
+        Assert.Equal(HealthState.Degraded, Node(snapshot, "pay.payments-api").State);
+        AssertMatchesGolden(snapshot, "bad-day.json");
+    }
+
+    [Fact]
+    public async Task Lost_and_found_is_flagged_and_comes_last()
+    {
+        var snapshot = await new Rig().Tick();
+
+        Assert.Single(snapshot.Groups, g => g.IsLostFound);
+        Assert.True(snapshot.Groups[^1].IsLostFound);
+        Assert.False(snapshot.Groups[0].IsLostFound);
+    }
+
+    private static void AssertMatchesGolden(Snapshot snapshot, string fixture)
+    {
         var actual = JsonSerializer.Serialize(snapshot, Json).ReplaceLineEndings("\n");
-        var path = Path.Combine(TestPaths.Fixtures, "calm.json");
+        var path = Path.Combine(TestPaths.Fixtures, fixture);
         if (Environment.GetEnvironmentVariable("UPDATE_GOLDEN") == "1" || !File.Exists(path))
             File.WriteAllText(path, actual + "\n");
         Assert.Equal(File.ReadAllText(path).ReplaceLineEndings("\n").TrimEnd(), actual.TrimEnd());

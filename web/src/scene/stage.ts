@@ -2,6 +2,13 @@ import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { palette } from '../themes/harbour-town/palette'
 
+export type Quality = 'high' | 'medium' | 'low'
+
+const QUALITY_STEPS: Quality[] = ['high', 'medium', 'low']
+/** Average frame time (ms) over the sample window above which quality steps down one level. About 30 frames a second. */
+const SLOW_FRAME_MS = 33
+const SAMPLE_FRAMES = 90
+
 /** Renderer, camera, sky, sea and light: everything that is the same whatever town is shown. */
 export class Stage {
   readonly renderer: THREE.WebGLRenderer
@@ -9,6 +16,14 @@ export class Stage {
   readonly camera: THREE.PerspectiveCamera
   readonly controls: OrbitControls
   readonly sun: THREE.DirectionalLight
+  quality: Quality = 'high'
+  /** Called when quality steps down on its own, so the page can say so. */
+  onQualityStep: ((to: Quality) => void) | null = null
+  private autoQuality = true
+  private frameTimes: number[] = []
+  private lastFrame = 0
+  private warmup = 150
+  private sinceShadow = 0
   private readonly seaUniforms = { uTime: { value: 0 } }
   private homeTarget = new THREE.Vector3(0, 0, -30)
   private homeDistance = 105
@@ -54,6 +69,13 @@ export class Stage {
     this.sun.shadow.normalBias = 0.05
     this.sun.target.position.set(0, 0, -30)
     this.scene.add(this.sun, this.sun.target)
+
+    // ?quality=high|medium|low pins the level and turns the automatic step-down off
+    const asked = new URLSearchParams(window.location.search).get('quality')
+    if (asked === 'high' || asked === 'medium' || asked === 'low') {
+      this.autoQuality = false
+      this.setQuality(asked)
+    }
 
     this.home(true)
     window.addEventListener('resize', () => this.resize())
@@ -122,6 +144,15 @@ export class Stage {
     }
   }
 
+  /** Glides to look at a point from the current side, standing `distance` away at a comfortable angle. */
+  focus(target: THREE.Vector3, distance: number): void {
+    const offset = this.camera.position.clone().sub(this.controls.target)
+    const sph = new THREE.Spherical().setFromVector3(offset)
+    sph.radius = THREE.MathUtils.clamp(distance, this.controls.minDistance, this.controls.maxDistance)
+    sph.phi = THREE.MathUtils.clamp(sph.phi, THREE.MathUtils.degToRad(40), THREE.MathUtils.degToRad(62))
+    this.glideTo(target, target.clone().add(new THREE.Vector3().setFromSpherical(sph)))
+  }
+
   private glide: { fromPos: THREE.Vector3; toPos: THREE.Vector3; fromT: THREE.Vector3; toT: THREE.Vector3; t: number } | null = null
 
   glideTo(target: THREE.Vector3, position: THREE.Vector3): void {
@@ -168,8 +199,47 @@ export class Stage {
     this.camera.updateProjectionMatrix()
   }
 
+  /**
+   * High: full resolution and shadows redrawn every frame. Medium: slightly lower resolution, and shadows redrawn a few times
+   * a second (buildings never move, so only the cars' shadows lag). Low: normal resolution and no shadows.
+   */
+  setQuality(q: Quality): void {
+    this.quality = q
+    const dpr = window.devicePixelRatio
+    this.renderer.setPixelRatio(q === 'high' ? Math.min(dpr, 2) : q === 'medium' ? Math.min(dpr, 1.5) : 1)
+    this.renderer.shadowMap.autoUpdate = q === 'high'
+    this.renderer.shadowMap.needsUpdate = true
+    this.sun.castShadow = q !== 'low'
+    this.resize()
+  }
+
   render(): void {
+    this.watchFrameTime()
     this.renderer.render(this.scene, this.camera)
+  }
+
+  /** Steps quality down once when the town cannot keep up, and never back up on its own, so it cannot flicker. */
+  private watchFrameTime(): void {
+    const now = performance.now()
+    const dt = now - this.lastFrame
+    this.lastFrame = now
+    if (this.quality === 'medium') {
+      this.sinceShadow += dt
+      if (this.sinceShadow > 160) { this.renderer.shadowMap.needsUpdate = true; this.sinceShadow = 0 }
+    }
+    if (!this.autoQuality || this.quality === 'low') return
+    if (this.warmup > 0) { this.warmup--; return } // the first frames compile shaders and always run long
+    if (dt > 400) return // a hidden tab or a pause, not slowness
+    this.frameTimes.push(dt)
+    if (this.frameTimes.length < SAMPLE_FRAMES) return
+    const avg = this.frameTimes.reduce((a, b) => a + b, 0) / this.frameTimes.length
+    this.frameTimes = []
+    if (avg > SLOW_FRAME_MS) {
+      const next = QUALITY_STEPS[QUALITY_STEPS.indexOf(this.quality) + 1]
+      this.setQuality(next)
+      this.warmup = 30
+      this.onQualityStep?.(next)
+    }
   }
 
   private sky(): void {

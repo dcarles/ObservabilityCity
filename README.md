@@ -2,7 +2,7 @@
 
 A browser app that shows system health as a living, animated 3D town instead of a dashboard. Each pillar (or team) is an island, each system is a building, and what is going on shows in the town itself: floors for instances, lit windows for load, rooftop beacons for errors, cars for traffic.
 
-**Status: Phase 1, slice 1.** The pipeline runs end to end on fake data (backend, live push, browser), and the hub island plus two sample islands (Galactic Credit's "Core Ledger" and "Payments") are built. Everything else is in [plan/](plan/observability-city-plan.md).
+**Status: Phase 1, slice 2.** The pipeline runs end to end on fake data (backend, live push, browser), and the whole sample town is built: the hub, 14 pillar islands and a Lost & found island. Everything else is in [plan/](plan/observability-city-plan.md).
 
 ## What you need installed
 
@@ -51,7 +51,7 @@ The browser app proxies `/api` and `/hubs` to the backend, so there is nothing t
 
 ## Try it
 
-Hover a building for its numbers. Drag to orbit, scroll to zoom, right-drag to pan, **Home** frames the town.
+Hover a building for its numbers. Drag to orbit, scroll to zoom, right-drag to pan, **Home** frames the whole town. Click a building, or pick one in the search box (press `/` to focus it), and the camera glides to it and keeps its name board readable. Search also finds islands. Any drag cancels a glide.
 
 The **Try it** panel (temporary in this slice) pokes the fake data source: pick a target (the whole town, an island or one building), then press Traffic spike, Slow, Errors, Sick instances, High CPU, High memory, DB saturated, Queue backs up, Dead letters or Down. Effects stack, and each shows as a chip you can click to clear. **Calm** freezes the noise and the daily cycle.
 
@@ -73,6 +73,8 @@ How to read the town, as built so far:
 | API, worker and database side by side | One service. Systems that share a `service` in the registry stand next to each other on one pad, with their fronts toward the road. Pads sit on a grid, so every building's front is visible from the road side |
 | Name board above a building | System name and "N/M healthy". Fades out when the camera is far away, except for troubled buildings |
 | Bridges | One road bridge from the hub's plaza to each island's gate. All sync traffic between islands goes through the hub |
+| Islands on a ring round the hub, a few further out | Pillars, in the order of `layout.yaml`. Twelve fit on the first ring, the rest stand in a staggered outer ring with their bridges passing between first-ring islands. The hub grows with the number of islands |
+| Island with a heap of boxes and bins by the gate | Lost & found: systems that carry no pillar tag and no `pillar.code` |
 | Harbour with crates and a crane | The island's port, where messaging boats dock. Messages waiting pile up as crates on the quay with a "waiting N, oldest" sign. Dead letters sit in a pen of broken crates with a "DLQ N" badge and a sweeping red light. The hub shows the DLQ total |
 | Boats between hub quays and island harbours | Asynchronous messaging. Busier queues send more boats, smaller than before, and the crates on a boat show how loaded it is. Bridges are synchronous calls, boats are asynchronous ones. Boats sail only on open water: each island has a quay on the hub in the water gap beside its bridge, and lanes are found around land and bridges |
 | "Closed for repairs" sign and a blackout | The system is down |
@@ -81,7 +83,7 @@ How to read the town, as built so far:
 ## How it fits together
 
 ```
-samples/galactic-credit/   registry (YAML): town, defaults, hub, pillars, fake-data baselines
+samples/galactic-credit/   registry (YAML): town, defaults, hub, layout, pillars, schemas, fake-data baselines
 src/ObservabilityCity.Contracts    Snapshot records: the source of truth for the wire format
 src/ObservabilityCity.Core         registry loader, source interface, snapshot builder and rules
 src/ObservabilityCity.Adapters.Fake  the fake source: noise, daily cycle, autoscaling, scenario effects
@@ -111,7 +113,37 @@ dotnet test                       # registry, rules, fake source, golden snapsho
 cd web && npm test                # visual rules, plus the same golden fixture on the TypeScript side
 ```
 
-To refresh the golden fixture after an intended change: `UPDATE_GOLDEN=1 dotnet test`.
+To refresh the golden fixtures (calm town, a bad day across several islands, and the editor schemas) after an intended change: `UPDATE_GOLDEN=1 dotnet test`. The island layout golden is refreshed with `cd web && UPDATE_GOLDEN=1 npm test`.
+
+### The registry
+
+One folder describes a town. The sample is `samples/galactic-credit/`:
+
+| File | What it holds |
+| --- | --- |
+| `town.yaml` | Name, what an island is called, topology |
+| `defaults.yaml` | App-wide defaults per role (SLA, error, resource, throttle and backlog thresholds) |
+| `hub.yaml` | The hub's shared resources (gateway, broker, egress, database) and the outside callers (`externalCallers`, each lists the external systems it reaches) |
+| `layout.yaml` | The order of the islands round the hub. Unlisted pillars follow, Lost & found is always last |
+| `pillars/<code>.yaml` | One island: its systems, `calls` links, per-role `defaults` |
+| `pillars/lost-found.yaml` | The island for systems nobody owns |
+| `fake.yaml` | Baseline numbers for the fake source only |
+
+Settings cascade: system, then the pillar's `defaults`, then `defaults.yaml`, then built-in values.
+
+The loader checks everything and reports all problems at once, each with its file name. Ids must be `pillar.system` (the prefix matches the file, lowercase kebab-case, unique in the town). A misspelt key, role, call target or layout entry gets a suggestion, for example `'aa.ledger-api' calls 'aa.ledger-dbb', which is not in this town. Did you mean 'aa.ledger-db'?`. When a system is renamed, keep its old id under `aliases: [old.id]` and files that still use it keep working.
+
+**Editor help.** Each YAML file starts with a `# yaml-language-server: $schema=...` line, so an editor with the YAML extension (VS Code: Red Hat YAML) completes keys and roles and checks them as you type. `calls` and `layout.yaml` complete from the town's real ids, which live in `schema/system-ids.schema.json`. After adding systems, refresh it:
+
+```
+dotnet run --project src/ObservabilityCity.Host -- --write-schema
+```
+
+A test fails if the committed schema files are out of date.
+
+### Performance
+
+The sample town has 15 islands, about 110 buildings and up to 420 cars. Roads, lamps, props, bridges and quays are merged into a few meshes per island (about 4,700 draw calls instead of 8,900). If a frame takes more than 33 ms on average, quality steps down by itself, once per step and never back up: first shadows refresh a few times a second and at a lower resolution, then they turn off, and a note says so. Add `?quality=high` (or `medium`, `low`) to the address to pin a level and turn the automatic step off.
 
 ### Settings
 

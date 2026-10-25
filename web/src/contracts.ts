@@ -29,6 +29,7 @@ export interface components {
             displayName: string;
             color: string;
             isHub: boolean;
+            isLostFound: boolean;
             nodes: components["schemas"]["NodeSnapshot"][];
         };
         /** @enum {string} */

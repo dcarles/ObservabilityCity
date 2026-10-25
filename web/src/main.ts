@@ -4,7 +4,7 @@ import { Stage } from './scene/stage'
 import { Town } from './scene/town'
 import { loadKit } from './assets/kit'
 import { Connection } from './connection'
-import { PreviewPanel, showTooltip, TopBar } from './ui'
+import { PreviewPanel, Search, showTooltip, TopBar, type SearchItem } from './ui'
 import type { Snapshot } from './types'
 import { Building } from './buildings/building'
 
@@ -17,9 +17,35 @@ async function start(): Promise<void> {
   const town = new Town()
   stage.scene.add(town.root)
 
+  stage.onQualityStep = (to) => {
+    const banner = document.getElementById('banner')
+    if (!banner) return
+    banner.textContent = to === 'medium'
+      ? 'Running slowly, so shadows now update a few times a second. Add ?quality=high to the address to keep full detail.'
+      : 'Still slow: shadows are off. Add ?quality=high to the address to keep full detail.'
+    banner.hidden = false
+    window.setTimeout(() => { banner.hidden = true }, 9000)
+  }
+
   const topbar = new TopBar(() => stage.home())
   const preview = new PreviewPanel(() =>
     [...town.buildings.values()].map((b) => ({ id: b.id, name: b.node?.name ?? b.id, group: b.id.split('.')[0] })))
+
+  const search = new Search(
+    () => {
+      const items: SearchItem[] = town.islands.map((i) => ({ kind: 'island', id: i.group.id, name: i.group.displayName, where: i.group.displayName }))
+      for (const isl of town.islands)
+        for (const [id, b] of isl.buildings) items.push({ kind: 'building', id, name: b.node?.name ?? id, where: isl.group.displayName })
+      for (const [id, b] of town.buildings) if (id.startsWith('hub.')) items.push({ kind: 'building', id, name: b.node?.name ?? id, where: 'Platform hub' })
+      return items
+    },
+    (item) => {
+      const focus = item.kind === 'island' ? town.islandFocusOf(item.id) : town.focusOf(item.id)
+      town.select(item.kind === 'building' ? item.id : null)
+      if (focus) stage.focus(focus.target, focus.distance)
+    },
+  )
+  void search
 
   function onSnapshot(s: Snapshot): void {
     if (!town.matches(s)) {
@@ -51,7 +77,20 @@ async function start(): Promise<void> {
     dirty = true
   })
   canvas.addEventListener('pointerleave', () => showTooltip(null, 0, 0))
-  canvas.addEventListener('pointerdown', () => stage.cancelGlide())
+  // A click (not a drag) on a building glides the camera to it and keeps its name board visible; a click on the sea lets go.
+  let down: { x: number; y: number } | null = null
+  canvas.addEventListener('pointerdown', (e) => { stage.cancelGlide(); down = { x: e.clientX, y: e.clientY } })
+  canvas.addEventListener('pointerup', (e) => {
+    if (!down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 5) return
+    down = null
+    pointer.set((e.clientX / window.innerWidth) * 2 - 1, -(e.clientY / window.innerHeight) * 2 + 1)
+    ray.setFromCamera(pointer, stage.camera)
+    const hit = ray.intersectObjects([...town.buildings.values()].map((b) => b.hit), false)[0]
+    const b = hit?.object.userData.building as Building | undefined
+    town.select(b?.id ?? null)
+    const focus = b ? town.focusOf(b.id) : null
+    if (focus) stage.focus(focus.target, focus.distance)
+  })
 
   function hover(): void {
     if (!dirty) return

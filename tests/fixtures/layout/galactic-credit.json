@@ -1,0 +1,174 @@
+{
+  "hub": {
+    "scale": 2,
+    "rx": 44,
+    "rz": 42
+  },
+  "islands": [
+    {
+      "id": "cl",
+      "ring": 1,
+      "angleDeg": 15,
+      "radius": 235.4,
+      "portDeg": 29.3,
+      "rows": 2,
+      "rx": 50.9,
+      "rz": 42.4,
+      "buildings": 11
+    },
+    {
+      "id": "acc",
+      "ring": 1,
+      "angleDeg": 45,
+      "radius": 235.4,
+      "portDeg": 43.3,
+      "rows": 2,
+      "rx": 50.9,
+      "rz": 42.4,
+      "buildings": 7
+    },
+    {
+      "id": "pay",
+      "ring": 1,
+      "angleDeg": 75,
+      "radius": 235.4,
+      "portDeg": 57.2,
+      "rows": 1,
+      "rx": 47.1,
+      "rz": 39.2,
+      "buildings": 6
+    },
+    {
+      "id": "frd",
+      "ring": 1,
+      "angleDeg": 105,
+      "radius": 235.4,
+      "portDeg": 122.8,
+      "rows": 2,
+      "rx": 50.9,
+      "rz": 42.4,
+      "buildings": 6
+    },
+    {
+      "id": "cus",
+      "ring": 1,
+      "angleDeg": 135,
+      "radius": 235.4,
+      "portDeg": 136.7,
+      "rows": 2,
+      "rx": 49,
+      "rz": 40.8,
+      "buildings": 9
+    },
+    {
+      "id": "acq",
+      "ring": 1,
+      "angleDeg": 165,
+      "radius": 235.4,
+      "portDeg": 150.7,
+      "rows": 2,
+      "rx": 49.9,
+      "rz": 41.6,
+      "buildings": 8
+    },
+    {
+      "id": "dec",
+      "ring": 1,
+      "angleDeg": 195,
+      "radius": 235.4,
+      "portDeg": 202.4,
+      "rows": 2,
+      "rx": 49,
+      "rz": 40.8,
+      "buildings": 6
+    },
+    {
+      "id": "bil",
+      "ring": 1,
+      "angleDeg": 225,
+      "radius": 235.4,
+      "portDeg": 230.2,
+      "rows": 2,
+      "rx": 50.9,
+      "rz": 42.4,
+      "buildings": 6
+    },
+    {
+      "id": "col",
+      "ring": 1,
+      "angleDeg": 255,
+      "radius": 235.4,
+      "portDeg": 244.1,
+      "rows": 2,
+      "rx": 49.9,
+      "rz": 41.6,
+      "buildings": 11
+    },
+    {
+      "id": "dsp",
+      "ring": 1,
+      "angleDeg": 285,
+      "radius": 235.4,
+      "portDeg": 295.9,
+      "rows": 1,
+      "rx": 44.3,
+      "rz": 37,
+      "buildings": 5
+    },
+    {
+      "id": "rwd",
+      "ring": 1,
+      "angleDeg": 315,
+      "radius": 235.4,
+      "portDeg": 309.8,
+      "rows": 2,
+      "rx": 50.9,
+      "rz": 42.4,
+      "buildings": 6
+    },
+    {
+      "id": "obk",
+      "ring": 1,
+      "angleDeg": 345,
+      "radius": 235.4,
+      "portDeg": 337.6,
+      "rows": 2,
+      "rx": 49,
+      "rz": 40.8,
+      "buildings": 6
+    },
+    {
+      "id": "ntf",
+      "ring": 2,
+      "angleDeg": 90,
+      "radius": 325.4,
+      "portDeg": 108.9,
+      "rows": 2,
+      "rx": 50.9,
+      "rz": 42.4,
+      "buildings": 6
+    },
+    {
+      "id": "dat",
+      "ring": 2,
+      "angleDeg": 210,
+      "radius": 325.4,
+      "portDeg": 216.3,
+      "rows": 2,
+      "rx": 49,
+      "rz": 40.8,
+      "buildings": 8
+    },
+    {
+      "id": "lost-found",
+      "ring": 2,
+      "angleDeg": 330,
+      "radius": 325.4,
+      "portDeg": 323.7,
+      "rows": 1,
+      "rx": 43.5,
+      "rz": 36.2,
+      "buildings": 4
+    }
+  ]
+}

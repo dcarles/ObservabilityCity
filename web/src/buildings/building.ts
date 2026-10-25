@@ -55,6 +55,8 @@ export class Building {
   private label: THREE.Sprite | null = null
   private labelKey = ''
   readonly hit: THREE.Mesh
+  /** True while the building is selected: its name board stays readable from any distance. */
+  pinned = false
   private gate: { arm: THREE.Group } | null = null
   private gateAngle = Math.PI / 2
 
@@ -382,7 +384,7 @@ export class Building {
     const troubled = this.node.state !== 'Healthy' || this.node.instancesHealthy < this.node.instancesTotal
     const d = camera.position.distanceTo(this.label.getWorldPosition(new THREE.Vector3()))
     const far = clamp((d - 75) / 40, 0, 1)
-    const opacity = troubled ? 1 : 1 - far
+    const opacity = troubled || this.pinned ? 1 : 1 - far
     ;(this.label.material as THREE.SpriteMaterial).opacity = opacity
     this.label.visible = opacity > 0.02
   }

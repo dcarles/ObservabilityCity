@@ -87,7 +87,6 @@
             "hub.customer-db",
             "hub.egress",
             "hub.service-bus",
-            "hub.token-cache",
             "lost-found.batch-gateway-api",
             "lost-found.batch-gateway-db",
             "lost-found.batch-gateway-worker",

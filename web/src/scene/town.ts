@@ -6,57 +6,22 @@ import type { GroupSnapshot, NodeSnapshot, Snapshot } from '../types'
 import { palette } from '../themes/harbour-town/palette'
 import { blockPad, bench, bridge, crates, fountain, junction, lamp, pier, prop, ring, roadBetween, ROAD_W, serviceLane, street, streetX } from './props'
 import { buildIslandBody, GROUND, makeOutline, scatterNature, type Outline, type Rect } from './island'
+import { COL_X, CURB, LANE_SLOTS, LANE_Z, PAD_D, PAD_W, QUEUE_GAP, coastScan, planIsland, type Placed, type Plan } from './plan'
 import { hashString } from './random'
 import { clamp, formatRate, speedFactor } from '../visuals'
 import { CarSystem, type Route } from './cars'
 import { BoatSystem, type BoatRoute } from './boats'
 import { HarbourStatus, messagingOf, type Messaging } from './harbour'
 import { findLane, type SeaMap } from './sea'
+import { mergeStatic } from './merge'
 import { hubGeometry, layoutTown, wrapAngle, type HubGeometry } from './layout'
 
 const QUAY = 9
-const SLOT = 7.6 // width of the plot of one building along a pad
-const PAD_W = 3 * SLOT + 0.8 // a service pad holds up to three buildings side by side
-const PAD_D = 8.8
-const CURB = 5.6 // road centre line to the front of a pad: half the road, the service lane where cars wait, and a verge
-const SPINE_CURB = 6.6 // spine centre line to the nearest pad, which leaves room for cars to turn into the service lanes
-const LANE_Z = 3.5 // road centre line to the middle of the service lane
-const QUEUE_GAP = 2.5 // spacing of the cars waiting in a service lane
-const LANE_SLOTS = 5 // cars a service lane holds when it is long enough
-const GAP = 9 // lawn between one row of pads and the road of the next, so the front row never hides the one behind
-const ROW = PAD_D + 2 * CURB + GAP // distance between two rows of pads
-const COL_X = SPINE_CURB + 0.4 + PAD_W / 2 // pad centre from the spine's centre line
-const FRONT = 4.0 // building centre from the front edge of its pad
 
-/** One service pad on the island's grid, with its buildings in a row and their fronts toward the road. */
 /** Where an island's road leaves the hub: the direction it lies in and the point on the hub's coast. */
 interface Port {
   angle: number
   coast: THREE.Vector3
-}
-
-interface Pad {
-  nodes: NodeSnapshot[]
-  col: 0 | 1
-  row: number
-}
-
-interface Placed {
-  node: NodeSnapshot
-  pad: Pad
-  /** Island-local position of the building's centre and of the road in front of it. */
-  x: number
-  z: number
-  roadZ: number
-}
-
-interface Plan {
-  pads: Pad[]
-  placed: Placed[]
-  rows: number
-  rowRoadZ: number[]
-  rx: number
-  rz: number
 }
 
 interface Island {
@@ -81,6 +46,7 @@ export class Town {
   hubOutline!: Outline
   /** Size of the hub for this town. It grows with the number of islands. */
   private hubGeo: HubGeometry = hubGeometry(0)
+  private hubDecor = new THREE.Group()
   /** Extent used to frame the camera. */
   readonly bounds = new THREE.Box3()
   /** Points along every coast, for working out how far back the camera must stand to show the whole town. */
@@ -135,6 +101,8 @@ export class Town {
     }
 
     // ── Islands ──────────────────────────────────────────────────────────────
+    const bridgeDecor = new THREE.Group()
+    this.root.add(bridgeDecor)
     pillars.forEach((g, index) => {
       const plan = plans[index]
       const dir = dirOf(angles[index])
@@ -145,7 +113,7 @@ export class Town {
       this.expandBounds(island.outline, center, island.root.rotation.y, 12)
 
       const gate = island.root.localToWorld(new THREE.Vector3(0, GROUND, coastScan(island.outline, 'z') - 0.7))
-      this.root.add(bridge({ from: hubCoasts[index].clone().setY(0), to: gate.clone().setY(0) }))
+      bridgeDecor.add(bridge({ from: hubCoasts[index].clone().setY(0), to: gate.clone().setY(0) }))
       bridges.push([new THREE.Vector2(hubCoasts[index].x, hubCoasts[index].z), new THREE.Vector2(gate.x, gate.z)])
       routes.push(...this.islandRoutes(island, plan, ports[index], hubCoasts[index], gate))
     })
@@ -163,7 +131,7 @@ export class Town {
       const key = Math.round(wrapAngle(a) * 100)
       let q = quays.get(key)
       if (!q) {
-        q = this.hubQuay(hubRoot, a)
+        q = this.hubQuay(a)
         quays.set(key, q)
       }
       return q
@@ -186,6 +154,8 @@ export class Town {
       boatRoutes.push(this.boatRoute(this.islands[index], best, hubBuildings))
     })
 
+    mergeStatic(bridgeDecor)
+    mergeStatic(this.hubDecor)
     routes.push(...this.hubRoutes(hubBuildings, ports.map((a, i) => ({ angle: a, coast: hubCoasts[i] }))))
     this.cars.setRoutes(routes)
     this.boats.setRoutes(boatRoutes)
@@ -248,6 +218,9 @@ export class Town {
 
   private buildHub(hubRoot: THREE.Group, hub: GroupSnapshot | undefined, ports: Port[]): Building[] {
     const out: Building[] = []
+    const decor = new THREE.Group()
+    hubRoot.add(decor)
+    this.hubDecor = decor
     const f = this.hubGeo.scale
     const ringR = this.hubGeo.ringR
     const CZ = 2 // the plaza's centre sits a little south of the hub's
@@ -284,26 +257,26 @@ export class Town {
     fount.position.x = 0
     fount.position.z = CZ
     fount.scale.setScalar(Math.min(1.8, f))
-    hubRoot.add(paving, fount, ring(0, CZ, 3.7 * f + 0.4, ringR + 2.1))
+    decor.add(paving, fount, ring(0, CZ, 3.7 * f + 0.4, ringR + 2.1))
     // a short street from the ring road to the front of each building
     const reach = (d: number) => d - 3.1
-    hubRoot.add(
+    decor.add(
       street(0, CZ - reach(13.5 * f), CZ - (ringR + 2.1)), street(0, CZ + (ringR + 2.1), CZ + reach(14 * f) - 1.5),
       streetX(CZ, ringR + 2.1, reach(14.5 * f) - 0.4), streetX(CZ, -reach(14.5 * f) + 0.4, -(ringR + 2.1)),
     )
     // one spoke from the plaza to the coast for each island, where its bridge starts
     for (const port of ports) {
       const edge = new THREE.Vector3(Math.sin(port.angle) * (ringR + 1.9), GROUND, CZ - Math.cos(port.angle) * (ringR + 1.9))
-      hubRoot.add(roadBetween(edge, port.coast))
+      decor.add(roadBetween(edge, port.coast))
       for (let r = 9 * f; r < 30 * f; r += 4) avoid.push({ x: Math.sin(port.angle) * r, z: CZ - Math.cos(port.angle) * r, w: 7, d: 7 })
     }
     const lamps = Math.round(8 * f)
     for (let i = 0; i < lamps; i++) {
       const a = (i / lamps) * Math.PI * 2 + 0.4
       if (ports.some((p) => Math.abs(wrapAngle(a - p.angle)) < 0.3 / f)) continue
-      hubRoot.add(lamp(Math.sin(a) * (ringR + 2.9), CZ - Math.cos(a) * (ringR + 2.9), Math.sin(a)))
+      decor.add(lamp(Math.sin(a) * (ringR + 2.9), CZ - Math.cos(a) * (ringR + 2.9), Math.sin(a)))
     }
-    hubRoot.add(bench(-6.0 * f, CZ - 8.2 * f, 0.6), bench(6.0 * f, CZ + 7.6 * f, 3.6), bench(-9.4 * f, CZ + 6.2 * f, 1.3))
+    decor.add(bench(-6.0 * f, CZ - 8.2 * f, 0.6), bench(6.0 * f, CZ + 7.6 * f, 3.6), bench(-9.4 * f, CZ + 6.2 * f, 1.3))
     hubRoot.add(scatterNature(this.hubOutline, avoid, hashString('hub-trees'), { trees: Math.round(26 * f * f), rocks: Math.round(12 * f) }))
     return out
   }
@@ -346,6 +319,9 @@ export class Town {
 
     const outline = makeOutline(hashString(g.id), plan.rx, plan.rz, 0.06)
     root.add(buildIslandBody(outline))
+    // everything that never changes goes in here, and is merged into a few meshes once the island is built
+    const decor = new THREE.Group()
+    root.add(decor)
 
     const { rows, rowRoadZ } = plan
     const edge = COL_X + PAD_W / 2 + 0.4
@@ -357,14 +333,14 @@ export class Town {
 
     // Roads: one spine from the gate, and a road in front of every row of pads, with a junction where they meet.
     const half = ROAD_W / 2
-    root.add(street(0, rowRoadZ[0] + half, gateZ + 0.2))
+    decor.add(street(0, rowRoadZ[0] + half, gateZ + 0.2))
     for (let r = 0; r < rows; r++) {
       const z = rowRoadZ[r]
-      root.add(junction(0, z, r === rows - 1))
-      if (r < rows - 1) root.add(street(0, rowRoadZ[r + 1] + half, z - half))
+      decor.add(junction(0, z, r === rows - 1))
+      if (r < rows - 1) decor.add(street(0, rowRoadZ[r + 1] + half, z - half))
       // no pavement on the pad side: that edge is the service lane, where cars pull in
-      root.add(streetX(z, -edge, -half, [-1]))
-      root.add(streetX(z, half, r === harbourRow ? harbourCoast - 8.3 : edge, [-1]))
+      decor.add(streetX(z, -edge, -half, [-1]))
+      decor.add(streetX(z, half, r === harbourRow ? harbourCoast - 8.3 : edge, [-1]))
       avoid.push({ x: 0, z, w: 2 * edge + 2, d: 2 * CURB + 1 })
       // keep the lawn between rows clear of trees, so the front of every building stays in view
       if (r < rows - 1) {
@@ -379,13 +355,13 @@ export class Town {
       const roadZ = rowRoadZ[pad.row]
       const zf = roadZ - CURB
       const cx = (pad.col === 0 ? -1 : 1) * COL_X
-      root.add(blockPad(cx, zf - PAD_D, zf, PAD_W))
+      decor.add(blockPad(cx, zf - PAD_D, zf, PAD_W))
       // the service lane in front of the pad: where cars pull in, wait their turn and are served
       const out = pad.col === 0 ? -1 : 1
       const laneFrom = out * 3.0, laneTo = cx + out * (PAD_W / 2 + 0.4)
-      root.add(serviceLane((laneFrom + laneTo) / 2, roadZ - LANE_Z, Math.abs(laneTo - laneFrom), CURB - 2.1 - 0.7))
+      decor.add(serviceLane((laneFrom + laneTo) / 2, roadZ - LANE_Z, Math.abs(laneTo - laneFrom), CURB - 2.1 - 0.7))
       avoid.push({ x: cx, z: zf - PAD_D / 2, w: PAD_W + 1, d: PAD_D + 1 })
-      for (const side of [-1, 1]) root.add(lamp(cx + side * (PAD_W / 2 - 3.4), zf + 0.45, 0, -Math.PI / 2))
+      for (const side of [-1, 1]) decor.add(lamp(cx + side * (PAD_W / 2 - 3.4), zf + 0.45, 0, -Math.PI / 2))
     }
     for (const p of plan.placed) {
       const b = new Building(p.node.id, p.node.kind, g.color)
@@ -395,30 +371,40 @@ export class Town {
       buildings.set(p.node.id, b)
       const zf = p.roadZ - CURB
       // a little garden in front of each building and the odd bit of street furniture
-      root.add(prop('bush', p.x - 2.2, zf - 0.9, 0, 2.2), prop('bush', p.x + 2.8, zf - 0.9, 0, 1.8))
-      if (p.node.kind === 'Worker') root.add(prop('dumpster', p.x + 2.4, p.z - 3.6, 0.2))
-      if (p.node.kind === 'Api') root.add(prop('firehydrant', p.x + 2.9, zf + 0.5, 0, 2.4))
+      decor.add(prop('bush', p.x - 2.2, zf - 0.9, 0, 2.2), prop('bush', p.x + 2.8, zf - 0.9, 0, 1.8))
+      if (p.node.kind === 'Worker') decor.add(prop('dumpster', p.x + 2.4, p.z - 3.6, 0.2))
+      if (p.node.kind === 'Api') decor.add(prop('firehydrant', p.x + 2.9, zf + 0.5, 0, 2.4))
     }
     // a spare cell in the grid becomes a small park
     if (plan.pads.length % 2 === 1) {
       const row = rows - 1
       const zf = rowRoadZ[row] - CURB
-      root.add(...parkProps(COL_X, zf - PAD_D / 2))
+      decor.add(...parkProps(COL_X, zf - PAD_D / 2))
       avoid.push({ x: COL_X, z: zf - PAD_D / 2, w: PAD_W + 1, d: PAD_D + 1 })
     }
 
     // the island's sign: one post, standing on land beside the gate
     const signZ = gateZ - 2.4
-    root.add(this.islandSign(g, -8.5, signZ))
+    decor.add(this.islandSign(g, -8.5, signZ))
     avoid.push({ x: -8.5, z: signZ, w: 12, d: 5 })
+    // Lost & found: a heap of boxes and bins by the gate, for the systems nobody has claimed
+    if (g.isLostFound) {
+      const pile: [Parameters<typeof prop>[0], number, number, number, number][] = [
+        ['box_A', 7.5, signZ + 0.4, 0.3, 9], ['box_B', 10.5, signZ - 0.5, 1.1, 8], ['box_A', 9, signZ + 2.4, 2.0, 7],
+        ['box_B', 13, signZ + 0.8, 0.6, 7.5], ['trash_A', 15.2, signZ - 0.6, 0, 6], ['dumpster', 12, signZ - 3.2, 0.1, 5],
+      ]
+      for (const [name, x, z, rot, scale] of pile) decor.add(prop(name, x, z, rot, scale))
+      avoid.push({ x: 11, z: signZ, w: 10, d: 7 })
+    }
     // the island's own harbour on the east coast, at the end of a road
-    root.add(this.harbour(harbourCoast, harbourZ))
+    decor.add(this.harbour(harbourCoast, harbourZ))
     const status = new HarbourStatus(harbourCoast, harbourZ)
     root.add(status.group)
     avoid.push({ x: harbourCoast - 4, z: harbourZ - 2, w: 13, d: 16 })
 
     const trees = Math.min(110, Math.round(40 * (plan.rx * plan.rz) / (24 * 20)))
     root.add(scatterNature(outline, avoid, hashString(g.id + '-nature'), { trees, rocks: Math.round(trees / 3) }))
+    mergeStatic(decor)
     root.updateMatrixWorld(true)
     return { group: g, root, outline, buildings, harbour: status, messaging: messagingOf([]) }
   }
@@ -490,7 +476,7 @@ export class Town {
   // ── routes ──────────────────────────────────────────────────────────────
 
   /** A wooden quay on the hub's coast where boats leave for one island. Returns the water point at its tip. */
-  private hubQuay(hubRoot: THREE.Group, angle: number): THREE.Vector3 {
+  private hubQuay(angle: number): THREE.Vector3 {
     const dir = new THREE.Vector3(Math.sin(angle), 0, -Math.cos(angle))
     const coast = coastPoint(this.hubOutline, dir, 1.6)
     const p = pier(QUAY)
@@ -499,7 +485,7 @@ export class Town {
     const c = crates()
     c.position.set(coast.x - dir.x * 1.2 - dir.z * 1.6, 0, coast.z - dir.z * 1.2 + dir.x * 1.6)
     c.rotation.y = p.rotation.y
-    hubRoot.add(p, c)
+    this.hubDecor.add(p, c)
     return coast.clone().addScaledVector(dir, QUAY + 3).setY(0)
   }
 
@@ -571,59 +557,31 @@ export class Town {
     return routes
   }
 
+  /** What the camera should look at to show one building: its place in the world and how far back to stand. */
+  focusOf(id: string): { target: THREE.Vector3; distance: number } | null {
+    const b = this.buildings.get(id)
+    if (!b) return null
+    b.root.updateWorldMatrix(true, false)
+    return { target: b.root.getWorldPosition(new THREE.Vector3()).setY(2), distance: 46 }
+  }
+
+  /** The same for a whole island, standing back far enough to show it. */
+  islandFocusOf(groupId: string): { target: THREE.Vector3; distance: number } | null {
+    const isl = this.islands.find((i) => i.group.id === groupId)
+    if (!isl) return null
+    let reach = 0
+    for (const p of isl.outline.points) reach = Math.max(reach, Math.hypot(p.x, p.y))
+    return { target: isl.root.getWorldPosition(new THREE.Vector3()).setY(0), distance: reach * 2.1 }
+  }
+
+  /** Marks one building as selected, so its name board stays visible. */
+  select(id: string | null): void {
+    for (const b of this.buildings.values()) b.pinned = b.id === id
+  }
+
   node(id: string): NodeSnapshot | null {
     return this.buildings.get(id)?.node ?? null
   }
-}
-
-/** Services become pads (an API, its worker and its database side by side), lone buildings share pads, and pads fill a two-column grid. */
-function planPads(nodes: NodeSnapshot[]): Pad[] {
-  const groups: NodeSnapshot[][] = []
-  for (const n of nodes) {
-    const last = groups[groups.length - 1]
-    if (n.service && last && last[0].service === n.service && last.length < 3) last.push(n)
-    else groups.push([n])
-  }
-  const out: NodeSnapshot[][] = []
-  let loose: NodeSnapshot[] = []
-  for (const grp of groups) {
-    if (grp.length === 1 && !grp[0].service) {
-      loose.push(grp[0])
-      if (loose.length === 3) { out.push(loose); loose = [] }
-    } else out.push(grp)
-  }
-  if (loose.length) out.push(loose)
-  return out.map((ns, i) => ({ nodes: ns, col: (i % 2) as 0 | 1, row: Math.floor(i / 2) }))
-}
-
-/** Lays out one island's grid and finds the smallest coast that holds it, with room for the gate and the harbour. */
-function planIsland(g: GroupSnapshot): Plan {
-  const pads = planPads(g.nodes)
-  const rows = Math.max(1, Math.ceil(pads.length / 2))
-  const span = (rows - 1) * ROW + 2 * CURB + PAD_D
-  const roadZ0 = span / 2 - CURB
-  const rowRoadZ = Array.from({ length: rows }, (_, r) => roadZ0 - r * ROW)
-  const placed: Placed[] = []
-  for (const pad of pads) {
-    const roadZ = rowRoadZ[pad.row]
-    const cx = (pad.col === 0 ? -1 : 1) * COL_X
-    pad.nodes.forEach((node, i) => placed.push({ node, pad, x: cx + (i - (pad.nodes.length - 1) / 2) * SLOT, z: roadZ - CURB - FRONT, roadZ }))
-  }
-  const edge = COL_X + PAD_W / 2 + 0.4
-  const southZ = roadZ0 + CURB
-  const northZ = rowRoadZ[rows - 1] - CURB - PAD_D
-  const harbourZ = rowRoadZ[Math.floor((rows - 1) / 2)]
-  const check: [number, number][] = [[-edge, southZ], [edge, southZ], [-edge, northZ], [edge, northZ], [edge + 11, harbourZ], [-edge - 2, harbourZ], [0, northZ - 4]]
-  let k = 1
-  let rx = 24, rz = 20
-  for (let i = 0; i < 200; i++) {
-    rx = 24 * k
-    rz = 20 * k
-    const o = makeOutline(hashString(g.id), rx, rz, 0.06)
-    if (check.every(([x, z]) => o.contains(x, z, 2)) && coastScan(o, 'z') - 0.6 - southZ >= 9) break
-    k *= 1.02
-  }
-  return { pads, placed, rows, rowRoadZ, rx, rz }
 }
 
 /** A couple of trees, flower beds and benches for a spare pad. */
@@ -669,16 +627,4 @@ function coastPoint(outline: Outline, dir: THREE.Vector3, inset: number): THREE.
     else hi = mid
   }
   return new THREE.Vector3(dir.x * (lo - inset), GROUND, dir.z * (lo - inset))
-}
-
-/** Island-local coast: the far +z edge at x=0 (for 'z'), or the +x edge at the given z (for 'x'). */
-function coastScan(outline: Outline, axis: 'z' | 'x', at = 0): number {
-  let lo = 0, hi = 90
-  for (let i = 0; i < 26; i++) {
-    const mid = (lo + hi) / 2
-    const inside = axis === 'z' ? outline.contains(0, mid) : outline.contains(mid, at)
-    if (inside) lo = mid
-    else hi = mid
-  }
-  return lo
 }

@@ -1,6 +1,6 @@
 # Observability City: plan
 
-Planning material for Observability City, a browser app that shows system health as a living 3D town. Nothing here is code yet. Building starts with Phase 1, slice 1 (see the plan).
+Planning material for Observability City, a browser app that shows system health as a living 3D town. The code lives beside it. Phase 1 is built slice by slice (see the plan and the decision log).
 
 | File | What it is |
 |---|---|

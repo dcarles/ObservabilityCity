@@ -34,6 +34,7 @@
           "displayName",
           "id",
           "isHub",
+          "isLostFound",
           "nodes"
         ],
         "type": "object",
@@ -48,6 +49,9 @@
             "type": "string"
           },
           "isHub": {
+            "type": "boolean"
+          },
+          "isLostFound": {
             "type": "boolean"
           },
           "nodes": {
