@@ -1,0 +1,11 @@
+bin/
+obj/
+node_modules/
+web/dist/
+*.user
+.vs/
+.idea/
+.env
+secrets.json
+# Commercial or private model packs live here, never in the public repo
+themes-private/

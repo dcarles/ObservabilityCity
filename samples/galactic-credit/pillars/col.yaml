@@ -1,0 +1,17 @@
+pillar: col
+displayName: Collections
+color: "#9b6bd6"
+defaults:
+  api: { slaP99Ms: 600 }
+systems:
+  - { id: col.cases-api, service: cases, name: Cases API, role: api }
+  - { id: col.cases-worker, service: cases, name: Cases worker, role: worker }
+  - { id: col.cases-db, service: cases, name: Cases DB, role: db }
+  - { id: col.dunning-api, service: dunning, name: Dunning API, role: api }
+  - { id: col.dunning-worker, service: dunning, name: Dunning worker, role: worker }
+  - { id: col.dunning-db, service: dunning, name: Dunning DB, role: db }
+  - { id: col.agency-api, service: agency, name: Agency API, role: api, external: true }
+  - { id: col.agency-worker, service: agency, name: Agency worker, role: worker }
+  - { id: col.agency-db, service: agency, name: Agency DB, role: db }
+  - { id: col.letters-cron, name: Letter run, role: cron }
+  - { id: col.queue-cache, name: Work queue cache, role: cache }

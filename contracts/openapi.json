@@ -1,0 +1,311 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "ObservabilityCity.Host, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null",
+    "version": "1.0"
+  },
+  "paths": {
+    "/api/snapshot/latest": {
+      "get": {
+        "tags": [
+          "ObservabilityCity.Host, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+        ],
+        "operationId": "GetLatestSnapshot",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Snapshot"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "GroupSnapshot": {
+        "required": [
+          "color",
+          "displayName",
+          "id",
+          "isHub",
+          "nodes"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "color": {
+            "type": "string"
+          },
+          "isHub": {
+            "type": "boolean"
+          },
+          "nodes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NodeSnapshot"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "HealthState": {
+        "enum": [
+          "Healthy",
+          "Degraded",
+          "Down",
+          "Stale"
+        ],
+        "type": "string"
+      },
+      "NodeKind": {
+        "enum": [
+          "Api",
+          "Worker",
+          "Database",
+          "Cache",
+          "Cron",
+          "Gateway",
+          "Broker",
+          "Egress"
+        ],
+        "type": "string"
+      },
+      "NodeSnapshot": {
+        "required": [
+          "backlogAmber",
+          "backlogRed",
+          "errorAmber",
+          "errorRate",
+          "errorRed",
+          "external",
+          "id",
+          "instancesHealthy",
+          "instancesTotal",
+          "kind",
+          "load",
+          "name",
+          "p99Ms",
+          "requestsPerSecond",
+          "resourceAmber",
+          "resourceRed",
+          "slaP99Ms",
+          "state",
+          "throttleAmber",
+          "throttleRed"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/NodeKind"
+          },
+          "service": {
+            "type": "string",
+            "nullable": true
+          },
+          "external": {
+            "type": "boolean"
+          },
+          "state": {
+            "$ref": "#/components/schemas/HealthState"
+          },
+          "instancesTotal": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "instancesHealthy": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "load": {
+            "type": "number",
+            "format": "double"
+          },
+          "cpu": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "memory": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "utilisation": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "throttled": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "queueDepth": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "oldestMessageSeconds": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "deadLetters": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "requestsPerSecond": {
+            "type": "number",
+            "format": "double"
+          },
+          "errorRate": {
+            "type": "number",
+            "format": "double"
+          },
+          "p99Ms": {
+            "type": "number",
+            "format": "double"
+          },
+          "slaP99Ms": {
+            "type": "number",
+            "format": "double"
+          },
+          "errorAmber": {
+            "type": "number",
+            "format": "double"
+          },
+          "errorRed": {
+            "type": "number",
+            "format": "double"
+          },
+          "resourceAmber": {
+            "type": "number",
+            "format": "double"
+          },
+          "resourceRed": {
+            "type": "number",
+            "format": "double"
+          },
+          "throttleAmber": {
+            "type": "number",
+            "format": "double"
+          },
+          "throttleRed": {
+            "type": "number",
+            "format": "double"
+          },
+          "backlogAmber": {
+            "type": "number",
+            "format": "double"
+          },
+          "backlogRed": {
+            "type": "number",
+            "format": "double"
+          },
+          "lastUpdated": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "Snapshot": {
+        "required": [
+          "dayFraction",
+          "environment",
+          "generatedAt",
+          "groupLabel",
+          "groups",
+          "totals",
+          "townId",
+          "townName"
+        ],
+        "type": "object",
+        "properties": {
+          "townId": {
+            "type": "string"
+          },
+          "townName": {
+            "type": "string"
+          },
+          "groupLabel": {
+            "type": "string"
+          },
+          "environment": {
+            "type": "string"
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "dayFraction": {
+            "type": "number",
+            "format": "double"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/TownTotals"
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GroupSnapshot"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "TownTotals": {
+        "required": [
+          "degraded",
+          "down",
+          "errorRate",
+          "p99Ms",
+          "requestsPerSecond"
+        ],
+        "type": "object",
+        "properties": {
+          "requestsPerSecond": {
+            "type": "number",
+            "format": "double"
+          },
+          "errorRate": {
+            "type": "number",
+            "format": "double"
+          },
+          "p99Ms": {
+            "type": "number",
+            "format": "double"
+          },
+          "degraded": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "down": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  }
+}

@@ -1,0 +1,517 @@
+import * as THREE from 'three'
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
+import type { Building } from '../buildings/building'
+import { canvasTexture, roundRect } from '../buildings/mk'
+import { kitParts, type KitName } from '../assets/kit'
+import { clamp, spawnRate } from '../visuals'
+
+/** Where a request comes from decides the car: internal calls are blue sedans, external calls yellow taxis. */
+export type Origin = 'internal' | 'external'
+
+/** Where a car waits and is served: a lane beside the road in front of the building. */
+export interface Bay {
+  /** Points in drive order, already placed (no lane offset): the last one is the door, where the car is served. */
+  drive: THREE.Vector3[]
+  /** How many cars the lane holds. A car that finds it full drives on and is counted as turned away. */
+  slots: number
+  /** Where the "waiting" marker floats. */
+  marker: THREE.Vector3
+}
+
+/** A way requests reach a building: the road they take and whether they come from inside or outside. */
+export interface Route {
+  dest: Building
+  origin: Origin
+  /** Road centre line from where cars appear to the point where they turn into the bay (or stop, without a bay). */
+  path: THREE.Vector3[]
+  /** Share of the destination's traffic that takes this route. */
+  share: number
+  bay?: Bay
+}
+
+interface Planned {
+  route: Route
+  /** The way there, lane offset applied, and the way back to where the car came from. */
+  there: THREE.Vector3[]
+  back: THREE.Vector3[]
+  /** How far along `there` a car checks whether the bay has room. */
+  decision: number
+  slots: number
+  marker: THREE.Vector3
+}
+
+type Stage = 'there' | 'serving' | 'back'
+
+interface Car {
+  id: number
+  plan: Planned
+  points: THREE.Vector3[]
+  lengths: number[]
+  total: number
+  dist: number
+  stage: Stage
+  committed: boolean
+  timer: number
+  model: 0 | 1
+  failed: boolean
+  yaw: number
+  x: number
+  z: number
+  dx: number
+  dz: number
+  /** Metres per second it actually covered last frame. */
+  speed: number
+  stuck: number
+  by?: string
+  lookX: number[]
+  lookZ: number[]
+  /** Seconds it has been in a standoff: two cars each waiting for the other. */
+  standoff: number
+  /** Seconds left of fading out, or -1 while the car is solid. A car stuck in a jam for good dissolves instead of driving through others. */
+  fade: number
+  pace: number
+  /** Seconds spent waiting for a gap to turn round into. */
+  wait: number
+}
+
+interface Marker {
+  sprite: THREE.Sprite
+  key: string
+  turned: number[]
+}
+
+const MODELS: KitName[] = ['car_sedan', 'car_taxi'] // internal, external
+/** Every car model is scaled to this length in metres, so the models all come out the same size. */
+const CAR_LENGTH = 2.2
+const SPEED = 4.2
+const LANE = 1.05
+/** Cars keep at least this far from the one in front, centre to centre, and start braking at BRAKE_FROM. */
+const HALT = 2.7
+const BRAKE_FROM = 5.2
+const SIDE = 1.25
+/** The sweep is LOOK points, LOOK_STEP metres apart, ahead of the car. Two points closer than TOUCH metres mean contact. */
+const LOOK = 5
+const LOOK_STEP = 1.1
+const TOUCH = 1.3
+const TOUCH_YOUNGER = 1.1
+const REACH = 11
+const CROWD_R = 9
+const CROWD_MAX = 3
+const TRAFFIC = 0.4 // every car now drives there and back, so fewer need to leave
+
+/**
+ * Requests as cars. The number of cars follows the request rate (a sample, not a count). Each car drives to its
+ * destination and waits in the building's service lane; time in the lane is the latency, so a slow system builds a
+ * queue. A served car drives into the building. A failed request carries a red flag and is turned away at the door,
+ * back the way it came. Cars never touch: in a lane each brakes for the car ahead, and at crossings and merges a car
+ * keeps out of the path of any older car (a standoff dissolves the younger one). All invented in the browser from the
+ * numbers in the snapshot, drawn as instanced kit models.
+ */
+export class CarSystem {
+  readonly object = new THREE.Group()
+  private readonly meshes: THREE.InstancedMesh[] = []
+  private readonly flags: THREE.InstancedMesh
+  private readonly lights: THREE.InstancedMesh
+  private readonly cars: Car[] = []
+  private readonly plans: Planned[] = []
+  private readonly acc = new Map<Planned, number>()
+  private readonly markers = new Map<Building, Marker>()
+  private readonly m = new THREE.Matrix4()
+  private readonly q = new THREE.Quaternion()
+  private readonly up = new THREE.Vector3(0, 1, 0)
+  private readonly pos = new THREE.Vector3()
+  private readonly scaleV = new THREE.Vector3()
+  private readonly one = new THREE.Vector3(1, 1, 1)
+  private readonly unit: number[] = []
+  private nextId = 1
+  private time = 0
+
+  constructor(private readonly max = 420) {
+    for (const name of MODELS) {
+      const { geometry, material } = kitParts(name)
+      geometry.computeBoundingBox()
+      const size = geometry.boundingBox!.getSize(new THREE.Vector3())
+      this.unit.push(CAR_LENGTH / Math.max(size.x, size.z))
+      const im = new THREE.InstancedMesh(geometry, material, max)
+      im.count = 0
+      im.castShadow = true
+      im.receiveShadow = true
+      im.frustumCulled = false
+      this.meshes.push(im)
+      this.object.add(im)
+    }
+    // a small red flag on the roof marks a failed request
+    const pole = new THREE.BoxGeometry(0.05, 0.9, 0.05)
+    pole.translate(0, 0.45, 0)
+    const cloth = new THREE.BoxGeometry(0.62, 0.38, 0.04)
+    cloth.translate(0.33, 0.78, 0)
+    this.flags = new THREE.InstancedMesh(mergeGeometries([pole, cloth])!, new THREE.MeshBasicMaterial({ color: '#ff3d3d', toneMapped: false }), max)
+    this.flags.count = 0
+    this.flags.frustumCulled = false
+    // amber hazard lights on cars stuck in a slow queue
+    this.lights = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.17, 0), new THREE.MeshBasicMaterial({ color: '#ffb830', toneMapped: false }), max * 2)
+    this.lights.count = 0
+    this.lights.frustumCulled = false
+    this.object.add(this.flags, this.lights)
+  }
+
+  setRoutes(routes: Route[]): void {
+    this.plans.length = 0
+    for (const r of routes) {
+      const road = driveOnRight(roundCorners(r.path, 1.6), LANE)
+      const there = roundCorners([...road, ...(r.bay?.drive ?? [])], 1.2)
+      const back = driveOnRight(roundCorners([...r.path].reverse(), 1.6), LANE)
+      const bayLen = r.bay ? polyLength(r.bay.drive) + 4 : 8
+      const last = r.bay?.drive[r.bay.drive.length - 1] ?? r.path[r.path.length - 1]
+      this.plans.push({
+        route: r, there, back,
+        decision: Math.max(0, polyLength(there) - bayLen - 3),
+        slots: r.bay?.slots ?? 3,
+        marker: r.bay?.marker ?? last,
+      })
+    }
+    this.cars.length = 0
+    this.acc.clear()
+    for (const mk of this.markers.values()) this.object.remove(mk.sprite)
+    this.markers.clear()
+  }
+
+  update(dt: number): void {
+    this.time += dt
+    for (const plan of this.plans) {
+      const n = plan.route.dest.node
+      if (!n || (n.state !== 'Healthy' && n.state !== 'Degraded')) continue
+      const a = (this.acc.get(plan) ?? Math.random()) + spawnRate(n.requestsPerSecond) * TRAFFIC * plan.route.share * dt
+      // a car that cannot leave yet (the road is not clear) waits its turn, up to a few
+      let owed = a
+      while (owed >= 1 && this.cars.length < this.max && this.spawn(plan)) owed -= 1
+      this.acc.set(plan, Math.min(owed, 3))
+    }
+
+    // Where each car will be over the next few metres of its road: the sweep other cars have to keep out of.
+    for (const c of this.cars) {
+      if (c.fade >= 0) continue
+      for (let k = 0; k < LOOK; k++) this.pointAt(c, Math.min(c.total, c.dist + LOOK_STEP * (k + 1)), k)
+    }
+
+    // Who gives way to whom. In a lane every car brakes for the car ahead, whatever its age. Everywhere else (crossings,
+    // merges, corners) a car keeps out of an older car's body and sweep, and out of any younger car's body. Waiting only
+    // ever depends on older cars there, so two cars cannot hold each other up for long.
+    for (const c of this.cars) {
+      let free = 1
+      c.by = undefined
+      let queued = false // held up by a car that is being served: a normal queue, not a jam
+      if (c.stage !== 'serving' && c.fade < 0) {
+        for (const o of this.cars) {
+          if (o === c || o.fade >= 0) continue
+          const vx = o.x - c.x, vz = o.z - c.z
+          const d2 = vx * vx + vz * vz
+          if (d2 > REACH * REACH) continue
+          const fwd = vx * c.dx + vz * c.dz
+          const lat = Math.abs(vx * c.dz - vz * c.dx)
+          const dot = c.dx * o.dx + c.dz * o.dz
+          if ((dot >= 0.7 || (dot <= -0.7 && c.id > o.id)) && lat < SIDE && fwd > 0.05 && d2 <= BRAKE_FROM * BRAKE_FROM) {
+            const f = clamp((fwd - HALT) / (BRAKE_FROM - HALT), 0, 1)
+            if (f < free) { free = f; queued = o.stage === 'serving'; c.by = `lane:${o.id}` }
+            continue
+          }
+          if (dot > 0.7 && lat < 1.6) continue // same lane: the car-following above covers it
+          const older = o.id < c.id && o.stage !== 'serving'
+          const reach = o.id > c.id ? TOUCH_YOUNGER : TOUCH // an older car may edge closer to a younger one that is waiting
+          for (let k = 0; k < LOOK; k++) {
+            const px = c.lookX[k], pz = c.lookZ[k]
+            const body = nearBy(px, pz, o.x, o.z, reach) || nearBy(px, pz, o.x + o.dx * 0.9, o.z + o.dz * 0.9, reach) || nearBy(px, pz, o.x - o.dx * 0.9, o.z - o.dz * 0.9, reach)
+            let sweep = false
+            if (!body && older) for (let j = 0; j < LOOK; j++) if (near(px, pz, o.lookX[j], o.lookZ[j])) { sweep = true; break }
+            if (body || sweep) {
+              // a body is in the way: slow down for it. An older car's path is crossed: stop well short of it
+              const f = sweep ? clamp((k - 3) / 2, 0, 1) : clamp((k - 0.5) / 2.0, 0, 1)
+              if (f < free) { free = f; queued = false; c.by = `sweep:${o.id}` }
+              break
+            }
+          }
+        }
+      }
+      c.stuck = free < 0.05 && c.stage !== 'serving' && !queued ? c.stuck + dt : 0
+      if (c.stuck > 6 && c.fade < 0) c.fade = 0.5 // never deadlock: a car that cannot move for a long time dissolves, so the jam clears
+      if (c.fade >= 0) {
+        c.fade -= dt
+        if (c.fade < 0) c.id = -1
+        continue
+      }
+      const before = c.dist
+      if (c.stage === 'serving') {
+        c.timer -= dt
+        if (c.timer <= 0) {
+          if (c.failed) {
+            // turned away: waits at the door for a gap in the traffic home; after a couple of seconds it edges out and the cars behind give way
+            c.wait += dt
+            this.turnAround(c, c.wait > 2)
+          } else c.fade = 0.5 // served: the car drives into the building and is gone
+        }
+      } else {
+        c.dist = Math.min(c.total, c.dist + SPEED * c.pace * free * dt)
+      }
+      c.speed = dt > 0 ? (c.dist - before) / dt : 0
+    }
+
+    // A standoff, two cars each waiting for the other, would last for ever: after a moment the younger one gives up and dissolves.
+    const byId = new Map<number, Car>()
+    for (const c of this.cars) byId.set(c.id, c)
+    for (const c of this.cars) {
+      const o = c.fade < 0 && c.by && c.speed <= 0.3 ? byId.get(Number(c.by.split(':')[1])) : undefined
+      if (o && o.fade < 0 && o.speed <= 0.3 && o.by && Number(o.by.split(':')[1]) === c.id) {
+        c.standoff += dt
+        if (c.standoff > 1.5 && c.id > o.id) c.fade = 0.4
+      } else c.standoff = 0
+    }
+
+    for (const c of this.cars) {
+      if (c.stage === 'there') {
+        if (!c.committed && c.dist >= c.plan.decision) this.decide(c)
+        if (c.stage === 'there' && c.dist >= c.total) {
+          const n = c.plan.route.dest.node
+          const ratio = n && n.slaP99Ms > 0 ? n.p99Ms / n.slaP99Ms : 0
+          c.stage = 'serving'
+          // time at the door is the latency: brief inside the SLA, longer as p99 passes it. Failed requests are turned away quickly.
+          c.timer = c.failed ? 0.25 : Math.min(6, 0.3 + 1.6 * Math.max(0, ratio - 0.5))
+        }
+      } else if (c.stage === 'back' && c.dist >= c.total - 2.5 && c.fade < 0) {
+        c.fade = 0.4 // gone from the sample just before the start of the road, where new cars appear
+      }
+    }
+    for (let i = this.cars.length - 1; i >= 0; i--) if (this.cars[i].id < 0) this.cars.splice(i, 1)
+
+    const counts = [0, 0]
+    let flagN = 0, lightN = 0
+    const blink = Math.floor(this.time * 2.4) % 2 === 0
+    for (const c of this.cars) {
+      this.sample(c)
+      const target = Math.atan2(c.dx, c.dz)
+      let d = target - c.yaw
+      d = Math.atan2(Math.sin(d), Math.cos(d))
+      c.yaw += d * Math.min(1, dt * 9)
+      const s = this.unit[c.model] * (c.fade >= 0 ? Math.max(0.01, c.fade / 0.5) : 1)
+      this.q.setFromAxisAngle(this.up, c.yaw)
+      this.m.compose(this.pos, this.q, this.scaleV.set(s, s, s))
+      this.meshes[c.model].setMatrixAt(counts[c.model]++, this.m)
+      if (c.failed && c.stage !== 'back') {
+        this.m.compose(this.pos.clone().setY(this.pos.y + 0.78), this.q, this.one)
+        this.flags.setMatrixAt(flagN++, this.m)
+      }
+      const n = c.plan.route.dest.node
+      const slow = !!n && n.slaP99Ms > 0 && n.p99Ms > n.slaP99Ms
+      if (blink && slow && c.committed && c.stage !== 'back' && (c.stage === 'serving' || c.speed < 0.4)) {
+        for (const side of [-0.4, 0.4]) {
+          const p = new THREE.Vector3(side * c.dz, 0.95, -side * c.dx).add(this.pos)
+          this.m.compose(p, this.q, this.one)
+          this.lights.setMatrixAt(lightN++, this.m)
+        }
+      }
+    }
+    this.meshes.forEach((im, i) => { im.count = counts[i]; im.instanceMatrix.needsUpdate = true })
+    this.flags.count = flagN
+    this.flags.instanceMatrix.needsUpdate = true
+    this.lights.count = lightN
+    this.lights.instanceMatrix.needsUpdate = true
+    this.updateMarkers()
+  }
+
+  get count(): number {
+    return this.cars.length
+  }
+
+  private spawn(plan: Planned): boolean {
+    const points = plan.there
+    if (points.length < 2) return false
+    // never appear on top of another car
+    const start = points[0]
+    if (this.cars.some((o) => Math.hypot(o.x - start.x, o.z - start.z) < HALT)) return false
+    // and never into a crowd: where roads meet, too many cars at once is how they jam
+    let near = 0
+    for (const o of this.cars) if (Math.hypot(o.x - start.x, o.z - start.z) < CROWD_R) near++
+    if (near >= CROWD_MAX) return false
+    const first = points[1].clone().sub(points[0])
+    const n = plan.route.dest.node
+    const failed = Math.random() < (n?.errorRate ?? 0)
+    const car: Car = {
+      id: this.nextId++, plan, points, lengths: segmentLengths(points), total: polyLength(points), dist: 0,
+      stage: 'there', committed: false, timer: 0,
+      model: plan.route.origin === 'external' ? 1 : 0, failed,
+      yaw: Math.atan2(first.x, first.z), x: start.x, z: start.z, dx: first.x, dz: first.z,
+      speed: 0, stuck: 0, standoff: 0, fade: -1, lookX: new Array(LOOK).fill(start.x), lookZ: new Array(LOOK).fill(start.z), pace: 0.95 + Math.random() * 0.1, wait: 0,
+    }
+    const len = Math.hypot(car.dx, car.dz) || 1
+    car.dx /= len; car.dz /= len
+    this.cars.push(car)
+    return true
+  }
+
+  /** At the bay's mouth a car checks for room: a full lane means it turns round and the marker counts it as turned away. */
+  private decide(c: Car): void {
+    const waiting = this.cars.filter((o) => o !== c && o.plan.route.dest === c.plan.route.dest && o.committed && o.stage !== 'back').length
+    if (waiting < c.plan.slots) { c.committed = true; return }
+    // full: turn round as soon as the way back is clear (until then it carries on toward the bay)
+    c.wait += 1 / 10
+    if (this.turnAround(c, c.wait > 1.5)) this.markerFor(c.plan).turned.push(this.time)
+  }
+
+  /** Leave the door (or the road) by a smooth U-turn onto the way home, once the lane there is clear. Returns false if it must wait. */
+  private turnAround(c: Car, force = false): boolean {
+    const tail = c.plan.back
+    let best = -1, bestD = Infinity
+    for (let i = 0; i < tail.length - 1; i++) {
+      const tx = tail[i + 1].x - tail[i].x, tz = tail[i + 1].z - tail[i].z
+      if (tx * c.dx + tz * c.dz > 0) continue // must head the other way
+      const d = Math.hypot(tail[i].x - c.x, tail[i].z - c.z)
+      if (d < bestD) { bestD = d; best = i }
+    }
+    if (best < 0) { c.id = -1; return true }
+    const T = tail[best]
+    const dirT = tail[Math.min(tail.length - 1, best + 1)].clone().sub(T).setY(0).normalize()
+    for (const o of this.cars) {
+      if (force) break
+      if (o === c) continue
+      if (o.dx * dirT.x + o.dz * dirT.z < 0.5) continue // only cars already driving that way matter
+      const ox = o.x - T.x, oz = o.z - T.z
+      if (ox * ox + oz * oz < 3.0 * 3.0) return false
+      // a car coming up behind the join point in that lane
+      const along = ox * dirT.x + oz * dirT.z, side = Math.abs(ox * dirT.z - oz * dirT.x)
+      if (along < 0 && along > -7 && side < 1.3 && o.speed > 0.5) return false
+    }
+    const a = new THREE.Vector3(c.x, T.y, c.z)
+    const k = Math.max(1.6, bestD * 0.55)
+    const h = new THREE.Vector3(c.dx, 0, c.dz)
+    const curve = new THREE.CubicBezierCurve3(a, a.clone().addScaledVector(h, k), T.clone().addScaledVector(dirT, -k), T)
+    c.points = [...curve.getPoints(10), ...tail.slice(best + 1)]
+    c.lengths = segmentLengths(c.points)
+    c.total = polyLength(c.points)
+    c.dist = 0
+    c.stage = 'back'
+    c.committed = false
+    return true
+  }
+
+  /** Where the car will be when it has driven to `dist` along its road, stored as look-ahead point k. */
+  private pointAt(c: Car, dist: number, k: number): void {
+    let i = 0
+    let left = dist
+    while (i < c.lengths.length - 1 && left > c.lengths[i]) { left -= c.lengths[i]; i++ }
+    const t = c.lengths[i] > 0 ? clamp(left / c.lengths[i], 0, 1) : 0
+    c.lookX[k] = c.points[i].x + (c.points[i + 1].x - c.points[i].x) * t
+    c.lookZ[k] = c.points[i].z + (c.points[i + 1].z - c.points[i].z) * t
+  }
+
+  private sample(c: Car): void {
+    let i = 0
+    let left = c.dist
+    while (i < c.lengths.length - 1 && left > c.lengths[i]) { left -= c.lengths[i]; i++ }
+    const t = c.lengths[i] > 0 ? clamp(left / c.lengths[i], 0, 1) : 0
+    this.pos.lerpVectors(c.points[i], c.points[i + 1], t)
+    const dx = c.points[i + 1].x - c.points[i].x, dz = c.points[i + 1].z - c.points[i].z
+    const len = Math.hypot(dx, dz)
+    if (len > 1e-5) { c.dx = dx / len; c.dz = dz / len }
+    c.x = this.pos.x
+    c.z = this.pos.z
+  }
+
+  private markerFor(plan: Planned): Marker {
+    const b = plan.route.dest
+    let mk = this.markers.get(b)
+    if (!mk) {
+      const tex = canvasTexture(320, 96, () => {})
+      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, toneMapped: false }))
+      sprite.renderOrder = 11
+      sprite.scale.set(3.3, 0.99, 1)
+      sprite.visible = false
+      sprite.position.copy(plan.marker).setY(plan.marker.y + 2.6)
+      this.object.add(sprite)
+      mk = { sprite, key: '', turned: [] }
+      this.markers.set(b, mk)
+    }
+    return mk
+  }
+
+  /** The "+N waiting" and "!" bubble over a bay: N is cars turned away in the last ten seconds, "!" shows when p99 is well past the SLA. */
+  private updateMarkers(): void {
+    for (const plan of this.plans) {
+      const mk = this.markers.get(plan.route.dest)
+      if (!mk) continue
+      while (mk.turned.length > 0 && this.time - mk.turned[0] > 10) mk.turned.shift()
+      const n = plan.route.dest.node
+      const honk = !!n && n.slaP99Ms > 0 && n.p99Ms > n.slaP99Ms * 1.5 && this.cars.some((c) => c.plan.route.dest === plan.route.dest && c.committed && c.stage !== 'back')
+      const turned = mk.turned.length
+      const key = `${honk}|${turned}`
+      mk.sprite.visible = honk || turned > 0
+      if (key === mk.key) continue
+      mk.key = key
+      const tex = (mk.sprite.material as THREE.SpriteMaterial).map as THREE.CanvasTexture
+      const ctx = (tex.image as HTMLCanvasElement).getContext('2d')!
+      ctx.clearRect(0, 0, 320, 96)
+      ctx.fillStyle = 'rgba(20,28,40,0.92)'; roundRect(ctx, 4, 8, 312, 80, 28); ctx.fill()
+      ctx.strokeStyle = '#ffb830'; ctx.lineWidth = 6; ctx.stroke()
+      ctx.textBaseline = 'middle'
+      let x = 28
+      if (honk) {
+        ctx.fillStyle = '#ffb830'; ctx.beginPath(); ctx.arc(52, 48, 26, 0, Math.PI * 2); ctx.fill()
+        ctx.fillStyle = '#20180a'; ctx.font = '800 40px system-ui, sans-serif'; ctx.textAlign = 'center'
+        ctx.fillText('!', 52, 50)
+        x = 94
+      }
+      if (turned > 0) {
+        ctx.fillStyle = '#fff'; ctx.font = '700 34px system-ui, sans-serif'; ctx.textAlign = 'left'
+        ctx.fillText(`+${turned} waiting`, x, 50, 300 - x)
+      }
+      tex.needsUpdate = true
+    }
+  }
+}
+
+function nearBy(ax: number, az: number, bx: number, bz: number, r: number): boolean {
+  const dx = ax - bx, dz = az - bz
+  return dx * dx + dz * dz < r * r
+}
+
+function near(ax: number, az: number, bx: number, bz: number): boolean {
+  const dx = ax - bx, dz = az - bz
+  return dx * dx + dz * dz < TOUCH * TOUCH
+}
+
+function segmentLengths(points: THREE.Vector3[]): number[] {
+  const out: number[] = []
+  for (let i = 1; i < points.length; i++) out.push(points[i].distanceTo(points[i - 1]))
+  return out
+}
+
+function polyLength(points: THREE.Vector3[]): number {
+  let l = 0
+  for (let i = 1; i < points.length; i++) l += points[i].distanceTo(points[i - 1])
+  return l
+}
+
+/** Replaces sharp corners with short curves so cars steer round them. */
+export function roundCorners(points: THREE.Vector3[], radius: number): THREE.Vector3[] {
+  if (points.length < 3) return points.map((p) => p.clone())
+  const out: THREE.Vector3[] = [points[0].clone()]
+  for (let i = 1; i < points.length - 1; i++) {
+    const prev = points[i - 1], p = points[i], next = points[i + 1]
+    const a = prev.clone().sub(p), b = next.clone().sub(p)
+    const r = Math.min(radius, a.length() / 2, b.length() / 2)
+    if (r < 0.05) { out.push(p.clone()); continue }
+    const p1 = p.clone().addScaledVector(a.normalize(), r)
+    const p2 = p.clone().addScaledVector(b.normalize(), r)
+    const curve = new THREE.QuadraticBezierCurve3(p1, p.clone(), p2)
+    out.push(...curve.getPoints(5))
+  }
+  out.push(points[points.length - 1].clone())
+  return out
+}
+
+/** Shifts a road centre line to the driver's right-hand lane. */
+export function driveOnRight(points: THREE.Vector3[], offset: number): THREE.Vector3[] {
+  return points.map((p, i) => {
+    const a = points[Math.max(0, i - 1)], b = points[Math.min(points.length - 1, i + 1)]
+    const d = b.clone().sub(a).setY(0).normalize()
+    return p.clone().add(new THREE.Vector3(-d.z, 0, d.x).multiplyScalar(offset))
+  })
+}
