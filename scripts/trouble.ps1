@@ -28,6 +28,16 @@ $presets = [ordered]@{
   'down'         = @(, @('cl.ledger-api', 'Down', 1))
   'stale'        = @(, @('frd.screening-api', 'Stale', 1))
   'traffic'      = @(, @('*', 'Traffic', 0.6))
+  'rain'         = @(, @('pay', 'Incident', 0.6))
+  'storm'        = @(, @('cl', 'Incident', 0.9))
+  'overcast'     = @(, @('frd', 'Incident', 0.4))
+  'clouds'       = @(, @('dat', 'Incident', 0.1))
+  'incident-storm' = @(@('pay', 'Incident', 0.9), @('cl', 'Incident', 0.6), @('frd', 'Incident', 0.4))
+  'vendor-down'  = @(, @('ext.credit-bureau', 'Down', 1))
+  'vendor-slow'  = @(, @('ext.card-network', 'Latency', 0.9))
+  'vendor-errors' = @(, @('ext.sms-email', 'Errors', 0.7))
+  'airport-rush' = @(, @('hub.apim', 'Traffic', 0.9))
+  'stale-island' = @(, @('frd', 'Stale', 1))
   'bad-day'      = @(@('pay', 'Errors', 0.6), @('pay', 'Latency', 0.7), @('pay.payments-worker', 'Poison', 1), @('cl.ledger-db', 'Saturate', 0.8))
 }
 
@@ -48,10 +58,10 @@ if ($Preset[0] -eq 'raw') {
 foreach ($name in $Preset) {
   switch ($name) {
     'list' {
-      $presets.GetEnumerator() | ForEach-Object { '{0,-12} {1}' -f $_.Key, (($_.Value | ForEach-Object { "$($_[1]) $($_[0])" }) -join ', ') }
-      'reset       clears every effect and the backlog and dead letters they left'
-      'calm        freezes the noise and the daily cycle (calm-off to undo)'
-      'raw         raw <target> <kind> [intensity]; kinds: Traffic Errors Latency UnhealthyInstances Down HighCpu HighMemory Saturate Backlog Poison Stale'
+      $presets.GetEnumerator() | ForEach-Object { '{0,-14} {1}' -f $_.Key, (($_.Value | ForEach-Object { "$($_[1]) $($_[0])" }) -join ', ') }
+      'reset         clears every effect and the backlog and dead letters they left'
+      'calm          freezes the noise and the daily cycle (calm-off to undo)'
+      'raw           raw <target> <kind> [intensity]; kinds: Traffic Errors Latency UnhealthyInstances Down HighCpu HighMemory Saturate Backlog Poison Stale Incident (severity from intensity; third parties take the same effects as any system)'
     }
     'reset' { Send Post '/reset' $null | Out-Null; Write-Host 'Reset to a calm baseline' }
     'calm' { Send Post '/calm' @{ on = $true } | Out-Null; Write-Host 'Calm on' }

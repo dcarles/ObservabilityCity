@@ -191,4 +191,69 @@ public class RegistryValidationTests
         foreach (var file in Directory.GetFiles(TestPaths.Registry, "*.yaml", SearchOption.AllDirectories).Where(f => Path.GetFileName(f) != "fake.yaml"))
             Assert.StartsWith("# yaml-language-server: $schema=", File.ReadLines(file).First());
     }
+
+    // ── ring capacity ───────────────────────────────────────────────────────
+
+    private static Dictionary<string, string> Pillars(int n) =>
+        Enumerable.Range(1, n).ToDictionary(i => $"p{i:00}", i => Pillar($"p{i:00}", $"{{ id: p{i:00}.api, name: API, role: api }}"));
+
+    [Fact]
+    public void The_ring_capacity_defaults_to_twelve()
+    {
+        using var f = new Folder(Pillars(3));
+
+        Assert.Equal(12, f.Load().RingCapacity);
+    }
+
+    [Theory]
+    [InlineData(12, 23, true)]
+    [InlineData(12, 24, false)]
+    [InlineData(18, 35, true)]
+    [InlineData(18, 36, false)]
+    [InlineData(6, 11, true)]
+    [InlineData(6, 12, false)]
+    public void A_town_holds_up_to_twice_the_ring_capacity_less_one_pillars(int capacity, int pillars, bool fits)
+    {
+        using var f = new Folder(Pillars(pillars), layout: $"ringCapacity: {capacity}\n");
+
+        if (fits)
+            Assert.Equal(capacity, f.Load().RingCapacity);
+        else
+        {
+            var e = Assert.Throws<RegistryException>(f.Load);
+            Assert.Contains($"{pillars} pillars do not fit on two rings of {capacity}: at most {capacity * 2 - 1}", e.Message);
+            Assert.Contains("layout.yaml", e.Message);
+        }
+    }
+
+    [Fact]
+    public void The_error_says_which_capacity_would_fit_and_when_none_does()
+    {
+        using var small = new Folder(Pillars(24));
+        Assert.Contains("set ringCapacity to 13 or more", Assert.Throws<RegistryException>(small.Load).Message);
+
+        using var big = new Folder(Pillars(36), layout: "ringCapacity: 18\n");
+        Assert.Contains("35 is the most a town can hold", Assert.Throws<RegistryException>(big.Load).Message);
+    }
+
+    [Theory]
+    [InlineData(5)]
+    [InlineData(19)]
+    [InlineData(0)]
+    public void A_ring_capacity_outside_six_to_eighteen_is_refused(int capacity)
+    {
+        using var f = new Folder(Pillars(3), layout: $"ringCapacity: {capacity}\n");
+
+        var e = Assert.Throws<RegistryException>(f.Load);
+
+        Assert.Contains($"layout.yaml: ringCapacity must be between 6 and 18, not {capacity}", e.Message);
+    }
+
+    [Fact]
+    public void A_town_that_does_not_fit_fails_even_a_resilient_load()
+    {
+        using var f = new Folder(Pillars(24));
+
+        Assert.Throws<RegistryException>(() => RegistryLoader.LoadResilient(f.Path));
+    }
 }

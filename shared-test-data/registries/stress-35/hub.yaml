@@ -1,0 +1,11 @@
+displayName: Platform hub
+color: "#f5c26b"
+resources:
+  - { id: hub.apim, name: API gateway, role: gateway }
+  - { id: hub.service-bus, name: Service Bus, role: broker }
+  - { id: hub.egress, name: Central egress, role: egress }
+  - { id: hub.customer-db, name: Shared customer DB, role: db }
+externalCallers:
+  - { id: mobile-app, name: Mobile app, calls: [p01.s1-api, p02.s1-api, p03.s1-api, p04.s1-api, p05.s1-api, p06.s1-api, p07.s1-api, p08.s1-api] }
+  - { id: partner-portal, name: Partner portal, calls: [p09.s1-api, p10.s1-api, p11.s1-api, p12.s1-api, p13.s1-api, p14.s1-api, p15.s1-api, p16.s1-api] }
+  - { id: vendor-hooks, name: Vendor webhooks, calls: [p17.s1-api, p18.s1-api, p19.s1-api, p20.s1-api, p21.s1-api, p22.s1-api, p23.s1-api, p24.s1-api, p25.s1-api, p26.s1-api, p27.s1-api, p28.s1-api, p29.s1-api, p30.s1-api, p31.s1-api, p32.s1-api, p33.s1-api, p34.s1-api, p35.s1-api] }

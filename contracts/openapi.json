@@ -28,11 +28,61 @@
   },
   "components": {
     "schemas": {
+      "DependencySnapshot": {
+        "required": [
+          "from",
+          "requestsPerSecond",
+          "to"
+        ],
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          },
+          "requestsPerSecond": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ExternalCallerSnapshot": {
+        "required": [
+          "calls",
+          "id",
+          "name",
+          "requestsPerSecond"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "requestsPerSecond": {
+            "type": "number",
+            "format": "double"
+          },
+          "calls": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
       "GroupSnapshot": {
         "required": [
           "color",
           "displayName",
           "id",
+          "incidents",
           "isHub",
           "isLostFound",
           "nodes"
@@ -58,6 +108,12 @@
             "type": "string",
             "nullable": true
           },
+          "incidents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IncidentSnapshot"
+            }
+          },
           "nodes": {
             "type": "array",
             "items": {
@@ -75,6 +131,32 @@
           "Stale"
         ],
         "type": "string"
+      },
+      "IncidentSnapshot": {
+        "required": [
+          "id",
+          "severity",
+          "startedAt",
+          "title"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
       },
       "NodeKind": {
         "enum": [
@@ -98,6 +180,7 @@
           "errorRate",
           "errorRed",
           "external",
+          "gatewayCalls",
           "id",
           "instancesHealthy",
           "instancesTotal",
@@ -235,6 +318,12 @@
               "type": "string"
             }
           },
+          "gatewayCalls": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "lastUpdated": {
             "type": "string",
             "format": "date-time",
@@ -246,14 +335,18 @@
       "Snapshot": {
         "required": [
           "dayFraction",
+          "dependencies",
           "environment",
+          "externalCallers",
           "generatedAt",
           "groupLabel",
           "groups",
           "notices",
+          "ringCapacity",
           "totals",
           "townId",
-          "townName"
+          "townName",
+          "vendors"
         ],
         "type": "object",
         "properties": {
@@ -291,6 +384,28 @@
             "items": {
               "$ref": "#/components/schemas/GroupSnapshot"
             }
+          },
+          "vendors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VendorSnapshot"
+            }
+          },
+          "externalCallers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExternalCallerSnapshot"
+            }
+          },
+          "dependencies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DependencySnapshot"
+            }
+          },
+          "ringCapacity": {
+            "type": "integer",
+            "format": "int32"
           }
         },
         "additionalProperties": false
@@ -300,6 +415,7 @@
           "degraded",
           "down",
           "errorRate",
+          "incidents",
           "p99Ms",
           "requestsPerSecond"
         ],
@@ -324,6 +440,29 @@
           "down": {
             "type": "integer",
             "format": "int32"
+          },
+          "incidents": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "VendorSnapshot": {
+        "required": [
+          "calledBy",
+          "node"
+        ],
+        "type": "object",
+        "properties": {
+          "node": {
+            "$ref": "#/components/schemas/NodeSnapshot"
+          },
+          "calledBy": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "additionalProperties": false

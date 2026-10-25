@@ -24,6 +24,12 @@ public enum FakeEffectKind
     Poison,
     /// <summary>The source stops answering for the target, so its readings age into the stale state. Intensity is ignored.</summary>
     Stale,
+    /// <summary>
+    /// An incident assigned to the target's island (a group id, a system's group, or "*" for every island, the hub too). Intensity sets the
+    /// severity: 0.85 or more is sev 1, 0.6 sev 2, 0.35 sev 3, below that sev 4. Down, Errors and the other effects on a vendor
+    /// show up in the calls our systems make to it, which is how a real third party's health would be read.
+    /// </summary>
+    Incident,
 }
 
 /// <summary>A scenario effect layered on the baseline. Target is a node id, a group id (a whole island) or "*".</summary>

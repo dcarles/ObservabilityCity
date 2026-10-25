@@ -3,7 +3,7 @@ pillar: cus
 displayName: Customers
 color: "#3fb68b"
 systems:
-  - { id: cus.profile-api, service: profile, name: Profile API, role: api, external: true, calls: [cus.profile-db, cus.consent-api, cus.kyc-api] }
+  - { id: cus.profile-api, service: profile, name: Profile API, role: api, external: true, calls: [cus.profile-db, cus.consent-api, cus.kyc-api], gatewayCalls: [ntf.dispatch-api] }
   - { id: cus.profile-worker, service: profile, name: Profile worker, role: worker, calls: [cus.profile-db] }
   - { id: cus.profile-db, service: profile, name: Profile DB, role: db }
   - { id: cus.consent-api, service: consent, name: Consent API, role: api, calls: [cus.consent-db] }

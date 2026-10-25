@@ -39,27 +39,34 @@ async function start(): Promise<void> {
   const stateList = new StateList(
     (state) => {
       const groups = seen.last?.groups ?? []
-      return groups.flatMap((g) => g.nodes.filter((n) => n.state === state).map<PickItem>((n) => ({ kind: 'building', id: n.id, name: n.name, where: g.displayName, state: n.state })))
+      if (state === 'Incidents')
+        return groups.filter((g) => g.incidents.length > 0).map<PickItem>((g) => ({ kind: 'island', id: g.id, name: g.displayName, where: `sev ${g.incidents[0].severity}, ${g.incidents.length} open` }))
+      const inGroups = groups.flatMap((g) => g.nodes.filter((n) => n.state === state).map<PickItem>((n) => ({ kind: 'building', id: n.id, name: n.name, where: g.displayName, state: n.state })))
+      const vendors = (seen.last?.vendors ?? []).filter((v) => v.node.state === state).map<PickItem>((v) => ({ kind: 'building', id: v.node.id, name: v.node.name, where: 'Third party', state: v.node.state }))
+      return [...inGroups, ...vendors]
     },
     goTo,
   )
-  const topbar = new TopBar(() => stage.home(), (state, anchor) => stateList.toggle(state, anchor))
+  const topbar = new TopBar(() => stage.home(), (state, anchor) => stateList.toggle(state, anchor), (on) => { town.overlay.visible = on })
   const notices = new NoticesPanel()
   const buildingItems = (): SearchItem[] => {
     const items: SearchItem[] = []
     for (const isl of town.islands)
       for (const [id, b] of isl.buildings) items.push({ kind: 'building', id, name: b.node?.name ?? id, where: isl.group.displayName })
     for (const [id, b] of town.buildings) if (id.startsWith('hub.')) items.push({ kind: 'building', id, name: b.node?.name ?? id, where: 'Platform hub' })
+    for (const [id, v] of town.vendors) items.push({ kind: 'building', id, name: v.building.node?.name ?? id, where: 'Third party' })
     return items
   }
   const islandItems = (): SearchItem[] => town.islands.map((i) => ({ kind: 'island', id: i.group.id, name: i.group.displayName, where: i.group.displayName }))
+  const airportItem = (): SearchItem[] => (town.airport ? [{ kind: 'island', id: 'airport', name: 'Airport', where: 'Outside callers' }] : [])
   const preview = new PreviewPanel(() => [
     { kind: 'town', id: '*', name: 'Whole town', where: '' },
+    { kind: 'island', id: 'hub', name: 'Island: Platform hub', where: 'Platform hub' },
     ...islandItems().map((i) => ({ ...i, name: `Island: ${i.name}` })),
     ...buildingItems(),
   ])
 
-  const search = new Search(() => [...islandItems(), ...buildingItems()], goTo)
+  const search = new Search(() => [...islandItems(), ...airportItem(), ...buildingItems()], goTo)
   void search
 
   // What the page has shown so far, for tests and for poking from the console.
@@ -82,7 +89,7 @@ async function start(): Promise<void> {
     try {
       if (!town.matches(s)) {
         const started = performance.now()
-        town.root.remove(...town.root.children.filter((c) => c !== town.cars.object && c !== town.boats.object))
+        town.root.remove(...town.root.children.filter((c) => c !== town.cars.object && c !== town.boats.object && c !== town.overlay.object))
         town.buildings.clear()
         town.islands.length = 0
         town.extent.length = 0
@@ -168,6 +175,9 @@ async function start(): Promise<void> {
     feed: (raw: unknown) => onSnapshot(raw),
     inspect: (id: string) => town.inspect(id),
     inspectIsland: (id: string) => town.inspectIsland(id),
+    inspectAirport: () => town.inspectAirport(),
+    inspectVendors: () => town.inspectVendors(),
+    overlay: () => town.overlay.status(),
     /** Draw once and say how much that took: draw calls, triangles and milliseconds. */
     measureFrame: () => {
       const t0 = performance.now()

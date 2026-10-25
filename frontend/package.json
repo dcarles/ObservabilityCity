@@ -11,8 +11,9 @@
     "test": "vitest run",
     "gen:contracts": "node scripts/gen-contracts.mjs",
     "e2e": "playwright test",
-    "e2e:slow": "npm run e2e:stress && npm run e2e:town",
+    "e2e:slow": "npm run e2e:stress && npm run e2e:stress35 && npm run e2e:town",
     "e2e:stress": "cross-env E2E_SUITE=stress playwright test",
+    "e2e:stress35": "cross-env E2E_SUITE=stress35 playwright test",
     "e2e:town": "cross-env E2E_SUITE=town playwright test",
     "check:contracts": "node scripts/gen-contracts.mjs --check"
   },

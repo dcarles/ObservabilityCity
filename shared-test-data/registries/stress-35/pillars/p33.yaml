@@ -1,0 +1,13 @@
+pillar: p33
+displayName: Pillar 33 (9)
+color: "#27ae60"
+systems:
+  - { id: p33.s1-api, service: s1, name: S1 API, role: api, external: true, calls: [p33.s1-db, p33.s2-api, p33.s3-api] }
+  - { id: p33.s1-worker, service: s1, name: S1 worker, role: worker, calls: [p33.s1-db] }
+  - { id: p33.s1-db, service: s1, name: S1 DB, role: db }
+  - { id: p33.s2-api, service: s2, name: S2 API, role: api, calls: [p33.s2-db] }
+  - { id: p33.s2-worker, service: s2, name: S2 worker, role: worker, calls: [p33.s2-db] }
+  - { id: p33.s2-db, service: s2, name: S2 DB, role: db }
+  - { id: p33.s3-api, service: s3, name: S3 API, role: api, calls: [p33.s3-db] }
+  - { id: p33.s3-worker, service: s3, name: S3 worker, role: worker, calls: [p33.s3-db] }
+  - { id: p33.s3-db, service: s3, name: S3 DB, role: db }

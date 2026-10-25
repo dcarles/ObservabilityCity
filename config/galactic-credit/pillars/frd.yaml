@@ -8,6 +8,6 @@ systems:
   - { id: frd.screening-api, service: screening, name: Screening API, role: api, external: true, calls: [frd.screening-db, frd.rules-cache, frd.cases-api] }
   - { id: frd.screening-worker, service: screening, name: Screening worker, role: worker, calls: [frd.screening-db] }
   - { id: frd.screening-db, service: screening, name: Screening DB, role: db }
-  - { id: frd.cases-api, service: cases, name: Cases API, role: api, calls: [frd.cases-db] }
+  - { id: frd.cases-api, service: cases, name: Cases API, role: api, calls: [frd.cases-db], gatewayCalls: [cus.profile-api] }
   - { id: frd.cases-db, service: cases, name: Cases DB, role: db }
   - { id: frd.rules-cache, name: Rules cache, role: cache }

@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { planIsland } from '../../src/scene/plan'
 import { layoutTown } from '../../src/scene/layout'
+import { AIRPORT } from './layout.testutil'
 import type { Snapshot } from '../../src/types'
 
 const snapshotPath = resolve(__dirname, '../../../shared-test-data/snapshots/calm.json')
@@ -10,7 +11,7 @@ const goldenPath = resolve(__dirname, '../../../shared-test-data/layout/galactic
 const snapshot = JSON.parse(readFileSync(snapshotPath, 'utf8')) as Snapshot
 const pillars = snapshot.groups.filter((g) => !g.isHub)
 const plans = pillars.map((g) => planIsland(g))
-const layout = layoutTown(plans.map((p) => ({ rx: p.rx, rz: p.rz })))
+const layout = layoutTown(plans.map((p) => ({ rx: p.rx, rz: p.rz })), snapshot.ringCapacity, AIRPORT)
 
 const r = (v: number) => Math.round(v * 10) / 10
 
@@ -46,6 +47,7 @@ describe('the sample town', () => {
         rz: r(plans[i].rz),
         buildings: plans[i].placed.length,
       })),
+      airport: { ring: layout.airport!.ring, angleDeg: r((layout.airport!.angle * 180) / Math.PI), radius: r(layout.airport!.radius), portDeg: r((layout.airport!.portAngle * 180) / Math.PI) },
     }
     const text = JSON.stringify(actual, null, 2) + '\n'
     if (process.env.UPDATE_GOLDEN === '1' || !existsSync(goldenPath)) {

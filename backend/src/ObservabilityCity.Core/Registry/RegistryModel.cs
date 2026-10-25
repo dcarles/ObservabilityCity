@@ -10,6 +10,19 @@ public sealed record Registry(
 {
     public IEnumerable<RegistryNode> AllNodes => Groups.SelectMany(g => g.Nodes);
 
+    /// <summary>How many islands fit on the first ring (layout.yaml ringCapacity). The town holds up to <see cref="MaxPillars"/> pillars on two rings.</summary>
+    public int RingCapacity { get; init; } = DefaultRingCapacity;
+
+    public const int DefaultRingCapacity = 12;
+    public const int MinRingCapacity = 6;
+    public const int MaxRingCapacity = 18;
+
+    /// <summary>Two rings of <paramref name="ringCapacity"/>, less the place the airport takes in the second.</summary>
+    public static int MaxPillars(int ringCapacity) => ringCapacity * 2 - 1;
+
+    /// <summary>Third parties outside the town. They are not part of any group: they stand on offshore islands.</summary>
+    public IReadOnlyList<RegistryVendor> Vendors { get; init; } = [];
+
     /// <summary>Problems a resilient load worked around (a skipped pillar file, a dropped call link). Always empty after a strict load.</summary>
     public IReadOnlyList<string> Notices { get; init; } = [];
 
@@ -34,6 +47,13 @@ public sealed record RegistryGroup(
     public bool IsLostFound => Id == LostFoundId;
 }
 
+/// <summary>A third party (a credit bureau, a data warehouse). Its Node uses the group id <see cref="GroupId"/>; CalledBy lists our systems that call it.</summary>
+public sealed record RegistryVendor(RegistryNode Node, IReadOnlyList<string> CalledBy)
+{
+    /// <summary>The group id every vendor id starts with (ext.snowflake).</summary>
+    public const string GroupId = "ext";
+}
+
 /// <summary>Someone outside the town (an app, a partner) and the external systems it calls.</summary>
 public sealed record ExternalCaller(string Id, string Name, IReadOnlyList<string> Calls);
 
@@ -54,7 +74,11 @@ public sealed record RegistryNode(
     double ThrottleRed,
     double BacklogAmber,
     double BacklogRed,
-    IReadOnlyList<string> Calls);
+    IReadOnlyList<string> Calls)
+{
+    /// <summary>Systems on other islands this one reaches through the API gateway. Only the dependency overlay and the cars' origins use them.</summary>
+    public IReadOnlyList<string> GatewayCalls { get; init; } = [];
+}
 
 /// <summary>Raised when a registry file is wrong. The message names the file and the id.</summary>
 public sealed class RegistryException(string message) : Exception(message);

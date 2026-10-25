@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { layoutTown, RING_CAPACITY, wrapAngle, type IslandSize, type TownLayout } from '../../src/scene/layout'
+import { DEFAULT_RING_CAPACITY, layoutTown, maxPillars, wrapAngle, type IslandSize, type TownLayout } from '../../src/scene/layout'
+
+/** The airport's size, as the scene draws it. */
+export const AIRPORT: IslandSize = { rx: 40, rz: 22 }
 
 /** Points on an island's coast, treating it as an ellipse turned to face the hub. */
 function coast(l: TownLayout, s: IslandSize[], i: number, grow = 0): { x: number; z: number }[] {
@@ -24,15 +27,25 @@ function inside(l: TownLayout, s: IslandSize[], i: number, pt: { x: number; z: n
 }
 
 /** The rules every layout must keep, whatever the island sizes: no island touches another or the hub, bridges stay clear, spokes have room. */
-export function layoutInvariants(name: string, s: IslandSize[]): void {
+export function layoutInvariants(name: string, pillars: IslandSize[], capacity = DEFAULT_RING_CAPACITY): void {
+  const tl = layoutTown(pillars, capacity, AIRPORT)
+  // the airport is an island like the others as far as room and bridges go
+  const l: TownLayout = { ...tl, islands: [...tl.islands, tl.airport!] }
+  const s = [...pillars, AIRPORT]
   const n = s.length
-  const l = layoutTown(s)
   describe(name, () => {
 
-    it('puts at most twelve islands in the first ring and the rest in a second ring further out', () => {
-      expect(l.islands.filter((i) => i.ring === 1)).toHaveLength(Math.min(n, RING_CAPACITY))
+    it('puts at most `capacity` islands in the first ring and the rest in a second ring further out', () => {
+      expect(l.islands.filter((i) => i.ring === 1)).toHaveLength(Math.min(pillars.length, capacity))
       const r1 = Math.max(...l.islands.filter((i) => i.ring === 1).map((i) => i.radius))
       for (const i of l.islands.filter((x) => x.ring === 2)) expect(i.radius).toBeGreaterThan(r1)
+    })
+
+    it('puts the airport due north in the second ring, in a place no island takes', () => {
+      expect(tl.airport!.angle).toBe(0)
+      expect(tl.airport!.ring).toBe(2)
+      for (const i of tl.islands) expect(Math.abs(wrapAngle(i.angle))).toBeGreaterThan(1e-6)
+      expect(pillars.length).toBeLessThanOrEqual(maxPillars(capacity))
     })
 
     it('keeps every island clear of every other, with open sea between', () => {

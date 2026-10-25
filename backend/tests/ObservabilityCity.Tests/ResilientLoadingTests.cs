@@ -102,7 +102,7 @@ public class ResilientLoadingTests
     [Fact]
     public void A_healthy_registry_has_no_notices()
     {
-        var registry = RegistryLoader.LoadResilient(TestPaths.Stress24);
+        var registry = RegistryLoader.LoadResilient(TestPaths.Stress23);
 
         Assert.Empty(registry.Notices);
         Assert.Empty(registry.Problems);

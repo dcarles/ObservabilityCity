@@ -13,14 +13,11 @@ namespace ObservabilityCity.Validate;
 /// </summary>
 public static class RegistryValidator
 {
-    /// <summary>The island layout is designed for up to this many pillars.</summary>
-    public const int MaxIslands = 24;
-
     private static readonly Regex FileName = new(@"^([A-Za-z0-9._-]+\.yaml)(?: \(line (\d+)\))?", RegexOptions.Compiled);
     private static readonly Regex Colour = new("^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$", RegexOptions.Compiled);
     private static readonly Regex Quoted = new("'([^']+)'", RegexOptions.Compiled);
     private static readonly Regex CallsMessage = new("^'([^']+)' calls '([^']+)'", RegexOptions.Compiled);
-    private static readonly string[] TopLevel = ["town.yaml", "defaults.yaml", "hub.yaml", "layout.yaml", "fake.yaml"];
+    private static readonly string[] TopLevel = ["town.yaml", "defaults.yaml", "hub.yaml", "layout.yaml", "fake.yaml", "third-parties.yaml"];
     private static readonly string[] Topologies = ["hub-and-spoke", "direct"];
     private static readonly string[] Blocks = ["errors", "resources", "throttle", "backlog"];
 
@@ -104,8 +101,6 @@ public static class RegistryValidator
             foreach (var g in pillars.Where(g => !g.IsLostFound && !listed.Contains(g.Id)))
                 c.Error(c.PillarFile(g.Id), 1, "layout", $"Pillar '{g.Id}' has no entry in layout.yaml, so its place round the hub is an accident of file order. Add '{g.Id}' to islands.");
         }
-        if (pillars.Count > MaxIslands)
-            c.Warn("layout.yaml", 1, "island-count", $"The town has {pillars.Count} islands; the layout is designed and tested for up to {MaxIslands}.");
     }
 
     // ── thresholds ──────────────────────────────────────────────────────────
@@ -272,7 +267,7 @@ public static class RegistryValidator
             return;
         }
 
-        var ids = registry.AllNodes.Select(n => n.Id).ToHashSet();
+        var ids = registry.AllNodes.Concat(registry.Vendors.Select(v => v.Node)).Select(n => n.Id).ToHashSet(); // vendors have fake profiles too
         var aliases = c.Aliases();
         var raw = c.Raw("fake.yaml");
         if (raw.Root is null) return;

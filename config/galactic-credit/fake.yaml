@@ -108,3 +108,7 @@ lost-found.batch-gateway-api:    { rps: 12, p99Ms: 500, minInstances: 1 }
 lost-found.batch-gateway-worker: { rps: 4,  p99Ms: 20000, minInstances: 1 }
 lost-found.batch-gateway-db:     { rps: 16, p99Ms: 40,  minInstances: 1 }
 lost-found.legacy-ftp-api:       { rps: 2,  p99Ms: 900, minInstances: 1 }
+ext.credit-bureau:      { rps: 28,  p99Ms: 700,  errorRate: 0.004 }
+ext.card-network:       { rps: 95,  p99Ms: 420,  errorRate: 0.003 }
+ext.sms-email:          { rps: 40,  p99Ms: 1100, errorRate: 0.01 }
+ext.snowflake:          { rps: 12,  p99Ms: 1800, errorRate: 0.002 }

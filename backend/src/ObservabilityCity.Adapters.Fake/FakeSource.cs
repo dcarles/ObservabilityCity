@@ -19,7 +19,7 @@ public sealed class FakeOptions
 public sealed class FakeSource(
     IReadOnlyDictionary<string, FakeProfile> profiles,
     FakeOptions options,
-    TimeProvider clock) : IMetricSource, IFakeControl
+    TimeProvider clock) : IMetricSource, IFakeControl, IIncidentSource
 {
     // The autoscaler aims for this share of capacity, so nominal load sits mid-way and spikes push it over.
     private const double TargetUtilisation = 0.65;
@@ -28,11 +28,13 @@ public sealed class FakeSource(
     private readonly ConcurrentDictionary<string, int> _instances = new();
     private readonly ConcurrentDictionary<string, double> _backlog = new(); // messages a consumer has fallen behind by
     private readonly ConcurrentDictionary<string, double> _deadLetters = new();
+    private readonly ConcurrentDictionary<string, DateTimeOffset> _incidentStart = new();
     private DateTimeOffset _lastPoll;
     private readonly object _gate = new();
     private readonly List<FakeEffect> _effects = [];
     private int _nextId;
 
+    string IIncidentSource.Name => "fake";
     public string Name => "fake";
     public TimeSpan PollInterval => options.PollInterval;
 
@@ -47,6 +49,7 @@ public sealed class FakeSource(
     {
         var e = new FakeEffect($"fx{Interlocked.Increment(ref _nextId)}", target, kind, Math.Clamp(intensity, 0, 1));
         lock (_gate) _effects.Add(e);
+        if (kind == FakeEffectKind.Incident) _incidentStart[e.Id] = clock.GetUtcNow();
         return e;
     }
 
@@ -79,6 +82,20 @@ public sealed class FakeSource(
         }
     }
 
+    /// <summary>Severity for an Incident effect's intensity: 0.85 and up is sev 1, then 0.6, 0.35, and sev 4 below.</summary>
+    public static int SeverityOf(double intensity) => intensity >= 0.85 ? 1 : intensity >= 0.6 ? 2 : intensity >= 0.35 ? 3 : 4;
+
+    public IReadOnlyList<Incident> Current(Registry registry)
+    {
+        var started = _start;
+        var nodeGroup = registry.AllNodes.ToDictionary(n => n.Id, n => n.GroupId);
+        return Effects.Where(e => e.Kind == FakeEffectKind.Incident)
+            .SelectMany(e => registry.Groups
+                .Where(g => e.Target == "*" || e.Target == g.Id || nodeGroup.GetValueOrDefault(e.Target) == g.Id)
+                .Select(g => new Incident($"{e.Id}-{g.Id}", g.Id, SeverityOf(e.Intensity), $"Simulated sev{SeverityOf(e.Intensity)} incident", _incidentStart.GetValueOrDefault(e.Id, started))))
+            .ToList();
+    }
+
     public Task<IReadOnlyDictionary<string, NodeReading>> PollAsync(Registry registry, CancellationToken ct)
     {
         var now = clock.GetUtcNow();
@@ -88,9 +105,20 @@ public sealed class FakeSource(
         var dt = _lastPoll == default ? 0 : Math.Clamp((now - _lastPoll).TotalSeconds, 0, 5);
         _lastPoll = now;
 
-        foreach (var node in registry.AllNodes)
+        // A vendor that is down or failing makes the calls our systems send it fail too; that is also how its health would be read for real.
+        var vendorTrouble = registry.Vendors.ToDictionary(v => v.Node.Id, v => VendorTrouble(effects.Where(e => Applies(e, v.Node)).ToList()));
+        double CallerTrouble(string id) => registry.Vendors.Where(v => v.CalledBy.Contains(id)).Select(v => 0.4 * vendorTrouble[v.Node.Id]).DefaultIfEmpty(0).Max();
+
+        foreach (var node in registry.AllNodes.Concat(registry.Vendors.Select(v => v.Node)))
         {
+            var isVendor = node.GroupId == RegistryVendor.GroupId;
             var p = FakeProfiles.Fill(profiles.GetValueOrDefault(node.Id), node.Kind);
+            if (isVendor)
+            {
+                // a third party is one opaque service: no instances or CPU to see, only the calls we make to it
+                p.MinInstances = p.MaxInstances = 1;
+                p.PerInstanceRps = p.Rps!.Value * 2;
+            }
             var fx = effects.Where(e => Applies(e, node)).ToList();
             if (fx.Any(e => e.Kind == FakeEffectKind.Stale)) continue; // the source says nothing about this node
 
@@ -115,7 +143,7 @@ public sealed class FakeSource(
             var healthy = Math.Max(0, current - unhealthy);
 
             var errorFx = fx.Where(e => e.Kind == FakeEffectKind.Errors).Select(e => 0.03 + 0.30 * e.Intensity).DefaultIfEmpty(0).Max();
-            var errors = Math.Clamp(p.ErrorRate!.Value * (Calm ? 1 : 1 + 0.4 * Wobble(node.Id, t, 7)) + errorFx, 0, 1);
+            var errors = Math.Clamp(p.ErrorRate!.Value * (Calm ? 1 : 1 + 0.4 * Wobble(node.Id, t, 7)) + errorFx + CallerTrouble(node.Id), 0, 1);
 
             var latencyFx = fx.Where(e => e.Kind == FakeEffectKind.Latency).Sum(e => 9 * e.Intensity);
             // Latency rises a little when instances are saturated, and with load on a degraded fleet.
@@ -134,7 +162,7 @@ public sealed class FakeSource(
                 load = utilisation.Value;
                 errors = Math.Clamp(errors + throttled.Value * 0.2, 0, 1);
             }
-            else if (!down)
+            else if (!down && !isVendor)
             {
                 var cpuFx = fx.Where(e => e.Kind == FakeEffectKind.HighCpu).Sum(e => 0.55 * e.Intensity);
                 var memFx = fx.Where(e => e.Kind == FakeEffectKind.HighMemory).Sum(e => 0.5 * e.Intensity);
@@ -169,6 +197,10 @@ public sealed class FakeSource(
 
         return Task.FromResult<IReadOnlyDictionary<string, NodeReading>>(result);
     }
+
+    /// <summary>How badly a vendor is failing, 0 to 1: all of it when down, else the error effects' rate.</summary>
+    private static double VendorTrouble(List<FakeEffect> fx) =>
+        fx.Any(e => e.Kind == FakeEffectKind.Down) ? 1 : fx.Where(e => e.Kind == FakeEffectKind.Errors).Select(e => 0.03 + 0.30 * e.Intensity).DefaultIfEmpty(0).Max();
 
     private static bool Applies(FakeEffect e, RegistryNode n) =>
         e.Target == "*" || e.Target == n.Id || e.Target == n.GroupId;

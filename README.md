@@ -55,7 +55,7 @@ The browser app proxies `/api` and `/hubs` to the backend, so there is nothing t
 
 Hover a building for its numbers. Drag to orbit, scroll to zoom, right-drag to pan, **Home** frames the whole town. Click a building, or pick one in the search box (press `/` to focus it), and the camera glides to it and keeps its name board readable. Search also finds islands. Any drag cancels a glide.
 
-The **Try it** panel (temporary in this slice) pokes the fake data source: pick a target (the whole town, an island or one building), then press Traffic spike, Slow, Errors, Sick instances, High CPU, High memory, DB saturated, Queue backs up, Dead letters or Down. Effects stack, and each shows as a chip you can click to clear. **Calm** freezes the noise and the daily cycle.
+The **Try it** panel (temporary in this slice) pokes the fake data source: pick a target (the whole town, an island or one building), then press Traffic spike, Slow, Errors, Sick instances, High CPU, High memory, DB saturated, Queue backs up, Dead letters, Down, or an Incident (Sev 1 to 4, which brings weather over the island). Pick a third party as the target to take a vendor offline or slow. Effects stack, and each shows as a chip you can click to clear. **Calm** freezes the noise and the daily cycle.
 
 ### Demo trouble from a script
 
@@ -65,6 +65,7 @@ Until the Break things panel exists, `scripts/trouble.ps1` pokes the fake source
 ./scripts/trouble.ps1 list                  # the presets
 ./scripts/trouble.ps1 high-cpu dlq-buildup  # presets stack
 ./scripts/trouble.ps1 bad-day               # errors, slowness, dead letters and a throttled DB across Payments and Core Ledger
+./scripts/trouble.ps1 rain vendor-down      # incident weather over Payments, a third party offline
 ./scripts/trouble.ps1 raw cl.ledger-api Errors 0.5
 ./scripts/trouble.ps1 reset                 # back to a calm baseline
 ```
@@ -89,7 +90,7 @@ How to read the town, as built so far:
 | API, worker and database side by side | One service. Systems that share a `service` in the registry stand next to each other on one pad, with their fronts toward the road. Pads sit on a grid, so every building's front is visible from the road side |
 | Name board above a building | System name and "N/M healthy". Fades out when the camera is far away, except for troubled buildings |
 | Bridges | One road bridge from the hub's plaza to each island's gate. All sync traffic between islands goes through the hub |
-| Islands on a ring round the hub, a few further out | Pillars, in the order of `layout.yaml`. Twelve fit on the first ring, the rest stand in a staggered outer ring with their bridges passing between first-ring islands. The hub grows with the number of islands |
+| Islands on a ring round the hub, a few further out | Pillars, in the order of `layout.yaml`. `ringCapacity` (default 12, 6 to 18) fit on the first ring, the rest stand in a staggered second ring with their bridges passing between first-ring islands. Two rings only, so at most (ringCapacity x 2) - 1 pillars. The airport takes the second ring's north slot. A ring road circles the town, with third-party vendors outside it. The hub grows with the number of islands |
 | Island with a heap of boxes and bins by the gate | Lost & found: systems that carry no pillar tag and no `pillar.code` |
 | Harbour with crates and a crane | The island's port, where messaging boats dock. Messages waiting pile up as crates on the quay with a "waiting N, oldest" sign. Dead letters sit in a pen of broken crates with a "DLQ N" badge and a sweeping red light. The hub shows the DLQ total |
 | Boats between hub quays and island harbours | Asynchronous messaging. Busier queues send more boats, smaller than before, and the crates on a boat show how loaded it is. Bridges are synchronous calls, boats are asynchronous ones. Boats sail only on open water: each island has a quay on the hub in the water gap beside its bridge, and lanes are found around land and bridges |
@@ -132,10 +133,10 @@ CI runs `npm run check:contracts` and fails if the generated files are out of da
 ### Tests
 
 ```
-dotnet test --solution backend/ObservabilityCity.slnx  # registry, resilient loading, validator, rules, fake source, 24-island backend load, golden fixtures
+dotnet test --solution backend/ObservabilityCity.slnx  # registry, resilient loading, validator, rules, fake source, 23- and 35-island backend load, golden fixtures
 cd frontend && npm test          # visual rules, snapshot guard, island layout (including 24 uneven islands), golden fixtures
 cd frontend && npm run e2e       # browser scenarios on a small town: break things, check the town, calm it down (about 1 minute)
-cd frontend && npm run e2e:slow  # 24-island stress town and the full sample town, with screenshots (about 1 minute)
+cd frontend && npm run e2e:slow  # 23- and 35-island stress towns and the full sample town, with screenshots (a few minutes)
 dotnet run --project backend/tools/ObservabilityCity.Validate -- --all   # check every registry folder in the repo
 ```
 
@@ -154,7 +155,7 @@ To refresh the golden fixtures (calm town, a bad day across several islands, and
 | Thresholds make sense: ranges, and amber below red, also after the defaults are applied | error |
 | Colours are hex, pillars have a display name, the hub has one gateway, broker, egress and database at most | error |
 | `fake.yaml` names real systems and its numbers make sense | error |
-| A worker has a database, a system has a caller, no `layout.yaml`, an empty pillar, more than 24 islands | warning |
+| A worker has a database, a system has a caller, no `layout.yaml`, an empty pillar | warning |
 
 On a pull request the check writes annotations on the files and posts one comment listing every finding with file and line (the same comment is updated on each push).
 

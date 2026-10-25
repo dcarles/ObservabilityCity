@@ -12,3 +12,5 @@ bb.ledger-db:            { rps: 100, p99Ms: 20, minInstances: 2, perInstanceRps:
 cc.notify-api:           { rps: 40, p99Ms: 200, minInstances: 2, perInstanceRps: 40 }
 cc.notify-worker:        { rps: 20, p99Ms: 3000, minInstances: 3, perInstanceRps: 12 }
 cc.notify-db:            { rps: 100, p99Ms: 20, minInstances: 2, perInstanceRps: 120 }
+ext.bureau:              { rps: 20, p99Ms: 600, errorRate: 0.002 }
+ext.mailer:              { rps: 12, p99Ms: 900, errorRate: 0.002 }

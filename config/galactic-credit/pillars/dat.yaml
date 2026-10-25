@@ -5,7 +5,7 @@ color: "#8d99ae"
 defaults:
   api: { slaP99Ms: 2000 }
 systems:
-  - { id: dat.ingest-api, service: ingest, name: Ingest API, role: api, calls: [dat.ingest-db] }
+  - { id: dat.ingest-api, service: ingest, name: Ingest API, role: api, calls: [dat.ingest-db], gatewayCalls: [cl.ledger-api, pay.payments-api] }
   - { id: dat.ingest-worker, service: ingest, name: Ingest worker, role: worker, calls: [dat.ingest-db] }
   - { id: dat.ingest-db, service: ingest, name: Ingest DB, role: db }
   - { id: dat.reports-api, service: reports, name: Reports API, role: api, external: true, calls: [dat.reports-db, dat.reports-cache] }
