@@ -9,17 +9,19 @@ A browser app that shows system health as a living, animated 3D town instead of 
 | Tool | Version | Why |
 | --- | --- | --- |
 | [.NET SDK](https://dotnet.microsoft.com/download/dotnet/10.0) | **10.0** (LTS; the .NET 10 SDK includes the runtime) | Backend and the Aspire app host |
-| [Node.js](https://nodejs.org) | **20 or 22 LTS** (includes npm) | The browser app (Vite) |
+| [Node.js](https://nodejs.org) | **22 or 24 LTS** (includes npm; Vite 8 needs 20.19 or newer) | The browser app (Vite) |
 | A browser with WebGL | Any current Chrome, Edge, Firefox or Safari | The 3D town |
 | Git | Any | To clone |
 
 **You do not need Docker, Docker Desktop, Rancher or any container tool.** Phase 1 uses fake data and keeps no history store, so nothing runs in a container. The .NET Aspire dashboard that opens with the app runs as a normal process.
 
+On Windows: `winget install Microsoft.DotNet.SDK.10` and `winget install OpenJS.NodeJS.LTS`, then open a new terminal.
+
 Check what you have:
 
 ```
 dotnet --list-sdks     # should include 10.0.x
-node --version         # v20 or v22
+node --version         # v22 or v24
 ```
 
 ## Run it
@@ -27,11 +29,11 @@ node --version         # v20 or v22
 ```
 git clone https://github.com/dcarles/ObservabilityCity.git
 cd ObservabilityCity
-cd frontend && npm install && cd ..
+cd frontend && npm install && cd ..   # once, and again after pulling dependency changes
 dotnet run --project backend/src/ObservabilityCity.AppHost
 ```
 
-The first run downloads NuGet packages, so give it a minute. When it is up:
+The first run downloads NuGet packages, so give it a minute. Stop it with Ctrl+C. When it is up:
 
 - **The town:** http://localhost:5173
 - **Aspire dashboard** (logs, traces, resource status): http://localhost:15180
@@ -139,7 +141,7 @@ dotnet run --project backend/tools/ObservabilityCity.Validate -- --all   # check
 
 To refresh the golden fixtures (calm town, a bad day across several islands, and the editor schemas) after an intended change: `UPDATE_GOLDEN=1 dotnet test --solution backend/ObservabilityCity.slnx`. The island layout golden is refreshed with `cd frontend && UPDATE_GOLDEN=1 npm test`.
 
-**Browser tests** (`frontend/tests/e2e/`, Playwright) start the real backend with the fake source and the real page, steer the fake source through `/api/fake/effects`, and read the scene's state through `window.city` (beacon colour, dark floors, closed sign, queue warning, crates, dead-letter light) instead of pixels. With `?test=1` the page draws nothing on its own and time moves only when a test calls `city.step(seconds)`, so tests do not depend on a GPU. The first run needs the browser: `cd frontend && npx playwright install chromium`. Set `E2E_NO_BUILD=1` once the backend is built in Release.
+**Browser tests** (`frontend/tests/e2e/`, Playwright) start the real backend with the fake source and the real page, steer the fake source through `/api/fake/effects`, and read the scene's state through `window.city` (beacon colour, dark floors, closed sign, queue warning, crates, dead-letter light) instead of pixels. With `?test=1` the page draws nothing on its own and time moves only when a test calls `city.step(seconds)`, so tests do not depend on a GPU. The first run needs the browser: `cd frontend && npx playwright install chromium` (once, and again when the Playwright version changes). Set `E2E_NO_BUILD=1` once the backend is built in Release.
 
 **Registry checks** (`backend/tools/ObservabilityCity.Validate`) go beyond what loading needs. Errors fail CI, warnings are listed and do not:
 
