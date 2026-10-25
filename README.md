@@ -109,11 +109,37 @@ CI runs `npm run check:contracts` and fails if the generated files are out of da
 ### Tests
 
 ```
-dotnet test                       # registry, rules, fake source, golden snapshot fixture
-cd web && npm test                # visual rules, plus the same golden fixture on the TypeScript side
+dotnet test                       # registry, resilient loading, validator, rules, fake source, 24-island backend load, golden fixtures
+cd web && npm test                # visual rules, snapshot guard, island layout (including 24 uneven islands), golden fixtures
+cd web && npm run e2e             # browser scenarios on a small town: break things, check the town, calm it down (about 1 minute)
+cd web && npm run e2e:slow        # 24-island stress town and the full sample town, with screenshots (about 1 minute)
+dotnet run --project tools/ObservabilityCity.Validate -- --all   # check every registry folder in the repo
 ```
 
 To refresh the golden fixtures (calm town, a bad day across several islands, and the editor schemas) after an intended change: `UPDATE_GOLDEN=1 dotnet test`. The island layout golden is refreshed with `cd web && UPDATE_GOLDEN=1 npm test`.
+
+**Browser tests** (`web/e2e/`, Playwright) start the real backend with the fake source and the real page, steer the fake source through `/api/fake/effects`, and read the scene's state through `window.city` (beacon colour, dark floors, closed sign, queue warning, crates, dead-letter light) instead of pixels. With `?test=1` the page draws nothing on its own and time moves only when a test calls `city.step(seconds)`, so tests do not depend on a GPU. The first run needs the browser: `cd web && npx playwright install chromium`. Set `E2E_NO_BUILD=1` once the backend is built in Release.
+
+**Registry checks** (`tools/ObservabilityCity.Validate`) go beyond what loading needs. Errors fail CI, warnings are listed and do not:
+
+| Rule | Severity |
+| --- | --- |
+| Format, ids, roles, calls and layout entries that point nowhere, aliases | error |
+| Every pillar has a `layout.yaml` entry (Lost & found excepted) | error |
+| In a hub-and-spoke town, a pillar does not call another pillar directly; it goes through the hub | error |
+| Outside callers reach only systems marked `external` | error |
+| Thresholds make sense: ranges, and amber below red, also after the defaults are applied | error |
+| Colours are hex, pillars have a display name, the hub has one gateway, broker, egress and database at most | error |
+| `fake.yaml` names real systems and its numbers make sense | error |
+| A worker has a database, a system has a caller, no `layout.yaml`, an empty pillar, more than 24 islands | warning |
+
+On a pull request the check writes annotations on the files and posts one comment listing every finding with file and line (the same comment is updated on each push).
+
+**A broken pillar file does not stop the town.** The running app skips a pillar file with problems and draws its island as a *config error* island (a board saying what is wrong), drops call links that point nowhere, and lists everything it worked around in a small panel under the top bar. The registry folder is watched: a reload that fails keeps the last good registry and says so in the panel. If `town.yaml`, `defaults.yaml`, `hub.yaml` or `layout.yaml` is unreadable at start-up the app does not start, since there is nothing to show. The page also refuses a snapshot it cannot draw and keeps the last good town.
+
+**Pull request checks.** `.github/workflows/ci.yml` runs four jobs side by side (backend tests, web tests and build, UI scenarios, registry checks) and a final job called `PR checks` that passes only when all of them did. `.github/workflows/slow.yml` runs the stress town and the full sample town on merge to main and every night.
+
+To make it required on `main`: GitHub, Settings, Branches, Add branch protection rule (or Rulesets, New branch ruleset), branch name pattern `main`, tick *Require a pull request before merging* and *Require status checks to pass before merging*, search for and add **PR checks**, save. Run CI once first, or the check name will not be offered in the search.
 
 ### The registry
 
@@ -152,6 +178,8 @@ The sample town has 15 islands, about 110 buildings and up to 420 cars. Roads, l
 | `Registry:Path` | `samples/galactic-credit` | Folder with the registry YAML files |
 | `Fake:DayLengthSeconds` | `120` | Real seconds per simulated day |
 | `Snapshot:IntervalSeconds` | `2` | How often a snapshot is pushed |
+| `Snapshot:StaleAfterSeconds` | `30` | Readings older than this are shown as stale |
+| `Registry:WatchSeconds` | `5` | How often the registry folder is checked for changes (0 turns reloading off) |
 
 Set them with environment variables (`Registry__Path=...`) or in `appsettings.json` of the Host project.
 
