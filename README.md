@@ -151,7 +151,9 @@ frontend/                          Vite + TypeScript + three.js browser app
 config/galactic-credit/            registry (YAML): town, defaults, hub, layout, pillars, schemas, fake-data baselines
 contracts/openapi.json             generated from the C# records
 shared-test-data/                  fixtures used by both sides: registries, golden snapshots, layout golden
-docs/                              plan, decision log, previews
+docs/                              plan, decision log, previews, connect-your-company runbook
+extensions/                        a company fork's own code (empty upstream)
+AGENTS.md, .github/copilot-instructions.md   instructions for coding assistants
 ```
 
 Data flows one way: a source writes readings, the snapshot builder joins them with the registry and applies the rules (stale is never green, down beats degraded), and one snapshot is pushed over SignalR every two seconds. The browser invents all motion from the numbers in the snapshot. It never knows which source produced them, so real adapters later replace the fake one without touching the town.
@@ -178,6 +180,7 @@ cd frontend && npm run e2e:ui      # top bar, island filter, layers, inspector d
 cd frontend && npm run e2e:direct  # signposts for hidden islands in a town without a hub
 cd frontend && npm run e2e:slow  # 23- and 35-island stress towns and the full sample town, with screenshots (a few minutes)
 dotnet run --project backend/tools/ObservabilityCity.Validate -- --all   # check every registry folder in the repo
+dotnet run --project backend/tools/ObservabilityCity.Validate -- --sources config/<town>   # probe each configured source with your Azure login (see docs/connect-your-company.md)
 ```
 
 To refresh the golden fixtures (calm town, a bad day across several islands, and the editor schemas) after an intended change: `UPDATE_GOLDEN=1 dotnet test --solution backend/ObservabilityCity.slnx`. The island layout golden is refreshed with `cd frontend && UPDATE_GOLDEN=1 npm test`.
