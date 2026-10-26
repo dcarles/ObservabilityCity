@@ -44,7 +44,7 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
         var links = TownLinks.Of(registry);
         var allGroups = registry.Groups
             .Select(g => new GroupSnapshot(g.Id, g.DisplayName, g.Color, g.IsHub, g.IsLostFound, g.ConfigError,
-                incidents.GetValueOrDefault(g.Id) ?? [], links[g.Id].HasBridge, MessagingOf(registry, g),
+                incidents.GetValueOrDefault(g.Id) ?? [], links[g.Id].HasBridge, links[g.Id].HasRingBridge, MessagingOf(registry, g),
                 g.Nodes.Select(n => ToNode(n, now, registry)).ToList()))
             .ToList();
         var allVendors = registry.Vendors.Select(v => new VendorSnapshot(ToNode(v.Node, now, registry), v.CalledBy)).ToList();

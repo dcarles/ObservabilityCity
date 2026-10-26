@@ -383,6 +383,7 @@ async function start(): Promise<void> {
     inspect: (id: string) => town.inspect(id),
     inspectIsland: (id: string) => town.inspectIsland(id),
     inspectAirport: () => town.inspectAirport(),
+    inspectRoads: () => town.inspectRoads(),
     inspectServices: (id: string) => town.inspectServices(id),
     /** Open a service's panel as a click on its sign would. */
     openService: (key: string) => { const sv = seen.last ? town.serviceSummary(key, seen.last) : null; if (sv) { inspector.close(); servicePanel.show(sv) } return sv },

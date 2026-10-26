@@ -2,7 +2,6 @@
 displayName: Platform
 color: "#7bd88f"
 resources:
-  - { id: hub.edge, name: Edge gateway, role: gateway }
   - { id: hub.kafka, name: Kafka, role: broker }
   - { id: hub.accounts-db, name: Shared accounts DB, role: db }
 # Outside callers of the shop: shoppers in a browser, the mobile app and the courier's tracking webhooks.

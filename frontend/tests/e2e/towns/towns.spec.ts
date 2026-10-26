@@ -72,6 +72,29 @@ test.describe('Droid Shop', () => {
     expect(await page.evaluate(() => (window as any).city.seen.last.groups[0].nodes.find((n: any) => n.kind === 'Broker').name)).toBe('Kafka')
   })
 
+  test('the teams reach each other over the ring road: only the two that call the shared accounts DB have a spoke to the platform', async ({ town, page }) => {
+    await town.open()
+    const r = await page.evaluate(() => (window as any).city.town.inspectRoads())
+
+    expect(r).toMatchObject({ direct: true, ringRoad: true, airport: 'ring', routesThroughHub: 0 })
+    expect([...r.ringBridges].sort()).toEqual(['chk', 'inv', 'mob', 'ntf', 'shp', 'web'])
+    expect([...r.hubBridges].sort()).toEqual(['mob', 'web'])
+    expect(r.routes).toBeGreaterThan(0)
+  })
+
+  test('has no gateway on the platform, and outside callers arrive at the airport', async ({ town, page }) => {
+    await town.open()
+    const kinds = await page.evaluate(() => (window as any).city.seen.last.groups.find((g: any) => g.isHub).nodes.map((n: any) => n.kind))
+    const externalFrom = await page.evaluate(() => {
+      const t = (window as any).city.town
+      return t.cars.routeList.filter((r: any) => r.origin === 'external').map((r: any) => (r.source === t.airport ? 'airport' : 'other'))
+    })
+
+    expect(kinds).not.toContain('Gateway')
+    expect(externalFrom.length).toBeGreaterThan(0)
+    expect(new Set(externalFrom)).toEqual(new Set(['airport']))
+  })
+
   test('the team with no messaging has no pier, and the others do', async ({ town }) => {
     await town.open()
     expect((await town.island('mob')).pier).toBe(false)
@@ -125,6 +148,17 @@ test.describe('Droid Shop', () => {
     await page.waitForFunction(() => (window as any).city.wall().stop?.kind === 'down')
     await expect(page.locator('#wall-headline')).toHaveText('1 DOWN')
     await expect(page.locator('#wall-caption')).toContainText('Shipments worker (Shipping) is down')
+  })
+})
+
+test.describe('Galactic Credit keeps its hub and spokes', () => {
+  test('every island with an API has a spoke, the airport is on a spoke, and outside callers cross the hub', async ({ town, page }) => {
+    await town.open()
+    const r = await page.evaluate(() => (window as any).city.town.inspectRoads())
+
+    expect(r).toMatchObject({ direct: false, airport: 'hub' })
+    expect(r.hubBridges.length).toBeGreaterThanOrEqual(10)
+    expect(r.routesThroughHub).toBeGreaterThan(0)
   })
 })
 

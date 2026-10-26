@@ -121,6 +121,7 @@ export interface components {
             configError?: string | null;
             incidents: components["schemas"]["IncidentSnapshot"][];
             hasBridge: boolean;
+            hasRingBridge: boolean;
             messaging: components["schemas"]["MessagingSnapshot"];
             nodes: components["schemas"]["NodeSnapshot"][];
         };

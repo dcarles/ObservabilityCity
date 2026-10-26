@@ -273,6 +273,7 @@
           "color",
           "displayName",
           "hasBridge",
+          "hasRingBridge",
           "id",
           "incidents",
           "isHub",
@@ -308,6 +309,9 @@
             }
           },
           "hasBridge": {
+            "type": "boolean"
+          },
+          "hasRingBridge": {
             "type": "boolean"
           },
           "messaging": {

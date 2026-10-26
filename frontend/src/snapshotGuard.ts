@@ -148,6 +148,8 @@ function checkGroup(g: unknown, seen: Set<string>, problems: string[]): GroupSna
     })).sort((a, b) => a.severity - b.severity),
     // a snapshot that does not say keeps the bridge it always had; one with no messaging block has no pier
     hasBridge: g.hasBridge !== false,
+    // a snapshot that does not say has no road to the ring except where a third party is reached (the town works that out)
+    hasRingBridge: g.hasRingBridge === true,
     messaging: checkMessaging(g.messaging),
     nodes,
   }

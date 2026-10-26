@@ -145,8 +145,10 @@ public sealed record MessagingSnapshot(
 /// ConfigError is set when the group's registry file is broken and was skipped: the island is drawn as a "config error" island
 /// with no buildings, and the text says what is wrong. It is null for every healthy island.
 /// Incidents are the open incidents assigned to this group (empty when the sky is clear).
-/// HasBridge says whether a bridge joins the island to the hub: it has an API, or a call link crosses its coast. Without one the island is
-/// reached only by boat (or by nothing at all). Messaging lists its topics and subscriptions; an island with neither has no pier. The renderer
+/// HasBridge says whether a bridge joins the island to the hub: in a hub-and-spoke town it has an API, or a call link crosses its coast; in a town
+/// whose islands call each other directly, a call link to or from the hub's shared resources. HasRingBridge says whether a bridge joins the island's
+/// back gate to the outer ring road: a third party to reach and, in a direct town, every call that does not involve the hub. Without a bridge the
+/// island is reached only by boat (or by nothing at all). Messaging lists its topics and subscriptions; an island with neither has no pier. The renderer
 /// builds only the connectors that these say exist.
 /// </summary>
 public sealed record GroupSnapshot(
@@ -158,6 +160,7 @@ public sealed record GroupSnapshot(
     string? ConfigError,
     IReadOnlyList<IncidentSnapshot> Incidents,
     bool HasBridge,
+    bool HasRingBridge,
     MessagingSnapshot Messaging,
     IReadOnlyList<NodeSnapshot> Nodes);
 
