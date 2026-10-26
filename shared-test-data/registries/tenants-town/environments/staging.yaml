@@ -1,0 +1,11 @@
+name: Staging
+order: 2
+sources:
+  metrics: { kind: fake }
+tenants:
+  - { id: acme, name: Acme, kind: customer }
+  - { id: borealis, name: Borealis, kind: customer }
+  - { id: qa, name: QA, kind: test }
+  - { id: smoke, name: Smoke, kind: test }
+fake:
+  undeclaredTenants: [ghost-co]

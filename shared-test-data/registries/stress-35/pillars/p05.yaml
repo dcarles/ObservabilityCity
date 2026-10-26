@@ -2,12 +2,12 @@ pillar: p05
 displayName: Pillar 05 (5)
 color: "#bb6bd9"
 systems:
-  - { id: p05.s1-api, service: s1, name: S1 API, role: api, external: true, calls: [p05.s1-db, p05.s2-api] }
-  - { id: p05.s1-worker, service: s1, name: S1 worker, role: worker, calls: [p05.s1-db] }
-  - { id: p05.s1-db, service: s1, name: S1 DB, role: db }
-  - { id: p05.s2-api, service: s2, name: S2 API, role: api, calls: [p05.s2-db] }
-  - { id: p05.s2-db, service: s2, name: S2 DB, role: db }
+  - { id: p05.s1-api, service: p05-s1, name: S1 API, role: api, external: true, calls: [p05.s1-db, p05.s2-api] }
+  - { id: p05.s1-worker, service: p05-s1, name: S1 worker, role: worker, calls: [p05.s1-db] }
+  - { id: p05.s1-db, service: p05-s1, name: S1 DB, role: db }
+  - { id: p05.s2-api, service: p05-s2, name: S2 API, role: api, calls: [p05.s2-db] }
+  - { id: p05.s2-db, service: p05-s2, name: S2 DB, role: db }
 messaging:
-  topics: [s1]
+  topics: [p05-s1]
   subscriptions:
-    - { topic: p04-s1-outbox, consumer: p05.s1-worker }
+    - { topic: p04-p04-s1-outbox, consumer: p05.s1-worker }

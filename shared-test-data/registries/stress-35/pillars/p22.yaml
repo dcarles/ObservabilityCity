@@ -2,19 +2,19 @@ pillar: p22
 displayName: Pillar 22 (10)
 color: "#27ae60"
 systems:
-  - { id: p22.s1-api, service: s1, name: S1 API, role: api, external: true, calls: [p22.s1-db, p22.s2-api, p22.s3-api, p22.session-cache] }
-  - { id: p22.s1-worker, service: s1, name: S1 worker, role: worker, calls: [p22.s1-db] }
-  - { id: p22.s1-db, service: s1, name: S1 DB, role: db }
-  - { id: p22.s2-api, service: s2, name: S2 API, role: api, calls: [p22.s2-db] }
-  - { id: p22.s2-worker, service: s2, name: S2 worker, role: worker, calls: [p22.s2-db] }
-  - { id: p22.s2-db, service: s2, name: S2 DB, role: db }
-  - { id: p22.s3-api, service: s3, name: S3 API, role: api, calls: [p22.s3-db] }
-  - { id: p22.s3-worker, service: s3, name: S3 worker, role: worker, calls: [p22.s3-db] }
-  - { id: p22.s3-db, service: s3, name: S3 DB, role: db }
+  - { id: p22.s1-api, service: p22-s1, name: S1 API, role: api, external: true, calls: [p22.s1-db, p22.s2-api, p22.s3-api, p22.session-cache] }
+  - { id: p22.s1-worker, service: p22-s1, name: S1 worker, role: worker, calls: [p22.s1-db] }
+  - { id: p22.s1-db, service: p22-s1, name: S1 DB, role: db }
+  - { id: p22.s2-api, service: p22-s2, name: S2 API, role: api, calls: [p22.s2-db] }
+  - { id: p22.s2-worker, service: p22-s2, name: S2 worker, role: worker, calls: [p22.s2-db] }
+  - { id: p22.s2-db, service: p22-s2, name: S2 DB, role: db }
+  - { id: p22.s3-api, service: p22-s3, name: S3 API, role: api, calls: [p22.s3-db] }
+  - { id: p22.s3-worker, service: p22-s3, name: S3 worker, role: worker, calls: [p22.s3-db] }
+  - { id: p22.s3-db, service: p22-s3, name: S3 DB, role: db }
   - { id: p22.session-cache, name: Session cache, role: cache }
 messaging:
-  topics: [s1]
+  topics: [p22-s1]
   subscriptions:
-    - { topic: p21-s1-outbox, consumer: p22.s1-worker }
-    - { topic: p21-s1-outbox, consumer: p22.s2-worker }
-    - { topic: p21-s1-outbox, consumer: p22.s3-worker }
+    - { topic: p21-p21-s1-outbox, consumer: p22.s1-worker }
+    - { topic: p21-p21-s1-outbox, consumer: p22.s2-worker }
+    - { topic: p21-p21-s1-outbox, consumer: p22.s3-worker }

@@ -2,15 +2,15 @@ pillar: p13
 displayName: Pillar 13 (7)
 color: "#5aa9ff"
 systems:
-  - { id: p13.s1-api, service: s1, name: S1 API, role: api, external: true, calls: [p13.s1-db, p13.s2-api, p13.session-cache] }
-  - { id: p13.s1-worker, service: s1, name: S1 worker, role: worker, calls: [p13.s1-db] }
-  - { id: p13.s1-db, service: s1, name: S1 DB, role: db }
-  - { id: p13.s2-api, service: s2, name: S2 API, role: api, calls: [p13.s2-db] }
-  - { id: p13.s2-worker, service: s2, name: S2 worker, role: worker, calls: [p13.s2-db] }
-  - { id: p13.s2-db, service: s2, name: S2 DB, role: db }
+  - { id: p13.s1-api, service: p13-s1, name: S1 API, role: api, external: true, calls: [p13.s1-db, p13.s2-api, p13.session-cache] }
+  - { id: p13.s1-worker, service: p13-s1, name: S1 worker, role: worker, calls: [p13.s1-db] }
+  - { id: p13.s1-db, service: p13-s1, name: S1 DB, role: db }
+  - { id: p13.s2-api, service: p13-s2, name: S2 API, role: api, calls: [p13.s2-db] }
+  - { id: p13.s2-worker, service: p13-s2, name: S2 worker, role: worker, calls: [p13.s2-db] }
+  - { id: p13.s2-db, service: p13-s2, name: S2 DB, role: db }
   - { id: p13.session-cache, name: Session cache, role: cache }
 messaging:
-  topics: [s1]
+  topics: [p13-s1]
   subscriptions:
-    - { topic: p12-s1-outbox, consumer: p13.s1-worker }
-    - { topic: p12-s1-outbox, consumer: p13.s2-worker }
+    - { topic: p12-p12-s1-outbox, consumer: p13.s1-worker }
+    - { topic: p12-p12-s1-outbox, consumer: p13.s2-worker }

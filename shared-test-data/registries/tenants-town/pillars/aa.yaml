@@ -1,0 +1,13 @@
+# Systems of one service are not next to each other here: the cache and the cron stand between them. They are still one pad, and the
+# two without a service get a pad each. aa.orders-db keeps one database for each tenant.
+pillar: aa
+displayName: Alpha
+color: "#5aa9ff"
+systems:
+  - { id: aa.orders-api, service: orders, name: Orders API, role: api, external: true, calls: [aa.orders-db, aa.audit-cache] }
+  - { id: aa.audit-cache, name: Audit cache, role: cache }
+  - { id: aa.orders-worker, service: orders, name: Orders worker, role: worker, calls: [aa.orders-db] }
+  - { id: aa.tools-cron, name: Tools run, role: cron, calls: [aa.orders-api] }
+  - { id: aa.orders-db, service: orders, tenantPattern: "merchant-{tenant}-db", name: Orders DB, role: db }
+messaging:
+  topics: [orders]

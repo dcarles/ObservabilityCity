@@ -32,9 +32,9 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
         var groups = registry.Groups
             .Select(g => new GroupSnapshot(g.Id, g.DisplayName, g.Color, g.IsHub, g.IsLostFound, g.ConfigError,
                 incidents.GetValueOrDefault(g.Id) ?? [], links[g.Id].HasBridge, MessagingOf(registry, g),
-                g.Nodes.Select(n => ToNode(n, now)).ToList()))
+                g.Nodes.Select(n => ToNode(n, now, registry)).ToList()))
             .ToList();
-        var vendors = registry.Vendors.Select(v => new VendorSnapshot(ToNode(v.Node, now), v.CalledBy)).ToList();
+        var vendors = registry.Vendors.Select(v => new VendorSnapshot(ToNode(v.Node, now, registry), v.CalledBy)).ToList();
 
         var nodes = groups.SelectMany(g => g.Nodes).ToList();
         var live = nodes.Where(n => n.State != HealthState.Stale).ToList();
@@ -51,8 +51,36 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
             live.Where(n => registry.ConsumerIds.Contains(n.Id)).Sum(n => n.DeadLetters ?? 0));
 
         var byId = nodes.Concat(vendors.Select(v => v.Node)).ToDictionary(n => n.Id);
-        return new Snapshot(registry.Town.Id, registry.Town.Name, registry.Town.GroupLabel, Environment, now, DayFraction(), totals, registries.Notices, groups,
-            vendors, ExternalCallers(registry, byId), Dependencies(registry, byId), registry.RingCapacity);
+        var env = registry.ActiveEnvironment;
+        var environments = registry.Environments.Count > 0
+            ? registry.Environments.Select(e => new EnvironmentInfo(e.Id, e.Name, e.Id == registry.DefaultEnvironmentId)).ToList()
+            : [new EnvironmentInfo(Environment, Environment, true)];
+        return new Snapshot(registry.Town.Id, registry.Town.Name, registry.Town.GroupLabel, env?.Id ?? Environment, now, DayFraction(), totals, registries.Notices, groups,
+            vendors, ExternalCallers(registry, byId), Dependencies(registry, byId), registry.RingCapacity,
+            env?.Name ?? Environment, environments, TenantsOf(env, nodes));
+    }
+
+    /// <summary>
+    /// The environment's tenants with the share of traffic each brings: its share of the request rate its tenant databases see, or, until a tenant
+    /// database reports anything, an even split in which a test tenant counts a tenth of a customer. Tenants the data shows that the environment does
+    /// not list come last, as unknown.
+    /// </summary>
+    internal static List<TenantInfo> TenantsOf(RegistryEnvironment? env, IReadOnlyList<NodeSnapshot> nodes)
+    {
+        var seen = new Dictionary<string, double>(); // tenant id to the request rate its databases see
+        var unknown = new SortedSet<string>(StringComparer.Ordinal);
+        foreach (var unit in nodes.Where(n => n.State != HealthState.Stale).SelectMany(n => n.Tenants ?? []))
+        {
+            seen[unit.Id] = seen.GetValueOrDefault(unit.Id) + unit.RequestsPerSecond;
+            if (unit.Kind == TenantKind.Unknown) unknown.Add(unit.Id);
+        }
+        var declared = env?.Tenants ?? [];
+        var all = declared.Select(t => (Id: t.Id, Name: t.Name, Kind: t.Kind)).Concat(unknown.Select(id => (Id: id, Name: id, Kind: TenantKind.Unknown))).ToList();
+        if (all.Count == 0) return [];
+        var total = all.Sum(t => seen.GetValueOrDefault(t.Id));
+        double Weight(string id, TenantKind kind) => total > 0 ? seen.GetValueOrDefault(id) : kind == TenantKind.Test ? 0.1 : 1.0;
+        var sum = all.Sum(t => Weight(t.Id, t.Kind));
+        return all.Select(t => new TenantInfo(t.Id, t.Name, t.Kind, sum > 0 ? Weight(t.Id, t.Kind) / sum : 0)).ToList();
     }
 
     private static MessagingSnapshot MessagingOf(Registry.Registry registry, RegistryGroup g) => new(
@@ -125,25 +153,87 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
         return rps > 0 ? serving.Sum(n => n.P99Ms * n.RequestsPerSecond) / rps : 0;
     }
 
-    private NodeSnapshot ToNode(RegistryNode n, DateTimeOffset now)
+    private NodeSnapshot ToNode(RegistryNode n, DateTimeOffset now, Registry.Registry registry)
     {
         var r = state.Get(n.Id);
+        var env = registry.ActiveEnvironment;
         if (r is null || now - r.At > StaleAfter)
         {
             // No fresh data: keep the last numbers out of it. Grey, never green.
             return new NodeSnapshot(n.Id, n.Name, n.Kind, n.Service, n.External, HealthState.Stale, 0, 0, 0, null, null, null, null, null, null, null, 0, 0, 0,
-                n.SlaP99Ms, n.ErrorAmber, n.ErrorRed, n.ResourceAmber, n.ResourceRed, n.ThrottleAmber, n.ThrottleRed, n.BacklogAmber, n.BacklogRed, n.Calls, n.GatewayCalls, r?.At);
+                n.SlaP99Ms, n.ErrorAmber, n.ErrorRed, n.ResourceAmber, n.ResourceRed, n.ThrottleAmber, n.ThrottleRed, n.BacklogAmber, n.BacklogRed, n.Calls, n.GatewayCalls, r?.At,
+                n.TenantPattern is null ? null : StaleUnits(n, env));
         }
 
+        // A store with a database for each tenant: each unit gets its own state, and the store's numbers are the worst that count.
+        var tenants = n.TenantPattern is null ? null : TenantUnits(n, r, env);
+        var utilisation = r.Utilisation;
+        var throttled = r.Throttled;
+        if (tenants is not null) (utilisation, throttled) = Aggregate(n, tenants, r);
+
         // Degraded: errors, slow, unhealthy instances, a resource running hot, a data store turning requests away, or a consumer running late.
-        var hot = Math.Max(Math.Max(r.Cpu ?? 0, r.Memory ?? 0), r.Utilisation ?? 0) >= n.ResourceAmber;
+        var hot = Math.Max(Math.Max(r.Cpu ?? 0, r.Memory ?? 0), utilisation ?? 0) >= n.ResourceAmber;
         var health = !r.Up ? HealthState.Down
-            : r.ErrorRate >= n.ErrorAmber || r.P99Ms > n.SlaP99Ms || r.InstancesHealthy < r.InstancesTotal || hot || (r.Throttled ?? 0) >= n.ThrottleAmber || (r.OldestMessageSeconds ?? 0) >= n.BacklogAmber
+            : r.ErrorRate >= n.ErrorAmber || r.P99Ms > n.SlaP99Ms || r.InstancesHealthy < r.InstancesTotal || hot || (throttled ?? 0) >= n.ThrottleAmber || (r.OldestMessageSeconds ?? 0) >= n.BacklogAmber
                 ? HealthState.Degraded
                 : HealthState.Healthy;
 
         return new NodeSnapshot(n.Id, n.Name, n.Kind, n.Service, n.External, health, r.InstancesTotal, r.InstancesHealthy,
-            r.Load, r.Cpu, r.Memory, r.Utilisation, r.Throttled, r.QueueDepth, r.OldestMessageSeconds, r.DeadLetters, r.RequestsPerSecond, r.ErrorRate, r.P99Ms, n.SlaP99Ms, n.ErrorAmber, n.ErrorRed,
-            n.ResourceAmber, n.ResourceRed, n.ThrottleAmber, n.ThrottleRed, n.BacklogAmber, n.BacklogRed, n.Calls, n.GatewayCalls, r.At);
+            r.Load, r.Cpu, r.Memory, utilisation, throttled, r.QueueDepth, r.OldestMessageSeconds, r.DeadLetters, r.RequestsPerSecond, r.ErrorRate, r.P99Ms, n.SlaP99Ms, n.ErrorAmber, n.ErrorRed,
+            n.ResourceAmber, n.ResourceRed, n.ThrottleAmber, n.ThrottleRed, n.BacklogAmber, n.BacklogRed, n.Calls, n.GatewayCalls, r.At, tenants);
+    }
+
+    /// <summary>The units of a tenant store with no fresh data: every tenant the environment lists, grey.</summary>
+    private static List<TenantUnitSnapshot> StaleUnits(RegistryNode n, RegistryEnvironment? env) =>
+        (env?.Tenants ?? []).Select(t => new TenantUnitSnapshot(t.Id, t.Name, t.Kind, RegistryEnvironment.DatabaseName(n.TenantPattern!, t.Id), HealthState.Stale, null, null, 0)).ToList();
+
+    /// <summary>
+    /// One unit for each tenant: first the tenants the environment lists, in its order (grey when no database was found for one), then the ones the
+    /// data shows that it does not list, as unknown. A unit is amber when its database runs hot or throttles and red when it is past the red
+    /// thresholds; a test tenant is never red.
+    /// </summary>
+    private static List<TenantUnitSnapshot> TenantUnits(RegistryNode n, NodeReading r, RegistryEnvironment? env)
+    {
+        var found = (r.Tenants ?? []).GroupBy(t => t.TenantId).ToDictionary(g => g.Key, g => g.First());
+        var units = new List<TenantUnitSnapshot>();
+        foreach (var t in env?.Tenants ?? [])
+            units.Add(found.TryGetValue(t.Id, out var reading)
+                ? Unit(n, r, reading, t.Name, t.Kind)
+                : new TenantUnitSnapshot(t.Id, t.Name, t.Kind, RegistryEnvironment.DatabaseName(n.TenantPattern!, t.Id), HealthState.Stale, null, null, 0));
+        var listed = (env?.Tenants ?? []).Select(t => t.Id).ToHashSet();
+        foreach (var reading in found.Values.Where(t => !listed.Contains(t.TenantId)).OrderBy(t => t.TenantId, StringComparer.Ordinal))
+            units.Add(Unit(n, r, reading, reading.TenantId, TenantKind.Unknown));
+        return units;
+    }
+
+    private static TenantUnitSnapshot Unit(RegistryNode n, NodeReading r, TenantReading t, string name, TenantKind kind)
+    {
+        var u = t.Utilisation ?? 0;
+        var th = t.Throttled ?? 0;
+        var state = !r.Up || u >= n.ResourceRed || th >= n.ThrottleRed ? HealthState.Down
+            : u >= n.ResourceAmber || th >= n.ThrottleAmber ? HealthState.Degraded
+            : HealthState.Healthy;
+        if (kind == TenantKind.Test && state == HealthState.Down) state = HealthState.Degraded; // test tenants raise amber at most
+        return new TenantUnitSnapshot(t.TenantId, name, kind, RegistryEnvironment.DatabaseName(n.TenantPattern!, t.TenantId), state, t.Utilisation, t.Throttled, t.RequestsPerSecond);
+    }
+
+    /// <summary>
+    /// The store's own utilisation and throttling: the worst of the customer and unknown tenants. With only test tenants to go by they are held just
+    /// under the red thresholds, so a test tenant's trouble makes the store amber and never red.
+    /// </summary>
+    private static (double? Utilisation, double? Throttled) Aggregate(RegistryNode n, List<TenantUnitSnapshot> units, NodeReading r)
+    {
+        var live = units.Where(u => u.State != HealthState.Stale).ToList();
+        if (live.Count == 0) return (r.Utilisation, r.Throttled); // no tenant database reported: the store's own numbers stand
+        var real = live.Where(u => u.Kind != TenantKind.Test).ToList();
+        var from = real.Count > 0 ? real : live;
+        var utilisation = from.Max(u => u.Utilisation ?? 0);
+        var throttled = from.Max(u => u.Throttled ?? 0);
+        if (real.Count == 0)
+        {
+            utilisation = Math.Min(utilisation, n.ResourceRed * 0.999);
+            throttled = Math.Min(throttled, n.ThrottleRed * 0.999);
+        }
+        return (utilisation, throttled);
     }
 }

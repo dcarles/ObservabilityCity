@@ -1,7 +1,9 @@
-import type { Snapshot, NodeSnapshot } from './types'
+import type { Snapshot, NodeSnapshot, TenantInfo } from './types'
 import type { ConnectionState } from './connection'
 import { formatMs, formatRate } from './visuals'
 import { escapeHtml, Picker, type PickItem } from './picker'
+import { yardSummary, type TenantView } from './tenants'
+import type { ServiceSummary } from './scene/service'
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T
 
@@ -46,7 +48,8 @@ export class TopBar {
     const stale = s ? staleCount(s) : 0
     $('topbar-left').innerHTML = `
       <span class="brand">Observability City</span>
-      ${s ? `<span class="town">${escapeHtml(s.townName)}</span>` : ''}`
+      ${s ? `<span class="town">${escapeHtml(s.townName)}</span>` : ''}
+      ${s && s.environments.length > 1 ? `<span class="env" id="env-label" title="The environment this page shows">${escapeHtml(s.environmentName)}</span>` : ''}`
     $('topbar-right').innerHTML = `
       <span class="spacer"></span>
       ${t ? `
@@ -107,7 +110,17 @@ function clock(fraction: number): string {
   return `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`
 }
 
-export function showTooltip(n: NodeSnapshot | null, x: number, y: number): void {
+/** The tenant lines of a data store with a database for each tenant: the sign's words and the units that are not fine. */
+function tenantRows(n: NodeSnapshot, view: TenantView): string {
+  if (!n.tenants) return ''
+  const sum = yardSummary(n.tenants, view, n.throttleAmber)
+  const shown = n.tenants.filter((u) => !(view.hideTest && u.kind === 'Test'))
+  const worst = [...shown].sort((a, b) => (b.utilisation ?? 0) - (a.utilisation ?? 0)).slice(0, 4)
+  return `<div class="row tenants"><span>tenants</span><span>${escapeHtml(sum.text)}${sum.note ? ` · ${escapeHtml(sum.note)}` : ''}</span></div>` +
+    worst.map((u) => `<div class="row"><span>${escapeHtml(u.name)}${u.kind === 'Test' ? ' (test)' : u.kind === 'Unknown' ? ' (unknown)' : ''}</span><span>${u.utilisation == null ? '–' : `${Math.round(u.utilisation * 100)}%`}${(u.throttled ?? 0) > 0 ? ` · ${(u.throttled! * 100).toFixed(0)}% refused` : ''}</span></div>`).join('')
+}
+
+export function showTooltip(n: NodeSnapshot | null, x: number, y: number, view: TenantView = { hideTest: false, tenant: null }): void {
   const el = $('tooltip')
   if (!n) { el.hidden = true; return }
   const cls = n.state === 'Healthy' ? 'ok' : n.state === 'Degraded' ? 'warn' : n.state === 'Down' ? 'bad' : 'stale'
@@ -119,11 +132,22 @@ export function showTooltip(n: NodeSnapshot | null, x: number, y: number): void 
     <div class="row"><span>requests</span><span>${formatRate(n.requestsPerSecond)}/s</span></div>
     <div class="row"><span>errors</span><span class="${n.errorRate >= n.errorRed ? 'bad' : n.errorRate >= n.errorAmber ? 'warn' : ''}">${(n.errorRate * 100).toFixed(2)}%</span></div>
     <div class="row"><span>p99 / SLA</span><span class="${slow ? 'warn' : ''}">${formatMs(n.p99Ms)} / ${formatMs(n.slaP99Ms)}</span></div>
-    <div class="row"><span>load</span><span>${Math.round(n.load * 100)}%</span></div>`
+    <div class="row"><span>load</span><span>${Math.round(n.load * 100)}%</span></div>${tenantRows(n, view)}`
   el.hidden = false
   const w = el.offsetWidth, h = el.offsetHeight
   el.style.left = `${Math.min(x + 16, window.innerWidth - w - 8)}px`
   el.style.top = `${Math.min(y + 16, window.innerHeight - h - 8)}px`
+}
+
+/** What the panel needs from the page to pick an environment and a tenant. */
+export interface ViewControls {
+  /** The environment the page asked for (null for the default). */
+  env: string | null
+  environments(): { id: string; name: string; current: boolean }[]
+  tenants(): TenantInfo[]
+  view(): TenantView
+  setView(v: TenantView): void
+  switchEnv(id: string): void
 }
 
 interface FxState { calm: boolean; effects: { id: string; target: string; kind: string; intensity: number }[] }
@@ -138,18 +162,45 @@ export class PreviewPanel {
   private state: FxState = { calm: false, effects: [] }
   private target = '*'
 
-  constructor(private targets: () => PickItem[]) {}
+  constructor(private targets: () => PickItem[], private readonly view: ViewControls) {}
+
+  private get query(): string {
+    return this.view.env ? `?env=${encodeURIComponent(this.view.env)}` : ''
+  }
 
   async refresh(): Promise<void> {
     try {
-      this.state = (await (await fetch('/api/fake')).json()) as FxState
+      this.state = (await (await fetch(`/api/fake${this.query}`)).json()) as FxState
     } catch { /* backend not up yet */ }
     this.render()
   }
 
   private async send(path: string, method: string, body?: unknown): Promise<void> {
-    await fetch(`/api/fake${path}`, { method, headers: { 'content-type': 'application/json' }, body: body ? JSON.stringify(body) : undefined })
+    await fetch(`/api/fake${path}${this.query}`, { method, headers: { 'content-type': 'application/json' }, body: body ? JSON.stringify(body) : undefined })
     await this.refresh()
+  }
+
+  /** The environment picker and the tenant filter, at the top of the panel. */
+  private viewHtml(): string {
+    const v = this.view
+    const envs = v.environments()
+    const tenants = v.tenants()
+    const sel = v.view()
+    return `
+      ${envs.length > 1 ? `<label>Environment</label>
+      <select id="env-select">${envs.map((e) => `<option value="${escapeHtml(e.id)}" ${e.current ? 'selected' : ''}>${escapeHtml(e.name)}</option>`).join('')}</select>` : ''}
+      ${tenants.length > 0 ? `<label>Tenant</label>
+      <select id="tenant-select"><option value="">All tenants</option>${tenants.map((t) => `<option value="${escapeHtml(t.id)}" ${t.id === sel.tenant ? 'selected' : ''}>${escapeHtml(t.name)}${t.kind === 'Test' ? ' (test)' : t.kind === 'Unknown' ? ' (unknown)' : ''}</option>`).join('')}</select>
+      <label class="check"><input type="checkbox" id="hide-test" ${sel.hideTest ? 'checked' : ''} /> Hide test tenants</label>` : ''}`
+  }
+
+  private wireView(): void {
+    const v = this.view
+    this.el.querySelector<HTMLSelectElement>('#env-select')?.addEventListener('change', (e) => v.switchEnv((e.target as HTMLSelectElement).value))
+    this.el.querySelector<HTMLSelectElement>('#tenant-select')?.addEventListener('change', (e) => {
+      v.setView({ ...v.view(), tenant: (e.target as HTMLSelectElement).value || null })
+    })
+    this.el.querySelector<HTMLInputElement>('#hide-test')?.addEventListener('change', (e) => v.setView({ ...v.view(), hideTest: (e.target as HTMLInputElement).checked }))
   }
 
   render(): void {
@@ -157,6 +208,7 @@ export class PreviewPanel {
     this.el.innerHTML = `
       <div class="head"><h3>Try it (preview)</h3><button id="fold">${this.collapsed ? '▾' : '▴'}</button></div>
       <p class="note">Temporary controls for this slice. The final Break things panel comes later.</p>
+      ${this.viewHtml()}
       <label>Target</label>
       <div class="combo"><input id="target" type="text" placeholder="Type to find a target" autocomplete="off" spellcheck="false" /><div id="target-results" class="picker-results" hidden></div></div>
       <div class="grid">
@@ -167,6 +219,7 @@ export class PreviewPanel {
         <button data-fx="HighCpu" data-i="1">High CPU</button>
         <button data-fx="HighMemory" data-i="1">High memory</button>
         <button data-fx="Saturate" data-i="1">DB saturated</button>
+        <button id="tenant-throttle" title="Saturate the chosen target's database for the tenant picked above (or the first customer)">Tenant DB throttled</button>
         <button data-fx="Backlog" data-i="1">Queue backs up</button>
         <button data-fx="Poison" data-i="1">Dead letters</button>
         <button data-fx="Down" data-i="1">Down</button>
@@ -186,6 +239,12 @@ export class PreviewPanel {
     })
     this.el.querySelectorAll<HTMLButtonElement>('[data-fx]').forEach((b) =>
       b.addEventListener('click', () => void this.send('/effects', 'POST', { target: this.target, kind: b.dataset.fx, intensity: Number(b.dataset.i) })))
+    this.el.querySelector('#tenant-throttle')!.addEventListener('click', () => {
+      const tenant = this.view.view().tenant ?? this.view.tenants().find((t) => t.kind === 'Customer')?.id
+      if (!tenant) return
+      void this.send('/effects', 'POST', { target: `${this.target}#${tenant}`, kind: 'Saturate', intensity: 1 })
+    })
+    this.wireView()
     this.el.querySelector('#reset')!.addEventListener('click', () => void this.send('/effects', 'DELETE'))
     this.el.querySelector('#calm')!.addEventListener('click', () => void this.send('/calm', 'POST', { on: !this.state.calm }))
     this.el.querySelectorAll<HTMLElement>('.fxchip').forEach((c) => c.addEventListener('click', () => void this.send(`/effects/${c.dataset.id}`, 'DELETE')))
@@ -263,5 +322,49 @@ export class StateList {
     this.state = null
     this.key = ''
     this.el.hidden = true
+  }
+}
+
+/**
+ * What a click on a service's sign or hedge opens: the service, the island it stands on, and each of its systems with its numbers.
+ * A data store with a database for each tenant adds how many tenants it has and how many are throttled.
+ */
+export class ServicePanel {
+  private readonly el = $('service-panel')
+
+  constructor(private readonly onPick: (systemId: string) => void) {
+    window.addEventListener('keydown', (e) => { if (e.key === 'Escape') this.close() })
+  }
+
+  get open(): boolean {
+    return !this.el.hidden
+  }
+
+  /** The key of the service shown, or null. */
+  get key(): string | null {
+    return this.el.hidden ? null : this.el.dataset.key ?? null
+  }
+
+  show(sv: ServiceSummary): void {
+    const cls = sv.state === 'Healthy' ? 'ok' : sv.state === 'Degraded' ? 'warn' : sv.state === 'Down' ? 'bad' : 'stale'
+    this.el.dataset.key = sv.key
+    this.el.dataset.state = sv.state
+    this.el.innerHTML = `
+      <div class="head"><div><b>${escapeHtml(sv.name)}</b> <span class="${cls}">· ${sv.state}</span><div class="where">Service on ${escapeHtml(sv.groupName)}</div></div><button id="service-close" title="Close">✕</button></div>
+      ${sv.systems.map((m) => {
+        const mc = m.state === 'Healthy' ? 'ok' : m.state === 'Degraded' ? 'warn' : m.state === 'Down' ? 'bad' : 'stale'
+        return `<div class="sys" data-id="${escapeHtml(m.id)}">
+          <div class="line"><b>${escapeHtml(m.name)}</b><span class="${mc}">${m.state}</span></div>
+          <div class="nums">${m.kind} · ${formatRate(m.requestsPerSecond)}/s · ${(m.errorRate * 100).toFixed(2)}% errors · p99 ${formatMs(m.p99Ms)}${m.tenants ? ` · ${m.tenants.total} tenants, ${m.tenants.throttled} throttled` : ''}</div>
+        </div>`
+      }).join('')}`
+    this.el.hidden = false
+    this.el.querySelector('#service-close')!.addEventListener('click', () => this.close())
+    this.el.querySelectorAll<HTMLElement>('.sys').forEach((row) => row.addEventListener('click', () => this.onPick(row.dataset.id!)))
+  }
+
+  close(): void {
+    this.el.hidden = true
+    delete this.el.dataset.key
   }
 }

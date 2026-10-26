@@ -19,6 +19,15 @@ public enum NodeKind
     Egress,
 }
 
+/// <summary>Who a tenant is: a paying customer, a test tenant (smoke tests, QA, sandboxes), or one the data shows that the environment does not list.</summary>
+[JsonConverter(typeof(JsonStringEnumConverter))]
+public enum TenantKind
+{
+    Customer,
+    Test,
+    Unknown,
+}
+
 /// <summary>Overall state after the rules ran. Stale means no fresh data and is never shown as healthy.</summary>
 [JsonConverter(typeof(JsonStringEnumConverter))]
 public enum HealthState
@@ -41,6 +50,9 @@ public enum HealthState
 /// ErrorRate is the share of failed requests: 5xx responses, timeouts and unhandled exceptions. Client errors (4xx) are not failures, and 429 is counted as throttling.
 /// For a message consumer, QueueDepth is the messages waiting, OldestMessageSeconds the age of the oldest one (how late the consumer is), and DeadLetters the
 /// messages parked in the dead-letter queue. Sources that cannot tell leave them null.
+/// Tenants is set only for a data store that keeps one database per tenant (its registry entry has a tenantPattern): one unit for each tenant, and null
+/// for every other system. Utilisation and Throttled of such a store are the worst of its tenants' that count: customers and unknown tenants, and
+/// test tenants only when there are no others, held below the red thresholds, so a test tenant's trouble shows amber on its own unit and never turns the building red.
 /// </summary>
 public sealed record NodeSnapshot(
     string Id,
@@ -73,7 +85,33 @@ public sealed record NodeSnapshot(
     double BacklogRed,
     IReadOnlyList<string> Calls,
     IReadOnlyList<string> GatewayCalls,
-    DateTimeOffset? LastUpdated);
+    DateTimeOffset? LastUpdated,
+    IReadOnlyList<TenantUnitSnapshot>? Tenants);
+
+/// <summary>
+/// One tenant's database of a multi-tenant data store. Database is its real name (the store's tenantPattern with the tenant id put in).
+/// State is Healthy, Degraded (amber: running hot or throttling), Down (red: past the red thresholds, never for a test tenant) or Stale (no database found, or no fresh data).
+/// Utilisation and Throttled are this database's own share of provisioned capacity in use and share of requests turned away.
+/// Kind Unknown is a tenant the data shows that the environment does not list.
+/// </summary>
+public sealed record TenantUnitSnapshot(
+    string Id,
+    string Name,
+    TenantKind Kind,
+    string Database,
+    HealthState State,
+    double? Utilisation,
+    double? Throttled,
+    double RequestsPerSecond);
+
+/// <summary>An environment the server can show (dev, staging, prod). Each has its own sources, its own tenants and its own stream of snapshots.</summary>
+public sealed record EnvironmentInfo(string Id, string Name, bool IsDefault);
+
+/// <summary>
+/// A tenant of this environment. Share is the part of the environment's tenant traffic it brings (0 to 1, all tenants add up to 1),
+/// which decides how many of the cars carry its name.
+/// </summary>
+public sealed record TenantInfo(string Id, string Name, TenantKind Kind, double Share);
 
 /// <summary>
 /// An open incident assigned to a group. Severity runs from 1 (worst) to 4 (minor), as in the incident tool. The renderer turns the worst
@@ -164,6 +202,8 @@ public sealed record TownTotals(
 /// a call link that points nowhere and was dropped. The renderer lists them in the top bar.
 /// RingCapacity is how many islands stand on the first ring (layout.yaml), which the renderer lays the two rings out from.
 /// Vendors are the third parties, ExternalCallers feed the airport, and Dependencies are the cross-group traffic the overlay draws.
+/// Environment is the id of the environment this snapshot shows (EnvironmentName its display name); Environments lists every environment the server
+/// serves. Tenants are the tenants of this environment, the unknown ones the data shows included; it is empty for an environment without tenants.
 /// </summary>
 public sealed record Snapshot(
     string TownId,
@@ -178,4 +218,7 @@ public sealed record Snapshot(
     IReadOnlyList<VendorSnapshot> Vendors,
     IReadOnlyList<ExternalCallerSnapshot> ExternalCallers,
     IReadOnlyList<DependencySnapshot> Dependencies,
-    int RingCapacity);
+    int RingCapacity,
+    string EnvironmentName,
+    IReadOnlyList<EnvironmentInfo> Environments,
+    IReadOnlyList<TenantInfo> Tenants);

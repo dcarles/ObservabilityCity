@@ -18,7 +18,14 @@ public sealed record NodeReading(
     double? Throttled = null,
     double? QueueDepth = null,
     double? OldestMessageSeconds = null,
-    double? DeadLetters = null);
+    double? DeadLetters = null,
+    IReadOnlyList<TenantReading>? Tenants = null);
+
+/// <summary>
+/// One tenant's database of a data store that keeps one per tenant: how much of its provisioned capacity it uses, how much it turns away and the
+/// request rate it sees. TenantId is whatever the source found in the database name; the environment may not list it.
+/// </summary>
+public sealed record TenantReading(string TenantId, double? Utilisation, double? Throttled, double RequestsPerSecond);
 
 /// <summary>
 /// One data source behind the town. The renderer never knows which one produced a number.

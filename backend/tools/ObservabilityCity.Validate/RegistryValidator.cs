@@ -13,7 +13,7 @@ namespace ObservabilityCity.Validate;
 /// </summary>
 public static class RegistryValidator
 {
-    private static readonly Regex FileName = new(@"^([A-Za-z0-9._-]+\.yaml)(?: \(line (\d+)\))?", RegexOptions.Compiled);
+    private static readonly Regex FileName = new(@"^((?:environments/)?[A-Za-z0-9._-]+\.yaml)(?: \(line (\d+)\))?", RegexOptions.Compiled);
     private static readonly Regex Colour = new("^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$", RegexOptions.Compiled);
     private static readonly Regex Quoted = new("'([^']+)'", RegexOptions.Compiled);
     private static readonly Regex CallsMessage = new("^'([^']+)' calls '([^']+)'", RegexOptions.Compiled);
@@ -52,6 +52,8 @@ public static class RegistryValidator
         CheckWorkersHaveDatabases(ctx, registry);
         CheckUncalled(ctx, registry);
         CheckStandalone(ctx, registry);
+        CheckServices(ctx, registry);
+        CheckEnvironments(ctx, registry);
         CheckFake(ctx, registry);
         return ctx.Result();
     }
@@ -256,6 +258,45 @@ public static class RegistryValidator
             c.Warn(c.PillarFile(g.Id), 1, "standalone", $"Island '{g.Id}' stands alone: it has no API, no topics or subscriptions, no calls to or from other islands and no third party, so nothing connects it to the town. Add an API, a messaging block or a calls link.");
     }
 
+    /// <summary>A service belongs to one pillar: the same service name in two would be drawn as two unrelated pads and read as one in the topics.</summary>
+    private static void CheckServices(Context c, Registry registry)
+    {
+        var owners = new Dictionary<string, List<string>>(); // service to the pillars that use it
+        foreach (var g in registry.Groups.Where(g => !g.IsHub && g.ConfigError is null))
+            foreach (var service in g.Nodes.Select(n => n.Service).OfType<string>().Distinct())
+                (owners.TryGetValue(service, out var l) ? l : owners[service] = []).Add(g.Id);
+        foreach (var (service, pillars) in owners.Where(o => o.Value.Count > 1))
+            foreach (var pillar in pillars)
+            {
+                var first = registry.Groups.First(g => g.Id == pillar).Nodes.First(n => n.Service == service);
+                var at = c.Locate(first.Id);
+                c.Warn(at.File, at.Line, "service-split",
+                    $"Service '{service}' is split across pillars {string.Join(" and ", pillars.Select(p => $"'{p}'"))}. A service belongs to one pillar: give each its own name (for example '{pillar}-{service}'), or move the systems together.");
+            }
+    }
+
+    // ── environments and tenants ────────────────────────────────────────────
+
+    private static void CheckEnvironments(Context c, Registry registry)
+    {
+        var tenanted = registry.AllNodes.Where(n => n.TenantPattern is not null).ToList();
+        if (registry.Environments.Count == 0)
+        {
+            foreach (var n in tenanted)
+            {
+                var at = c.Locate(n.Id);
+                c.Warn(at.File, at.Line, "tenants", $"'{n.Id}' has a tenantPattern, but the town has no environments folder, so there are no tenants to draw. Add environments/{{env}}.yaml with a tenants list.");
+            }
+            return;
+        }
+        foreach (var env in registry.Environments)
+        {
+            var file = $"environments/{env.Id}.yaml";
+            foreach (var warning in Registry.EnvironmentWarnings(env, registry.ForEnvironment(env.Id)))
+                c.Warn(file, 1, "tenants", warning);
+        }
+    }
+
     // ── fake data ───────────────────────────────────────────────────────────
 
     private static void CheckFake(Context c, Registry registry)
@@ -383,7 +424,7 @@ public static class RegistryValidator
             if (FileName.Match(message) is { Success: true } m)
             {
                 file = m.Groups[1].Value;
-                file = TopLevel.Contains(file) ? file : PillarFile(Path.GetFileNameWithoutExtension(file));
+                file = TopLevel.Contains(file) || file.StartsWith("environments/") ? file : PillarFile(Path.GetFileNameWithoutExtension(file));
                 if (m.Groups[2].Success) line = int.Parse(m.Groups[2].Value);
                 if (message.Contains("external caller") && Quoted.Matches(message) is { Count: > 1 } q)
                     line = Raw(file).FindScalar(q[1].Groups[1].Value);

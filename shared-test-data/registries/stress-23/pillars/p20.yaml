@@ -2,23 +2,23 @@ pillar: p20
 displayName: Pillar 20 (14)
 color: "#56ccf2"
 systems:
-  - { id: p20.s1-api, service: s1, name: S1 API, role: api, external: true, calls: [p20.s1-db, p20.s2-api, p20.s3-api, p20.s4-api, p20.s5-api] }
-  - { id: p20.s1-worker, service: s1, name: S1 worker, role: worker, calls: [p20.s1-db] }
-  - { id: p20.s1-db, service: s1, name: S1 DB, role: db }
-  - { id: p20.s2-api, service: s2, name: S2 API, role: api, calls: [p20.s2-db] }
-  - { id: p20.s2-worker, service: s2, name: S2 worker, role: worker, calls: [p20.s2-db] }
-  - { id: p20.s2-db, service: s2, name: S2 DB, role: db }
-  - { id: p20.s3-api, service: s3, name: S3 API, role: api, calls: [p20.s3-db] }
-  - { id: p20.s3-worker, service: s3, name: S3 worker, role: worker, calls: [p20.s3-db] }
-  - { id: p20.s3-db, service: s3, name: S3 DB, role: db }
-  - { id: p20.s4-api, service: s4, name: S4 API, role: api, calls: [p20.s4-db] }
-  - { id: p20.s4-worker, service: s4, name: S4 worker, role: worker, calls: [p20.s4-db] }
-  - { id: p20.s4-db, service: s4, name: S4 DB, role: db }
-  - { id: p20.s5-api, service: s5, name: S5 API, role: api, calls: [p20.s5-db] }
-  - { id: p20.s5-db, service: s5, name: S5 DB, role: db }
+  - { id: p20.s1-api, service: p20-s1, name: S1 API, role: api, external: true, calls: [p20.s1-db, p20.s2-api, p20.s3-api, p20.s4-api, p20.s5-api] }
+  - { id: p20.s1-worker, service: p20-s1, name: S1 worker, role: worker, calls: [p20.s1-db] }
+  - { id: p20.s1-db, service: p20-s1, name: S1 DB, role: db }
+  - { id: p20.s2-api, service: p20-s2, name: S2 API, role: api, calls: [p20.s2-db] }
+  - { id: p20.s2-worker, service: p20-s2, name: S2 worker, role: worker, calls: [p20.s2-db] }
+  - { id: p20.s2-db, service: p20-s2, name: S2 DB, role: db }
+  - { id: p20.s3-api, service: p20-s3, name: S3 API, role: api, calls: [p20.s3-db] }
+  - { id: p20.s3-worker, service: p20-s3, name: S3 worker, role: worker, calls: [p20.s3-db] }
+  - { id: p20.s3-db, service: p20-s3, name: S3 DB, role: db }
+  - { id: p20.s4-api, service: p20-s4, name: S4 API, role: api, calls: [p20.s4-db] }
+  - { id: p20.s4-worker, service: p20-s4, name: S4 worker, role: worker, calls: [p20.s4-db] }
+  - { id: p20.s4-db, service: p20-s4, name: S4 DB, role: db }
+  - { id: p20.s5-api, service: p20-s5, name: S5 API, role: api, calls: [p20.s5-db] }
+  - { id: p20.s5-db, service: p20-s5, name: S5 DB, role: db }
 messaging:
-  topics: [s1]
+  topics: [p20-s1]
   subscriptions:
-    - { topic: p19-s1-outbox, consumer: p20.s1-worker }
-    - { topic: p19-s1-outbox, consumer: p20.s2-worker }
-    - { topic: p19-s1-outbox, consumer: p20.s3-worker }
+    - { topic: p19-p19-s1-outbox, consumer: p20.s1-worker }
+    - { topic: p19-p19-s1-outbox, consumer: p20.s2-worker }
+    - { topic: p19-p19-s1-outbox, consumer: p20.s3-worker }

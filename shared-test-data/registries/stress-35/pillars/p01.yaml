@@ -2,7 +2,7 @@ pillar: p01
 displayName: Pillar 01 (2)
 color: "#5aa9ff"
 systems:
-  - { id: p01.s1-api, service: s1, name: S1 API, role: api, external: true, calls: [p01.s1-db] }
-  - { id: p01.s1-db, service: s1, name: S1 DB, role: db }
+  - { id: p01.s1-api, service: p01-s1, name: S1 API, role: api, external: true, calls: [p01.s1-db] }
+  - { id: p01.s1-db, service: p01-s1, name: S1 DB, role: db }
 messaging:
-  topics: [s1]
+  topics: [p01-s1]

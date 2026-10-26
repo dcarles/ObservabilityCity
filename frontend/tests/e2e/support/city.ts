@@ -20,6 +20,13 @@ export interface Status {
   barrierDown: boolean | null
   plaque: string
   bubble: { visible: boolean; honk: boolean; waiting: number } | null
+  /** Only a data store with a database for each tenant. */
+  tenants: TenantYard | null
+}
+
+export interface TenantYard {
+  units: { id: string; level: BeaconLevel; test: boolean; unknown: boolean; shown: boolean; dimmed: boolean; throttled: boolean; fill: number }[]
+  sign: { text: string; note: string }
 }
 
 export interface IslandStatus {
@@ -64,12 +71,20 @@ export interface NodeView {
 }
 
 export class Town {
+  /** The environment the page and the fake-source calls are about; null is the server's default. A test that wants another sets it before `open`. */
+  env: string | null = null
+
   constructor(readonly page: Page, readonly request: APIRequestContext) {}
+
+  /** `?env=` for the API calls of the environment under test. */
+  private get envQuery(): string {
+    return this.env ? `?env=${encodeURIComponent(this.env)}` : ''
+  }
 
   /** Opens the page in test mode against a calm, clean town and waits for the first snapshot. */
   async open(query = ''): Promise<void> {
     await this.reset()
-    await this.page.goto(`/?test=1&quality=low${query}`)
+    await this.page.goto(`/?test=1&quality=low${this.env ? `&env=${encodeURIComponent(this.env)}` : ''}${query}`)
     await this.page.waitForFunction(() => (window as any).city?.seen.snapshots > 0)
     // The first snapshot can predate the reset (a node still stale or down from the last test). Start from one that is calm.
     await this.page.waitForFunction(
@@ -82,19 +97,24 @@ export class Town {
   /** Back to a calm baseline: no effects, no backlog or dead letters left over, noise frozen. */
   async reset(): Promise<void> {
     // calm first: a poll that lands between the two calls must not see the noisy baseline
-    expect((await this.request.post(`${API}/api/fake/calm`, { data: { on: true } })).ok()).toBe(true)
-    expect((await this.request.post(`${API}/api/fake/reset`)).ok()).toBe(true)
+    // every environment, not only the one under test: another test may have left one disturbed
+    const listed = await this.request.get(`${API}/api/environments`)
+    const ids = listed.ok() ? ((await listed.json()) as { id: string }[]).map((e) => `?env=${encodeURIComponent(e.id)}`) : ['']
+    for (const q of ids) {
+      expect((await this.request.post(`${API}/api/fake/calm${q}`, { data: { on: true } })).ok()).toBe(true)
+      expect((await this.request.post(`${API}/api/fake/reset${q}`)).ok()).toBe(true)
+    }
   }
 
   async effect(target: string, kind: string, intensity = 1): Promise<string> {
-    const r = await this.request.post(`${API}/api/fake/effects`, { data: { target, kind, intensity } })
+    const r = await this.request.post(`${API}/api/fake/effects${this.envQuery}`, { data: { target, kind, intensity } })
     expect(r.ok(), await r.text()).toBe(true)
     return ((await r.json()) as { id: string }).id
   }
 
   /** Removes one effect or, with no id, all of them. The backlog and dead letters they caused stay until they drain or are reset. */
   async removeEffects(id?: string): Promise<void> {
-    const r = await this.request.delete(`${API}/api/fake/effects${id ? `/${id}` : ''}`)
+    const r = await this.request.delete(`${API}/api/fake/effects${id ? `/${id}` : ''}${this.envQuery}`)
     expect(r.ok()).toBe(true)
   }
 
@@ -155,6 +175,18 @@ export class Town {
   async nextSnapshot(): Promise<void> {
     const before = await this.page.evaluate(() => (window as any).city.seen.snapshots as number)
     await this.page.waitForFunction((n) => (window as any).city.seen.snapshots > n + 1, before, { timeout: 15_000 })
+  }
+
+  /** The tenant yard of a data store: its units and the sign. */
+  async yard(id: string): Promise<TenantYard> {
+    const s = await this.inspect(id)
+    expect(s.tenants, `${id} has no tenant yard`).not.toBeNull()
+    return s.tenants as TenantYard
+  }
+
+  /** The services on an island: the sign each shows and the systems on its pad. */
+  async services(islandId: string): Promise<{ key: string; name: string; state: string | null; systems: string[] }[]> {
+    return await this.page.evaluate((i) => (window as any).city.inspectServices(i), islandId)
   }
 
   async allBuildings(): Promise<Status[]> {

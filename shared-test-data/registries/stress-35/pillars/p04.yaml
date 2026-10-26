@@ -2,27 +2,27 @@ pillar: p04
 displayName: Pillar 04 (18)
 color: "#eb5757"
 systems:
-  - { id: p04.s1-api, service: s1, name: S1 API, role: api, external: true, calls: [p04.s1-db, p04.s2-api, p04.s3-api, p04.s4-api, p04.s5-api, p04.s6-api] }
-  - { id: p04.s1-worker, service: s1, name: S1 worker, role: worker, calls: [p04.s1-db] }
-  - { id: p04.s1-db, service: s1, name: S1 DB, role: db }
-  - { id: p04.s2-api, service: s2, name: S2 API, role: api, calls: [p04.s2-db] }
-  - { id: p04.s2-worker, service: s2, name: S2 worker, role: worker, calls: [p04.s2-db] }
-  - { id: p04.s2-db, service: s2, name: S2 DB, role: db }
-  - { id: p04.s3-api, service: s3, name: S3 API, role: api, calls: [p04.s3-db] }
-  - { id: p04.s3-worker, service: s3, name: S3 worker, role: worker, calls: [p04.s3-db] }
-  - { id: p04.s3-db, service: s3, name: S3 DB, role: db }
-  - { id: p04.s4-api, service: s4, name: S4 API, role: api, calls: [p04.s4-db] }
-  - { id: p04.s4-worker, service: s4, name: S4 worker, role: worker, calls: [p04.s4-db] }
-  - { id: p04.s4-db, service: s4, name: S4 DB, role: db }
-  - { id: p04.s5-api, service: s5, name: S5 API, role: api, calls: [p04.s5-db] }
-  - { id: p04.s5-worker, service: s5, name: S5 worker, role: worker, calls: [p04.s5-db] }
-  - { id: p04.s5-db, service: s5, name: S5 DB, role: db }
-  - { id: p04.s6-api, service: s6, name: S6 API, role: api, calls: [p04.s6-db] }
-  - { id: p04.s6-worker, service: s6, name: S6 worker, role: worker, calls: [p04.s6-db] }
-  - { id: p04.s6-db, service: s6, name: S6 DB, role: db }
+  - { id: p04.s1-api, service: p04-s1, name: S1 API, role: api, external: true, calls: [p04.s1-db, p04.s2-api, p04.s3-api, p04.s4-api, p04.s5-api, p04.s6-api] }
+  - { id: p04.s1-worker, service: p04-s1, name: S1 worker, role: worker, calls: [p04.s1-db] }
+  - { id: p04.s1-db, service: p04-s1, name: S1 DB, role: db }
+  - { id: p04.s2-api, service: p04-s2, name: S2 API, role: api, calls: [p04.s2-db] }
+  - { id: p04.s2-worker, service: p04-s2, name: S2 worker, role: worker, calls: [p04.s2-db] }
+  - { id: p04.s2-db, service: p04-s2, name: S2 DB, role: db }
+  - { id: p04.s3-api, service: p04-s3, name: S3 API, role: api, calls: [p04.s3-db] }
+  - { id: p04.s3-worker, service: p04-s3, name: S3 worker, role: worker, calls: [p04.s3-db] }
+  - { id: p04.s3-db, service: p04-s3, name: S3 DB, role: db }
+  - { id: p04.s4-api, service: p04-s4, name: S4 API, role: api, calls: [p04.s4-db] }
+  - { id: p04.s4-worker, service: p04-s4, name: S4 worker, role: worker, calls: [p04.s4-db] }
+  - { id: p04.s4-db, service: p04-s4, name: S4 DB, role: db }
+  - { id: p04.s5-api, service: p04-s5, name: S5 API, role: api, calls: [p04.s5-db] }
+  - { id: p04.s5-worker, service: p04-s5, name: S5 worker, role: worker, calls: [p04.s5-db] }
+  - { id: p04.s5-db, service: p04-s5, name: S5 DB, role: db }
+  - { id: p04.s6-api, service: p04-s6, name: S6 API, role: api, calls: [p04.s6-db] }
+  - { id: p04.s6-worker, service: p04-s6, name: S6 worker, role: worker, calls: [p04.s6-db] }
+  - { id: p04.s6-db, service: p04-s6, name: S6 DB, role: db }
 messaging:
-  topics: [s1]
+  topics: [p04-s1]
   subscriptions:
-    - { topic: p03-s1-outbox, consumer: p04.s1-worker }
-    - { topic: p03-s1-outbox, consumer: p04.s2-worker }
-    - { topic: p03-s1-outbox, consumer: p04.s3-worker }
+    - { topic: p03-p03-s1-outbox, consumer: p04.s1-worker }
+    - { topic: p03-p03-s1-outbox, consumer: p04.s2-worker }
+    - { topic: p03-p03-s1-outbox, consumer: p04.s3-worker }

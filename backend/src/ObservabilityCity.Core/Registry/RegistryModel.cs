@@ -3,7 +3,7 @@ using ObservabilityCity.Contracts;
 namespace ObservabilityCity.Core.Registry;
 
 /// <summary>Everything the registry folder says about one town.</summary>
-public sealed record Registry(
+public sealed partial record Registry(
     TownInfo Town,
     IReadOnlyList<RegistryGroup> Groups,
     IReadOnlyList<ExternalCaller> ExternalCallers)
@@ -34,6 +34,20 @@ public sealed record Registry(
 
     /// <summary>The workers that consume at least one topic. Only these have a queue and a dead-letter queue.</summary>
     public IReadOnlySet<string> ConsumerIds => Subscriptions.Select(s => s.ConsumerId).ToHashSet();
+
+    /// <summary>
+    /// The environments of this town (environments/*.yaml). Empty when the folder has none: the town then has one environment, "demo", without tenants.
+    /// </summary>
+    public IReadOnlyList<RegistryEnvironment> Environments { get; init; } = [];
+
+    /// <summary>The environment this registry is the view of (see <see cref="ForEnvironment"/>), or null for the whole town.</summary>
+    public RegistryEnvironment? ActiveEnvironment { get; init; }
+
+    /// <summary>The environment shown when none is asked for: the one marked default, else the first, else "demo".</summary>
+    public string DefaultEnvironmentId => (Environments.FirstOrDefault(e => e.IsDefault) ?? Environments.FirstOrDefault())?.Id ?? DemoEnvironmentId;
+
+    /// <summary>The environment of a town that has no environments folder.</summary>
+    public const string DemoEnvironmentId = "demo";
 
     /// <summary>Problems a resilient load worked around (a skipped pillar file, a dropped call link). Always empty after a strict load.</summary>
     public IReadOnlyList<string> Notices { get; init; } = [];
@@ -100,9 +114,37 @@ public sealed record RegistryNode(
     double BacklogRed,
     IReadOnlyList<string> Calls)
 {
+    /// <summary>For a data store with one database per tenant: its name with {tenant} where the tenant id goes. Null for everything else.</summary>
+    public string? TenantPattern { get; init; }
+
     /// <summary>Systems on other islands this one reaches through the API gateway. Only the dependency overlay and the cars' origins use them.</summary>
     public IReadOnlyList<string> GatewayCalls { get; init; } = [];
 }
 
 /// <summary>Raised when a registry file is wrong. The message names the file and the id.</summary>
 public sealed class RegistryException(string message) : Exception(message);
+
+/// <summary>A customer or a test tenant of an environment.</summary>
+public sealed record RegistryTenant(string Id, string Name, TenantKind Kind);
+
+/// <summary>Where one signal of an environment comes from.</summary>
+public sealed record RegistrySource(string Name, string Kind, string? Connection);
+
+/// <summary>
+/// One environment: dev, staging, prod. Pillars and systems are shared; the environment brings its own sources and tenants and leaves out
+/// the systems that are not deployed there. UndeclaredTenants are for the fake source only.
+/// </summary>
+public sealed record RegistryEnvironment(
+    string Id,
+    string Name,
+    bool IsDefault,
+    IReadOnlyList<RegistrySource> Sources,
+    IReadOnlyList<RegistryTenant> Tenants,
+    IReadOnlySet<string> Excluded,
+    IReadOnlyList<string> UndeclaredTenants)
+{
+    /// <summary>The database a tenant has in a store with this pattern.</summary>
+    public static string DatabaseName(string pattern, string tenantId) => pattern.Replace(TenantToken, tenantId);
+
+    public const string TenantToken = "{tenant}";
+}

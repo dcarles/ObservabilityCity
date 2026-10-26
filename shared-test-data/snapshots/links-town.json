@@ -68,7 +68,8 @@
           "backlogRed": 300,
           "calls": [],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-25T12:00:03+00:00"
+          "lastUpdated": "2026-10-25T12:00:03+00:00",
+          "tenants": null
         },
         {
           "id": "hub.service-bus",
@@ -101,7 +102,8 @@
           "backlogRed": 300,
           "calls": [],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-25T12:00:03+00:00"
+          "lastUpdated": "2026-10-25T12:00:03+00:00",
+          "tenants": null
         },
         {
           "id": "hub.egress",
@@ -134,7 +136,8 @@
           "backlogRed": 300,
           "calls": [],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-25T12:00:03+00:00"
+          "lastUpdated": "2026-10-25T12:00:03+00:00",
+          "tenants": null
         },
         {
           "id": "hub.customer-db",
@@ -167,7 +170,8 @@
           "backlogRed": 300,
           "calls": [],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-25T12:00:03+00:00"
+          "lastUpdated": "2026-10-25T12:00:03+00:00",
+          "tenants": null
         }
       ]
     },
@@ -230,7 +234,8 @@
             "ful.orders-db"
           ],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-25T12:00:03+00:00"
+          "lastUpdated": "2026-10-25T12:00:03+00:00",
+          "tenants": null
         },
         {
           "id": "ful.orders-worker",
@@ -265,7 +270,8 @@
             "ful.orders-db"
           ],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-25T12:00:03+00:00"
+          "lastUpdated": "2026-10-25T12:00:03+00:00",
+          "tenants": null
         },
         {
           "id": "ful.orders-db",
@@ -298,7 +304,8 @@
           "backlogRed": 300,
           "calls": [],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-25T12:00:03+00:00"
+          "lastUpdated": "2026-10-25T12:00:03+00:00",
+          "tenants": null
         }
       ]
     },
@@ -361,7 +368,8 @@
             "wrk.batch-db"
           ],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-25T12:00:03+00:00"
+          "lastUpdated": "2026-10-25T12:00:03+00:00",
+          "tenants": null
         },
         {
           "id": "wrk.batch-db",
@@ -394,7 +402,8 @@
           "backlogRed": 300,
           "calls": [],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-25T12:00:03+00:00"
+          "lastUpdated": "2026-10-25T12:00:03+00:00",
+          "tenants": null
         }
       ]
     },
@@ -445,7 +454,8 @@
             "nom.catalog-cache"
           ],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-25T12:00:03+00:00"
+          "lastUpdated": "2026-10-25T12:00:03+00:00",
+          "tenants": null
         },
         {
           "id": "nom.catalog-cache",
@@ -478,7 +488,8 @@
           "backlogRed": 300,
           "calls": [],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-25T12:00:03+00:00"
+          "lastUpdated": "2026-10-25T12:00:03+00:00",
+          "tenants": null
         }
       ]
     },
@@ -529,7 +540,8 @@
             "hub.customer-db"
           ],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-25T12:00:03+00:00"
+          "lastUpdated": "2026-10-25T12:00:03+00:00",
+          "tenants": null
         }
       ]
     },
@@ -587,7 +599,8 @@
             "leg.feed-db"
           ],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-25T12:00:03+00:00"
+          "lastUpdated": "2026-10-25T12:00:03+00:00",
+          "tenants": null
         },
         {
           "id": "leg.feed-worker",
@@ -622,7 +635,8 @@
             "leg.feed-db"
           ],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-25T12:00:03+00:00"
+          "lastUpdated": "2026-10-25T12:00:03+00:00",
+          "tenants": null
         },
         {
           "id": "leg.feed-db",
@@ -655,7 +669,8 @@
           "backlogRed": 300,
           "calls": [],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-25T12:00:03+00:00"
+          "lastUpdated": "2026-10-25T12:00:03+00:00",
+          "tenants": null
         }
       ]
     },
@@ -704,7 +719,8 @@
           "backlogRed": 300,
           "calls": [],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-25T12:00:03+00:00"
+          "lastUpdated": "2026-10-25T12:00:03+00:00",
+          "tenants": null
         }
       ]
     }
@@ -729,5 +745,14 @@
       "requestsPerSecond": 64
     }
   ],
-  "ringCapacity": 12
+  "ringCapacity": 12,
+  "environmentName": "demo",
+  "environments": [
+    {
+      "id": "demo",
+      "name": "demo",
+      "isDefault": true
+    }
+  ],
+  "tenants": []
 }

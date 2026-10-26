@@ -2,7 +2,7 @@
 
 A browser app that shows system health as a living, animated 3D town instead of a dashboard. Each pillar (or team) is an island, each system is a building, and what is going on shows in the town itself: floors for instances, lit windows for load, rooftop beacons for errors, cars for traffic.
 
-**Status: Phase 1, slice 3.** The pipeline runs end to end on fake data (backend, live push, browser), and the whole sample town is built: the hub, 16 pillar islands and a Lost & found island, with messaging between them. Everything else is in [docs/](docs/observability-city-plan.md).
+**Status: Phase 1, slice 3.5.** The pipeline runs end to end on fake data (backend, live push, browser), and the whole sample town is built: the hub, 16 pillar islands and a Lost & found island, with messaging between them. Everything else is in [docs/](docs/observability-city-plan.md).
 
 ## What you need installed
 
@@ -138,8 +138,9 @@ CI runs `npm run check:contracts` and fails if the generated files are out of da
 ```
 dotnet test --solution backend/ObservabilityCity.slnx  # registry, resilient loading, validator, rules, fake source, 23- and 35-island backend load, golden fixtures
 cd frontend && npm test          # visual rules, snapshot guard, island layout (including 24 uneven islands), golden fixtures
-cd frontend && npm run e2e       # browser scenarios on a small town (break things, check the town, calm it down), then the link rules on a town with an island for each case (about 2 minutes)
+cd frontend && npm run e2e       # browser scenarios on a small town (break things, check the town, calm it down), then the link rules on a town with an island for each case, then the environment, tenant and service rules (about 3 minutes)
 cd frontend && npm run e2e:links # the link rules alone: pier, bridge and buildings follow real links
+cd frontend && npm run e2e:tenants # environments, tenant yards, tenant traffic and service groups, on a town with three environments
 cd frontend && npm run e2e:slow  # 23- and 35-island stress towns and the full sample town, with screenshots (a few minutes)
 dotnet run --project backend/tools/ObservabilityCity.Validate -- --all   # check every registry folder in the repo
 ```
@@ -182,6 +183,7 @@ One folder describes a town. The sample is `config/galactic-credit/`:
 | `layout.yaml` | The order of the islands round the hub. Unlisted pillars follow, Lost & found is always last |
 | `pillars/<code>.yaml` | One island: its systems, `calls` links, per-role `defaults`, and its `messaging` (topics it publishes, topics its workers consume) |
 | `pillars/lost-found.yaml` | The island for systems nobody owns |
+| `environments/<id>.yaml` | One file per environment (`dev`, `staging`, `prod`): its tenants, its sources and what it leaves out. Optional: a town without them has one environment, `demo` |
 | `fake.yaml` | Baseline numbers for the fake source only |
 
 Settings cascade: system, then the pillar's `defaults`, then `defaults.yaml`, then built-in values.
@@ -214,6 +216,28 @@ dotnet run --project backend/src/ObservabilityCity.Host -- --write-schema
 ```
 
 A test fails if the committed schema files are out of date.
+
+**Environments, tenants and services.** Pillar and system files are shared by every environment; an environment file only says what differs:
+
+```yaml
+# environments/staging.yaml
+name: Staging
+order: 2                                  # position in the picker
+default: false                            # exactly one environment is the default (shown when the address has no ?env=)
+sources:                                  # which source feeds each signal; only the fake source exists today
+  metrics: { kind: fake }
+  incidents: { kind: fake }
+exclude: [lost-found.batch-gateway-api]   # systems that do not exist here, with the calls and links that hang on them
+tenants:
+  - { id: acme-bank, name: Acme Bank, kind: customer }
+  - { id: smoke-stg, name: Smoke, kind: test }
+fake: { undeclaredTenants: [zeta-trading] }   # fake source only: a tenant that shows up in the readings without being listed
+```
+
+- One backend serves every environment, each with its own snapshot stream. The page asks for one with `?env=staging` (nothing asked gets the default; a name that does not exist shows an empty town and a note, never another environment). The temporary picker in the *Try it* panel reloads the page for the chosen one, and the fake-source calls take `?env=` too.
+- A database with `tenantPattern: "merchant-{tenant}-db"` has a database for each tenant. It is drawn as a storage yard with a unit for each tenant (height is how much of its capacity it uses, colour is its state) and a sign, "N tenants, M throttled". A tenant found in the readings but not on the list is a purple unit marked "?". Test tenants are paler and striped, and their trouble is amber at worst: it never turns the store or its service red. The store itself shows the worst of its customers.
+- Cars carry the tenant their request is for. The *Try it* panel has a tenant filter (follow one tenant: everything else dims and only its cars are drawn) and a *Hide test tenants* switch. The proper filter comes with the top bar.
+- A service is the systems that share a `service:` name, on one pad wherever they stand in the file (more than three take more pads). A low sign in front of the pad names it and shows its worst state; click the sign or the hedge to open the service's panel. A system with no service stands on a pad of its own. The validator warns when one service is split across pillars.
 
 ### Performance
 

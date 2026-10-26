@@ -47,6 +47,8 @@ public sealed class FakeSource(
 
     public FakeEffect Add(string target, FakeEffectKind kind, double intensity)
     {
+        if (target.Contains('#') && (kind != FakeEffectKind.Saturate || target.EndsWith('#') || target.StartsWith('#')))
+            throw new ArgumentException($"'{target}': only DB saturated can be aimed at one tenant, as store#tenant", nameof(target));
         var e = new FakeEffect($"fx{Interlocked.Increment(ref _nextId)}", target, kind, Math.Clamp(intensity, 0, 1));
         lock (_gate) _effects.Add(e);
         if (kind == FakeEffectKind.Incident) _incidentStart[e.Id] = clock.GetUtcNow();
@@ -110,6 +112,7 @@ public sealed class FakeSource(
         double CallerTrouble(string id) => registry.Vendors.Where(v => v.CalledBy.Contains(id)).Select(v => 0.4 * vendorTrouble[v.Node.Id]).DefaultIfEmpty(0).Max();
 
         var consumers = registry.ConsumerIds;
+        var tenants = TenantsOf(registry.ActiveEnvironment);
         foreach (var node in registry.AllNodes.Concat(registry.Vendors.Select(v => v.Node)))
         {
             var isVendor = node.GroupId == RegistryVendor.GroupId;
@@ -153,15 +156,38 @@ public sealed class FakeSource(
 
             double? cpu = null, memory = null, utilisation = null, throttled = null;
             double load = down ? 0 : saturation;
+            List<TenantReading>? tenantReadings = null;
             if (!down && isStore)
             {
                 // A data store is provisioned for a ceiling, so what matters is how much of it is used and what gets turned away.
                 var provisioned = p.Rps!.Value * 1.6;
-                var saturate = fx.Where(e => e.Kind == FakeEffectKind.Saturate).Sum(e => 0.6 * e.Intensity);
+                var saturate = fx.Where(e => e.Kind == FakeEffectKind.Saturate && e.Tenant is null).Sum(e => 0.6 * e.Intensity);
                 utilisation = Math.Clamp(rps / provisioned + saturate, 0, 1.2);
                 throttled = utilisation > 0.95 ? Math.Min(0.6, (utilisation.Value - 0.95) * 2.4) : 0;
-                load = utilisation.Value;
-                errors = Math.Clamp(errors + throttled.Value * 0.2, 0, 1);
+                if (node.TenantPattern is not null && tenants.Count > 0)
+                {
+                    // one database for each tenant: it has its own share of the traffic and its own use of its own capacity
+                    var weights = tenants.ToDictionary(tn => tn.Id, tn => TenantWeight(tn));
+                    var sum = weights.Values.Sum();
+                    tenantReadings = [];
+                    foreach (var tn in tenants)
+                    {
+                        var skew = 0.8 + 0.4 * (StableHash(node.Id + "/" + tn.Id) % 100) / 100.0;
+                        var own = fx.Where(e => e.Kind == FakeEffectKind.Saturate && e.Tenant == tn.Id).Sum(e => 0.6 * e.Intensity);
+                        var u = Math.Clamp(rps / provisioned * skew + saturate + own, 0, 1.2);
+                        var th = u > 0.95 ? Math.Min(0.6, (u - 0.95) * 2.4) : 0;
+                        tenantReadings.Add(new TenantReading(tn.Id, u, th, rps * weights[tn.Id] / sum));
+                    }
+                    // the store's own numbers follow its customers; the snapshot builder works out the same from the units
+                    var customers = tenantReadings.Where(r => tenants.First(tn => tn.Id == r.TenantId).Kind != TenantKind.Test).ToList();
+                    if (customers.Count > 0)
+                    {
+                        utilisation = customers.Max(r => r.Utilisation);
+                        throttled = customers.Max(r => r.Throttled);
+                    }
+                }
+                load = utilisation!.Value;
+                errors = Math.Clamp(errors + throttled!.Value * 0.2, 0, 1);
             }
             else if (!down && !isVendor)
             {
@@ -193,7 +219,7 @@ public sealed class FakeSource(
                 deadLetters = Math.Round(dead);
             }
 
-            result[node.Id] = new NodeReading(now, !down, current, healthy, load, rps, errors, p99, cpu, memory, utilisation, throttled, queueDepth, oldest, deadLetters);
+            result[node.Id] = new NodeReading(now, !down, current, healthy, load, rps, errors, p99, cpu, memory, utilisation, throttled, queueDepth, oldest, deadLetters, tenantReadings);
         }
 
         return Task.FromResult<IReadOnlyDictionary<string, NodeReading>>(result);
@@ -204,7 +230,19 @@ public sealed class FakeSource(
         fx.Any(e => e.Kind == FakeEffectKind.Down) ? 1 : fx.Where(e => e.Kind == FakeEffectKind.Errors).Select(e => 0.03 + 0.30 * e.Intensity).DefaultIfEmpty(0).Max();
 
     private static bool Applies(FakeEffect e, RegistryNode n) =>
-        e.Target == "*" || e.Target == n.Id || e.Target == n.GroupId;
+        (e.Scope == "*" || e.Scope == n.Id || e.Scope == n.GroupId) && (e.Tenant is null || n.TenantPattern is not null);
+
+    /// <summary>The tenants of the environment, then the ones the fake source "finds" in the data that the environment does not list.</summary>
+    private static List<(string Id, TenantKind Kind)> TenantsOf(RegistryEnvironment? env) =>
+        env is null ? [] : env.Tenants.Select(t => (t.Id, t.Kind)).Concat(env.UndeclaredTenants.Select(id => (id, TenantKind.Unknown))).ToList();
+
+    /// <summary>How much traffic a tenant brings, relative to the others: customers differ a little, a test tenant brings next to none.</summary>
+    private static double TenantWeight((string Id, TenantKind Kind) t) => t.Kind switch
+    {
+        TenantKind.Test => 0.08,
+        TenantKind.Unknown => 0.5,
+        _ => 1 + 0.6 * (StableHash(t.Id) % 100) / 100.0,
+    };
 
     /// <summary>Smooth, repeatable wobble in -1..1 that differs per node.</summary>
     private static double Wobble(string id, double t, double period)

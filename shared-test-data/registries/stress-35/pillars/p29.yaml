@@ -2,21 +2,21 @@ pillar: p29
 displayName: Pillar 29 (12)
 color: "#6fcf97"
 systems:
-  - { id: p29.s1-api, service: s1, name: S1 API, role: api, external: true, calls: [p29.s1-db, p29.s2-api, p29.s3-api, p29.s4-api] }
-  - { id: p29.s1-worker, service: s1, name: S1 worker, role: worker, calls: [p29.s1-db] }
-  - { id: p29.s1-db, service: s1, name: S1 DB, role: db }
-  - { id: p29.s2-api, service: s2, name: S2 API, role: api, calls: [p29.s2-db] }
-  - { id: p29.s2-worker, service: s2, name: S2 worker, role: worker, calls: [p29.s2-db] }
-  - { id: p29.s2-db, service: s2, name: S2 DB, role: db }
-  - { id: p29.s3-api, service: s3, name: S3 API, role: api, calls: [p29.s3-db] }
-  - { id: p29.s3-worker, service: s3, name: S3 worker, role: worker, calls: [p29.s3-db] }
-  - { id: p29.s3-db, service: s3, name: S3 DB, role: db }
-  - { id: p29.s4-api, service: s4, name: S4 API, role: api, calls: [p29.s4-db] }
-  - { id: p29.s4-worker, service: s4, name: S4 worker, role: worker, calls: [p29.s4-db] }
-  - { id: p29.s4-db, service: s4, name: S4 DB, role: db }
+  - { id: p29.s1-api, service: p29-s1, name: S1 API, role: api, external: true, calls: [p29.s1-db, p29.s2-api, p29.s3-api, p29.s4-api] }
+  - { id: p29.s1-worker, service: p29-s1, name: S1 worker, role: worker, calls: [p29.s1-db] }
+  - { id: p29.s1-db, service: p29-s1, name: S1 DB, role: db }
+  - { id: p29.s2-api, service: p29-s2, name: S2 API, role: api, calls: [p29.s2-db] }
+  - { id: p29.s2-worker, service: p29-s2, name: S2 worker, role: worker, calls: [p29.s2-db] }
+  - { id: p29.s2-db, service: p29-s2, name: S2 DB, role: db }
+  - { id: p29.s3-api, service: p29-s3, name: S3 API, role: api, calls: [p29.s3-db] }
+  - { id: p29.s3-worker, service: p29-s3, name: S3 worker, role: worker, calls: [p29.s3-db] }
+  - { id: p29.s3-db, service: p29-s3, name: S3 DB, role: db }
+  - { id: p29.s4-api, service: p29-s4, name: S4 API, role: api, calls: [p29.s4-db] }
+  - { id: p29.s4-worker, service: p29-s4, name: S4 worker, role: worker, calls: [p29.s4-db] }
+  - { id: p29.s4-db, service: p29-s4, name: S4 DB, role: db }
 messaging:
-  topics: [s1]
+  topics: [p29-s1]
   subscriptions:
-    - { topic: p28-s1-outbox, consumer: p29.s1-worker }
-    - { topic: p28-s1-outbox, consumer: p29.s2-worker }
-    - { topic: p28-s1-outbox, consumer: p29.s3-worker }
+    - { topic: p28-p28-s1-outbox, consumer: p29.s1-worker }
+    - { topic: p28-p28-s1-outbox, consumer: p29.s2-worker }
+    - { topic: p28-p28-s1-outbox, consumer: p29.s3-worker }

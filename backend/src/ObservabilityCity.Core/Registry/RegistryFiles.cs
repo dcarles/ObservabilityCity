@@ -38,6 +38,8 @@ internal sealed class SystemFile
     public string? Role { get; set; }
     /// <summary>Systems that share a service name are drawn together as one block.</summary>
     public string? Service { get; set; }
+    /// <summary>For a data store that keeps one database per tenant: the database name with {tenant} where the tenant id goes, for example merchant-{tenant}-db.</summary>
+    public string? TenantPattern { get; set; }
     public bool? External { get; set; }
     public double? SlaP99Ms { get; set; }
     public ErrorThresholdsFile? Errors { get; set; }
@@ -119,4 +121,43 @@ internal sealed class VendorFile
     public List<string> CalledBy { get; set; } = [];
     public double? SlaP99Ms { get; set; }
     public ErrorThresholdsFile? Errors { get; set; }
+}
+
+/// <summary>environments/{id}.yaml: one environment. The pillar and system files are shared by every environment; this file says what differs.</summary>
+internal sealed class EnvironmentFile
+{
+    public string? Name { get; set; }
+    /// <summary>Where it stands in the picker, lowest first. Ties go by id.</summary>
+    public int? Order { get; set; }
+    /// <summary>The environment shown when none is asked for. Without one, the first.</summary>
+    public bool Default { get; set; }
+    /// <summary>Where this environment's numbers come from, by signal: metrics, incidents, messaging.</summary>
+    public Dictionary<string, SourceFile> Sources { get; set; } = new();
+    public List<TenantFile> Tenants { get; set; } = [];
+    /// <summary>Ids of systems that are not deployed in this environment. They are left out of its town.</summary>
+    public List<string> Exclude { get; set; } = [];
+    /// <summary>Settings for the fake source only.</summary>
+    public EnvironmentFakeFile? Fake { get; set; }
+}
+
+internal sealed class SourceFile
+{
+    /// <summary>The kind of source. Only fake exists so far.</summary>
+    public string Kind { get; set; } = "";
+    /// <summary>How to reach it (a workspace, an endpoint). Not used by the fake source.</summary>
+    public string? Connection { get; set; }
+}
+
+internal sealed class TenantFile
+{
+    public string Id { get; set; } = "";
+    public string? Name { get; set; }
+    /// <summary>customer or test.</summary>
+    public string Kind { get; set; } = "customer";
+}
+
+internal sealed class EnvironmentFakeFile
+{
+    /// <summary>Tenants the fake source finds in the data that the tenant list does not name, so the town can show an unknown tenant.</summary>
+    public List<string> UndeclaredTenants { get; set; } = [];
 }

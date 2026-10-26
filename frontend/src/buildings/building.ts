@@ -3,7 +3,8 @@ import type { NodeSnapshot } from '../types'
 import { beaconLevel, clamp, darkFloorsFor, floorsFor, formatAge, formatMs, formatRate, lerp, MAX_FLOORS, plaqueText, type BeaconLevel } from '../visuals'
 import { palette } from '../themes/harbour-town/palette'
 import { buildModel } from '../themes/harbour-town/models'
-import type { BuildingModel, FloorModule } from './model'
+import type { BuildingModel, FloorModule, TenantYardStatus } from './model'
+import { ALL_TENANTS, type TenantView } from '../tenants'
 import { canvasTexture, roundRect } from './mk'
 
 /** What a building shows, for tests. See Building.status. */
@@ -21,6 +22,8 @@ export interface BuildingStatus {
   /** Only data stores have a barrier: down while they turn requests away. */
   barrierDown: boolean | null
   plaque: string
+  /** Only a data store with a database for each tenant: its units and sign. Null for every other building. */
+  tenants: TenantYardStatus | null
 }
 
 interface FloorState {
@@ -77,8 +80,11 @@ export class Building {
   private gate: { arm: THREE.Group } | null = null
   private gateAngle = Math.PI / 2
 
-  constructor(readonly id: string, readonly kind: NodeSnapshot['kind'], accent: string) {
-    this.model = buildModel(kind, accent)
+  /** What the viewer chose to see of the tenants. Only a tenant yard looks at it. */
+  private tenantView: TenantView = ALL_TENANTS
+
+  constructor(readonly id: string, readonly kind: NodeSnapshot['kind'], accent: string, tenanted = false) {
+    this.model = buildModel(kind, accent, { tenanted })
     const m = this.model
     this.pivot.add(m.base)
     for (let i = 0; i < MAX_FLOORS; i++) {
@@ -131,9 +137,20 @@ export class Building {
     return this.model.doorDir.clone().applyQuaternion(q)
   }
 
+  /** True for a data store that has a unit for each tenant. */
+  get tenanted(): boolean {
+    return this.model.setTenants !== undefined
+  }
+
+  setTenantView(view: TenantView): void {
+    this.tenantView = view
+    if (this.node) this.model.setTenants?.(this.node.tenants ?? [], this.node.throttleAmber, view)
+  }
+
   setNode(n: NodeSnapshot): void {
     const first = this.node === null
     this.node = n
+    this.model.setTenants?.(n.tenants ?? [], n.throttleAmber, this.tenantView)
     this.floorsWanted = this.model.fixedFloors ?? floorsFor(n.instancesTotal || 1)
     this.darkWanted = n.state === 'Down' ? this.floorsWanted : darkFloorsFor(n.instancesTotal, n.instancesHealthy, this.floorsWanted)
     if (first) {
@@ -216,6 +233,7 @@ export class Building {
       closedSign: this.closedSign.visible,
       barrierDown: this.gate ? this.gateAngle < 0.4 : null,
       plaque: plaqueText(n),
+      tenants: this.model.tenantStatus?.() ?? null,
     }
   }
 

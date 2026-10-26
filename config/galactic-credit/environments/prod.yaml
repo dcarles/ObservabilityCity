@@ -1,0 +1,15 @@
+# yaml-language-server: $schema=../schema/environment.schema.json
+# One file for each environment. The pillar and system files are shared by all of them; an environment says only what differs:
+# where its numbers come from, which tenants it has, and which systems are not deployed there.
+name: Production
+order: 3
+default: true
+sources:
+  metrics: { kind: fake }
+  incidents: { kind: fake }
+# Systems with a tenantPattern keep one database per tenant; the tenant id goes into the database name (merchant-acme-bank-db).
+tenants:
+  - { id: acme-bank, name: Acme Bank, kind: customer }
+  - { id: borealis-credit, name: Borealis Credit Union, kind: customer }
+  - { id: cygnus-finance, name: Cygnus Finance, kind: customer }
+  - { id: smoke-prod, name: Production smoke tests, kind: test }

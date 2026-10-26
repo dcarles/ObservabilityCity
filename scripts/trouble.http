@@ -43,6 +43,12 @@ Content-Type: application/json
 
 { "target": "cl.ledger-db", "kind": "Saturate", "intensity": 1 }
 
+### One tenant's ledger database throttling (add ?env=staging to aim at another environment)
+POST {{host}}/api/fake/effects
+Content-Type: application/json
+
+{ "target": "cl.ledger-db#acme-bank", "kind": "Saturate", "intensity": 1 }
+
 ### Rain over Payments (a sev 2 incident; intensity 0.9 is sev 1 and a storm, 0.4 overcast, 0.1 clouds)
 POST {{host}}/api/fake/effects
 Content-Type: application/json

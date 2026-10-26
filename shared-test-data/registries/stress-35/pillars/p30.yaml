@@ -2,11 +2,11 @@ pillar: p30
 displayName: Pillar 30 (4)
 color: "#f2c94c"
 systems:
-  - { id: p30.s1-api, service: s1, name: S1 API, role: api, external: true, calls: [p30.s1-db, p30.session-cache] }
-  - { id: p30.s1-worker, service: s1, name: S1 worker, role: worker, calls: [p30.s1-db] }
-  - { id: p30.s1-db, service: s1, name: S1 DB, role: db }
+  - { id: p30.s1-api, service: p30-s1, name: S1 API, role: api, external: true, calls: [p30.s1-db, p30.session-cache] }
+  - { id: p30.s1-worker, service: p30-s1, name: S1 worker, role: worker, calls: [p30.s1-db] }
+  - { id: p30.s1-db, service: p30-s1, name: S1 DB, role: db }
   - { id: p30.session-cache, name: Session cache, role: cache }
 messaging:
-  topics: [s1]
+  topics: [p30-s1]
   subscriptions:
-    - { topic: p29-s1-outbox, consumer: p30.s1-worker }
+    - { topic: p29-p29-s1-outbox, consumer: p30.s1-worker }

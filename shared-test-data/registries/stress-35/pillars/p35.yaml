@@ -2,18 +2,18 @@ pillar: p35
 displayName: Pillar 35 (15)
 color: "#81b29a"
 systems:
-  - { id: p35.s1-api, service: s1, name: S1 API, role: api, external: true, calls: [p35.s1-db, p35.s2-api, p35.s3-api, p35.s4-api, p35.s5-api] }
-  - { id: p35.s1-worker, service: s1, name: S1 worker, role: worker, calls: [p35.s1-db] }
-  - { id: p35.s1-db, service: s1, name: S1 DB, role: db }
-  - { id: p35.s2-api, service: s2, name: S2 API, role: api, calls: [p35.s2-db] }
-  - { id: p35.s2-worker, service: s2, name: S2 worker, role: worker, calls: [p35.s2-db] }
-  - { id: p35.s2-db, service: s2, name: S2 DB, role: db }
-  - { id: p35.s3-api, service: s3, name: S3 API, role: api, calls: [p35.s3-db] }
-  - { id: p35.s3-worker, service: s3, name: S3 worker, role: worker, calls: [p35.s3-db] }
-  - { id: p35.s3-db, service: s3, name: S3 DB, role: db }
-  - { id: p35.s4-api, service: s4, name: S4 API, role: api, calls: [p35.s4-db] }
-  - { id: p35.s4-worker, service: s4, name: S4 worker, role: worker, calls: [p35.s4-db] }
-  - { id: p35.s4-db, service: s4, name: S4 DB, role: db }
-  - { id: p35.s5-api, service: s5, name: S5 API, role: api, calls: [p35.s5-db] }
-  - { id: p35.s5-worker, service: s5, name: S5 worker, role: worker, calls: [p35.s5-db] }
-  - { id: p35.s5-db, service: s5, name: S5 DB, role: db }
+  - { id: p35.s1-api, service: p35-s1, name: S1 API, role: api, external: true, calls: [p35.s1-db, p35.s2-api, p35.s3-api, p35.s4-api, p35.s5-api] }
+  - { id: p35.s1-worker, service: p35-s1, name: S1 worker, role: worker, calls: [p35.s1-db] }
+  - { id: p35.s1-db, service: p35-s1, name: S1 DB, role: db }
+  - { id: p35.s2-api, service: p35-s2, name: S2 API, role: api, calls: [p35.s2-db] }
+  - { id: p35.s2-worker, service: p35-s2, name: S2 worker, role: worker, calls: [p35.s2-db] }
+  - { id: p35.s2-db, service: p35-s2, name: S2 DB, role: db }
+  - { id: p35.s3-api, service: p35-s3, name: S3 API, role: api, calls: [p35.s3-db] }
+  - { id: p35.s3-worker, service: p35-s3, name: S3 worker, role: worker, calls: [p35.s3-db] }
+  - { id: p35.s3-db, service: p35-s3, name: S3 DB, role: db }
+  - { id: p35.s4-api, service: p35-s4, name: S4 API, role: api, calls: [p35.s4-db] }
+  - { id: p35.s4-worker, service: p35-s4, name: S4 worker, role: worker, calls: [p35.s4-db] }
+  - { id: p35.s4-db, service: p35-s4, name: S4 DB, role: db }
+  - { id: p35.s5-api, service: p35-s5, name: S5 API, role: api, calls: [p35.s5-db] }
+  - { id: p35.s5-worker, service: p35-s5, name: S5 worker, role: worker, calls: [p35.s5-db] }
+  - { id: p35.s5-db, service: p35-s5, name: S5 DB, role: db }

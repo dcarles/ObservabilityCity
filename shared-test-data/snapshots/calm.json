@@ -66,7 +66,8 @@
           "backlogRed": 300,
           "calls": [],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "hub.service-bus",
@@ -99,7 +100,8 @@
           "backlogRed": 300,
           "calls": [],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "hub.egress",
@@ -132,7 +134,8 @@
           "backlogRed": 300,
           "calls": [],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "hub.customer-db",
@@ -165,7 +168,8 @@
           "backlogRed": 300,
           "calls": [],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         }
       ]
     },
@@ -262,7 +266,8 @@
             "cl.posting-api"
           ],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "cl.ledger-worker",
@@ -297,7 +302,8 @@
             "cl.ledger-db"
           ],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "cl.ledger-db",
@@ -330,7 +336,8 @@
           "backlogRed": 300,
           "calls": [],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": []
         },
         {
           "id": "cl.posting-api",
@@ -366,7 +373,8 @@
             "cl.session-cache"
           ],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "cl.posting-worker",
@@ -402,7 +410,8 @@
             "cl.statements-api"
           ],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "cl.posting-db",
@@ -435,7 +444,8 @@
           "backlogRed": 300,
           "calls": [],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": []
         },
         {
           "id": "cl.statements-api",
@@ -473,7 +483,8 @@
           "gatewayCalls": [
             "ntf.dispatch-api"
           ],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "cl.statements-worker",
@@ -508,7 +519,8 @@
             "cl.statements-db"
           ],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "cl.statements-db",
@@ -541,7 +553,8 @@
           "backlogRed": 300,
           "calls": [],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": []
         },
         {
           "id": "cl.statement-cron",
@@ -576,7 +589,8 @@
             "cl.statements-api"
           ],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "cl.session-cache",
@@ -609,7 +623,8 @@
           "backlogRed": 300,
           "calls": [],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         }
       ]
     },
@@ -682,7 +697,8 @@
           "gatewayCalls": [
             "cl.ledger-api"
           ],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "acc.accounts-worker",
@@ -717,7 +733,8 @@
             "acc.accounts-db"
           ],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "acc.accounts-db",
@@ -750,7 +767,8 @@
           "backlogRed": 300,
           "calls": [],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "acc.limits-api",
@@ -786,7 +804,8 @@
             "acc.accounts-cache"
           ],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "acc.limits-db",
@@ -819,7 +838,8 @@
           "backlogRed": 300,
           "calls": [],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "acc.interest-cron",
@@ -854,7 +874,8 @@
             "acc.accounts-api"
           ],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "acc.accounts-cache",
@@ -887,7 +908,8 @@
           "backlogRed": 300,
           "calls": [],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         }
       ]
     },
@@ -970,7 +992,8 @@
             "frd.screening-api",
             "cl.posting-api"
           ],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "pay.payments-worker",
@@ -1005,7 +1028,8 @@
             "pay.payments-db"
           ],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "pay.payments-db",
@@ -1038,7 +1062,8 @@
           "backlogRed": 300,
           "calls": [],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": []
         },
         {
           "id": "pay.refunds-api",
@@ -1075,7 +1100,8 @@
           "gatewayCalls": [
             "cl.posting-api"
           ],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "pay.refunds-worker",
@@ -1110,7 +1136,8 @@
             "pay.refunds-db"
           ],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "pay.refunds-db",
@@ -1143,7 +1170,8 @@
           "backlogRed": 300,
           "calls": [],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": []
         }
       ]
     },
@@ -1208,7 +1236,8 @@
             "frd.cases-api"
           ],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "frd.screening-worker",
@@ -1243,7 +1272,8 @@
             "frd.screening-db"
           ],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "frd.screening-db",
@@ -1276,13 +1306,14 @@
           "backlogRed": 300,
           "calls": [],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": []
         },
         {
           "id": "frd.cases-api",
           "name": "Cases API",
           "kind": "Api",
-          "service": "cases",
+          "service": "fraud-cases",
           "external": false,
           "state": "Healthy",
           "instancesTotal": 1,
@@ -1313,13 +1344,14 @@
           "gatewayCalls": [
             "cus.profile-api"
           ],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "frd.cases-db",
           "name": "Cases DB",
           "kind": "Database",
-          "service": "cases",
+          "service": "fraud-cases",
           "external": false,
           "state": "Healthy",
           "instancesTotal": 1,
@@ -1346,7 +1378,8 @@
           "backlogRed": 300,
           "calls": [],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "frd.rules-cache",
@@ -1379,7 +1412,8 @@
           "backlogRed": 300,
           "calls": [],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         }
       ]
     },
@@ -1456,7 +1490,8 @@
           "gatewayCalls": [
             "ntf.dispatch-api"
           ],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "cus.profile-worker",
@@ -1491,7 +1526,8 @@
             "cus.profile-db"
           ],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "cus.profile-db",
@@ -1524,7 +1560,8 @@
           "backlogRed": 300,
           "calls": [],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": []
         },
         {
           "id": "cus.consent-api",
@@ -1559,7 +1596,8 @@
             "cus.consent-db"
           ],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "cus.consent-worker",
@@ -1594,7 +1632,8 @@
             "cus.consent-db"
           ],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "cus.consent-db",
@@ -1627,7 +1666,8 @@
           "backlogRed": 300,
           "calls": [],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "cus.kyc-api",
@@ -1662,7 +1702,8 @@
             "cus.kyc-db"
           ],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "cus.kyc-db",
@@ -1695,7 +1736,8 @@
           "backlogRed": 300,
           "calls": [],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "cus.archive-cron",
@@ -1730,7 +1772,8 @@
             "cus.profile-api"
           ],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         }
       ]
     },
@@ -1803,7 +1846,8 @@
             "dec.decision-api",
             "cus.kyc-api"
           ],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "acq.applications-worker",
@@ -1838,7 +1882,8 @@
             "acq.applications-db"
           ],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "acq.applications-db",
@@ -1871,7 +1916,8 @@
           "backlogRed": 300,
           "calls": [],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "acq.offers-api",
@@ -1906,7 +1952,8 @@
             "acq.offers-db"
           ],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "acq.offers-db",
@@ -1939,7 +1986,8 @@
           "backlogRed": 300,
           "calls": [],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "acq.leads-api",
@@ -1977,7 +2025,8 @@
           "gatewayCalls": [
             "cus.profile-api"
           ],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "acq.leads-worker",
@@ -2012,7 +2061,8 @@
             "acq.leads-db"
           ],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "acq.leads-db",
@@ -2045,7 +2095,8 @@
           "backlogRed": 300,
           "calls": [],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         }
       ]
     },
@@ -2113,7 +2164,8 @@
             "frd.screening-api",
             "cus.profile-api"
           ],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "dec.decision-worker",
@@ -2149,7 +2201,8 @@
             "dec.scorecards-api"
           ],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "dec.decision-db",
@@ -2182,7 +2235,8 @@
           "backlogRed": 300,
           "calls": [],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "dec.scorecards-api",
@@ -2217,7 +2271,8 @@
             "dec.scorecards-db"
           ],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "dec.scorecards-db",
@@ -2250,7 +2305,8 @@
           "backlogRed": 300,
           "calls": [],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "dec.features-cache",
@@ -2283,7 +2339,8 @@
           "backlogRed": 300,
           "calls": [],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         }
       ]
     },
@@ -2350,7 +2407,8 @@
             "pay.payments-api",
             "acc.accounts-api"
           ],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "bil.invoices-worker",
@@ -2385,7 +2443,8 @@
             "bil.invoices-db"
           ],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "bil.invoices-db",
@@ -2418,7 +2477,8 @@
           "backlogRed": 300,
           "calls": [],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "bil.rating-api",
@@ -2453,7 +2513,8 @@
             "bil.rating-db"
           ],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "bil.rating-db",
@@ -2486,7 +2547,8 @@
           "backlogRed": 300,
           "calls": [],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "bil.billing-cron",
@@ -2521,7 +2583,8 @@
             "bil.invoices-api"
           ],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         }
       ]
     },
@@ -2605,7 +2668,8 @@
             "bil.invoices-api",
             "cus.profile-api"
           ],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "col.cases-worker",
@@ -2640,7 +2704,8 @@
             "col.cases-db"
           ],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "col.cases-db",
@@ -2673,7 +2738,8 @@
           "backlogRed": 300,
           "calls": [],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "col.dunning-api",
@@ -2712,7 +2778,8 @@
           "gatewayCalls": [
             "ntf.dispatch-api"
           ],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "col.dunning-worker",
@@ -2747,7 +2814,8 @@
             "col.dunning-db"
           ],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "col.dunning-db",
@@ -2780,7 +2848,8 @@
           "backlogRed": 300,
           "calls": [],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "col.agency-api",
@@ -2815,7 +2884,8 @@
             "col.agency-db"
           ],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "col.agency-worker",
@@ -2851,7 +2921,8 @@
             "col.queue-cache"
           ],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "col.agency-db",
@@ -2884,7 +2955,8 @@
           "backlogRed": 300,
           "calls": [],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "col.letters-cron",
@@ -2920,7 +2992,8 @@
             "col.cases-api"
           ],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "col.queue-cache",
@@ -2953,7 +3026,8 @@
           "backlogRed": 300,
           "calls": [],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         }
       ]
     },
@@ -3020,7 +3094,8 @@
             "pay.payments-api",
             "frd.cases-api"
           ],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "dsp.disputes-worker",
@@ -3055,7 +3130,8 @@
             "dsp.disputes-db"
           ],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "dsp.disputes-db",
@@ -3088,7 +3164,8 @@
           "backlogRed": 300,
           "calls": [],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "dsp.evidence-api",
@@ -3123,7 +3200,8 @@
             "dsp.evidence-db"
           ],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "dsp.evidence-db",
@@ -3156,7 +3234,8 @@
           "backlogRed": 300,
           "calls": [],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         }
       ]
     },
@@ -3223,7 +3302,8 @@
           "gatewayCalls": [
             "cl.ledger-api"
           ],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "rwd.points-worker",
@@ -3258,7 +3338,8 @@
             "rwd.points-db"
           ],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "rwd.points-db",
@@ -3291,7 +3372,8 @@
           "backlogRed": 300,
           "calls": [],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "rwd.catalog-api",
@@ -3326,7 +3408,8 @@
             "rwd.catalog-db"
           ],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "rwd.catalog-db",
@@ -3359,7 +3442,8 @@
           "backlogRed": 300,
           "calls": [],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "rwd.points-cache",
@@ -3392,7 +3476,8 @@
           "backlogRed": 300,
           "calls": [],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         }
       ]
     },
@@ -3456,7 +3541,8 @@
             "obk.tokens-cache"
           ],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "obk.consents-db",
@@ -3489,7 +3575,8 @@
           "backlogRed": 300,
           "calls": [],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "obk.data-api",
@@ -3529,7 +3616,8 @@
             "acc.accounts-api",
             "cus.consent-api"
           ],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "obk.data-worker",
@@ -3564,7 +3652,8 @@
             "obk.data-db"
           ],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "obk.data-db",
@@ -3597,7 +3686,8 @@
           "backlogRed": 300,
           "calls": [],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "obk.tokens-cache",
@@ -3630,7 +3720,8 @@
           "backlogRed": 300,
           "calls": [],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         }
       ]
     },
@@ -3706,7 +3797,8 @@
             "ntf.templates-api"
           ],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "ntf.dispatch-worker",
@@ -3741,7 +3833,8 @@
             "ntf.dispatch-db"
           ],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "ntf.dispatch-db",
@@ -3774,7 +3867,8 @@
           "backlogRed": 300,
           "calls": [],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "ntf.templates-api",
@@ -3809,7 +3903,8 @@
             "ntf.templates-db"
           ],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "ntf.templates-db",
@@ -3842,7 +3937,8 @@
           "backlogRed": 300,
           "calls": [],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "ntf.digest-cron",
@@ -3877,7 +3973,8 @@
             "ntf.dispatch-api"
           ],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         }
       ]
     },
@@ -3961,7 +4058,8 @@
             "cl.ledger-api",
             "pay.payments-api"
           ],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "dat.ingest-worker",
@@ -3996,7 +4094,8 @@
             "dat.ingest-db"
           ],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "dat.ingest-db",
@@ -4029,7 +4128,8 @@
           "backlogRed": 300,
           "calls": [],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "dat.reports-api",
@@ -4065,7 +4165,8 @@
             "dat.reports-cache"
           ],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "dat.reports-worker",
@@ -4100,7 +4201,8 @@
             "dat.reports-db"
           ],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "dat.reports-db",
@@ -4133,7 +4235,8 @@
           "backlogRed": 300,
           "calls": [],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "dat.refresh-cron",
@@ -4168,7 +4271,8 @@
             "dat.ingest-api"
           ],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "dat.reports-cache",
@@ -4201,7 +4305,8 @@
           "backlogRed": 300,
           "calls": [],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         }
       ]
     },
@@ -4270,7 +4375,8 @@
             "rcn.matching-db"
           ],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "rcn.matching-db",
@@ -4303,7 +4409,8 @@
           "backlogRed": 300,
           "calls": [],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "rcn.settlement-cron",
@@ -4338,7 +4445,8 @@
             "rcn.matching-db"
           ],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         }
       ]
     },
@@ -4390,7 +4498,8 @@
             "reg.rules-cache"
           ],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "reg.rules-cache",
@@ -4423,7 +4532,8 @@
           "backlogRed": 300,
           "calls": [],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         }
       ]
     },
@@ -4481,7 +4591,8 @@
             "lost-found.batch-gateway-db"
           ],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "lost-found.batch-gateway-worker",
@@ -4516,7 +4627,8 @@
             "lost-found.batch-gateway-db"
           ],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "lost-found.batch-gateway-db",
@@ -4549,7 +4661,8 @@
           "backlogRed": 300,
           "calls": [],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         },
         {
           "id": "lost-found.legacy-ftp-api",
@@ -4582,7 +4695,8 @@
           "backlogRed": 300,
           "calls": [],
           "gatewayCalls": [],
-          "lastUpdated": "2026-10-24T12:00:01+00:00"
+          "lastUpdated": "2026-10-24T12:00:01+00:00",
+          "tenants": null
         }
       ]
     }
@@ -4620,7 +4734,8 @@
         "backlogRed": 300,
         "calls": [],
         "gatewayCalls": [],
-        "lastUpdated": "2026-10-24T12:00:01+00:00"
+        "lastUpdated": "2026-10-24T12:00:01+00:00",
+        "tenants": null
       },
       "calledBy": [
         "dec.decision-api",
@@ -4659,7 +4774,8 @@
         "backlogRed": 300,
         "calls": [],
         "gatewayCalls": [],
-        "lastUpdated": "2026-10-24T12:00:01+00:00"
+        "lastUpdated": "2026-10-24T12:00:01+00:00",
+        "tenants": null
       },
       "calledBy": [
         "pay.payments-api"
@@ -4697,7 +4813,8 @@
         "backlogRed": 300,
         "calls": [],
         "gatewayCalls": [],
-        "lastUpdated": "2026-10-24T12:00:01+00:00"
+        "lastUpdated": "2026-10-24T12:00:01+00:00",
+        "tenants": null
       },
       "calledBy": [
         "ntf.dispatch-worker"
@@ -4735,7 +4852,8 @@
         "backlogRed": 300,
         "calls": [],
         "gatewayCalls": [],
-        "lastUpdated": "2026-10-24T12:00:01+00:00"
+        "lastUpdated": "2026-10-24T12:00:01+00:00",
+        "tenants": null
       },
       "calledBy": [
         "dat.ingest-worker",
@@ -4930,5 +5048,24 @@
       "requestsPerSecond": 4.800000000000001
     }
   ],
-  "ringCapacity": 12
+  "ringCapacity": 12,
+  "environmentName": "demo",
+  "environments": [
+    {
+      "id": "dev",
+      "name": "Development",
+      "isDefault": false
+    },
+    {
+      "id": "staging",
+      "name": "Staging",
+      "isDefault": false
+    },
+    {
+      "id": "prod",
+      "name": "Production",
+      "isDefault": true
+    }
+  ],
+  "tenants": []
 }

@@ -16,7 +16,10 @@ public enum FakeEffectKind
     HighCpu,
     /// <summary>Memory raised by up to 50 points, like a leak.</summary>
     HighMemory,
-    /// <summary>A data store's utilisation pushed up by up to 60 points, so it starts throttling.</summary>
+    /// <summary>
+    /// A data store's utilisation pushed up by up to 60 points, so it starts throttling. On a store with a database for each tenant it hits every tenant's
+    /// database, unless the target names one tenant: "cl.ledger-db#acme" (or "*#acme" for that tenant in every store).
+    /// </summary>
     Saturate,
     /// <summary>A consumer slows to a crawl, so its queue grows and its oldest message ages.</summary>
     Backlog,
@@ -32,8 +35,18 @@ public enum FakeEffectKind
     Incident,
 }
 
-/// <summary>A scenario effect layered on the baseline. Target is a node id, a group id (a whole island) or "*".</summary>
-public sealed record FakeEffect(string Id, string Target, FakeEffectKind Kind, double Intensity);
+/// <summary>
+/// A scenario effect layered on the baseline. Target is a node id, a group id (a whole island) or "*". A Saturate effect may add "#tenant" to
+/// hit one tenant's database only.
+/// </summary>
+public sealed record FakeEffect(string Id, string Target, FakeEffectKind Kind, double Intensity)
+{
+    /// <summary>The node, group or "*" the effect is aimed at, without the tenant.</summary>
+    public string Scope => Target.Contains('#') ? Target[..Target.IndexOf('#')] : Target;
+
+    /// <summary>The one tenant it is aimed at, or null for all of them.</summary>
+    public string? Tenant => Target.Contains('#') ? Target[(Target.IndexOf('#') + 1)..] : null;
+}
 
 /// <summary>How the app (and later the Break things panel) steers the generator.</summary>
 public interface IFakeControl

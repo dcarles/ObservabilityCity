@@ -1,0 +1,18 @@
+# yaml-language-server: $schema=../schema/environment.schema.json
+name: Staging
+order: 2
+sources:
+  metrics: { kind: fake }
+  incidents: { kind: fake }
+tenants:
+  - { id: acme-bank, name: Acme Bank, kind: customer }
+  - { id: borealis-credit, name: Borealis Credit Union, kind: customer }
+  - { id: cygnus-finance, name: Cygnus Finance, kind: customer }
+  - { id: qa-regression, name: QA regression, kind: test }
+  - { id: qa-load, name: QA load test, kind: test }
+  - { id: uat-acme, name: Acme UAT, kind: test }
+  - { id: partner-sandbox, name: Partner sandbox, kind: test }
+  - { id: smoke-staging, name: Staging smoke tests, kind: test }
+# Only the fake source reads this: a tenant it finds in the data that the list above does not name, so the town can show an unknown tenant.
+fake:
+  undeclaredTenants: [zeta-trading]

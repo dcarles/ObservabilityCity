@@ -3,10 +3,11 @@ import * as THREE from 'three'
 import { Stage } from './scene/stage'
 import { Town } from './scene/town'
 import { loadKit } from './assets/kit'
-import { Connection } from './connection'
-import { NoticesPanel, PreviewPanel, Search, showTooltip, StateList, TopBar, type SearchItem } from './ui'
+import { Connection, requestedEnv } from './connection'
+import { NoticesPanel, PreviewPanel, Search, ServicePanel, showTooltip, StateList, TopBar, type SearchItem } from './ui'
+import { ALL_TENANTS, type TenantView } from './tenants'
 import type { PickItem } from './picker'
-import type { Snapshot } from './types'
+import type { Snapshot, TenantInfo } from './types'
 import { checkSnapshot } from './snapshotGuard'
 import { Building } from './buildings/building'
 
@@ -59,12 +60,32 @@ async function start(): Promise<void> {
   }
   const islandItems = (): SearchItem[] => town.islands.map((i) => ({ kind: 'island', id: i.group.id, name: i.group.displayName, where: i.group.displayName }))
   const airportItem = (): SearchItem[] => (town.airport ? [{ kind: 'island', id: 'airport', name: 'Airport', where: 'Outside callers' }] : [])
+  const env = requestedEnv()
+  let tenantView: TenantView = ALL_TENANTS
+  const setTenantView = (v: TenantView): void => {
+    tenantView = v
+    town.setTenantView(v)
+    void preview.render()
+  }
+  const servicePanel = new ServicePanel((id) => goTo({ kind: 'building', id, name: id, where: '' }))
   const preview = new PreviewPanel(() => [
     { kind: 'town', id: '*', name: 'Whole town', where: '' },
     { kind: 'island', id: 'hub', name: 'Island: Platform hub', where: 'Platform hub' },
     ...islandItems().map((i) => ({ ...i, name: `Island: ${i.name}` })),
     ...buildingItems(),
-  ])
+  ], {
+    env,
+    environments: () => (seen.last?.environments ?? []).map((e) => ({ id: e.id, name: e.name, current: e.id === seen.last?.environment })),
+    tenants: () => (seen.last?.tenants ?? []) as TenantInfo[],
+    view: () => tenantView,
+    setView: setTenantView,
+    // a different environment is a different town: load the page again for it, so nothing of the old one is left behind
+    switchEnv: (id) => {
+      const u = new URL(window.location.href)
+      u.searchParams.set('env', id)
+      window.location.href = u.toString()
+    },
+  })
 
   const search = new Search(() => [...islandItems(), ...airportItem(), ...buildingItems()], goTo)
   void search
@@ -72,6 +93,7 @@ async function start(): Promise<void> {
   // What the page has shown so far, for tests and for poking from the console.
   const seen = { snapshots: 0, rejected: 0, buildErrors: 0, buildMs: 0, last: null as Snapshot | null }
   const reportedProblems = new Set<string>()
+  let tenantsShown = 0
 
   function onSnapshot(raw: unknown): void {
     // A snapshot that cannot be drawn is dropped and the town keeps showing the last good one.
@@ -99,8 +121,18 @@ async function start(): Promise<void> {
         stage.frame(town.extent)
         stage.home(true)
         void preview.refresh()
+        servicePanel.close()
       }
       town.apply(s)
+      // a tenant that left the environment can no longer be followed
+      if (tenantView.tenant && !(s.tenants ?? []).some((t) => t.id === tenantView.tenant)) setTenantView({ ...tenantView, tenant: null })
+      else if ((s.tenants ?? []).length !== tenantsShown) { tenantsShown = (s.tenants ?? []).length; void preview.render() }
+      const open = servicePanel.key
+      if (open) {
+        const sv = town.serviceSummary(open, s)
+        if (sv) servicePanel.show(sv)
+        else servicePanel.close()
+      }
     } catch (e) {
       // the layout could not be built: try again with the next snapshot instead of leaving a half-built town for good
       seen.buildErrors++
@@ -117,7 +149,12 @@ async function start(): Promise<void> {
     notices.show(s.notices)
   }
 
-  const connection = new Connection(onSnapshot, (st) => topbar.setStatus(st))
+  const connection = new Connection(onSnapshot, (st) => topbar.setStatus(st), env, (e) => {
+    const banner = document.getElementById('banner')
+    if (!banner) return
+    banner.textContent = `There is no environment "${e.requested ?? ''}". Available: ${e.environments.join(', ') || 'none'}.`
+    banner.hidden = false
+  })
   connection.start()
 
   // Hover: name and numbers for the building under the pointer.
@@ -141,6 +178,11 @@ async function start(): Promise<void> {
     ray.setFromCamera(pointer, stage.camera)
     const hit = ray.intersectObjects([...town.buildings.values()].map((b) => b.hit), false)[0]
     const b = hit?.object.userData.building as Building | undefined
+    // nothing but a service's sign or hedge under the pointer: open that service
+    const svc = b ? undefined : ray.intersectObjects(town.serviceHits(), false)[0]?.object.userData.serviceKey as string | undefined
+    const sv = svc && seen.last ? town.serviceSummary(svc, seen.last) : null
+    if (sv) servicePanel.show(sv)
+    else if (!b) servicePanel.close()
     town.select(b?.id ?? null)
     const focus = b ? town.focusOf(b.id) : null
     if (focus) stage.focus(focus.target, focus.distance)
@@ -152,8 +194,9 @@ async function start(): Promise<void> {
     ray.setFromCamera(pointer, stage.camera)
     const hits = ray.intersectObjects([...town.buildings.values()].map((b) => b.hit), false)
     const b = hits[0]?.object.userData.building as Building | undefined
-    showTooltip(b?.node ?? null, pointerPx.x, pointerPx.y)
-    canvas.style.cursor = b ? 'pointer' : 'grab'
+    showTooltip(b?.node ?? null, pointerPx.x, pointerPx.y, tenantView)
+    const overService = !b && ray.intersectObjects(town.serviceHits(), false).length > 0
+    canvas.style.cursor = b || overService ? 'pointer' : 'grab'
   }
 
   // ?test=1 is for automated tests: nothing is drawn on its own, and time moves only when the test calls city.step(seconds).
@@ -176,6 +219,12 @@ async function start(): Promise<void> {
     inspect: (id: string) => town.inspect(id),
     inspectIsland: (id: string) => town.inspectIsland(id),
     inspectAirport: () => town.inspectAirport(),
+    inspectServices: (id: string) => town.inspectServices(id),
+    /** Open a service's panel as a click on its sign would. */
+    openService: (key: string) => { const sv = seen.last ? town.serviceSummary(key, seen.last) : null; if (sv) servicePanel.show(sv); return sv },
+    tenantView: () => tenantView,
+    setTenantView,
+    drawnCars: () => ({ drawn: town.cars.drawn, byTenant: town.cars.tenantCounts() }),
     inspectVendors: () => town.inspectVendors(),
     overlay: () => town.overlay.status(),
     /** Draw once and say how much that took: draw calls, triangles and milliseconds. */

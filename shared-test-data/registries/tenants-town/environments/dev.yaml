@@ -1,0 +1,7 @@
+name: Development
+order: 1
+tenants:
+  - { id: dev-one, name: Dev one, kind: test }
+  - { id: dev-two, name: Dev two, kind: test }
+  - { id: dev-three, name: Dev three, kind: test }
+exclude: [bb.billing-api, bb.billing-db, bb.shared-db, aa.tools-cron]

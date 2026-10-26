@@ -1,0 +1,8 @@
+name: Production
+order: 3
+default: true
+tenants:
+  - { id: acme, name: Acme, kind: customer }
+  - { id: borealis, name: Borealis, kind: customer }
+  - { id: cygnus, name: Cygnus, kind: customer }
+  - { id: smoke, name: Smoke, kind: test }

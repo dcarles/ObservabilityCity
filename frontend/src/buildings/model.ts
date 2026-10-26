@@ -1,4 +1,6 @@
 import type * as THREE from 'three'
+import type { TenantUnitSnapshot } from '../types'
+import type { TenantLevel, TenantView } from '../tenants'
 import type { WindowUniforms } from './windowMaterial'
 
 /** One floor module: a stack slice with its own window uniforms, so it can go dark on its own. */
@@ -38,4 +40,34 @@ export interface BuildingModel {
   animate?(time: number, dt: number): void
   /** Optional hook when the building is closed for repairs or running. */
   setRunning?(running: boolean): void
+  /**
+   * Only the storage yard of a data store with a database for each tenant: one unit per tenant, whose colour follows the unit's state and whose
+   * height follows its use of capacity. `throttleAmber` is the store's threshold for counting a tenant as throttled.
+   */
+  setTenants?(units: readonly TenantUnitSnapshot[], throttleAmber: number, view: TenantView): void
+  /** What the yard shows right now, as plain values. For tests. */
+  tenantStatus?(): TenantYardStatus
+}
+
+/** One tenant unit as drawn, for tests. */
+export interface TenantUnitStatus {
+  id: string
+  level: TenantLevel
+  /** Test tenants are drawn paler and striped. */
+  test: boolean
+  /** A tenant the environment does not list. */
+  unknown: boolean
+  /** False for a test tenant the viewer hid: it is not drawn at all. */
+  shown: boolean
+  /** True for every unit but the followed tenant's while one is followed. */
+  dimmed: boolean
+  throttled: boolean
+  /** Height as a share of the tallest a unit gets (0 to 1). */
+  fill: number
+}
+
+export interface TenantYardStatus {
+  units: TenantUnitStatus[]
+  /** The two lines of the yard's sign. */
+  sign: { text: string; note: string }
 }
