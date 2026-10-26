@@ -248,14 +248,16 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
 
     private NodeSnapshot ToNode(RegistryNode n, DateTimeOffset now, Registry.Registry registry)
     {
+        var absent = registry.AbsentSignals(n);
         var r = state.Get(n.Id);
         var env = registry.ActiveEnvironment;
-        if (r is null || now - r.At > StaleAfter)
+        if (r is not null) r = WithoutAbsent(r, absent);
+        if (r is null || absent.Count == Signals.All.Length || now - r.At > StaleAfter)
         {
             // No fresh data: keep the last numbers out of it. Grey, never green.
             return new NodeSnapshot(n.Id, n.Name, n.Kind, n.Service, n.External, HealthState.Stale, 0, 0, 0, null, null, null, null, null, null, null, 0, 0, 0,
                 n.SlaP99Ms, n.ErrorAmber, n.ErrorRed, n.ResourceAmber, n.ResourceRed, n.ThrottleAmber, n.ThrottleRed, n.BacklogAmber, n.BacklogRed, n.Calls, n.GatewayCalls, r?.At,
-                n.TenantPattern is null ? null : StaleUnits(n, env));
+                n.TenantPattern is null ? null : StaleUnits(n, env), absent);
         }
 
         // A store with a database for each tenant: each unit gets its own state, and the store's numbers are the worst that count.
@@ -273,7 +275,32 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
 
         return new NodeSnapshot(n.Id, n.Name, n.Kind, n.Service, n.External, health, r.InstancesTotal, r.InstancesHealthy,
             r.Load, r.Cpu, r.Memory, utilisation, throttled, r.QueueDepth, r.OldestMessageSeconds, r.DeadLetters, r.RequestsPerSecond, r.ErrorRate, r.P99Ms, n.SlaP99Ms, n.ErrorAmber, n.ErrorRed,
-            n.ResourceAmber, n.ResourceRed, n.ThrottleAmber, n.ThrottleRed, n.BacklogAmber, n.BacklogRed, n.Calls, n.GatewayCalls, r.At, tenants);
+            n.ResourceAmber, n.ResourceRed, n.ThrottleAmber, n.ThrottleRed, n.BacklogAmber, n.BacklogRed, n.Calls, n.GatewayCalls, r.At, tenants, absent);
+    }
+
+    /// <summary>
+    /// What a source reported, less the signals nothing is configured for. A source may well measure more than the environment asked it for; what was not
+    /// asked for is not shown and plays no part in health. Errors and latency of nothing are 0, which no threshold treats as trouble.
+    /// </summary>
+    private static NodeReading WithoutAbsent(NodeReading r, IReadOnlyList<string> absent)
+    {
+        if (absent.Count == 0) return r;
+        bool Gone(string signal) => absent.Contains(signal);
+        return r with
+        {
+            RequestsPerSecond = Gone(Signals.Requests) ? 0 : r.RequestsPerSecond,
+            ErrorRate = Gone(Signals.Errors) ? 0 : r.ErrorRate,
+            P99Ms = Gone(Signals.Latency) ? 0 : r.P99Ms,
+            InstancesTotal = Gone(Signals.Instances) ? 0 : r.InstancesTotal,
+            InstancesHealthy = Gone(Signals.Instances) ? 0 : r.InstancesHealthy,
+            Cpu = Gone(Signals.Cpu) ? null : r.Cpu,
+            Memory = Gone(Signals.Memory) ? null : r.Memory,
+            Utilisation = Gone(Signals.Utilisation) ? null : r.Utilisation,
+            Throttled = Gone(Signals.Throttled) ? null : r.Throttled,
+            QueueDepth = Gone(Signals.Backlog) ? null : r.QueueDepth,
+            OldestMessageSeconds = Gone(Signals.Backlog) ? null : r.OldestMessageSeconds,
+            DeadLetters = Gone(Signals.DeadLetters) ? null : r.DeadLetters,
+        };
     }
 
     /// <summary>The units of a tenant store with no fresh data: every tenant the environment lists, grey.</summary>

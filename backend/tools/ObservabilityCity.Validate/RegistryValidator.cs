@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using ObservabilityCity.Adapters.Fake;
 using ObservabilityCity.Contracts;
 using ObservabilityCity.Core.Registry;
+using ObservabilityCity.Core.Sources;
 using YamlDotNet.Core;
 using YamlDotNet.RepresentationModel;
 
@@ -21,7 +22,8 @@ public static class RegistryValidator
     private static readonly string[] Topologies = ["hub-and-spoke", "direct"];
     private static readonly string[] Blocks = ["errors", "resources", "throttle", "backlog"];
 
-    public static ValidationResult Validate(string folder)
+    /// <param name="adapters">The adapter modules loaded, to check the kinds of source and login against. Without them only the shape of the files is checked.</param>
+    public static ValidationResult Validate(string folder, AdapterCatalog? adapters = null)
     {
         folder = Path.GetFullPath(folder);
         var findings = new List<Finding>();
@@ -53,7 +55,7 @@ public static class RegistryValidator
         CheckUncalled(ctx, registry);
         CheckStandalone(ctx, registry);
         CheckServices(ctx, registry);
-        CheckEnvironments(ctx, registry);
+        CheckEnvironments(ctx, registry, adapters);
         CheckFake(ctx, registry);
         return ctx.Result();
     }
@@ -282,7 +284,7 @@ public static class RegistryValidator
 
     // ── environments and tenants ────────────────────────────────────────────
 
-    private static void CheckEnvironments(Context c, Registry registry)
+    private static void CheckEnvironments(Context c, Registry registry, AdapterCatalog? adapters)
     {
         var tenanted = registry.AllNodes.Where(n => n.TenantPattern is not null).ToList();
         if (registry.Environments.Count == 0)
@@ -297,6 +299,8 @@ public static class RegistryValidator
         foreach (var env in registry.Environments)
         {
             var file = $"environments/{env.Id}.yaml";
+            foreach (var problem in adapters?.Check(env) ?? [])
+                c.Error(file, 1, "sources", problem.StartsWith(file + ": ") ? problem[(file.Length + 2)..] : problem);
             foreach (var warning in Registry.EnvironmentWarnings(env, registry.ForEnvironment(env.Id)))
                 c.Warn(file, 1, "tenants", warning);
         }

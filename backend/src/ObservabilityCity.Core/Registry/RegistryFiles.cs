@@ -48,6 +48,8 @@ internal sealed class SystemFile
     public ErrorThresholdsFile? Resources { get; set; }
     public ErrorThresholdsFile? Throttle { get; set; }
     public ErrorThresholdsFile? Backlog { get; set; }
+    /// <summary>Signal to source name (or none), overriding the pillar's and the environment's choice for this system.</summary>
+    public Dictionary<string, string> Signals { get; set; } = new();
     /// <summary>Ids of the systems this one calls directly. Cars drive only along declared links.</summary>
     public List<string> Calls { get; set; } = [];
     /// <summary>Ids of systems on other islands this one reaches through the API gateway (the way calls between islands go in a hub-and-spoke town).</summary>
@@ -63,6 +65,8 @@ internal sealed class PillarFile
     public string Color { get; set; } = "#8ab4ff";
     public bool External { get; set; }
     public DefaultsFile Defaults { get; set; } = new();
+    /// <summary>Signal to source name (or none) for every system of the pillar, overriding the environment's choice; a system can override it again.</summary>
+    public Dictionary<string, string> Signals { get; set; } = new();
     public List<SystemFile> Systems { get; set; } = [];
     public MessagingFile? Messaging { get; set; }
 }
@@ -133,8 +137,12 @@ internal sealed class EnvironmentFile
     public int? Order { get; set; }
     /// <summary>The environment shown when none is asked for. Without one, the first.</summary>
     public bool Default { get; set; }
-    /// <summary>Where this environment's numbers come from, by signal: metrics, incidents, messaging.</summary>
+    /// <summary>Where this environment's numbers come from, by source name. The names metrics, incidents and messaging are the defaults for those groups of signals; any other kebab-case name is a source a signal can be pointed at.</summary>
     public Dictionary<string, SourceFile> Sources { get; set; } = new();
+    /// <summary>How sources sign in to Azure, by name. A source names one with credential; without it, the Azure CLI login is used.</summary>
+    public Dictionary<string, CredentialFile> Credentials { get; set; } = new();
+    /// <summary>Which source each signal comes from in this environment (a source name, or none). Signals not listed use the source named metrics or messaging.</summary>
+    public Dictionary<string, string> Signals { get; set; } = new();
     public List<TenantFile> Tenants { get; set; } = [];
     /// <summary>Ids of systems that are not deployed in this environment. They are left out of its town.</summary>
     public List<string> Exclude { get; set; } = [];
@@ -144,10 +152,28 @@ internal sealed class EnvironmentFile
 
 internal sealed class SourceFile
 {
-    /// <summary>The kind of source. Only fake exists so far.</summary>
+    /// <summary>The kind of source: fake, resourcegraph, loganalytics, azuremonitor, servicebus, prometheus or grafana-irm.</summary>
     public string Kind { get; set; } = "";
     /// <summary>How to reach it (a workspace, an endpoint). Not used by the fake source.</summary>
     public string? Connection { get; set; }
+    /// <summary>The login to use, by name from credentials. Azure sources only; without it, the Azure CLI login.</summary>
+    public string? Credential { get; set; }
+    /// <summary>How often the source is asked, in seconds.</summary>
+    public double? PollSeconds { get; set; }
+    /// <summary>How long one ask may take before it is given up, in seconds.</summary>
+    public double? TimeoutSeconds { get; set; }
+}
+
+internal sealed class CredentialFile
+{
+    /// <summary>azure-cli, default, managed-identity or service-principal.</summary>
+    public string Kind { get; set; } = "";
+    /// <summary>The directory (tenant) to sign in to. Without it, the login's own.</summary>
+    public string? TenantId { get; set; }
+    /// <summary>The app registration's client id (service-principal), or the user-assigned identity's (managed-identity).</summary>
+    public string? ClientId { get; set; }
+    /// <summary>The name of the environment variable that holds a service principal's secret. The secret itself never goes in a registry file.</summary>
+    public string? ClientSecretEnv { get; set; }
 }
 
 internal sealed class TenantFile

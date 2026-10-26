@@ -1,6 +1,7 @@
 // What the inspector drawer says, as pure functions: a system's numbers in, rows and sentences out.
 
 import type { ConfigValue, HealthState, IncidentSnapshot, LinkRef, LogLine, NodeSnapshot, SettingLayer, SystemDetail } from './types'
+import { isAbsent, isUnmonitored } from './signals'
 import { formatAge, formatMs, formatRate, plaqueText, resourceUse } from './visuals'
 
 export type Tone = 'ok' | 'warn' | 'bad' | 'stale' | ''
@@ -11,19 +12,21 @@ const pct = (v: number, digits = 0): string => `${(v * 100).toFixed(digits)}%`
 
 /** In words, why the system is not healthy. Empty for a healthy one. Each line names the number and the line it crossed. */
 export function reasons(n: NodeSnapshot): string[] {
+  if (isUnmonitored(n)) return []
   if (n.state === 'Stale') return ['No fresh data: the last reading is too old to trust, so nothing here is shown as healthy.']
   if (n.state === 'Down') return ['Down: the system is not answering.']
   const out: string[] = []
-  if (n.errorRate >= n.errorRed) out.push(`Errors are at ${pct(n.errorRate, 1)}, past the red line of ${pct(n.errorRed, 1)}.`)
+  if (isAbsent(n, 'errors')) { /* nothing measures errors here, so there is nothing to say about them */ }
+  else if (n.errorRate >= n.errorRed) out.push(`Errors are at ${pct(n.errorRate, 1)}, past the red line of ${pct(n.errorRed, 1)}.`)
   else if (n.errorRate >= n.errorAmber) out.push(`Errors are at ${pct(n.errorRate, 1)}, past the amber line of ${pct(n.errorAmber, 1)}.`)
-  if (n.p99Ms > n.slaP99Ms) out.push(`p99 is ${formatMs(n.p99Ms)}, over the SLA of ${formatMs(n.slaP99Ms)}.`)
-  if (n.instancesHealthy < n.instancesTotal) out.push(`${n.instancesTotal - n.instancesHealthy} of ${n.instancesTotal} instances are unhealthy.`)
+  if (!isAbsent(n, 'latency') && n.p99Ms > n.slaP99Ms) out.push(`p99 is ${formatMs(n.p99Ms)}, over the SLA of ${formatMs(n.slaP99Ms)}.`)
+  if (!isAbsent(n, 'instances') && n.instancesHealthy < n.instancesTotal) out.push(`${n.instancesTotal - n.instancesHealthy} of ${n.instancesTotal} instances are unhealthy.`)
   const use = resourceUse(n)
   if (use >= n.resourceRed) out.push(`Resources are at ${pct(use)}, past the red line of ${pct(n.resourceRed)}.`)
   else if (use >= n.resourceAmber) out.push(`Resources are at ${pct(use)}, past the amber line of ${pct(n.resourceAmber)}.`)
-  if ((n.throttled ?? 0) >= n.throttleAmber && (n.throttled ?? 0) > 0) out.push(`Turning away ${pct(n.throttled!, 1)} of requests (throttled).`)
-  if ((n.oldestMessageSeconds ?? 0) >= n.backlogAmber && (n.oldestMessageSeconds ?? 0) > 0) out.push(`The oldest message has waited ${formatAge(n.oldestMessageSeconds!)}, past the ${formatAge(n.backlogAmber)} line.`)
-  if ((n.deadLetters ?? 0) > 0) out.push(`${formatRate(n.deadLetters!)} message${n.deadLetters === 1 ? ' is' : 's are'} in the dead-letter queue.`)
+  if (!isAbsent(n, 'throttled') && (n.throttled ?? 0) >= n.throttleAmber && (n.throttled ?? 0) > 0) out.push(`Turning away ${pct(n.throttled!, 1)} of requests (throttled).`)
+  if (!isAbsent(n, 'backlog') && (n.oldestMessageSeconds ?? 0) >= n.backlogAmber && (n.oldestMessageSeconds ?? 0) > 0) out.push(`The oldest message has waited ${formatAge(n.oldestMessageSeconds!)}, past the ${formatAge(n.backlogAmber)} line.`)
+  if (!isAbsent(n, 'deadLetters') && (n.deadLetters ?? 0) > 0) out.push(`${formatRate(n.deadLetters!)} message${n.deadLetters === 1 ? ' is' : 's are'} in the dead-letter queue.`)
   return out
 }
 
@@ -35,22 +38,22 @@ export interface Row {
 
 /** The key numbers of a system, in reading order. Numbers a source does not give are left out, not shown as zero. */
 export function overviewRows(n: NodeSnapshot): Row[] {
+  if (isUnmonitored(n)) return [{ label: 'Data', value: 'no source configured', tone: '' }]
   if (n.state === 'Stale') return [{ label: 'Data', value: 'none fresh', tone: 'stale' }]
-  const rows: Row[] = [
-    { label: 'Instances', value: plaqueText(n), tone: n.instancesHealthy < n.instancesTotal ? 'warn' : '' },
-    { label: 'Requests', value: `${formatRate(n.requestsPerSecond)}/s`, tone: '' },
-    { label: 'Errors', value: pct(n.errorRate, 2), tone: n.errorRate >= n.errorRed ? 'bad' : n.errorRate >= n.errorAmber ? 'warn' : '' },
-    { label: 'p99 / SLA', value: `${formatMs(n.p99Ms)} / ${formatMs(n.slaP99Ms)}`, tone: n.p99Ms > n.slaP99Ms ? 'warn' : '' },
-    { label: 'Load', value: pct(n.load), tone: '' },
-  ]
+  const rows: Row[] = []
+  if (!isAbsent(n, 'instances')) rows.push({ label: 'Instances', value: plaqueText(n), tone: n.instancesHealthy < n.instancesTotal ? 'warn' : '' })
+  if (!isAbsent(n, 'requests')) rows.push({ label: 'Requests', value: `${formatRate(n.requestsPerSecond)}/s`, tone: '' })
+  if (!isAbsent(n, 'errors')) rows.push({ label: 'Errors', value: pct(n.errorRate, 2), tone: n.errorRate >= n.errorRed ? 'bad' : n.errorRate >= n.errorAmber ? 'warn' : '' })
+  if (!isAbsent(n, 'latency')) rows.push({ label: 'p99 / SLA', value: `${formatMs(n.p99Ms)} / ${formatMs(n.slaP99Ms)}`, tone: n.p99Ms > n.slaP99Ms ? 'warn' : '' })
+  if (!isAbsent(n, 'requests') && !isAbsent(n, 'instances')) rows.push({ label: 'Load', value: pct(n.load), tone: '' })
   const hot = (v: number) => (v >= n.resourceRed ? 'bad' : v >= n.resourceAmber ? 'warn' : '') as Tone
-  if (n.cpu != null) rows.push({ label: 'CPU', value: pct(n.cpu), tone: hot(n.cpu) })
-  if (n.memory != null) rows.push({ label: 'Memory', value: pct(n.memory), tone: hot(n.memory) })
-  if (n.utilisation != null) rows.push({ label: 'Capacity used', value: pct(n.utilisation), tone: hot(n.utilisation) })
-  if (n.throttled != null) rows.push({ label: 'Throttled', value: pct(n.throttled, 1), tone: n.throttled >= n.throttleRed ? 'bad' : n.throttled >= n.throttleAmber && n.throttled > 0 ? 'warn' : '' })
-  if (n.queueDepth != null) rows.push({ label: 'Waiting', value: `${formatRate(n.queueDepth)} messages`, tone: '' })
-  if (n.oldestMessageSeconds != null) rows.push({ label: 'Oldest message', value: formatAge(n.oldestMessageSeconds), tone: n.oldestMessageSeconds >= n.backlogRed ? 'bad' : n.oldestMessageSeconds >= n.backlogAmber ? 'warn' : '' })
-  if (n.deadLetters != null) rows.push({ label: 'Dead letters', value: formatRate(n.deadLetters), tone: n.deadLetters > 0 ? 'bad' : '' })
+  if (n.cpu != null && !isAbsent(n, 'cpu')) rows.push({ label: 'CPU', value: pct(n.cpu), tone: hot(n.cpu) })
+  if (n.memory != null && !isAbsent(n, 'memory')) rows.push({ label: 'Memory', value: pct(n.memory), tone: hot(n.memory) })
+  if (n.utilisation != null && !isAbsent(n, 'utilisation')) rows.push({ label: 'Capacity used', value: pct(n.utilisation), tone: hot(n.utilisation) })
+  if (n.throttled != null && !isAbsent(n, 'throttled')) rows.push({ label: 'Throttled', value: pct(n.throttled, 1), tone: n.throttled >= n.throttleRed ? 'bad' : n.throttled >= n.throttleAmber && n.throttled > 0 ? 'warn' : '' })
+  if (n.queueDepth != null && !isAbsent(n, 'backlog')) rows.push({ label: 'Waiting', value: `${formatRate(n.queueDepth)} messages`, tone: '' })
+  if (n.oldestMessageSeconds != null && !isAbsent(n, 'backlog')) rows.push({ label: 'Oldest message', value: formatAge(n.oldestMessageSeconds), tone: n.oldestMessageSeconds >= n.backlogRed ? 'bad' : n.oldestMessageSeconds >= n.backlogAmber ? 'warn' : '' })
+  if (n.deadLetters != null && !isAbsent(n, 'deadLetters')) rows.push({ label: 'Dead letters', value: formatRate(n.deadLetters), tone: n.deadLetters > 0 ? 'bad' : '' })
   return rows
 }
 

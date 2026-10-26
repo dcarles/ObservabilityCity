@@ -139,6 +139,7 @@ How to read the town, as built so far:
 backend/                           .NET solution (ObservabilityCity.slnx)
   src/ObservabilityCity.Contracts    Snapshot records: the source of truth for the wire format
   src/ObservabilityCity.Core         registry loader, source interface, snapshot builder and rules
+  src/ObservabilityCity.Adapters.Azure the azure adapter module: Azure logins and source kinds; the host loads it from `adapters/azure`, it does not reference it
   src/ObservabilityCity.Adapters.Fake  the fake source: noise, daily cycle, autoscaling, scenario effects
   src/ObservabilityCity.Host         ASP.NET Core: /api/snapshot/latest, SignalR hub /hubs/town, /api/fake
   src/ObservabilityCity.AppHost      .NET Aspire: starts the host and the frontend together
@@ -263,9 +264,13 @@ A test fails if the committed schema files are out of date.
 name: Staging
 order: 2                                  # position in the picker
 default: false                            # exactly one environment is the default (shown when the address has no ?env=)
-sources:                                  # which source feeds each signal; only the fake source exists today
+sources:                                  # named sources: metrics, messaging and incidents are what signals use unless told otherwise
   metrics: { kind: fake }
   incidents: { kind: fake }
+# A live environment can name its own sources, a login and a source for each signal (see docs/connect-your-company.md):
+#   credentials: { reader: { kind: service-principal, tenantId: ..., clientId: ..., clientSecretEnv: READER_SECRET } }
+#   sources: { telemetry: { kind: loganalytics, connection: ..., pollSeconds: 60, timeoutSeconds: 20, credential: reader } }
+#   signals: { requests: telemetry, errors: telemetry, latency: telemetry, instances: none }
 exclude: [lost-found.batch-gateway-api]   # systems that do not exist here, with the calls and links that hang on them
 tenants:
   - { id: acme-bank, name: Acme Bank, kind: customer }

@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import type { NodeSnapshot } from '../types'
+import { isAbsent, isUnmonitored } from '../signals'
 import { beaconLevel, clamp, darkFloorsFor, floorsFor, formatAge, formatMs, formatRate, lerp, MAX_FLOORS, plaqueText, type BeaconLevel } from '../visuals'
 import { buildModel, palette } from '../themes/active'
 import type { BuildingModel, FloorModule, TenantYardStatus } from './model'
@@ -157,7 +158,7 @@ export class Building {
       // Appear fully formed on the first snapshot.
       this.lit = n.state === 'Healthy' || n.state === 'Degraded' ? this.litTarget(n) : 0
       this.errorRate = n.errorRate
-      this.stale = n.state === 'Stale' ? 1 : 0
+      this.stale = isGrey(n) ? 1 : 0
       this.floors.forEach((f, i) => {
         f.height = i < this.floorsWanted ? 1 : 0
         f.dark = i >= this.floorsWanted - this.darkWanted && i < this.floorsWanted ? 1 : 0
@@ -179,7 +180,7 @@ export class Building {
     this.lit = lerp(this.lit, live ? this.litTarget(n) : 0, ease(1.5))
     this.model.setActivity?.(n.cpu ?? clamp(n.load * 0.6, 0, 1))
     this.updateGate(n, dt)
-    this.stale = lerp(this.stale, n.state === 'Stale' ? 1 : 0, ease(3))
+    this.stale = lerp(this.stale, isGrey(n) ? 1 : 0, ease(3))
     this.errorRate = lerp(this.errorRate, n.errorRate, ease(2))
 
     // Floors: rise and sink toward the wanted count; the top ones go dark for unhealthy instances.
@@ -253,6 +254,7 @@ export class Building {
   private updateBeacon(n: NodeSnapshot, time: number, camera: THREE.Camera): void {
     this.level = beaconLevel({ ...n, errorRate: this.errorRate })
     const color = new THREE.Color(palette.beacon[this.level])
+    this.halo.visible = this.level !== 'off'
     let pulse = 1
     if (n.state === 'Down') pulse = 1 // down is a steady red: it is not an alarm that flickers, the building is shut
     else if (this.level === 'red') pulse = 0.65 + 0.35 * Math.sin(time * 7 + this.pulsePhase)
@@ -262,7 +264,7 @@ export class Building {
     ;(this.bulb.material as THREE.MeshBasicMaterial).color.copy(color).multiplyScalar(0.55 + 0.9 * pulse)
     const haloMat = this.halo.material as THREE.SpriteMaterial
     haloMat.color.copy(color)
-    haloMat.opacity = this.level === 'grey' ? 0 : 0.35 + 0.5 * pulse
+    haloMat.opacity = this.level === 'grey' || this.level === 'off' ? 0 : 0.35 + 0.5 * pulse
 
     // Keep the halo readable from far away: a minimum size on screen, bigger for the alarming colours.
     const world = this.beaconAnchor.getWorldPosition(new THREE.Vector3())
@@ -293,7 +295,7 @@ export class Building {
     const n = this.node
     if (!n || !this.plaqueCanvas) return
     const text = plaqueText(n)
-    const warn = n.state === 'Stale' ? 'stale' : n.instancesHealthy < n.instancesTotal || n.state === 'Down' ? 'warn' : 'ok'
+    const warn = isGrey(n) ? 'stale' : n.instancesHealthy < n.instancesTotal || n.state === 'Down' ? 'warn' : 'ok'
     const key = `${text}|${warn}`
     if (key === this.plaqueKey) return
     this.plaqueKey = key
@@ -369,8 +371,11 @@ export class Building {
     if (!n) return
     const text = plaqueText(n)
     const pct = (v: number | null | undefined) => (v == null ? -1 : Math.round(v * 100))
-    const warn = n.state === 'Down' ? 'down' : n.state === 'Stale' ? 'stale' : n.state !== 'Healthy' || n.instancesHealthy < n.instancesTotal ? 'warn' : 'ok'
+    const unmonitored = isUnmonitored(n)
+    const warn = n.state === 'Down' ? 'down' : isGrey(n) ? 'stale' : !unmonitored && (n.state !== 'Healthy' || n.instancesHealthy < n.instancesTotal) ? 'warn' : 'ok'
     const live = n.state !== 'Stale' && n.state !== 'Down'
+    // the error bar and the p99 note are drawn only for what a source supplies
+    const hasHealth = live && (!isAbsent(n, 'errors') || !isAbsent(n, 'latency'))
     const key = [n.name, text, warn, pct(n.cpu), pct(n.memory), pct(n.utilisation), Math.round((n.throttled ?? 0) * 1000),
       Math.round(n.errorRate * 1000), Math.round(n.p99Ms / 10), Math.round((n.queueDepth ?? -1) / 5), Math.round((n.oldestMessageSeconds ?? -1) / 2), n.deadLetters ?? -1].join('|')
     const hasMeters = live && (n.cpu != null || n.utilisation != null)
@@ -389,7 +394,7 @@ export class Building {
     const ctx = (tex.image as HTMLCanvasElement).getContext('2d')!
     ctx.clearRect(0, 0, 512, 256)
     const color = { down: '#d63a2f', stale: '#8d949e', warn: '#e8a21a', ok: '#9fb4cc' }[warn]
-    const rows = (hasMeters ? 1 : 0) + (live ? 1 : 0) + (hasQueue ? 1 : 0)
+    const rows = (hasMeters ? 1 : 0) + (hasHealth ? 1 : 0) + (hasQueue ? 1 : 0)
     const h = 116 + rows * 38
     const y0 = 256 - h - 6
     ctx.fillStyle = 'rgba(20,28,40,0.9)'; roundRect(ctx, 4, y0, 504, h, 24); ctx.fill()
@@ -423,10 +428,10 @@ export class Building {
       }
       top += 38
     }
-    if (live) {
+    if (hasHealth) {
       // errors (5xx, timeouts) as a share of requests, and how the slowest requests compare with the target
-      bar(24, 224, 'ERR', n.errorRate / Math.max(n.errorRed * 1.5, 0.001), `${(n.errorRate * 100).toFixed(n.errorRate < 0.1 ? 1 : 0)}%`, n.errorAmber / Math.max(n.errorRed * 1.5, 0.001), n.errorRed / Math.max(n.errorRed * 1.5, 0.001))
-      note(264, `p99 ${formatMs(n.p99Ms)} / ${formatMs(n.slaP99Ms)}`, n.p99Ms > n.slaP99Ms)
+      if (!isAbsent(n, 'errors')) bar(24, 224, 'ERR', n.errorRate / Math.max(n.errorRed * 1.5, 0.001), `${(n.errorRate * 100).toFixed(n.errorRate < 0.1 ? 1 : 0)}%`, n.errorAmber / Math.max(n.errorRed * 1.5, 0.001), n.errorRed / Math.max(n.errorRed * 1.5, 0.001))
+      if (!isAbsent(n, 'latency')) note(isAbsent(n, 'errors') ? 24 : 264, `p99 ${formatMs(n.p99Ms)} / ${formatMs(n.slaP99Ms)}`, n.p99Ms > n.slaP99Ms)
       top += 38
     }
     if (hasQueue) {
@@ -439,11 +444,16 @@ export class Building {
 
   private fadeLabel(camera: THREE.Camera): void {
     if (!this.label || !this.node) return
-    const troubled = this.node.state !== 'Healthy' || this.node.instancesHealthy < this.node.instancesTotal
+    const troubled = !isUnmonitored(this.node) && (this.node.state !== 'Healthy' || this.node.instancesHealthy < this.node.instancesTotal)
     const d = camera.position.distanceTo(this.label.getWorldPosition(new THREE.Vector3()))
     const far = clamp((d - 75) / 40, 0, 1)
     const opacity = troubled || this.pinned ? 1 : 1 - far
     ;(this.label.material as THREE.SpriteMaterial).opacity = opacity
     this.label.visible = opacity > 0.02
   }
+}
+
+/** Grey means a source is configured and has nothing fresh to say. A system no source is configured for is not grey: it simply has no readings. */
+function isGrey(n: NodeSnapshot): boolean {
+  return n.state === 'Stale' && !isUnmonitored(n)
 }

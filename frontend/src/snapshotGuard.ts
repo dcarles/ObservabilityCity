@@ -2,6 +2,7 @@
 // safe (a missing list becomes an empty one, a number that is not a number becomes 0) and dropped where it is not (a building
 // with no id), and a snapshot with nothing usable in it is refused so the town keeps showing the last good one.
 
+import { SIGNALS } from './signals'
 import { DEFAULT_RING_CAPACITY, MAX_RING_CAPACITY, MIN_RING_CAPACITY, maxPillars } from './scene/layout'
 import type { DependencySnapshot, EnvironmentInfo, OffscreenLink, ViewInfo, ExternalCallerSnapshot, GroupSnapshot, IncidentSnapshot, MessagingSnapshot, NodeSnapshot, Snapshot, TenantInfo, TenantUnitSnapshot, VendorSnapshot } from './types'
 
@@ -194,6 +195,8 @@ function checkNode(n: unknown, groupId: string, ids: Set<string>, problems: stri
     calls: strings(n.calls),
     gatewayCalls: strings(n.gatewayCalls),
     lastUpdated: typeof n.lastUpdated === 'string' ? n.lastUpdated : null,
+    // an older server that does not say has every signal present
+    absent: strings(n.absent).filter((s) => (SIGNALS as readonly string[]).includes(s)),
   }
   for (const key of REQUIRED_NUMBERS) {
     out[key] = isFiniteNumber(n[key]) ? n[key] : 0

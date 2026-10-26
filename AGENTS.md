@@ -23,6 +23,7 @@ source (fake now, Prometheus / Log Analytics / Service Bus / Grafana IRM later)
 | --- | --- |
 | `backend/src/ObservabilityCity.Contracts` | Snapshot records: the wire format. Source of truth for the TypeScript types |
 | `backend/src/ObservabilityCity.Core` | Registry loader and schema, source interfaces (`IMetricSource`, `IIncidentSource`, `ILogSource`), `SourcePoller`, `SnapshotBuilder` and the health rules |
+| `backend/src/ObservabilityCity.Adapters.Azure` | the azure adapter module (`IAdapterModule`): Azure source kinds and logins (`az login`, managed identity, service principal); no queries yet. The host does not reference it: the build copies it to `adapters/azure/` and the host loads it |
 | `backend/src/ObservabilityCity.Adapters.Fake` | The fake source: noise, daily cycle, autoscaling, scenarios and stories |
 | `backend/src/ObservabilityCity.Host` | ASP.NET Core host: one runtime per town and environment, REST, SignalR |
 | `backend/src/ObservabilityCity.AppHost` | .NET Aspire app host that starts backend and frontend together |
@@ -80,13 +81,13 @@ sources:
   messaging: { kind: servicebus, connection: "sb-example.servicebus.windows.net" }
 ```
 
-A signal with no source is absent from the town. Kinds the connectivity check knows: `fake`, `prometheus`, `loganalytics`, `servicebus`, `grafana-irm`. Real adapters for them arrive phase by phase (see the plan); until an adapter exists the running town uses the fake source.
+A signal with no source is absent from the town (not grey: grey is a configured source with no fresh data). Source names are free (`metrics`, `messaging`, `incidents` are the defaults); `signals:` in an environment, a pillar or a system points a signal at a named source or at `none`. Kinds: `fake`, `resourcegraph`, `loganalytics`, `azuremonitor`, `servicebus`, `prometheus`, `grafana-irm`. Azure sources sign in with `az login` unless a `credentials:` entry says otherwise; a secret is never in a file, only the name of the variable that holds it. Real adapters arrive phase by phase (see the plan); a kind with no adapter yet is accepted, reported at start-up, and shows no data. The demo town's fake source fills every signal.
 
 Edit YAML with the schemas in `schema/` for completion. `dotnet run --project backend/tools/ObservabilityCity.Validate -- --all` must stay clean.
 
 ## Extension points
 
-- **A new source adapter**: implement `IMetricSource` (and `IIncidentSource` / `ILogSource` when it has them) in a new project under `extensions/<company>.<name>/` in a fork, or under `backend/src/ObservabilityCity.Adapters.<Name>` upstream when it is generic. Build it against recorded fixtures kept in `shared-test-data/`, never against live services in tests.
+- **A new source adapter**: add it to a module (`IAdapterModule.Register`: `AddSourceKind`, `AddSource` for its `IMetricSourceFactory`, `AddCredentialKind` for a login) and implement `IMetricSource` (and `IIncidentSource` / `ILogSource` when it has them) in a new project under `extensions/<company>.<name>/` in a fork (the build copies every such project to `adapters/<name>/`, and the host loads it; no host code changes), or under `backend/src/ObservabilityCity.Adapters.<Name>` upstream when it is generic. Build it against recorded fixtures kept in `shared-test-data/`, never against live services in tests.
 - **A new connectivity probe**: implement `ISourceProbe` in `backend/tools/ObservabilityCity.Validate` (see `SourceProbes.cs`) and add it to `SourceProbes.Default`. Probes take an `HttpClient` and an `ITokenProvider` so tests use canned answers.
 - **Company rules** (naming conventions, tag-to-pillar mapping, special cases) belong in the fork's `config/<company>/` or `extensions/`, not in core.
 - **Themes**: `frontend/src/themes` and `shared-test-data/themes/theme-contract.json`.

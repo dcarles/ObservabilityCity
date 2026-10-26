@@ -91,6 +91,59 @@ sources:
 
 A signal you leave out is absent from the town, not grey. Add the next one only when the last one reports `connected`.
 
+### Name your sources, then point each signal at one
+
+`metrics`, `messaging` and `incidents` are the names a signal uses unless you say otherwise, but a source can have any lowercase kebab-case name, and each signal can be pointed at a different one. A company that reads request rate from one place and instance counts from another writes:
+
+```yaml
+name: Production
+sources:
+  telemetry: { kind: loganalytics, connection: "<workspace id>", pollSeconds: 60, timeoutSeconds: 20 }
+  inventory: { kind: resourcegraph, connection: "<scope>" }
+signals:                      # signal: source name, or none
+  requests: telemetry
+  errors: telemetry
+  latency: telemetry
+  instances: inventory
+```
+
+The signals are `requests`, `errors`, `latency`, `instances`, `cpu`, `memory`, `utilisation`, `throttled`, `backlog` and `deadLetters`. A signal comes from, in order: the system's own `signals:`, its pillar's `signals:`, the environment's `signals:`, then the environment's source called `metrics` (`messaging` for `backlog` and `deadLetters`). `none` switches a signal off for that system or pillar. A signal that ends up with no source is absent, and the town shows nothing for it: no lamp, no row in the inspector, no total in the top bar. That is different from grey, which is a source that is configured but has nothing fresh to say.
+
+```yaml
+# pillars/<pillar>.yaml or a system in it
+signals: { cpu: platform }    # every system of the pillar takes cpu from the source called platform
+```
+
+Every source takes `pollSeconds` (default 30) and `timeoutSeconds` (default 10). Which kinds the build can already read is in the table of the phase you are on; a kind whose adapter is not loaded is an error in `validate` and, when the server starts, a notice; its signals then show no data (grey).
+
+### Adapters are plug-ins
+
+The program knows no platform by name. Each platform's source kinds and logins come in an adapter module: a folder under `adapters/` beside the program, which the host loads when it starts (`Adapters:Path` moves the folder). The build puts every adapter project in `backend/src/` and every project in `extensions/` there. Azure is the `azure` module; a company on another cloud, or that reads metrics from somewhere else, adds a module for it and leaves Azure out (`dotnet build -p:ExcludeAdapters=true` builds without any). Sources do not have to share a platform: an environment can read metrics from Prometheus while its resources are read from Azure.
+
+### Logins
+
+Azure sources (`resourcegraph`, `loganalytics`, `azuremonitor`, `servicebus`) sign in with whoever ran `az login`, unless you say otherwise. Define logins in the environment file and name one on a source:
+
+```yaml
+credentials:
+  reader: { kind: service-principal, tenantId: "<tenant>", clientId: "<app id>", clientSecretEnv: REPORTER_SECRET }
+sources:
+  platform: { kind: azuremonitor, credential: reader }
+```
+
+| Kind | Signs in as |
+| --- | --- |
+| `azure-cli` (the default) | The account `az login` signed in |
+| `default` | The Azure SDK's usual chain: environment variables, managed identity, developer tools |
+| `managed-identity` | The identity of the machine it runs on (`clientId` picks a user-assigned one) |
+| `service-principal` | An app registration. `clientSecretEnv` is the *name* of the environment variable that holds its secret; the secret never goes in a file |
+
+A login defined with the name `default` replaces the Azure CLI one for every source that names none. Nobody is signed in when the server starts: a token is asked for when a source first needs it, so a town starts before `az login` and a missing login costs only the signals that need it. A service principal whose variable is not set is reported at start-up and its sources are left out.
+
+### What each adapter's runbook section contains
+
+Each real adapter lands with its own section here, with the same four parts: the permission the login needs, the `connection` value, the `pollSeconds` and `timeoutSeconds` that suit it, and what `--sources` reports for it. Until an adapter has its section, its kind is known to the module but nothing reads it yet.
+
 ## 5. Run the check
 
 ```
@@ -107,10 +160,11 @@ For each environment and signal it makes one cheap read with your Azure login an
 | unreachable | No answer, an error, or a timeout | Check the address, VPN, firewall |
 | not configured | The environment has no source for this signal | Fine; the town leaves the signal out |
 | unknown kind | The kind is spelt wrong or has no probe | The message lists the kinds it knows |
+| no probe yet | A loaded adapter knows the kind but its probe arrives with the adapter | Nothing; not a failure |
 
 The exit code is 1 when anything is *no permission*, *unreachable* or *unknown kind* (and, with `--strict`, *empty*), so you can run it in a pipeline.
 
-The normal registry check (`-- config/<company>`) validates the files and, until an adapter for a kind exists, reports that kind as one that "does not exist yet". `--sources` reads the environment files directly, so you can verify connectivity before the adapter lands.
+The normal registry check (`-- config/<company>`) validates the files, including source names, kinds, logins and signal choices, and warns about a signal pointed at a source the environment does not define. `--sources` reads the environment files directly and reports every source you defined, so you can verify connectivity before the adapter lands.
 
 ## 6. Watch the town
 

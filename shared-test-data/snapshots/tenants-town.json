@@ -68,7 +68,8 @@
           "calls": [],
           "gatewayCalls": [],
           "lastUpdated": "2026-10-25T12:00:02+00:00",
-          "tenants": null
+          "tenants": null,
+          "absent": []
         },
         {
           "id": "hub.service-bus",
@@ -102,7 +103,8 @@
           "calls": [],
           "gatewayCalls": [],
           "lastUpdated": "2026-10-25T12:00:02+00:00",
-          "tenants": null
+          "tenants": null,
+          "absent": []
         },
         {
           "id": "hub.egress",
@@ -136,7 +138,8 @@
           "calls": [],
           "gatewayCalls": [],
           "lastUpdated": "2026-10-25T12:00:02+00:00",
-          "tenants": null
+          "tenants": null,
+          "absent": []
         },
         {
           "id": "hub.customer-db",
@@ -170,7 +173,8 @@
           "calls": [],
           "gatewayCalls": [],
           "lastUpdated": "2026-10-25T12:00:02+00:00",
-          "tenants": null
+          "tenants": null,
+          "absent": []
         }
       ]
     },
@@ -229,7 +233,8 @@
           ],
           "gatewayCalls": [],
           "lastUpdated": "2026-10-25T12:00:02+00:00",
-          "tenants": null
+          "tenants": null,
+          "absent": []
         },
         {
           "id": "aa.audit-cache",
@@ -263,7 +268,8 @@
           "calls": [],
           "gatewayCalls": [],
           "lastUpdated": "2026-10-25T12:00:02+00:00",
-          "tenants": null
+          "tenants": null,
+          "absent": []
         },
         {
           "id": "aa.orders-worker",
@@ -299,7 +305,8 @@
           ],
           "gatewayCalls": [],
           "lastUpdated": "2026-10-25T12:00:02+00:00",
-          "tenants": null
+          "tenants": null,
+          "absent": []
         },
         {
           "id": "aa.tools-cron",
@@ -335,7 +342,8 @@
           ],
           "gatewayCalls": [],
           "lastUpdated": "2026-10-25T12:00:02+00:00",
-          "tenants": null
+          "tenants": null,
+          "absent": []
         },
         {
           "id": "aa.orders-db",
@@ -420,7 +428,8 @@
               "throttled": 0,
               "requestsPerSecond": 12.338062924120914
             }
-          ]
+          ],
+          "absent": []
         }
       ]
     },
@@ -474,7 +483,8 @@
           ],
           "gatewayCalls": [],
           "lastUpdated": "2026-10-25T12:00:02+00:00",
-          "tenants": null
+          "tenants": null,
+          "absent": []
         },
         {
           "id": "bb.billing-db",
@@ -559,7 +569,8 @@
               "throttled": 0,
               "requestsPerSecond": 7.402837754472547
             }
-          ]
+          ],
+          "absent": []
         },
         {
           "id": "bb.shared-db",
@@ -593,7 +604,8 @@
           "calls": [],
           "gatewayCalls": [],
           "lastUpdated": "2026-10-25T12:00:02+00:00",
-          "tenants": null
+          "tenants": null,
+          "absent": []
         }
       ]
     }

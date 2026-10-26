@@ -20,6 +20,8 @@ public enum ProbeStatus
     NotConfigured,
     /// <summary>The kind is not one this tool knows how to probe.</summary>
     UnknownKind,
+    /// <summary>The registry accepts this kind but its probe arrives with its adapter. Not a failure.</summary>
+    NoProbeYet,
 }
 
 public sealed record ProbeResult(ProbeStatus Status, string Detail = "");

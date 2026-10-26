@@ -2,7 +2,8 @@ import * as THREE from 'three'
 import { box, canvasTexture, flat, roundRect } from '../buildings/mk'
 import { palette } from '../themes/active'
 import type { HealthState, NodeSnapshot } from '../types'
-import { worstState } from '../visuals'
+import { isUnmonitored, type Signal } from '../signals'
+import { formatMs, formatRate, worstState } from '../visuals'
 import { GROUND } from './island'
 import type { Pad } from './plan'
 
@@ -14,6 +15,10 @@ export interface ServiceSystem {
   name: string
   kind: NodeSnapshot['kind']
   state: HealthState
+  /** No source is configured for any signal of the system. */
+  unmonitored: boolean
+  /** The signals no source supplies. */
+  absent: readonly string[]
   requestsPerSecond: number
   errorRate: number
   p99Ms: number
@@ -28,18 +33,33 @@ export interface ServiceSummary {
   /** The island the service stands on. */
   group: string
   groupName: string
-  /** The worst state of its systems. */
+  /** The worst state of its systems that have a source. */
   state: HealthState
+  /** False when no system of the service has any source: the sign then says nothing about its health. */
+  monitored: boolean
   systems: ServiceSystem[]
 }
 
 /** What a service is and how it is doing, from the snapshot's nodes. Systems the snapshot no longer has are left out. */
 export function summariseService(pad: Pick<Pad, 'key' | 'name' | 'nodes'>, group: string, groupName: string, nodes: ReadonlyMap<string, NodeSnapshot>): ServiceSummary {
   const systems = pad.nodes.map((p) => nodes.get(p.id)).filter((n): n is NodeSnapshot => !!n).map<ServiceSystem>((n) => ({
-    id: n.id, name: n.name, kind: n.kind, state: n.state, requestsPerSecond: n.requestsPerSecond, errorRate: n.errorRate, p99Ms: n.p99Ms, slaP99Ms: n.slaP99Ms,
+    id: n.id, name: n.name, kind: n.kind, state: n.state, unmonitored: isUnmonitored(n), absent: n.absent ?? [], requestsPerSecond: n.requestsPerSecond, errorRate: n.errorRate, p99Ms: n.p99Ms, slaP99Ms: n.slaP99Ms,
     tenants: n.tenants ? { total: n.tenants.length, throttled: n.tenants.filter((u) => (u.throttled ?? 0) >= n.throttleAmber && (u.throttled ?? 0) > 0).length } : null,
   }))
-  return { key: pad.key, name: pad.name, group, groupName, state: worstState(systems.map((s) => s.state)), systems }
+  return { key: pad.key, name: pad.name, group, groupName, state: worstState(systems.filter((s) => !s.unmonitored).map((s) => s.state)), monitored: systems.some((s) => !s.unmonitored), systems }
+}
+
+/** What a service card says about one system: its kind and the numbers a source supplies. Absent signals are left out, never printed as zero. */
+export function systemNumbers(m: Pick<ServiceSystem, 'kind' | 'unmonitored' | 'absent' | 'requestsPerSecond' | 'errorRate' | 'p99Ms' | 'tenants'>): string {
+  if (m.unmonitored) return `${m.kind} · no source configured`
+  const has = (signal: Signal) => !m.absent.includes(signal)
+  return [
+    m.kind,
+    has('requests') ? `${formatRate(m.requestsPerSecond)}/s` : null,
+    has('errors') ? `${(m.errorRate * 100).toFixed(2)}% errors` : null,
+    has('latency') ? `p99 ${formatMs(m.p99Ms)}` : null,
+    m.tenants ? `${m.tenants.total} tenants, ${m.tenants.throttled} throttled` : null,
+  ].filter((p) => p !== null).join(' · ')
 }
 
 const LEVEL: Record<HealthState, keyof typeof palette.beacon> = { Healthy: 'green', Degraded: 'amber', Down: 'red', Stale: 'grey' }
@@ -54,6 +74,7 @@ export class ServiceSign {
   /** Invisible boxes over the sign and the hedge: what a click on the service hits. They carry the pad's key. */
   readonly hits: THREE.Mesh[] = []
   state: HealthState | null = null
+  monitored = true
   private readonly ctx: CanvasRenderingContext2D
   private readonly tex: THREE.CanvasTexture
 
@@ -94,18 +115,20 @@ export class ServiceSign {
   }
 
   /** Paints the sign for a state. Nothing happens when it is already showing it. */
-  set(state: HealthState): void {
-    if (state === this.state) return
+  set(state: HealthState, monitored = true): void {
+    if (state === this.state && monitored === this.monitored) return
     this.state = state
-    const color = palette.beacon[LEVEL[state]]
+    this.monitored = monitored
+    // no source for any system of the service: a plain board with its name, no lamp and no word about its health
+    const color = monitored ? palette.beacon[LEVEL[state]] : '#d9cfb8'
     const { ctx } = this
     ctx.clearRect(0, 0, 512, 108)
     ctx.fillStyle = '#f7f0df'; roundRect(ctx, 4, 4, 504, 100, 20); ctx.fill()
     ctx.strokeStyle = color; ctx.lineWidth = state === 'Healthy' ? 6 : 12; ctx.stroke()
-    ctx.fillStyle = color; ctx.beginPath(); ctx.arc(52, 54, 22, 0, Math.PI * 2); ctx.fill()
+    if (monitored) { ctx.fillStyle = color; ctx.beginPath(); ctx.arc(52, 54, 22, 0, Math.PI * 2); ctx.fill() }
     ctx.fillStyle = '#26364f'; ctx.font = '800 46px system-ui, sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'
-    const word = WORD[state]
-    ctx.fillText(this.pad.name, 92, word ? 44 : 56, 392)
+    const word = monitored ? WORD[state] : ''
+    ctx.fillText(this.pad.name, monitored ? 92 : 30, word ? 44 : 56, monitored ? 392 : 452)
     if (word) { ctx.fillStyle = state === 'Stale' ? '#6c7480' : '#b3541e'; ctx.font = '800 30px system-ui, sans-serif'; ctx.fillText(word.toUpperCase(), 92, 82, 392) }
     this.tex.needsUpdate = true
   }

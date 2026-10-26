@@ -1,5 +1,6 @@
 // What needs looking at on the wall: incidents first, then systems that are down, then degraded ones, then systems with no data. Pure: a snapshot in, a list out.
 
+import { isUnmonitored } from '../signals'
 import type { GroupSnapshot, NodeSnapshot, Snapshot } from '../types'
 import { reasons } from '../inspectorModel'
 
@@ -41,7 +42,7 @@ export function attentionOf(s: Snapshot): Attention[] {
     }
   }
   const add = (n: NodeSnapshot, where: string) => {
-    const kind: AttentionKind | null = n.state === 'Down' ? 'down' : n.state === 'Degraded' ? 'degraded' : n.state === 'Stale' ? 'stale' : null
+    const kind: AttentionKind | null = n.state === 'Down' ? 'down' : n.state === 'Degraded' ? 'degraded' : n.state === 'Stale' && !isUnmonitored(n) ? 'stale' : null
     if (!kind) return
     const why = kind === 'down' ? 'is down' : kind === 'stale' ? 'has no fresh data' : `is degraded: ${reasons(n)[0]?.replace(/\.$/, '') ?? 'running outside its limits'}`
     items.push({

@@ -10,6 +10,7 @@
     "color": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$", "description": "Accent colour of the island." },
     "external": { "type": "boolean", "description": "Every system here is reached by outside callers, unless it says otherwise." },
     "defaults": { "$ref": "defs.schema.json#/$defs/defaults" },
+    "signals": { "$ref": "defs.schema.json#/$defs/signals" },
     "messaging": { "$ref": "defs.schema.json#/$defs/messaging" },
     "systems": {
       "type": "array",
@@ -23,6 +24,7 @@
           "role": { "$ref": "defs.schema.json#/$defs/role" },
           "service": { "type": "string", "description": "Systems that share a service are drawn side by side on one pad (an API, its worker and its database)." },
           "tenantPattern": { "type": "string", "pattern": "^[^{}]*\\{tenant\\}[^{}]*$", "description": "For a database (role: db) that keeps one database per tenant: its name with {tenant} where the tenant id goes, for example merchant-{tenant}-db. The store then stands as a yard with one unit for each tenant of the environment." },
+          "signals": { "$ref": "defs.schema.json#/$defs/signals" },
           "external": { "type": "boolean", "description": "Reached by callers outside the town." },
           "slaP99Ms": { "type": "number" },
           "errors": { "$ref": "defs.schema.json#/$defs/thresholds" },

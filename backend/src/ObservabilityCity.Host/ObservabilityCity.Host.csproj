@@ -4,4 +4,5 @@
     <ProjectReference Include="..\ObservabilityCity.Core\ObservabilityCity.Core.csproj" />
     <ProjectReference Include="..\ObservabilityCity.Adapters.Fake\ObservabilityCity.Adapters.Fake.csproj" />
   </ItemGroup>
+  <Import Project="..\..\Adapters.targets" />
 </Project>

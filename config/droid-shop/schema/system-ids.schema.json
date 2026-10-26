@@ -12,7 +12,6 @@
             "chk.orders-db",
             "chk.orders-worker",
             "hub.accounts-db",
-            "hub.edge",
             "hub.kafka",
             "inv.stock-api",
             "inv.stock-db",

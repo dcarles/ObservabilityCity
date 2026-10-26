@@ -24,7 +24,7 @@ public sealed class SourcePoller(
             try
             {
                 using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
-                timeout.CancelAfter(TimeSpan.FromSeconds(10));
+                timeout.CancelAfter(source.Timeout);
                 state.Update(await source.PollAsync(registries.Current, timeout.Token));
             }
             catch (Exception e) when (e is not OperationCanceledException || !ct.IsCancellationRequested)

@@ -1,6 +1,7 @@
 // The visual language as pure functions: numbers from a snapshot in, visual parameters out.
 // Nothing here touches three.js, so it is unit tested against the same golden fixtures as the backend.
 
+import { drivesBeacon, isAbsent, isUnmonitored } from './signals'
 import type { HealthState, NodeSnapshot } from './types'
 
 export const MAX_FLOORS = 8
@@ -25,15 +26,18 @@ export function litFraction(load: number): number {
   return clamp(load * 1.25, 0.1, 1)
 }
 
-export type BeaconLevel = 'green' | 'amber' | 'red' | 'grey'
+/** off: nothing is measured that would colour it (no source for errors or resources), so the lamp is dark. */
+export type BeaconLevel = 'green' | 'amber' | 'red' | 'grey' | 'off'
 
 /** Share of capacity in use across CPU, memory and a data store's utilisation: the busiest one counts. */
-export function resourceUse(n: Pick<NodeSnapshot, 'cpu' | 'memory' | 'utilisation'>): number {
-  return Math.max(n.cpu ?? 0, n.memory ?? 0, n.utilisation ?? 0)
+export function resourceUse(n: Pick<NodeSnapshot, 'cpu' | 'memory' | 'utilisation'> & Partial<Pick<NodeSnapshot, 'absent'>>): number {
+  // a signal nothing supplies counts for nothing, whatever number comes with it
+  const seen = (signal: 'cpu' | 'memory' | 'utilisation') => (isAbsent(n, signal) ? 0 : n[signal] ?? 0)
+  return Math.max(seen('cpu'), seen('memory'), seen('utilisation'))
 }
 
 type BeaconInput = Pick<NodeSnapshot, 'state' | 'errorRate' | 'errorAmber' | 'errorRed'> &
-  Partial<Pick<NodeSnapshot, 'cpu' | 'memory' | 'utilisation' | 'throttled' | 'resourceAmber' | 'throttleAmber' | 'throttleRed'>>
+  Partial<Pick<NodeSnapshot, 'cpu' | 'memory' | 'utilisation' | 'throttled' | 'resourceAmber' | 'throttleAmber' | 'throttleRed' | 'absent'>>
 
 /**
  * Rooftop beacon colour. Red means requests are failing: a system that is down (the beacon then stays on, steady), errors
@@ -41,6 +45,7 @@ type BeaconInput = Pick<NodeSnapshot, 'state' | 'errorRate' | 'errorAmber' | 'er
  * memory or utilisation past their amber thresholds.
  */
 export function beaconLevel(n: BeaconInput): BeaconLevel {
+  if (!drivesBeacon(n)) return 'off' // nothing here is measured: not grey, there is no data to be missing
   if (n.state === 'Stale') return 'grey'
   if (n.state === 'Down') return 'red' // a system that is down is red whatever its error rate or silence says
   const throttled = n.throttled ?? 0
@@ -62,7 +67,9 @@ export function spawnRate(rps: number): number {
   return rps <= 0 ? 0 : 0.1 * Math.pow(rps, 0.6)
 }
 
-export function plaqueText(n: Pick<NodeSnapshot, 'state' | 'instancesTotal' | 'instancesHealthy'>): string {
+export function plaqueText(n: Pick<NodeSnapshot, 'state' | 'instancesTotal' | 'instancesHealthy'> & Partial<Pick<NodeSnapshot, 'absent'>>): string {
+  if (isUnmonitored(n)) return 'not monitored'
+  if (isAbsent(n, 'instances')) return n.state === 'Stale' ? 'no data' : ''
   if (n.state === 'Stale') return 'no data'
   return `${n.instancesHealthy}/${n.instancesTotal} healthy`
 }

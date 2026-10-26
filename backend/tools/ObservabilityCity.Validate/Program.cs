@@ -1,3 +1,4 @@
+using ObservabilityCity.Core.Sources;
 using ObservabilityCity.Validate;
 
 // Validates registry folders. Exit code 1 when any has an error; warnings never fail the run.
@@ -27,6 +28,12 @@ for (var i = 0; i < args.Length; i++)
     }
 }
 
+// The adapters sit in adapters/ beside the tool (the build puts them there), as they do beside the host.
+var adapterFolder = Path.Combine(AppContext.BaseDirectory, "adapters");
+var plugins = AdapterLoader.LoadFrom(adapterFolder);
+foreach (var problem in plugins.Problems) Console.Error.WriteLine(problem);
+var adapters = new AdapterCatalog(plugins.Modules);
+
 var root = Report.FindRepoRoot(Directory.GetCurrentDirectory());
 if (all) folders.AddRange(Report.FindRegistries(root));
 if (folders.Count == 0)
@@ -42,7 +49,7 @@ if (sources)
     var checks = new List<SourceCheckResult>();
     foreach (var folder in folders)
     {
-        var check = await SourceCheck.RunAsync(folder, probes, TimeSpan.FromSeconds(30), CancellationToken.None);
+        var check = await SourceCheck.RunAsync(folder, probes, TimeSpan.FromSeconds(30), CancellationToken.None, adapters.SourceKindNames);
         SourceCheck.WriteText(check, root, Console.Out);
         checks.Add(check);
     }
@@ -51,7 +58,7 @@ if (sources)
     return code;
 }
 
-var results = folders.Select(RegistryValidator.Validate).ToList();
+var results = folders.Select(f => RegistryValidator.Validate(f, adapters)).ToList();
 foreach (var r in results) Report.WriteText(r, root, Console.Out);
 if (github) foreach (var r in results) Report.WriteAnnotations(r, root, Console.Out);
 if (markdownPath is not null) File.WriteAllText(markdownPath, Report.Markdown(results, root));

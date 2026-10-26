@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/ObservabilityCity.Adapters.Azure/ObservabilityCity.Adapters.Azure.csproj" />
     <Project Path="src/ObservabilityCity.Adapters.Fake/ObservabilityCity.Adapters.Fake.csproj" />
     <Project Path="src/ObservabilityCity.AppHost/ObservabilityCity.AppHost.csproj" />
     <Project Path="src/ObservabilityCity.Contracts/ObservabilityCity.Contracts.csproj" />

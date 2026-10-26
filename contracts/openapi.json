@@ -478,6 +478,7 @@
       },
       "NodeSnapshot": {
         "required": [
+          "absent",
           "backlogAmber",
           "backlogRed",
           "calls",
@@ -640,6 +641,12 @@
               "$ref": "#/components/schemas/TenantUnitSnapshot"
             },
             "nullable": true
+          },
+          "absent": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "additionalProperties": false
