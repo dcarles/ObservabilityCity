@@ -55,6 +55,10 @@ The browser app proxies `/api` and `/hubs` to the backend, so there is nothing t
 
 Hover a building for its numbers. Drag to orbit, scroll to zoom, right-drag to pan, **Home** frames the whole town. Click a building, or pick one in the search box (press `/` to focus it), and the camera glides to it and keeps its name board readable. Search also finds islands. Any drag cancels a glide.
 
+### Demo and live towns
+
+`mode` in `town.yaml` is read once, when the server starts. A town with `mode: demo` gets the fake source, `/api/fake/*`, the Break things panel and the story bar, and the top bar says "Live (demo data)". A town with no `mode`, or `mode: live`, gets none of them: `/api/fake` answers 404, the panel and story bar are not drawn, and the top bar says "Live". Every town in `shared-test-data` that uses the fake source says `mode: demo`.
+
 ### Break things
 
 The **Break things** panel on the left breaks the fake town on purpose. Pick a scenario (Traffic spike, Slow, Errors, Sick instances, High CPU, High memory, DB saturated, Tenant DB throttled, Queue backs up, Dead letters, Down, Go quiet, or an incident from Sev 1 storm to Sev 4 clouds), then click a building in the town, or search for a target (the whole town, an island, a building or a third party). The search works the other way round too: choose the target, then the scenario. Esc lets go of a scenario that is waiting.
@@ -194,6 +198,7 @@ To refresh the golden fixtures (calm town, a bad day across several islands, and
 | Thresholds make sense: ranges, and amber below red, also after the defaults are applied | error |
 | Colours are hex, pillars have a display name, the hub has one gateway, broker, egress and database at most | error |
 | `fake.yaml` names real systems and its numbers make sense | error |
+| A town with `fake.yaml` or a `stories/` folder says `mode: demo` in `town.yaml`, and `mode` is `demo` or `live` | error |
 | A worker has a database, a system has a caller, no `layout.yaml`, an empty pillar, an island that stands alone (no API, messaging or call links) | warning |
 | Messaging: topics are services of the pillar, subscriptions name an existing topic and a worker of the same pillar, no duplicates, `legacy` exactly for the hub's egress topic | error |
 
@@ -211,7 +216,7 @@ One folder describes a town. The sample is `config/galactic-credit/`:
 
 | File | What it holds |
 | --- | --- |
-| `town.yaml` | Name, what an island is called, topology |
+| `town.yaml` | Name, what an island is called, topology, and `mode` (`demo` or `live`; left out means `live`) |
 | `defaults.yaml` | App-wide defaults per role (SLA, error, resource, throttle and backlog thresholds) |
 | `hub.yaml` | The hub's shared resources (gateway, broker, egress, database), its `messaging` topics (`egress`), and the outside callers (`externalCallers`, each lists the external systems it reaches) |
 | `layout.yaml` | The order of the islands round the hub. Unlisted pillars follow, Lost & found is always last |
@@ -286,6 +291,7 @@ fake: { undeclaredTenants: [zeta-trading] }   # fake source only: a tenant that 
 ### Two towns, quality levels and the wall screen
 
 - **Two sample towns.** The server runs every folder in `config/` that has a `town.yaml`: Galactic Credit (Service Bus, hub-and-spoke) and Droid Shop (Kafka, islands call each other directly, a payment gateway, a courier and a push service as third parties, and a flash-sale story). `?town=droid-shop` picks one (nothing asked gets the default); the town name in the top bar becomes a dropdown when there is more than one, and switching drops the environment, islands and tenants of the old town. A town the server does not have shows an empty page with a note. `GET /api/towns` lists them; every other call takes `?town=` as well. The port sign and board carry the broker's own name (KAFKA, SERVICE BUS).
+- **Direct towns** (`topology: direct`): nothing goes through the central island. It holds the shared resources (the broker, a shared database) and has a spoke only to the islands that really call them. Islands reach each other over the outer ring road: each has a bridge from its back gate, and a call between teams drives out of one back gate, round the ring and in at the other. The airport and the third parties are on the ring road too, so outside callers arrive there. A hub-and-spoke town (`topology: hub-and-spoke`) is drawn as before.
 - **Quality** (top bar list, or `?quality=high|medium|low`, remembered per browser): High is full resolution with shadows every frame and all the traffic; Medium draws fewer pixels, refreshes shadows a few times a second and sends 70% of the traffic; Low has no shadows, normal resolution and 40% of the traffic. The page still steps down by itself unless a level was chosen.
 - **Dusk** has lit windows on every building (one shared glow, so it costs nothing extra) and a low sun.
 - **Wall screen** (`?wall=1`): no bar or panels, Dusk by default, Medium quality, and a big status strip that is always on (headline, town name, requests per second, errors, p99, dead letters, a caption). The camera tours by itself: with trouble, incidents first, then what is down, then what is degraded, holding on each for 20 seconds (`&hold=` seconds) with a caption; when all is well it runs a showcase loop (the whole town, the hub, each island in order, the busiest services, the hub again) and says "All systems healthy, N h since last incident". New trouble cuts straight to it with a red pulse; when it clears the strip says "Resolved" in green. `&islands=chk,shp` makes a view for one team, `&quality=low` lowers the load, `&light=day` overrides Dusk, `&retry=` sets the seconds between tries to open the live socket again. A wall that loses the backend polls and reconnects by itself.

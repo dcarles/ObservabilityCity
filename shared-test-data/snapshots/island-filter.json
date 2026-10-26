@@ -25,6 +25,7 @@
       "configError": null,
       "incidents": [],
       "hasBridge": false,
+      "hasRingBridge": false,
       "messaging": {
         "topics": [],
         "subscriptions": []
@@ -177,6 +178,7 @@
       "configError": null,
       "incidents": [],
       "hasBridge": true,
+      "hasRingBridge": true,
       "messaging": {
         "topics": [
           {
@@ -311,6 +313,7 @@
       "configError": null,
       "incidents": [],
       "hasBridge": true,
+      "hasRingBridge": true,
       "messaging": {
         "topics": [
           {
@@ -572,6 +575,7 @@
   ],
   "tenants": [],
   "topology": "hub-and-spoke",
+  "mode": "demo",
   "view": {
     "islands": [
       "aa",

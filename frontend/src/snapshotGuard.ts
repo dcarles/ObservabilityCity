@@ -69,6 +69,7 @@ export function checkSnapshot(raw: unknown): Checked {
       .map<EnvironmentInfo>((e) => ({ id: e.id as string, name: str(e.name) || (e.id as string), isDefault: e.isDefault === true })),
     tenants: checkTenants(raw.tenants, problems),
     topology: str(raw.topology) || 'direct',
+    mode: raw.mode === 'demo' ? 'demo' : 'live',
     view: checkView(raw.view),
     generatedAt: str(raw.generatedAt),
     incidentFreeSince: typeof raw.incidentFreeSince === 'string' && Number.isFinite(Date.parse(raw.incidentFreeSince)) ? raw.incidentFreeSince : null,
@@ -147,6 +148,8 @@ function checkGroup(g: unknown, seen: Set<string>, problems: string[]): GroupSna
     })).sort((a, b) => a.severity - b.severity),
     // a snapshot that does not say keeps the bridge it always had; one with no messaging block has no pier
     hasBridge: g.hasBridge !== false,
+    // a snapshot that does not say has no road to the ring except where a third party is reached (the town works that out)
+    hasRingBridge: g.hasRingBridge === true,
     messaging: checkMessaging(g.messaging),
     nodes,
   }

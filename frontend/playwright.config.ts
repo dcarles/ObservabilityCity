@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url'
 //   npm run e2e:links    the link rules alone (pier, bridge and buildings follow real links)
 //   npm run e2e:ui       the top bar, island filter, layers, inspector drawer, legend and Day/Dusk, on the small town
 //   npm run e2e:direct   how a filtered island's traffic is shown in a town without a hub (signposts), on a small town with direct topology
+//   npm run e2e:live     a live town (no mode in town.yaml): no Break things panel, no story bar, no /api/fake, "Live" in the top bar
 //   npm run e2e:tenants  environments, tenant yards, tenant traffic and service groups, on a town with two pillars and three environments
 //   npm run e2e:towns    the town switcher and the second sample town (Droid Shop, on Kafka), on the server's own config folder with both sample towns
 //   npm run e2e:slow     the slow set: the 23-island and 35-island stress towns and the full sample town, with screenshots. Runs on merge to main and nightly.
@@ -22,6 +23,7 @@ const registries: Record<string, string> = {
   links: 'shared-test-data/registries/links-town',
   ui: 'shared-test-data/registries/mini-town',
   direct: 'shared-test-data/registries/direct-town',
+  live: 'shared-test-data/registries/live-town',
   tenants: 'shared-test-data/registries/tenants-town',
   // no single folder: the server finds the towns in config/ itself
   towns: '',
@@ -33,7 +35,7 @@ const fixture = registries[suite] ? resolve(repo, registries[suite]) : ''
 
 // The scenario tests edit registry files to check reloading, so they run against a copy. The main process makes the copy and
 // passes its path down in the environment, which the workers inherit, so there is only ever one.
-if (['scenarios', 'links', 'tenants', 'ui', 'direct'].includes(suite) && !process.env.E2E_REGISTRY_COPY) {
+if (['scenarios', 'links', 'tenants', 'ui', 'direct', 'live'].includes(suite) && !process.env.E2E_REGISTRY_COPY) {
   const copy = mkdtempSync(join(tmpdir(), 'oc-e2e-registry-'))
   cpSync(fixture, copy, { recursive: true })
   process.env.E2E_REGISTRY_COPY = copy
@@ -52,7 +54,7 @@ export default defineConfig({
   workers: 1,
   fullyParallel: false,
   retries: process.env.CI ? 1 : 0,
-  timeout: ['scenarios', 'links', 'tenants', 'ui', 'direct', 'towns'].includes(suite) ? 60_000 : 240_000,
+  timeout: ['scenarios', 'links', 'tenants', 'ui', 'direct', 'live', 'towns'].includes(suite) ? 60_000 : 240_000,
   expect: { timeout: 10_000 },
   reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
   outputDir: 'test-results',

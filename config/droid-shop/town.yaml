@@ -3,3 +3,4 @@ id: droid-shop
 name: Droid Shop
 groupLabel: Team          # what an island is called in this town
 topology: direct          # teams call each other's systems directly; there is no gateway between islands
+mode: demo                # runs on the fake source, with Break things and stories

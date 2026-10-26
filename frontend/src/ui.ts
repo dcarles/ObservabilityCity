@@ -46,7 +46,7 @@ export class TopBar {
   private render(): void {
     const s = this.snap
     const t = s ? viewTotals(s, this.view()) : null
-    const label = { connecting: 'Connecting…', live: 'Live (demo data)', reconnecting: 'Reconnecting…', offline: 'Backend offline', badData: 'Bad data, showing the last good town' }[this.status]
+    const label = { connecting: 'Connecting…', live: s?.mode === 'demo' ? 'Live (demo data)' : 'Live', reconnecting: 'Reconnecting…', offline: 'Backend offline', badData: 'Bad data, showing the last good town' }[this.status]
     const dot = this.status === 'live' ? 'live' : this.status === 'offline' || this.status === 'badData' ? '' : 'wait'
     const day = s ? clock(s.dayFraction) : ''
     // what the numbers count, in words, for the tooltips
