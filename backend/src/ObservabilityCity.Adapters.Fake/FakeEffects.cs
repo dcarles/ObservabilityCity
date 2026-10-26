@@ -48,7 +48,7 @@ public sealed record FakeEffect(string Id, string Target, FakeEffectKind Kind, d
     public string? Tenant => Target.Contains('#') ? Target[(Target.IndexOf('#') + 1)..] : null;
 }
 
-/// <summary>How the app (and later the Break things panel) steers the generator.</summary>
+/// <summary>How the app (the Break things panel and the story player) steers the generator.</summary>
 public interface IFakeControl
 {
     bool Calm { get; set; }
@@ -56,6 +56,12 @@ public interface IFakeControl
     FakeEffect Add(string target, FakeEffectKind kind, double intensity);
     bool Remove(string id);
     void Clear();
-    /// <summary>Removes every effect and forgets the backlog, dead letters and autoscaling the effects left behind, back to a calm baseline.</summary>
+    /// <summary>Removes every effect, stops the story, and forgets the backlog, dead letters and autoscaling the effects left behind, back to a calm baseline.</summary>
     void Reset();
+    /// <summary>Changes how strong an effect set by hand is. False when there is no such effect.</summary>
+    bool SetIntensity(string id, double intensity);
+    /// <summary>The story player: timelines of the same effects, layered beside the ones set by hand.</summary>
+    StoryPlayer Story { get; }
+    /// <summary>Real seconds one simulated day takes. Changing it keeps the time of day where it is.</summary>
+    double DayLengthSeconds { get; set; }
 }

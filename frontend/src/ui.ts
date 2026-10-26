@@ -1,4 +1,4 @@
-import type { Snapshot, NodeSnapshot, TenantInfo } from './types'
+import type { Snapshot, NodeSnapshot } from './types'
 import type { ConnectionState } from './connection'
 import { formatMs, formatRate } from './visuals'
 import { escapeHtml, Picker, type PickItem } from './picker'
@@ -46,7 +46,7 @@ export class TopBar {
   private render(): void {
     const s = this.snap
     const t = s ? viewTotals(s, this.view()) : null
-    const label = { connecting: 'Connecting…', live: 'Live (demo data)', reconnecting: 'Reconnecting…', offline: 'Backend offline', badData: 'Bad data, showing the last good town' }[this.status]
+    const label = { connecting: 'Connecting…', live: s?.mode === 'demo' ? 'Live (demo data)' : 'Live', reconnecting: 'Reconnecting…', offline: 'Backend offline', badData: 'Bad data, showing the last good town' }[this.status]
     const dot = this.status === 'live' ? 'live' : this.status === 'offline' || this.status === 'badData' ? '' : 'wait'
     const day = s ? clock(s.dayFraction) : ''
     // what the numbers count, in words, for the tooltips
@@ -132,91 +132,6 @@ export function showTooltip(n: NodeSnapshot | null, x: number, y: number, view: 
   const w = el.offsetWidth, h = el.offsetHeight
   el.style.left = `${Math.min(x + 16, window.innerWidth - w - 8)}px`
   el.style.top = `${Math.min(y + 16, window.innerHeight - h - 8)}px`
-}
-
-/** What the panel needs from the page: the environment to steer, and the tenants and the view the top bar picked. */
-export interface ViewControls {
-  /** The environment the page asked for (null for the default). */
-  env: string | null
-  tenants(): TenantInfo[]
-  view(): TenantView
-}
-
-interface FxState { calm: boolean; effects: { id: string; target: string; kind: string; intensity: number }[] }
-
-/**
- * Temporary controls for slice 1: they poke the fake generator so the look can be judged while things
- * break. The real Break things panel and story bar replace this in a later slice.
- */
-export class PreviewPanel {
-  private readonly el = $('preview')
-  private collapsed = false
-  private state: FxState = { calm: false, effects: [] }
-  private target = '*'
-
-  constructor(private targets: () => PickItem[], private readonly view: ViewControls) {}
-
-  private get query(): string {
-    return this.view.env ? `?env=${encodeURIComponent(this.view.env)}` : ''
-  }
-
-  async refresh(): Promise<void> {
-    try {
-      this.state = (await (await fetch(`/api/fake${this.query}`)).json()) as FxState
-    } catch { /* backend not up yet */ }
-    this.render()
-  }
-
-  private async send(path: string, method: string, body?: unknown): Promise<void> {
-    await fetch(`/api/fake${path}${this.query}`, { method, headers: { 'content-type': 'application/json' }, body: body ? JSON.stringify(body) : undefined })
-    await this.refresh()
-  }
-
-  render(): void {
-    this.el.dataset.collapsed = String(this.collapsed)
-    this.el.innerHTML = `
-      <div class="head"><h3>Try it (preview)</h3><button id="fold">${this.collapsed ? '▾' : '▴'}</button></div>
-      <p class="note">Temporary controls for this slice. The final Break things panel comes later.</p>
-      <label>Target</label>
-      <div class="combo"><input id="target" type="text" placeholder="Type to find a target" autocomplete="off" spellcheck="false" /><div id="target-results" class="picker-results" hidden></div></div>
-      <div class="grid">
-        <button data-fx="Traffic" data-i="0.8">Traffic spike</button>
-        <button data-fx="Latency" data-i="0.6">Slow</button>
-        <button data-fx="Errors" data-i="0.4">Errors</button>
-        <button data-fx="UnhealthyInstances" data-i="0.5">Sick instances</button>
-        <button data-fx="HighCpu" data-i="1">High CPU</button>
-        <button data-fx="HighMemory" data-i="1">High memory</button>
-        <button data-fx="Saturate" data-i="1">DB saturated</button>
-        <button id="tenant-throttle" title="Saturate the chosen target's database for the tenant picked in the top bar (or the first customer if none or several)">Tenant DB throttled</button>
-        <button data-fx="Backlog" data-i="1">Queue backs up</button>
-        <button data-fx="Poison" data-i="1">Dead letters</button>
-        <button data-fx="Down" data-i="1">Down</button>
-        <button data-fx="Stale" data-i="1">Go quiet</button>
-        <button data-fx="Incident" data-i="1" title="Storm over the island">Sev 1 storm</button>
-        <button data-fx="Incident" data-i="0.7" title="Rain over the island">Sev 2 rain</button>
-        <button data-fx="Incident" data-i="0.45" title="Overcast over the island">Sev 3 overcast</button>
-        <button data-fx="Incident" data-i="0.2" title="A few light clouds over the island">Sev 4 clouds</button>
-        <button id="reset">Reset all</button>
-      </div>
-      <button class="wide ${this.state.calm ? 'on' : ''}" id="calm">Calm (freeze noise and day)</button>
-      <div class="chips">${this.state.effects.map((e) => `<span class="fxchip" data-id="${e.id}" title="Click to clear">${e.kind} · ${e.target} ✕</span>`).join('')}</div>`
-    this.el.querySelector('#fold')!.addEventListener('click', () => { this.collapsed = !this.collapsed; this.render() })
-    const named = () => this.targets().find((t) => t.id === this.target)?.name ?? 'Whole town'
-    new Picker(this.el.querySelector<HTMLInputElement>('#target')!, this.el.querySelector<HTMLElement>('#target-results')!, {
-      items: () => this.targets(), limit: 200, showAll: true, label: named, onPick: (t) => { this.target = t.id },
-    })
-    this.el.querySelectorAll<HTMLButtonElement>('[data-fx]').forEach((b) =>
-      b.addEventListener('click', () => void this.send('/effects', 'POST', { target: this.target, kind: b.dataset.fx, intensity: Number(b.dataset.i) })))
-    this.el.querySelector('#tenant-throttle')!.addEventListener('click', () => {
-      const followed = this.view.view().tenants
-      const tenant = followed.length === 1 ? followed[0] : this.view.tenants().find((t) => t.kind === 'Customer')?.id
-      if (!tenant) return
-      void this.send('/effects', 'POST', { target: `${this.target}#${tenant}`, kind: 'Saturate', intensity: 1 })
-    })
-    this.el.querySelector('#reset')!.addEventListener('click', () => void this.send('/effects', 'DELETE'))
-    this.el.querySelector('#calm')!.addEventListener('click', () => void this.send('/calm', 'POST', { on: !this.state.calm }))
-    this.el.querySelectorAll<HTMLElement>('.fxchip').forEach((c) => c.addEventListener('click', () => void this.send(`/effects/${c.dataset.id}`, 'DELETE')))
-  }
 }
 
 export type SearchItem = PickItem

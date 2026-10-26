@@ -62,6 +62,7 @@ export interface NodeView {
   id: string
   state: string
   errorRate: number
+  requestsPerSecond: number
   throttled: number | null
   oldestMessageSeconds: number | null
   deadLetters: number | null

@@ -55,11 +55,44 @@ The browser app proxies `/api` and `/hubs` to the backend, so there is nothing t
 
 Hover a building for its numbers. Drag to orbit, scroll to zoom, right-drag to pan, **Home** frames the whole town. Click a building, or pick one in the search box (press `/` to focus it), and the camera glides to it and keeps its name board readable. Search also finds islands. Any drag cancels a glide.
 
-The **Try it** panel (temporary in this slice) pokes the fake data source: pick a target (the whole town, an island or one building), then press Traffic spike, Slow, Errors, Sick instances, High CPU, High memory, DB saturated, Queue backs up, Dead letters, Down, or an Incident (Sev 1 to 4, which brings weather over the island). Pick a third party as the target to take a vendor offline or slow. Effects stack, and each shows as a chip you can click to clear. **Calm** freezes the noise and the daily cycle.
+### Demo and live towns
+
+`mode` in `town.yaml` is read once, when the server starts. A town with `mode: demo` gets the fake source, `/api/fake/*`, the Break things panel and the story bar, and the top bar says "Live (demo data)". A town with no `mode`, or `mode: live`, gets none of them: `/api/fake` answers 404, the panel and story bar are not drawn, and the top bar says "Live". Every town in `shared-test-data` that uses the fake source says `mode: demo`.
+
+### Break things
+
+The **Break things** panel on the left breaks the fake town on purpose. Pick a scenario (Traffic spike, Slow, Errors, Sick instances, High CPU, High memory, DB saturated, Tenant DB throttled, Queue backs up, Dead letters, Down, Go quiet, or an incident from Sev 1 storm to Sev 4 clouds), then click a building in the town, or search for a target (the whole town, an island, a building or a third party). The search works the other way round too: choose the target, then the scenario. Esc lets go of a scenario that is waiting.
+
+Every effect shows as a chip with a slider for how strong it is and a cross to clear it. Effects stack. **Reset** clears them all, stops the story and sets the day back to its usual length. **Calm** freezes the noise and the daily cycle. **A day takes** speeds the daily traffic cycle up (2 min, 30 s or 10 s): traffic is busiest mid-afternoon and quietest at night, and services add floors at the peak and drop them again.
+
+### Stories
+
+The **story bar** at the bottom plays a story: the same effects, on a timeline, with a caption for each step and a camera that glides to what the step is about. Pick a story to start it. Play and pause, a speed button (0.5x to 8x), and a scrub bar with a tick for every step; scrubbing sets the town to exactly how it is at that second, forwards or back. Effects a story has in force show in the panel as blue "story" chips. A town ships its stories in `stories/*.yaml` beside its other config (see `config/galactic-credit/stories/`); the editor schema is `schema/story.schema.json`.
+
+```yaml
+# yaml-language-server: $schema=../schema/story.schema.json
+name: The card network goes down
+length: 75                         # seconds; optional
+steps:
+  - at: 0                          # seconds from the start
+    caption: A normal afternoon.
+    camera: pay                    # a system, third party or island to glide to
+  - at: 6
+    ramp:                          # grows from one strength to another, then holds
+      - { target: ext.card-network, kind: Errors, from: 0.1, to: 0.8, over: 14 }
+  - at: 20
+    apply:                         # starts and stays until cleared
+      - { target: ext.card-network, kind: Down }
+  - at: 48
+    clear:                         # by target, by kind, or { all: true }
+      - { target: ext.card-network }
+```
+
+A story with problems is skipped and reported when the server starts. The same controls are on `/api/fake`: `GET /stories`, `GET /story`, `POST /story/play|pause|resume|stop|seek|speed`, `PUT /effects/{id}` for the strength and `POST /day` for the length of a day.
 
 ### Demo trouble from a script
 
-Until the Break things panel exists, `scripts/trouble.ps1` pokes the fake source with ready-made trouble (PowerShell 5.1 or 7, backend running on http://localhost:5080):
+`scripts/trouble.ps1` pokes the fake source with ready-made trouble (PowerShell 5.1 or 7, backend running on http://localhost:5080):
 
 ```
 ./scripts/trouble.ps1 list                  # the presets
@@ -162,6 +195,7 @@ To refresh the golden fixtures (calm town, a bad day across several islands, and
 | Thresholds make sense: ranges, and amber below red, also after the defaults are applied | error |
 | Colours are hex, pillars have a display name, the hub has one gateway, broker, egress and database at most | error |
 | `fake.yaml` names real systems and its numbers make sense | error |
+| A town with `fake.yaml` or a `stories/` folder says `mode: demo` in `town.yaml`, and `mode` is `demo` or `live` | error |
 | A worker has a database, a system has a caller, no `layout.yaml`, an empty pillar, an island that stands alone (no API, messaging or call links) | warning |
 | Messaging: topics are services of the pillar, subscriptions name an existing topic and a worker of the same pillar, no duplicates, `legacy` exactly for the hub's egress topic | error |
 
@@ -179,7 +213,7 @@ One folder describes a town. The sample is `config/galactic-credit/`:
 
 | File | What it holds |
 | --- | --- |
-| `town.yaml` | Name, what an island is called, topology |
+| `town.yaml` | Name, what an island is called, topology, and `mode` (`demo` or `live`; left out means `live`) |
 | `defaults.yaml` | App-wide defaults per role (SLA, error, resource, throttle and backlog thresholds) |
 | `hub.yaml` | The hub's shared resources (gateway, broker, egress, database), its `messaging` topics (`egress`), and the outside callers (`externalCallers`, each lists the external systems it reaches) |
 | `layout.yaml` | The order of the islands round the hub. Unlisted pillars follow, Lost & found is always last |

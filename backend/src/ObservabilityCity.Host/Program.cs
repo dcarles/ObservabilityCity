@@ -22,7 +22,13 @@ if (args.Contains("--write-schema"))
 }
 
 var fakeOptions = builder.Configuration.GetSection("Fake").Get<FakeOptions>() ?? new FakeOptions();
-var fakeProfiles = FakeProfiles.Load(registryPath);
+// A demo town runs on the fake source and can be steered (Break things, stories). A live town has no fake source at all and no /api/fake.
+// The mode is read once, when the server starts: change town.yaml and restart to switch.
+var demo = registry.Town.IsDemo;
+var mode = registry.Town.Mode;
+var fakeProfiles = demo ? FakeProfiles.Load(registryPath) : new Dictionary<string, FakeProfile>();
+var (stories, storyNotices) = demo ? StoryFiles.Load(registryPath) : ([], []);
+foreach (var notice in storyNotices) Console.Error.WriteLine($"Registry notice: {notice}");
 var snapshotInterval = TimeSpan.FromSeconds(builder.Configuration.GetValue("Snapshot:IntervalSeconds", 2.0));
 var staleAfter = TimeSpan.FromSeconds(builder.Configuration.GetValue("Snapshot:StaleAfterSeconds", 30.0));
 
@@ -32,17 +38,20 @@ var runtimes = new List<EnvironmentRuntime>();
 foreach (var environmentId in environmentIds)
 {
     var view = new EnvironmentRegistry(registries, environmentId);
-    var fake = new FakeSource(fakeProfiles, fakeOptions, TimeProvider.System);
+    var fake = demo ? new FakeSource(fakeProfiles, fakeOptions, TimeProvider.System, stories) : null;
     var state = new LatestState();
     var store = new SnapshotStore();
     var snapshots = new SnapshotBuilder(view, state, TimeProvider.System)
     {
-        IncidentSources = [fake],
+        IncidentSources = fake is null ? [] : [fake],
         Environment = environmentId,
+        Mode = mode,
         StaleAfter = staleAfter,
-        DayFraction = () => fake.DayFraction,
+        // a demo town has its own sped-up day; a live one shows the real time of day
+        DayFraction = fake is null ? () => TimeProvider.System.GetLocalNow().TimeOfDay.TotalDays : () => fake.DayFraction,
     };
-    runtimes.Add(new EnvironmentRuntime(environmentId, view, fake, state, snapshots, store, new FakeLogSource(state, TimeProvider.System, staleAfter)));
+    ILogSource logs = fake is null ? new NoLogSource() : new FakeLogSource(state, TimeProvider.System, staleAfter);
+    runtimes.Add(new EnvironmentRuntime(environmentId, view, fake, state, snapshots, store, logs));
 }
 var environments = new EnvironmentSet(runtimes, registry.DefaultEnvironmentId);
 
@@ -57,7 +66,7 @@ builder.Services.AddSingleton<ISnapshotNotifier, SignalRSnapshotNotifier>();
 foreach (var rt in runtimes)
 {
     // AddHostedService would keep only the first of each type, so these are added as plain services
-    builder.Services.AddSingleton<IHostedService>(sp => new SourcePoller([rt.Fake], rt.Registry, rt.State, sp.GetRequiredService<ILogger<SourcePoller>>()));
+    builder.Services.AddSingleton<IHostedService>(sp => new SourcePoller(rt.Fake is null ? [] : [rt.Fake], rt.Registry, rt.State, sp.GetRequiredService<ILogger<SourcePoller>>()));
     builder.Services.AddSingleton<IHostedService>(sp => new SnapshotPublisher(rt.Builder, rt.Store, sp.GetRequiredService<ISnapshotNotifier>(), snapshotInterval, sp.GetRequiredService<ILogger<SnapshotPublisher>>()));
 }
 builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter()));
@@ -108,37 +117,77 @@ app.MapGet("/api/systems/{id}/logs", async (string id, EnvironmentSet envs, stri
    .Produces<LogLine[]>()
    .WithName("GetSystemLogs");
 
-// Demo steering for the fake generator. The Break things panel (a later slice) is built on this.
+// Demo steering for the fake generator: the Break things panel and the story bar are built on this.
+if (demo)
+{
 var fx = app.MapGroup("/api/fake").ExcludeFromDescription();
 fx.MapGet("/", (EnvironmentSet envs, string? env) =>
-    envs.Find(env) is { } rt ? Results.Ok(new { calm = rt.Fake.Calm, effects = rt.Fake.Effects }) : EnvironmentNotFound(envs, env));
+    envs.Find(env) is { } rt
+        ? Results.Ok(new { calm = rt.Fake!.Calm, dayLengthSeconds = rt.Fake!.DayLengthSeconds, effects = rt.Fake!.Effects, story = rt.Fake!.Story.State() })
+        : EnvironmentNotFound(envs, env));
 fx.MapPost("/effects", (EffectRequest r, EnvironmentSet envs, string? env) =>
 {
     if (envs.Find(env) is not { } rt) return EnvironmentNotFound(envs, env);
     if (r.Target is null) return Results.BadRequest("target is required");
-    try { return Results.Ok(rt.Fake.Add(r.Target, r.Kind, r.Intensity)); }
+    try { return Results.Ok(rt.Fake!.Add(r.Target, r.Kind, r.Intensity)); }
     catch (ArgumentException e) { return Results.BadRequest(e.Message); }
 });
+fx.MapPut("/effects/{id}", (string id, IntensityRequest r, EnvironmentSet envs, string? env) =>
+    envs.Find(env) is not { } rt ? EnvironmentNotFound(envs, env) : rt.Fake!.SetIntensity(id, r.Intensity) ? Results.NoContent() : Results.NotFound());
 fx.MapDelete("/effects/{id}", (string id, EnvironmentSet envs, string? env) =>
-    envs.Find(env) is not { } rt ? EnvironmentNotFound(envs, env) : rt.Fake.Remove(id) ? Results.NoContent() : Results.NotFound());
+    envs.Find(env) is not { } rt ? EnvironmentNotFound(envs, env) : rt.Fake!.Remove(id) ? Results.NoContent() : Results.NotFound());
 fx.MapDelete("/effects", (EnvironmentSet envs, string? env) =>
 {
     if (envs.Find(env) is not { } rt) return EnvironmentNotFound(envs, env);
-    rt.Fake.Clear();
+    rt.Fake!.Clear();
     return Results.NoContent();
 });
 fx.MapPost("/reset", (EnvironmentSet envs, string? env) =>
 {
     if (envs.Find(env) is not { } rt) return EnvironmentNotFound(envs, env);
-    rt.Fake.Reset();
+    rt.Fake!.Reset();
     return Results.NoContent();
 });
 fx.MapPost("/calm", (CalmRequest r, EnvironmentSet envs, string? env) =>
 {
     if (envs.Find(env) is not { } rt) return EnvironmentNotFound(envs, env);
-    rt.Fake.Calm = r.On;
-    return Results.Ok(new { calm = rt.Fake.Calm });
+    rt.Fake!.Calm = r.On;
+    return Results.Ok(new { calm = rt.Fake!.Calm });
 });
+
+fx.MapPost("/day", (DayRequest r, EnvironmentSet envs, string? env) =>
+{
+    if (envs.Find(env) is not { } rt) return EnvironmentNotFound(envs, env);
+    if (!(r.Seconds >= 5)) return Results.BadRequest("a day takes at least 5 seconds");
+    rt.Fake!.DayLengthSeconds = r.Seconds;
+    return Results.Ok(new { dayLengthSeconds = rt.Fake!.DayLengthSeconds });
+});
+
+// Stories: timelines of the same effects. One plays at a time; its effects go away when it stops or the panel is reset.
+fx.MapGet("/stories", (EnvironmentSet envs, string? env) =>
+    envs.Find(env) is not { } rt ? EnvironmentNotFound(envs, env)
+    : Results.Ok(rt.Fake!.Story.Library.Select(s => new StorySummary(
+        s.Id, s.Name, s.Description, s.Duration,
+        s.Steps.Select((st, i) => new StoryStepSummary(i, st.At, st.Caption, st.Camera)).ToList()))));
+fx.MapGet("/story", (EnvironmentSet envs, string? env) =>
+    envs.Find(env) is { } rt ? Results.Ok(rt.Fake!.Story.State()) : EnvironmentNotFound(envs, env));
+fx.MapPost("/story/play", (PlayRequest r, EnvironmentSet envs, string? env) =>
+    envs.Find(env) is not { } rt ? EnvironmentNotFound(envs, env)
+    : r.Id is not null && rt.Fake!.Story.Play(r.Id, r.Speed) ? Results.Ok(rt.Fake!.Story.State())
+    : Results.NotFound(new { error = $"No story '{r.Id}'.", stories = envs.Default.Fake!.Story.Library.Select(s => s.Id) }));
+fx.MapPost("/story/pause", (EnvironmentSet envs, string? env) => StoryAction(envs, env, p => p.Pause()));
+fx.MapPost("/story/resume", (EnvironmentSet envs, string? env) => StoryAction(envs, env, p => p.Resume()));
+fx.MapPost("/story/stop", (EnvironmentSet envs, string? env) => StoryAction(envs, env, p => p.Stop()));
+fx.MapPost("/story/seek", (SeekRequest r, EnvironmentSet envs, string? env) => StoryAction(envs, env, p => p.Seek(r.Seconds)));
+fx.MapPost("/story/speed", (SpeedRequest r, EnvironmentSet envs, string? env) => StoryAction(envs, env, p => p.SetSpeed(r.Speed)));
+
+static IResult StoryAction(EnvironmentSet envs, string? env, Action<StoryPlayer> act)
+{
+    if (envs.Find(env) is not { } rt) return EnvironmentNotFound(envs, env);
+    act(rt.Fake!.Story);
+    return Results.Ok(rt.Fake!.Story.State());
+}
+}
 
 static IResult EnvironmentNotFound(EnvironmentSet envs, string? env) =>
     Results.NotFound(new { error = $"No environment '{env}'.", environments = envs.All.Select(e => e.Id) });
@@ -154,6 +203,13 @@ app.Run();
 
 record EffectRequest(string? Target, FakeEffectKind Kind, double Intensity);
 record CalmRequest(bool On);
+record IntensityRequest(double Intensity);
+record DayRequest(double Seconds);
+record PlayRequest(string? Id, double? Speed);
+record SeekRequest(double Seconds);
+record SpeedRequest(double Speed);
+record StorySummary(string Id, string Name, string? Description, double Duration, IReadOnlyList<StoryStepSummary> Steps);
+record StoryStepSummary(int Index, double At, string? Caption, string? Camera);
 
 // Lets tests use WebApplicationFactory<Program>.
 public partial class Program;

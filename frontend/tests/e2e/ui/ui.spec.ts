@@ -10,8 +10,8 @@ test.describe('the top bar', () => {
       await expect(page.locator(id)).toBeVisible()
     await expect(page.locator('#town-name')).toHaveText('Mini Town')
     const bar = (await page.locator('#topbar').boundingBox())!
-    const preview = (await page.locator('#preview').boundingBox())!
-    expect(preview.y).toBeGreaterThanOrEqual(bar.y + bar.height)
+    const panel = (await page.locator('#break-panel').boundingBox())!
+    expect(panel.y).toBeGreaterThanOrEqual(bar.y + bar.height)
     for (const width of [960, 600]) {
       await page.setViewportSize({ width, height: 700 })
       const wide = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)

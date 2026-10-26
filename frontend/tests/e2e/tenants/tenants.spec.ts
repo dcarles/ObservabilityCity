@@ -169,12 +169,15 @@ test.describe('the tenant yard', () => {
     expect((await town.yard(DB)).sign.text).toBe('5 tenants, 0 throttled')
   })
 
-  test('Try it throttles the tenant picked in the top bar', async ({ town, page }) => {
+  test('Break things throttles the tenant picked in the top bar', async ({ town, page }) => {
     await page.locator('#tenant-button').click()
     await page.locator('#tenant-list .vb-row', { hasText: 'Borealis' }).click()
     await page.locator('#tenant-button').click() // closes the list
-    await page.locator('#tenant-throttle').click()
-    await expect.poll(async () => (await (await town.request.get(`${API}/api/fake?env=staging`)).json()).effects.map((e: any) => e.target)).toContain('*#borealis')
+    // the target first, then the scenario: a tenant scenario needs one store
+    await page.locator('#target').fill(DB)
+    await page.locator('#target-results .hit').first().click()
+    await page.locator('[data-scenario="tenant-db"]').click()
+    await expect.poll(async () => (await (await town.request.get(`${API}/api/fake?env=staging`)).json()).effects.map((e: any) => e.target)).toContain(`${DB}#borealis`)
   })
 })
 

@@ -233,6 +233,7 @@ export interface components {
             environments: components["schemas"]["EnvironmentInfo"][];
             tenants: components["schemas"]["TenantInfo"][];
             topology: string;
+            mode: string;
             view: components["schemas"]["ViewInfo"];
         };
         SubscriptionSnapshot: {

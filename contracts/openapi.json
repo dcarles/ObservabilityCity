@@ -666,6 +666,7 @@
           "generatedAt",
           "groupLabel",
           "groups",
+          "mode",
           "notices",
           "ringCapacity",
           "tenants",
@@ -751,6 +752,9 @@
             }
           },
           "topology": {
+            "type": "string"
+          },
+          "mode": {
             "type": "string"
           },
           "view": {
