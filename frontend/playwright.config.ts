@@ -11,6 +11,7 @@ import { fileURLToPath } from 'node:url'
 //   npm run e2e:direct   how a filtered island's traffic is shown in a town without a hub (signposts), on a small town with direct topology
 //   npm run e2e:live     a live town (no mode in town.yaml): no Break things panel, no story bar, no /api/fake, "Live" in the top bar
 //   npm run e2e:tenants  environments, tenant yards, tenant traffic and service groups, on a town with two pillars and three environments
+//   npm run e2e:towns    the town switcher and the second sample town (Droid Shop, on Kafka), on the server's own config folder with both sample towns
 //   npm run e2e:slow     the slow set: the 23-island and 35-island stress towns and the full sample town, with screenshots. Runs on merge to main and nightly.
 // Set E2E_NO_BUILD=1 when the backend is already built in Release (CI does this).
 
@@ -24,11 +25,13 @@ const registries: Record<string, string> = {
   direct: 'shared-test-data/registries/direct-town',
   live: 'shared-test-data/registries/live-town',
   tenants: 'shared-test-data/registries/tenants-town',
+  // no single folder: the server finds the towns in config/ itself
+  towns: '',
   stress: 'shared-test-data/registries/stress-23',
   stress35: 'shared-test-data/registries/stress-35',
   town: 'config/galactic-credit',
 }
-const fixture = resolve(repo, registries[suite])
+const fixture = registries[suite] ? resolve(repo, registries[suite]) : ''
 
 // The scenario tests edit registry files to check reloading, so they run against a copy. The main process makes the copy and
 // passes its path down in the environment, which the workers inherit, so there is only ever one.
@@ -37,6 +40,7 @@ if (['scenarios', 'links', 'tenants', 'ui', 'direct', 'live'].includes(suite) &&
   cpSync(fixture, copy, { recursive: true })
   process.env.E2E_REGISTRY_COPY = copy
 }
+// the towns suite reads the sample towns in place; it changes no registry file
 const registry = process.env.E2E_REGISTRY_COPY ?? fixture
 
 const API_PORT = Number(process.env.E2E_API_PORT ?? 5290)
@@ -50,7 +54,7 @@ export default defineConfig({
   workers: 1,
   fullyParallel: false,
   retries: process.env.CI ? 1 : 0,
-  timeout: ['scenarios', 'links', 'tenants', 'ui', 'direct', 'live'].includes(suite) ? 60_000 : 240_000,
+  timeout: ['scenarios', 'links', 'tenants', 'ui', 'direct', 'live', 'towns'].includes(suite) ? 60_000 : 240_000,
   expect: { timeout: 10_000 },
   reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
   outputDir: 'test-results',

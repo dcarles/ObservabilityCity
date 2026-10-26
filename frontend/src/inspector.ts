@@ -1,5 +1,6 @@
 import type { GroupSnapshot, LogLine, NodeSnapshot, Snapshot, SystemDetail } from './types'
 import { escapeHtml } from './picker'
+import { scopeParams, type Scope } from './scope'
 import { yardSummary, type TenantView } from './tenants'
 import { ago, clockTime, configOrder, filterLogs, incidentSummary, LAYER_WORD, linkSections, overviewRows, reasons, SEVERITY_WORD, stateTone, type LogFilter } from './inspectorModel'
 
@@ -13,8 +14,8 @@ const TABS: { id: InspectorTab; label: string }[] = [
 
 /** What the drawer needs from the page. */
 export interface InspectorHost {
-  /** The environment the page asked for (null for the default). */
-  env: string | null
+  /** The town and environment the page asked for (null for the defaults). */
+  scope: Scope
   /** Whether the system is drawn: a link to one the island filter hides cannot be followed. */
   onScreen(id: string): boolean
   /** Go to a linked system. */
@@ -108,7 +109,7 @@ export class Inspector {
   }
 
   private get query(): string {
-    return this.host.env ? `env=${encodeURIComponent(this.host.env)}` : ''
+    return scopeParams(this.host.scope)
   }
 
   private async loadDetail(id: string): Promise<void> {

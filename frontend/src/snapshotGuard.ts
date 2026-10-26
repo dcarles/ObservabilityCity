@@ -72,6 +72,8 @@ export function checkSnapshot(raw: unknown): Checked {
     mode: raw.mode === 'demo' ? 'demo' : 'live',
     view: checkView(raw.view),
     generatedAt: str(raw.generatedAt),
+    incidentFreeSince: typeof raw.incidentFreeSince === 'string' && Number.isFinite(Date.parse(raw.incidentFreeSince)) ? raw.incidentFreeSince : null,
+    incidentsSeen: raw.incidentsSeen === true,
     dayFraction: isFiniteNumber(raw.dayFraction) ? raw.dayFraction : 0.5,
     totals: {
       requestsPerSecond: num(totals.requestsPerSecond),

@@ -1,0 +1,12 @@
+# yaml-language-server: $schema=schema/hub.schema.json
+displayName: Platform
+color: "#7bd88f"
+resources:
+  - { id: hub.edge, name: Edge gateway, role: gateway }
+  - { id: hub.kafka, name: Kafka, role: broker }
+  - { id: hub.accounts-db, name: Shared accounts DB, role: db }
+# Outside callers of the shop: shoppers in a browser, the mobile app and the courier's tracking webhooks.
+externalCallers:
+  - { id: shoppers, name: Shoppers, calls: [web.storefront-api] }
+  - { id: mobile-app, name: Mobile app, calls: [mob.app-api] }
+  - { id: courier-webhooks, name: Courier webhooks, calls: [shp.tracking-api] }

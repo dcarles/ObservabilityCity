@@ -1,0 +1,51 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Pillar file: one island",
+  "type": "object",
+  "required": ["pillar", "displayName", "systems"],
+  "additionalProperties": false,
+  "properties": {
+    "pillar": { "$ref": "defs.schema.json#/$defs/kebabName", "description": "Short lowercase code. Must match the file name, and prefixes every system id." },
+    "displayName": { "type": "string", "description": "Name on the island's sign." },
+    "color": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$", "description": "Accent colour of the island." },
+    "external": { "type": "boolean", "description": "Every system here is reached by outside callers, unless it says otherwise." },
+    "defaults": { "$ref": "defs.schema.json#/$defs/defaults" },
+    "messaging": { "$ref": "defs.schema.json#/$defs/messaging" },
+    "systems": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "role"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*\\.[a-z0-9]+(-[a-z0-9]+)*$", "description": "pillar.system, lowercase kebab-case, unique in the town." },
+          "name": { "type": "string" },
+          "role": { "$ref": "defs.schema.json#/$defs/role" },
+          "service": { "type": "string", "description": "Systems that share a service are drawn side by side on one pad (an API, its worker and its database)." },
+          "tenantPattern": { "type": "string", "pattern": "^[^{}]*\\{tenant\\}[^{}]*$", "description": "For a database (role: db) that keeps one database per tenant: its name with {tenant} where the tenant id goes, for example merchant-{tenant}-db. The store then stands as a yard with one unit for each tenant of the environment." },
+          "external": { "type": "boolean", "description": "Reached by callers outside the town." },
+          "slaP99Ms": { "type": "number" },
+          "errors": { "$ref": "defs.schema.json#/$defs/thresholds" },
+          "resources": { "$ref": "defs.schema.json#/$defs/thresholds" },
+          "throttle": { "$ref": "defs.schema.json#/$defs/thresholds" },
+          "backlog": { "$ref": "defs.schema.json#/$defs/thresholds" },
+          "calls": {
+            "type": "array",
+            "description": "Systems this one calls directly. Cars drive only along these links.",
+            "items": { "$ref": "system-ids.schema.json#/$defs/systemId" }
+          },
+          "gatewayCalls": {
+            "type": "array",
+            "description": "Systems on other islands this one reaches through the API gateway. They draw the dependency overlay and decide where the cars come from.",
+            "items": { "$ref": "system-ids.schema.json#/$defs/systemId" }
+          },
+          "aliases": {
+            "type": "array",
+            "description": "Former ids of this system, so files that still use them keep working after a rename.",
+            "items": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+}

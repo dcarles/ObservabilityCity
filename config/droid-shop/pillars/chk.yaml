@@ -1,0 +1,14 @@
+# yaml-language-server: $schema=../schema/pillar.schema.json
+pillar: chk
+displayName: Checkout
+color: "#f2994a"
+defaults:
+  api: { slaP99Ms: 500 }
+systems:
+  - { id: chk.cart-api, service: cart, name: Cart API, role: api, external: true, calls: [chk.cart-cache, chk.orders-api, inv.stock-api] }
+  - { id: chk.cart-cache, service: cart, name: Cart cache, role: cache }
+  - { id: chk.orders-api, service: orders, name: Orders API, role: api, calls: [chk.orders-db, inv.stock-api] }
+  - { id: chk.orders-worker, service: orders, name: Orders worker, role: worker, calls: [chk.orders-db] }
+  - { id: chk.orders-db, service: orders, name: Orders DB, role: db }
+messaging:
+  topics: [orders]

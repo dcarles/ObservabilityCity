@@ -215,3 +215,42 @@ body:has(#inspector:not([hidden])) #service-panel { display: none; }
 #story-bar .time { font-variant-numeric: tabular-nums; font-size: 12px; opacity: 0.75; min-width: 72px; text-align: right; }
 @media (max-width: 760px) { #story-bar { bottom: 8px; } }
 body:has(#story-bar:not([hidden])) #banner { bottom: 130px; }
+
+/* Wall mode (?wall=1): the town on a big screen. The bar and panels go; a status strip stays. */
+body.wall #topbar, body.wall #break-panel, body.wall #story-bar, body.wall #state-list, body.wall #service-panel,
+body.wall #inspector, body.wall #legend, body.wall #notices, body.wall #tooltip { display: none !important; }
+#wall-strip { position: fixed; z-index: 9; left: 16px; right: 16px; bottom: 16px; padding: 12px 26px 14px; color: #fff; background: rgba(12, 18, 28, 0.88);
+  border: 5px solid var(--green); border-radius: 20px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.45); pointer-events: none; }
+#wall-strip[hidden] { display: none; }
+#wall-strip[data-tone='warn'] { border-color: var(--amber); }
+#wall-strip[data-tone='bad'] { border-color: var(--red); }
+#wall-strip .wall-row { display: flex; justify-content: space-between; align-items: baseline; gap: 24px; flex-wrap: wrap; }
+#wall-strip .wall-where { display: flex; gap: 14px; align-items: baseline; font-size: clamp(14px, 1.6vw, 26px); opacity: 0.85; }
+#wall-strip .wall-where b { font-size: clamp(16px, 2vw, 32px); }
+#wall-strip .wall-clock { font-variant-numeric: tabular-nums; }
+#wall-strip .wall-numbers { display: flex; gap: clamp(14px, 2.4vw, 44px); }
+#wall-strip .wall-num { display: flex; flex-direction: column; line-height: 1.05; }
+#wall-strip .wall-num b { font-size: clamp(18px, 2.4vw, 40px); font-variant-numeric: tabular-nums; }
+#wall-strip .wall-num span { font-size: clamp(10px, 1vw, 16px); opacity: 0.65; text-transform: uppercase; letter-spacing: 0.06em; }
+#wall-strip .wall-num.bad b { color: #ff6b61; }
+#wall-strip .wall-num.warn b { color: #ffc24a; }
+#wall-strip .wall-headline { font-size: clamp(28px, 5.4vw, 88px); font-weight: 900; line-height: 1.05; letter-spacing: 0.01em; color: #5ee09a; }
+#wall-strip[data-tone='warn'] .wall-headline { color: #ffc24a; }
+#wall-strip[data-tone='bad'] .wall-headline { color: #ff6b61; }
+#wall-strip .wall-counts { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 4px; font-size: clamp(14px, 1.7vw, 28px); }
+#wall-strip .wall-count b { font-variant-numeric: tabular-nums; }
+#wall-strip .wall-count.bad b { color: #ff6b61; }
+#wall-strip .wall-count.warn b { color: #ffc24a; }
+#wall-strip .wall-caption { margin-top: 4px; font-size: clamp(16px, 2.1vw, 36px); font-weight: 600; opacity: 0.95; }
+#wall-strip .wall-note { margin-top: 6px; display: inline-block; padding: 3px 14px; border-radius: 10px; background: rgba(47, 184, 106, 0.25); color: #7dffb0;
+  font-size: clamp(14px, 1.8vw, 30px); font-weight: 700; }
+#wall-pulse { position: fixed; inset: 0; z-index: 8; pointer-events: none; opacity: 0; }
+#wall-pulse.on { opacity: 1; animation: wall-pulse 1s ease-in-out infinite; }
+@keyframes wall-pulse {
+  0%, 100% { box-shadow: inset 0 0 60px 8px rgba(224, 68, 58, 0.1); }
+  50% { box-shadow: inset 0 0 180px 50px rgba(224, 68, 58, 0.6); }
+}
+#wall-connection { position: fixed; z-index: 10; top: 16px; left: 50%; transform: translateX(-50%); padding: 10px 28px; border-radius: 14px; background: var(--amber); color: #1d2a3a;
+  font-size: clamp(18px, 2.6vw, 42px); font-weight: 800; box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4); }
+#wall-connection[hidden] { display: none; }
+#wall-connection[data-state='offline'] { background: var(--red); color: #fff; }

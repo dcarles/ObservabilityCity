@@ -10,6 +10,10 @@ export interface LightingPreset {
   hemisphere: { sky: string; ground: string; intensity: number }
   sun: { color: string; intensity: number }
   exposure: number
+  /** How strongly lit windows glow: 1 is the daytime look, more makes a town readable from far away when the light is low. */
+  windowGlow: number
+  /** Where the sun stands relative to the middle of the town. A low sun throws long shadows. */
+  sunOffset: { x: number; y: number; z: number }
   /** The page behind the canvas, seen before the first frame. */
   page: string
 }
@@ -23,16 +27,20 @@ export const LIGHTING: Record<Lighting, LightingPreset> = {
     hemisphere: { sky: '#d6ecff', ground: '#c9b88f', intensity: 1.15 },
     sun: { color: '#fff0d6', intensity: 2.6 },
     exposure: 1.05,
+    windowGlow: 1,
+    sunOffset: { x: -70, y: 110, z: 60 },
     page: '#cfe9fb',
   },
   dusk: {
     name: 'Dusk',
-    sky: { top: '#1d2b57', horizon: '#f2a36b' },
-    fog: '#7a6f94',
-    sea: { deep: '#14375c', shallow: '#2d5f86' },
-    hemisphere: { sky: '#6f7fc4', ground: '#53436b', intensity: 0.75 },
-    sun: { color: '#ffb36b', intensity: 1.5 },
-    exposure: 0.95,
+    sky: { top: '#1a2552', horizon: '#f59a6a' },
+    fog: '#8a7096',
+    sea: { deep: '#14375c', shallow: '#336a94' },
+    hemisphere: { sky: '#7586d0', ground: '#5d4a74', intensity: 0.9 },
+    sun: { color: '#ffa860', intensity: 1.9 },
+    exposure: 1,
+    windowGlow: 2.6,
+    sunOffset: { x: -125, y: 46, z: 45 },
     page: '#2b3260',
   },
 }
@@ -50,15 +58,15 @@ export interface Store {
   setItem(key: string, value: string): void
 }
 
-/** The lighting the page opens with: ?light= in the address, else what this browser last chose, else Day. */
-export function startLighting(search: string, store: Store | null): Lighting {
+/** The lighting the page opens with: ?light= in the address, else what this browser last chose, else the page's own default (Day; Dusk on a wall). */
+export function startLighting(search: string, store: Store | null, fallback: Lighting = 'day'): Lighting {
   const asked = new URLSearchParams(search).get('light')
   if (isLighting(asked)) return asked
   try {
     const saved = store?.getItem(LIGHTING_KEY)
     if (isLighting(saved)) return saved
   } catch { /* storage blocked */ }
-  return 'day'
+  return fallback
 }
 
 export function saveLighting(store: Store | null, l: Lighting): void {

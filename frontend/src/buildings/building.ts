@@ -83,8 +83,9 @@ export class Building {
   /** What the viewer chose to see of the tenants. Only a tenant yard looks at it. */
   private tenantView: TenantView = ALL_TENANTS
 
-  constructor(readonly id: string, readonly kind: NodeSnapshot['kind'], accent: string, tenanted = false) {
-    this.model = buildModel(kind, accent, { tenanted })
+  /** `name` is the system's own name; a broker's port sign reads it. */
+  constructor(readonly id: string, readonly kind: NodeSnapshot['kind'], accent: string, tenanted = false, name?: string) {
+    this.model = buildModel(kind, accent, { tenanted, name })
     const m = this.model
     this.pivot.add(m.base)
     for (let i = 0; i < MAX_FLOORS; i++) {

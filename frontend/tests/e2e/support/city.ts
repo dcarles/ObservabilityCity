@@ -56,6 +56,7 @@ export interface HubStatus {
   /** Islands with a sea lane. */
   boats: number
   lighthouse: { total: number; alarm: boolean } | null
+  sign: { board: string; model: string | null }
 }
 
 export interface NodeView {
@@ -77,15 +78,28 @@ export class Town {
 
   constructor(readonly page: Page, readonly request: APIRequestContext) {}
 
-  /** `?env=` for the API calls of the environment under test. */
+  /** The town the page and the fake-source calls are about; null is the server's default. A test that wants another sets it before `open`. */
+  townId: string | null = null
+
+  /** The `town=` and `env=` parameters (no leading ? or &) that aim a request at the town and environment under test. */
+  scope(env: string | null = this.env): string {
+    const q = new URLSearchParams()
+    if (this.townId) q.set('town', this.townId)
+    if (env) q.set('env', env)
+    return q.toString()
+  }
+
+  /** `?town=&env=` for the API calls of the environment under test. */
   private get envQuery(): string {
-    return this.env ? `?env=${encodeURIComponent(this.env)}` : ''
+    const q = this.scope()
+    return q ? `?${q}` : ''
   }
 
   /** Opens the page in test mode against a calm, clean town and waits for the first snapshot. */
   async open(query = ''): Promise<void> {
     await this.reset()
-    await this.page.goto(`/?test=1&quality=low${this.env ? `&env=${encodeURIComponent(this.env)}` : ''}${query}`)
+    const scope = this.scope()
+    await this.page.goto(`/?test=1&quality=low${scope ? `&${scope}` : ''}${query}`)
     await this.page.waitForFunction(() => (window as any).city?.seen.snapshots > 0)
     // The first snapshot can predate the reset (a node still stale or down from the last test). Start from one that is calm.
     await this.page.waitForFunction(
@@ -99,8 +113,9 @@ export class Town {
   async reset(): Promise<void> {
     // calm first: a poll that lands between the two calls must not see the noisy baseline
     // every environment, not only the one under test: another test may have left one disturbed
-    const listed = await this.request.get(`${API}/api/environments`)
-    const ids = listed.ok() ? ((await listed.json()) as { id: string }[]).map((e) => `?env=${encodeURIComponent(e.id)}`) : ['']
+    const town = this.townId ? `?town=${encodeURIComponent(this.townId)}` : ''
+    const listed = await this.request.get(`${API}/api/environments${town}`)
+    const ids = listed.ok() ? ((await listed.json()) as { id: string }[]).map((e) => `?${this.scope(e.id)}`) : [town]
     for (const q of ids) {
       expect((await this.request.post(`${API}/api/fake/calm${q}`, { data: { on: true } })).ok()).toBe(true)
       expect((await this.request.post(`${API}/api/fake/reset${q}`)).ok()).toBe(true)

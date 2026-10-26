@@ -205,10 +205,12 @@ public class HostViewTests : IDisposable
         await using (var viewer = Connect("?islands=aa"))
         {
             await viewer.StartAsync();
-            Assert.Single(views.InUse("demo"));
+            // the server registers the view a moment after the socket opens
+            for (var i = 0; i < 50 && views.InUse("mini-town/demo").Count == 0; i++) await Task.Delay(100);
+            Assert.Single(views.InUse("mini-town/demo"));
         }
 
-        for (var i = 0; i < 50 && views.InUse("demo").Count > 0; i++) await Task.Delay(100);
-        Assert.Empty(views.InUse("demo"));
+        for (var i = 0; i < 50 && views.InUse("mini-town/demo").Count > 0; i++) await Task.Delay(100);
+        Assert.Empty(views.InUse("mini-town/demo"));
     }
 }

@@ -285,6 +285,13 @@ fake: { undeclaredTenants: [zeta-trading] }   # fake source only: a tenant that 
 - **Legend:** the `?` button opens a card saying what each thing means; the first visit from a browser opens it by itself.
 - **Day and Dusk** (`?light=day|dusk`, remembered per browser) and the **theme picker** (`?theme=`; one theme so far, the picker is ready for more).
 
+### Two towns, quality levels and the wall screen
+
+- **Two sample towns.** The server runs every folder in `config/` that has a `town.yaml`: Galactic Credit (Service Bus, hub-and-spoke) and Droid Shop (Kafka, islands call each other directly, a payment gateway, a courier and a push service as third parties, and a flash-sale story). `?town=droid-shop` picks one (nothing asked gets the default); the town name in the top bar becomes a dropdown when there is more than one, and switching drops the environment, islands and tenants of the old town. A town the server does not have shows an empty page with a note. `GET /api/towns` lists them; every other call takes `?town=` as well. The port sign and board carry the broker's own name (KAFKA, SERVICE BUS).
+- **Quality** (top bar list, or `?quality=high|medium|low`, remembered per browser): High is full resolution with shadows every frame and all the traffic; Medium draws fewer pixels, refreshes shadows a few times a second and sends 70% of the traffic; Low has no shadows, normal resolution and 40% of the traffic. The page still steps down by itself unless a level was chosen.
+- **Dusk** has lit windows on every building (one shared glow, so it costs nothing extra) and a low sun.
+- **Wall screen** (`?wall=1`): no bar or panels, Dusk by default, Medium quality, and a big status strip that is always on (headline, town name, requests per second, errors, p99, dead letters, a caption). The camera tours by itself: with trouble, incidents first, then what is down, then what is degraded, holding on each for 20 seconds (`&hold=` seconds) with a caption; when all is well it runs a showcase loop (the whole town, the hub, each island in order, the busiest services, the hub again) and says "All systems healthy, N h since last incident". New trouble cuts straight to it with a red pulse; when it clears the strip says "Resolved" in green. `&islands=chk,shp` makes a view for one team, `&quality=low` lowers the load, `&light=day` overrides Dusk, `&retry=` sets the seconds between tries to open the live socket again. A wall that loses the backend polls and reconnects by itself.
+
 ### Performance
 
 The sample town has 17 islands, about 110 buildings and up to 420 cars. Roads, lamps, props, bridges and quays are merged into a few meshes per island (about 4,700 draw calls instead of 8,900). If a frame takes more than 33 ms on average, quality steps down by itself, once per step and never back up: first shadows refresh a few times a second and at a lower resolution, then they turn off, and a note says so. Add `?quality=high` (or `medium`, `low`) to the address to pin a level and turn the automatic step off.
@@ -293,7 +300,9 @@ The sample town has 17 islands, about 110 buildings and up to 420 cars. Roads, l
 
 | Setting | Default | What it does |
 | --- | --- | --- |
-| `Registry:Path` | `config/galactic-credit` | Folder with the registry YAML files |
+| `Registry:Path` | none | Run only this one folder, as the single town |
+| `Registry:Towns:0` ... | every `config/*/town.yaml` | The folders of the towns to run |
+| `Registry:DefaultTown` | `galactic-credit` | The town a page gets when it asks for none |
 | `Fake:DayLengthSeconds` | `120` | Real seconds per simulated day |
 | `Snapshot:IntervalSeconds` | `2` | How often a snapshot is pushed |
 | `Snapshot:StaleAfterSeconds` | `30` | Readings older than this are shown as stale |

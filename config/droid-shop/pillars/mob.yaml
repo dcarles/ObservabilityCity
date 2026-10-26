@@ -1,0 +1,8 @@
+# yaml-language-server: $schema=../schema/pillar.schema.json
+pillar: mob
+displayName: Mobile
+color: "#c77dff"
+systems:
+  - { id: mob.app-api, service: app, name: App API, role: api, external: true, calls: [mob.app-db, mob.session-cache, web.catalog-api, chk.cart-api, inv.stock-api, hub.accounts-db] }
+  - { id: mob.app-db, service: app, name: App DB, role: db }
+  - { id: mob.session-cache, service: app, name: Session cache, role: cache }

@@ -5,6 +5,8 @@ internal static class TestPaths
     public static string RepoRoot { get; } = FindRoot();
 
     public static string Registry => Path.Combine(RepoRoot, "config", "galactic-credit");
+    public static string DroidShop => Path.Combine(RepoRoot, "config", "droid-shop");
+    public static string DirectTown => Path.Combine(RepoRoot, "shared-test-data", "registries", "direct-town");
     public static string MiniTown => Path.Combine(RepoRoot, "shared-test-data", "registries", "mini-town");
     public static string LinksTown => Path.Combine(RepoRoot, "shared-test-data", "registries", "links-town");
     public static string TenantsTown => Path.Combine(RepoRoot, "shared-test-data", "registries", "tenants-town");

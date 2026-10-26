@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Town file",
+  "type": "object",
+  "required": ["id", "name"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "$ref": "defs.schema.json#/$defs/kebabName" },
+    "name": { "type": "string" },
+    "groupLabel": { "type": "string", "description": "What an island is called in this town (Pillar, Team, ...)." },
+    "mode": { "enum": ["demo", "live"], "default": "live", "description": "demo: the town runs on fake data and has the Break things panel and the story bar. live (the default when this is left out): real sources only, nothing to break. Read when the server starts." },
+    "topology": { "enum": ["hub-and-spoke", "direct"], "description": "Whether calls between islands go through the hub." }
+  }
+}

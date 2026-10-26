@@ -4,70 +4,100 @@ using ObservabilityCity.Core.Registry;
 using ObservabilityCity.Core.Snapshots;
 using ObservabilityCity.Core.Sources;
 using ObservabilityCity.Host;
+using Microsoft.AspNetCore.SignalR;
 
 var builder = WebApplication.CreateBuilder(args);
 
-var registryPath = RegistryPath.Resolve(builder.Configuration);
-// A pillar file with problems is skipped (its island shows a config error). The files every pillar depends on must be sound.
-var registry = RegistryLoader.LoadResilient(registryPath);
-foreach (var notice in registry.Notices) Console.Error.WriteLine($"Registry notice: {notice}");
-var registries = new RegistryHolder(registry);
+// A town whose files every other file depends on being sound stops the server, as before; an extra town that is broken is left out and reported.
+var townFolders = RegistryPath.ResolveAll(builder.Configuration);
+var loaded = new List<(string Folder, Registry Registry)>();
+foreach (var folder in townFolders)
+{
+    try { loaded.Add((folder, RegistryLoader.LoadResilient(folder))); }
+    catch (Exception e) when (loaded.Count > 0)
+    {
+        Console.Error.WriteLine($"Town {folder} left out: {e.Message.ReplaceLineEndings(" ")}");
+    }
+}
+foreach (var (_, registry) in loaded)
+    foreach (var notice in registry.Notices) Console.Error.WriteLine($"Registry notice ({registry.Town.Id}): {notice}");
 
 // `dotnet run --project src/ObservabilityCity.Host -- --write-schema` refreshes the registry's editor schemas and exits.
 if (args.Contains("--write-schema"))
 {
-    RegistrySchema.Write(registry, registryPath);
-    Console.WriteLine($"Schemas written to {Path.Combine(registryPath, RegistrySchema.FolderName)}");
+    foreach (var (folder, registry) in loaded)
+    {
+        RegistrySchema.Write(registry, folder);
+        Console.WriteLine($"Schemas written to {Path.Combine(folder, RegistrySchema.FolderName)}");
+    }
     return;
 }
 
 var fakeOptions = builder.Configuration.GetSection("Fake").Get<FakeOptions>() ?? new FakeOptions();
-// A demo town runs on the fake source and can be steered (Break things, stories). A live town has no fake source at all and no /api/fake.
-// The mode is read once, when the server starts: change town.yaml and restart to switch.
-var demo = registry.Town.IsDemo;
-var mode = registry.Town.Mode;
-var fakeProfiles = demo ? FakeProfiles.Load(registryPath) : new Dictionary<string, FakeProfile>();
-var (stories, storyNotices) = demo ? StoryFiles.Load(registryPath) : ([], []);
-foreach (var notice in storyNotices) Console.Error.WriteLine($"Registry notice: {notice}");
 var snapshotInterval = TimeSpan.FromSeconds(builder.Configuration.GetValue("Snapshot:IntervalSeconds", 2.0));
 var staleAfter = TimeSpan.FromSeconds(builder.Configuration.GetValue("Snapshot:StaleAfterSeconds", 30.0));
 
-// One runtime for each environment of the town (a town without environments has the one, "demo"): its own source, readings and snapshots.
-var environmentIds = registry.Environments.Count > 0 ? registry.Environments.Select(e => e.Id).ToList() : [Registry.DemoEnvironmentId];
-var runtimes = new List<EnvironmentRuntime>();
-foreach (var environmentId in environmentIds)
+// One runtime for each environment of each town (a town without environments has the one, "demo"): its own source, readings and snapshots.
+var townRuntimes = new List<TownRuntime>();
+var hostedByTown = new List<(TownRuntime Town, List<EnvironmentRuntime> Runtimes)>();
+foreach (var (folder, registry) in loaded)
 {
-    var view = new EnvironmentRegistry(registries, environmentId);
-    var fake = demo ? new FakeSource(fakeProfiles, fakeOptions, TimeProvider.System, stories) : null;
-    var state = new LatestState();
-    var store = new SnapshotStore();
-    var snapshots = new SnapshotBuilder(view, state, TimeProvider.System)
+    if (townRuntimes.Any(t => t.Id == registry.Town.Id))
     {
-        IncidentSources = fake is null ? [] : [fake],
-        Environment = environmentId,
-        Mode = mode,
-        StaleAfter = staleAfter,
-        // a demo town has its own sped-up day; a live one shows the real time of day
-        DayFraction = fake is null ? () => TimeProvider.System.GetLocalNow().TimeOfDay.TotalDays : () => fake.DayFraction,
-    };
-    ILogSource logs = fake is null ? new NoLogSource() : new FakeLogSource(state, TimeProvider.System, staleAfter);
-    runtimes.Add(new EnvironmentRuntime(environmentId, view, fake, state, snapshots, store, logs));
+        Console.Error.WriteLine($"Town {folder} left out: another town already has the id '{registry.Town.Id}'.");
+        continue;
+    }
+    var registries = new RegistryHolder(registry);
+    // A demo town runs on the fake source and can be steered (Break things, stories). A live town has no fake source at all and no /api/fake.
+    // The mode is read once, when the server starts: change town.yaml and restart to switch.
+    var demo = registry.Town.IsDemo;
+    var mode = registry.Town.Mode;
+    var fakeProfiles = demo ? FakeProfiles.Load(folder) : new Dictionary<string, FakeProfile>();
+    var (stories, storyNotices) = demo ? StoryFiles.Load(folder) : ([], []);
+    foreach (var notice in storyNotices) Console.Error.WriteLine($"Registry notice ({registry.Town.Id}): {notice}");
+    var environmentIds = registry.Environments.Count > 0 ? registry.Environments.Select(e => e.Id).ToList() : [Registry.DemoEnvironmentId];
+    var runtimes = new List<EnvironmentRuntime>();
+    foreach (var environmentId in environmentIds)
+    {
+        var view = new EnvironmentRegistry(registries, environmentId);
+        var fake = demo ? new FakeSource(fakeProfiles, fakeOptions, TimeProvider.System, stories) : null;
+        var state = new LatestState();
+        var store = new SnapshotStore();
+        var snapshots = new SnapshotBuilder(view, state, TimeProvider.System)
+        {
+            IncidentSources = fake is null ? [] : [fake],
+            Environment = environmentId,
+            Mode = mode,
+            StaleAfter = staleAfter,
+            // a demo town has its own sped-up day; a live one shows the real time of day
+            DayFraction = fake is null ? () => TimeProvider.System.GetLocalNow().TimeOfDay.TotalDays : () => fake.DayFraction,
+        };
+        ILogSource logs = fake is null ? new NoLogSource() : new FakeLogSource(state, TimeProvider.System, staleAfter);
+        runtimes.Add(new EnvironmentRuntime(registry.Town.Id, environmentId, view, fake, state, snapshots, store, logs));
+    }
+    var town = new TownRuntime(registry.Town.Id, registry.Town.Name, folder, registries, new EnvironmentSet(runtimes, registry.DefaultEnvironmentId, registry.Town.Id));
+    townRuntimes.Add(town);
+    hostedByTown.Add((town, runtimes));
 }
-var environments = new EnvironmentSet(runtimes, registry.DefaultEnvironmentId);
+var defaultTown = builder.Configuration["Registry:DefaultTown"] is { Length: > 0 } wanted && townRuntimes.Any(t => t.Id == wanted) ? wanted : townRuntimes[0].Id;
+var towns = new TownSet(townRuntimes, defaultTown);
 
-builder.Services.AddSingleton(registries);
-builder.Services.AddSingleton<IRegistryProvider>(registries);
-builder.Services.AddHostedService(sp => new RegistryReloader(
-    registries, registryPath, TimeSpan.FromSeconds(builder.Configuration.GetValue("Registry:WatchSeconds", 5.0)), sp.GetRequiredService<ILogger<RegistryReloader>>()));
+builder.Services.AddSingleton(towns);
 builder.Services.AddSingleton(TimeProvider.System);
-builder.Services.AddSingleton(environments);
 builder.Services.AddSingleton<IslandViews>();
-builder.Services.AddSingleton<ISnapshotNotifier, SignalRSnapshotNotifier>();
-foreach (var rt in runtimes)
+foreach (var (town, runtimes) in hostedByTown)
 {
-    // AddHostedService would keep only the first of each type, so these are added as plain services
-    builder.Services.AddSingleton<IHostedService>(sp => new SourcePoller(rt.Fake is null ? [] : [rt.Fake], rt.Registry, rt.State, sp.GetRequiredService<ILogger<SourcePoller>>()));
-    builder.Services.AddSingleton<IHostedService>(sp => new SnapshotPublisher(rt.Builder, rt.Store, sp.GetRequiredService<ISnapshotNotifier>(), snapshotInterval, sp.GetRequiredService<ILogger<SnapshotPublisher>>()));
+    var holder = town.Registry;
+    builder.Services.AddSingleton<IHostedService>(sp => new RegistryReloader(
+        holder, town.Folder, TimeSpan.FromSeconds(builder.Configuration.GetValue("Registry:WatchSeconds", 5.0)), sp.GetRequiredService<ILogger<RegistryReloader>>()));
+    foreach (var rt in runtimes)
+    {
+        // AddHostedService would keep only the first of each type, so these are added as plain services
+        builder.Services.AddSingleton<IHostedService>(sp => new SourcePoller(rt.Fake is null ? [] : [rt.Fake], rt.Registry, rt.State, sp.GetRequiredService<ILogger<SourcePoller>>()));
+        builder.Services.AddSingleton<IHostedService>(sp => new SnapshotPublisher(rt.Builder, rt.Store,
+            new SignalRSnapshotNotifier(sp.GetRequiredService<IHubContext<TownHub>>(), town.Environments, sp.GetRequiredService<IslandViews>()),
+            snapshotInterval, sp.GetRequiredService<ILogger<SnapshotPublisher>>()));
+    }
 }
 builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter()));
 builder.Services.AddSignalR();
@@ -80,12 +110,16 @@ builder.Services.AddSwaggerGen(c =>
 
 var app = builder.Build();
 
-app.MapGet("/api/health", () => Results.Ok(new { status = "ok", town = registries.Current.Town.Name }))
+app.MapGet("/api/health", () => Results.Ok(new { status = "ok", town = towns.Default.Registry.Current.Town.Name }))
    .ExcludeFromDescription();
 
-// Which environment an endpoint answers for is the ?env= of its address; without one, the default environment.
+// The towns the server runs. Which one an endpoint answers for is the ?town= of its address, and which environment of it the ?env=; without them, the defaults.
+app.MapGet("/api/towns", (TownSet all) => all.Infos)
+   .Produces<TownSummary[]>()
+   .WithName("GetTowns");
+
 app.MapGet("/api/environments", (EnvironmentSet envs) =>
-        envs.All.Select(e => new EnvironmentInfo(e.Id, e.Registry.Current.ActiveEnvironment?.Name ?? e.Id, e.Id == envs.Default.Id)))
+        !envs.Exists ? EnvironmentNotFound(envs, null) : Results.Ok(envs.All.Select(e => new EnvironmentInfo(e.Id, e.Registry.Current.ActiveEnvironment?.Name ?? e.Id, e.Id == envs.Default.Id))))
    .Produces<EnvironmentInfo[]>()
    .WithName("GetEnvironments");
 
@@ -118,9 +152,18 @@ app.MapGet("/api/systems/{id}/logs", async (string id, EnvironmentSet envs, stri
    .WithName("GetSystemLogs");
 
 // Demo steering for the fake generator: the Break things panel and the story bar are built on this.
-if (demo)
+// With several towns, only a demo town answers: asking a live town for a fake call is a plain 404.
+if (townRuntimes.Any(t => t.Environments.Default.Fake is not null))
 {
 var fx = app.MapGroup("/api/fake").ExcludeFromDescription();
+fx.AddEndpointFilter(async (ctx, next) =>
+{
+    var envs = ctx.Arguments.OfType<EnvironmentSet>().FirstOrDefault();
+    var env = ctx.HttpContext.Request.Query["env"].ToString();
+    return envs is { Exists: true } && envs.Find(env) is { Fake: null }
+        ? Results.NotFound(new { error = "This town runs on live readings: there is nothing to steer." })
+        : await next(ctx);
+});
 fx.MapGet("/", (EnvironmentSet envs, string? env) =>
     envs.Find(env) is { } rt
         ? Results.Ok(new { calm = rt.Fake!.Calm, dayLengthSeconds = rt.Fake!.DayLengthSeconds, effects = rt.Fake!.Effects, story = rt.Fake!.Story.State() })
@@ -190,7 +233,9 @@ static IResult StoryAction(EnvironmentSet envs, string? env, Action<StoryPlayer>
 }
 
 static IResult EnvironmentNotFound(EnvironmentSet envs, string? env) =>
-    Results.NotFound(new { error = $"No environment '{env}'.", environments = envs.All.Select(e => e.Id) });
+    envs.Exists
+        ? Results.NotFound(new { error = $"No environment '{env}'.", environments = envs.All.Select(e => e.Id) })
+        : Results.NotFound(new { error = $"No town '{envs.TownId}'.", towns = Array.Empty<string>() });
 
 app.MapHub<TownHub>("/hubs/town");
 

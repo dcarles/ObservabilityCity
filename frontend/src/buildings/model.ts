@@ -32,6 +32,8 @@ export interface BuildingModel {
   plaque: { position: THREE.Vector3; width: number; rotY?: number }
   /** Rough footprint radius, used for hit testing and labels. */
   radius: number
+  /** The words on the building's own sign, for a model that has one worth testing (a broker's port). */
+  signText?: string
   /** Floors are fixed instead of following the instance count (a data store is not measured in instances). */
   fixedFloors?: number
   /** How busy the building is (0 to 1, from CPU), for things like chimney smoke. */

@@ -122,7 +122,7 @@ export function linkSections(d: SystemDetail): LinkSection[] {
     { id: 'gatewayCalls', title: 'Calls through the gateway', items: d.gatewayCalls.map(linkItem) },
     { id: 'gatewayCalledBy', title: 'Called through the gateway by', items: d.gatewayCalledBy.map(linkItem) },
     { id: 'outside', title: 'Called from outside', items: d.outsideCallers.map((c) => ({ id: null, name: c, where: 'Outside caller' })) },
-    { id: 'topics', title: 'Service Bus topics', items: d.serviceTopics.map((t) => ({ id: null, name: t, where: 'Topic' })) },
+    { id: 'topics', title: 'Topics published', items: d.serviceTopics.map((t) => ({ id: null, name: t, where: 'Topic' })) },
     {
       id: 'subscriptions',
       title: 'Messages',

@@ -94,6 +94,9 @@ export class BoatSystem {
     }
   }
 
+  /** The share of the usual number of boats that are sent out: 1 for all of them, less on a weak PC (see the quality presets). */
+  density = 1
+
   setRoutes(routes: BoatRoute[]): void {
     this.routes.length = 0
     this.routes.push(...routes)
@@ -107,7 +110,7 @@ export class BoatSystem {
     for (const r of this.routes) {
       const rate = r.rate()
       if (rate <= 0) continue
-      const a = (this.acc.get(r) ?? Math.random()) + rate * dt
+      const a = (this.acc.get(r) ?? Math.random()) + rate * this.density * dt
       let whole = Math.floor(a)
       this.acc.set(r, a - whole)
       while (whole-- > 0 && this.free.length > 0) this.spawn(r)
