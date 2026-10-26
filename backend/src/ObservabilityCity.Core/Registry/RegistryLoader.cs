@@ -69,6 +69,8 @@ public static class RegistryLoader
             problems.Add(message);
         }
         var town = Read<TownFile>(Path.Combine(folder, "town.yaml"));
+        if (!TownModes.All.Contains(town.Mode))
+            throw new RegistryException($"town.yaml: mode '{town.Mode}' is not known. Use {string.Join(" or ", TownModes.All)}.{DidYouMean.Hint(town.Mode, TownModes.All)}");
         var defaults = File.Exists(Path.Combine(folder, "defaults.yaml"))
             ? Read<DefaultsFile>(Path.Combine(folder, "defaults.yaml"))
             : new DefaultsFile();
@@ -239,7 +241,7 @@ public static class RegistryLoader
             throw new RegistryException($"The registry has {errors.Count} problems:\n" + string.Join("\n", errors.Select(e => "  - " + e)));
 
         var final = groups.Select(g => g with { Nodes = g.Nodes.Select(n => n with { Calls = resolved[n.Id], GatewayCalls = resolvedGateway[n.Id] }).ToList() }).ToList();
-        var registry = new Registry(new TownInfo(town.Id, town.Name, town.GroupLabel, town.Topology), final, callers)
+        var registry = new Registry(new TownInfo(town.Id, town.Name, town.GroupLabel, town.Topology, town.Mode), final, callers)
         {
             Notices = notices, Problems = problems, Vendors = vendors, RingCapacity = ringCapacity, Topics = topics, Subscriptions = subscriptions, Environments = environments,
         };

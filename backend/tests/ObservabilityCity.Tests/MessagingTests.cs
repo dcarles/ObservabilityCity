@@ -74,7 +74,7 @@ public class MessagingTests
     {
         var links = TownLinks.Of(RegistryLoader.Load(TestPaths.LinksTown));
 
-        Assert.Equal(new GroupLinks(true, true, true, false), links["ful"]);
+        Assert.Equal(new GroupLinks(true, true, false, true, false), links["ful"]);
     }
 
     [Fact]
@@ -152,7 +152,6 @@ public class MessagingTests
     public void A_call_into_an_island_gives_it_a_bridge_too()
     {
         using var copy = new RegistryCopy(TestPaths.LinksTown);
-        copy.Replace("town.yaml", "hub-and-spoke", "direct");
         copy.Replace("pillars/nom.yaml", "calls: [nom.catalog-cache] }", "calls: [nom.catalog-cache, sta.idle-cron] }");
 
         var links = TownLinks.Of(RegistryLoader.Load(copy.Path));

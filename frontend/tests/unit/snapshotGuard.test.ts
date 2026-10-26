@@ -143,3 +143,16 @@ describe('what the island filter adds to a snapshot', () => {
     expect(snapshot!.view!.links.every((l) => typeof l.nodeId === 'string' && typeof l.requestsPerSecond === 'number')).toBe(true)
   })
 })
+
+describe('the town mode', () => {
+  it('keeps demo, and treats anything else, including a snapshot with no mode, as live', () => {
+    expect(checkSnapshot({ ...calm(), mode: 'demo' }).snapshot!.mode).toBe('demo')
+    expect(checkSnapshot({ ...calm(), mode: 'live' }).snapshot!.mode).toBe('live')
+    expect(checkSnapshot({ ...calm(), mode: undefined }).snapshot!.mode).toBe('live')
+    expect(checkSnapshot({ ...calm(), mode: 'surprise' }).snapshot!.mode).toBe('live')
+  })
+
+  it('the golden demo snapshots say demo', () => {
+    expect(fixture('calm.json').mode).toBe('demo')
+  })
+})

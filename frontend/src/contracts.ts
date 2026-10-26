@@ -121,6 +121,7 @@ export interface components {
             configError?: string | null;
             incidents: components["schemas"]["IncidentSnapshot"][];
             hasBridge: boolean;
+            hasRingBridge: boolean;
             messaging: components["schemas"]["MessagingSnapshot"];
             nodes: components["schemas"]["NodeSnapshot"][];
         };
@@ -249,6 +250,7 @@ export interface components {
             environments: components["schemas"]["EnvironmentInfo"][];
             tenants: components["schemas"]["TenantInfo"][];
             topology: string;
+            mode: string;
             view: components["schemas"]["ViewInfo"];
             /** Format: date-time */
             incidentFreeSince?: string | null;

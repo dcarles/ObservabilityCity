@@ -67,6 +67,11 @@ public static class RegistryValidator
         var topology = RawYaml.Get(town.Root, "topology");
         if (topology is not null && RawYaml.Str(topology) is { } t && !Topologies.Contains(t))
             c.Error("town.yaml", RawYaml.Line(topology), "topology", $"topology '{t}' is not known. Use {string.Join(" or ", Topologies)}.{DidYouMean.Hint(t, Topologies)}");
+        // fake data and stories belong to a demo town: in a live one they would never be used, and someone probably forgot to say it is a demo
+        var mode = RawYaml.Get(town.Root, "mode");
+        var demo = mode is not null && RawYaml.Str(mode) == TownModes.Demo;
+        if (!demo && (File.Exists(Path.Combine(c.Folder, "fake.yaml")) || Directory.Exists(Path.Combine(c.Folder, "stories"))))
+            c.Error("town.yaml", mode is null ? 1 : RawYaml.Line(mode), "mode", "This town has demo files (fake.yaml or stories/) but is not set to demo, so it runs live and never uses them. Add 'mode: demo' to town.yaml, or remove the demo files.");
         foreach (var key in new[] { "id", "name" })
             if (string.IsNullOrWhiteSpace(RawYaml.Str(RawYaml.Get(town.Root, key))))
                 c.Error("town.yaml", 1, "town", $"town.yaml needs a non-empty '{key}'.");

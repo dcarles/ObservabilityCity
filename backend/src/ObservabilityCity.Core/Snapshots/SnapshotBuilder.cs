@@ -22,6 +22,9 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
 
     public string Environment { get; init; } = "demo";
 
+    /// <summary>The mode the server runs in. Fixed when the server starts, so a registry reload cannot turn a live server into a demo one. Without it, the town's own mode.</summary>
+    public string? Mode { get; init; }
+
     public Func<double> DayFraction { get; init; } = () => 0.5;
 
     /// <summary>Where open incidents come from. Without a source, the sky is clear.</summary>
@@ -41,7 +44,7 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
         var links = TownLinks.Of(registry);
         var allGroups = registry.Groups
             .Select(g => new GroupSnapshot(g.Id, g.DisplayName, g.Color, g.IsHub, g.IsLostFound, g.ConfigError,
-                incidents.GetValueOrDefault(g.Id) ?? [], links[g.Id].HasBridge, MessagingOf(registry, g),
+                incidents.GetValueOrDefault(g.Id) ?? [], links[g.Id].HasBridge, links[g.Id].HasRingBridge, MessagingOf(registry, g),
                 g.Nodes.Select(n => ToNode(n, now, registry)).ToList()))
             .ToList();
         var allVendors = registry.Vendors.Select(v => new VendorSnapshot(ToNode(v.Node, now, registry), v.CalledBy)).ToList();
@@ -98,7 +101,7 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
 
         return new Snapshot(registry.Town.Id, registry.Town.Name, registry.Town.GroupLabel, env?.Id ?? Environment, now, DayFraction(), totals, notices, groups,
             vendors, callers, dependencies, registry.RingCapacity,
-            env?.Name ?? Environment, environments, TenantsOf(env, allNodes), registry.Town.Topology, view, incidentFreeSince, incidentsSeen);
+            env?.Name ?? Environment, environments, TenantsOf(env, allNodes), registry.Town.Topology, Mode ?? registry.Town.Mode, view, incidentFreeSince, incidentsSeen);
     }
 
     /// <summary>Remembers when each island last had an open incident. Every full build calls this, so the memory does not depend on who is looking.</summary>

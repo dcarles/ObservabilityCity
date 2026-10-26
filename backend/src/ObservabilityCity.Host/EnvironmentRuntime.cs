@@ -10,7 +10,7 @@ namespace ObservabilityCity.Host;
 /// Everything one environment runs on its own: its view of the registry, its source and the readings that source produced, and the stream of
 /// snapshots built from them. Every environment of the town has one, so dev, staging and prod each move on their own.
 /// </summary>
-public sealed class EnvironmentRuntime(string townId, string id, EnvironmentRegistry registry, FakeSource fake, LatestState state, SnapshotBuilder builder, SnapshotStore store, ILogSource logs)
+public sealed class EnvironmentRuntime(string townId, string id, EnvironmentRegistry registry, FakeSource? fake, LatestState state, SnapshotBuilder builder, SnapshotStore store, ILogSource logs)
 {
     public string TownId { get; } = townId;
     public string Id { get; } = id;
@@ -18,7 +18,8 @@ public sealed class EnvironmentRuntime(string townId, string id, EnvironmentRegi
     /// <summary>The SignalR group of everyone looking at this environment of this town. Two towns can both have a "demo" or a "prod".</summary>
     public string Key { get; } = $"{townId}/{id}";
     public EnvironmentRegistry Registry { get; } = registry;
-    public FakeSource Fake { get; } = fake;
+    /// <summary>The fake source, in a demo town only. A live town has none, and nothing to steer.</summary>
+    public FakeSource? Fake { get; } = fake;
     public LatestState State { get; } = state;
     public SnapshotBuilder Builder { get; } = builder;
     public SnapshotStore Store { get; } = store;
@@ -70,4 +71,11 @@ public sealed class TownSet(IReadOnlyList<TownRuntime> all, string defaultId)
     public EnvironmentSet EnvironmentsOf(string? id) => Find(id)?.Environments ?? new EnvironmentSet([], "", id ?? "");
 
     public IReadOnlyList<TownSummary> Infos => All.Select(t => new TownSummary(t.Id, t.Registry.Current.Town.Name, t.Id == defaultId)).ToList();
+}
+
+/// <summary>The log source of a live town until a real one is wired in: no lines for any system.</summary>
+public sealed class NoLogSource : ILogSource
+{
+    public string Name => "none";
+    public Task<IReadOnlyList<LogLine>> RecentAsync(RegistryNode node, int limit, CancellationToken ct) => Task.FromResult<IReadOnlyList<LogLine>>([]);
 }
