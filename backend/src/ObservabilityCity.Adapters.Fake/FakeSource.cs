@@ -19,7 +19,8 @@ public sealed class FakeOptions
 public sealed class FakeSource(
     IReadOnlyDictionary<string, FakeProfile> profiles,
     FakeOptions options,
-    TimeProvider clock) : IMetricSource, IFakeControl, IIncidentSource
+    TimeProvider clock,
+    IReadOnlyList<Story>? stories = null) : IMetricSource, IFakeControl, IIncidentSource
 {
     // The autoscaler aims for this share of capacity, so nominal load sits mid-way and spikes push it over.
     private const double TargetUtilisation = 0.65;
@@ -33,6 +34,15 @@ public sealed class FakeSource(
     private readonly object _gate = new();
     private readonly List<FakeEffect> _effects = [];
     private int _nextId;
+    private double _dayLength = options.DayLengthSeconds;
+    private double _dayBase = 0.3; // the time of day at _dayBaseTime, as a fraction of the day
+    private DateTimeOffset _dayBaseTime = clock.GetUtcNow();
+
+    public StoryPlayer Story { get; } = new(stories ?? [], clock);
+
+    /// <summary>The effects set by hand and the ones the story has in force now.</summary>
+    private List<FakeEffect> AllEffects() =>
+        Effects.Concat(Story.Effects().Select(e => new FakeEffect(e.Id, e.Target, e.Kind, e.Intensity))).ToList();
 
     string IIncidentSource.Name => "fake";
     public string Name => "fake";
@@ -65,8 +75,20 @@ public sealed class FakeSource(
         lock (_gate) _effects.Clear();
     }
 
+    public bool SetIntensity(string id, double intensity)
+    {
+        lock (_gate)
+        {
+            var i = _effects.FindIndex(e => e.Id == id);
+            if (i < 0) return false;
+            _effects[i] = _effects[i] with { Intensity = Math.Clamp(intensity, 0, 1) };
+            return true;
+        }
+    }
+
     public void Reset()
     {
+        Story.Stop();
         lock (_gate) _effects.Clear();
         _backlog.Clear();
         _deadLetters.Clear();
@@ -79,8 +101,22 @@ public sealed class FakeSource(
         get
         {
             if (Calm) return 0.5;
-            var elapsed = (clock.GetUtcNow() - _start).TotalSeconds;
-            return (elapsed / options.DayLengthSeconds + 0.3) % 1.0;
+            lock (_gate) return (_dayBase + (clock.GetUtcNow() - _dayBaseTime).TotalSeconds / _dayLength) % 1.0;
+        }
+    }
+
+    public double DayLengthSeconds
+    {
+        get { lock (_gate) return _dayLength; }
+        set
+        {
+            lock (_gate)
+            {
+                var now = clock.GetUtcNow();
+                _dayBase = (_dayBase + (now - _dayBaseTime).TotalSeconds / _dayLength) % 1.0;
+                _dayBaseTime = now;
+                _dayLength = Math.Clamp(value, 5, 3600);
+            }
         }
     }
 
@@ -89,12 +125,11 @@ public sealed class FakeSource(
 
     public IReadOnlyList<Incident> Current(Registry registry)
     {
-        var started = _start;
         var nodeGroup = registry.AllNodes.ToDictionary(n => n.Id, n => n.GroupId);
-        return Effects.Where(e => e.Kind == FakeEffectKind.Incident)
+        return AllEffects().Where(e => e.Kind == FakeEffectKind.Incident)
             .SelectMany(e => registry.Groups
                 .Where(g => e.Target == "*" || e.Target == g.Id || nodeGroup.GetValueOrDefault(e.Target) == g.Id)
-                .Select(g => new Incident($"{e.Id}-{g.Id}", g.Id, SeverityOf(e.Intensity), $"Simulated sev{SeverityOf(e.Intensity)} incident", _incidentStart.GetValueOrDefault(e.Id, started))))
+                .Select(g => new Incident($"{e.Id}-{g.Id}", g.Id, SeverityOf(e.Intensity), $"Simulated sev{SeverityOf(e.Intensity)} incident", _incidentStart.GetOrAdd(e.Id, _ => clock.GetUtcNow()))))
             .ToList();
     }
 
@@ -102,7 +137,7 @@ public sealed class FakeSource(
     {
         var now = clock.GetUtcNow();
         var t = (now - _start).TotalSeconds;
-        var effects = Effects;
+        var effects = AllEffects();
         var result = new Dictionary<string, NodeReading>();
         var dt = _lastPoll == default ? 0 : Math.Clamp((now - _lastPoll).TotalSeconds, 0, 5);
         _lastPoll = now;

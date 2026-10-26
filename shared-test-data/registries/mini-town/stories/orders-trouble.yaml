@@ -1,0 +1,22 @@
+# yaml-language-server: $schema=../schema/story.schema.json
+id: orders-trouble
+name: Orders trouble
+description: A short story the browser tests play.
+steps:
+  - at: 0
+    caption: All quiet.
+  - at: 10
+    caption: The orders API starts to fail.
+    camera: aa.orders-api
+    ramp:
+      - { target: aa.orders-api, kind: Errors, from: 0, to: 1, over: 10 }
+  - at: 20
+    caption: The orders worker goes down.
+    camera: aa.orders-worker
+    apply:
+      - { target: aa.orders-worker, kind: Down }
+  - at: 30
+    caption: Everything recovers.
+    clear:
+      - { all: true }
+length: 40

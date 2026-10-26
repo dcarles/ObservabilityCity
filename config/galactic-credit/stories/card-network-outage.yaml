@@ -1,0 +1,40 @@
+# yaml-language-server: $schema=../schema/story.schema.json
+id: card-network-outage
+name: The card network goes down
+description: A third party fails, payments back up behind it, and the island is put under a storm.
+steps:
+  - at: 0
+    caption: A normal afternoon. Everything is green.
+    camera: pay
+  - at: 6
+    caption: The card network starts failing a few calls.
+    camera: ext.card-network
+    ramp:
+      - { target: ext.card-network, kind: Errors, from: 0.1, to: 0.8, over: 14 }
+  - at: 20
+    caption: It is down. Payments cannot authorise anything.
+    camera: pay.payments-api
+    apply:
+      - { target: ext.card-network, kind: Down }
+      - { target: pay, kind: Incident, intensity: 0.9 }
+  - at: 30
+    caption: Retries pile up. The payments worker falls behind and its queue grows.
+    camera: pay.payments-worker
+    apply:
+      - { target: pay.payments-worker, kind: Backlog, intensity: 1 }
+      - { target: pay.payments-api, kind: Latency, intensity: 0.6 }
+  - at: 48
+    caption: The network is back. Errors stop at once.
+    camera: ext.card-network
+    clear:
+      - { target: ext.card-network }
+      - { target: pay.payments-api }
+  - at: 58
+    caption: The backlog drains and the storm passes.
+    camera: pay
+    clear:
+      - { target: pay.payments-worker }
+      - { target: pay }
+  - at: 70
+    caption: Back to normal.
+length: 75

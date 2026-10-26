@@ -1,0 +1,75 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Story file: a timeline of demo trouble the story bar can play (stories/*.yaml)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["steps"],
+  "properties": {
+    "id": { "type": "string", "pattern": "^[a-z0-9-]+$", "description": "Defaults to the file name." },
+    "name": { "type": "string", "description": "What the story bar lists. Defaults to the id." },
+    "description": { "type": "string" },
+    "length": { "type": "number", "exclusiveMinimum": 0, "description": "Seconds the story runs. Defaults to 5 seconds after its last step (or the end of its longest ramp)." },
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "description": "In time order.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "at": { "type": "number", "minimum": 0, "description": "Seconds from the start of the story." },
+          "caption": { "type": "string", "description": "Shown in the story bar until a later step has a caption." },
+          "camera": { "type": "string", "description": "A system or island the camera glides to when the step begins." },
+          "apply": {
+            "type": "array",
+            "description": "Effects that start and stay until cleared.",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["target", "kind"],
+              "properties": {
+                "target": { "type": "string", "description": "A system id, an island id, a vendor id or *. A data store with a database for each tenant takes store#tenant for Saturate." },
+                "kind": { "$ref": "#/$defs/kind" },
+                "intensity": { "type": "number", "minimum": 0, "maximum": 1, "default": 1 }
+              }
+            }
+          },
+          "ramp": {
+            "type": "array",
+            "description": "Effects that grow or shrink from one intensity to another, starting with the step, and then hold.",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["target", "kind", "to"],
+              "properties": {
+                "target": { "type": "string" },
+                "kind": { "$ref": "#/$defs/kind" },
+                "from": { "type": "number", "minimum": 0, "maximum": 1, "default": 0 },
+                "to": { "type": "number", "minimum": 0, "maximum": 1 },
+                "over": { "type": "number", "exclusiveMinimum": 0, "description": "Seconds the change takes.", "default": 10 }
+              }
+            }
+          },
+          "clear": {
+            "type": "array",
+            "description": "Takes effects away: all of them, or those with this target and/or kind.",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "all": { "type": "boolean" },
+                "target": { "type": "string" },
+                "kind": { "$ref": "#/$defs/kind" }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "kind": {
+      "enum": ["Traffic", "Errors", "Latency", "UnhealthyInstances", "Down", "HighCpu", "HighMemory", "Saturate", "Backlog", "Poison", "Stale", "Incident"]
+    }
+  }
+}

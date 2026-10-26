@@ -1,0 +1,28 @@
+# yaml-language-server: $schema=../schema/story.schema.json
+id: ledger-database-saturates
+name: The ledger database saturates
+description: A traffic spike fills the ledger database, it starts to throttle, and its callers slow down.
+steps:
+  - at: 0
+    caption: Month end is coming. Traffic on the ledger starts to climb.
+    camera: cl.ledger-api
+    ramp:
+      - { target: cl.ledger-api, kind: Traffic, from: 0, to: 0.7, over: 20 }
+  - at: 22
+    caption: The ledger database is close to its limit.
+    camera: cl.ledger-db
+    ramp:
+      - { target: cl.ledger-db, kind: Saturate, from: 0, to: 1, over: 15 }
+  - at: 38
+    caption: It is throttling. Callers see errors and slow replies.
+    camera: cl.ledger-api
+    apply:
+      - { target: cl.ledger-api, kind: Latency, intensity: 0.5 }
+  - at: 55
+    caption: Traffic falls away and the database recovers.
+    camera: cl.ledger-db
+    clear:
+      - { all: true }
+  - at: 65
+    caption: Back to normal.
+length: 70
