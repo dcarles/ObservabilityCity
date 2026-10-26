@@ -73,6 +73,20 @@ public class DailyCycleTests
     }
 
     [Fact]
+    public void Reset_puts_the_day_back_to_its_usual_length_without_moving_the_time_of_day()
+    {
+        var rig = new Rig(120);
+        rig.Fake.DayLengthSeconds = 10;
+        rig.Clock.Advance(TimeSpan.FromSeconds(3));
+        var now = rig.Fake.DayFraction;
+
+        rig.Fake.Reset();
+
+        Assert.Equal(120, rig.Fake.DayLengthSeconds);
+        Assert.Equal(now, rig.Fake.DayFraction, 6);
+    }
+
+    [Fact]
     public async Task Traffic_follows_the_day_busy_in_the_afternoon_and_quiet_at_night()
     {
         var rig = new Rig(120);

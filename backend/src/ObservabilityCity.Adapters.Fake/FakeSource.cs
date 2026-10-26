@@ -89,6 +89,7 @@ public sealed class FakeSource(
     public void Reset()
     {
         Story.Stop();
+        DayLengthSeconds = options.DayLengthSeconds;
         lock (_gate) _effects.Clear();
         _backlog.Clear();
         _deadLetters.Clear();

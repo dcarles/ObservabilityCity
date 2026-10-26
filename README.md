@@ -55,11 +55,40 @@ The browser app proxies `/api` and `/hubs` to the backend, so there is nothing t
 
 Hover a building for its numbers. Drag to orbit, scroll to zoom, right-drag to pan, **Home** frames the whole town. Click a building, or pick one in the search box (press `/` to focus it), and the camera glides to it and keeps its name board readable. Search also finds islands. Any drag cancels a glide.
 
-The **Try it** panel (temporary in this slice) pokes the fake data source: pick a target (the whole town, an island or one building), then press Traffic spike, Slow, Errors, Sick instances, High CPU, High memory, DB saturated, Queue backs up, Dead letters, Down, or an Incident (Sev 1 to 4, which brings weather over the island). Pick a third party as the target to take a vendor offline or slow. Effects stack, and each shows as a chip you can click to clear. **Calm** freezes the noise and the daily cycle.
+### Break things
+
+The **Break things** panel on the left breaks the fake town on purpose. Pick a scenario (Traffic spike, Slow, Errors, Sick instances, High CPU, High memory, DB saturated, Tenant DB throttled, Queue backs up, Dead letters, Down, Go quiet, or an incident from Sev 1 storm to Sev 4 clouds), then click a building in the town, or search for a target (the whole town, an island, a building or a third party). The search works the other way round too: choose the target, then the scenario. Esc lets go of a scenario that is waiting.
+
+Every effect shows as a chip with a slider for how strong it is and a cross to clear it. Effects stack. **Reset** clears them all, stops the story and sets the day back to its usual length. **Calm** freezes the noise and the daily cycle. **A day takes** speeds the daily traffic cycle up (2 min, 30 s or 10 s): traffic is busiest mid-afternoon and quietest at night, and services add floors at the peak and drop them again.
+
+### Stories
+
+The **story bar** at the bottom plays a story: the same effects, on a timeline, with a caption for each step and a camera that glides to what the step is about. Pick a story to start it. Play and pause, a speed button (0.5x to 8x), and a scrub bar with a tick for every step; scrubbing sets the town to exactly how it is at that second, forwards or back. Effects a story has in force show in the panel as blue "story" chips. A town ships its stories in `stories/*.yaml` beside its other config (see `config/galactic-credit/stories/`); the editor schema is `schema/story.schema.json`.
+
+```yaml
+# yaml-language-server: $schema=../schema/story.schema.json
+name: The card network goes down
+length: 75                         # seconds; optional
+steps:
+  - at: 0                          # seconds from the start
+    caption: A normal afternoon.
+    camera: pay                    # a system, third party or island to glide to
+  - at: 6
+    ramp:                          # grows from one strength to another, then holds
+      - { target: ext.card-network, kind: Errors, from: 0.1, to: 0.8, over: 14 }
+  - at: 20
+    apply:                         # starts and stays until cleared
+      - { target: ext.card-network, kind: Down }
+  - at: 48
+    clear:                         # by target, by kind, or { all: true }
+      - { target: ext.card-network }
+```
+
+A story with problems is skipped and reported when the server starts. The same controls are on `/api/fake`: `GET /stories`, `GET /story`, `POST /story/play|pause|resume|stop|seek|speed`, `PUT /effects/{id}` for the strength and `POST /day` for the length of a day.
 
 ### Demo trouble from a script
 
-Until the Break things panel exists, `scripts/trouble.ps1` pokes the fake source with ready-made trouble (PowerShell 5.1 or 7, backend running on http://localhost:5080):
+`scripts/trouble.ps1` pokes the fake source with ready-made trouble (PowerShell 5.1 or 7, backend running on http://localhost:5080):
 
 ```
 ./scripts/trouble.ps1 list                  # the presets

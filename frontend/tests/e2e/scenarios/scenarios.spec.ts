@@ -409,10 +409,11 @@ test.describe('cars', () => {
 })
 
 test.describe('finding things', () => {
-  test('the Try it target is a dropdown you can type into, and what you pick is what the buttons hit', async ({ town, page }) => {
+  test('the Break things target is a dropdown you can type into, and what you pick is what the next scenario hits', async ({ town, page }) => {
     await town.open()
     const target = page.locator('#target')
-    await expect(target).toHaveValue('Whole town')
+    await expect(target).toHaveValue('')
+    await expect(target).toHaveAttribute('placeholder', 'Type to find a target')
 
     // opening it lists the whole town, and typing narrows it down
     await target.click()
@@ -424,8 +425,8 @@ test.describe('finding things', () => {
     await page.locator('#target-results .hit', { hasText: 'Ledger API' }).first().click()
     await expect(target).toHaveValue('Ledger API')
 
-    await page.locator('[data-fx="Traffic"]').click()
-    await expect(page.locator('.fxchip')).toHaveText(/Traffic · bb\.ledger-api/)
+    await page.locator('[data-scenario="traffic"]').click()
+    await expect(page.locator('.fxchip')).toHaveText(/Traffic spike · Ledger API/)
     await town.removeEffects()
 
     // an island is a target too, and Escape puts the picked name back

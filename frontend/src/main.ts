@@ -4,9 +4,12 @@ import { Stage } from './scene/stage'
 import { Town } from './scene/town'
 import { loadKit } from './assets/kit'
 import { Connection, requestedEnv } from './connection'
-import { NoticesPanel, PreviewPanel, Search, ServicePanel, showTooltip, StateList, TopBar, type SearchItem } from './ui'
+import { NoticesPanel, Search, ServicePanel, showTooltip, StateList, TopBar, type SearchItem } from './ui'
 import { ALL_TENANTS, pruneTenants, type TenantView } from './tenants'
 import { ViewBar } from './viewbar'
+import { BreakPanel } from './breakPanel'
+import { FxClient } from './fxClient'
+import { StoryBar } from './storyBar'
 import { Inspector } from './inspector'
 import { LegendCard } from './legendCard'
 import { LEGEND_SEEN_KEY } from './legend'
@@ -169,16 +172,25 @@ async function start(): Promise<void> {
   const firstVisit = (() => { try { return !!store && store.getItem(LEGEND_SEEN_KEY) === null } catch { return false } })()
   if ((firstVisit && (!testMode || params.get('legend') === 'first')) || params.get('legend') === '1') legend.open()
   const servicePanel = new ServicePanel((id) => goTo({ kind: 'building', id, name: id, where: '' }))
-  const preview = new PreviewPanel(() => [
-    { kind: 'town', id: '*', name: 'Whole town', where: '' },
-    { kind: 'island', id: 'hub', name: 'Island: Platform hub', where: 'Platform hub' },
-    ...islandItems().map((i) => ({ ...i, name: `Island: ${i.name}` })),
-    ...buildingItems(),
-  ], {
-    env,
+  const fx = new FxClient(env)
+  const breakPanel = new BreakPanel(fx, {
+    targets: () => [
+      { kind: 'town', id: '*', name: 'Whole town', where: '' },
+      { kind: 'island', id: 'hub', name: 'Island: Platform hub', where: 'Platform hub' },
+      ...islandItems().map((i) => ({ ...i, name: `Island: ${i.name}` })),
+      ...buildingItems(),
+    ],
     tenants: () => (seen.last?.tenants ?? []) as TenantInfo[],
     view: () => tenantView,
+    armedChanged: (armed) => { canvas.style.cursor = armed ? 'crosshair' : 'grab' },
   })
+  /** The story bar's camera: glides to a system, a vendor or an island without opening anything. */
+  const storyBar = new StoryBar(fx, (id) => {
+    const focus = town.focusOf(id) ?? town.islandFocusOf(id)
+    if (focus) stage.focus(focus.target, focus.distance)
+  })
+  void storyBar
+  fx.start()
 
   const search = new Search(() => [...islandItems(), ...airportItem(), ...buildingItems()], goTo)
   void search
@@ -212,7 +224,7 @@ async function start(): Promise<void> {
         seen.buildMs = performance.now() - started
         stage.frame(town.extent)
         stage.home(true)
-        void preview.refresh()
+        breakPanel.refresh()
         servicePanel.close()
       }
       town.apply(s)
@@ -278,6 +290,11 @@ async function start(): Promise<void> {
     // nothing but a service's sign or hedge under the pointer: open that service
     const svc = b ? undefined : ray.intersectObjects(town.serviceHits(), false)[0]?.object.userData.serviceKey as string | undefined
     const sv = svc && seen.last ? town.serviceSummary(svc, seen.last) : null
+    // a scenario waiting for its target takes the click instead of opening the building
+    if (breakPanel.armed) {
+      if (b) breakPanel.aimAt(b.id)
+      return
+    }
     if (b) { servicePanel.close(); inspector.open(b.id) }
     else if (sv) { inspector.close(); servicePanel.show(sv) }
     else { servicePanel.close(); inspector.close() }
@@ -294,7 +311,7 @@ async function start(): Promise<void> {
     const b = hits[0]?.object.userData.building as Building | undefined
     showTooltip(b?.node ?? null, pointerPx.x, pointerPx.y, tenantView)
     const overService = !b && ray.intersectObjects(town.serviceHits(), false).length > 0
-    canvas.style.cursor = b || overService ? 'pointer' : 'grab'
+    canvas.style.cursor = breakPanel.armed ? 'crosshair' : b || overService ? 'pointer' : 'grab'
   }
 
   // ?test=1 is for automated tests: nothing is drawn on its own, and time moves only when the test calls city.step(seconds).
@@ -320,6 +337,15 @@ async function start(): Promise<void> {
     /** Open a service's panel as a click on its sign would. */
     openService: (key: string) => { const sv = seen.last ? town.serviceSummary(key, seen.last) : null; if (sv) { inspector.close(); servicePanel.show(sv) } return sv },
     tenantView: () => tenantView,
+    breakArmed: () => breakPanel.armed,
+    /** Where a building is on the screen, in page pixels, so a test can click it. */
+    screenOf: (id: string) => {
+      const f = town.focusOf(id)
+      if (!f) return null
+      stage.camera.updateMatrixWorld()
+      const v = f.target.clone().setY(3).project(stage.camera)
+      return { x: ((v.x + 1) / 2) * window.innerWidth, y: ((1 - v.y) / 2) * window.innerHeight }
+    },
     layers: () => layers,
     /** The headline numbers as the top bar shows them for the tenants chosen. */
     totals: () => (seen.last ? viewTotals(seen.last, tenantView) : null),

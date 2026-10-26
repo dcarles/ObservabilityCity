@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  Ready-made trouble for the fake data source, until the Break things panel exists.
+  Ready-made trouble for the fake data source, from a terminal instead of the Break things panel.
 .EXAMPLE
   ./scripts/trouble.ps1 list                       # show the presets
   ./scripts/trouble.ps1 high-cpu                   # one preset
