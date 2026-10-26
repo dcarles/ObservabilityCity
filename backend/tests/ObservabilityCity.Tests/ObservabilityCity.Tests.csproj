@@ -2,6 +2,7 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <IsPackable>false</IsPackable>
+    <AdaptersAlreadyReferenced>true</AdaptersAlreadyReferenced>
   </PropertyGroup>
   <ItemGroup>
     <Using Include="Xunit" />
@@ -13,7 +14,9 @@
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" />
     <ProjectReference Include="..\..\src\ObservabilityCity.Host\ObservabilityCity.Host.csproj" />
     <ProjectReference Include="..\..\src\ObservabilityCity.Core\ObservabilityCity.Core.csproj" />
+    <ProjectReference Include="..\..\src\ObservabilityCity.Adapters.Azure\ObservabilityCity.Adapters.Azure.csproj" />
     <ProjectReference Include="..\..\src\ObservabilityCity.Adapters.Fake\ObservabilityCity.Adapters.Fake.csproj" />
     <ProjectReference Include="..\..\tools\ObservabilityCity.Validate\ObservabilityCity.Validate.csproj" />
   </ItemGroup>
+  <Import Project="..\..\Adapters.targets" />
 </Project>

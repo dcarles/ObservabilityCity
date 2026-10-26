@@ -1,0 +1,25 @@
+<Project>
+  <!--
+    Adapters are plug-ins: each is built and copied into adapters/<name>/ beside the program, and the program loads whatever it finds there. The
+    program does not reference them. Built here: the adapter projects under src/ and every project under extensions/ (a fork's own).
+    A build that wants none of them sets ExcludeAdapters=true, or leaves a project out by removing it from the AdapterProject items.
+  -->
+  <ItemGroup Condition="'$(ExcludeAdapters)' != 'true'">
+    <AdapterProject Include="$(MSBuildThisFileDirectory)src/ObservabilityCity.Adapters.*/*.csproj" Exclude="$(MSBuildThisFileDirectory)src/ObservabilityCity.Adapters.Fake/*.csproj" />
+    <AdapterProject Include="$(MSBuildThisFileDirectory)../extensions/*/*.csproj" />
+    <!-- A project that references an adapter itself (the tests) sets AdaptersAlreadyReferenced so it is not referenced twice; it is still copied. -->
+    <ProjectReference Include="@(AdapterProject)" ReferenceOutputAssembly="false" Condition="'$(AdaptersAlreadyReferenced)' != 'true'" />
+  </ItemGroup>
+
+  <Target Name="CopyAdapters" AfterTargets="Build" Condition="'$(ExcludeAdapters)' != 'true' And '@(AdapterProject)' != ''">
+    <MSBuild Projects="@(AdapterProject)" Targets="GetTargetPath" Properties="Configuration=$(Configuration)">
+      <Output TaskParameter="TargetOutputs" ItemName="_AdapterDll" />
+    </MSBuild>
+    <ItemGroup>
+      <_AdapterFile Include="%(_AdapterDll.RootDir)%(_AdapterDll.Directory)*" Exclude="%(_AdapterDll.RootDir)%(_AdapterDll.Directory)ObservabilityCity.Core.*;%(_AdapterDll.RootDir)%(_AdapterDll.Directory)ObservabilityCity.Contracts.*;%(_AdapterDll.RootDir)%(_AdapterDll.Directory)*.pdb">
+        <Adapter>$([System.String]::new('%(_AdapterDll.Filename)').Replace('ObservabilityCity.Adapters.', '').ToLowerInvariant())</Adapter>
+      </_AdapterFile>
+    </ItemGroup>
+    <Copy SourceFiles="@(_AdapterFile)" DestinationFolder="$(OutDir)adapters/%(_AdapterFile.Adapter)" SkipUnchangedFiles="true" />
+  </Target>
+</Project>

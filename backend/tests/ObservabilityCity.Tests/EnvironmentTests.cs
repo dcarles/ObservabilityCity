@@ -155,12 +155,12 @@ public class EnvironmentTests
     }
 
     [Fact]
-    public void A_source_must_have_a_kebab_case_name_and_a_known_kind()
+    public void A_source_must_have_a_kebab_case_name_and_kind()
     {
         Assert.Contains("environments/staging.yaml: source name 'Metrics' must be lowercase kebab-case",
             FailWith(c => c.Replace("environments/staging.yaml", "  metrics:", "  Metrics:")));
-        Assert.Contains("environments/staging.yaml: source 'metrics' has kind 'azure-monitor', which is not a kind of source. Use fake, resourcegraph, loganalytics, azuremonitor, servicebus, prometheus, grafana-irm. Did you mean 'azuremonitor'?",
-            FailWith(c => c.Replace("environments/staging.yaml", "kind: fake", "kind: azure-monitor")));
+        Assert.Contains("environments/staging.yaml: source 'metrics' has kind 'Azure Monitor', which must be lowercase kebab-case.",
+            FailWith(c => c.Replace("environments/staging.yaml", "kind: fake", "kind: Azure Monitor")));
     }
 
     [Fact]

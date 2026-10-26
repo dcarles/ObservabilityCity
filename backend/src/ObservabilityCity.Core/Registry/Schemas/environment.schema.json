@@ -17,9 +17,9 @@
         "required": ["kind"],
         "additionalProperties": false,
         "properties": {
-          "kind": { "enum": ["fake", "resourcegraph", "loganalytics", "azuremonitor", "servicebus", "prometheus", "grafana-irm"], "description": "The kind of source. A kind may be accepted before the adapter that reads it exists; until then its signals show no data." },
+          "kind": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$", "description": "The kind of source. Which kinds exist depends on the adapters loaded (the adapters folder beside the program): fake and prometheus are built in, the Azure ones come with the azure adapter. `validate` checks the kind against them. A kind accepted before the adapter that reads it exists shows no data." },
           "connection": { "type": "string", "description": "How to reach it (a workspace, an endpoint). Not used by the fake source." },
-          "credential": { "type": "string", "description": "Azure sources only: the login to use, by name from credentials. Without it, the Azure CLI login (az login)." },
+          "credential": { "type": "string", "description": "Sources that sign in only: the login to use, by name from credentials. Without it, the one called default, else the kind's usual login (the Azure CLI, az login, for Azure sources)." },
           "pollSeconds": { "type": "number", "exclusiveMinimum": 0, "description": "How often the source is asked. Default 30." },
           "timeoutSeconds": { "type": "number", "exclusiveMinimum": 0, "description": "How long one ask may take before it is given up. Default 10." }
         }
@@ -27,14 +27,14 @@
     },
     "credentials": {
       "type": "object",
-      "description": "How Azure sources sign in, by name. A source without a credential uses the Azure CLI login; to change that for all of them, define one called default.",
+      "description": "How sources sign in, by name. A source without a credential uses the one called default, else its kind's usual login; to change that for all of them, define one called default.",
       "propertyNames": { "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
       "additionalProperties": {
         "type": "object",
         "required": ["kind"],
         "additionalProperties": false,
         "properties": {
-          "kind": { "enum": ["azure-cli", "default", "managed-identity", "service-principal"], "description": "azure-cli: whoever az login signed in. default: the Azure SDK's usual chain. managed-identity: the identity of the machine it runs on. service-principal: an app registration." },
+          "kind": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$", "description": "The way to sign in; the adapters loaded say which exist. The azure adapter has azure-cli (whoever az login signed in), default (the Azure SDK's usual chain), managed-identity (the identity of the machine it runs on) and service-principal (an app registration)." },
           "tenantId": { "type": "string", "description": "The directory to sign in to. Without it, the login's own." },
           "clientId": { "type": "string", "description": "The app registration (service-principal) or user-assigned identity (managed-identity)." },
           "clientSecretEnv": { "type": "string", "description": "service-principal only: the name of the environment variable that holds the secret. The secret itself never goes in a registry file." }

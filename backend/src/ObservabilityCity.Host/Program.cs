@@ -1,4 +1,3 @@
-using ObservabilityCity.Adapters.Azure;
 using ObservabilityCity.Adapters.Fake;
 using ObservabilityCity.Contracts;
 using ObservabilityCity.Core.Registry;
@@ -38,8 +37,16 @@ var fakeOptions = builder.Configuration.GetSection("Fake").Get<FakeOptions>() ??
 var snapshotInterval = TimeSpan.FromSeconds(builder.Configuration.GetValue("Snapshot:IntervalSeconds", 2.0));
 var staleAfter = TimeSpan.FromSeconds(builder.Configuration.GetValue("Snapshot:StaleAfterSeconds", 30.0));
 
-// The adapters this build has, by the kind of source they serve. A live environment starts one for each source its file defines.
-var sourceCatalog = new SourceCatalog(SourceAdapters.Factories, new AzureCredentialFactory());
+// The adapters this build has: every module found in adapters/ beside the program (Adapters:Path moves the folder). A live environment starts
+// one source for each source its file defines. The host knows no platform by name; no module for it means its kinds are unknown.
+var adapterFolder = builder.Configuration["Adapters:Path"] ?? Path.Combine(AppContext.BaseDirectory, "adapters");
+var plugins = AdapterLoader.LoadFrom(adapterFolder);
+foreach (var problem in plugins.Problems) Console.Error.WriteLine(problem);
+var sourceCatalog = new AdapterCatalog(plugins.Modules);
+Console.WriteLine($"Adapters: {string.Join(", ", sourceCatalog.Modules)}");
+foreach (var (_, registry) in loaded)
+    foreach (var environment in registry.Environments)
+        foreach (var problem in sourceCatalog.Check(environment)) Console.Error.WriteLine(problem);
 
 // One runtime for each environment of each town (a town without environments has the one, "demo"): its own source, readings and snapshots.
 var townRuntimes = new List<TownRuntime>();

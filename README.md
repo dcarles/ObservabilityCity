@@ -139,7 +139,7 @@ How to read the town, as built so far:
 backend/                           .NET solution (ObservabilityCity.slnx)
   src/ObservabilityCity.Contracts    Snapshot records: the source of truth for the wire format
   src/ObservabilityCity.Core         registry loader, source interface, snapshot builder and rules
-  src/ObservabilityCity.Adapters.Azure Azure logins for the Azure sources
+  src/ObservabilityCity.Adapters.Azure the azure adapter module: Azure logins and source kinds; the host loads it from `adapters/azure`, it does not reference it
   src/ObservabilityCity.Adapters.Fake  the fake source: noise, daily cycle, autoscaling, scenario effects
   src/ObservabilityCity.Host         ASP.NET Core: /api/snapshot/latest, SignalR hub /hubs/town, /api/fake
   src/ObservabilityCity.AppHost      .NET Aspire: starts the host and the frontend together

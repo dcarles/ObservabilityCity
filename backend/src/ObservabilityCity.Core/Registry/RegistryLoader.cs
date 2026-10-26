@@ -250,9 +250,6 @@ public static class RegistryLoader
         return registry with { Warnings = TownLinks.Warnings(registry).ToList() };
     }
 
-    // Sources may be named freely; these three are the defaults for the groups of signals they have always stood for.
-    private static readonly string[] KnownSourceKinds = SourceKinds.All;
-
     /// <summary>
     /// Reads environments/*.yaml. The file name is the environment's id. A file with problems is reported (an error in a strict load) and, in a
     /// resilient load, left out, so the other environments still run. A town without the folder has no environments.
@@ -302,28 +299,17 @@ public static class RegistryLoader
         {
             if (!KebabId.IsMatch(source))
                 errors.Add($"{name}: source name '{source}' must be lowercase kebab-case");
-            if (!KnownSourceKinds.Contains(def.Kind.ToLowerInvariant()))
-                errors.Add($"{name}: source '{source}' has kind '{def.Kind}', which is not a kind of source. Use {string.Join(", ", KnownSourceKinds)}.{DidYouMean.Hint(def.Kind, KnownSourceKinds)}");
+            if (!KebabId.IsMatch(def.Kind.ToLowerInvariant()))
+                errors.Add($"{name}: source '{source}' has kind '{def.Kind}', which must be lowercase kebab-case. Which kinds exist depends on the adapters loaded; `validate` checks that");
             if (def.PollSeconds is <= 0) errors.Add($"{name}: source '{source}' has pollSeconds {def.PollSeconds}; it must be above 0");
             if (def.TimeoutSeconds is <= 0) errors.Add($"{name}: source '{source}' has timeoutSeconds {def.TimeoutSeconds}; it must be above 0");
-            if (def.Credential is not null)
-            {
-                if (!SourceKinds.UsesAzureLogin(def.Kind.ToLowerInvariant()))
-                    errors.Add($"{name}: source '{source}' names a credential, but a {def.Kind} source does not sign in to Azure");
-                else if (!f.Credentials.ContainsKey(def.Credential))
-                    errors.Add($"{name}: source '{source}' uses credential '{def.Credential}', which this file does not define.{DidYouMean.Hint(def.Credential, f.Credentials.Keys)}");
-            }
+            if (def.Credential is not null && !f.Credentials.ContainsKey(def.Credential))
+                errors.Add($"{name}: source '{source}' uses credential '{def.Credential}', which this file does not define.{DidYouMean.Hint(def.Credential, f.Credentials.Keys)}");
         }
         foreach (var (credential, def) in f.Credentials)
         {
             if (!KebabId.IsMatch(credential)) errors.Add($"{name}: credential name '{credential}' must be lowercase kebab-case");
-            var kind = def.Kind.ToLowerInvariant();
-            if (!CredentialKinds.All.Contains(kind))
-                errors.Add($"{name}: credential '{credential}' has kind '{def.Kind}'. Use {string.Join(", ", CredentialKinds.All)}.{DidYouMean.Hint(def.Kind, CredentialKinds.All)}");
-            else if (kind == CredentialKinds.ServicePrincipal && (def.ClientId is null || def.ClientSecretEnv is null))
-                errors.Add($"{name}: credential '{credential}' is a service-principal, which needs clientId and clientSecretEnv (the name of the environment variable that holds the secret)");
-            else if (kind != CredentialKinds.ServicePrincipal && def.ClientSecretEnv is not null)
-                errors.Add($"{name}: credential '{credential}' has clientSecretEnv, which only a service-principal uses");
+            if (!KebabId.IsMatch(def.Kind.ToLowerInvariant())) errors.Add($"{name}: credential '{credential}' has kind '{def.Kind}', which must be lowercase kebab-case");
         }
         foreach (var (signal, source) in f.Signals)
         {

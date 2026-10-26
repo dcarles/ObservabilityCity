@@ -90,21 +90,18 @@ public class SourcePlumbingTests
     }
 
     [Fact]
-    public void A_kind_that_is_not_one_is_refused_with_the_kinds_there_are()
+    public void The_loader_checks_only_the_shape_of_a_kind_and_leaves_which_kinds_exist_to_the_adapters_loaded()
     {
-        var message = LoadError("sources:\n  metrics: { kind: loganalytic }\n");
+        using var copy = LiveTownWith("sources:\n  metrics: { kind: nothing-reads-this }\n");
 
-        Assert.Contains("environments/prod.yaml: source 'metrics' has kind 'loganalytic', which is not a kind of source. Use fake, resourcegraph, loganalytics, azuremonitor, servicebus, prometheus, grafana-irm. Did you mean 'loganalytics'?", message);
+        Assert.Equal("nothing-reads-this", RegistryLoader.Load(copy.Path).Environments.Single().Sources.Single().Kind);
+        Assert.Contains("source 'metrics' has kind 'Not Kebab', which must be lowercase kebab-case", LoadError("sources:\n  metrics: { kind: Not Kebab }\n"));
     }
 
     [Theory]
     [InlineData("sources:\n  metrics: { kind: prometheus, pollSeconds: 0 }\n", "source 'metrics' has pollSeconds 0; it must be above 0")]
     [InlineData("sources:\n  metrics: { kind: prometheus, timeoutSeconds: -5 }\n", "source 'metrics' has timeoutSeconds -5; it must be above 0")]
     [InlineData("sources:\n  metrics: { kind: loganalytics, credential: reader }\n", "source 'metrics' uses credential 'reader', which this file does not define")]
-    [InlineData("sources:\n  metrics: { kind: prometheus, credential: reader }\ncredentials:\n  reader: { kind: azure-cli }\n", "source 'metrics' names a credential, but a prometheus source does not sign in to Azure")]
-    [InlineData("credentials:\n  reader: { kind: azure-clu }\n", "credential 'reader' has kind 'azure-clu'. Use azure-cli, default, managed-identity, service-principal. Did you mean 'azure-cli'?")]
-    [InlineData("credentials:\n  reader: { kind: service-principal, tenantId: t }\n", "credential 'reader' is a service-principal, which needs clientId and clientSecretEnv")]
-    [InlineData("credentials:\n  reader: { kind: azure-cli, clientSecretEnv: X }\n", "credential 'reader' has clientSecretEnv, which only a service-principal uses")]
     [InlineData("sources:\n  metrics: { kind: prometheus }\nsignals:\n  cpuu: metrics\n", "unknown signal 'cpuu'. Use requests, errors, latency, instances, cpu, memory, utilisation, throttled, backlog, deadLetters. Did you mean 'cpu'?")]
     [InlineData("sources:\n  metrics: { kind: prometheus }\nsignals:\n  cpu: metrcs\n", "signal 'cpu' comes from source 'metrcs', which this file does not define. Did you mean 'metrics'?")]
     public void Mistakes_in_sources_credentials_and_signals_are_named_with_the_file(string environment, string expected)
@@ -278,13 +275,38 @@ public class SourcePlumbingTests
         public IMetricSource Create(SourceContext context) => new Recorded(context);
     }
 
-    private sealed class Logins : ICredentialFactory
+    /// <summary>Records the logins asked for instead of making Azure ones.</summary>
+    private sealed class Logins
     {
         public List<RegistryCredential> Made { get; } = [];
-        public ICredentialSource Create(RegistryCredential credential) { Made.Add(credential); return new TokenCredentialSource(new AzureCliCredential()); }
+        public IEnumerable<ICredentialKind> Kinds => new[] { "azure-cli", "service-principal" }.Select(k => (ICredentialKind)new RecordedLogin(k, Made));
     }
 
-    private static SourceCatalog Catalog(Logins logins, params string[] kinds) => new(kinds.Select(k => new RecordingFactory(k)), logins);
+    private sealed class RecordedLogin(string kind, List<RegistryCredential> made) : ICredentialKind
+    {
+        public string Kind { get; } = kind;
+        public IEnumerable<string> Check(RegistryCredential credential) => [];
+        public ICredentialSource Create(RegistryCredential credential) { made.Add(credential); return new TokenCredentialSource(new AzureCliCredential()); }
+    }
+
+    /// <summary>A module of test doubles: the given source factories, and the kinds below that sign in.</summary>
+    private sealed class TestModule(IEnumerable<IMetricSourceFactory> factories, IEnumerable<ICredentialKind> logins) : IAdapterModule
+    {
+        private static readonly string[] SignIn = ["loganalytics", "resourcegraph", "azuremonitor", "servicebus"];
+        public string Name => "test";
+
+        public void Register(IAdapterRegistry registry)
+        {
+            foreach (var f in factories)
+            {
+                registry.AddSourceKind(new SourceKindInfo(f.Kind, SignIn.Contains(f.Kind) ? "azure-cli" : null));
+                registry.AddSource(f);
+            }
+            foreach (var l in logins) registry.AddCredentialKind(l);
+        }
+    }
+
+    private static AdapterCatalog Catalog(Logins logins, params string[] kinds) => new([new TestModule(kinds.Select(k => new RecordingFactory(k)), logins.Kinds)]);
 
     [Fact]
     public void Each_defined_source_is_started_by_the_adapter_for_its_kind_with_its_own_settings()
@@ -326,7 +348,7 @@ public class SourcePlumbingTests
         var set = Catalog(new Logins(), "loganalytics").Build(RegistryLoader.Load(copy.Path).Environments.Single());
 
         Assert.Equal(["metrics"], set.Sources.Select(s => s.Name));
-        Assert.Contains("source 'inventory' is a resourcegraph source, and this build has no adapter for resourcegraph yet, so its signals have no data.", string.Join("\n", set.Problems));
+        Assert.Contains("source 'inventory' is a resourcegraph source, and no loaded adapter reads resourcegraph yet, so its signals have no data.", string.Join("\n", set.Problems));
         Assert.Equal(2, set.Problems.Count);
     }
 
@@ -346,7 +368,7 @@ public class SourcePlumbingTests
     {
         using var copy = LiveTownWith(ShapeA);
         var failing = new FailingFactory("loganalytics");
-        var catalog = new SourceCatalog([failing, new RecordingFactory("resourcegraph"), new RecordingFactory("azuremonitor")], new Logins());
+        var catalog = new AdapterCatalog([new TestModule([failing, new RecordingFactory("resourcegraph"), new RecordingFactory("azuremonitor")], new Logins().Kinds)]);
 
         var set = catalog.Build(RegistryLoader.Load(copy.Path).Environments.Single());
 
@@ -450,7 +472,7 @@ public class SourcePlumbingTests
     {
         using var copy = LiveTownWith(ShapeA);
 
-        var result = await SourceCheck.RunAsync(copy.Path, [], TimeSpan.FromSeconds(1), TestContext.Current.CancellationToken);
+        var result = await SourceCheck.RunAsync(copy.Path, [], TimeSpan.FromSeconds(1), TestContext.Current.CancellationToken, AzureOnly().SourceKindNames);
 
         Assert.Equal(["inventory", "metrics", "platform"], result.Findings.Where(f => f.Result.Status == ProbeStatus.NoProbeYet).Select(f => f.Signal).Order());
         Assert.Contains(result.Findings, f => f.Signal == "incidents" && f.Result.Status == ProbeStatus.NotConfigured);
@@ -459,13 +481,15 @@ public class SourcePlumbingTests
 
     // ---- the logins ----
 
+    private static AzureLogin[] Azure(Func<string, string?> env) => [new AzureCliLogin(), new AzureDefaultLogin(), new AzureManagedIdentityLogin(), new AzureServicePrincipalLogin(env)];
+
     [Theory]
     [InlineData("azure-cli", typeof(AzureCliCredential))]
     [InlineData("default", typeof(DefaultAzureCredential))]
     [InlineData("managed-identity", typeof(ManagedIdentityCredential))]
     public void Each_kind_of_login_makes_its_azure_credential_without_signing_anyone_in(string kind, Type expected)
     {
-        var made = new AzureCredentialFactory(_ => null).Credential(new RegistryCredential("c", kind, "tenant-x", null, null));
+        var made = ((AzureLogin)Azure(_ => null).Single(l => l.Kind == kind)).Credential(new RegistryCredential("c", kind, "tenant-x", null, null));
 
         Assert.IsType(expected, made);
     }
@@ -474,7 +498,7 @@ public class SourcePlumbingTests
     public void A_service_principal_reads_its_secret_from_the_environment_variable_it_names()
     {
         string? asked = null;
-        var factory = new AzureCredentialFactory(name => { asked = name; return "s3cret"; });
+        var factory = new AzureServicePrincipalLogin(name => { asked = name; return "s3cret"; });
 
         var made = factory.Credential(new RegistryCredential("reader", "service-principal", "tenant-a", "client-a", "EXAMPLE_SECRET"));
 
@@ -485,7 +509,7 @@ public class SourcePlumbingTests
     [Fact]
     public void A_service_principal_whose_variable_is_not_set_says_which_one_is_missing()
     {
-        var factory = new AzureCredentialFactory(_ => null);
+        var factory = new AzureServicePrincipalLogin(_ => null);
 
         var e = Assert.Throws<InvalidOperationException>(() => factory.Credential(new RegistryCredential("reader", "service-principal", "t", "c", "EXAMPLE_SECRET")));
 
@@ -496,9 +520,7 @@ public class SourcePlumbingTests
     public void A_login_that_cannot_be_made_leaves_out_only_the_sources_that_use_it()
     {
         using var copy = LiveTownWith(ShapeA);
-        var catalog = new SourceCatalog(
-            new[] { "loganalytics", "resourcegraph", "azuremonitor" }.Select(k => new RecordingFactory(k)),
-            new AzureCredentialFactory(_ => null)); // EXAMPLE_SECRET is not set
+        var catalog = new AdapterCatalog([new TestModule(new[] { "loganalytics", "resourcegraph", "azuremonitor" }.Select(k => new RecordingFactory(k)), Azure(_ => null))]); // EXAMPLE_SECRET is not set
 
         var set = catalog.Build(RegistryLoader.Load(copy.Path).Environments.Single());
 
@@ -526,5 +548,90 @@ public class SourcePlumbingTests
         // and each one's snapshot hides exactly what its config leaves without a source
         Assert.Equal(["backlog", "deadLetters"], Find(Build(ra), node).Absent);
         Assert.Equal(["instances", "cpu", "memory", "utilisation", "throttled"], Find(Build(rb), node).Absent);
+    }
+
+    // ---- the adapters a build has ----
+
+    private static AdapterCatalog AzureOnly() => new([new AzureAdapters()]);
+
+    private static IReadOnlyList<string> Check(string environment)
+    {
+        using var copy = LiveTownWith(environment);
+        return AzureOnly().Check(RegistryLoader.Load(copy.Path).Environments.Single());
+    }
+
+    [Theory]
+    [InlineData("sources:\n  metrics: { kind: loganalytic }\n", "source 'metrics' has kind 'loganalytic', which is not a kind of source this build knows. Use fake, prometheus, grafana-irm, resourcegraph, loganalytics, azuremonitor, servicebus. Did you mean 'loganalytics'?")]
+    [InlineData("sources:\n  metrics: { kind: prometheus, credential: reader }\ncredentials:\n  reader: { kind: azure-cli }\n", "source 'metrics' names a credential, but a prometheus source does not sign in")]
+    [InlineData("credentials:\n  reader: { kind: azure-clu }\n", "credential 'reader' has kind 'azure-clu'. Use azure-cli, default, managed-identity, service-principal. Did you mean 'azure-cli'?")]
+    [InlineData("credentials:\n  reader: { kind: service-principal, tenantId: t }\n", "credential 'reader' is a service-principal, which needs clientId and clientSecretEnv")]
+    [InlineData("credentials:\n  reader: { kind: azure-cli, clientSecretEnv: X }\n", "credential 'reader' has clientSecretEnv, which only a service-principal uses")]
+    public void The_modules_loaded_say_what_is_wrong_with_a_kind_of_source_or_login(string environment, string expected)
+    {
+        Assert.Contains(Check(environment), p => p.StartsWith($"environments/prod.yaml: {expected}"));
+    }
+
+    [Fact]
+    public void A_good_environment_passes_the_check_of_the_modules_it_needs_and_both_shapes_do()
+    {
+        Assert.Empty(Check(ShapeA));
+        Assert.Empty(Check(ShapeB));
+    }
+
+    [Fact]
+    public void A_build_without_a_module_does_not_know_its_kinds_and_logins()
+    {
+        using var copy = LiveTownWith(ShapeA);
+        var nothing = new AdapterCatalog([]);
+
+        var problems = nothing.Check(RegistryLoader.Load(copy.Path).Environments.Single());
+
+        Assert.Equal(["fake", "prometheus", "grafana-irm"], nothing.SourceKindNames);
+        Assert.Empty(nothing.CredentialKindNames);
+        Assert.Contains(problems, p => p.Contains("source 'metrics' has kind 'loganalytics', which is not a kind of source this build knows"));
+        Assert.Contains(problems, p => p.Contains("credential 'reader' has kind 'service-principal'. Use ."));
+    }
+
+    [Fact]
+    public void Modules_are_loaded_from_their_own_folders_under_adapters_and_share_the_cores_types()
+    {
+        var loaded = AdapterLoader.LoadFrom(Path.Combine(AppContext.BaseDirectory, "adapters"));
+
+        Assert.Empty(loaded.Problems);
+        var module = Assert.Single(loaded.Modules);
+        Assert.Equal("azure", module.Name);
+        Assert.NotSame(typeof(AzureAdapters), module.GetType()); // its own load context, not the one the tests were loaded into
+        var catalog = new AdapterCatalog(loaded.Modules);
+        Assert.Contains("loganalytics", catalog.SourceKindNames);
+        Assert.Equal(["azure-cli", "default", "managed-identity", "service-principal"], catalog.CredentialKindNames.Order());
+    }
+
+    [Fact]
+    public void A_folder_with_no_adapters_loads_nothing_and_a_broken_one_is_reported_not_fatal()
+    {
+        var root = Directory.CreateTempSubdirectory().FullName;
+        try
+        {
+            Assert.Empty(AdapterLoader.LoadFrom(Path.Combine(root, "missing")).Modules);
+
+            var broken = Directory.CreateDirectory(Path.Combine(root, "broken")).FullName;
+            File.WriteAllText(Path.Combine(broken, "Some.Adapters.dll"), "not an assembly");
+            Directory.CreateDirectory(Path.Combine(root, "empty"));
+            var loaded = AdapterLoader.LoadFrom(root);
+
+            Assert.Empty(loaded.Modules);
+            Assert.Contains(loaded.Problems, p => p.Contains("broken"));
+        }
+        finally { Directory.Delete(root, true); }
+    }
+
+    [Fact]
+    public void The_host_does_not_reference_azure_it_loads_it()
+    {
+        var referenced = typeof(TownRuntime).Assembly.GetReferencedAssemblies().Select(a => a.Name).ToList();
+
+        Assert.DoesNotContain("ObservabilityCity.Adapters.Azure", referenced);
+        Assert.DoesNotContain("Azure.Identity", referenced);
+        Assert.True(File.Exists(Path.Combine(AppContext.BaseDirectory, "adapters", "azure", "ObservabilityCity.Adapters.Azure.dll")), "the build copies the azure adapter into adapters/azure");
     }
 }

@@ -21,7 +21,7 @@ public static class SourceCheck
     /// <summary>The sources an environment is reported on even when it does not define them: what the signals use unless told otherwise.</summary>
     public static readonly string[] Signals = ["metrics", "incidents", "messaging"];
 
-    public static async Task<SourceCheckResult> RunAsync(string folder, IReadOnlyList<ISourceProbe> probes, TimeSpan timeout, CancellationToken ct)
+    public static async Task<SourceCheckResult> RunAsync(string folder, IReadOnlyList<ISourceProbe> probes, TimeSpan timeout, CancellationToken ct, IReadOnlyCollection<string>? knownKinds = null)
     {
         var findings = new List<SourceFinding>();
         var dir = Path.Combine(folder, "environments");
@@ -38,9 +38,9 @@ public static class SourceCheck
                     continue;
                 }
                 var probe = probes.FirstOrDefault(p => p.Kind == source.Kind);
-                if (probe is null && Core.Sources.SourceKinds.All.Contains(source.Kind))
+                if (probe is null && knownKinds?.Contains(source.Kind) == true)
                 {
-                    findings.Add(new SourceFinding(env, signal, source.Kind, new ProbeResult(ProbeStatus.NoProbeYet, "the registry accepts this kind; its probe comes with its adapter")));
+                    findings.Add(new SourceFinding(env, signal, source.Kind, new ProbeResult(ProbeStatus.NoProbeYet, "a loaded adapter accepts this kind; its probe comes with the adapter")));
                     continue;
                 }
                 if (probe is null)

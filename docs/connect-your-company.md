@@ -114,7 +114,11 @@ The signals are `requests`, `errors`, `latency`, `instances`, `cpu`, `memory`, `
 signals: { cpu: platform }    # every system of the pillar takes cpu from the source called platform
 ```
 
-Every source takes `pollSeconds` (default 30) and `timeoutSeconds` (default 10). Which kinds the build can already read is in the table of the phase you are on; a kind the registry accepts before its adapter exists shows no data (grey) and the server says so when it starts.
+Every source takes `pollSeconds` (default 30) and `timeoutSeconds` (default 10). Which kinds the build can already read is in the table of the phase you are on; a kind whose adapter is not loaded is an error in `validate` and, when the server starts, a notice; its signals then show no data (grey).
+
+### Adapters are plug-ins
+
+The program knows no platform by name. Each platform's source kinds and logins come in an adapter module: a folder under `adapters/` beside the program, which the host loads when it starts (`Adapters:Path` moves the folder). The build puts every adapter project in `backend/src/` and every project in `extensions/` there. Azure is the `azure` module; a company on another cloud, or that reads metrics from somewhere else, adds a module for it and leaves Azure out (`dotnet build -p:ExcludeAdapters=true` builds without any). Sources do not have to share a platform: an environment can read metrics from Prometheus while its resources are read from Azure.
 
 ### Logins
 
@@ -138,7 +142,7 @@ A login defined with the name `default` replaces the Azure CLI one for every sou
 
 ### What each adapter's runbook section contains
 
-Each real adapter lands with its own section here, with the same four parts: the permission the login needs, the `connection` value, the `pollSeconds` and `timeoutSeconds` that suit it, and what `--sources` reports for it. Until an adapter has its section, its kind is only accepted by the registry.
+Each real adapter lands with its own section here, with the same four parts: the permission the login needs, the `connection` value, the `pollSeconds` and `timeoutSeconds` that suit it, and what `--sources` reports for it. Until an adapter has its section, its kind is known to the module but nothing reads it yet.
 
 ## 5. Run the check
 
@@ -156,7 +160,7 @@ For each environment and signal it makes one cheap read with your Azure login an
 | unreachable | No answer, an error, or a timeout | Check the address, VPN, firewall |
 | not configured | The environment has no source for this signal | Fine; the town leaves the signal out |
 | unknown kind | The kind is spelt wrong or has no probe | The message lists the kinds it knows |
-| no probe yet | The registry accepts the kind but its probe arrives with its adapter | Nothing; not a failure |
+| no probe yet | A loaded adapter knows the kind but its probe arrives with the adapter | Nothing; not a failure |
 
 The exit code is 1 when anything is *no permission*, *unreachable* or *unknown kind* (and, with `--strict`, *empty*), so you can run it in a pipeline.
 
