@@ -61,6 +61,55 @@
         }
       }
     },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "How this environment's pillars and systems map onto the cloud: the subscription of each pillar, the workspace, which resources belong to a service and what the telemetry calls each system. Every convention is a rule or a template here; the program assumes none. Templates have {variable} and {variable|filter} holes (filters: nospace, lower, upper); {environment} is this file's id and variables are your own.",
+      "properties": {
+        "inventory": { "type": "string", "description": "The source (from sources) that reads the inventory, a resourcegraph source. Without it, the only one." },
+        "workspace": { "type": "string", "description": "The workspace the telemetry is in, a template over {environment} and variables." },
+        "variables": { "type": "object", "description": "Your own words for the templates, for example env: prd.", "additionalProperties": { "type": "string" } },
+        "subscription": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "How a pillar finds its subscription: by name or by tag (exactly one). Templates over {pillar} (its scope.code, else its id), {pillarId}, {environment} and variables.",
+          "properties": {
+            "nameLike": { "type": "string", "description": "A wildcard (* and ?) matched, ignoring case, against the subscriptions' names, for example *-{env}-{pillar}." },
+            "tag": {
+              "type": "object",
+              "required": ["key"],
+              "additionalProperties": false,
+              "properties": { "key": { "type": "string" }, "value": { "type": "string", "description": "Default {pillar}." } }
+            }
+          }
+        },
+        "pillars": { "type": "object", "description": "Pillars named instead of found: pillar id to subscription id.", "additionalProperties": { "type": "string" } },
+        "resources": {
+          "type": "array",
+          "description": "Which resources belong to a service.",
+          "items": {
+            "type": "object",
+            "required": ["name", "types", "pattern"],
+            "additionalProperties": false,
+            "properties": {
+              "name": { "$ref": "defs.schema.json#/$defs/kebabName", "description": "Names the rule in what the inspector shows." },
+              "types": { "type": "array", "minItems": 1, "items": { "type": "string" }, "description": "The resource types it applies to, for example microsoft.web/serverfarms." },
+              "pattern": { "type": "string", "description": "A regular expression over the resource's name, ignoring case. Named groups: service (required) is matched with a system's serviceCode; role (api, worker...), pillar, region and tenant are optional." },
+              "roles": { "type": "array", "items": { "enum": ["api", "worker", "db", "cache", "cron", "gateway", "broker", "egress"] }, "description": "Only systems of these roles. Without it, all." },
+              "serviceTag": { "type": "string", "description": "A tag that names the service, for a resource whose name does not match the pattern." },
+              "tenantNameTag": { "type": "string", "description": "The tag that holds a tenant's friendly name, on resources whose pattern has a tenant group." }
+            }
+          }
+        },
+        "telemetryRole": { "type": "string", "description": "What the telemetry calls a system that has no telemetry.role of its own: a template over {system}, {service}, {name}, {role}, {pillar}, {pillarId}, {environment} and variables." },
+        "queries": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Replaces the inventory source's own queries. {types} in resources stands for the quoted resource types the rules name.",
+          "properties": { "subscriptions": { "type": "string" }, "resources": { "type": "string" } }
+        }
+      }
+    },
     "exclude": {
       "type": "array",
       "description": "Systems that are not deployed in this environment. They are left out of its town, and an island with no system left is not on the map.",

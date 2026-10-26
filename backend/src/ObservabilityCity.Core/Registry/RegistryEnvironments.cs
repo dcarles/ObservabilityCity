@@ -42,6 +42,8 @@ public sealed partial record Registry
     /// <summary>Things worth fixing about an environment that do not stop it: tenant databases but no tenants listed.</summary>
     internal static IEnumerable<string> EnvironmentWarnings(RegistryEnvironment env, Registry view)
     {
+        foreach (var pillar in env.Scope.PillarSubscriptions.Keys.Where(p => view.Groups.All(g => g.Id != p)))
+            yield return $"Environment '{env.Id}': scope.pillars names '{pillar}', which is not a pillar of this town (or is not deployed here).{DidYouMean.Hint(pillar, view.Groups.Select(g => g.Id))}";
         var tenanted = view.AllNodes.Where(n => n.TenantPattern is not null).ToList();
         if (tenanted.Count > 0 && env.Tenants.Count == 0 && env.UndeclaredTenants.Count == 0)
             yield return $"Environment '{env.Id}' lists no tenants, so its {tenanted.Count} tenant database{(tenanted.Count == 1 ? "" : "s")} show an empty yard. Add tenants to environments/{env.Id}.yaml.";

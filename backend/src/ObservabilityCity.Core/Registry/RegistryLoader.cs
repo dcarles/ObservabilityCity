@@ -12,7 +12,7 @@ namespace ObservabilityCity.Core.Registry;
 /// Every problem found in the files is collected and reported together, each naming its file, with a
 /// "did you mean" for names that are close to a real one.
 /// </summary>
-public static class RegistryLoader
+public static partial class RegistryLoader
 {
     private static readonly Regex KebabId = new("^[a-z0-9]+(-[a-z0-9]+)*$", RegexOptions.Compiled);
     private static readonly Regex UnknownKey = new("Property '([^']+)' not found", RegexOptions.Compiled);
@@ -32,6 +32,8 @@ public static class RegistryLoader
         "amber", "red", "vendors", "calledBy", "gatewayCalls", "messaging", "topics", "subscriptions", "topic", "consumer", "legacy",
         "tenantPattern", "order", "default", "sources", "kind", "connection", "tenants", "exclude", "fake", "undeclaredTenants",
         "signals", "credentials", "credential", "pollSeconds", "timeoutSeconds", "tenantId", "clientId", "clientSecretEnv",
+        "scope", "inventory", "workspace", "variables", "subscription", "pillars", "types", "pattern", "roles", "serviceTag", "tenantNameTag",
+        "telemetryRole", "queries", "nameLike", "tag", "key", "value", "code", "serviceCode", "telemetry",
     ];
 
     // Last resort when defaults.yaml is missing or silent about a role.
@@ -284,6 +286,7 @@ public static class RegistryLoader
             {
                 Credentials = f.Credentials.Select(kv => new RegistryCredential(kv.Key, kv.Value.Kind.ToLowerInvariant(), kv.Value.TenantId, kv.Value.ClientId, kv.Value.ClientSecretEnv)).ToList(),
                 Signals = f.Signals,
+                Scope = ToScope(f.Scope),
             }, f.Order ?? 100));
         }
         var ordered = parsed.OrderBy(p => p.Order).ThenBy(p => p.Env.Id, StringComparer.Ordinal).Select(p => p.Env).ToList();
@@ -318,6 +321,7 @@ public static class RegistryLoader
             if (source != Signals.None && !f.Sources.ContainsKey(source))
                 errors.Add($"{name}: signal '{signal}' comes from source '{source}', which this file does not define.{DidYouMean.Hint(source, f.Sources.Keys)}");
         }
+        CheckScope(f, name, errors);
         var seen = new HashSet<string>();
         foreach (var t in f.Tenants)
         {
@@ -408,8 +412,11 @@ public static class RegistryLoader
             .Select(s => ToNode(s, p.Pillar, name, p.Pillar, defaults, p.Defaults, p.External, p.Signals, ids, aliases, errors))
             .OfType<RegistryNode>()
             .ToList();
+        if (p.Scope?.Code is { } scopeCode && scopeCode.Trim().Length == 0)
+            errors.Add($"{name}: scope.code is empty; leave it out to use the pillar id");
         var group = new RegistryGroup(p.Pillar, p.DisplayName, p.Color, false, nodes)
         {
+            Code = p.Scope?.Code,
             TopicServices = p.Messaging?.Topics ?? [],
             SubscriptionDecls = (p.Messaging?.Subscriptions ?? []).Select(x => (x.Topic, x.Consumer, x.Legacy)).ToList(),
         };
@@ -516,6 +523,8 @@ public static class RegistryLoader
         }
 
         if (!TryParseKind(s.Role, s.Id, fileName, errors, out var kind)) return null;
+        if (s.ServiceCode is { } code && code.Trim().Length == 0) errors.Add($"{fileName}: serviceCode of '{s.Id}' is empty; leave it out to use the service name");
+        if (s.Telemetry?.Role is { } telemetryRole && telemetryRole.Trim().Length == 0) errors.Add($"{fileName}: telemetry.role of '{s.Id}' is empty; leave it out to derive it from the environment");
         CheckSignals(s.Signals, $"'{s.Id}'", fileName, errors);
         if (s.TenantPattern is not null)
         {
@@ -562,6 +571,8 @@ public static class RegistryLoader
             s.Calls)
         {
             GatewayCalls = s.GatewayCalls,
+            ServiceCode = s.ServiceCode,
+            TelemetryRole = s.Telemetry?.Role,
             TenantPattern = s.TenantPattern,
             Signals = Merge(pillarSignals, s.Signals),
             SourceFile = fileName,

@@ -50,6 +50,10 @@ internal sealed class SystemFile
     public ErrorThresholdsFile? Backlog { get; set; }
     /// <summary>Signal to source name (or none), overriding the pillar's and the environment's choice for this system.</summary>
     public Dictionary<string, string> Signals { get; set; } = new();
+    /// <summary>The name this system's resources carry for its service, matched against the service group of the environment's resource patterns. Without it, the service name.</summary>
+    public string? ServiceCode { get; set; }
+    /// <summary>What the telemetry says about this system.</summary>
+    public TelemetryFile? Telemetry { get; set; }
     /// <summary>Ids of the systems this one calls directly. Cars drive only along declared links.</summary>
     public List<string> Calls { get; set; } = [];
     /// <summary>Ids of systems on other islands this one reaches through the API gateway (the way calls between islands go in a hub-and-spoke town).</summary>
@@ -69,6 +73,20 @@ internal sealed class PillarFile
     public Dictionary<string, string> Signals { get; set; } = new();
     public List<SystemFile> Systems { get; set; } = [];
     public MessagingFile? Messaging { get; set; }
+    /// <summary>How the pillar is spelt in the environments' scope rules, when that is not its id.</summary>
+    public PillarScopeFile? Scope { get; set; }
+}
+
+internal sealed class PillarScopeFile
+{
+    /// <summary>What {pillar} stands for in the scope rules. Without it, the pillar id.</summary>
+    public string? Code { get; set; }
+}
+
+internal sealed class TelemetryFile
+{
+    /// <summary>The name the telemetry gives this system (its role name). Without it, the environment's scope.telemetryRole template, if any.</summary>
+    public string? Role { get; set; }
 }
 
 /// <summary>The "messaging" block of a pillar file (or hub.yaml): the outboxes it publishes and the topics its workers consume.</summary>
@@ -148,6 +166,48 @@ internal sealed class EnvironmentFile
     public List<string> Exclude { get; set; } = [];
     /// <summary>Settings for the fake source only.</summary>
     public EnvironmentFakeFile? Fake { get; set; }
+    /// <summary>How pillars and systems map onto the cloud: subscriptions, workspace, resources and telemetry names.</summary>
+    public ScopeFile? Scope { get; set; }
+}
+
+internal sealed class ScopeFile
+{
+    public string? Inventory { get; set; }
+    public string? Workspace { get; set; }
+    public Dictionary<string, string> Variables { get; set; } = new();
+    public SubscriptionRuleFile? Subscription { get; set; }
+    public Dictionary<string, string> Pillars { get; set; } = new();
+    public List<ResourceRuleFile> Resources { get; set; } = [];
+    public string? TelemetryRole { get; set; }
+    public ScopeQueriesFile? Queries { get; set; }
+}
+
+internal sealed class SubscriptionRuleFile
+{
+    public string? NameLike { get; set; }
+    public TagRuleFile? Tag { get; set; }
+}
+
+internal sealed class TagRuleFile
+{
+    public string Key { get; set; } = "";
+    public string? Value { get; set; }
+}
+
+internal sealed class ResourceRuleFile
+{
+    public string Name { get; set; } = "";
+    public List<string> Types { get; set; } = [];
+    public string Pattern { get; set; } = "";
+    public List<string> Roles { get; set; } = [];
+    public string? ServiceTag { get; set; }
+    public string? TenantNameTag { get; set; }
+}
+
+internal sealed class ScopeQueriesFile
+{
+    public string? Subscriptions { get; set; }
+    public string? Resources { get; set; }
 }
 
 internal sealed class SourceFile

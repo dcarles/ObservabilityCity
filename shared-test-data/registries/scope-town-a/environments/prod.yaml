@@ -1,0 +1,16 @@
+# Convention A: everything is in the names. A subscription is named <org>-<region>-<env>-<pillar code>; resources are named <kind>-<org>-<pillar code>-<service code>-<region><hash>;
+# a data account is <tenant id>-<pillar code>-<service code>. The telemetry names are written out on each system.
+name: Production
+default: true
+sources:
+  inventory: { kind: resourcegraph, connection: "file:inventory.json" }
+scope:
+  inventory: inventory
+  variables: { env: prd }
+  workspace: "ws-{env}-main"
+  subscription: { nameLike: "*-{env}-{pillar}" }
+  resources:
+    - { name: plans, types: [microsoft.web/serverfarms], roles: [api, worker], pattern: '^plan-cf-[^-]+-(?<pillar>[^-]+)-(?<service>[^-]+)-(?<region>[a-z]+)' }
+    - { name: apps, types: [microsoft.web/sites], roles: [api, worker], pattern: '^(?<role>api|worker)-[^-]+-(?<pillar>[^-]+)-(?<service>[^-]+)-(?<region>[a-z]+)' }
+    - { name: accounts, types: [microsoft.documentdb/databaseaccounts], roles: [db], pattern: '^(?<tenant>[0-9a-f]{32})-(?<pillar>[^-]+)-(?<service>[^-]+)$', tenantNameTag: tenant }
+exclude: [cc.notify-api, cc.notify-worker, cc.notify-db]

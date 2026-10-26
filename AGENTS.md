@@ -23,7 +23,7 @@ source (fake now, Prometheus / Log Analytics / Service Bus / Grafana IRM later)
 | --- | --- |
 | `backend/src/ObservabilityCity.Contracts` | Snapshot records: the wire format. Source of truth for the TypeScript types |
 | `backend/src/ObservabilityCity.Core` | Registry loader and schema, source interfaces (`IMetricSource`, `IIncidentSource`, `ILogSource`), `SourcePoller`, `SnapshotBuilder` and the health rules |
-| `backend/src/ObservabilityCity.Adapters.Azure` | the azure adapter module (`IAdapterModule`): Azure source kinds and logins (`az login`, managed identity, service principal); no queries yet. The host does not reference it: the build copies it to `adapters/azure/` and the host loads it |
+| `backend/src/ObservabilityCity.Adapters.Azure` | the azure adapter module (`IAdapterModule`): Azure source kinds and logins (`az login`, managed identity, service principal), and the `resourcegraph` inventory source that fills the scope (see **Scope** below). The host does not reference it: the build copies it to `adapters/azure/` and the host loads it |
 | `backend/src/ObservabilityCity.Adapters.Fake` | The fake source: noise, daily cycle, autoscaling, scenarios and stories |
 | `backend/src/ObservabilityCity.Host` | ASP.NET Core host: one runtime per town and environment, REST, SignalR |
 | `backend/src/ObservabilityCity.AppHost` | .NET Aspire app host that starts backend and frontend together |
@@ -82,6 +82,8 @@ sources:
 ```
 
 A signal with no source is absent from the town (not grey: grey is a configured source with no fresh data). Source names are free (`metrics`, `messaging`, `incidents` are the defaults); `signals:` in an environment, a pillar or a system points a signal at a named source or at `none`. Kinds: `fake`, `resourcegraph`, `loganalytics`, `azuremonitor`, `servicebus`, `prometheus`, `grafana-irm`. Azure sources sign in with `az login` unless a `credentials:` entry says otherwise; a secret is never in a file, only the name of the variable that holds it. Real adapters arrive phase by phase (see the plan); a kind with no adapter yet is accepted, reported at start-up, and shows no data. The demo town's fake source fills every signal.
+
+**Scope** (`scope:` in an environment file) says how pillars and systems map onto the cloud: a pillar's subscription (by a name pattern, a tag or an id), the workspace, which resources belong to a service (a regular expression over names with `service`, `role`, `region` and `tenant` groups), and what the telemetry calls a system (`telemetry.role` on a system, or a `telemetryRole` template). Every convention is a rule or template with `{variables}`; core assumes none, and a test runs two towns with opposite conventions (`shared-test-data/registries/scope-town-a` and `-b`) to prove it. `ScopeResolver` is pure; the `resourcegraph` source only fills a `ScopeStore` with the inventory it read, and later adapters ask the store where a system lives. The inspector's Config tab shows the result. The runbook has the details.
 
 Edit YAML with the schemas in `schema/` for completion. `dotnet run --project backend/tools/ObservabilityCity.Validate -- --all` must stay clean.
 

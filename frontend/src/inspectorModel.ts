@@ -1,6 +1,6 @@
 // What the inspector drawer says, as pure functions: a system's numbers in, rows and sentences out.
 
-import type { ConfigValue, HealthState, IncidentSnapshot, LinkRef, LogLine, NodeSnapshot, SettingLayer, SystemDetail } from './types'
+import type { ConfigValue, HealthState, IncidentSnapshot, LinkRef, LogLine, NodeSnapshot, ScopeInfo, ScopeResource, SettingLayer, SystemDetail } from './types'
 import { isAbsent, isUnmonitored } from './signals'
 import { formatAge, formatMs, formatRate, plaqueText, resourceUse } from './visuals'
 
@@ -133,4 +133,49 @@ export function linkSections(d: SystemDetail): LinkSection[] {
     },
   ]
   return sections.filter((s) => s.items.length > 0)
+}
+
+export interface ScopeRow {
+  key: string
+  value: string
+  /** How the value was found, in words. */
+  note: string
+}
+
+export interface ScopeView {
+  rows: ScopeRow[]
+  resources: ScopeResource[]
+  problems: string[]
+  /** What the inventory is doing, when that matters; empty once it has been read. */
+  status: string
+}
+
+const VIA: Record<string, string> = {
+  explicit: 'named in the environment file',
+  name: 'found by its name',
+  tag: 'found by its tag',
+  'telemetry.role': 'set on this system',
+  'scope.telemetryRole': 'derived from the environment template',
+}
+
+const INVENTORY: Record<string, string> = {
+  none: 'No inventory source is configured, so only what the rules say on their own is shown.',
+  waiting: 'Waiting for the first read of the inventory.',
+  failed: 'The last read of the inventory failed. What was read before is shown.',
+  read: '',
+}
+
+/**
+ * The "where it lives" part of the Config tab. Null when the environment has no scope rules at all (nothing is drawn); a value the rules do not give
+ * is left out, not shown empty.
+ */
+export function scopeView(s: ScopeInfo | null | undefined): ScopeView | null {
+  if (!s) return null
+  const rows: ScopeRow[] = []
+  if (s.subscription) rows.push({ key: 'subscription', value: s.subscription, note: VIA[s.subscriptionVia ?? ''] ?? '' })
+  if (s.workspace) rows.push({ key: 'workspace', value: s.workspace, note: 'from the environment' })
+  if (s.serviceCode) rows.push({ key: 'service code', value: s.serviceCode, note: 'matched against resource names' })
+  if (s.telemetryRole) rows.push({ key: 'telemetry role', value: s.telemetryRole, note: VIA[s.telemetryRoleVia ?? ''] ?? '' })
+  const resources = [...s.resources].sort((a, b) => a.name.localeCompare(b.name))
+  return { rows, resources, problems: [...s.problems], status: INVENTORY[s.inventoryState] ?? '' }
 }

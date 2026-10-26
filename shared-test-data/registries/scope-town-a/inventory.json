@@ -1,0 +1,143 @@
+{
+  "subscriptions": [
+    {
+      "id": "00000000-0000-0000-0000-0000000000a1",
+      "name": "acme-eu-prd-al",
+      "tags": {}
+    },
+    {
+      "id": "00000000-0000-0000-0000-0000000000a2",
+      "name": "acme-eu-prd-be",
+      "tags": {}
+    },
+    {
+      "id": "00000000-0000-0000-0000-0000000000a3",
+      "name": "acme-eu-stg-al",
+      "tags": {}
+    }
+  ],
+  "resources": [
+    {
+      "id": "/subscriptions/00000000-0000-0000-0000-0000000000a1/resourceGroups/rg/providers/microsoft.web/serverfarms/plan-cf-acme-al-ord-northeurope1x",
+      "name": "plan-cf-acme-al-ord-northeurope1x",
+      "type": "microsoft.web/serverfarms",
+      "subscriptionId": "00000000-0000-0000-0000-0000000000a1",
+      "location": "northeurope",
+      "tags": {}
+    },
+    {
+      "id": "/subscriptions/00000000-0000-0000-0000-0000000000a1/resourceGroups/rg/providers/microsoft.web/serverfarms/plan-cf-acme-al-ord-westeurope9z",
+      "name": "plan-cf-acme-al-ord-westeurope9z",
+      "type": "microsoft.web/serverfarms",
+      "subscriptionId": "00000000-0000-0000-0000-0000000000a1",
+      "location": "westeurope",
+      "tags": {}
+    },
+    {
+      "id": "/subscriptions/00000000-0000-0000-0000-0000000000a1/resourceGroups/rg/providers/microsoft.web/sites/api-acme-al-ord-northeurope1x",
+      "name": "api-acme-al-ord-northeurope1x",
+      "type": "microsoft.web/sites",
+      "subscriptionId": "00000000-0000-0000-0000-0000000000a1",
+      "location": "northeurope",
+      "tags": {}
+    },
+    {
+      "id": "/subscriptions/00000000-0000-0000-0000-0000000000a1/resourceGroups/rg/providers/microsoft.web/sites/worker-acme-al-ord-northeurope1x",
+      "name": "worker-acme-al-ord-northeurope1x",
+      "type": "microsoft.web/sites",
+      "subscriptionId": "00000000-0000-0000-0000-0000000000a1",
+      "location": "northeurope",
+      "tags": {}
+    },
+    {
+      "id": "/subscriptions/00000000-0000-0000-0000-0000000000a1/resourceGroups/rg/providers/microsoft.documentdb/databaseaccounts/11111111111111111111111111111111-al-ord",
+      "name": "11111111111111111111111111111111-al-ord",
+      "type": "microsoft.documentdb/databaseaccounts",
+      "subscriptionId": "00000000-0000-0000-0000-0000000000a1",
+      "location": "northeurope",
+      "tags": {
+        "tenant": "Acme Bank"
+      }
+    },
+    {
+      "id": "/subscriptions/00000000-0000-0000-0000-0000000000a1/resourceGroups/rg/providers/microsoft.documentdb/databaseaccounts/22222222222222222222222222222222-al-ord",
+      "name": "22222222222222222222222222222222-al-ord",
+      "type": "microsoft.documentdb/databaseaccounts",
+      "subscriptionId": "00000000-0000-0000-0000-0000000000a1",
+      "location": "northeurope",
+      "tags": {
+        "tenant": "Borealis Credit Union"
+      }
+    },
+    {
+      "id": "/subscriptions/00000000-0000-0000-0000-0000000000a1/resourceGroups/rg/providers/microsoft.documentdb/databaseaccounts/33333333333333333333333333333333-al-ord",
+      "name": "33333333333333333333333333333333-al-ord",
+      "type": "microsoft.documentdb/databaseaccounts",
+      "subscriptionId": "00000000-0000-0000-0000-0000000000a1",
+      "location": "northeurope",
+      "tags": {
+        "tenant": "Cygnus Finance"
+      }
+    },
+    {
+      "id": "/subscriptions/00000000-0000-0000-0000-0000000000a2/resourceGroups/rg/providers/microsoft.web/serverfarms/plan-cf-acme-be-led-northeurope1x",
+      "name": "plan-cf-acme-be-led-northeurope1x",
+      "type": "microsoft.web/serverfarms",
+      "subscriptionId": "00000000-0000-0000-0000-0000000000a2",
+      "location": "northeurope",
+      "tags": {}
+    },
+    {
+      "id": "/subscriptions/00000000-0000-0000-0000-0000000000a2/resourceGroups/rg/providers/microsoft.web/serverfarms/plan-cf-acme-be-led-westeurope9z",
+      "name": "plan-cf-acme-be-led-westeurope9z",
+      "type": "microsoft.web/serverfarms",
+      "subscriptionId": "00000000-0000-0000-0000-0000000000a2",
+      "location": "westeurope",
+      "tags": {}
+    },
+    {
+      "id": "/subscriptions/00000000-0000-0000-0000-0000000000a2/resourceGroups/rg/providers/microsoft.web/sites/api-acme-be-led-northeurope1x",
+      "name": "api-acme-be-led-northeurope1x",
+      "type": "microsoft.web/sites",
+      "subscriptionId": "00000000-0000-0000-0000-0000000000a2",
+      "location": "northeurope",
+      "tags": {}
+    },
+    {
+      "id": "/subscriptions/00000000-0000-0000-0000-0000000000a2/resourceGroups/rg/providers/microsoft.web/sites/worker-acme-be-led-northeurope1x",
+      "name": "worker-acme-be-led-northeurope1x",
+      "type": "microsoft.web/sites",
+      "subscriptionId": "00000000-0000-0000-0000-0000000000a2",
+      "location": "northeurope",
+      "tags": {}
+    },
+    {
+      "id": "/subscriptions/00000000-0000-0000-0000-0000000000a2/resourceGroups/rg/providers/microsoft.documentdb/databaseaccounts/11111111111111111111111111111111-be-led",
+      "name": "11111111111111111111111111111111-be-led",
+      "type": "microsoft.documentdb/databaseaccounts",
+      "subscriptionId": "00000000-0000-0000-0000-0000000000a2",
+      "location": "northeurope",
+      "tags": {
+        "tenant": "Acme Bank"
+      }
+    },
+    {
+      "id": "/subscriptions/00000000-0000-0000-0000-0000000000a2/resourceGroups/rg/providers/microsoft.documentdb/databaseaccounts/22222222222222222222222222222222-be-led",
+      "name": "22222222222222222222222222222222-be-led",
+      "type": "microsoft.documentdb/databaseaccounts",
+      "subscriptionId": "00000000-0000-0000-0000-0000000000a2",
+      "location": "northeurope",
+      "tags": {
+        "tenant": "Borealis Credit Union"
+      }
+    },
+    {
+      "id": "/subscriptions/00000000-0000-0000-0000-0000000000a3/resourceGroups/rg/providers/microsoft.web/serverfarms/plan-cf-acme-al-ord-northeurope0s",
+      "name": "plan-cf-acme-al-ord-northeurope0s",
+      "type": "microsoft.web/serverfarms",
+      "subscriptionId": "00000000-0000-0000-0000-0000000000a3",
+      "location": "northeurope",
+      "tags": {}
+    }
+  ]
+}
