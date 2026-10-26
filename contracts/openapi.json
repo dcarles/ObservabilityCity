@@ -5,12 +5,44 @@
     "version": "1.0"
   },
   "paths": {
+    "/api/environments": {
+      "get": {
+        "tags": [
+          "ObservabilityCity.Host, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+        ],
+        "operationId": "GetEnvironments",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EnvironmentInfo"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/snapshot/latest": {
       "get": {
         "tags": [
           "ObservabilityCity.Host, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
         ],
         "operationId": "GetLatestSnapshot",
+        "parameters": [
+          {
+            "name": "env",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "OK",
@@ -45,6 +77,26 @@
           "requestsPerSecond": {
             "type": "number",
             "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
+      "EnvironmentInfo": {
+        "required": [
+          "id",
+          "isDefault",
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "isDefault": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false
@@ -358,6 +410,13 @@
             "type": "string",
             "format": "date-time",
             "nullable": true
+          },
+          "tenants": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TenantUnitSnapshot"
+            },
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -367,12 +426,15 @@
           "dayFraction",
           "dependencies",
           "environment",
+          "environmentName",
+          "environments",
           "externalCallers",
           "generatedAt",
           "groupLabel",
           "groups",
           "notices",
           "ringCapacity",
+          "tenants",
           "totals",
           "townId",
           "townName",
@@ -436,6 +498,21 @@
           "ringCapacity": {
             "type": "integer",
             "format": "int32"
+          },
+          "environmentName": {
+            "type": "string"
+          },
+          "environments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EnvironmentInfo"
+            }
+          },
+          "tenants": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TenantInfo"
+            }
           }
         },
         "additionalProperties": false
@@ -460,6 +537,82 @@
           },
           "legacy": {
             "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "TenantInfo": {
+        "required": [
+          "id",
+          "kind",
+          "name",
+          "share"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/TenantKind"
+          },
+          "share": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
+      "TenantKind": {
+        "enum": [
+          "Customer",
+          "Test",
+          "Unknown"
+        ],
+        "type": "string"
+      },
+      "TenantUnitSnapshot": {
+        "required": [
+          "database",
+          "id",
+          "kind",
+          "name",
+          "requestsPerSecond",
+          "state"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/TenantKind"
+          },
+          "database": {
+            "type": "string"
+          },
+          "state": {
+            "$ref": "#/components/schemas/HealthState"
+          },
+          "utilisation": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "throttled": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "requestsPerSecond": {
+            "type": "number",
+            "format": "double"
           }
         },
         "additionalProperties": false

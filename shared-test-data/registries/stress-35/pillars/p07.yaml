@@ -2,11 +2,11 @@ pillar: p07
 displayName: Pillar 07 (4)
 color: "#f2c94c"
 systems:
-  - { id: p07.s1-api, service: s1, name: S1 API, role: api, external: true, calls: [p07.s1-db, p07.session-cache] }
-  - { id: p07.s1-worker, service: s1, name: S1 worker, role: worker, calls: [p07.s1-db] }
-  - { id: p07.s1-db, service: s1, name: S1 DB, role: db }
+  - { id: p07.s1-api, service: p07-s1, name: S1 API, role: api, external: true, calls: [p07.s1-db, p07.session-cache] }
+  - { id: p07.s1-worker, service: p07-s1, name: S1 worker, role: worker, calls: [p07.s1-db] }
+  - { id: p07.s1-db, service: p07-s1, name: S1 DB, role: db }
   - { id: p07.session-cache, name: Session cache, role: cache }
 messaging:
-  topics: [s1]
+  topics: [p07-s1]
   subscriptions:
-    - { topic: p06-s1-outbox, consumer: p07.s1-worker }
+    - { topic: p06-p06-s1-outbox, consumer: p07.s1-worker }

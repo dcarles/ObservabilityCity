@@ -22,6 +22,15 @@ export interface Pad {
   nodes: NodeSnapshot[]
   col: 0 | 1
   row: number
+  /**
+   * The service these systems belong to (as written in the registry), or null for a system that has none: it stands on a pad of its own.
+   * The same on every pad of a service that needs more than one.
+   */
+  service: string | null
+  /** Identifies the pad: the island and service for a service (with a part number past the first pad), the system's id for one without. */
+  key: string
+  /** What the pad's sign says. */
+  name: string
 }
 
 export interface Placed {
@@ -42,29 +51,53 @@ export interface Plan {
   rz: number
 }
 
-/** Services become pads (an API, its worker and its database side by side), lone buildings share pads, and pads fill a two-column grid. */
-export function planPads(nodes: NodeSnapshot[]): Pad[] {
-  const groups: NodeSnapshot[][] = []
+/** "fraud-cases" becomes "Fraud cases": the way a service is named on its pad's sign. */
+export function serviceName(service: string): string {
+  const words = service.replace(/[-_]+/g, ' ').trim()
+  return words.charAt(0).toUpperCase() + words.slice(1)
+}
+
+/**
+ * Pads for an island's systems. Every service is one pad (an API, its worker and its database side by side), wherever its systems stand in the
+ * registry file, in the order the services first appear. A service of more than three systems takes more pads, each named for it. A system
+ * with no service stands on a pad of its own. Pads fill a two-column grid.
+ */
+export function planPads(nodes: NodeSnapshot[], groupId = ''): Pad[] {
+  const order: { service: string | null; nodes: NodeSnapshot[] }[] = []
+  const byService = new Map<string, { service: string | null; nodes: NodeSnapshot[] }>()
   for (const n of nodes) {
-    const last = groups[groups.length - 1]
-    if (n.service && last && last[0].service === n.service && last.length < 3) last.push(n)
-    else groups.push([n])
+    if (!n.service) {
+      order.push({ service: null, nodes: [n] })
+      continue
+    }
+    let entry = byService.get(n.service)
+    if (!entry) {
+      entry = { service: n.service, nodes: [] }
+      byService.set(n.service, entry)
+      order.push(entry)
+    }
+    entry.nodes.push(n)
   }
-  const out: NodeSnapshot[][] = []
-  let loose: NodeSnapshot[] = []
-  for (const grp of groups) {
-    if (grp.length === 1 && !grp[0].service) {
-      loose.push(grp[0])
-      if (loose.length === 3) { out.push(loose); loose = [] }
-    } else out.push(grp)
+  const pads: Omit<Pad, 'col' | 'row'>[] = []
+  for (const e of order) {
+    if (e.service === null) {
+      pads.push({ nodes: e.nodes, service: null, key: e.nodes[0].id, name: e.nodes[0].name })
+      continue
+    }
+    const parts = Math.ceil(e.nodes.length / 3)
+    for (let part = 0; part < parts; part++)
+      pads.push({
+        nodes: e.nodes.slice(part * 3, part * 3 + 3), service: e.service,
+        key: `${groupId}/${e.service}${part > 0 ? `#${part + 1}` : ''}`,
+        name: serviceName(e.service) + (parts > 1 ? ` (${part + 1})` : ''),
+      })
   }
-  if (loose.length) out.push(loose)
-  return out.map((ns, i) => ({ nodes: ns, col: (i % 2) as 0 | 1, row: Math.floor(i / 2) }))
+  return pads.map((p, i) => ({ ...p, col: (i % 2) as 0 | 1, row: Math.floor(i / 2) }))
 }
 
 /** Lays out one island's grid and finds the smallest coast that holds it, with room for the gate and the harbour. */
 export function planIsland(g: GroupSnapshot): Plan {
-  const pads = planPads(g.nodes)
+  const pads = planPads(g.nodes, g.id)
   const rows = Math.max(1, Math.ceil(pads.length / 2))
   const span = (rows - 1) * ROW + 2 * CURB + PAD_D
   const roadZ0 = span / 2 - CURB

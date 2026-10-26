@@ -4,6 +4,8 @@ import type { Building } from '../buildings/building'
 import { canvasTexture, roundRect } from '../buildings/mk'
 import { kitParts, type KitName } from '../assets/kit'
 import { clamp, spawnRate } from '../visuals'
+import type { TenantInfo } from '../types'
+import { carShown, pickTenant, type TenantView } from '../tenants'
 
 /** Where a request comes from decides the car: internal calls are blue sedans, external calls yellow taxis. */
 export type Origin = 'internal' | 'external'
@@ -76,6 +78,8 @@ interface Car {
   wait: number
   /** Seconds since it appeared. A new car grows out of its building's front for a moment, so it never pops into view. */
   age: number
+  /** The tenant the request is for, or null in an environment without tenants. */
+  tenant: string | null
 }
 
 interface Marker {
@@ -133,6 +137,11 @@ export class CarSystem {
   private readonly one = new THREE.Vector3(1, 1, 1)
   private readonly unit: number[] = []
   private nextId = 1
+  private tenants: readonly TenantInfo[] = []
+  private readonly tenantKinds = new Map<string, TenantInfo['kind']>()
+  private view: TenantView = { hideTest: false, tenants: [] }
+  /** Cars drawn in the last frame, so tests can tell whether the filter hides them. */
+  private shown = 0
   private time = 0
   /** Failed requests that stopped at the door and drove back the way they came, since the town was built. For tests. */
   turnedAway = 0
@@ -307,6 +316,7 @@ export class CarSystem {
       d = Math.atan2(Math.sin(d), Math.cos(d))
       c.yaw += d * Math.min(1, dt * 9)
       c.age += dt
+      if (!carShown(c.tenant, this.tenantKinds, this.view)) continue
       const s = this.unit[c.model] * (c.fade >= 0 ? Math.max(0.01, c.fade / 0.5) : Math.min(1, 0.05 + c.age / GROW))
       this.q.setFromAxisAngle(this.up, c.yaw)
       this.m.compose(this.pos, this.q, this.scaleV.set(s, s, s))
@@ -325,6 +335,7 @@ export class CarSystem {
         }
       }
     }
+    this.shown = counts[0] + counts[1]
     this.meshes.forEach((im, i) => { im.count = counts[i]; im.instanceMatrix.needsUpdate = true })
     this.flags.count = flagN
     this.flags.instanceMatrix.needsUpdate = true
@@ -336,6 +347,33 @@ export class CarSystem {
   /** Every road cars can take, for tests. */
   get routeList(): readonly Route[] {
     return this.plans.map((p) => p.route)
+  }
+
+  /** The tenants requests are for. Cars already on the road keep theirs; new cars pick by share. */
+  setTenants(list: readonly TenantInfo[]): void {
+    this.tenants = list
+    this.tenantKinds.clear()
+    for (const t of list) this.tenantKinds.set(t.id, t.kind)
+  }
+
+  /** Which cars are drawn. The cars of hidden tenants still drive (and take their place in the queues); they are only not drawn. */
+  setTenantView(view: TenantView): void {
+    this.view = view
+  }
+
+  /** How many cars were drawn last frame, and how many of them carry each tenant. For tests. */
+  get drawn(): number {
+    return this.shown
+  }
+
+  tenantCounts(): Record<string, number> {
+    const out: Record<string, number> = {}
+    for (const c of this.cars) {
+      if (c.fade >= 0 || !carShown(c.tenant, this.tenantKinds, this.view)) continue
+      const k = c.tenant ?? ''
+      out[k] = (out[k] ?? 0) + 1
+    }
+    return out
   }
 
   get count(): number {
@@ -368,6 +406,7 @@ export class CarSystem {
       model: plan.route.origin === 'external' ? 1 : 0, failed,
       yaw: Math.atan2(first.x, first.z), x: start.x, z: start.z, dx: first.x, dz: first.z,
       speed: 0, stuck: 0, standoff: 0, fade: -1, lookX: new Array(LOOK).fill(start.x), lookZ: new Array(LOOK).fill(start.z), pace: 0.95 + Math.random() * 0.1, wait: 0, age: 0,
+      tenant: pickTenant(this.tenants, Math.random()),
     }
     const len = Math.hypot(car.dx, car.dz) || 1
     car.dx /= len; car.dz /= len

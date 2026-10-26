@@ -8,10 +8,12 @@
   ./scripts/trouble.ps1 reset                      # clear everything
   ./scripts/trouble.ps1 raw cl.ledger-api Errors 0.5
   ./scripts/trouble.ps1 -BaseUrl http://localhost:5080 bad-day
+  ./scripts/trouble.ps1 -Env staging tenant-unknown   # aim at one environment (default: the server's default, prod in the sample town)
 #>
 param(
   [Parameter(Position = 0, ValueFromRemainingArguments = $true)][string[]]$Preset = @('list'),
-  [string]$BaseUrl = 'http://localhost:5080'
+  [string]$BaseUrl = 'http://localhost:5080',
+  [Alias('Env')][string]$Environment = ''
 )
 $ErrorActionPreference = 'Stop'
 
@@ -42,11 +44,17 @@ $presets = [ordered]@{
   'pier-dlq'     = @(, @('rcn.matching-worker', 'Poison', 1))
   'legacy-dlq'   = @(, @('lost-found.batch-gateway-worker', 'Poison', 1))
   'dlq-everywhere' = @(@('rcn.matching-worker', 'Poison', 1), @('pay.payments-worker', 'Poison', 1), @('cl.ledger-worker', 'Poison', 0.6), @('lost-found.batch-gateway-worker', 'Poison', 0.4))
+  # a database with a database for each tenant: aim at one tenant with store#tenant (prod tenants; zeta-trading is the staging tenant nobody listed)
+  'tenant-throttle' = @(, @('cl.ledger-db#acme-bank', 'Saturate', 1))
+  'tenant-throttle-test' = @(, @('cl.ledger-db#smoke-prod', 'Saturate', 1))
+  'tenant-throttle-all' = @(@('cl.ledger-db#acme-bank', 'Saturate', 1), @('cl.ledger-db#borealis-credit', 'Saturate', 0.8), @('cl.ledger-db#cygnus-finance', 'Saturate', 0.6))
+  'tenant-unknown' = @(, @('cl.ledger-db#zeta-trading', 'Saturate', 1))
   'bad-day'      = @(@('pay', 'Errors', 0.6), @('pay', 'Latency', 0.7), @('pay.payments-worker', 'Poison', 1), @('cl.ledger-db', 'Saturate', 0.8))
 }
 
 function Send($method, $path, $body) {
-  $req = @{ Method = $method; Uri = "$BaseUrl/api/fake$path"; ErrorAction = 'Stop' }
+  $query = if ($Environment) { "?env=$([uri]::EscapeDataString($Environment))" } else { '' }
+  $req = @{ Method = $method; Uri = "$BaseUrl/api/fake$path$query"; ErrorAction = 'Stop' }
   if ($body) { $req.Body = ($body | ConvertTo-Json); $req.ContentType = 'application/json' }
   try { Invoke-RestMethod @req } catch { throw "Cannot reach $BaseUrl (is the backend running?): $($_.Exception.Message)" }
 }
@@ -65,7 +73,7 @@ foreach ($name in $Preset) {
       $presets.GetEnumerator() | ForEach-Object { '{0,-14} {1}' -f $_.Key, (($_.Value | ForEach-Object { "$($_[1]) $($_[0])" }) -join ', ') }
       'reset         clears every effect and the backlog and dead letters they left'
       'calm          freezes the noise and the daily cycle (calm-off to undo)'
-      'raw           raw <target> <kind> [intensity]; kinds: Traffic Errors Latency UnhealthyInstances Down HighCpu HighMemory Saturate Backlog Poison Stale Incident (severity from intensity; third parties take the same effects as any system)'
+      'raw           raw <target> <kind> [intensity]; kinds: Traffic Errors Latency UnhealthyInstances Down HighCpu HighMemory Saturate Backlog Poison Stale Incident (Saturate can name one tenant: raw cl.ledger-db#acme-bank Saturate; severity from intensity; third parties take the same effects as any system)'
     }
     'reset' { Send Post '/reset' $null | Out-Null; Write-Host 'Reset to a calm baseline' }
     'calm' { Send Post '/calm' @{ on = $true } | Out-Null; Write-Host 'Calm on' }

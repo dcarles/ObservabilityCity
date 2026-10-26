@@ -1,7 +1,7 @@
 // The visual language as pure functions: numbers from a snapshot in, visual parameters out.
 // Nothing here touches three.js, so it is unit tested against the same golden fixtures as the backend.
 
-import type { NodeSnapshot } from './types'
+import type { HealthState, NodeSnapshot } from './types'
 
 export const MAX_FLOORS = 8
 
@@ -86,4 +86,10 @@ export function formatAge(seconds: number): string {
 
 export function formatMs(ms: number): string {
   return ms >= 1000 ? `${(ms / 1000).toFixed(1)} s` : `${ms.toFixed(0)} ms`
+}
+
+/** The state of a group of buildings (a service): the worst of them. Down, then Degraded, then Stale (no data is not healthy), then Healthy. */
+export function worstState(states: readonly HealthState[]): HealthState {
+  for (const s of ['Down', 'Degraded', 'Stale'] as const) if (states.includes(s)) return s
+  return 'Healthy'
 }

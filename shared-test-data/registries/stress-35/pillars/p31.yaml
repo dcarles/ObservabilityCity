@@ -2,31 +2,31 @@ pillar: p31
 displayName: Pillar 31 (22)
 color: "#56ccf2"
 systems:
-  - { id: p31.s1-api, service: s1, name: S1 API, role: api, external: true, calls: [p31.s1-db, p31.s2-api, p31.s3-api, p31.s4-api, p31.s5-api, p31.s6-api, p31.s7-api, p31.session-cache] }
-  - { id: p31.s1-worker, service: s1, name: S1 worker, role: worker, calls: [p31.s1-db] }
-  - { id: p31.s1-db, service: s1, name: S1 DB, role: db }
-  - { id: p31.s2-api, service: s2, name: S2 API, role: api, calls: [p31.s2-db] }
-  - { id: p31.s2-worker, service: s2, name: S2 worker, role: worker, calls: [p31.s2-db] }
-  - { id: p31.s2-db, service: s2, name: S2 DB, role: db }
-  - { id: p31.s3-api, service: s3, name: S3 API, role: api, calls: [p31.s3-db] }
-  - { id: p31.s3-worker, service: s3, name: S3 worker, role: worker, calls: [p31.s3-db] }
-  - { id: p31.s3-db, service: s3, name: S3 DB, role: db }
-  - { id: p31.s4-api, service: s4, name: S4 API, role: api, calls: [p31.s4-db] }
-  - { id: p31.s4-worker, service: s4, name: S4 worker, role: worker, calls: [p31.s4-db] }
-  - { id: p31.s4-db, service: s4, name: S4 DB, role: db }
-  - { id: p31.s5-api, service: s5, name: S5 API, role: api, calls: [p31.s5-db] }
-  - { id: p31.s5-worker, service: s5, name: S5 worker, role: worker, calls: [p31.s5-db] }
-  - { id: p31.s5-db, service: s5, name: S5 DB, role: db }
-  - { id: p31.s6-api, service: s6, name: S6 API, role: api, calls: [p31.s6-db] }
-  - { id: p31.s6-worker, service: s6, name: S6 worker, role: worker, calls: [p31.s6-db] }
-  - { id: p31.s6-db, service: s6, name: S6 DB, role: db }
-  - { id: p31.s7-api, service: s7, name: S7 API, role: api, calls: [p31.s7-db] }
-  - { id: p31.s7-worker, service: s7, name: S7 worker, role: worker, calls: [p31.s7-db] }
-  - { id: p31.s7-db, service: s7, name: S7 DB, role: db }
+  - { id: p31.s1-api, service: p31-s1, name: S1 API, role: api, external: true, calls: [p31.s1-db, p31.s2-api, p31.s3-api, p31.s4-api, p31.s5-api, p31.s6-api, p31.s7-api, p31.session-cache] }
+  - { id: p31.s1-worker, service: p31-s1, name: S1 worker, role: worker, calls: [p31.s1-db] }
+  - { id: p31.s1-db, service: p31-s1, name: S1 DB, role: db }
+  - { id: p31.s2-api, service: p31-s2, name: S2 API, role: api, calls: [p31.s2-db] }
+  - { id: p31.s2-worker, service: p31-s2, name: S2 worker, role: worker, calls: [p31.s2-db] }
+  - { id: p31.s2-db, service: p31-s2, name: S2 DB, role: db }
+  - { id: p31.s3-api, service: p31-s3, name: S3 API, role: api, calls: [p31.s3-db] }
+  - { id: p31.s3-worker, service: p31-s3, name: S3 worker, role: worker, calls: [p31.s3-db] }
+  - { id: p31.s3-db, service: p31-s3, name: S3 DB, role: db }
+  - { id: p31.s4-api, service: p31-s4, name: S4 API, role: api, calls: [p31.s4-db] }
+  - { id: p31.s4-worker, service: p31-s4, name: S4 worker, role: worker, calls: [p31.s4-db] }
+  - { id: p31.s4-db, service: p31-s4, name: S4 DB, role: db }
+  - { id: p31.s5-api, service: p31-s5, name: S5 API, role: api, calls: [p31.s5-db] }
+  - { id: p31.s5-worker, service: p31-s5, name: S5 worker, role: worker, calls: [p31.s5-db] }
+  - { id: p31.s5-db, service: p31-s5, name: S5 DB, role: db }
+  - { id: p31.s6-api, service: p31-s6, name: S6 API, role: api, calls: [p31.s6-db] }
+  - { id: p31.s6-worker, service: p31-s6, name: S6 worker, role: worker, calls: [p31.s6-db] }
+  - { id: p31.s6-db, service: p31-s6, name: S6 DB, role: db }
+  - { id: p31.s7-api, service: p31-s7, name: S7 API, role: api, calls: [p31.s7-db] }
+  - { id: p31.s7-worker, service: p31-s7, name: S7 worker, role: worker, calls: [p31.s7-db] }
+  - { id: p31.s7-db, service: p31-s7, name: S7 DB, role: db }
   - { id: p31.session-cache, name: Session cache, role: cache }
 messaging:
-  topics: [s1]
+  topics: [p31-s1]
   subscriptions:
-    - { topic: p30-s1-outbox, consumer: p31.s1-worker }
-    - { topic: p30-s1-outbox, consumer: p31.s2-worker }
-    - { topic: p30-s1-outbox, consumer: p31.s3-worker }
+    - { topic: p30-p30-s1-outbox, consumer: p31.s1-worker }
+    - { topic: p30-p30-s1-outbox, consumer: p31.s2-worker }
+    - { topic: p30-p30-s1-outbox, consumer: p31.s3-worker }

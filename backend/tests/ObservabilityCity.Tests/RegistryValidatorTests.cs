@@ -12,6 +12,7 @@ public class RegistryValidatorTests
     [Theory]
     [InlineData("config/galactic-credit")]
     [InlineData("shared-test-data/registries/mini-town")]
+    [InlineData("shared-test-data/registries/tenants-town")]
     [InlineData("shared-test-data/registries/stress-23")]
     [InlineData("shared-test-data/registries/stress-35")]
     public void Every_registry_in_the_repo_is_clean(string folder)
@@ -28,6 +29,7 @@ public class RegistryValidatorTests
 
         Assert.Contains("config/galactic-credit", found);
         Assert.Contains("shared-test-data/registries/mini-town", found);
+        Assert.Contains("shared-test-data/registries/tenants-town", found);
         Assert.Contains("shared-test-data/registries/stress-23", found);
         Assert.Contains("shared-test-data/registries/stress-35", found);
     }
@@ -312,5 +314,67 @@ public class RegistryValidatorTests
         Assert.StartsWith(Report.CommentMarker, markdown);
         Assert.Contains("pillars/aa.yaml:", markdown);
         Assert.Contains("problems to fix", markdown);
+    }
+
+    // ── services, environments, tenants ──────────────────────────────────────
+
+    [Fact]
+    public void A_service_split_across_pillars_is_a_warning_on_each_pillars_file()
+    {
+        using var f = new RegistryCopy(TestPaths.TenantsTown);
+        f.Replace("pillars/bb.yaml", "service: billing, name: Billing API", "service: orders, name: Billing API");
+
+        var hits = Check(f).Findings.Where(x => x.Rule == "service-split").ToList();
+
+        Assert.Equal(["pillars/aa.yaml", "pillars/bb.yaml"], hits.Select(h => h.File).Order());
+        Assert.All(hits, h => Assert.Equal(Severity.Warning, h.Severity));
+        Assert.All(hits, h => Assert.Contains("Service 'orders' is split across pillars 'aa' and 'bb'", h.Message));
+        Assert.Equal(f.LineOf("pillars/bb.yaml", "bb.billing-api"), hits.Single(h => h.File == "pillars/bb.yaml").Line);
+    }
+
+    [Fact]
+    public void Systems_of_one_service_that_are_not_next_to_each_other_are_fine()
+    {
+        using var f = new RegistryCopy(TestPaths.TenantsTown); // aa.orders-api and aa.orders-worker have a cache between them
+
+        Assert.DoesNotContain(Check(f).Findings, x => x.Rule == "service-split");
+    }
+
+    [Fact]
+    public void A_mistake_in_an_environment_file_is_an_error_on_that_file_and_line()
+    {
+        using var f = new RegistryCopy(TestPaths.TenantsTown);
+        f.Replace("environments/prod.yaml", "{ id: cygnus, name: Cygnus, kind: customer }", "{ id: cygnus, name: Cygnus, kind: customerr }");
+
+        var hit = Assert.Single(Check(f).Findings, x => x.File == "environments/prod.yaml");
+
+        Assert.Equal(Severity.Error, hit.Severity);
+        Assert.Contains("kind 'customerr'", hit.Message);
+    }
+
+    [Fact]
+    public void An_environment_with_tenant_databases_and_no_tenants_is_a_warning_on_its_file()
+    {
+        using var f = new RegistryCopy(TestPaths.TenantsTown);
+        f.Write("environments/prod.yaml", "default: true\n");
+
+        var hit = Single(Check(f), "tenants");
+
+        Assert.Equal(Severity.Warning, hit.Severity);
+        Assert.Equal("environments/prod.yaml", hit.File);
+        Assert.Contains("lists no tenants", hit.Message);
+    }
+
+    [Fact]
+    public void A_tenant_pattern_in_a_town_without_environments_is_a_warning_on_the_system()
+    {
+        using var f = new RegistryCopy(TestPaths.MiniTown);
+        f.Replace("pillars/aa.yaml", "{ id: aa.orders-db,", "{ id: aa.orders-db, tenantPattern: \"t-{tenant}\",");
+
+        var hit = Single(Check(f), "tenants");
+
+        Assert.Equal(Severity.Warning, hit.Severity);
+        Assert.Equal("pillars/aa.yaml", hit.File);
+        Assert.Contains("no environments folder", hit.Message);
     }
 }

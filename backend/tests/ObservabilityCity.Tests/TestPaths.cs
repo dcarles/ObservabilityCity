@@ -7,6 +7,7 @@ internal static class TestPaths
     public static string Registry => Path.Combine(RepoRoot, "config", "galactic-credit");
     public static string MiniTown => Path.Combine(RepoRoot, "shared-test-data", "registries", "mini-town");
     public static string LinksTown => Path.Combine(RepoRoot, "shared-test-data", "registries", "links-town");
+    public static string TenantsTown => Path.Combine(RepoRoot, "shared-test-data", "registries", "tenants-town");
     public static string Stress23 => Path.Combine(RepoRoot, "shared-test-data", "registries", "stress-23");
     public static string Stress35 => Path.Combine(RepoRoot, "shared-test-data", "registries", "stress-35");
     public static string Fixtures => Path.Combine(RepoRoot, "shared-test-data", "snapshots");

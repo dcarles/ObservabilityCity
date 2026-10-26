@@ -2,16 +2,16 @@ pillar: p17
 displayName: Pillar 17 (8)
 color: "#bb6bd9"
 systems:
-  - { id: p17.s1-api, service: s1, name: S1 API, role: api, external: true, calls: [p17.s1-db, p17.s2-api, p17.s3-api] }
-  - { id: p17.s1-worker, service: s1, name: S1 worker, role: worker, calls: [p17.s1-db] }
-  - { id: p17.s1-db, service: s1, name: S1 DB, role: db }
-  - { id: p17.s2-api, service: s2, name: S2 API, role: api, calls: [p17.s2-db] }
-  - { id: p17.s2-worker, service: s2, name: S2 worker, role: worker, calls: [p17.s2-db] }
-  - { id: p17.s2-db, service: s2, name: S2 DB, role: db }
-  - { id: p17.s3-api, service: s3, name: S3 API, role: api, calls: [p17.s3-db] }
-  - { id: p17.s3-db, service: s3, name: S3 DB, role: db }
+  - { id: p17.s1-api, service: p17-s1, name: S1 API, role: api, external: true, calls: [p17.s1-db, p17.s2-api, p17.s3-api] }
+  - { id: p17.s1-worker, service: p17-s1, name: S1 worker, role: worker, calls: [p17.s1-db] }
+  - { id: p17.s1-db, service: p17-s1, name: S1 DB, role: db }
+  - { id: p17.s2-api, service: p17-s2, name: S2 API, role: api, calls: [p17.s2-db] }
+  - { id: p17.s2-worker, service: p17-s2, name: S2 worker, role: worker, calls: [p17.s2-db] }
+  - { id: p17.s2-db, service: p17-s2, name: S2 DB, role: db }
+  - { id: p17.s3-api, service: p17-s3, name: S3 API, role: api, calls: [p17.s3-db] }
+  - { id: p17.s3-db, service: p17-s3, name: S3 DB, role: db }
 messaging:
-  topics: [s1]
+  topics: [p17-s1]
   subscriptions:
-    - { topic: p16-s1-outbox, consumer: p17.s1-worker }
-    - { topic: p16-s1-outbox, consumer: p17.s2-worker }
+    - { topic: p16-p16-s1-outbox, consumer: p17.s1-worker }
+    - { topic: p16-p16-s1-outbox, consumer: p17.s2-worker }

@@ -23,6 +23,8 @@ import { Weather, type SkyStatus } from './weather'
 import { Airport, type AirportStatus } from './airport'
 import { VendorIsland, VENDOR_COLOR } from './vendors'
 import { DependencyOverlay } from './overlay'
+import { ServiceSign, summariseService, type ServiceSummary } from './service'
+import type { TenantView } from '../tenants'
 
 const QUAY = 9
 /** Traffic that crosses the hub drives a long way, so fewer cars are drawn for it than a short trip would need. */
@@ -59,6 +61,8 @@ interface Island {
   weather: Weather
   /** Island-local z of the back gate, where the road to a third party's bridge leaves. Null for an island with no third party to reach. */
   backGateZ: number | null
+  /** The sign and hedge of every service pad, by the pad's key. */
+  services: Map<string, ServiceSign>
 }
 
 /** An island's road to one third party: out of its back gate, over its bridge to the ring road, round the loop and down the vendor's spur. */
@@ -111,6 +115,8 @@ export class Town {
   private airportJoin = 0
   /** How many bridges reach each third party. */
   private readonly vendorBridges = new Map<string, number>()
+  /** The tenant filter the buildings and cars follow. */
+  private tenantView: TenantView | null = null
 
   constructor() {
     this.root.add(this.cars.object, this.boats.object, this.overlay.object)
@@ -353,6 +359,7 @@ export class Town {
     for (const [id, vi] of this.vendors) anchors.set(id, { at: vi.root.position.clone(), color: VENDOR_COLOR })
     this.overlay.setAnchors(anchors)
     this.snapshotId = layoutKey(s)
+    if (this.tenantView) this.setTenantView(this.tenantView)
   }
 
   /** The Service Bus port's board: how many topics and subscriptions the town has, and how many piers they reach. */
@@ -390,6 +397,13 @@ export class Town {
       const g = s.groups.find((x) => x.id === isl.group.id)
       if (g) this.guard(`messaging ${g.id}`, () => { isl.messaging = messagingOf([...g.nodes], g.messaging) })
     }
+    for (const isl of this.islands) {
+      const g = s.groups.find((x) => x.id === isl.group.id)
+      if (!g) continue
+      const nodes = new Map(g.nodes.map((n) => [n.id, n]))
+      for (const [key, sign] of isl.services) this.guard(`service ${key}`, () => sign.set(summariseService(sign.pad, g.id, g.displayName, nodes).state))
+    }
+    this.guard('tenants', () => this.cars.setTenants(s.tenants ?? []))
     // the lighthouse shows the town-wide total, the same number the snapshot's totals carry
     this.hubDeadLetters = s.totals.deadLetters
     this.lighthouse?.set(this.hubDeadLetters)
@@ -454,6 +468,34 @@ export class Town {
       bridge: isl.links.bridge, pier: isl.harbour !== null, lane: this.boatLanes.has(groupId), crossings: this.crossings.get(groupId) ?? 0,
       ...(isl.harbour?.status() ?? { crates: 0, brokenCrates: 0, alarm: false, pennant: false }), sky: isl.weather.status(),
     }
+  }
+
+  /** Boxes over every service's sign and hedge, for picking with the pointer. Each carries `userData.serviceKey`. */
+  serviceHits(): THREE.Object3D[] {
+    return this.islands.flatMap((i) => [...i.services.values()].flatMap((s) => s.hits))
+  }
+
+  /** What one service is and how it is doing, from the latest snapshot. Null when no island has it. */
+  serviceSummary(key: string, s: Snapshot): ServiceSummary | null {
+    for (const isl of this.islands) {
+      const sign = isl.services.get(key)
+      const g = s.groups.find((x) => x.id === isl.group.id)
+      if (sign && g) return summariseService(sign.pad, g.id, g.displayName, new Map(g.nodes.map((n) => [n.id, n])))
+    }
+    return null
+  }
+
+  /** The services on an island: key, name, and the state the sign shows. For tests. */
+  inspectServices(groupId: string): { key: string; name: string; state: string | null; systems: string[] }[] {
+    const isl = this.islands.find((i) => i.group.id === groupId)
+    return isl ? [...isl.services].map(([key, sg]) => ({ key, name: sg.pad.name, state: sg.state, systems: sg.pad.nodes.map((n) => n.id) })) : []
+  }
+
+  /** Which tenants the town shows: tenant yards dim the others, and cars of hidden tenants are not drawn. */
+  setTenantView(view: TenantView): void {
+    this.tenantView = view
+    this.cars.setTenantView(view)
+    for (const b of this.buildings.values()) b.setTenantView(view)
   }
 
   /** What the Service Bus port and the lighthouse show: topics, subscriptions, piers, the old-route reads, and the dead-letter total. For tests. */
@@ -671,6 +713,8 @@ export class Town {
     }
 
     const buildings = new Map<string, Building>()
+    const services = new Map<string, ServiceSign>()
+    const signSpans: { x: number; zf: number }[] = []
     for (const pad of plan.pads) {
       const roadZ = rowRoadZ[pad.row]
       const zf = roadZ - CURB
@@ -682,16 +726,23 @@ export class Town {
       decor.add(serviceLane((laneFrom + laneTo) / 2, roadZ - LANE_Z, Math.abs(laneTo - laneFrom), CURB - 2.1 - 0.7))
       avoid.push({ x: cx, z: zf - PAD_D / 2, w: PAD_W + 1, d: PAD_D + 1 })
       for (const side of [-1, 1]) decor.add(lamp(cx + side * (PAD_W / 2 - 3.4), zf + 0.45, 0, -Math.PI / 2))
+      // the service's low sign and hedge; the sign repaints with its worst state, so it is not merged into the static decor
+      const sign = new ServiceSign(pad, cx, zf, PAD_D, PAD_W)
+      root.add(sign.object)
+      services.set(pad.key, sign)
+      signSpans.push({ x: cx, zf })
     }
     for (const p of plan.placed) {
-      const b = new Building(p.node.id, p.node.kind, g.color)
+      const b = new Building(p.node.id, p.node.kind, g.color, p.node.tenants != null)
       b.root.position.set(p.x, GROUND + 0.08, p.z)
       root.add(b.root)
       this.buildings.set(p.node.id, b)
       buildings.set(p.node.id, b)
       const zf = p.roadZ - CURB
       // a little garden in front of each building and the odd bit of street furniture
-      decor.add(prop('bush', p.x - 2.2, zf - 0.9, 0, 2.2), prop('bush', p.x + 2.8, zf - 0.9, 0, 1.8))
+      // the service sign stands at the middle of the pad's front, so a bush never grows through it
+      const nearSign = (x: number) => signSpans.some((sp) => Math.abs(x - sp.x) < 2.6 && Math.abs(zf - sp.zf) < 1.5)
+      for (const [bx, bs] of [[p.x - 2.2, 2.2], [p.x + 2.8, 1.8]] as const) if (!nearSign(bx)) decor.add(prop('bush', bx, zf - 0.9, 0, bs))
       if (p.node.kind === 'Worker') decor.add(prop('dumpster', p.x + 2.4, p.z - 3.6, 0.2))
       if (p.node.kind === 'Api') decor.add(prop('firehydrant', p.x + 2.9, zf + 0.5, 0, 2.4))
     }
@@ -733,7 +784,7 @@ export class Town {
     root.updateMatrixWorld(true)
     const weather = new Weather(g.id, plan.rx, plan.rz)
     root.add(weather.object)
-    return { group: g, root, outline, buildings, harbour: status, links, consumers: consumersOf(g.messaging), messaging: messagingOf([], g.messaging), weather, backGateZ: backZ }
+    return { group: g, root, outline, buildings, harbour: status, links, consumers: consumersOf(g.messaging), messaging: messagingOf([], g.messaging), weather, backGateZ: backZ, services }
   }
 
   /** A quay with a pier house, a pier and crates: where the boats from the hub's Service Bus port land. */
@@ -999,9 +1050,9 @@ function parkProps(x: number, z: number): THREE.Object3D[] {
 }
 
 function layoutKey(s: Snapshot): string {
-  const groups = s.groups.map((g) => `${g.id}${g.configError ? '!' : ''}:${g.nodes.map((n) => `${n.id}/${n.kind}/${n.service ?? ''}/${n.calls.join('+')}/${(n.gatewayCalls ?? []).join('+')}`).join(',')}|${g.hasBridge === false ? 'nb' : 'b'}|${(g.messaging?.topics ?? []).map((t) => t.name).join('+')}|${(g.messaging?.subscriptions ?? []).map((x) => `${x.topic}>${x.consumer}${x.legacy ? '!' : ''}`).join('+')}`).join(';')
+  const groups = s.groups.map((g) => `${g.id}${g.configError ? '!' : ''}:${g.nodes.map((n) => `${n.id}/${n.kind}/${n.tenants != null ? 'T' : ''}/${n.service ?? ''}/${n.calls.join('+')}/${(n.gatewayCalls ?? []).join('+')}`).join(',')}|${g.hasBridge === false ? 'nb' : 'b'}|${(g.messaging?.topics ?? []).map((t) => t.name).join('+')}|${(g.messaging?.subscriptions ?? []).map((x) => `${x.topic}>${x.consumer}${x.legacy ? '!' : ''}`).join('+')}`).join(';')
   const vendors = (s.vendors ?? []).map((v) => `${v.node.id}<${v.calledBy.join('+')}`).join(';')
-  return `${s.townId}|${groups}|${vendors}`
+  return `${s.townId}|${s.environment ?? ''}|${groups}|${vendors}`
 }
 
 /** Where a straight line from the hub's centre leaves the hub's coast (inset a little). */

@@ -1,0 +1,24 @@
+# yaml-language-server: $schema=../schema/environment.schema.json
+name: Development
+order: 1
+sources:
+  metrics: { kind: fake }
+  incidents: { kind: fake }
+tenants:
+  - { id: dev-alpha, name: Dev alpha, kind: test }
+  - { id: dev-bravo, name: Dev bravo, kind: test }
+  - { id: dev-charlie, name: Dev charlie, kind: test }
+  - { id: dev-delta, name: Dev delta, kind: test }
+  - { id: dev-echo, name: Dev echo, kind: test }
+  - { id: dev-foxtrot, name: Dev foxtrot, kind: test }
+  - { id: dev-golf, name: Dev golf, kind: test }
+  - { id: dev-hotel, name: Dev hotel, kind: test }
+  - { id: dev-india, name: Dev india, kind: test }
+  - { id: dev-juliet, name: Dev juliet, kind: test }
+# Not deployed in development: the legacy batch gateway (its whole island) and the nightly statement run.
+exclude:
+  - lost-found.batch-gateway-api
+  - lost-found.batch-gateway-worker
+  - lost-found.batch-gateway-db
+  - lost-found.legacy-ftp-api
+  - cl.statement-cron

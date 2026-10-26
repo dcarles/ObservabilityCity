@@ -9,6 +9,9 @@
   <ItemGroup>
     <PackageReference Include="xunit.v3.mtp-v2" />
     <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" />
+    <ProjectReference Include="..\..\src\ObservabilityCity.Host\ObservabilityCity.Host.csproj" />
     <ProjectReference Include="..\..\src\ObservabilityCity.Core\ObservabilityCity.Core.csproj" />
     <ProjectReference Include="..\..\src\ObservabilityCity.Adapters.Fake\ObservabilityCity.Adapters.Fake.csproj" />
     <ProjectReference Include="..\..\tools\ObservabilityCity.Validate\ObservabilityCity.Validate.csproj" />

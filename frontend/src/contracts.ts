@@ -4,6 +4,22 @@
  */
 
 export interface paths {
+    "/api/environments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetEnvironments"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/snapshot/latest": {
         parameters: {
             query?: never;
@@ -29,6 +45,11 @@ export interface components {
             to: string;
             /** Format: double */
             requestsPerSecond: number;
+        };
+        EnvironmentInfo: {
+            id: string;
+            name: string;
+            isDefault: boolean;
         };
         ExternalCallerSnapshot: {
             id: string;
@@ -120,6 +141,7 @@ export interface components {
             gatewayCalls: string[];
             /** Format: date-time */
             lastUpdated?: string | null;
+            tenants?: components["schemas"]["TenantUnitSnapshot"][] | null;
         };
         Snapshot: {
             townId: string;
@@ -138,12 +160,37 @@ export interface components {
             dependencies: components["schemas"]["DependencySnapshot"][];
             /** Format: int32 */
             ringCapacity: number;
+            environmentName: string;
+            environments: components["schemas"]["EnvironmentInfo"][];
+            tenants: components["schemas"]["TenantInfo"][];
         };
         SubscriptionSnapshot: {
             topic: string;
             publisher: string;
             consumer: string;
             legacy: boolean;
+        };
+        TenantInfo: {
+            id: string;
+            name: string;
+            kind: components["schemas"]["TenantKind"];
+            /** Format: double */
+            share: number;
+        };
+        /** @enum {string} */
+        TenantKind: "Customer" | "Test" | "Unknown";
+        TenantUnitSnapshot: {
+            id: string;
+            name: string;
+            kind: components["schemas"]["TenantKind"];
+            database: string;
+            state: components["schemas"]["HealthState"];
+            /** Format: double */
+            utilisation?: number | null;
+            /** Format: double */
+            throttled?: number | null;
+            /** Format: double */
+            requestsPerSecond: number;
         };
         TopicSnapshot: {
             name: string;
@@ -178,9 +225,31 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    GetLatestSnapshot: {
+    GetEnvironments: {
         parameters: {
             query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvironmentInfo"][];
+                };
+            };
+        };
+    };
+    GetLatestSnapshot: {
+        parameters: {
+            query?: {
+                env?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;

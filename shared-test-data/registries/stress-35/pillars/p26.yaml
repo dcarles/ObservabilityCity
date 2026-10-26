@@ -2,10 +2,10 @@ pillar: p26
 displayName: Pillar 26 (3)
 color: "#f2994a"
 systems:
-  - { id: p26.s1-api, service: s1, name: S1 API, role: api, external: true, calls: [p26.s1-db] }
-  - { id: p26.s1-worker, service: s1, name: S1 worker, role: worker, calls: [p26.s1-db] }
-  - { id: p26.s1-db, service: s1, name: S1 DB, role: db }
+  - { id: p26.s1-api, service: p26-s1, name: S1 API, role: api, external: true, calls: [p26.s1-db] }
+  - { id: p26.s1-worker, service: p26-s1, name: S1 worker, role: worker, calls: [p26.s1-db] }
+  - { id: p26.s1-db, service: p26-s1, name: S1 DB, role: db }
 messaging:
-  topics: [s1]
+  topics: [p26-s1]
   subscriptions:
-    - { topic: p25-s1-outbox, consumer: p26.s1-worker }
+    - { topic: p25-p25-s1-outbox, consumer: p26.s1-worker }

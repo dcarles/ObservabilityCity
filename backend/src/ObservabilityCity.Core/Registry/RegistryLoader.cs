@@ -29,6 +29,7 @@ public static class RegistryLoader
         "id", "name", "groupLabel", "topology", "pillar", "displayName", "color", "external", "defaults", "systems", "resources",
         "externalCallers", "islands", "role", "service", "slaP99Ms", "errors", "resources", "throttle", "backlog", "calls", "aliases",
         "amber", "red", "vendors", "calledBy", "gatewayCalls", "messaging", "topics", "subscriptions", "topic", "consumer", "legacy",
+        "tenantPattern", "order", "default", "sources", "kind", "connection", "tenants", "exclude", "fake", "undeclaredTenants",
     ];
 
     // Last resort when defaults.yaml is missing or silent about a role.
@@ -231,6 +232,7 @@ public static class RegistryLoader
         }
 
         var (topics, subscriptions) = ResolveMessaging(groups, brokenPillars, resilient, Problem);
+        var environments = LoadEnvironments(folder, ids, aliases, resilient, Problem);
 
         if (errors.Count == 1) throw new RegistryException(errors[0]);
         if (errors.Count > 1)
@@ -239,9 +241,81 @@ public static class RegistryLoader
         var final = groups.Select(g => g with { Nodes = g.Nodes.Select(n => n with { Calls = resolved[n.Id], GatewayCalls = resolvedGateway[n.Id] }).ToList() }).ToList();
         var registry = new Registry(new TownInfo(town.Id, town.Name, town.GroupLabel, town.Topology), final, callers)
         {
-            Notices = notices, Problems = problems, Vendors = vendors, RingCapacity = ringCapacity, Topics = topics, Subscriptions = subscriptions,
+            Notices = notices, Problems = problems, Vendors = vendors, RingCapacity = ringCapacity, Topics = topics, Subscriptions = subscriptions, Environments = environments,
         };
         return registry with { Warnings = TownLinks.Warnings(registry).ToList() };
+    }
+
+    private static readonly string[] SourceNames = ["metrics", "incidents", "messaging"];
+    private static readonly string[] SourceKinds = ["fake"];
+
+    /// <summary>
+    /// Reads environments/*.yaml. The file name is the environment's id. A file with problems is reported (an error in a strict load) and, in a
+    /// resilient load, left out, so the other environments still run. A town without the folder has no environments.
+    /// </summary>
+    private static List<RegistryEnvironment> LoadEnvironments(string folder, HashSet<string> ids, Dictionary<string, string> aliases, bool resilient, Action<string> problem)
+    {
+        var dir = Path.Combine(folder, "environments");
+        var result = new List<RegistryEnvironment>();
+        if (!Directory.Exists(dir)) return result;
+        var parsed = new List<(RegistryEnvironment Env, int Order)>();
+        foreach (var file in Directory.GetFiles(dir, "*.yaml").OrderBy(f => f, StringComparer.Ordinal))
+        {
+            var stem = Path.GetFileNameWithoutExtension(file);
+            var name = $"environments/{Path.GetFileName(file)}";
+            var own = new List<string>();
+            EnvironmentFile? f = null;
+            try { f = Read<EnvironmentFile>(file, name); }
+            catch (RegistryException e) { own.Add(e.Message); }
+            if (f is not null) CheckEnvironment(f, stem, name, ids, aliases, own);
+            if (own.Count > 0)
+            {
+                foreach (var message in own) problem(message);
+                continue;
+            }
+            var excluded = f!.Exclude.Select(id => ids.Contains(id) ? id : aliases[id]).ToHashSet();
+            parsed.Add((new RegistryEnvironment(
+                stem, f.Name ?? stem, f.Default,
+                f.Sources.Select(kv => new RegistrySource(kv.Key, kv.Value.Kind.ToLowerInvariant(), kv.Value.Connection)).ToList(),
+                f.Tenants.Select(t => new RegistryTenant(t.Id, t.Name ?? t.Id, t.Kind.Equals("test", StringComparison.OrdinalIgnoreCase) ? TenantKind.Test : TenantKind.Customer)).ToList(),
+                excluded, f.Fake?.UndeclaredTenants ?? []), f.Order ?? 100));
+        }
+        var ordered = parsed.OrderBy(p => p.Order).ThenBy(p => p.Env.Id, StringComparer.Ordinal).Select(p => p.Env).ToList();
+        if (ordered.Count(e => e.IsDefault) > 1)
+            problem($"environments: {string.Join(" and ", ordered.Where(e => e.IsDefault).Select(e => $"'{e.Id}'"))} are all marked default: only one environment can be");
+        return ordered;
+    }
+
+    private static void CheckEnvironment(EnvironmentFile f, string stem, string name, HashSet<string> ids, Dictionary<string, string> aliases, List<string> errors)
+    {
+        if (!KebabId.IsMatch(stem)) errors.Add($"{name}: the file name '{stem}' is the environment's id and must be lowercase kebab-case");
+        foreach (var (source, def) in f.Sources)
+        {
+            if (!SourceNames.Contains(source))
+                errors.Add($"{name}: unknown source '{source}'. Use {string.Join(", ", SourceNames)}.{DidYouMean.Hint(source, SourceNames)}");
+            if (!SourceKinds.Contains(def.Kind.ToLowerInvariant()))
+                errors.Add($"{name}: source '{source}' has kind '{def.Kind}', which does not exist yet. Use {string.Join(" or ", SourceKinds)}.{DidYouMean.Hint(def.Kind, SourceKinds)}");
+        }
+        var seen = new HashSet<string>();
+        foreach (var t in f.Tenants)
+        {
+            if (!KebabId.IsMatch(t.Id)) errors.Add($"{name}: tenant id '{t.Id}' must be lowercase kebab-case, because it is part of the tenant's database names");
+            else if (!seen.Add(t.Id)) errors.Add($"{name}: tenant '{t.Id}' is listed twice");
+            if (!t.Kind.Equals("customer", StringComparison.OrdinalIgnoreCase) && !t.Kind.Equals("test", StringComparison.OrdinalIgnoreCase))
+                errors.Add($"{name}: tenant '{t.Id}' has kind '{t.Kind}'. Use customer or test.{DidYouMean.Hint(t.Kind, ["customer", "test"])}");
+        }
+        foreach (var id in f.Fake?.UndeclaredTenants ?? [])
+        {
+            if (!KebabId.IsMatch(id)) errors.Add($"{name}: undeclared tenant '{id}' must be lowercase kebab-case");
+            else if (seen.Contains(id)) errors.Add($"{name}: '{id}' is both listed under tenants and an undeclared tenant: an undeclared tenant is one the list does not name");
+        }
+        foreach (var id in f.Exclude)
+        {
+            if (!ids.Contains(id) && !aliases.ContainsKey(id))
+                errors.Add($"{name}: excludes '{id}', which is not in this town.{DidYouMean.Hint(id, ids.Concat(aliases.Keys))}");
+            else if ((ids.Contains(id) ? id : aliases[id]).StartsWith("hub."))
+                errors.Add($"{name}: excludes '{id}', a resource of the hub. The hub is the same in every environment");
+        }
     }
 
     /// <summary>
@@ -419,6 +493,13 @@ public static class RegistryLoader
         }
 
         if (!TryParseKind(s.Role, s.Id, fileName, errors, out var kind)) return null;
+        if (s.TenantPattern is not null)
+        {
+            if (kind != NodeKind.Database)
+                errors.Add($"{fileName}: '{s.Id}' has a tenantPattern, but only a database (role: db) keeps one database per tenant");
+            else if (s.TenantPattern.Split(RegistryEnvironment.TenantToken).Length != 2)
+                errors.Add($"{fileName}: tenantPattern '{s.TenantPattern}' of '{s.Id}' must contain {RegistryEnvironment.TenantToken} exactly once, where the tenant id goes (for example merchant-{{tenant}}-db)");
+        }
         var role = kind == NodeKind.Database ? "db" : kind.ToString().ToLowerInvariant(); // the YAML spelling
         appDefaults.TryGetValue(role, out var app);
         pillarDefaults.TryGetValue(role, out var pillar);
@@ -445,6 +526,7 @@ public static class RegistryLoader
             s.Calls)
         {
             GatewayCalls = s.GatewayCalls,
+            TenantPattern = s.TenantPattern,
         };
     }
 
@@ -477,11 +559,11 @@ public static class RegistryLoader
         return true;
     }
 
-    private static T Read<T>(string path)
+    private static T Read<T>(string path, string? displayName = null)
     {
         if (!File.Exists(path))
             throw new RegistryException($"Registry file not found: {path}");
-        var name = Path.GetFileName(path);
+        var name = displayName ?? Path.GetFileName(path);
         try
         {
             return Yaml.Deserialize<T>(File.ReadAllText(path)) ?? throw new RegistryException($"{name} is empty");

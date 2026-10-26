@@ -3,10 +3,11 @@
 // with no id), and a snapshot with nothing usable in it is refused so the town keeps showing the last good one.
 
 import { DEFAULT_RING_CAPACITY, MAX_RING_CAPACITY, MIN_RING_CAPACITY, maxPillars } from './scene/layout'
-import type { DependencySnapshot, ExternalCallerSnapshot, GroupSnapshot, IncidentSnapshot, MessagingSnapshot, NodeSnapshot, Snapshot, VendorSnapshot } from './types'
+import type { DependencySnapshot, EnvironmentInfo, ExternalCallerSnapshot, GroupSnapshot, IncidentSnapshot, MessagingSnapshot, NodeSnapshot, Snapshot, TenantInfo, TenantUnitSnapshot, VendorSnapshot } from './types'
 
 const KINDS = ['Api', 'Worker', 'Database', 'Cache', 'Cron', 'Gateway', 'Broker', 'Egress']
 const STATES = ['Healthy', 'Degraded', 'Down', 'Stale']
+const TENANT_KINDS = ['Customer', 'Test', 'Unknown']
 
 /** Numbers every node has. Anything that is not a finite number becomes 0. */
 const REQUIRED_NUMBERS = [
@@ -63,6 +64,10 @@ export function checkSnapshot(raw: unknown): Checked {
     townName: str(raw.townName) || str(raw.townId),
     groupLabel: str(raw.groupLabel) || 'Group',
     environment: str(raw.environment),
+    environmentName: str(raw.environmentName) || str(raw.environment),
+    environments: (Array.isArray(raw.environments) ? raw.environments : []).filter(isObject).filter((e) => typeof e.id === 'string' && e.id !== '')
+      .map<EnvironmentInfo>((e) => ({ id: e.id as string, name: str(e.name) || (e.id as string), isDefault: e.isDefault === true })),
+    tenants: checkTenants(raw.tenants, problems),
     generatedAt: str(raw.generatedAt),
     dayFraction: isFiniteNumber(raw.dayFraction) ? raw.dayFraction : 0.5,
     totals: {
@@ -171,7 +176,52 @@ function checkNode(n: unknown, groupId: string, ids: Set<string>, problems: stri
     if (!isFiniteNumber(n[key])) problems.push(`'${n.id}' has no usable ${key}`)
   }
   for (const key of OPTIONAL_NUMBERS) out[key] = isFiniteNumber(n[key]) ? n[key] : null
+  // null is a store without tenants; a list, even an empty one, is a store with a database for each tenant
+  out.tenants = Array.isArray(n.tenants) ? checkUnits(n.tenants, n.id, problems) : null
   return out as unknown as NodeSnapshot
+}
+
+function checkUnits(list: unknown[], nodeId: string, problems: string[]): TenantUnitSnapshot[] {
+  const ids = new Set<string>()
+  const out: TenantUnitSnapshot[] = []
+  for (const u of list) {
+    if (!isObject(u) || typeof u.id !== 'string' || u.id === '' || ids.has(u.id)) {
+      problems.push(`dropped a tenant with no usable id in '${nodeId}'`)
+      continue
+    }
+    ids.add(u.id)
+    out.push({
+      id: u.id,
+      name: str(u.name) || u.id,
+      kind: TENANT_KINDS.includes(u.kind as string) ? (u.kind as TenantUnitSnapshot['kind']) : 'Unknown',
+      database: str(u.database),
+      // an unknown state is shown as grey, never as healthy
+      state: STATES.includes(u.state as string) ? (u.state as TenantUnitSnapshot['state']) : 'Stale',
+      utilisation: isFiniteNumber(u.utilisation) ? u.utilisation : null,
+      throttled: isFiniteNumber(u.throttled) ? u.throttled : null,
+      requestsPerSecond: isFiniteNumber(u.requestsPerSecond) ? u.requestsPerSecond : 0,
+    })
+  }
+  return out
+}
+
+function checkTenants(list: unknown, problems: string[]): TenantInfo[] {
+  const ids = new Set<string>()
+  const out: TenantInfo[] = []
+  for (const t of Array.isArray(list) ? list : []) {
+    if (!isObject(t) || typeof t.id !== 'string' || t.id === '' || ids.has(t.id)) {
+      problems.push('dropped a tenant with no usable id')
+      continue
+    }
+    ids.add(t.id)
+    out.push({
+      id: t.id,
+      name: str(t.name) || t.id,
+      kind: TENANT_KINDS.includes(t.kind as string) ? (t.kind as TenantInfo['kind']) : 'Unknown',
+      share: isFiniteNumber(t.share) && t.share >= 0 ? t.share : 0,
+    })
+  }
+  return out
 }
 
 function str(v: unknown): string {

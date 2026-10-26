@@ -1,0 +1,8 @@
+# Not deployed in dev at all: dev.yaml excludes every system, so the island is not on dev's map.
+pillar: bb
+displayName: Bravo
+color: "#f2994a"
+systems:
+  - { id: bb.billing-api, service: billing, name: Billing API, role: api, external: true, calls: [bb.billing-db, bb.shared-db] }
+  - { id: bb.billing-db, service: billing, tenantPattern: "bill-{tenant}", name: Billing DB, role: db }
+  - { id: bb.shared-db, name: Shared DB, role: db }

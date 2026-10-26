@@ -22,33 +22,43 @@ if (args.Contains("--write-schema"))
 }
 
 var fakeOptions = builder.Configuration.GetSection("Fake").Get<FakeOptions>() ?? new FakeOptions();
-var fake = new FakeSource(FakeProfiles.Load(registryPath), fakeOptions, TimeProvider.System);
+var fakeProfiles = FakeProfiles.Load(registryPath);
 var snapshotInterval = TimeSpan.FromSeconds(builder.Configuration.GetValue("Snapshot:IntervalSeconds", 2.0));
+var staleAfter = TimeSpan.FromSeconds(builder.Configuration.GetValue("Snapshot:StaleAfterSeconds", 30.0));
+
+// One runtime for each environment of the town (a town without environments has the one, "demo"): its own source, readings and snapshots.
+var environmentIds = registry.Environments.Count > 0 ? registry.Environments.Select(e => e.Id).ToList() : [Registry.DemoEnvironmentId];
+var runtimes = new List<EnvironmentRuntime>();
+foreach (var environmentId in environmentIds)
+{
+    var view = new EnvironmentRegistry(registries, environmentId);
+    var fake = new FakeSource(fakeProfiles, fakeOptions, TimeProvider.System);
+    var state = new LatestState();
+    var store = new SnapshotStore();
+    var snapshots = new SnapshotBuilder(view, state, TimeProvider.System)
+    {
+        IncidentSources = [fake],
+        Environment = environmentId,
+        StaleAfter = staleAfter,
+        DayFraction = () => fake.DayFraction,
+    };
+    runtimes.Add(new EnvironmentRuntime(environmentId, view, fake, state, snapshots, store));
+}
+var environments = new EnvironmentSet(runtimes, registry.DefaultEnvironmentId);
 
 builder.Services.AddSingleton(registries);
 builder.Services.AddSingleton<IRegistryProvider>(registries);
 builder.Services.AddHostedService(sp => new RegistryReloader(
     registries, registryPath, TimeSpan.FromSeconds(builder.Configuration.GetValue("Registry:WatchSeconds", 5.0)), sp.GetRequiredService<ILogger<RegistryReloader>>()));
 builder.Services.AddSingleton(TimeProvider.System);
-builder.Services.AddSingleton<LatestState>();
-builder.Services.AddSingleton<SnapshotStore>();
-builder.Services.AddSingleton(fake);
-builder.Services.AddSingleton<IFakeControl>(fake);
-builder.Services.AddSingleton<IMetricSource>(fake);
-builder.Services.AddSingleton<IIncidentSource>(fake);
+builder.Services.AddSingleton(environments);
 builder.Services.AddSingleton<ISnapshotNotifier, SignalRSnapshotNotifier>();
-builder.Services.AddSingleton(sp => new SnapshotBuilder(
-    sp.GetRequiredService<IRegistryProvider>(), sp.GetRequiredService<LatestState>(), sp.GetRequiredService<TimeProvider>())
+foreach (var rt in runtimes)
 {
-    IncidentSources = sp.GetServices<IIncidentSource>().ToList(),
-    Environment = "demo",
-    StaleAfter = TimeSpan.FromSeconds(builder.Configuration.GetValue("Snapshot:StaleAfterSeconds", 30.0)),
-    DayFraction = () => fake.DayFraction,
-});
-builder.Services.AddHostedService<SourcePoller>();
-builder.Services.AddHostedService(sp => new SnapshotPublisher(
-    sp.GetRequiredService<SnapshotBuilder>(), sp.GetRequiredService<SnapshotStore>(),
-    sp.GetRequiredService<ISnapshotNotifier>(), snapshotInterval, sp.GetRequiredService<ILogger<SnapshotPublisher>>()));
+    // AddHostedService would keep only the first of each type, so these are added as plain services
+    builder.Services.AddSingleton<IHostedService>(sp => new SourcePoller([rt.Fake], rt.Registry, rt.State, sp.GetRequiredService<ILogger<SourcePoller>>()));
+    builder.Services.AddSingleton<IHostedService>(sp => new SnapshotPublisher(rt.Builder, rt.Store, sp.GetRequiredService<ISnapshotNotifier>(), snapshotInterval, sp.GetRequiredService<ILogger<SnapshotPublisher>>()));
+}
 builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter()));
 builder.Services.AddSignalR();
 builder.Services.AddEndpointsApiExplorer();
@@ -63,20 +73,52 @@ var app = builder.Build();
 app.MapGet("/api/health", () => Results.Ok(new { status = "ok", town = registries.Current.Town.Name }))
    .ExcludeFromDescription();
 
-app.MapGet("/api/snapshot/latest", (SnapshotStore store) =>
-        store.Latest is { } s ? Results.Ok(s) : Results.StatusCode(StatusCodes.Status503ServiceUnavailable))
+// Which environment an endpoint answers for is the ?env= of its address; without one, the default environment.
+app.MapGet("/api/environments", (EnvironmentSet envs) =>
+        envs.All.Select(e => new EnvironmentInfo(e.Id, e.Registry.Current.ActiveEnvironment?.Name ?? e.Id, e.Id == envs.Default.Id)))
+   .Produces<EnvironmentInfo[]>()
+   .WithName("GetEnvironments");
+
+app.MapGet("/api/snapshot/latest", (EnvironmentSet envs, string? env) =>
+        envs.Find(env) is not { } rt ? EnvironmentNotFound(envs, env)
+        : rt.Store.Latest is { } s ? Results.Ok(s) : Results.StatusCode(StatusCodes.Status503ServiceUnavailable))
    .Produces<Snapshot>()
    .WithName("GetLatestSnapshot");
 
 // Demo steering for the fake generator. The Break things panel (a later slice) is built on this.
 var fx = app.MapGroup("/api/fake").ExcludeFromDescription();
-fx.MapGet("/", (IFakeControl c) => new { calm = c.Calm, effects = c.Effects });
-fx.MapPost("/effects", (EffectRequest r, IFakeControl c) =>
-    r.Target is null ? Results.BadRequest("target is required") : Results.Ok(c.Add(r.Target, r.Kind, r.Intensity)));
-fx.MapDelete("/effects/{id}", (string id, IFakeControl c) => c.Remove(id) ? Results.NoContent() : Results.NotFound());
-fx.MapDelete("/effects", (IFakeControl c) => { c.Clear(); return Results.NoContent(); });
-fx.MapPost("/reset", (IFakeControl c) => { c.Reset(); return Results.NoContent(); });
-fx.MapPost("/calm", (CalmRequest r, IFakeControl c) => { c.Calm = r.On; return Results.Ok(new { calm = c.Calm }); });
+fx.MapGet("/", (EnvironmentSet envs, string? env) =>
+    envs.Find(env) is { } rt ? Results.Ok(new { calm = rt.Fake.Calm, effects = rt.Fake.Effects }) : EnvironmentNotFound(envs, env));
+fx.MapPost("/effects", (EffectRequest r, EnvironmentSet envs, string? env) =>
+{
+    if (envs.Find(env) is not { } rt) return EnvironmentNotFound(envs, env);
+    if (r.Target is null) return Results.BadRequest("target is required");
+    try { return Results.Ok(rt.Fake.Add(r.Target, r.Kind, r.Intensity)); }
+    catch (ArgumentException e) { return Results.BadRequest(e.Message); }
+});
+fx.MapDelete("/effects/{id}", (string id, EnvironmentSet envs, string? env) =>
+    envs.Find(env) is not { } rt ? EnvironmentNotFound(envs, env) : rt.Fake.Remove(id) ? Results.NoContent() : Results.NotFound());
+fx.MapDelete("/effects", (EnvironmentSet envs, string? env) =>
+{
+    if (envs.Find(env) is not { } rt) return EnvironmentNotFound(envs, env);
+    rt.Fake.Clear();
+    return Results.NoContent();
+});
+fx.MapPost("/reset", (EnvironmentSet envs, string? env) =>
+{
+    if (envs.Find(env) is not { } rt) return EnvironmentNotFound(envs, env);
+    rt.Fake.Reset();
+    return Results.NoContent();
+});
+fx.MapPost("/calm", (CalmRequest r, EnvironmentSet envs, string? env) =>
+{
+    if (envs.Find(env) is not { } rt) return EnvironmentNotFound(envs, env);
+    rt.Fake.Calm = r.On;
+    return Results.Ok(new { calm = rt.Fake.Calm });
+});
+
+static IResult EnvironmentNotFound(EnvironmentSet envs, string? env) =>
+    Results.NotFound(new { error = $"No environment '{env}'.", environments = envs.All.Select(e => e.Id) });
 
 app.MapHub<TownHub>("/hubs/town");
 
