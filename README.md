@@ -55,6 +55,10 @@ The browser app proxies `/api` and `/hubs` to the backend, so there is nothing t
 
 Hover a building for its numbers. Drag to orbit, scroll to zoom, right-drag to pan, **Home** frames the whole town. Click a building, or pick one in the search box (press `/` to focus it), and the camera glides to it and keeps its name board readable. Search also finds islands. Any drag cancels a glide.
 
+### Demo and live towns
+
+`mode` in `town.yaml` is read once, when the server starts. A town with `mode: demo` gets the fake source, `/api/fake/*`, the Break things panel and the story bar, and the top bar says "Live (demo data)". A town with no `mode`, or `mode: live`, gets none of them: `/api/fake` answers 404, the panel and story bar are not drawn, and the top bar says "Live". Every town in `shared-test-data` that uses the fake source says `mode: demo`.
+
 ### Break things
 
 The **Break things** panel on the left breaks the fake town on purpose. Pick a scenario (Traffic spike, Slow, Errors, Sick instances, High CPU, High memory, DB saturated, Tenant DB throttled, Queue backs up, Dead letters, Down, Go quiet, or an incident from Sev 1 storm to Sev 4 clouds), then click a building in the town, or search for a target (the whole town, an island, a building or a third party). The search works the other way round too: choose the target, then the scenario. Esc lets go of a scenario that is waiting.
@@ -191,6 +195,7 @@ To refresh the golden fixtures (calm town, a bad day across several islands, and
 | Thresholds make sense: ranges, and amber below red, also after the defaults are applied | error |
 | Colours are hex, pillars have a display name, the hub has one gateway, broker, egress and database at most | error |
 | `fake.yaml` names real systems and its numbers make sense | error |
+| A town with `fake.yaml` or a `stories/` folder says `mode: demo` in `town.yaml`, and `mode` is `demo` or `live` | error |
 | A worker has a database, a system has a caller, no `layout.yaml`, an empty pillar, an island that stands alone (no API, messaging or call links) | warning |
 | Messaging: topics are services of the pillar, subscriptions name an existing topic and a worker of the same pillar, no duplicates, `legacy` exactly for the hub's egress topic | error |
 
@@ -208,7 +213,7 @@ One folder describes a town. The sample is `config/galactic-credit/`:
 
 | File | What it holds |
 | --- | --- |
-| `town.yaml` | Name, what an island is called, topology |
+| `town.yaml` | Name, what an island is called, topology, and `mode` (`demo` or `live`; left out means `live`) |
 | `defaults.yaml` | App-wide defaults per role (SLA, error, resource, throttle and backlog thresholds) |
 | `hub.yaml` | The hub's shared resources (gateway, broker, egress, database), its `messaging` topics (`egress`), and the outside callers (`externalCallers`, each lists the external systems it reaches) |
 | `layout.yaml` | The order of the islands round the hub. Unlisted pillars follow, Lost & found is always last |

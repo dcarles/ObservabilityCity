@@ -69,6 +69,7 @@ export function checkSnapshot(raw: unknown): Checked {
       .map<EnvironmentInfo>((e) => ({ id: e.id as string, name: str(e.name) || (e.id as string), isDefault: e.isDefault === true })),
     tenants: checkTenants(raw.tenants, problems),
     topology: str(raw.topology) || 'direct',
+    mode: raw.mode === 'demo' ? 'demo' : 'live',
     view: checkView(raw.view),
     generatedAt: str(raw.generatedAt),
     incidentFreeSince: typeof raw.incidentFreeSince === 'string' && Number.isFinite(Date.parse(raw.incidentFreeSince)) ? raw.incidentFreeSince : null,

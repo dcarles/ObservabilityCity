@@ -572,6 +572,7 @@
   ],
   "tenants": [],
   "topology": "hub-and-spoke",
+  "mode": "demo",
   "view": {
     "islands": [
       "aa",

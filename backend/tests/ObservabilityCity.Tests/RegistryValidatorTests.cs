@@ -13,6 +13,7 @@ public class RegistryValidatorTests
     [InlineData("config/galactic-credit")]
     [InlineData("shared-test-data/registries/mini-town")]
     [InlineData("shared-test-data/registries/tenants-town")]
+    [InlineData("shared-test-data/registries/live-town")]
     [InlineData("shared-test-data/registries/stress-23")]
     [InlineData("shared-test-data/registries/stress-35")]
     public void Every_registry_in_the_repo_is_clean(string folder)

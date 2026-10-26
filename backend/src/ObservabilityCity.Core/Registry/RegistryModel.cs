@@ -62,7 +62,19 @@ public sealed record RegistryTopic(string Name, string GroupId, string Service);
 /// <summary>A worker reading a topic. PublisherGroupId is the island that owns the topic. Legacy marks a read of the hub's egress topic by a pillar.</summary>
 public sealed record RegistrySubscription(string Topic, string PublisherGroupId, string ConsumerId, string ConsumerGroupId, bool Legacy);
 
-public sealed record TownInfo(string Id, string Name, string GroupLabel, string Topology);
+/// <summary>Mode is <see cref="TownModes.Demo"/> or <see cref="TownModes.Live"/>; a town that does not say is live.</summary>
+public sealed record TownInfo(string Id, string Name, string GroupLabel, string Topology, string Mode = TownModes.Live)
+{
+    public bool IsDemo => Mode == TownModes.Demo;
+}
+
+/// <summary>Whether a town is a demo (fake data, steered from the Break things panel and the story bar) or live (real sources only, nothing to break).</summary>
+public static class TownModes
+{
+    public const string Demo = "demo";
+    public const string Live = "live";
+    public static readonly string[] All = [Demo, Live];
+}
 
 /// <summary>An island. The hub is a group too, flagged IsHub.</summary>
 public sealed record RegistryGroup(

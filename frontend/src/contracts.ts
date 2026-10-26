@@ -249,6 +249,7 @@ export interface components {
             environments: components["schemas"]["EnvironmentInfo"][];
             tenants: components["schemas"]["TenantInfo"][];
             topology: string;
+            mode: string;
             view: components["schemas"]["ViewInfo"];
             /** Format: date-time */
             incidentFreeSince?: string | null;

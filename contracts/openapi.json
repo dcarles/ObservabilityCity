@@ -690,6 +690,7 @@
           "groupLabel",
           "groups",
           "incidentsSeen",
+          "mode",
           "notices",
           "ringCapacity",
           "tenants",
@@ -775,6 +776,9 @@
             }
           },
           "topology": {
+            "type": "string"
+          },
+          "mode": {
             "type": "string"
           },
           "view": {
