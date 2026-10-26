@@ -5067,5 +5067,12 @@
       "isDefault": true
     }
   ],
-  "tenants": []
+  "tenants": [],
+  "topology": "hub-and-spoke",
+  "view": {
+    "islands": [],
+    "unknown": [],
+    "hidden": [],
+    "links": []
+  }
 }

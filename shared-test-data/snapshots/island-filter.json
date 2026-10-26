@@ -1,0 +1,597 @@
+{
+  "townId": "mini-town",
+  "townName": "Mini Town",
+  "groupLabel": "Pillar",
+  "environment": "demo",
+  "generatedAt": "2026-10-25T12:00:02+00:00",
+  "dayFraction": 0.5,
+  "totals": {
+    "requestsPerSecond": 456,
+    "errorRate": 0.014631578947368423,
+    "p99Ms": 119.33333333333333,
+    "degraded": 1,
+    "down": 0,
+    "incidents": 0,
+    "deadLetters": 0
+  },
+  "notices": [],
+  "groups": [
+    {
+      "id": "hub",
+      "displayName": "Platform hub",
+      "color": "#f5c26b",
+      "isHub": true,
+      "isLostFound": false,
+      "configError": null,
+      "incidents": [],
+      "hasBridge": false,
+      "messaging": {
+        "topics": [],
+        "subscriptions": []
+      },
+      "nodes": [
+        {
+          "id": "hub.apim",
+          "name": "API gateway",
+          "kind": "Gateway",
+          "service": null,
+          "external": false,
+          "state": "Healthy",
+          "instancesTotal": 2,
+          "instancesHealthy": 2,
+          "load": 0.3333333333333333,
+          "cpu": 0.26666666666666666,
+          "memory": 0.38,
+          "utilisation": null,
+          "throttled": null,
+          "queueDepth": null,
+          "oldestMessageSeconds": null,
+          "deadLetters": null,
+          "requestsPerSecond": 80,
+          "errorRate": 0.002,
+          "p99Ms": 58,
+          "slaP99Ms": 500,
+          "errorAmber": 0.01,
+          "errorRed": 0.05,
+          "resourceAmber": 0.8,
+          "resourceRed": 0.95,
+          "throttleAmber": 0.001,
+          "throttleRed": 0.02,
+          "backlogAmber": 60,
+          "backlogRed": 300,
+          "calls": [],
+          "gatewayCalls": [],
+          "lastUpdated": "2026-10-25T12:00:02+00:00",
+          "tenants": null
+        },
+        {
+          "id": "hub.service-bus",
+          "name": "Service Bus",
+          "kind": "Broker",
+          "service": null,
+          "external": false,
+          "state": "Healthy",
+          "instancesTotal": 2,
+          "instancesHealthy": 2,
+          "load": 0.2,
+          "cpu": 0.2,
+          "memory": 0.38,
+          "utilisation": null,
+          "throttled": null,
+          "queueDepth": null,
+          "oldestMessageSeconds": null,
+          "deadLetters": null,
+          "requestsPerSecond": 48,
+          "errorRate": 0.002,
+          "p99Ms": 9.4,
+          "slaP99Ms": 100,
+          "errorAmber": 0.005,
+          "errorRed": 0.02,
+          "resourceAmber": 0.8,
+          "resourceRed": 0.95,
+          "throttleAmber": 0.001,
+          "throttleRed": 0.02,
+          "backlogAmber": 60,
+          "backlogRed": 300,
+          "calls": [],
+          "gatewayCalls": [],
+          "lastUpdated": "2026-10-25T12:00:02+00:00",
+          "tenants": null
+        },
+        {
+          "id": "hub.egress",
+          "name": "Central egress",
+          "kind": "Egress",
+          "service": null,
+          "external": false,
+          "state": "Healthy",
+          "instancesTotal": 2,
+          "instancesHealthy": 2,
+          "load": 0.13333333333333333,
+          "cpu": 0.16666666666666669,
+          "memory": 0.38,
+          "utilisation": null,
+          "throttled": null,
+          "queueDepth": null,
+          "oldestMessageSeconds": null,
+          "deadLetters": null,
+          "requestsPerSecond": 8,
+          "errorRate": 0.002,
+          "p99Ms": 278,
+          "slaP99Ms": 2000,
+          "errorAmber": 0.01,
+          "errorRed": 0.05,
+          "resourceAmber": 0.8,
+          "resourceRed": 0.95,
+          "throttleAmber": 0.001,
+          "throttleRed": 0.02,
+          "backlogAmber": 60,
+          "backlogRed": 300,
+          "calls": [],
+          "gatewayCalls": [],
+          "lastUpdated": "2026-10-25T12:00:02+00:00",
+          "tenants": null
+        },
+        {
+          "id": "hub.customer-db",
+          "name": "Shared customer DB",
+          "kind": "Database",
+          "service": null,
+          "external": false,
+          "state": "Healthy",
+          "instancesTotal": 2,
+          "instancesHealthy": 2,
+          "load": 0.5,
+          "cpu": null,
+          "memory": null,
+          "utilisation": 0.5,
+          "throttled": 0,
+          "queueDepth": null,
+          "oldestMessageSeconds": null,
+          "deadLetters": null,
+          "requestsPerSecond": 64,
+          "errorRate": 0.002,
+          "p99Ms": 19.066666666666666,
+          "slaP99Ms": 100,
+          "errorAmber": 0.005,
+          "errorRed": 0.02,
+          "resourceAmber": 0.8,
+          "resourceRed": 0.95,
+          "throttleAmber": 0.001,
+          "throttleRed": 0.02,
+          "backlogAmber": 60,
+          "backlogRed": 300,
+          "calls": [],
+          "gatewayCalls": [],
+          "lastUpdated": "2026-10-25T12:00:02+00:00",
+          "tenants": null
+        }
+      ]
+    },
+    {
+      "id": "aa",
+      "displayName": "Alpha",
+      "color": "#5aa9ff",
+      "isHub": false,
+      "isLostFound": false,
+      "configError": null,
+      "incidents": [],
+      "hasBridge": true,
+      "messaging": {
+        "topics": [
+          {
+            "name": "aa-orders-outbox",
+            "service": "orders"
+          }
+        ],
+        "subscriptions": [
+          {
+            "topic": "bb-ledger-outbox",
+            "publisher": "bb",
+            "consumer": "aa.orders-worker",
+            "legacy": false
+          }
+        ]
+      },
+      "nodes": [
+        {
+          "id": "aa.orders-api",
+          "name": "Orders API",
+          "kind": "Api",
+          "service": "orders",
+          "external": true,
+          "state": "Degraded",
+          "instancesTotal": 2,
+          "instancesHealthy": 2,
+          "load": 0.4,
+          "cpu": 0.30000000000000004,
+          "memory": 0.38,
+          "utilisation": null,
+          "throttled": null,
+          "queueDepth": null,
+          "oldestMessageSeconds": null,
+          "deadLetters": null,
+          "requestsPerSecond": 32,
+          "errorRate": 0.182,
+          "p99Ms": 196,
+          "slaP99Ms": 1000,
+          "errorAmber": 0.01,
+          "errorRed": 0.05,
+          "resourceAmber": 0.8,
+          "resourceRed": 0.95,
+          "throttleAmber": 0.001,
+          "throttleRed": 0.02,
+          "backlogAmber": 60,
+          "backlogRed": 300,
+          "calls": [
+            "aa.orders-db"
+          ],
+          "gatewayCalls": [],
+          "lastUpdated": "2026-10-25T12:00:02+00:00",
+          "tenants": null
+        },
+        {
+          "id": "aa.orders-worker",
+          "name": "Orders worker",
+          "kind": "Worker",
+          "service": "orders",
+          "external": false,
+          "state": "Healthy",
+          "instancesTotal": 3,
+          "instancesHealthy": 3,
+          "load": 0.4444444444444444,
+          "cpu": 0.3222222222222222,
+          "memory": 0.46,
+          "utilisation": null,
+          "throttled": null,
+          "queueDepth": 1,
+          "oldestMessageSeconds": 0,
+          "deadLetters": 0,
+          "requestsPerSecond": 16,
+          "errorRate": 0.002,
+          "p99Ms": 2966.666666666667,
+          "slaP99Ms": 30000,
+          "errorAmber": 0.01,
+          "errorRed": 0.05,
+          "resourceAmber": 0.8,
+          "resourceRed": 0.95,
+          "throttleAmber": 0.001,
+          "throttleRed": 0.02,
+          "backlogAmber": 60,
+          "backlogRed": 300,
+          "calls": [
+            "aa.orders-db"
+          ],
+          "gatewayCalls": [],
+          "lastUpdated": "2026-10-25T12:00:02+00:00",
+          "tenants": null
+        },
+        {
+          "id": "aa.orders-db",
+          "name": "Orders DB",
+          "kind": "Database",
+          "service": "orders",
+          "external": false,
+          "state": "Healthy",
+          "instancesTotal": 2,
+          "instancesHealthy": 2,
+          "load": 0.5,
+          "cpu": null,
+          "memory": null,
+          "utilisation": 0.5,
+          "throttled": 0,
+          "queueDepth": null,
+          "oldestMessageSeconds": null,
+          "deadLetters": null,
+          "requestsPerSecond": 80,
+          "errorRate": 0.002,
+          "p99Ms": 19.333333333333332,
+          "slaP99Ms": 100,
+          "errorAmber": 0.005,
+          "errorRed": 0.02,
+          "resourceAmber": 0.8,
+          "resourceRed": 0.95,
+          "throttleAmber": 0.001,
+          "throttleRed": 0.02,
+          "backlogAmber": 60,
+          "backlogRed": 300,
+          "calls": [],
+          "gatewayCalls": [],
+          "lastUpdated": "2026-10-25T12:00:02+00:00",
+          "tenants": null
+        }
+      ]
+    },
+    {
+      "id": "cc",
+      "displayName": "Gamma",
+      "color": "#f2994a",
+      "isHub": false,
+      "isLostFound": false,
+      "configError": null,
+      "incidents": [],
+      "hasBridge": true,
+      "messaging": {
+        "topics": [
+          {
+            "name": "cc-notify-outbox",
+            "service": "notify"
+          }
+        ],
+        "subscriptions": [
+          {
+            "topic": "aa-orders-outbox",
+            "publisher": "aa",
+            "consumer": "cc.notify-worker",
+            "legacy": false
+          },
+          {
+            "topic": "bb-ledger-outbox",
+            "publisher": "bb",
+            "consumer": "cc.notify-worker",
+            "legacy": false
+          }
+        ]
+      },
+      "nodes": [
+        {
+          "id": "cc.notify-api",
+          "name": "Notify API",
+          "kind": "Api",
+          "service": "notify",
+          "external": true,
+          "state": "Healthy",
+          "instancesTotal": 2,
+          "instancesHealthy": 2,
+          "load": 0.4,
+          "cpu": 0.30000000000000004,
+          "memory": 0.38,
+          "utilisation": null,
+          "throttled": null,
+          "queueDepth": null,
+          "oldestMessageSeconds": null,
+          "deadLetters": null,
+          "requestsPerSecond": 32,
+          "errorRate": 0.002,
+          "p99Ms": 196,
+          "slaP99Ms": 1000,
+          "errorAmber": 0.01,
+          "errorRed": 0.05,
+          "resourceAmber": 0.8,
+          "resourceRed": 0.95,
+          "throttleAmber": 0.001,
+          "throttleRed": 0.02,
+          "backlogAmber": 60,
+          "backlogRed": 300,
+          "calls": [
+            "cc.notify-db"
+          ],
+          "gatewayCalls": [
+            "aa.orders-api",
+            "bb.ledger-api"
+          ],
+          "lastUpdated": "2026-10-25T12:00:02+00:00",
+          "tenants": null
+        },
+        {
+          "id": "cc.notify-worker",
+          "name": "Notify worker",
+          "kind": "Worker",
+          "service": "notify",
+          "external": false,
+          "state": "Healthy",
+          "instancesTotal": 3,
+          "instancesHealthy": 3,
+          "load": 0.4444444444444444,
+          "cpu": 0.3222222222222222,
+          "memory": 0.46,
+          "utilisation": null,
+          "throttled": null,
+          "queueDepth": 1,
+          "oldestMessageSeconds": 0,
+          "deadLetters": 0,
+          "requestsPerSecond": 16,
+          "errorRate": 0.002,
+          "p99Ms": 2966.666666666667,
+          "slaP99Ms": 30000,
+          "errorAmber": 0.01,
+          "errorRed": 0.05,
+          "resourceAmber": 0.8,
+          "resourceRed": 0.95,
+          "throttleAmber": 0.001,
+          "throttleRed": 0.02,
+          "backlogAmber": 60,
+          "backlogRed": 300,
+          "calls": [
+            "cc.notify-db"
+          ],
+          "gatewayCalls": [],
+          "lastUpdated": "2026-10-25T12:00:02+00:00",
+          "tenants": null
+        },
+        {
+          "id": "cc.notify-db",
+          "name": "Notify DB",
+          "kind": "Database",
+          "service": "notify",
+          "external": false,
+          "state": "Healthy",
+          "instancesTotal": 2,
+          "instancesHealthy": 2,
+          "load": 0.5,
+          "cpu": null,
+          "memory": null,
+          "utilisation": 0.5,
+          "throttled": 0,
+          "queueDepth": null,
+          "oldestMessageSeconds": null,
+          "deadLetters": null,
+          "requestsPerSecond": 80,
+          "errorRate": 0.002,
+          "p99Ms": 19.333333333333332,
+          "slaP99Ms": 100,
+          "errorAmber": 0.005,
+          "errorRed": 0.02,
+          "resourceAmber": 0.8,
+          "resourceRed": 0.95,
+          "throttleAmber": 0.001,
+          "throttleRed": 0.02,
+          "backlogAmber": 60,
+          "backlogRed": 300,
+          "calls": [],
+          "gatewayCalls": [],
+          "lastUpdated": "2026-10-25T12:00:02+00:00",
+          "tenants": null
+        }
+      ]
+    }
+  ],
+  "vendors": [
+    {
+      "node": {
+        "id": "ext.bureau",
+        "name": "Credit bureau",
+        "kind": "Api",
+        "service": null,
+        "external": false,
+        "state": "Healthy",
+        "instancesTotal": 1,
+        "instancesHealthy": 1,
+        "load": 0.4,
+        "cpu": null,
+        "memory": null,
+        "utilisation": null,
+        "throttled": null,
+        "queueDepth": null,
+        "oldestMessageSeconds": null,
+        "deadLetters": null,
+        "requestsPerSecond": 16,
+        "errorRate": 0.002,
+        "p99Ms": 588,
+        "slaP99Ms": 1500,
+        "errorAmber": 0.01,
+        "errorRed": 0.05,
+        "resourceAmber": 0.8,
+        "resourceRed": 0.95,
+        "throttleAmber": 0.001,
+        "throttleRed": 0.02,
+        "backlogAmber": 60,
+        "backlogRed": 300,
+        "calls": [],
+        "gatewayCalls": [],
+        "lastUpdated": "2026-10-25T12:00:02+00:00",
+        "tenants": null
+      },
+      "calledBy": [
+        "aa.orders-api"
+      ]
+    },
+    {
+      "node": {
+        "id": "ext.mailer",
+        "name": "Mail service",
+        "kind": "Api",
+        "service": null,
+        "external": false,
+        "state": "Healthy",
+        "instancesTotal": 1,
+        "instancesHealthy": 1,
+        "load": 0.4000000000000001,
+        "cpu": null,
+        "memory": null,
+        "utilisation": null,
+        "throttled": null,
+        "queueDepth": null,
+        "oldestMessageSeconds": null,
+        "deadLetters": null,
+        "requestsPerSecond": 9.600000000000001,
+        "errorRate": 0.002,
+        "p99Ms": 882,
+        "slaP99Ms": 1000,
+        "errorAmber": 0.01,
+        "errorRed": 0.05,
+        "resourceAmber": 0.8,
+        "resourceRed": 0.95,
+        "throttleAmber": 0.001,
+        "throttleRed": 0.02,
+        "backlogAmber": 60,
+        "backlogRed": 300,
+        "calls": [],
+        "gatewayCalls": [],
+        "lastUpdated": "2026-10-25T12:00:02+00:00",
+        "tenants": null
+      },
+      "calledBy": [
+        "cc.notify-worker"
+      ]
+    }
+  ],
+  "externalCallers": [
+    {
+      "id": "mobile-app",
+      "name": "Mobile app",
+      "requestsPerSecond": 32,
+      "calls": [
+        "aa.orders-api"
+      ]
+    },
+    {
+      "id": "partner",
+      "name": "Partner",
+      "requestsPerSecond": 32,
+      "calls": [
+        "cc.notify-api"
+      ]
+    }
+  ],
+  "dependencies": [
+    {
+      "from": "cc",
+      "to": "aa",
+      "requestsPerSecond": 32
+    },
+    {
+      "from": "aa",
+      "to": "ext.bureau",
+      "requestsPerSecond": 16
+    },
+    {
+      "from": "cc",
+      "to": "ext.mailer",
+      "requestsPerSecond": 4.800000000000001
+    }
+  ],
+  "ringCapacity": 12,
+  "environmentName": "demo",
+  "environments": [
+    {
+      "id": "demo",
+      "name": "demo",
+      "isDefault": true
+    }
+  ],
+  "tenants": [],
+  "topology": "hub-and-spoke",
+  "view": {
+    "islands": [
+      "aa",
+      "cc"
+    ],
+    "unknown": [],
+    "hidden": [
+      {
+        "id": "bb",
+        "displayName": "Beta"
+      }
+    ],
+    "links": [
+      {
+        "nodeId": "cc.notify-api",
+        "islandId": "bb",
+        "islandName": "Beta",
+        "incoming": false,
+        "requestsPerSecond": 32
+      }
+    ]
+  }
+}

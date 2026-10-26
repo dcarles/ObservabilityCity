@@ -41,6 +41,13 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "islands",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -56,10 +63,119 @@
           }
         }
       }
+    },
+    "/api/systems/{id}": {
+      "get": {
+        "tags": [
+          "ObservabilityCity.Host, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+        ],
+        "operationId": "GetSystem",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "env",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/systems/{id}/logs": {
+      "get": {
+        "tags": [
+          "ObservabilityCity.Host, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+        ],
+        "operationId": "GetSystemLogs",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "env",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/LogLine"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "ConfigValue": {
+        "required": [
+          "key",
+          "layer",
+          "source",
+          "value"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          },
+          "layer": {
+            "$ref": "#/components/schemas/SettingLayer"
+          },
+          "source": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
       "DependencySnapshot": {
         "required": [
           "from",
@@ -192,6 +308,22 @@
         ],
         "type": "string"
       },
+      "HiddenIsland": {
+        "required": [
+          "displayName",
+          "id"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
       "IncidentSnapshot": {
         "required": [
           "id",
@@ -214,6 +346,70 @@
           "startedAt": {
             "type": "string",
             "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "LinkKind": {
+        "enum": [
+          "System",
+          "Vendor"
+        ],
+        "type": "string"
+      },
+      "LinkRef": {
+        "required": [
+          "id",
+          "islandId",
+          "islandName",
+          "kind",
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/LinkKind"
+          },
+          "islandId": {
+            "type": "string"
+          },
+          "islandName": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "LogLevel": {
+        "enum": [
+          "Info",
+          "Warn",
+          "Error"
+        ],
+        "type": "string"
+      },
+      "LogLine": {
+        "required": [
+          "at",
+          "level",
+          "message"
+        ],
+        "type": "object",
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "level": {
+            "$ref": "#/components/schemas/LogLevel"
+          },
+          "message": {
+            "type": "string"
           }
         },
         "additionalProperties": false
@@ -421,6 +617,44 @@
         },
         "additionalProperties": false
       },
+      "OffscreenLink": {
+        "required": [
+          "incoming",
+          "islandId",
+          "islandName",
+          "nodeId",
+          "requestsPerSecond"
+        ],
+        "type": "object",
+        "properties": {
+          "nodeId": {
+            "type": "string"
+          },
+          "islandId": {
+            "type": "string"
+          },
+          "islandName": {
+            "type": "string"
+          },
+          "incoming": {
+            "type": "boolean"
+          },
+          "requestsPerSecond": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SettingLayer": {
+        "enum": [
+          "System",
+          "Pillar",
+          "App",
+          "BuiltIn"
+        ],
+        "type": "string"
+      },
       "Snapshot": {
         "required": [
           "dayFraction",
@@ -435,10 +669,12 @@
           "notices",
           "ringCapacity",
           "tenants",
+          "topology",
           "totals",
           "townId",
           "townName",
-          "vendors"
+          "vendors",
+          "view"
         ],
         "type": "object",
         "properties": {
@@ -513,6 +749,12 @@
             "items": {
               "$ref": "#/components/schemas/TenantInfo"
             }
+          },
+          "topology": {
+            "type": "string"
+          },
+          "view": {
+            "$ref": "#/components/schemas/ViewInfo"
           }
         },
         "additionalProperties": false
@@ -537,6 +779,98 @@
           },
           "legacy": {
             "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SystemDetail": {
+        "required": [
+          "calledBy",
+          "calls",
+          "config",
+          "file",
+          "gatewayCalledBy",
+          "gatewayCalls",
+          "id",
+          "islandId",
+          "islandName",
+          "kind",
+          "name",
+          "outsideCallers",
+          "serviceTopics",
+          "subscriptions"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/NodeKind"
+          },
+          "service": {
+            "type": "string",
+            "nullable": true
+          },
+          "islandId": {
+            "type": "string"
+          },
+          "islandName": {
+            "type": "string"
+          },
+          "file": {
+            "type": "string"
+          },
+          "config": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConfigValue"
+            }
+          },
+          "calls": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LinkRef"
+            }
+          },
+          "calledBy": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LinkRef"
+            }
+          },
+          "gatewayCalls": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LinkRef"
+            }
+          },
+          "gatewayCalledBy": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LinkRef"
+            }
+          },
+          "outsideCallers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "serviceTopics": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "subscriptions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SubscriptionSnapshot"
+            }
           }
         },
         "additionalProperties": false
@@ -690,6 +1024,42 @@
             "type": "array",
             "items": {
               "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "ViewInfo": {
+        "required": [
+          "hidden",
+          "islands",
+          "links",
+          "unknown"
+        ],
+        "type": "object",
+        "properties": {
+          "islands": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "unknown": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "hidden": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HiddenIsland"
+            }
+          },
+          "links": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OffscreenLink"
             }
           }
         },

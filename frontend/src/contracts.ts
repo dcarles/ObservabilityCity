@@ -36,10 +36,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/systems/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetSystem"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/systems/{id}/logs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetSystemLogs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        ConfigValue: {
+            key: string;
+            value: string;
+            layer: components["schemas"]["SettingLayer"];
+            source: string;
+        };
         DependencySnapshot: {
             from: string;
             to: string;
@@ -72,6 +110,10 @@ export interface components {
         };
         /** @enum {string} */
         HealthState: "Healthy" | "Degraded" | "Down" | "Stale";
+        HiddenIsland: {
+            id: string;
+            displayName: string;
+        };
         IncidentSnapshot: {
             id: string;
             title: string;
@@ -79,6 +121,23 @@ export interface components {
             severity: number;
             /** Format: date-time */
             startedAt: string;
+        };
+        /** @enum {string} */
+        LinkKind: "System" | "Vendor";
+        LinkRef: {
+            id: string;
+            name: string;
+            kind: components["schemas"]["LinkKind"];
+            islandId: string;
+            islandName: string;
+        };
+        /** @enum {string} */
+        LogLevel: "Info" | "Warn" | "Error";
+        LogLine: {
+            /** Format: date-time */
+            at: string;
+            level: components["schemas"]["LogLevel"];
+            message: string;
         };
         MessagingSnapshot: {
             topics: components["schemas"]["TopicSnapshot"][];
@@ -143,6 +202,16 @@ export interface components {
             lastUpdated?: string | null;
             tenants?: components["schemas"]["TenantUnitSnapshot"][] | null;
         };
+        OffscreenLink: {
+            nodeId: string;
+            islandId: string;
+            islandName: string;
+            incoming: boolean;
+            /** Format: double */
+            requestsPerSecond: number;
+        };
+        /** @enum {string} */
+        SettingLayer: "System" | "Pillar" | "App" | "BuiltIn";
         Snapshot: {
             townId: string;
             townName: string;
@@ -163,12 +232,31 @@ export interface components {
             environmentName: string;
             environments: components["schemas"]["EnvironmentInfo"][];
             tenants: components["schemas"]["TenantInfo"][];
+            topology: string;
+            view: components["schemas"]["ViewInfo"];
         };
         SubscriptionSnapshot: {
             topic: string;
             publisher: string;
             consumer: string;
             legacy: boolean;
+        };
+        SystemDetail: {
+            id: string;
+            name: string;
+            kind: components["schemas"]["NodeKind"];
+            service?: string | null;
+            islandId: string;
+            islandName: string;
+            file: string;
+            config: components["schemas"]["ConfigValue"][];
+            calls: components["schemas"]["LinkRef"][];
+            calledBy: components["schemas"]["LinkRef"][];
+            gatewayCalls: components["schemas"]["LinkRef"][];
+            gatewayCalledBy: components["schemas"]["LinkRef"][];
+            outsideCallers: string[];
+            serviceTopics: string[];
+            subscriptions: components["schemas"]["SubscriptionSnapshot"][];
         };
         TenantInfo: {
             id: string;
@@ -216,6 +304,12 @@ export interface components {
             node: components["schemas"]["NodeSnapshot"];
             calledBy: string[];
         };
+        ViewInfo: {
+            islands: string[];
+            unknown: string[];
+            hidden: components["schemas"]["HiddenIsland"][];
+            links: components["schemas"]["OffscreenLink"][];
+        };
     };
     responses: never;
     parameters: never;
@@ -249,6 +343,7 @@ export interface operations {
         parameters: {
             query?: {
                 env?: string;
+                islands?: string;
             };
             header?: never;
             path?: never;
@@ -263,6 +358,55 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Snapshot"];
+                };
+            };
+        };
+    };
+    GetSystem: {
+        parameters: {
+            query?: {
+                env?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SystemDetail"];
+                };
+            };
+        };
+    };
+    GetSystemLogs: {
+        parameters: {
+            query?: {
+                env?: string;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LogLine"][];
                 };
             };
         };

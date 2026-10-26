@@ -658,5 +658,12 @@
       "kind": "Unknown",
       "share": 0.15422578655151142
     }
-  ]
+  ],
+  "topology": "hub-and-spoke",
+  "view": {
+    "islands": [],
+    "unknown": [],
+    "hidden": [],
+    "links": []
+  }
 }

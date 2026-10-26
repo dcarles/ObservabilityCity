@@ -119,7 +119,16 @@ public sealed record RegistryNode(
 
     /// <summary>Systems on other islands this one reaches through the API gateway. Only the dependency overlay and the cars' origins use them.</summary>
     public IReadOnlyList<string> GatewayCalls { get; init; } = [];
+
+    /// <summary>The registry file the system is declared in (cl.yaml, hub.yaml, third-parties.yaml).</summary>
+    public string SourceFile { get; init; } = "";
+
+    /// <summary>For each setting (slaP99Ms, errors.amber, ...) which layer its value came from. Empty for a node made in code.</summary>
+    public IReadOnlyDictionary<string, SettingOrigin> Origins { get; init; } = new Dictionary<string, SettingOrigin>();
 }
+
+/// <summary>The layer of the defaults cascade a setting's value was taken from, and the file that layer is in (null for the built-in defaults).</summary>
+public sealed record SettingOrigin(SettingLayer Layer, string? File);
 
 /// <summary>Raised when a registry file is wrong. The message names the file and the id.</summary>
 public sealed class RegistryException(string message) : Exception(message);

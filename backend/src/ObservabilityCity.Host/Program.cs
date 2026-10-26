@@ -42,7 +42,7 @@ foreach (var environmentId in environmentIds)
         StaleAfter = staleAfter,
         DayFraction = () => fake.DayFraction,
     };
-    runtimes.Add(new EnvironmentRuntime(environmentId, view, fake, state, snapshots, store));
+    runtimes.Add(new EnvironmentRuntime(environmentId, view, fake, state, snapshots, store, new FakeLogSource(state, TimeProvider.System, staleAfter)));
 }
 var environments = new EnvironmentSet(runtimes, registry.DefaultEnvironmentId);
 
@@ -52,6 +52,7 @@ builder.Services.AddHostedService(sp => new RegistryReloader(
     registries, registryPath, TimeSpan.FromSeconds(builder.Configuration.GetValue("Registry:WatchSeconds", 5.0)), sp.GetRequiredService<ILogger<RegistryReloader>>()));
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton(environments);
+builder.Services.AddSingleton<IslandViews>();
 builder.Services.AddSingleton<ISnapshotNotifier, SignalRSnapshotNotifier>();
 foreach (var rt in runtimes)
 {
@@ -79,11 +80,33 @@ app.MapGet("/api/environments", (EnvironmentSet envs) =>
    .Produces<EnvironmentInfo[]>()
    .WithName("GetEnvironments");
 
-app.MapGet("/api/snapshot/latest", (EnvironmentSet envs, string? env) =>
+// ?islands=a,b shows only those islands (and the hub); totals, third parties and traffic then count only what is on screen.
+app.MapGet("/api/snapshot/latest", (EnvironmentSet envs, string? env, string? islands) =>
         envs.Find(env) is not { } rt ? EnvironmentNotFound(envs, env)
-        : rt.Store.Latest is { } s ? Results.Ok(s) : Results.StatusCode(StatusCodes.Status503ServiceUnavailable))
+        : rt.Store.Latest is not { } s ? Results.StatusCode(StatusCodes.Status503ServiceUnavailable)
+        : IslandViews.Parse(islands is null ? null : [islands]) is { Count: > 0 } filter ? Results.Ok(rt.Builder.Build(filter))
+        : Results.Ok(s))
    .Produces<Snapshot>()
    .WithName("GetLatestSnapshot");
+
+// What the inspector shows beyond the live numbers: links, and the settings in force with the layer each came from.
+app.MapGet("/api/systems/{id}", (string id, EnvironmentSet envs, string? env) =>
+        envs.Find(env) is not { } rt ? EnvironmentNotFound(envs, env)
+        : SystemDetails.Of(rt.Registry.Current, id) is { } detail ? Results.Ok(detail)
+        : Results.NotFound(new { error = $"No system '{id}'." }))
+   .Produces<SystemDetail>()
+   .WithName("GetSystem");
+
+// Recent log lines of one system, newest first. Read on demand while its inspector is open.
+app.MapGet("/api/systems/{id}/logs", async (string id, EnvironmentSet envs, string? env, int? limit, CancellationToken ct) =>
+    {
+        if (envs.Find(env) is not { } rt) return EnvironmentNotFound(envs, env);
+        var registry = rt.Registry.Current;
+        var node = registry.AllNodes.FirstOrDefault(n => n.Id == id) ?? registry.Vendors.FirstOrDefault(v => v.Node.Id == id)?.Node;
+        return node is null ? Results.NotFound(new { error = $"No system '{id}'." }) : Results.Ok(await rt.Logs.RecentAsync(node, limit ?? 60, ct));
+    })
+   .Produces<LogLine[]>()
+   .WithName("GetSystemLogs");
 
 // Demo steering for the fake generator. The Break things panel (a later slice) is built on this.
 var fx = app.MapGroup("/api/fake").ExcludeFromDescription();
