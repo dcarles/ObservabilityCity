@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- For the people who write adapters: canned HTTP, a fixed login, and the checks every adapter has to pass. It depends on no test framework. -->
+  <ItemGroup>
+    <ProjectReference Include="..\ObservabilityCity.Core\ObservabilityCity.Core.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,16 @@
+# Convention B: a subscription is found by its pillar tag (Beta is named instead), services run as container apps called <service>-<role>, a data account is
+# cosmos-<service>-<tenant> with the customer's name in a tag, and the telemetry name is the system's display name without spaces.
+name: Production
+default: true
+sources:
+  inventory: { kind: resourcegraph, connection: "file:inventory.json" }
+scope:
+  variables: { stage: live }
+  workspace: "law-{stage}-{environment}"
+  subscription: { tag: { key: pillar, value: "{pillarId}" } }
+  pillars: { bb: 00000000-0000-0000-0000-0000000000b2 }
+  telemetryRole: "{name|nospace}"
+  resources:
+    - { name: container-apps, types: [microsoft.app/containerapps], roles: [api, worker], pattern: '^(?<service>[a-z]+)-(?<role>api|worker)$' }
+    - { name: accounts, types: [microsoft.documentdb/databaseaccounts], roles: [db], pattern: '^cosmos-(?<service>[a-z]+)-(?<tenant>[a-z0-9]+)$', tenantNameTag: customer }
+exclude: [cc.notify-api, cc.notify-worker, cc.notify-db]

@@ -1,4 +1,5 @@
 using ObservabilityCity.Core.Registry;
+using ObservabilityCity.Core.Scope;
 
 namespace ObservabilityCity.Core.Sources;
 
@@ -8,8 +9,12 @@ public interface ICredentialSource
     Task<string> GetTokenAsync(string scope, CancellationToken ct);
 }
 
-/// <summary>What an adapter needs to start: the source as the environment defines it and, for a source that signs in, the login it is to use.</summary>
-public sealed record SourceContext(string EnvironmentId, RegistrySource Source, ICredentialSource? Credential);
+/// <summary>
+/// What an adapter needs to start: the source as the environment defines it and, for a source that signs in, the login it is to use. <see cref="Rules"/>
+/// are the environment's scope rules and <see cref="Scope"/> the place an inventory source leaves what it reads (and other adapters look it up).
+/// <see cref="RegistryFolder"/> is where the town's files are, for a source that reads a file named relative to them.
+/// </summary>
+public sealed record SourceContext(string EnvironmentId, RegistrySource Source, ICredentialSource? Credential, ScopeRules? Rules = null, ScopeStore? Scope = null, string? RegistryFolder = null);
 
 /// <summary>Makes the source of one kind. Adapters register one each; the core knows none of them by name.</summary>
 public interface IMetricSourceFactory
@@ -56,7 +61,7 @@ public interface IAdapterModule
 }
 
 /// <summary>The sources an environment runs and what was wrong with the ones it could not.</summary>
-public sealed record SourceSet(IReadOnlyList<IMetricSource> Sources, IReadOnlyList<string> Problems);
+public sealed record SourceSet(IReadOnlyList<IMetricSource> Sources, IReadOnlyList<string> Problems, ScopeStore? Scope = null);
 
 /// <summary>The source kinds the core itself has no login for: the fake source, and kinds read over plain HTTP.</summary>
 public sealed class CoreAdapters : IAdapterModule
@@ -133,8 +138,9 @@ public sealed class AdapterCatalog : IAdapterRegistry
         return problems;
     }
 
-    public SourceSet Build(RegistryEnvironment environment)
+    public SourceSet Build(RegistryEnvironment environment, string? registryFolder = null)
     {
+        var scope = new ScopeStore();
         var sources = new List<IMetricSource>();
         var problems = new List<string>();
         var logins = new Dictionary<string, ICredentialSource>();
@@ -153,14 +159,14 @@ public sealed class AdapterCatalog : IAdapterRegistry
             }
             try
             {
-                sources.Add(factory.Create(new SourceContext(environment.Id, def, Login(environment, def, logins))));
+                sources.Add(factory.Create(new SourceContext(environment.Id, def, Login(environment, def, logins), environment.Scope, scope, registryFolder)));
             }
             catch (Exception e) when (e is InvalidOperationException or ArgumentException)
             {
                 problems.Add($"Environment '{environment.Id}': source '{def.Name}' could not start: {e.Message}");
             }
         }
-        return new SourceSet(sources, problems);
+        return new SourceSet(sources, problems, scope);
     }
 
     /// <summary>The login a source signs in with: the one it names, else the environment's login called default, else its kind's usual one. One login is shared by the sources that name it.</summary>

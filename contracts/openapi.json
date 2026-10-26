@@ -680,6 +680,80 @@
         },
         "additionalProperties": false
       },
+      "ScopeInfo": {
+        "required": [
+          "inventoryState",
+          "problems",
+          "resources"
+        ],
+        "type": "object",
+        "properties": {
+          "subscription": {
+            "type": "string",
+            "nullable": true
+          },
+          "subscriptionVia": {
+            "type": "string",
+            "nullable": true
+          },
+          "workspace": {
+            "type": "string",
+            "nullable": true
+          },
+          "serviceCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "telemetryRole": {
+            "type": "string",
+            "nullable": true
+          },
+          "telemetryRoleVia": {
+            "type": "string",
+            "nullable": true
+          },
+          "resources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ScopeResource"
+            }
+          },
+          "problems": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "inventoryState": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ScopeResource": {
+        "required": [
+          "name",
+          "type"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "region": {
+            "type": "string",
+            "nullable": true
+          },
+          "tenant": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "SettingLayer": {
         "enum": [
           "System",
@@ -918,6 +992,9 @@
             "items": {
               "$ref": "#/components/schemas/SubscriptionSnapshot"
             }
+          },
+          "scope": {
+            "$ref": "#/components/schemas/ScopeInfo"
           }
         },
         "additionalProperties": false

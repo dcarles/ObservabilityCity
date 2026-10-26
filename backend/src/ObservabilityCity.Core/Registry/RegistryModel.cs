@@ -95,6 +95,9 @@ public sealed record RegistryGroup(
     public const string LostFoundId = "lost-found";
 
     public bool IsLostFound => Id == LostFoundId;
+
+    /// <summary>The pillar's code in the scope rules' {pillar} (<c>scope.code</c> in its file). Null: the pillar id.</summary>
+    public string? Code { get; init; }
 }
 
 /// <summary>A third party (a credit bureau, a data warehouse). Its Node uses the group id <see cref="GroupId"/>; CalledBy lists our systems that call it.</summary>
@@ -134,6 +137,15 @@ public sealed record RegistryNode(
 
     /// <summary>Signal to source name (or none) set on the system or its pillar, the system's taking precedence. Empty when the environment's choice stands.</summary>
     public IReadOnlyDictionary<string, string> Signals { get; init; } = new Dictionary<string, string>();
+
+    /// <summary>The name this system's resources carry for its service (<c>serviceCode</c>). Null: the service name, else none.</summary>
+    public string? ServiceCode { get; init; }
+
+    /// <summary>What the telemetry calls this system (<c>telemetry.role</c>). Null: derived from the environment's template, if it has one.</summary>
+    public string? TelemetryRole { get; init; }
+
+    /// <summary>The role as the files spell it: api, worker, db, cache, cron, gateway, broker or egress.</summary>
+    public string RoleName => Kind == NodeKind.Database ? "db" : Kind.ToString().ToLowerInvariant();
 
     /// <summary>The registry file the system is declared in (cl.yaml, hub.yaml, third-parties.yaml).</summary>
     public string SourceFile { get; init; } = "";
@@ -194,4 +206,7 @@ public sealed record RegistryEnvironment(
 
     /// <summary>The source each signal is pointed at in this environment (a source name, or none). Signals not listed use the source called metrics or messaging.</summary>
     public IReadOnlyDictionary<string, string> Signals { get; init; } = new Dictionary<string, string>();
+
+    /// <summary>How this environment maps pillars and systems onto the cloud (<c>scope:</c>). Empty when the file has none.</summary>
+    public ScopeRules Scope { get; init; } = ScopeRules.None;
 }

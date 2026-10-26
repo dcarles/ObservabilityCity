@@ -140,6 +140,43 @@ sources:
 
 A login defined with the name `default` replaces the Azure CLI one for every source that names none. Nobody is signed in when the server starts: a token is asked for when a source first needs it, so a town starts before `az login` and a missing login costs only the signals that need it. A service principal whose variable is not set is reported at start-up and its sources are left out.
 
+### Scope: where each pillar and system lives
+
+Nothing in the program knows how your company names things. An environment file's `scope:` block says it, with rules and templates, so a company with other names, tags or resource types writes other rules and changes no code. Templates have `{variable}` holes (and `{variable|nospace}`, `|lower`, `|upper`); `{environment}` is the environment's id and `variables:` are your own words.
+
+```yaml
+sources:
+  inventory: { kind: resourcegraph, connection: "" }   # empty: every subscription the login can read; or subscription ids, comma separated
+scope:
+  inventory: inventory
+  variables: { env: prod }
+  workspace: "workspace-{env}"                          # the Log Analytics workspace of this environment
+  subscription: { nameLike: "*-{env}-{pillar}" }        # or: { tag: { key: pillar, value: "{pillarId}" } }
+  pillars: { acme: 00000000-0000-0000-0000-000000000000 }  # a pillar named instead of found (optional)
+  telemetryRole: "{name|nospace}"                       # what the telemetry calls a system that does not say
+  resources:                                            # which resources belong to a service
+    - { name: apps, types: [microsoft.web/sites], roles: [api, worker], pattern: '^(?<role>api|worker)-(?<service>[a-z]+)-(?<region>[a-z]+)' }
+    - { name: accounts, types: [microsoft.documentdb/databaseaccounts], roles: [db], pattern: '^(?<tenant>[0-9a-f]{32})-(?<service>[a-z]+)$', tenantNameTag: customer }
+```
+
+- **Pillar to subscription.** `subscription` finds it by name (a wildcard, any case) or by a tag on the subscription; `{pillar}` is the pillar's `scope: { code: ... }` (else its id) and `{pillarId}` its id. `pillars:` names a subscription outright and wins. A pillar that no subscription, or more than one, matches is reported and not guessed.
+- **Service to resources.** A `pattern` is a regular expression over a resource's name (any case) with named groups: `service` (required) is compared with the system's `serviceCode:` (else its `service:`); `role`, `pillar`, `region` and `tenant` are optional and narrow the match. `roles:` limits a rule to systems of those roles. `serviceTag:` finds a resource whose name does not match by a tag, and `tenantNameTag:` reads a tenant's friendly name from a tag, so the town can show it.
+- **Telemetry names.** A system says what its telemetry calls it with `telemetry: { role: ... }` in its pillar file; one that does not takes the `telemetryRole` template. Two systems with the same name are reported, since their telemetry would be read as one.
+- **Queries.** The adapter's own two queries (subscriptions, then the resources of the chosen subscriptions) can be replaced under `scope.queries`; every page of the answer is read.
+
+Each system's **Config** tab in the town then has a *Where it lives* part with the subscription, workspace, service code, telemetry role and resources, and says how each was found. An environment without `scope:` shows nothing there.
+
+#### `resourcegraph` (the inventory)
+
+| | |
+| --- | --- |
+| Permission | Reader on the subscriptions to read (or on the management group above them) |
+| `connection` | Empty for every subscription the login can read; subscription ids, comma separated, to limit it; `file:name.json` to replay a recording kept beside the town's files |
+| `pollSeconds`, `timeoutSeconds` | The inventory changes slowly: 300 and 30 suit it |
+| Fills | No readings. It fills the scope above, which the adapters that read signals use to find their systems |
+
+To try rules without Azure, keep a recording in the town folder, `{ "subscriptions": [ { "id", "name", "tags" } ], "resources": [ { "id", "name", "type", "subscriptionId", "location", "tags" } ] }`, and point the source at it with `file:`. The sample towns `scope-town-a` and `scope-town-b` under `shared-test-data/registries/` do exactly that, with opposite conventions.
+
 ### What each adapter's runbook section contains
 
 Each real adapter lands with its own section here, with the same four parts: the permission the login needs, the `connection` value, the `pollSeconds` and `timeoutSeconds` that suit it, and what `--sources` reports for it. Until an adapter has its section, its kind is known to the module but nothing reads it yet.

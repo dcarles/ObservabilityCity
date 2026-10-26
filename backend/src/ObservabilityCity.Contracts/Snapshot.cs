@@ -312,7 +312,27 @@ public sealed record SystemDetail(
     IReadOnlyList<LinkRef> GatewayCalledBy,
     IReadOnlyList<string> OutsideCallers,
     IReadOnlyList<string> ServiceTopics,
-    IReadOnlyList<SubscriptionSnapshot> Subscriptions);
+    IReadOnlyList<SubscriptionSnapshot> Subscriptions,
+    ScopeInfo? Scope = null);
+
+/// <summary>
+/// Where a system lives and what its telemetry calls it, as the environment's scope rules resolve it. Null on a system when the environment has no
+/// scope rules. Subscription and Workspace are null when the rules do not give one; InventoryState is "none" (no inventory source), "waiting" (not read yet),
+/// "read" or "failed". Problems are things the rules could not settle for this system.
+/// </summary>
+public sealed record ScopeInfo(
+    string? Subscription,
+    string? SubscriptionVia,
+    string? Workspace,
+    string? ServiceCode,
+    string? TelemetryRole,
+    string? TelemetryRoleVia,
+    IReadOnlyList<ScopeResource> Resources,
+    IReadOnlyList<string> Problems,
+    string InventoryState);
+
+/// <summary>A resource that belongs to a system. Tenant is the tenant's friendly name when the rules found one, else its id.</summary>
+public sealed record ScopeResource(string Name, string Type, string? Region, string? Tenant);
 
 [JsonConverter(typeof(JsonStringEnumConverter))]
 public enum LogLevel

@@ -16,6 +16,7 @@ public sealed class AzureAdapters : IAdapterModule
     {
         foreach (var kind in new[] { "resourcegraph", "loganalytics", "azuremonitor", "servicebus" })
             registry.AddSourceKind(new SourceKindInfo(kind, LoginKind));
+        registry.AddSource(new ResourceGraphSourceFactory());
         foreach (var login in new AzureLogin[] { new AzureCliLogin(), new AzureDefaultLogin(), new AzureManagedIdentityLogin(), new AzureServicePrincipalLogin() })
             registry.AddCredentialKind(login);
     }

@@ -1,6 +1,7 @@
 using ObservabilityCity.Adapters.Fake;
 using ObservabilityCity.Contracts;
 using ObservabilityCity.Core.Registry;
+using ObservabilityCity.Core.Scope;
 using ObservabilityCity.Core.Snapshots;
 using ObservabilityCity.Core.Sources;
 using ObservabilityCity.Host;
@@ -87,9 +88,9 @@ foreach (var (folder, registry) in loaded)
         // a live environment polls what its file defines; a demo town has the fake source and nothing else
         var set = fake is not null || registry.Environments.FirstOrDefault(e => e.Id == environmentId) is not { } environment
             ? new SourceSet(fake is null ? [] : [fake], [])
-            : sourceCatalog.Build(environment);
+            : sourceCatalog.Build(environment, folder);
         foreach (var problem in set.Problems) Console.Error.WriteLine($"Source notice ({registry.Town.Id}): {problem}");
-        runtimes.Add(new EnvironmentRuntime(registry.Town.Id, environmentId, view, fake, state, snapshots, store, logs, set.Sources, set.Problems));
+        runtimes.Add(new EnvironmentRuntime(registry.Town.Id, environmentId, view, fake, state, snapshots, store, logs, set.Sources, set.Problems, set.Scope));
     }
     var town = new TownRuntime(registry.Town.Id, registry.Town.Name, folder, registries, new EnvironmentSet(runtimes, registry.DefaultEnvironmentId, registry.Town.Id));
     townRuntimes.Add(town);
@@ -151,7 +152,7 @@ app.MapGet("/api/snapshot/latest", (EnvironmentSet envs, string? env, string? is
 // What the inspector shows beyond the live numbers: links, and the settings in force with the layer each came from.
 app.MapGet("/api/systems/{id}", (string id, EnvironmentSet envs, string? env) =>
         envs.Find(env) is not { } rt ? EnvironmentNotFound(envs, env)
-        : SystemDetails.Of(rt.Registry.Current, id) is { } detail ? Results.Ok(detail)
+        : SystemDetails.Of(rt.Registry.Current, id) is { } detail ? Results.Ok(detail with { Scope = ScopeInfos.Of(rt.Registry.Current, rt.Scope, id) })
         : Results.NotFound(new { error = $"No system '{id}'." }))
    .Produces<SystemDetail>()
    .WithName("GetSystem");

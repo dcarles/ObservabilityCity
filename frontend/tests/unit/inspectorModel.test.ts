@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { ago, clockTime, configOrder, filterLogs, incidentSummary, linkSections, overviewRows, reasons, stateTone } from '../../src/inspectorModel'
-import type { ConfigValue, LogLine, SystemDetail, NodeSnapshot, Snapshot } from '../../src/types'
+import { ago, clockTime, configOrder, filterLogs, incidentSummary, linkSections, overviewRows, reasons, scopeView, stateTone } from '../../src/inspectorModel'
+import type { ConfigValue, LogLine, ScopeInfo, SystemDetail, NodeSnapshot, Snapshot } from '../../src/types'
 
 const bad = JSON.parse(readFileSync(resolve(__dirname, '../../../shared-test-data/snapshots/bad-day.json'), 'utf8')) as Snapshot
 const all = bad.groups.flatMap((g) => g.nodes)
@@ -142,5 +142,54 @@ describe('the links tab', () => {
 
   it('has nothing for a system with no links at all', () => {
     expect(linkSections({ ...detail, calls: [], gatewayCalledBy: [], outsideCallers: [], serviceTopics: [], subscriptions: [] })).toEqual([])
+  })
+})
+
+describe('the scope rows', () => {
+  const scope = (patch: Partial<ScopeInfo> = {}): ScopeInfo => ({
+    subscription: 'sub-name', subscriptionVia: 'name', workspace: 'ws-prd', serviceCode: 'ord', telemetryRole: 'OrdersApi', telemetryRoleVia: 'telemetry.role',
+    resources: [], problems: [], inventoryState: 'read', ...patch,
+  })
+
+  it('draws nothing for an environment without scope rules', () => {
+    expect(scopeView(null)).toBeNull()
+    expect(scopeView(undefined)).toBeNull()
+  })
+
+  it('lists what the rules give, each with how it was found', () => {
+    expect(scopeView(scope())!.rows).toEqual([
+      { key: 'subscription', value: 'sub-name', note: 'found by its name' },
+      { key: 'workspace', value: 'ws-prd', note: 'from the environment' },
+      { key: 'service code', value: 'ord', note: 'matched against resource names' },
+      { key: 'telemetry role', value: 'OrdersApi', note: 'set on this system' },
+    ])
+  })
+
+  it('leaves out a value the rules do not give instead of showing it empty', () => {
+    const rows = scopeView(scope({ subscription: null, subscriptionVia: null, workspace: null, serviceCode: null, telemetryRole: null, telemetryRoleVia: null }))!.rows
+
+    expect(rows).toEqual([])
+  })
+
+  it('says where a derived role came from', () => {
+    expect(scopeView(scope({ telemetryRoleVia: 'scope.telemetryRole' }))!.rows.at(-1)!.note).toBe('derived from the environment template')
+  })
+
+  it('sorts the resources by name and keeps the tenant', () => {
+    const v = scopeView(scope({ resources: [{ name: 'b', type: 't', region: 'r', tenant: 'Acme Bank' }, { name: 'a', type: 't', region: null, tenant: null }] }))!
+
+    expect(v.resources.map((r) => r.name)).toEqual(['a', 'b'])
+    expect(v.resources[1].tenant).toBe('Acme Bank')
+  })
+
+  it('explains an inventory that is not there yet, is missing or failed, and says nothing once read', () => {
+    expect(scopeView(scope({ inventoryState: 'read' }))!.status).toBe('')
+    expect(scopeView(scope({ inventoryState: 'waiting' }))!.status).toMatch(/first read/)
+    expect(scopeView(scope({ inventoryState: 'none' }))!.status).toMatch(/No inventory source/)
+    expect(scopeView(scope({ inventoryState: 'failed' }))!.status).toMatch(/failed/)
+  })
+
+  it('passes on the problems the rules could not settle', () => {
+    expect(scopeView(scope({ problems: ['No resource found for x'] }))!.problems).toEqual(['No resource found for x'])
   })
 })

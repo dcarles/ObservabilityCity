@@ -2,7 +2,7 @@ import type { GroupSnapshot, LogLine, NodeSnapshot, Snapshot, SystemDetail } fro
 import { escapeHtml } from './picker'
 import { scopeParams, type Scope } from './scope'
 import { yardSummary, type TenantView } from './tenants'
-import { ago, clockTime, configOrder, filterLogs, incidentSummary, LAYER_WORD, linkSections, overviewRows, reasons, SEVERITY_WORD, stateTone, type LogFilter } from './inspectorModel'
+import { ago, clockTime, configOrder, filterLogs, incidentSummary, LAYER_WORD, linkSections, overviewRows, reasons, scopeView, SEVERITY_WORD, stateTone, type LogFilter } from './inspectorModel'
 
 export type InspectorTab = 'overview' | 'links' | 'logs' | 'config'
 const TABS: { id: InspectorTab; label: string }[] = [
@@ -243,6 +243,18 @@ export class Inspector {
     const d = this.detail
     return `
       <p class="note">Defined in <code>${escapeHtml(d.file)}</code>. Each value says which file layer it comes from.</p>
-      <div class="cfg">${configOrder(d.config).map((c) => `<div class="cfg-row" data-key="${escapeHtml(c.key)}"><span class="k">${escapeHtml(c.key)}</span><span class="v">${escapeHtml(c.value)}</span><span class="o ${c.layer.toLowerCase()}" title="${escapeHtml(c.source)}">${LAYER_WORD[c.layer]}</span></div>`).join('')}</div>`
+      <div class="cfg">${configOrder(d.config).map((c) => `<div class="cfg-row" data-key="${escapeHtml(c.key)}"><span class="k">${escapeHtml(c.key)}</span><span class="v">${escapeHtml(c.value)}</span><span class="o ${c.layer.toLowerCase()}" title="${escapeHtml(c.source)}">${LAYER_WORD[c.layer]}</span></div>`).join('')}</div>${this.scope(d)}`
+  }
+
+  /** Where the system lives and what its telemetry calls it, when the environment has scope rules. A town without them shows nothing here. */
+  private scope(d: SystemDetail): string {
+    const v = scopeView(d.scope)
+    if (!v) return ''
+    const rows = v.rows.map((r) => `<div class="cfg-row" data-key="${escapeHtml(r.key)}"><span class="k">${escapeHtml(r.key)}</span><span class="v">${escapeHtml(r.value)}</span><span class="o">${escapeHtml(r.note)}</span></div>`).join('')
+    const resources = v.resources.map((r) => `<div class="cfg-row" data-resource="${escapeHtml(r.name)}"><span class="k">${escapeHtml(r.name)}</span><span class="v">${escapeHtml([r.tenant, r.region].filter(Boolean).join(' · '))}</span><span class="o">${escapeHtml(r.type)}</span></div>`).join('')
+    return `<h4 class="scope-title">Where it lives</h4>
+      ${v.status ? `<p class="note scope-status">${escapeHtml(v.status)}</p>` : ''}
+      <div class="cfg scope-rows">${rows}${resources}</div>
+      ${v.problems.map((p) => `<p class="note scope-problem">${escapeHtml(p)}</p>`).join('')}`
   }
 }

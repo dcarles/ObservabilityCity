@@ -15,6 +15,9 @@
     <ProjectReference Include="..\..\src\ObservabilityCity.Host\ObservabilityCity.Host.csproj" />
     <ProjectReference Include="..\..\src\ObservabilityCity.Core\ObservabilityCity.Core.csproj" />
     <ProjectReference Include="..\..\src\ObservabilityCity.Adapters.Azure\ObservabilityCity.Adapters.Azure.csproj" />
+    <ProjectReference Include="..\..\src\ObservabilityCity.AdapterKit\ObservabilityCity.AdapterKit.csproj" />
+    <!-- the template is built here so it cannot rot, but not copied to adapters/ -->
+    <ProjectReference Include="..\..\..\templates\adapter\Template.Adapters.csproj" ReferenceOutputAssembly="true" />
     <ProjectReference Include="..\..\src\ObservabilityCity.Adapters.Fake\ObservabilityCity.Adapters.Fake.csproj" />
     <ProjectReference Include="..\..\tools\ObservabilityCity.Validate\ObservabilityCity.Validate.csproj" />
   </ItemGroup>

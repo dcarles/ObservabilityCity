@@ -1,0 +1,3 @@
+vendors:
+  - { id: ext.bureau, name: Credit bureau, calledBy: [aa.orders-api], slaP99Ms: 1500 }
+  - { id: ext.mailer, name: Mail service, calledBy: [cc.notify-worker, bb.ledger-worker] }

@@ -228,6 +228,23 @@ export interface components {
             /** Format: double */
             requestsPerSecond: number;
         };
+        ScopeInfo: {
+            subscription?: string | null;
+            subscriptionVia?: string | null;
+            workspace?: string | null;
+            serviceCode?: string | null;
+            telemetryRole?: string | null;
+            telemetryRoleVia?: string | null;
+            resources: components["schemas"]["ScopeResource"][];
+            problems: string[];
+            inventoryState: string;
+        };
+        ScopeResource: {
+            name: string;
+            type: string;
+            region?: string | null;
+            tenant?: string | null;
+        };
         /** @enum {string} */
         SettingLayer: "System" | "Pillar" | "App" | "BuiltIn";
         Snapshot: {
@@ -279,6 +296,7 @@ export interface components {
             outsideCallers: string[];
             serviceTopics: string[];
             subscriptions: components["schemas"]["SubscriptionSnapshot"][];
+            scope?: components["schemas"]["ScopeInfo"];
         };
         TenantInfo: {
             id: string;
