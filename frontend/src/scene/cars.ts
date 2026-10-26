@@ -2,7 +2,7 @@ import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import type { Building } from '../buildings/building'
 import { canvasTexture, roundRect } from '../buildings/mk'
-import { kitParts, type KitName } from '../assets/kit'
+import { vehicles } from '../themes/active'
 import { clamp, spawnRate } from '../visuals'
 import type { TenantInfo } from '../types'
 import { carShown, pickTenant, type TenantView } from '../tenants'
@@ -91,7 +91,6 @@ interface Marker {
   full: number
 }
 
-const MODELS: KitName[] = ['car_sedan', 'car_taxi'] // internal, external
 /** Every car model is scaled to this length in metres, so the models all come out the same size. */
 const CAR_LENGTH = 2.2
 const SPEED = 4.2
@@ -161,8 +160,7 @@ export class CarSystem {
   }
 
   constructor(private readonly max = 420) {
-    for (const name of MODELS) {
-      const { geometry, material } = kitParts(name)
+    for (const { geometry, material } of vehicles().cars()) {
       geometry.computeBoundingBox()
       const size = geometry.boundingBox!.getSize(new THREE.Vector3())
       this.unit.push(CAR_LENGTH / Math.max(size.x, size.z))

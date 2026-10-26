@@ -1,14 +1,14 @@
-import { LEGEND } from './legend'
+import { legendFor } from './legendWords'
 import { escapeHtml } from './picker'
 
 /** The card that says what everything in the town means. Opened by the "?" button, and by itself the first time a browser visits. */
 export class LegendCard {
   private readonly el = document.getElementById('legend') as HTMLElement
 
-  constructor(private readonly onChange: (open: boolean) => void = () => {}) {
+  constructor(private readonly onChange: (open: boolean) => void = () => {}, themeId = 'harbour-town') {
     this.el.innerHTML = `
       <div class="head"><b>What you are looking at</b><button id="legend-close" title="Close (Esc)">✕</button></div>
-      <div class="scroll">${LEGEND.map((s) => `
+      <div class="scroll">${legendFor(themeId).map((s) => `
         <h4>${escapeHtml(s.title)}</h4>
         ${s.entries.map((e) => `<div class="entry" data-id="${e.id}"><i class="swatch ${e.tone}"></i><div><b>${escapeHtml(e.sees)}</b><span>${escapeHtml(e.means)}</span></div></div>`).join('')}`).join('')}
       </div>`

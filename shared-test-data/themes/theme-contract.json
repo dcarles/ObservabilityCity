@@ -1,0 +1,7 @@
+{
+  "_about": "What every theme must be able to draw. The backend tests hold the first two lists to the snapshot contract and to the sample towns; the frontend tests hold every theme to them.",
+  "themes": ["harbour-town", "space", "factory"],
+  "buildingKinds": ["Api", "Worker", "Database", "Cache", "Cron", "Gateway", "Broker", "Egress"],
+  "healthStates": ["Healthy", "Degraded", "Down", "Stale"],
+  "beacons": { "green": "#47e07a", "amber": "#ffb830", "red": "#ff3d3d", "grey": "#8d949e" }
+}

@@ -1,5 +1,5 @@
-// The themes the picker offers. Only the harbour town is drawn so far; the picker is built so that more themes are added here and in the
-// theme folders, without touching the top bar.
+// The themes the picker offers. A theme is listed here (what the picker and the address need) and drawn by its kit in themes/<id>/, which
+// themes/kits.ts registers. Adding a theme does not touch the top bar.
 
 import { browserStore, type Store } from './lighting'
 
@@ -12,6 +12,8 @@ export interface ThemeInfo {
 
 export const THEMES: readonly ThemeInfo[] = [
   { id: 'harbour-town', name: 'Harbour town', blurb: 'Islands on a sea, buildings by role, boats and cars' },
+  { id: 'space', name: 'Space colony', blurb: 'Platforms in a violet void, light bridges, hover pods and cargo shuttles' },
+  { id: 'factory', name: 'Works', blurb: 'Concrete yards and brick halls by a canal, steel bridges, vans and barges' },
 ]
 
 export const DEFAULT_THEME = THEMES[0].id

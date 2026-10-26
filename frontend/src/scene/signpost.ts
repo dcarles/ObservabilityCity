@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { canvasTexture, roundRect } from '../buildings/mk'
-import { palette } from '../themes/harbour-town/palette'
+import { palette } from '../themes/active'
 import { GROUND } from './island'
 import { signBoard, signText, type SignLine } from '../edgeTraffic'
 

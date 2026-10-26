@@ -19,6 +19,8 @@ import { LegendCard } from './legendCard'
 import { LEGEND_SEEN_KEY } from './legend'
 import { browserStore, otherLighting, saveLighting, startLighting } from './lighting'
 import { saveTheme, startTheme, themeById } from './themes'
+import { kitById } from './themes/kits'
+import { activateTheme, palette as livePalette } from './themes/active'
 import { parseLayers, toggleLayer, type Layer } from './layers'
 import { islandChoices, parseIslands, pruneIslands } from './islands'
 import { withView } from './address'
@@ -32,6 +34,9 @@ import { WINDOW_GLOW } from './buildings/windowMaterial'
 void start()
 
 async function start(): Promise<void> {
+  // the theme is chosen before anything is drawn: the stage, the town and its traffic are all made from it
+  const themeAsked = startTheme(window.location.search, browserStore())
+  activateTheme(kitById(themeAsked.theme.id))
   await loadKit()
   const canvas = document.getElementById('town') as HTMLCanvasElement
   const stage = new Stage(canvas)
@@ -48,8 +53,7 @@ async function start(): Promise<void> {
   let layers = parseLayers(query)
   // a wall opens on Dusk whatever this browser last chose, unless the address says otherwise
   let lighting = wallParams.on ? startLighting(query, null, 'dusk') : startLighting(query, store)
-  const themeAsked = startTheme(query, store)
-  let theme = themeAsked.theme
+  const theme = themeAsked.theme
   town.setLayers(layers)
   stage.setLighting(lighting, true)
   document.documentElement.dataset.theme = theme.id
@@ -156,11 +160,14 @@ async function start(): Promise<void> {
       viewBar.refresh()
     },
     theme: () => theme,
+    // a different theme is a different page, like a different town: load it again, so nothing of the old one is left behind
     setTheme: (id) => {
-      theme = themeById(id) ?? theme
-      saveTheme(theme.id, store)
-      document.documentElement.dataset.theme = theme.id
-      viewBar.refresh()
+      const next = themeById(id)
+      if (!next || next.id === theme.id) return
+      saveTheme(next.id, store)
+      const u = new URL(window.location.href)
+      u.searchParams.set('theme', next.id)
+      window.location.href = u.toString()
     },
   })
   const inspector = new Inspector({
@@ -173,7 +180,7 @@ async function start(): Promise<void> {
   const legend = new LegendCard((open) => {
     document.getElementById('legend-button')?.classList.toggle('on', open)
     if (open) try { store?.setItem(LEGEND_SEEN_KEY, '1') } catch { /* storage blocked */ }
-  })
+  }, theme.id)
   document.getElementById('legend-button')!.addEventListener('click', () => legend.toggle())
   const lightingButton = document.getElementById('lighting')!
   const showLighting = (): void => { lightingButton.textContent = lighting === 'day' ? 'Day' : 'Dusk'; lightingButton.classList.toggle('on', lighting === 'dusk') }
@@ -412,6 +419,10 @@ async function start(): Promise<void> {
     windowGlow: () => WINDOW_GLOW.value,
     towns: () => towns,
     themeId: () => theme.id,
+    /** The colours the scene was built with: the theme's own. */
+    palette: () => livePalette,
+    /** True when the sky has stars (a theme set in space). */
+    hasStars: () => !!stage.scene.getObjectByName('stars'),
     islands: () => islands,
     /** Every island of the town, on screen or not. */
     islandChoices: () => viewBar.islandList,

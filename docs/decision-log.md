@@ -178,3 +178,10 @@ All 10 Phase 1 topics decided 2026-10-24.
 - Day and Dusk are two lighting presets over the same town (remembered per browser, `?light=` wins). Red in the legend is only for errors, amber a warning, grey no data; a unit test holds the legend to that.
 - One theme exists (harbour town); the picker is built so more themes are added without touching the top bar.
 
+## Slice 8: themes
+- Three themes: harbour town (default), space colony and works. A theme is a kit in `frontend/src/themes/<id>/`: palette (ground, water, trees, building colours), Day and Dusk presets, a model for each of the eight building kinds, the two cars and the boat, the bridge and the pier, and the words the legend uses. `themes.ts` lists them for the picker and the address; `themes/kits.ts` holds the drawn kits.
+- The theme is chosen once, when the page opens (`?theme=`, else what this browser last chose, else the harbour town), and everything is built from it. Picking another theme in the top bar loads the page again for it, as a different town or environment does, so nothing of the old one is left behind.
+- What stays the same in every theme, so a signal reads the same: the beacon colours (green, amber, red, grey), floors and dark floors, lit windows, the dead-letter pen and tower, crates on the pier, weather, tenant yards and their colours, service pads and signs. A new kind of building, or a new health state, has to be drawn by every theme: the backend and the frontend tests read one file (`shared-test-data/themes/theme-contract.json`) and fail on either side if a theme falls behind.
+- A model keeps the footprint, door, door direction and plaque place of the harbour town's, within a tolerance a unit test holds it to, so the layout, the cars and the walkers work unchanged.
+- Space and works use no model files: they are procedural geometry, so there is nothing to license. The harbour town's roads are tinted (space) rather than redrawn.
+- The legend keeps its entries, tones and meanings in every theme; only what each thing looks like is reworded (`legendWords.ts`).

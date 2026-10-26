@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import { activeKit } from '../themes/active'
 
 /** Model files from the CC0 KayKit "City Builder Bits" pack, shipped under /themes/harbour-town/kaykit. */
 const FILES = [
@@ -37,11 +38,30 @@ export function loadKit(): Promise<void> {
   return loading
 }
 
-/** A fresh copy of a kit model. Geometry and material are shared, so copies are cheap. */
+const tinted = new Map<string, THREE.Material>()
+
+/** The same material in the theme's road colour: shared by every copy, so tinting adds a handful of materials, not one per tile. */
+function tintOf(material: THREE.Material, tint: string): THREE.Material {
+  const key = `${material.uuid}|${tint}`
+  let t = tinted.get(key)
+  if (!t) {
+    t = material.clone()
+    ;(t as THREE.MeshStandardMaterial).color.multiply(new THREE.Color(tint))
+    tinted.set(key, t)
+  }
+  return t
+}
+
+/** A fresh copy of a kit model. Geometry and material are shared, so copies are cheap. Roads and lamps take the theme's tint. */
 export function kit(name: KitName): THREE.Object3D {
   const o = loaded.get(name)
   if (!o) throw new Error(`Kit model ${name} is not loaded yet`)
-  return o.clone(true)
+  const copy = o.clone(true)
+  const tint = activeKit().roadTint
+  if (tint && (name.startsWith('road_') || name === 'streetlight' || name === 'trafficlight_A')) {
+    copy.traverse((c) => { if (c instanceof THREE.Mesh) c.material = tintOf(c.material as THREE.Material, tint) })
+  }
+  return copy
 }
 
 /** The geometry and material of a kit model, for instancing. Transforms of its node are baked in. */

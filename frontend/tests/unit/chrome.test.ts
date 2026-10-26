@@ -59,11 +59,12 @@ describe('day and dusk', () => {
 })
 
 describe('the theme picker', () => {
-  it('offers the harbour town, which is the default', () => {
-    expect(THEMES.map((t) => t.id)).toEqual(['harbour-town'])
+  it('offers the harbour town, which is the default, then space and the works', () => {
+    expect(THEMES.map((t) => t.id)).toEqual(['harbour-town', 'space', 'factory'])
     expect(DEFAULT_THEME).toBe('harbour-town')
     expect(themeById('harbour-town')?.name).toBe('Harbour town')
-    expect(themeById('space')).toBeUndefined()
+    expect(themeById('space')?.name).toBe('Space colony')
+    expect(themeById('castle')).toBeUndefined()
   })
 
   it('opens with the default, or the one the address names', () => {
@@ -72,8 +73,8 @@ describe('the theme picker', () => {
   })
 
   it('falls back to the default for a theme it does not have, and says which', () => {
-    expect(startTheme('?theme=space', memory())).toEqual({ theme: THEMES[0], unknown: 'space' })
-    expect(startTheme('', memory({ [THEME_KEY]: 'space' }))).toEqual({ theme: THEMES[0], unknown: null })
+    expect(startTheme('?theme=castle', memory())).toEqual({ theme: THEMES[0], unknown: 'castle' })
+    expect(startTheme('', memory({ [THEME_KEY]: 'castle' }))).toEqual({ theme: THEMES[0], unknown: null })
   })
 
   it('remembers the choice and carries on when the browser will not store it', () => {
