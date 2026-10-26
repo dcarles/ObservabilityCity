@@ -46,7 +46,7 @@ export class Connection {
    */
   setIslands(ids: readonly string[]): void {
     this.islands = ids
-    if (this.hub?.state === signalR.HubConnectionState.Connected) void this.hub.invoke('SetIslands', [...ids]).catch(() => {})
+    if (this.hub?.state === signalR.HubConnectionState.Connected) void this.hub.invoke('SetIslands', [...ids]).catch((e) => console.warn('Could not change the islands:', e))
     else if (this.poll !== undefined) void this.pollOnce()
   }
 
@@ -70,7 +70,7 @@ export class Connection {
     hub.onreconnected(() => {
       this.set('live')
       // the server forgot the filter along with the old connection
-      if (this.islands.length > 0) void hub.invoke('SetIslands', [...this.islands]).catch(() => {})
+      if (this.islands.length > 0) void hub.invoke('SetIslands', [...this.islands]).catch((e) => console.warn('Could not restore the islands:', e))
     })
     hub.onclose(() => {
       this.set('offline')
@@ -78,7 +78,11 @@ export class Connection {
     })
 
     this.hub = hub
-    hub.start().catch(() => {
+    const askedWith = this.islands.join(',')
+    hub.start().then(() => {
+      // a first snapshot can already have moved the choice (islands the town does not have are let go) before the socket reported itself open
+      if (this.islands.join(',') !== askedWith) void hub.invoke('SetIslands', [...this.islands]).catch((e) => console.warn('Could not change the islands:', e))
+    }).catch(() => {
       this.set('offline')
       this.startPolling()
     })

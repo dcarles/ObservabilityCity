@@ -141,6 +141,8 @@ cd frontend && npm test          # visual rules, snapshot guard, island layout (
 cd frontend && npm run e2e       # browser scenarios on a small town (break things, check the town, calm it down), then the link rules on a town with an island for each case, then the environment, tenant and service rules (about 3 minutes)
 cd frontend && npm run e2e:links # the link rules alone: pier, bridge and buildings follow real links
 cd frontend && npm run e2e:tenants # environments, tenant yards, tenant traffic and service groups, on a town with three environments
+cd frontend && npm run e2e:ui      # top bar, island filter, layers, inspector drawer, legend, Day/Dusk
+cd frontend && npm run e2e:direct  # signposts for hidden islands in a town without a hub
 cd frontend && npm run e2e:slow  # 23- and 35-island stress towns and the full sample town, with screenshots (a few minutes)
 dotnet run --project backend/tools/ObservabilityCity.Validate -- --all   # check every registry folder in the repo
 ```

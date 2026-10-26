@@ -15,6 +15,7 @@ import { saveTheme, startTheme, themeById } from './themes'
 import { parseLayers, toggleLayer, type Layer } from './layers'
 import { islandChoices, parseIslands, pruneIslands } from './islands'
 import { withView } from './address'
+import { viewTotals } from './viewTotals'
 import type { PickItem } from './picker'
 import type { Snapshot, TenantInfo } from './types'
 import { checkSnapshot } from './snapshotGuard'
@@ -317,9 +318,11 @@ async function start(): Promise<void> {
     inspectAirport: () => town.inspectAirport(),
     inspectServices: (id: string) => town.inspectServices(id),
     /** Open a service's panel as a click on its sign would. */
-    openService: (key: string) => { const sv = seen.last ? town.serviceSummary(key, seen.last) : null; if (sv) servicePanel.show(sv); return sv },
+    openService: (key: string) => { const sv = seen.last ? town.serviceSummary(key, seen.last) : null; if (sv) { inspector.close(); servicePanel.show(sv) } return sv },
     tenantView: () => tenantView,
     layers: () => layers,
+    /** The headline numbers as the top bar shows them for the tenants chosen. */
+    totals: () => (seen.last ? viewTotals(seen.last, tenantView) : null),
     lighting: () => lighting,
     themeId: () => theme.id,
     islands: () => islands,

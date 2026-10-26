@@ -51,3 +51,18 @@ describe('layout is deterministic', () => {
     expect(layoutTown(sizes(15), 12, AIRPORT)).toEqual(layoutTown(sizes(15), 12, AIRPORT))
   })
 })
+
+describe('a town with no islands', () => {
+  it('has no places when there is no airport either', () => {
+    const l = layoutTown([])
+    expect(l.islands).toEqual([])
+    expect(l.airport).toBeNull()
+  })
+
+  it('still places the airport, off the plaza and clear of the hub, when the island filter leaves only the hub', () => {
+    const l = layoutTown([], 12, AIRPORT)
+    expect(l.islands).toEqual([])
+    expect(l.airport).not.toBeNull()
+    expect(l.airport!.radius).toBeGreaterThan(l.hub.rz + AIRPORT.rz)
+  })
+})

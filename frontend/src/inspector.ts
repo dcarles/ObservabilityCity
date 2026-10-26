@@ -180,7 +180,7 @@ export class Inspector {
     // the same words are not drawn again: a redraw would throw away the scroll position every half second
     const key = `${id}|${this.tab}|${html}`
     this.el.dataset.id = id
-    this.el.dataset.tab = this.tab
+    this.el.dataset.view = this.tab
     this.el.hidden = false
     if (key === this.key) return
     this.key = key
