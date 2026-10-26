@@ -148,4 +148,15 @@ test.describe('the story bar', () => {
     await town.until('aa.orders-worker', (n) => n.state === 'Down')
     await town.until('bb.ledger-api', (n) => n.state === 'Down')
   })
+
+  test('a story stopped elsewhere clears the bar', async ({ town, page }) => {
+    await town.open()
+    await page.locator('#story-select').selectOption('orders-trouble')
+    await expect(page.locator('#story-bar')).toHaveAttribute('data-state', 'playing')
+
+    await town.request.post(`${API}/api/fake/story/stop`)
+
+    await expect(page.locator('#story-bar')).toHaveAttribute('data-state', 'idle')
+    await expect(page.locator('#story-select')).toHaveValue('')
+  })
 })

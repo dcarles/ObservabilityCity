@@ -34,7 +34,8 @@ export class StoryBar {
   private setState(fx: FxState): void {
     const prev = this.state
     this.state = fx.story ?? IDLE
-    if (this.state.storyId !== null) this.picked = this.state.storyId
+    // what the select shows is the story that plays; with none playing it is empty (a story stopped elsewhere clears it too)
+    this.picked = this.state.storyId ?? ''
     const target = cameraMove(this.last, this.state)
     this.last = { story: this.state.storyId, step: this.state.step }
     if (target) this.camera(target)
