@@ -464,7 +464,7 @@ export class Town {
       const g = s.groups.find((x) => x.id === isl.group.id)
       if (!g) continue
       const nodes = new Map(g.nodes.map((n) => [n.id, n]))
-      for (const [key, sign] of isl.services) this.guard(`service ${key}`, () => sign.set(summariseService(sign.pad, g.id, g.displayName, nodes).state))
+      for (const [key, sign] of isl.services) this.guard(`service ${key}`, () => { const sv = summariseService(sign.pad, g.id, g.displayName, nodes); sign.set(sv.state, sv.monitored) })
     }
     this.guard('tenants', () => this.cars.setTenants(s.tenants ?? []))
     if (this.edge.mode === 'signpost') {

@@ -132,6 +132,9 @@ public sealed record RegistryNode(
     /// <summary>Systems on other islands this one reaches through the API gateway. Only the dependency overlay and the cars' origins use them.</summary>
     public IReadOnlyList<string> GatewayCalls { get; init; } = [];
 
+    /// <summary>Signal to source name (or none) set on the system or its pillar, the system's taking precedence. Empty when the environment's choice stands.</summary>
+    public IReadOnlyDictionary<string, string> Signals { get; init; } = new Dictionary<string, string>();
+
     /// <summary>The registry file the system is declared in (cl.yaml, hub.yaml, third-parties.yaml).</summary>
     public string SourceFile { get; init; } = "";
 
@@ -149,7 +152,24 @@ public sealed class RegistryException(string message) : Exception(message);
 public sealed record RegistryTenant(string Id, string Name, TenantKind Kind);
 
 /// <summary>Where one signal of an environment comes from.</summary>
-public sealed record RegistrySource(string Name, string Kind, string? Connection);
+public sealed record RegistrySource(string Name, string Kind, string? Connection)
+{
+    /// <summary>The login it uses, by name from the environment's credentials. Null: the implicit Azure CLI login.</summary>
+    public string? Credential { get; init; }
+
+    /// <summary>How often it is asked, and how long one ask may take. Null: the default (<see cref="DefaultPollSeconds"/>, <see cref="DefaultTimeoutSeconds"/>).</summary>
+    public double? PollSeconds { get; init; }
+    public double? TimeoutSeconds { get; init; }
+
+    public const double DefaultPollSeconds = 30;
+    public const double DefaultTimeoutSeconds = 10;
+
+    public TimeSpan PollInterval => TimeSpan.FromSeconds(PollSeconds ?? DefaultPollSeconds);
+    public TimeSpan Timeout => TimeSpan.FromSeconds(TimeoutSeconds ?? DefaultTimeoutSeconds);
+}
+
+/// <summary>A way to sign in to Azure, named in the environment file. Secrets are not here: ClientSecretEnv names the variable that holds one.</summary>
+public sealed record RegistryCredential(string Name, string Kind, string? TenantId, string? ClientId, string? ClientSecretEnv);
 
 /// <summary>
 /// One environment: dev, staging, prod. Pillars and systems are shared; the environment brings its own sources and tenants and leaves out
@@ -168,4 +188,10 @@ public sealed record RegistryEnvironment(
     public static string DatabaseName(string pattern, string tenantId) => pattern.Replace(TenantToken, tenantId);
 
     public const string TenantToken = "{tenant}";
+
+    /// <summary>Ways to sign in, by name. The one called "default" is the Azure CLI login unless the file says otherwise.</summary>
+    public IReadOnlyList<RegistryCredential> Credentials { get; init; } = [];
+
+    /// <summary>The source each signal is pointed at in this environment (a source name, or none). Signals not listed use the source called metrics or messaging.</summary>
+    public IReadOnlyDictionary<string, string> Signals { get; init; } = new Dictionary<string, string>();
 }

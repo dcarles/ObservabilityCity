@@ -1,0 +1,10 @@
+displayName: Platform hub
+color: "#f5c26b"
+resources:
+  - { id: hub.apim, name: API gateway, role: gateway }
+  - { id: hub.service-bus, name: Service Bus, role: broker }
+  - { id: hub.egress, name: Central egress, role: egress }
+  - { id: hub.customer-db, name: Shared customer DB, role: db }
+externalCallers:
+  - { id: mobile-app, name: Mobile app, calls: [aa.orders-api, bb.ledger-api] }
+  - { id: partner, name: Partner, calls: [cc.notify-api] }

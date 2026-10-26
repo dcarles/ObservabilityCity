@@ -2,6 +2,7 @@
 // so this adds the tenant choice on top: following some tenants shows their share of the traffic and the state of their own databases.
 
 import type { HealthState, NodeSnapshot, Snapshot, TenantInfo, TownTotals } from './types'
+import { isUnmonitored } from './signals'
 import { isFollowing, isFollowed, type TenantView } from './tenants'
 
 export interface ViewTotals extends TownTotals {
@@ -43,7 +44,9 @@ export function stateFor(n: Pick<NodeSnapshot, 'state' | 'tenants'>, tenants: re
 
 /** Systems and third parties with no fresh data. */
 export function staleCount(s: Pick<Snapshot, 'groups' | 'vendors'>): number {
-  return s.groups.reduce((a, g) => a + g.nodes.filter((n) => n.state === 'Stale').length, 0) + s.vendors.filter((v) => v.node.state === 'Stale').length
+  // a system with no source at all is not missing data: there is none to miss
+  const missing = (n: NodeSnapshot) => n.state === 'Stale' && !isUnmonitored(n)
+  return s.groups.reduce((a, g) => a + g.nodes.filter(missing).length, 0) + s.vendors.filter((v) => missing(v.node)).length
 }
 
 /**

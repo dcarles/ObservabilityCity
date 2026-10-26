@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using ObservabilityCity.Contracts;
+using ObservabilityCity.Core.Sources;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
@@ -30,6 +31,7 @@ public static class RegistryLoader
         "externalCallers", "islands", "role", "service", "slaP99Ms", "errors", "resources", "throttle", "backlog", "calls", "aliases",
         "amber", "red", "vendors", "calledBy", "gatewayCalls", "messaging", "topics", "subscriptions", "topic", "consumer", "legacy",
         "tenantPattern", "order", "default", "sources", "kind", "connection", "tenants", "exclude", "fake", "undeclaredTenants",
+        "signals", "credentials", "credential", "pollSeconds", "timeoutSeconds", "tenantId", "clientId", "clientSecretEnv",
     ];
 
     // Last resort when defaults.yaml is missing or silent about a role.
@@ -86,7 +88,7 @@ public static class RegistryLoader
         var aliases = new Dictionary<string, string>(); // old id to current id
 
         var hubNodes = hub.Resources
-            .Select(r => ToNode(r, "hub", "hub.yaml", "hub", defaults, new DefaultsFile(), false, ids, aliases, errors))
+            .Select(r => ToNode(r, "hub", "hub.yaml", "hub", defaults, new DefaultsFile(), false, new Dictionary<string, string>(), ids, aliases, errors))
             .OfType<RegistryNode>()
             .ToList();
         var hubGroup = new RegistryGroup("hub", hub.DisplayName, hub.Color, true, hubNodes) { TopicServices = hub.Messaging?.Topics ?? [] };
@@ -215,7 +217,7 @@ public static class RegistryLoader
         foreach (var v in thirdParties.Vendors)
         {
             var node = ToNode(new SystemFile { Id = v.Id, Name = v.Name, Role = "api", SlaP99Ms = v.SlaP99Ms, Errors = v.Errors }, RegistryVendor.GroupId,
-                "third-parties.yaml", RegistryVendor.GroupId, defaults, new DefaultsFile(), false, ids, aliases, errors);
+                "third-parties.yaml", RegistryVendor.GroupId, defaults, new DefaultsFile(), false, new Dictionary<string, string>(), ids, aliases, errors);
             if (node is null) continue;
             var calledBy = new List<string>();
             foreach (var caller in v.CalledBy)
@@ -248,8 +250,8 @@ public static class RegistryLoader
         return registry with { Warnings = TownLinks.Warnings(registry).ToList() };
     }
 
-    private static readonly string[] SourceNames = ["metrics", "incidents", "messaging"];
-    private static readonly string[] SourceKinds = ["fake"];
+    // Sources may be named freely; these three are the defaults for the groups of signals they have always stood for.
+    private static readonly string[] KnownSourceKinds = SourceKinds.All;
 
     /// <summary>
     /// Reads environments/*.yaml. The file name is the environment's id. A file with problems is reported (an error in a strict load) and, in a
@@ -278,9 +280,14 @@ public static class RegistryLoader
             var excluded = f!.Exclude.Select(id => ids.Contains(id) ? id : aliases[id]).ToHashSet();
             parsed.Add((new RegistryEnvironment(
                 stem, f.Name ?? stem, f.Default,
-                f.Sources.Select(kv => new RegistrySource(kv.Key, kv.Value.Kind.ToLowerInvariant(), kv.Value.Connection)).ToList(),
+                f.Sources.Select(kv => new RegistrySource(kv.Key, kv.Value.Kind.ToLowerInvariant(), kv.Value.Connection)
+                    { Credential = kv.Value.Credential, PollSeconds = kv.Value.PollSeconds, TimeoutSeconds = kv.Value.TimeoutSeconds }).ToList(),
                 f.Tenants.Select(t => new RegistryTenant(t.Id, t.Name ?? t.Id, t.Kind.Equals("test", StringComparison.OrdinalIgnoreCase) ? TenantKind.Test : TenantKind.Customer)).ToList(),
-                excluded, f.Fake?.UndeclaredTenants ?? []), f.Order ?? 100));
+                excluded, f.Fake?.UndeclaredTenants ?? [])
+            {
+                Credentials = f.Credentials.Select(kv => new RegistryCredential(kv.Key, kv.Value.Kind.ToLowerInvariant(), kv.Value.TenantId, kv.Value.ClientId, kv.Value.ClientSecretEnv)).ToList(),
+                Signals = f.Signals,
+            }, f.Order ?? 100));
         }
         var ordered = parsed.OrderBy(p => p.Order).ThenBy(p => p.Env.Id, StringComparer.Ordinal).Select(p => p.Env).ToList();
         if (ordered.Count(e => e.IsDefault) > 1)
@@ -293,10 +300,37 @@ public static class RegistryLoader
         if (!KebabId.IsMatch(stem)) errors.Add($"{name}: the file name '{stem}' is the environment's id and must be lowercase kebab-case");
         foreach (var (source, def) in f.Sources)
         {
-            if (!SourceNames.Contains(source))
-                errors.Add($"{name}: unknown source '{source}'. Use {string.Join(", ", SourceNames)}.{DidYouMean.Hint(source, SourceNames)}");
-            if (!SourceKinds.Contains(def.Kind.ToLowerInvariant()))
-                errors.Add($"{name}: source '{source}' has kind '{def.Kind}', which does not exist yet. Use {string.Join(" or ", SourceKinds)}.{DidYouMean.Hint(def.Kind, SourceKinds)}");
+            if (!KebabId.IsMatch(source))
+                errors.Add($"{name}: source name '{source}' must be lowercase kebab-case");
+            if (!KnownSourceKinds.Contains(def.Kind.ToLowerInvariant()))
+                errors.Add($"{name}: source '{source}' has kind '{def.Kind}', which is not a kind of source. Use {string.Join(", ", KnownSourceKinds)}.{DidYouMean.Hint(def.Kind, KnownSourceKinds)}");
+            if (def.PollSeconds is <= 0) errors.Add($"{name}: source '{source}' has pollSeconds {def.PollSeconds}; it must be above 0");
+            if (def.TimeoutSeconds is <= 0) errors.Add($"{name}: source '{source}' has timeoutSeconds {def.TimeoutSeconds}; it must be above 0");
+            if (def.Credential is not null)
+            {
+                if (!SourceKinds.UsesAzureLogin(def.Kind.ToLowerInvariant()))
+                    errors.Add($"{name}: source '{source}' names a credential, but a {def.Kind} source does not sign in to Azure");
+                else if (!f.Credentials.ContainsKey(def.Credential))
+                    errors.Add($"{name}: source '{source}' uses credential '{def.Credential}', which this file does not define.{DidYouMean.Hint(def.Credential, f.Credentials.Keys)}");
+            }
+        }
+        foreach (var (credential, def) in f.Credentials)
+        {
+            if (!KebabId.IsMatch(credential)) errors.Add($"{name}: credential name '{credential}' must be lowercase kebab-case");
+            var kind = def.Kind.ToLowerInvariant();
+            if (!CredentialKinds.All.Contains(kind))
+                errors.Add($"{name}: credential '{credential}' has kind '{def.Kind}'. Use {string.Join(", ", CredentialKinds.All)}.{DidYouMean.Hint(def.Kind, CredentialKinds.All)}");
+            else if (kind == CredentialKinds.ServicePrincipal && (def.ClientId is null || def.ClientSecretEnv is null))
+                errors.Add($"{name}: credential '{credential}' is a service-principal, which needs clientId and clientSecretEnv (the name of the environment variable that holds the secret)");
+            else if (kind != CredentialKinds.ServicePrincipal && def.ClientSecretEnv is not null)
+                errors.Add($"{name}: credential '{credential}' has clientSecretEnv, which only a service-principal uses");
+        }
+        foreach (var (signal, source) in f.Signals)
+        {
+            if (!Signals.All.Contains(signal))
+                errors.Add($"{name}: unknown signal '{signal}'. Use {string.Join(", ", Signals.All)}.{DidYouMean.Hint(signal, Signals.All)}");
+            if (source != Signals.None && !f.Sources.ContainsKey(source))
+                errors.Add($"{name}: signal '{signal}' comes from source '{source}', which this file does not define.{DidYouMean.Hint(source, f.Sources.Keys)}");
         }
         var seen = new HashSet<string>();
         foreach (var t in f.Tenants)
@@ -378,13 +412,14 @@ public static class RegistryLoader
         pillarAliases = aliases;
         var p = Read<PillarFile>(file);
         CheckRoleKeys(p.Defaults, name, errors);
+        CheckSignals(p.Signals, "the pillar", name, errors);
         if (!KebabId.IsMatch(p.Pillar))
             errors.Add($"{name}: pillar '{p.Pillar}' must be lowercase kebab-case");
         else if (Path.GetFileNameWithoutExtension(file) != p.Pillar)
             errors.Add($"{name}: pillar '{p.Pillar}' must match the file name");
 
         var nodes = p.Systems
-            .Select(s => ToNode(s, p.Pillar, name, p.Pillar, defaults, p.Defaults, p.External, ids, aliases, errors))
+            .Select(s => ToNode(s, p.Pillar, name, p.Pillar, defaults, p.Defaults, p.External, p.Signals, ids, aliases, errors))
             .OfType<RegistryNode>()
             .ToList();
         var group = new RegistryGroup(p.Pillar, p.DisplayName, p.Color, false, nodes)
@@ -473,7 +508,7 @@ public static class RegistryLoader
 
     private static RegistryNode? ToNode(
         SystemFile s, string groupId, string fileName, string prefix,
-        DefaultsFile appDefaults, DefaultsFile pillarDefaults, bool pillarExternal,
+        DefaultsFile appDefaults, DefaultsFile pillarDefaults, bool pillarExternal, Dictionary<string, string> pillarSignals,
         HashSet<string> ids, Dictionary<string, string> aliases, List<string> errors)
     {
         var dot = s.Id.IndexOf('.');
@@ -495,6 +530,7 @@ public static class RegistryLoader
         }
 
         if (!TryParseKind(s.Role, s.Id, fileName, errors, out var kind)) return null;
+        CheckSignals(s.Signals, $"'{s.Id}'", fileName, errors);
         if (s.TenantPattern is not null)
         {
             if (kind != NodeKind.Database)
@@ -541,9 +577,25 @@ public static class RegistryLoader
         {
             GatewayCalls = s.GatewayCalls,
             TenantPattern = s.TenantPattern,
+            Signals = Merge(pillarSignals, s.Signals),
             SourceFile = fileName,
             Origins = origins,
         };
+    }
+
+    private static IReadOnlyDictionary<string, string> Merge(Dictionary<string, string> pillar, Dictionary<string, string> system) =>
+        pillar.Concat(system).GroupBy(kv => kv.Key).ToDictionary(g => g.Key, g => g.Last().Value);
+
+    /// <summary>A signal override must name a known signal and a kebab-case source, or none. Whether the source exists is for each environment to say, so that is not checked here.</summary>
+    private static void CheckSignals(Dictionary<string, string> signals, string owner, string fileName, List<string> errors)
+    {
+        foreach (var (signal, source) in signals)
+        {
+            if (!Signals.All.Contains(signal))
+                errors.Add($"{fileName}: {owner} has signals.{signal}, which is not a signal. Use {string.Join(", ", Signals.All)}.{DidYouMean.Hint(signal, Signals.All)}");
+            if (source != Signals.None && !KebabId.IsMatch(source))
+                errors.Add($"{fileName}: {owner} points signals.{signal} at '{source}'; use a source name from the environment files (lowercase kebab-case) or {Signals.None}");
+        }
     }
 
     private static bool TryParseKind(string? role, string id, string fileName, List<string> errors, out NodeKind kind)

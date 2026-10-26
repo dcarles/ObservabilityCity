@@ -53,6 +53,9 @@ public enum HealthState
 /// Tenants is set only for a data store that keeps one database per tenant (its registry entry has a tenantPattern): one unit for each tenant, and null
 /// for every other system. Utilisation and Throttled of such a store are the worst of its tenants' that count: customers and unknown tenants, and
 /// test tenants only when there are no others, held below the red thresholds, so a test tenant's trouble shows amber on its own unit and never turns the building red.
+/// Absent lists the signals no source is configured for (requests, errors, latency, instances, cpu, memory, utilisation, throttled, backlog, deadLetters). They are not
+/// zero and not grey: the number in the matching field means nothing, health ignores it and the renderer shows nothing for it. A system whose signals are all absent has no
+/// source at all; it is Stale in State, but it is not grey and it is not counted as missing data.
 /// </summary>
 public sealed record NodeSnapshot(
     string Id,
@@ -86,7 +89,8 @@ public sealed record NodeSnapshot(
     IReadOnlyList<string> Calls,
     IReadOnlyList<string> GatewayCalls,
     DateTimeOffset? LastUpdated,
-    IReadOnlyList<TenantUnitSnapshot>? Tenants);
+    IReadOnlyList<TenantUnitSnapshot>? Tenants,
+    IReadOnlyList<string> Absent);
 
 /// <summary>
 /// One tenant's database of a multi-tenant data store. Database is its real name (the store's tenantPattern with the tenant id put in).

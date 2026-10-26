@@ -36,7 +36,7 @@ public sealed partial record Registry
             .ToList();
         var callers = ExternalCallers.Select(c => c with { Calls = c.Calls.Where(present.Contains).ToList() }).ToList();
         var view = this with { Groups = groups, ExternalCallers = callers, Topics = topics, Subscriptions = subscriptions, Vendors = vendors, ActiveEnvironment = env };
-        return view with { Warnings = [.. TownLinks.Warnings(view), .. EnvironmentWarnings(env, view)] };
+        return view with { Warnings = [.. TownLinks.Warnings(view), .. EnvironmentWarnings(env, view), .. view.UnknownSourceWarnings(env), .. view.UnusedSourceWarnings(env)] };
     }
 
     /// <summary>Things worth fixing about an environment that do not stop it: tenant databases but no tenants listed.</summary>

@@ -63,7 +63,8 @@
           "calls": [],
           "gatewayCalls": [],
           "lastUpdated": "2026-10-25T12:00:02+00:00",
-          "tenants": null
+          "tenants": null,
+          "absent": []
         },
         {
           "id": "hub.service-bus",
@@ -97,7 +98,8 @@
           "calls": [],
           "gatewayCalls": [],
           "lastUpdated": "2026-10-25T12:00:02+00:00",
-          "tenants": null
+          "tenants": null,
+          "absent": []
         },
         {
           "id": "hub.egress",
@@ -131,7 +133,8 @@
           "calls": [],
           "gatewayCalls": [],
           "lastUpdated": "2026-10-25T12:00:02+00:00",
-          "tenants": null
+          "tenants": null,
+          "absent": []
         },
         {
           "id": "hub.customer-db",
@@ -165,7 +168,8 @@
           "calls": [],
           "gatewayCalls": [],
           "lastUpdated": "2026-10-25T12:00:02+00:00",
-          "tenants": null
+          "tenants": null,
+          "absent": []
         }
       ]
     },
@@ -230,7 +234,8 @@
           ],
           "gatewayCalls": [],
           "lastUpdated": "2026-10-25T12:00:02+00:00",
-          "tenants": null
+          "tenants": null,
+          "absent": []
         },
         {
           "id": "aa.orders-worker",
@@ -266,7 +271,8 @@
           ],
           "gatewayCalls": [],
           "lastUpdated": "2026-10-25T12:00:02+00:00",
-          "tenants": null
+          "tenants": null,
+          "absent": []
         },
         {
           "id": "aa.orders-db",
@@ -300,7 +306,8 @@
           "calls": [],
           "gatewayCalls": [],
           "lastUpdated": "2026-10-25T12:00:02+00:00",
-          "tenants": null
+          "tenants": null,
+          "absent": []
         }
       ]
     },
@@ -374,7 +381,8 @@
             "bb.ledger-api"
           ],
           "lastUpdated": "2026-10-25T12:00:02+00:00",
-          "tenants": null
+          "tenants": null,
+          "absent": []
         },
         {
           "id": "cc.notify-worker",
@@ -410,7 +418,8 @@
           ],
           "gatewayCalls": [],
           "lastUpdated": "2026-10-25T12:00:02+00:00",
-          "tenants": null
+          "tenants": null,
+          "absent": []
         },
         {
           "id": "cc.notify-db",
@@ -444,7 +453,8 @@
           "calls": [],
           "gatewayCalls": [],
           "lastUpdated": "2026-10-25T12:00:02+00:00",
-          "tenants": null
+          "tenants": null,
+          "absent": []
         }
       ]
     }
@@ -483,7 +493,8 @@
         "calls": [],
         "gatewayCalls": [],
         "lastUpdated": "2026-10-25T12:00:02+00:00",
-        "tenants": null
+        "tenants": null,
+        "absent": []
       },
       "calledBy": [
         "aa.orders-api"
@@ -522,7 +533,8 @@
         "calls": [],
         "gatewayCalls": [],
         "lastUpdated": "2026-10-25T12:00:02+00:00",
-        "tenants": null
+        "tenants": null,
+        "absent": []
       },
       "calledBy": [
         "cc.notify-worker"

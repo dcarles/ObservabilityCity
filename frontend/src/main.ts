@@ -1,4 +1,5 @@
 import './style.css'
+import { isUnmonitored } from './signals'
 import * as THREE from 'three'
 import { Stage } from './scene/stage'
 import { Town } from './scene/town'
@@ -98,8 +99,8 @@ async function start(): Promise<void> {
       const groups = seen.last?.groups ?? []
       if (state === 'Incidents')
         return groups.filter((g) => g.incidents.length > 0).map<PickItem>((g) => ({ kind: 'island', id: g.id, name: g.displayName, where: `sev ${g.incidents[0].severity}, ${g.incidents.length} open` }))
-      const inGroups = groups.flatMap((g) => g.nodes.filter((n) => n.state === state).map<PickItem>((n) => ({ kind: 'building', id: n.id, name: n.name, where: g.displayName, state: n.state })))
-      const vendors = (seen.last?.vendors ?? []).filter((v) => v.node.state === state).map<PickItem>((v) => ({ kind: 'building', id: v.node.id, name: v.node.name, where: 'Third party', state: v.node.state }))
+      const inGroups = groups.flatMap((g) => g.nodes.filter((n) => n.state === state && !isUnmonitored(n)).map<PickItem>((n) => ({ kind: 'building', id: n.id, name: n.name, where: g.displayName, state: n.state })))
+      const vendors = (seen.last?.vendors ?? []).filter((v) => v.node.state === state && !isUnmonitored(v.node)).map<PickItem>((v) => ({ kind: 'building', id: v.node.id, name: v.node.name, where: 'Third party', state: v.node.state }))
       return [...inGroups, ...vendors]
     },
     goTo,

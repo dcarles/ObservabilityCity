@@ -3,6 +3,12 @@
   "$id": "defs.schema.json",
   "title": "Shared definitions of the registry files",
   "$defs": {
+    "signals": {
+      "type": "object",
+      "description": "Per-signal source choice, overriding the environment's: signal name to a source name defined in the environment files, or none. A system's choice wins over its pillar's.",
+      "propertyNames": { "enum": ["requests", "errors", "latency", "instances", "cpu", "memory", "utilisation", "throttled", "backlog", "deadLetters"] },
+      "additionalProperties": { "type": "string" }
+    },
     "role": {
       "description": "What a system is. It decides the building that stands for it.",
       "enum": ["api", "worker", "db", "cache", "cron", "gateway", "broker", "egress"]

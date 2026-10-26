@@ -35,5 +35,8 @@ public interface IMetricSource
 {
     string Name { get; }
     TimeSpan PollInterval { get; }
+
+    /// <summary>How long one poll may take before the poller gives up on it. A real source takes it from its definition in the environment file.</summary>
+    TimeSpan Timeout => TimeSpan.FromSeconds(Registry.RegistrySource.DefaultTimeoutSeconds);
     Task<IReadOnlyDictionary<string, NodeReading>> PollAsync(Registry.Registry registry, CancellationToken ct);
 }

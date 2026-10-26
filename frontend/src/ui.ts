@@ -1,9 +1,10 @@
+import { absentEverywhere, isAbsent, isUnmonitored, type Signal } from './signals'
 import type { Snapshot, NodeSnapshot } from './types'
 import type { ConnectionState } from './connection'
 import { formatMs, formatRate } from './visuals'
 import { escapeHtml, Picker, type PickItem } from './picker'
 import { yardSummary, type TenantView } from './tenants'
-import type { ServiceSummary } from './scene/service'
+import { systemNumbers, type ServiceSummary } from './scene/service'
 import { viewTotals } from './viewTotals'
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T
@@ -59,10 +60,10 @@ export class TopBar {
     $('topbar-right').innerHTML = `
       <span class="spacer"></span>
       ${t ? `
-        <div class="chip" id="chip-requests" title="${escapeHtml(scope + share)}"><b>${formatRate(t.requestsPerSecond)}</b><span>req/s</span></div>
-        <div class="chip ${t.errorRate >= 0.05 ? 'bad' : t.errorRate >= 0.01 ? 'warn' : ''}" title="${escapeHtml(scope + wide)}"><b>${(t.errorRate * 100).toFixed(1)}%</b><span>errors</span></div>
-        <div class="chip p99" title="${escapeHtml(scope + wide)}"><b>${formatMs(t.p99Ms)}</b><span>p99</span></div>
-        <div class="chip dlq ${t.deadLetters > 0 ? 'bad' : ''}" title="${escapeHtml(`Messages in dead-letter queues. ${scope}${wide}`)}"><b>${formatRate(t.deadLetters)}</b><span>DLQ</span></div>
+        ${absentEverywhere(s!, 'requests') ? '' : `<div class="chip" id="chip-requests" title="${escapeHtml(scope + share)}"><b>${formatRate(t.requestsPerSecond)}</b><span>req/s</span></div>`}
+        ${absentEverywhere(s!, 'errors') ? '' : `<div class="chip ${t.errorRate >= 0.05 ? 'bad' : t.errorRate >= 0.01 ? 'warn' : ''}" title="${escapeHtml(scope + wide)}"><b>${(t.errorRate * 100).toFixed(1)}%</b><span>errors</span></div>`}
+        ${absentEverywhere(s!, 'latency') ? '' : `<div class="chip p99" title="${escapeHtml(scope + wide)}"><b>${formatMs(t.p99Ms)}</b><span>p99</span></div>`}
+        ${absentEverywhere(s!, 'deadLetters') ? '' : `<div class="chip dlq ${t.deadLetters > 0 ? 'bad' : ''}" title="${escapeHtml(`Messages in dead-letter queues. ${scope}${wide}`)}"><b>${formatRate(t.deadLetters)}</b><span>DLQ</span></div>`}
         <button class="chip clickable ${t.degraded ? 'warn' : ''}" data-list="Degraded" title="Show the degraded systems"><b>${t.degraded}</b><span>degraded</span></button>
         <button class="chip clickable ${t.down ? 'bad' : ''}" data-list="Down" title="Show the systems that are down"><b>${t.down}</b><span>down</span></button>
         <button class="chip clickable ${t.stale ? 'stale' : ''}" data-list="Stale" title="Show the systems with no fresh data"><b>${t.stale}</b><span>no data</span></button>
@@ -120,14 +121,16 @@ export function showTooltip(n: NodeSnapshot | null, x: number, y: number, view: 
   if (!n) { el.hidden = true; return }
   const cls = n.state === 'Healthy' ? 'ok' : n.state === 'Degraded' ? 'warn' : n.state === 'Down' ? 'bad' : 'stale'
   const slow = n.p99Ms > n.slaP99Ms
+  const none = isUnmonitored(n)
+  const row = (signal: Signal, html: string) => (isAbsent(n, signal) ? '' : html)
   el.innerHTML = `
-    <b>${n.name}</b> <span class="${cls}">· ${n.state}</span>
+    <b>${n.name}</b> <span class="${none ? '' : cls}">· ${none ? 'no source' : n.state}</span>
     <div class="row"><span>id</span><span>${n.id}</span></div>
-    <div class="row"><span>instances</span><span>${n.instancesHealthy}/${n.instancesTotal} healthy</span></div>
-    <div class="row"><span>requests</span><span>${formatRate(n.requestsPerSecond)}/s</span></div>
-    <div class="row"><span>errors</span><span class="${n.errorRate >= n.errorRed ? 'bad' : n.errorRate >= n.errorAmber ? 'warn' : ''}">${(n.errorRate * 100).toFixed(2)}%</span></div>
-    <div class="row"><span>p99 / SLA</span><span class="${slow ? 'warn' : ''}">${formatMs(n.p99Ms)} / ${formatMs(n.slaP99Ms)}</span></div>
-    <div class="row"><span>load</span><span>${Math.round(n.load * 100)}%</span></div>${tenantRows(n, view)}`
+    ${row('instances', `<div class="row"><span>instances</span><span>${n.instancesHealthy}/${n.instancesTotal} healthy</span></div>`)}
+    ${row('requests', `<div class="row"><span>requests</span><span>${formatRate(n.requestsPerSecond)}/s</span></div>`)}
+    ${row('errors', `<div class="row"><span>errors</span><span class="${n.errorRate >= n.errorRed ? 'bad' : n.errorRate >= n.errorAmber ? 'warn' : ''}">${(n.errorRate * 100).toFixed(2)}%</span></div>`)}
+    ${row('latency', `<div class="row"><span>p99 / SLA</span><span class="${slow ? 'warn' : ''}">${formatMs(n.p99Ms)} / ${formatMs(n.slaP99Ms)}</span></div>`)}
+    ${isAbsent(n, 'requests') || isAbsent(n, 'instances') ? '' : `<div class="row"><span>load</span><span>${Math.round(n.load * 100)}%</span></div>`}${tenantRows(n, view)}`
   el.hidden = false
   const w = el.offsetWidth, h = el.offsetHeight
   el.style.left = `${Math.min(x + 16, window.innerWidth - w - 8)}px`
@@ -233,12 +236,12 @@ export class ServicePanel {
     this.el.dataset.key = sv.key
     this.el.dataset.state = sv.state
     this.el.innerHTML = `
-      <div class="head"><div><b>${escapeHtml(sv.name)}</b> <span class="${cls}">· ${sv.state}</span><div class="where">Service on ${escapeHtml(sv.groupName)}</div></div><button id="service-close" title="Close">✕</button></div>
+      <div class="head"><div><b>${escapeHtml(sv.name)}</b> <span class="${sv.monitored ? cls : ''}">· ${sv.monitored ? sv.state : 'no source'}</span><div class="where">Service on ${escapeHtml(sv.groupName)}</div></div><button id="service-close" title="Close">✕</button></div>
       ${sv.systems.map((m) => {
-        const mc = m.state === 'Healthy' ? 'ok' : m.state === 'Degraded' ? 'warn' : m.state === 'Down' ? 'bad' : 'stale'
+        const mc = m.unmonitored ? '' : m.state === 'Healthy' ? 'ok' : m.state === 'Degraded' ? 'warn' : m.state === 'Down' ? 'bad' : 'stale'
         return `<div class="sys" data-id="${escapeHtml(m.id)}">
-          <div class="line"><b>${escapeHtml(m.name)}</b><span class="${mc}">${m.state}</span></div>
-          <div class="nums">${m.kind} · ${formatRate(m.requestsPerSecond)}/s · ${(m.errorRate * 100).toFixed(2)}% errors · p99 ${formatMs(m.p99Ms)}${m.tenants ? ` · ${m.tenants.total} tenants, ${m.tenants.throttled} throttled` : ''}</div>
+          <div class="line"><b>${escapeHtml(m.name)}</b><span class="${mc}">${m.unmonitored ? 'no source' : m.state}</span></div>
+          <div class="nums">${systemNumbers(m)}</div>
         </div>`
       }).join('')}`
     this.el.hidden = false

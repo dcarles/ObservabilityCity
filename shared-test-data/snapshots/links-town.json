@@ -70,7 +70,8 @@
           "calls": [],
           "gatewayCalls": [],
           "lastUpdated": "2026-10-25T12:00:03+00:00",
-          "tenants": null
+          "tenants": null,
+          "absent": []
         },
         {
           "id": "hub.service-bus",
@@ -104,7 +105,8 @@
           "calls": [],
           "gatewayCalls": [],
           "lastUpdated": "2026-10-25T12:00:03+00:00",
-          "tenants": null
+          "tenants": null,
+          "absent": []
         },
         {
           "id": "hub.egress",
@@ -138,7 +140,8 @@
           "calls": [],
           "gatewayCalls": [],
           "lastUpdated": "2026-10-25T12:00:03+00:00",
-          "tenants": null
+          "tenants": null,
+          "absent": []
         },
         {
           "id": "hub.customer-db",
@@ -172,7 +175,8 @@
           "calls": [],
           "gatewayCalls": [],
           "lastUpdated": "2026-10-25T12:00:03+00:00",
-          "tenants": null
+          "tenants": null,
+          "absent": []
         }
       ]
     },
@@ -237,7 +241,8 @@
           ],
           "gatewayCalls": [],
           "lastUpdated": "2026-10-25T12:00:03+00:00",
-          "tenants": null
+          "tenants": null,
+          "absent": []
         },
         {
           "id": "ful.orders-worker",
@@ -273,7 +278,8 @@
           ],
           "gatewayCalls": [],
           "lastUpdated": "2026-10-25T12:00:03+00:00",
-          "tenants": null
+          "tenants": null,
+          "absent": []
         },
         {
           "id": "ful.orders-db",
@@ -307,7 +313,8 @@
           "calls": [],
           "gatewayCalls": [],
           "lastUpdated": "2026-10-25T12:00:03+00:00",
-          "tenants": null
+          "tenants": null,
+          "absent": []
         }
       ]
     },
@@ -372,7 +379,8 @@
           ],
           "gatewayCalls": [],
           "lastUpdated": "2026-10-25T12:00:03+00:00",
-          "tenants": null
+          "tenants": null,
+          "absent": []
         },
         {
           "id": "wrk.batch-db",
@@ -406,7 +414,8 @@
           "calls": [],
           "gatewayCalls": [],
           "lastUpdated": "2026-10-25T12:00:03+00:00",
-          "tenants": null
+          "tenants": null,
+          "absent": []
         }
       ]
     },
@@ -459,7 +468,8 @@
           ],
           "gatewayCalls": [],
           "lastUpdated": "2026-10-25T12:00:03+00:00",
-          "tenants": null
+          "tenants": null,
+          "absent": []
         },
         {
           "id": "nom.catalog-cache",
@@ -493,7 +503,8 @@
           "calls": [],
           "gatewayCalls": [],
           "lastUpdated": "2026-10-25T12:00:03+00:00",
-          "tenants": null
+          "tenants": null,
+          "absent": []
         }
       ]
     },
@@ -546,7 +557,8 @@
           ],
           "gatewayCalls": [],
           "lastUpdated": "2026-10-25T12:00:03+00:00",
-          "tenants": null
+          "tenants": null,
+          "absent": []
         }
       ]
     },
@@ -606,7 +618,8 @@
           ],
           "gatewayCalls": [],
           "lastUpdated": "2026-10-25T12:00:03+00:00",
-          "tenants": null
+          "tenants": null,
+          "absent": []
         },
         {
           "id": "leg.feed-worker",
@@ -642,7 +655,8 @@
           ],
           "gatewayCalls": [],
           "lastUpdated": "2026-10-25T12:00:03+00:00",
-          "tenants": null
+          "tenants": null,
+          "absent": []
         },
         {
           "id": "leg.feed-db",
@@ -676,7 +690,8 @@
           "calls": [],
           "gatewayCalls": [],
           "lastUpdated": "2026-10-25T12:00:03+00:00",
-          "tenants": null
+          "tenants": null,
+          "absent": []
         }
       ]
     },
@@ -727,7 +742,8 @@
           "calls": [],
           "gatewayCalls": [],
           "lastUpdated": "2026-10-25T12:00:03+00:00",
-          "tenants": null
+          "tenants": null,
+          "absent": []
         }
       ]
     }

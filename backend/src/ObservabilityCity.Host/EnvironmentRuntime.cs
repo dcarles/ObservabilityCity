@@ -10,7 +10,7 @@ namespace ObservabilityCity.Host;
 /// Everything one environment runs on its own: its view of the registry, its source and the readings that source produced, and the stream of
 /// snapshots built from them. Every environment of the town has one, so dev, staging and prod each move on their own.
 /// </summary>
-public sealed class EnvironmentRuntime(string townId, string id, EnvironmentRegistry registry, FakeSource? fake, LatestState state, SnapshotBuilder builder, SnapshotStore store, ILogSource logs)
+public sealed class EnvironmentRuntime(string townId, string id, EnvironmentRegistry registry, FakeSource? fake, LatestState state, SnapshotBuilder builder, SnapshotStore store, ILogSource logs, IReadOnlyList<IMetricSource> sources, IReadOnlyList<string> sourceProblems)
 {
     public string TownId { get; } = townId;
     public string Id { get; } = id;
@@ -24,6 +24,10 @@ public sealed class EnvironmentRuntime(string townId, string id, EnvironmentRegi
     public SnapshotBuilder Builder { get; } = builder;
     public SnapshotStore Store { get; } = store;
     public ILogSource Logs { get; } = logs;
+    /// <summary>The sources polled for this environment: the fake one in a demo town, the ones its environment file defines (that have an adapter) in a live one.</summary>
+    public IReadOnlyList<IMetricSource> Sources { get; } = sources;
+    /// <summary>Sources the environment defines that could not be started (no adapter for the kind yet, a login that could not be made).</summary>
+    public IReadOnlyList<string> SourceProblems { get; } = sourceProblems;
 }
 
 /// <summary>

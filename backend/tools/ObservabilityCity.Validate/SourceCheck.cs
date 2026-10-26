@@ -18,7 +18,7 @@ public sealed record SourceCheckResult(string Folder, IReadOnlyList<SourceFindin
 /// </summary>
 public static class SourceCheck
 {
-    /// <summary>The signals an environment can configure.</summary>
+    /// <summary>The sources an environment is reported on even when it does not define them: what the signals use unless told otherwise.</summary>
     public static readonly string[] Signals = ["metrics", "incidents", "messaging"];
 
     public static async Task<SourceCheckResult> RunAsync(string folder, IReadOnlyList<ISourceProbe> probes, TimeSpan timeout, CancellationToken ct)
@@ -30,7 +30,7 @@ public static class SourceCheck
         {
             var env = Path.GetFileNameWithoutExtension(file);
             var configured = ReadSources(file);
-            foreach (var signal in Signals)
+            foreach (var signal in configured.Keys.Concat(Signals.Where(s => !configured.ContainsKey(s))))
             {
                 if (!configured.TryGetValue(signal, out var source))
                 {
@@ -38,6 +38,11 @@ public static class SourceCheck
                     continue;
                 }
                 var probe = probes.FirstOrDefault(p => p.Kind == source.Kind);
+                if (probe is null && Core.Sources.SourceKinds.All.Contains(source.Kind))
+                {
+                    findings.Add(new SourceFinding(env, signal, source.Kind, new ProbeResult(ProbeStatus.NoProbeYet, "the registry accepts this kind; its probe comes with its adapter")));
+                    continue;
+                }
                 if (probe is null)
                 {
                     var known = string.Join(", ", probes.Select(p => p.Kind));
@@ -85,11 +90,12 @@ public static class SourceCheck
                 ProbeStatus.Empty => "query returned nothing",
                 ProbeStatus.Unreachable => "unreachable",
                 ProbeStatus.NotConfigured => "not configured",
+                ProbeStatus.NoProbeYet => "no probe yet",
                 _ => "unknown kind",
             };
             var kind = f.Kind.Length > 0 ? $" ({f.Kind})" : "";
             var detail = f.Result.Detail.Length > 0 ? $" - {f.Result.Detail}" : "";
-            w.WriteLine($"  {f.Environment,-12} {f.Signal,-10}{kind,-16} {label}{detail}");
+            w.WriteLine($"  {f.Environment,-12} {f.Signal,-12}{kind,-16} {label}{detail}");
         }
     }
 }

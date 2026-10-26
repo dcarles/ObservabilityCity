@@ -155,11 +155,11 @@ public class EnvironmentTests
     }
 
     [Fact]
-    public void Sources_must_be_known_signals_of_a_known_kind()
+    public void A_source_must_have_a_kebab_case_name_and_a_known_kind()
     {
-        Assert.Contains("environments/staging.yaml: unknown source 'metric'. Use metrics, incidents, messaging. Did you mean 'metrics'?",
-            FailWith(c => c.Replace("environments/staging.yaml", "  metrics:", "  metric:")));
-        Assert.Contains("environments/staging.yaml: source 'metrics' has kind 'azure-monitor', which does not exist yet. Use fake",
+        Assert.Contains("environments/staging.yaml: source name 'Metrics' must be lowercase kebab-case",
+            FailWith(c => c.Replace("environments/staging.yaml", "  metrics:", "  Metrics:")));
+        Assert.Contains("environments/staging.yaml: source 'metrics' has kind 'azure-monitor', which is not a kind of source. Use fake, resourcegraph, loganalytics, azuremonitor, servicebus, prometheus, grafana-irm. Did you mean 'azuremonitor'?",
             FailWith(c => c.Replace("environments/staging.yaml", "kind: fake", "kind: azure-monitor")));
     }
 

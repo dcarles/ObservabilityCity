@@ -1,3 +1,4 @@
+using ObservabilityCity.Adapters.Azure;
 using ObservabilityCity.Adapters.Fake;
 using ObservabilityCity.Contracts;
 using ObservabilityCity.Core.Registry;
@@ -37,6 +38,9 @@ var fakeOptions = builder.Configuration.GetSection("Fake").Get<FakeOptions>() ??
 var snapshotInterval = TimeSpan.FromSeconds(builder.Configuration.GetValue("Snapshot:IntervalSeconds", 2.0));
 var staleAfter = TimeSpan.FromSeconds(builder.Configuration.GetValue("Snapshot:StaleAfterSeconds", 30.0));
 
+// The adapters this build has, by the kind of source they serve. A live environment starts one for each source its file defines.
+var sourceCatalog = new SourceCatalog(SourceAdapters.Factories, new AzureCredentialFactory());
+
 // One runtime for each environment of each town (a town without environments has the one, "demo"): its own source, readings and snapshots.
 var townRuntimes = new List<TownRuntime>();
 var hostedByTown = new List<(TownRuntime Town, List<EnvironmentRuntime> Runtimes)>();
@@ -73,7 +77,12 @@ foreach (var (folder, registry) in loaded)
             DayFraction = fake is null ? () => TimeProvider.System.GetLocalNow().TimeOfDay.TotalDays : () => fake.DayFraction,
         };
         ILogSource logs = fake is null ? new NoLogSource() : new FakeLogSource(state, TimeProvider.System, staleAfter);
-        runtimes.Add(new EnvironmentRuntime(registry.Town.Id, environmentId, view, fake, state, snapshots, store, logs));
+        // a live environment polls what its file defines; a demo town has the fake source and nothing else
+        var set = fake is not null || registry.Environments.FirstOrDefault(e => e.Id == environmentId) is not { } environment
+            ? new SourceSet(fake is null ? [] : [fake], [])
+            : sourceCatalog.Build(environment);
+        foreach (var problem in set.Problems) Console.Error.WriteLine($"Source notice ({registry.Town.Id}): {problem}");
+        runtimes.Add(new EnvironmentRuntime(registry.Town.Id, environmentId, view, fake, state, snapshots, store, logs, set.Sources, set.Problems));
     }
     var town = new TownRuntime(registry.Town.Id, registry.Town.Name, folder, registries, new EnvironmentSet(runtimes, registry.DefaultEnvironmentId, registry.Town.Id));
     townRuntimes.Add(town);
@@ -93,7 +102,7 @@ foreach (var (town, runtimes) in hostedByTown)
     foreach (var rt in runtimes)
     {
         // AddHostedService would keep only the first of each type, so these are added as plain services
-        builder.Services.AddSingleton<IHostedService>(sp => new SourcePoller(rt.Fake is null ? [] : [rt.Fake], rt.Registry, rt.State, sp.GetRequiredService<ILogger<SourcePoller>>()));
+        builder.Services.AddSingleton<IHostedService>(sp => new SourcePoller(rt.Sources, rt.Registry, rt.State, sp.GetRequiredService<ILogger<SourcePoller>>()));
         builder.Services.AddSingleton<IHostedService>(sp => new SnapshotPublisher(rt.Builder, rt.Store,
             new SignalRSnapshotNotifier(sp.GetRequiredService<IHubContext<TownHub>>(), town.Environments, sp.GetRequiredService<IslandViews>()),
             snapshotInterval, sp.GetRequiredService<ILogger<SnapshotPublisher>>()));

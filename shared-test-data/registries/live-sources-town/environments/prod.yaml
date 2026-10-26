@@ -1,0 +1,10 @@
+# A live environment with one source for request rate, errors and latency and none for anything else. No adapter for prometheus exists yet,
+# so what it supplies is configured but silent (grey), while instances, CPU, memory and the queue signals are absent (not shown at all).
+name: Production
+default: true
+sources:
+  telemetry: { kind: prometheus, connection: "https://prom.example.test", pollSeconds: 15, timeoutSeconds: 5 }
+signals:
+  requests: telemetry
+  errors: telemetry
+  latency: telemetry

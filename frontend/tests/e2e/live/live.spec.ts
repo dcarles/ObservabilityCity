@@ -42,4 +42,34 @@ test.describe('a live town', () => {
     await page.waitForTimeout(1500)
     expect(asked).toEqual([])
   })
+
+  test('a system no source is configured for is absent, not grey: no lamp, no "no data", no totals that are really zeros', async ({ page, request }) => {
+    const snap = await (await request.get(`${API}/api/snapshot/latest`)).json()
+    for (const n of snap.groups.flatMap((g: any) => g.nodes)) expect(n.absent, n.id).toHaveLength(10)
+
+    await open(page)
+    await page.evaluate(() => (window as any).city.step(0.5))
+    const api = await page.evaluate(() => (window as any).city.inspect('aa.orders-api'))
+    expect(api.beacon).toBe('off')
+    expect(api.plaque).toBe('not monitored')
+
+    const bar = page.locator('#topbar')
+    await expect(bar).not.toContainText('req/s')
+    await expect(bar).not.toContainText('errors')
+    await expect(bar).not.toContainText('p99')
+    await expect(bar).not.toContainText('DLQ')
+    // nothing is missing data: there is nothing configured to miss
+    await expect(page.locator('#topbar [data-list="Stale"] b')).toHaveText('0')
+  })
+
+  test('the inspector says there is no source instead of listing numbers', async ({ page }) => {
+    await open(page)
+    await page.evaluate(() => (window as any).city.inspect('aa.orders-api'))
+    await page.evaluate(() => (document.querySelector('#search-input') as HTMLInputElement | null)?.focus())
+    await page.locator('#search-input').fill('Orders API')
+    await page.locator('#search-results .hit').first().click()
+    await expect(page.locator('#inspector .rows')).toContainText('no source configured')
+    await expect(page.locator('#inspector .rows')).not.toContainText('Requests')
+    await expect(page.locator('#inspector .why')).toHaveCount(0)
+  })
 })
