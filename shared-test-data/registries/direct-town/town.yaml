@@ -2,3 +2,4 @@ id: direct-town
 name: Direct Town
 groupLabel: Pillar
 topology: direct
+mode: demo

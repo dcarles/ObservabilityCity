@@ -37,6 +37,7 @@ export class BreakPanel {
   private noteTimer: number | undefined
 
   constructor(private readonly client: FxClient, private readonly ctx: BreakContext) {
+    this.el.hidden = false
     this.render()
     client.onState((s) => this.setState(s))
     // Escape lets go of a scenario that is waiting for its target

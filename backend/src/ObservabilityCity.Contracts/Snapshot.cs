@@ -205,6 +205,7 @@ public sealed record TownTotals(
 /// Environment is the id of the environment this snapshot shows (EnvironmentName its display name); Environments lists every environment the server
 /// serves. Tenants are the tenants of this environment, the unknown ones the data shows included; it is empty for an environment without tenants.
 /// Topology says how islands reach each other: "hub-and-spoke" (every call between islands goes through the hub's gateway) or "direct".
+/// Mode is "demo" (fake data, with the Break things panel and the story bar) or "live" (real sources; nothing to break).
 /// View says which islands this snapshot shows. Without a filter it is empty and the whole town is here; with one, the groups, vendors, totals,
 /// callers and dependencies hold only what is on screen, and View lists what was left out and the traffic that crosses the edge.
 /// </summary>
@@ -226,6 +227,7 @@ public sealed record Snapshot(
     IReadOnlyList<EnvironmentInfo> Environments,
     IReadOnlyList<TenantInfo> Tenants,
     string Topology,
+    string Mode,
     ViewInfo View);
 
 /// <summary>An island the island filter left out.</summary>

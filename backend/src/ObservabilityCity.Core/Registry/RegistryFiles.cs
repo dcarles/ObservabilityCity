@@ -8,6 +8,8 @@ internal sealed class TownFile
     public string Name { get; set; } = "";
     public string GroupLabel { get; set; } = "Group";
     public string Topology { get; set; } = "direct";
+    /// <summary>"demo" (a town with a fake source and the Break things panel) or "live". A town that does not say is live.</summary>
+    public string Mode { get; set; } = "live";
 }
 
 internal sealed class ErrorThresholdsFile

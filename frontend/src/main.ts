@@ -172,25 +172,30 @@ async function start(): Promise<void> {
   const firstVisit = (() => { try { return !!store && store.getItem(LEGEND_SEEN_KEY) === null } catch { return false } })()
   if ((firstVisit && (!testMode || params.get('legend') === 'first')) || params.get('legend') === '1') legend.open()
   const servicePanel = new ServicePanel((id) => goTo({ kind: 'building', id, name: id, where: '' }))
-  const fx = new FxClient(env)
-  const breakPanel = new BreakPanel(fx, {
-    targets: () => [
-      { kind: 'town', id: '*', name: 'Whole town', where: '' },
-      { kind: 'island', id: 'hub', name: 'Island: Platform hub', where: 'Platform hub' },
-      ...islandItems().map((i) => ({ ...i, name: `Island: ${i.name}` })),
-      ...buildingItems(),
-    ],
-    tenants: () => (seen.last?.tenants ?? []) as TenantInfo[],
-    view: () => tenantView,
-    armedChanged: (armed) => { canvas.style.cursor = armed ? 'crosshair' : 'grab' },
-  })
-  /** The story bar's camera: glides to a system, a vendor or an island without opening anything. */
-  const storyBar = new StoryBar(fx, (id) => {
-    const focus = town.focusOf(id) ?? town.islandFocusOf(id)
-    if (focus) stage.focus(focus.target, focus.distance)
-  })
-  void storyBar
-  fx.start()
+  // The tools for breaking things exist only in a demo town; a live town never gets them, and the server has no /api/fake for them to call.
+  let breakPanel: BreakPanel | null = null
+  function startDemoTools(): void {
+    if (breakPanel) return
+    const fx = new FxClient(env)
+    breakPanel = new BreakPanel(fx, {
+      targets: () => [
+        { kind: 'town', id: '*', name: 'Whole town', where: '' },
+        { kind: 'island', id: 'hub', name: 'Island: Platform hub', where: 'Platform hub' },
+        ...islandItems().map((i) => ({ ...i, name: `Island: ${i.name}` })),
+        ...buildingItems(),
+      ],
+      tenants: () => (seen.last?.tenants ?? []) as TenantInfo[],
+      view: () => tenantView,
+      armedChanged: (armed) => { canvas.style.cursor = armed ? 'crosshair' : 'grab' },
+    })
+    /** The story bar's camera: glides to a system, a vendor or an island without opening anything. */
+    void new StoryBar(fx, (id) => {
+      const focus = town.focusOf(id) ?? town.islandFocusOf(id)
+      if (focus) stage.focus(focus.target, focus.distance)
+    })
+    breakPanel.refresh()
+    fx.start()
+  }
 
   const search = new Search(() => [...islandItems(), ...airportItem(), ...buildingItems()], goTo)
   void search
@@ -224,10 +229,11 @@ async function start(): Promise<void> {
         seen.buildMs = performance.now() - started
         stage.frame(town.extent)
         stage.home(true)
-        breakPanel.refresh()
+        breakPanel?.refresh()
         servicePanel.close()
       }
       town.apply(s)
+      if (s.mode === 'demo') startDemoTools()
       // a followed tenant that left the environment can no longer be followed
       const pruned = pruneTenants(tenantView, s.tenants ?? [])
       if (pruned !== tenantView) setTenantView(pruned)
@@ -291,7 +297,7 @@ async function start(): Promise<void> {
     const svc = b ? undefined : ray.intersectObjects(town.serviceHits(), false)[0]?.object.userData.serviceKey as string | undefined
     const sv = svc && seen.last ? town.serviceSummary(svc, seen.last) : null
     // a scenario waiting for its target takes the click instead of opening the building
-    if (breakPanel.armed) {
+    if (breakPanel?.armed) {
       if (b) breakPanel.aimAt(b.id)
       return
     }
@@ -311,7 +317,7 @@ async function start(): Promise<void> {
     const b = hits[0]?.object.userData.building as Building | undefined
     showTooltip(b?.node ?? null, pointerPx.x, pointerPx.y, tenantView)
     const overService = !b && ray.intersectObjects(town.serviceHits(), false).length > 0
-    canvas.style.cursor = breakPanel.armed ? 'crosshair' : b || overService ? 'pointer' : 'grab'
+    canvas.style.cursor = breakPanel?.armed ? 'crosshair' : b || overService ? 'pointer' : 'grab'
   }
 
   // ?test=1 is for automated tests: nothing is drawn on its own, and time moves only when the test calls city.step(seconds).
@@ -337,7 +343,8 @@ async function start(): Promise<void> {
     /** Open a service's panel as a click on its sign would. */
     openService: (key: string) => { const sv = seen.last ? town.serviceSummary(key, seen.last) : null; if (sv) { inspector.close(); servicePanel.show(sv) } return sv },
     tenantView: () => tenantView,
-    breakArmed: () => breakPanel.armed,
+    breakArmed: () => breakPanel?.armed ?? false,
+    mode: () => seen.last?.mode ?? null,
     /** Where a building is on the screen, in page pixels, so a test can click it. */
     screenOf: (id: string) => {
       const f = town.focusOf(id)
