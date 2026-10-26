@@ -9,7 +9,7 @@ namespace ObservabilityCity.Host;
 /// Everything one environment runs on its own: its view of the registry, its source and the readings that source produced, and the stream of
 /// snapshots built from them. Every environment of the town has one, so dev, staging and prod each move on their own.
 /// </summary>
-public sealed class EnvironmentRuntime(string id, EnvironmentRegistry registry, FakeSource fake, LatestState state, SnapshotBuilder builder, SnapshotStore store)
+public sealed class EnvironmentRuntime(string id, EnvironmentRegistry registry, FakeSource fake, LatestState state, SnapshotBuilder builder, SnapshotStore store, ILogSource logs)
 {
     public string Id { get; } = id;
     public EnvironmentRegistry Registry { get; } = registry;
@@ -17,6 +17,7 @@ public sealed class EnvironmentRuntime(string id, EnvironmentRegistry registry, 
     public LatestState State { get; } = state;
     public SnapshotBuilder Builder { get; } = builder;
     public SnapshotStore Store { get; } = store;
+    public ILogSource Logs { get; } = logs;
 }
 
 /// <summary>The environments this server runs, by id. The environments are fixed when the server starts; the registry behind each can change while it runs.</summary>

@@ -25,6 +25,9 @@ import { VendorIsland, VENDOR_COLOR } from './vendors'
 import { DependencyOverlay } from './overlay'
 import { ServiceSign, summariseService, type ServiceSummary } from './service'
 import type { TenantView } from '../tenants'
+import { DEFAULT_LAYERS, buildingShown, type LayerState } from '../layers'
+import { edgeKey, edgeLinks, edgeMode, signLines, type EdgeMode } from '../edgeTraffic'
+import { Signpost } from './signpost'
 
 const QUAY = 9
 /** Traffic that crosses the hub drives a long way, so fewer cars are drawn for it than a short trip would need. */
@@ -63,6 +66,10 @@ interface Island {
   backGateZ: number | null
   /** The sign and hedge of every service pad, by the pad's key. */
   services: Map<string, ServiceSign>
+  /** The signpost to hidden islands, for a town whose islands call each other directly. Null where the island has no link to a hidden island. */
+  signpost: Signpost | null
+  /** Ids of the systems standing on the island. */
+  nodeIds: Set<string>
 }
 
 /** An island's road to one third party: out of its back gate, over its bridge to the ring road, round the loop and down the vendor's spur. */
@@ -117,6 +124,10 @@ export class Town {
   private readonly vendorBridges = new Map<string, number>()
   /** The tenant filter the buildings and cars follow. */
   private tenantView: TenantView | null = null
+  /** Which layers are drawn. */
+  private layers: LayerState = DEFAULT_LAYERS
+  /** How traffic to and from islands the filter hides is shown, and which systems have such traffic. */
+  private edge: { mode: EdgeMode; out: Set<string>; in: Set<string> } = { mode: 'plaza', out: new Set(), in: new Set() }
 
   constructor() {
     this.root.add(this.cars.object, this.boats.object, this.overlay.object)
@@ -160,6 +171,8 @@ export class Town {
     this.crossings.clear()
     const connectors = pillars.map((g) => connectorsOf(g))
     this.port = portSummary(s.groups)
+    const links = edgeLinks(s)
+    this.edge = { mode: edgeMode(s), out: new Set(links.filter((l) => !l.incoming).map((l) => l.nodeId)), in: new Set(links.filter((l) => l.incoming).map((l) => l.nodeId)) }
     this.airport = null
     this.airportPath = null
     const centres = places.map((l) => dirOf(l.angle).multiplyScalar(l.radius))
@@ -218,7 +231,7 @@ export class Town {
     pillars.forEach((g, index) => {
       const plan = plans[index]
       const center = centres[index].clone()
-      const island = this.buildIsland(g, plan, center, bridgedIslands.has(g.id), connectors[index])
+      const island = this.buildIsland(g, plan, center, bridgedIslands.has(g.id), connectors[index], this.edge.mode === 'signpost' && links.some((l) => g.nodes.some((n) => n.id === l.nodeId)))
       this.islands.push(island)
       this.root.add(island.root)
       this.expandBounds(island.outline, center, island.root.rotation.y, 12)
@@ -352,6 +365,7 @@ export class Town {
     gates.forEach((_g, index) => routes.push(...this.islandRoutes(index, gates, gateway)))
     for (const link of vendorLinks) routes.push(...this.vendorRoutes(link, gates, loopR))
     routes.push(...this.hubRoutes(hubBuildings, gates.filter((g) => g.bridged)))
+    routes.push(...this.edgeRoutes(s, gates, gateway))
     this.cars.setRoutes(routes)
     this.boats.setRoutes(boatRoutes)
     const anchors = new Map<string, { at: THREE.Vector3; color: string }>([['hub', { at: new THREE.Vector3(0, 0, 0), color: hub?.color ?? palette.flagFallback }]])
@@ -360,6 +374,7 @@ export class Town {
     this.overlay.setAnchors(anchors)
     this.snapshotId = layoutKey(s)
     if (this.tenantView) this.setTenantView(this.tenantView)
+    this.setLayers(this.layers)
   }
 
   /** The Service Bus port's board: how many topics and subscriptions the town has, and how many piers they reach. */
@@ -371,7 +386,7 @@ export class Town {
     const d = camera.position.distanceTo(hb.sprite.getWorldPosition(new THREE.Vector3()))
     const opacity = 1 - clamp((d - 70) / 40, 0, 1)
     ;(hb.sprite.material as THREE.SpriteMaterial).opacity = opacity
-    hb.sprite.visible = opacity > 0.02
+    hb.sprite.visible = opacity > 0.02 && this.layers.messaging
     if (key === hb.key) return
     hb.key = key
     const tex = (hb.sprite.material as THREE.SpriteMaterial).map as THREE.CanvasTexture
@@ -404,6 +419,10 @@ export class Town {
       for (const [key, sign] of isl.services) this.guard(`service ${key}`, () => sign.set(summariseService(sign.pad, g.id, g.displayName, nodes).state))
     }
     this.guard('tenants', () => this.cars.setTenants(s.tenants ?? []))
+    if (this.edge.mode === 'signpost') {
+      const links = edgeLinks(s)
+      for (const isl of this.islands) if (isl.signpost) this.guard(`signpost ${isl.group.id}`, () => isl.signpost!.set(signLines(links, isl.nodeIds)))
+    }
     // the lighthouse shows the town-wide total, the same number the snapshot's totals carry
     this.hubDeadLetters = s.totals.deadLetters
     this.lighthouse?.set(this.hubDeadLetters)
@@ -667,7 +686,7 @@ export class Town {
 
   // ── pillar islands ──────────────────────────────────────────────────────
 
-  private buildIsland(g: GroupSnapshot, plan: Plan, center: THREE.Vector3, backGate: boolean, links: Connectors): Island {
+  private buildIsland(g: GroupSnapshot, plan: Plan, center: THREE.Vector3, backGate: boolean, links: Connectors, signpost = false): Island {
     const root = new THREE.Group()
     root.position.copy(center)
     // local +z points at the hub, where the gate is
@@ -758,6 +777,13 @@ export class Town {
     const signZ = gateZ - 2.4
     decor.add(this.islandSign(g, -8.5, signZ))
     avoid.push({ x: -8.5, z: signZ, w: 12, d: 5 })
+    // a town whose islands call each other directly: a signpost opposite the island's own sign, for the traffic to and from hidden islands
+    let post: Signpost | null = null
+    if (signpost && links.bridge) {
+      post = new Signpost(8.5, signZ)
+      root.add(post.object)
+      avoid.push({ x: 8.5, z: signZ, w: 12, d: 5 })
+    }
     // A pillar whose registry file is broken: the island stays on the map, empty, with the problem written on a board
     if (g.configError) decor.add(this.configErrorBoard(g.configError))
     // Lost & found: a heap of boxes and bins by the gate, for the systems nobody has claimed
@@ -784,7 +810,7 @@ export class Town {
     root.updateMatrixWorld(true)
     const weather = new Weather(g.id, plan.rx, plan.rz)
     root.add(weather.object)
-    return { group: g, root, outline, buildings, harbour: status, links, consumers: consumersOf(g.messaging), messaging: messagingOf([], g.messaging), weather, backGateZ: backZ, services }
+    return { group: g, root, outline, buildings, harbour: status, links, consumers: consumersOf(g.messaging), messaging: messagingOf([], g.messaging), weather, backGateZ: backZ, services, signpost: post, nodeIds: new Set(g.nodes.map((n) => n.id)) }
   }
 
   /** A quay with a pier house, a pier and crates: where the boats from the hub's Service Bus port land. */
@@ -928,8 +954,10 @@ export class Town {
           for (const p of g.plan.placed) if (p.node.calls.includes(dest.node.id) && !declared.some((d) => d.gate === i)) declared.push({ gate: i, from: p })
         })
         const remote = declared.slice(0, 3)
+        // a system that is called from an island the filter hides is not called by a stand-in picked from the islands on screen
+        const hiddenCaller = this.edge.in.has(dest.node.id)
         const callable = gates.map((_g, i) => i).filter((i) => i !== index && gates[i].bridged && this.callerOf(gates[i].plan))
-        if (remote.length === 0 && callable.length > 0) {
+        if (remote.length === 0 && callable.length > 0 && !hiddenCaller) {
           const other = callable[hashString(dest.node.id) % callable.length]
           remote.push({ gate: other, from: this.callerOf(gates[other].plan)! })
         }
@@ -954,7 +982,7 @@ export class Town {
             share, ...toDest(dest, intoIsland(head, g.angle, dest), null)!,
           })
         })
-        if (remote.length === 0 && gateway && !external) {
+        if (remote.length === 0 && gateway && !external && (!hiddenCaller || this.edge.mode === 'plaza')) {
           // with no other island to call it: what comes in comes from the hub gateway
           this.cross(island.group.id)
           routes.push({ dest: b, source: gateway, origin: 'internal', share: remoteShare, ...toDest(dest, intoIsland([gateway.doorWorld().setY(GROUND), this.ringPoint(0)], 0, dest), null)! })
@@ -972,6 +1000,76 @@ export class Town {
       })
     }
     return routes
+  }
+
+  /**
+   * Cars from the systems on screen to an island the filter hides, in a hub-and-spoke town: out of the caller's door, over its bridge and round the
+   * plaza to the gateway, where they stop. Every call between islands goes through the gateway, so that is as far as they can be followed.
+   */
+  private edgeRoutes(s: Snapshot, gates: Gate[], gateway: Building | undefined): Route[] {
+    if (this.edge.mode !== 'plaza' || !gateway) return []
+    const gatewayRate = gateway.node?.requestsPerSecond ?? s.groups.find((g) => g.isHub)?.nodes.find((n) => n.kind === 'Gateway')?.requestsPerSecond ?? 0
+    const rates = new Map<string, number>()
+    for (const l of edgeLinks(s)) if (!l.incoming) rates.set(l.nodeId, (rates.get(l.nodeId) ?? 0) + l.requestsPerSecond)
+    const routes: Route[] = []
+    for (const [nodeId, rps] of rates) {
+      const g = gates.find((x) => x.island.buildings.has(nodeId))
+      const from = g?.plan.placed.find((p) => p.node.id === nodeId)
+      if (!g || !g.bridged || !from) continue
+      this.cross(g.island.group.id)
+      routes.push({
+        dest: gateway, source: g.island.buildings.get(nodeId)!, origin: 'internal', edge: true,
+        share: gatewayRate > 0 ? clamp(rps / gatewayRate, 0.02, 1) : 0.1,
+        path: [...this.outbound(g, from), ...this.ringArc(g.angle, 0), gateway.doorWorld().setY(GROUND)],
+      })
+    }
+    return routes
+  }
+
+  /**
+   * Shows or hides whole families of things. Traffic stops and its cars go; Messaging hides the boats, crates, pen, lighthouse and port board; Databases
+   * and Workers hide those buildings, and the cars that were headed to or from them.
+   */
+  setLayers(state: LayerState): void {
+    this.layers = state
+    const hidden = new Set<Building>()
+    for (const b of this.buildings.values()) {
+      const shown = buildingShown(b.kind, state)
+      b.root.visible = shown
+      if (!shown) hidden.add(b)
+    }
+    this.cars.setEnabled(state.traffic)
+    this.cars.setHidden(hidden)
+    this.boats.setEnabled(state.messaging)
+    for (const isl of this.islands) if (isl.harbour) isl.harbour.group.visible = state.messaging
+    if (this.lighthouse) this.lighthouse.group.visible = state.messaging
+    this.overlay.visible = state.dependencies
+  }
+
+  /** The hit boxes of the buildings that are drawn: a building hidden by a layer cannot be hovered or clicked. */
+  hitMeshes(): THREE.Mesh[] {
+    return [...this.buildings.values()].filter((b) => b.root.visible).map((b) => b.hit)
+  }
+
+  /** What the layers show right now, as plain values. For tests. */
+  inspectLayers(): { layers: LayerState; hiddenBuildings: string[]; cars: number; boats: number; boatsDrawn: boolean; lighthouse: boolean | null; harbours: boolean[]; overlay: boolean } {
+    return {
+      layers: this.layers,
+      hiddenBuildings: [...this.buildings].filter(([, b]) => !b.root.visible).map(([id]) => id),
+      cars: this.cars.count, boats: this.boats.count, boatsDrawn: this.boats.object.visible,
+      lighthouse: this.lighthouse ? this.lighthouse.group.visible : null,
+      harbours: this.islands.filter((i) => i.harbour).map((i) => i.harbour!.group.visible),
+      overlay: this.overlay.visible,
+    }
+  }
+
+  /** How traffic to and from hidden islands is shown: the mode, the cars that end at the hub plaza, and what each signpost says. For tests. */
+  inspectEdge(): { mode: EdgeMode; plazaRoutes: { from: string; to: string }[]; signposts: { island: string; lines: string[] }[] } {
+    return {
+      mode: this.edge.mode,
+      plazaRoutes: this.cars.routeList.filter((r) => r.edge).map((r) => ({ from: [...this.buildings].find(([, b]) => b === r.source)?.[0] ?? '', to: r.dest.id })),
+      signposts: this.islands.filter((i) => i.signpost).map((i) => ({ island: i.group.id, lines: i.signpost!.text })),
+    }
   }
 
   /** Counts a car route over an island's bridge. */
@@ -1052,7 +1150,7 @@ function parkProps(x: number, z: number): THREE.Object3D[] {
 function layoutKey(s: Snapshot): string {
   const groups = s.groups.map((g) => `${g.id}${g.configError ? '!' : ''}:${g.nodes.map((n) => `${n.id}/${n.kind}/${n.tenants != null ? 'T' : ''}/${n.service ?? ''}/${n.calls.join('+')}/${(n.gatewayCalls ?? []).join('+')}`).join(',')}|${g.hasBridge === false ? 'nb' : 'b'}|${(g.messaging?.topics ?? []).map((t) => t.name).join('+')}|${(g.messaging?.subscriptions ?? []).map((x) => `${x.topic}>${x.consumer}${x.legacy ? '!' : ''}`).join('+')}`).join(';')
   const vendors = (s.vendors ?? []).map((v) => `${v.node.id}<${v.calledBy.join('+')}`).join(';')
-  return `${s.townId}|${s.environment ?? ''}|${groups}|${vendors}`
+  return `${s.townId}|${s.environment ?? ''}|${groups}|${vendors}|${edgeKey(s)}`
 }
 
 /** Where a straight line from the hub's centre leaves the hub's coast (inset a little). */

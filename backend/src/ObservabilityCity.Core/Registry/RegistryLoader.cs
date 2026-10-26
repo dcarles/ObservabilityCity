@@ -504,8 +504,20 @@ public static class RegistryLoader
         appDefaults.TryGetValue(role, out var app);
         pillarDefaults.TryGetValue(role, out var pillar);
 
-        double Resolve(Func<RoleDefaultsFile?, double?> pick, double? own) =>
-            own ?? pick(pillar) ?? pick(app) ?? pick(BuiltIn)!.Value;
+        var origins = new Dictionary<string, SettingOrigin>();
+        double Resolve(string key, Func<RoleDefaultsFile?, double?> pick, double? own)
+        {
+            if (own is { } mine) { origins[key] = new SettingOrigin(SettingLayer.System, fileName); return mine; }
+            if (pick(pillar) is { } fromPillar) { origins[key] = new SettingOrigin(SettingLayer.Pillar, fileName); return fromPillar; }
+            if (pick(app) is { } fromApp) { origins[key] = new SettingOrigin(SettingLayer.App, "defaults.yaml"); return fromApp; }
+            origins[key] = new SettingOrigin(SettingLayer.BuiltIn, null);
+            return pick(BuiltIn)!.Value;
+        }
+
+        origins["role"] = new SettingOrigin(SettingLayer.System, fileName);
+        origins["external"] = s.External is not null ? new SettingOrigin(SettingLayer.System, fileName)
+            : pillarExternal ? new SettingOrigin(SettingLayer.Pillar, fileName)
+            : new SettingOrigin(SettingLayer.BuiltIn, null);
 
         return new RegistryNode(
             s.Id,
@@ -514,19 +526,21 @@ public static class RegistryLoader
             kind,
             s.Service,
             s.External ?? pillarExternal,
-            Resolve(d => d?.SlaP99Ms, s.SlaP99Ms),
-            Resolve(d => d?.Errors?.Amber, s.Errors?.Amber),
-            Resolve(d => d?.Errors?.Red, s.Errors?.Red),
-            Resolve(d => d?.Resources?.Amber, s.Resources?.Amber),
-            Resolve(d => d?.Resources?.Red, s.Resources?.Red),
-            Resolve(d => d?.Throttle?.Amber, s.Throttle?.Amber),
-            Resolve(d => d?.Throttle?.Red, s.Throttle?.Red),
-            Resolve(d => d?.Backlog?.Amber, s.Backlog?.Amber),
-            Resolve(d => d?.Backlog?.Red, s.Backlog?.Red),
+            Resolve("slaP99Ms", d => d?.SlaP99Ms, s.SlaP99Ms),
+            Resolve("errors.amber", d => d?.Errors?.Amber, s.Errors?.Amber),
+            Resolve("errors.red", d => d?.Errors?.Red, s.Errors?.Red),
+            Resolve("resources.amber", d => d?.Resources?.Amber, s.Resources?.Amber),
+            Resolve("resources.red", d => d?.Resources?.Red, s.Resources?.Red),
+            Resolve("throttle.amber", d => d?.Throttle?.Amber, s.Throttle?.Amber),
+            Resolve("throttle.red", d => d?.Throttle?.Red, s.Throttle?.Red),
+            Resolve("backlog.amber", d => d?.Backlog?.Amber, s.Backlog?.Amber),
+            Resolve("backlog.red", d => d?.Backlog?.Red, s.Backlog?.Red),
             s.Calls)
         {
             GatewayCalls = s.GatewayCalls,
             TenantPattern = s.TenantPattern,
+            SourceFile = fileName,
+            Origins = origins,
         };
     }
 

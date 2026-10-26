@@ -75,6 +75,15 @@ export class BoatSystem {
   private readonly boats: Boat[] = []
   private readonly free: { object: THREE.Group; cargo: THREE.Group }[] = []
   private time = 0
+  private enabled = true
+
+  /** Turns the boats on or off with the Messaging layer. Turning them off takes them away. */
+  setEnabled(on: boolean): void {
+    if (on === this.enabled) return
+    this.enabled = on
+    this.object.visible = on
+    if (!on) for (const b of this.boats.splice(0)) { b.object.visible = false; this.free.push({ object: b.object, cargo: b.cargo as THREE.Group }) }
+  }
 
   constructor(max = 48) {
     for (let i = 0; i < max; i++) {
@@ -93,6 +102,7 @@ export class BoatSystem {
   }
 
   update(dt: number): void {
+    if (!this.enabled) return
     this.time += dt
     for (const r of this.routes) {
       const rate = r.rate()

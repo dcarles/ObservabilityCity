@@ -113,3 +113,33 @@ describe('wrapText', () => {
     expect(wrapText('   ', 10)).toEqual([])
   })
 })
+
+describe('what the island filter adds to a snapshot', () => {
+  it('keeps a good view and topology as they are', () => {
+    const raw = fixture('island-filter.json')
+    const { snapshot, problems } = checkSnapshot(structuredClone(raw))
+    expect(problems).toEqual([])
+    expect(snapshot!.view).toEqual(raw.view)
+    expect(snapshot!.topology).toBe(raw.topology)
+  })
+
+  it('treats a snapshot from a server that does not send them as unfiltered, with direct calls', () => {
+    const raw = calm() as Record<string, unknown>
+    delete raw.view
+    delete raw.topology
+    const { snapshot } = checkSnapshot(raw)
+    expect(snapshot!.topology).toBe('direct')
+    expect(snapshot!.view).toEqual({ islands: [], unknown: [], hidden: [], links: [] })
+  })
+
+  it('drops view entries that cannot be used instead of refusing the town', () => {
+    const raw = calm() as Record<string, unknown>
+    raw.view = { islands: ['aa', 5, null], unknown: 'zz', hidden: [{ id: 'bb' }, { id: 7, displayName: 'x' }, null], links: [{ nodeId: 'a' }, 3] }
+    const { snapshot } = checkSnapshot(raw)
+    expect(snapshot).not.toBeNull()
+    expect(snapshot!.view!.islands).toEqual(['aa'])
+    expect(snapshot!.view!.unknown).toEqual([])
+    expect(snapshot!.view!.hidden.every((h) => typeof h.id === 'string')).toBe(true)
+    expect(snapshot!.view!.links.every((l) => typeof l.nodeId === 'string' && typeof l.requestsPerSecond === 'number')).toBe(true)
+  })
+})

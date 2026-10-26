@@ -235,6 +235,45 @@ test.describe('the tenant dropdown', () => {
   })
 })
 
+test.describe('the numbers in the top bar', () => {
+  test('follow the tenants chosen: their share of the traffic, and their own databases for degraded', async ({ town, page }) => {
+    await town.open()
+    const all = await page.evaluate(() => ({ totals: (window as any).city.totals(), shares: (window as any).city.seen.last.tenants }))
+    expect(all.totals.tenantShare).toBe(1)
+    await expect(page.locator('#chip-requests')).not.toHaveAttribute('title', /of the environment/)
+
+    await page.evaluate(() => (window as any).city.setTenantView({ hideTest: false, tenants: ['acme'] }))
+    const acme = await page.evaluate(() => (window as any).city.totals())
+    const share = all.shares.find((t: any) => t.id === 'acme').share / all.shares.reduce((a: number, t: any) => a + t.share, 0)
+    expect(acme.tenantShare).toBeCloseTo(share, 5)
+    expect(acme.requestsPerSecond).toBeCloseTo(all.totals.requestsPerSecond * share, 3)
+    expect(acme.requestsPerSecond).toBeLessThan(all.totals.requestsPerSecond)
+    await expect(page.locator('#chip-requests')).toHaveAttribute('title', /of the environment's traffic/)
+    // errors are not split by tenant, and the tooltip says so
+    await expect(page.locator('#topbar .chip', { hasText: 'errors' })).toHaveAttribute('title', /Not split by tenant/)
+  })
+
+  test('count a throttled tenant database as degraded only while that tenant is followed', async ({ town, page }) => {
+    await town.open()
+    await town.effect(`${DB}#borealis`, 'Saturate')
+    await town.until(DB, (n) => (n.throttled ?? 0) > 0)
+    await page.evaluate(() => (window as any).city.setTenantView({ hideTest: false, tenants: ['acme'] }))
+    const acme = await page.evaluate(() => (window as any).city.totals())
+    await page.evaluate(() => (window as any).city.setTenantView({ hideTest: false, tenants: ['borealis'] }))
+    const borealis = await page.evaluate(() => (window as any).city.totals())
+    expect(borealis.degraded + borealis.down).toBeGreaterThan(acme.degraded + acme.down)
+  })
+
+  test('the chip shows what the totals say', async ({ town, page }) => {
+    await town.open()
+    await page.evaluate(() => (window as any).city.setTenantView({ hideTest: false, tenants: ['acme'] }))
+    const t = await page.evaluate(() => (window as any).city.totals())
+    const text = await page.locator('#chip-requests b').textContent()
+    expect(Number.parseFloat(text!.replace(/[^\d.]/g, ''))).toBeGreaterThan(0)
+    expect(t.requestsPerSecond).toBeGreaterThan(0)
+  })
+})
+
 test.describe('tenant traffic', () => {
   test.beforeEach(async ({ town }) => {
     town.env = 'staging'

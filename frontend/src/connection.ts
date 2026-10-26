@@ -27,10 +27,27 @@ export class Connection {
     private readonly onState: (s: ConnectionState) => void,
     private readonly env: string | null = null,
     private readonly onUnknown: (e: EnvironmentUnknown) => void = () => {},
+    private islands: readonly string[] = [],
   ) {}
 
+  private hub: signalR.HubConnection | undefined
+
   private query(): string {
-    return this.env ? `?env=${encodeURIComponent(this.env)}` : ''
+    const q = new URLSearchParams()
+    if (this.env) q.set('env', this.env)
+    if (this.islands.length > 0) q.set('islands', this.islands.join(','))
+    const text = q.toString()
+    return text ? `?${text}` : ''
+  }
+
+  /**
+   * Looks at other islands, without reconnecting. The server answers with the town as the new filter shows it; while the socket is down,
+   * the polling asks for the same.
+   */
+  setIslands(ids: readonly string[]): void {
+    this.islands = ids
+    if (this.hub?.state === signalR.HubConnectionState.Connected) void this.hub.invoke('SetIslands', [...ids]).catch((e) => console.warn('Could not change the islands:', e))
+    else if (this.poll !== undefined) void this.pollOnce()
   }
 
   start(): void {
@@ -50,13 +67,22 @@ export class Connection {
       this.onUnknown(e)
     })
     hub.onreconnecting(() => this.set('reconnecting'))
-    hub.onreconnected(() => this.set('live'))
+    hub.onreconnected(() => {
+      this.set('live')
+      // the server forgot the filter along with the old connection
+      if (this.islands.length > 0) void hub.invoke('SetIslands', [...this.islands]).catch((e) => console.warn('Could not restore the islands:', e))
+    })
     hub.onclose(() => {
       this.set('offline')
       this.startPolling()
     })
 
-    hub.start().catch(() => {
+    this.hub = hub
+    const askedWith = this.islands.join(',')
+    hub.start().then(() => {
+      // a first snapshot can already have moved the choice (islands the town does not have are let go) before the socket reported itself open
+      if (this.islands.join(',') !== askedWith) void hub.invoke('SetIslands', [...this.islands]).catch((e) => console.warn('Could not change the islands:', e))
+    }).catch(() => {
       this.set('offline')
       this.startPolling()
     })
@@ -64,23 +90,24 @@ export class Connection {
 
   private startPolling(): void {
     if (this.poll !== undefined) return
-    const tick = async () => {
-      try {
-        const r = await fetch(`/api/snapshot/latest${this.query()}`)
-        if (r.ok) {
-          this.set('live')
-          this.onSnapshot(await r.json())
-        } else if (r.status === 404 && !this.unknown) {
-          const body = (await r.json()) as { environments?: string[] }
-          this.unknown = true
-          this.onUnknown({ requested: this.env, environments: body.environments ?? [] })
-        }
-      } catch {
-        this.set('offline')
+    void this.pollOnce()
+    this.poll = window.setInterval(() => void this.pollOnce(), 2000)
+  }
+
+  private async pollOnce(): Promise<void> {
+    try {
+      const r = await fetch(`/api/snapshot/latest${this.query()}`)
+      if (r.ok) {
+        this.set('live')
+        this.onSnapshot(await r.json())
+      } else if (r.status === 404 && !this.unknown) {
+        const body = (await r.json()) as { environments?: string[] }
+        this.unknown = true
+        this.onUnknown({ requested: this.env, environments: body.environments ?? [] })
       }
+    } catch {
+      this.set('offline')
     }
-    void tick()
-    this.poll = window.setInterval(tick, 2000)
   }
 
   private set(s: ConnectionState): void {

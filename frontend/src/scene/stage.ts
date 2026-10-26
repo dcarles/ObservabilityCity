@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { palette } from '../themes/harbour-town/palette'
+import { LIGHTING, type Lighting } from '../lighting'
 
 export type Quality = 'high' | 'medium' | 'low'
 
@@ -25,6 +26,15 @@ export class Stage {
   private warmup = 150
   private sinceShadow = 0
   private readonly seaUniforms = { uTime: { value: 0 } }
+  /** The colours the sky, haze and sea are drawn with. Lighting changes move these toward the preset, so Day and Dusk fade into each other. */
+  private readonly skyTop = new THREE.Color(palette.sky.top)
+  private readonly skyHorizon = new THREE.Color(palette.sky.horizon)
+  private readonly seaDeep = new THREE.Color(palette.sea.deep)
+  private readonly seaShallow = new THREE.Color(palette.sea.shallow)
+  private hemisphere!: THREE.HemisphereLight
+  /** The lighting the town is moving toward (Day or Dusk), and how far along the fade is. */
+  lighting: Lighting = 'day'
+  private lightingFade = 1
   private homeTarget = new THREE.Vector3(0, 0, -30)
   private homeDistance = 105
   private homeAzimuth = 0
@@ -58,6 +68,7 @@ export class Stage {
     this.sky()
     this.sea()
     const hemi = new THREE.HemisphereLight('#d6ecff', '#c9b88f', 1.15)
+    this.hemisphere = hemi
     this.scene.add(hemi)
     this.sun = new THREE.DirectionalLight('#fff0d6', 2.6)
     this.sun.position.set(-70, 110, 60)
@@ -80,6 +91,40 @@ export class Stage {
     this.home(true)
     window.addEventListener('resize', () => this.resize())
     this.resize()
+  }
+
+  /**
+   * Day or Dusk. The town fades to the new light over about a second (at once when `instant`). The models and the data are the same; only the
+   * sky, haze, sea and the two lights change.
+   */
+  setLighting(l: Lighting, instant = false): void {
+    this.lighting = l
+    this.lightingFade = instant ? 1 : 0
+    if (instant) this.blendLighting(1)
+    const preset = LIGHTING[l]
+    document.documentElement.style.setProperty('--page', preset.page)
+    document.documentElement.dataset.lighting = l
+  }
+
+  /** Moves every lit value a step toward the preset. */
+  private blendLighting(k: number): void {
+    const p = LIGHTING[this.lighting]
+    this.skyTop.lerp(new THREE.Color(p.sky.top), k)
+    this.skyHorizon.lerp(new THREE.Color(p.sky.horizon), k)
+    this.seaDeep.lerp(new THREE.Color(p.sea.deep), k)
+    this.seaShallow.lerp(new THREE.Color(p.sea.shallow), k)
+    if (this.scene.fog) this.scene.fog.color.lerp(new THREE.Color(p.fog), k)
+    this.hemisphere.color.lerp(new THREE.Color(p.hemisphere.sky), k)
+    this.hemisphere.groundColor.lerp(new THREE.Color(p.hemisphere.ground), k)
+    this.hemisphere.intensity += (p.hemisphere.intensity - this.hemisphere.intensity) * k
+    this.sun.color.lerp(new THREE.Color(p.sun.color), k)
+    this.sun.intensity += (p.sun.intensity - this.sun.intensity) * k
+    this.renderer.toneMappingExposure += (p.exposure - this.renderer.toneMappingExposure) * k
+  }
+
+  /** How far the fade to the chosen lighting has got, from 0 to 1. For tests. */
+  get lightingProgress(): number {
+    return this.lightingFade
   }
 
   /** Where Home frames the town. Centre it on the islands and pull back to fit. */
@@ -161,6 +206,10 @@ export class Stage {
 
   tick(dt: number, time: number): void {
     this.seaUniforms.uTime.value = time
+    if (this.lightingFade < 1) {
+      this.lightingFade = Math.min(1, this.lightingFade + dt / 1.0)
+      this.blendLighting(this.lightingFade >= 1 ? 1 : 1 - Math.exp(-dt * 5))
+    }
     // keep depth precision good when far out, or the sea-foam layers fight the grass
     const near = THREE.MathUtils.clamp(this.camera.position.distanceTo(this.controls.target) * 0.04, 0.5, 12)
     if (Math.abs(near - this.camera.near) > 0.1) {
@@ -248,7 +297,7 @@ export class Stage {
       side: THREE.BackSide,
       depthWrite: false,
       fog: false,
-      uniforms: { top: { value: new THREE.Color(palette.sky.top) }, horizon: { value: new THREE.Color(palette.sky.horizon) } },
+      uniforms: { top: { value: this.skyTop }, horizon: { value: this.skyHorizon } },
       vertexShader: 'varying vec3 vP; void main(){ vP = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
       fragmentShader: `varying vec3 vP; uniform vec3 top; uniform vec3 horizon;
         void main(){ float h = clamp(normalize(vP).y, 0.0, 1.0); vec3 c = mix(horizon, top, pow(h, 0.55));
@@ -265,8 +314,8 @@ export class Stage {
     const geo = new THREE.CircleGeometry(2800, 64)
     geo.rotateX(-Math.PI / 2)
     const mat = new THREE.MeshStandardMaterial({ color: palette.sea.deep, roughness: 0.35, metalness: 0.0 })
-    const deep = new THREE.Color(palette.sea.deep)
-    const shallow = new THREE.Color(palette.sea.shallow)
+    const deep = this.seaDeep
+    const shallow = this.seaShallow
     mat.onBeforeCompile = (shader) => {
       shader.uniforms.uTime = this.seaUniforms.uTime
       shader.uniforms.uDeep = { value: deep }

@@ -4,6 +4,7 @@ import { formatMs, formatRate } from './visuals'
 import { escapeHtml, Picker, type PickItem } from './picker'
 import { yardSummary, type TenantView } from './tenants'
 import type { ServiceSummary } from './scene/service'
+import { viewTotals } from './viewTotals'
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T
 
@@ -14,12 +15,10 @@ export class TopBar {
   private readonly el = $('topbar')
   private status: ConnectionState = 'connecting'
   private snap: Snapshot | null = null
-  private deps = false
 
   constructor(
-    private readonly onHome: () => void,
     private readonly onList: (state: ListedState, anchor: DOMRect) => void,
-    private readonly onDependencies: (on: boolean) => void,
+    private readonly view: () => TenantView,
   ) {
     // the bar is redrawn with every snapshot, so one listener on the bar itself serves the chips
     this.el.addEventListener('click', (e) => {
@@ -39,36 +38,37 @@ export class TopBar {
     this.render()
   }
 
+  /** Draws the numbers again after the tenant choice changed. */
+  refresh(): void {
+    this.render()
+  }
+
   private render(): void {
     const s = this.snap
-    const t = s?.totals
+    const t = s ? viewTotals(s, this.view()) : null
     const label = { connecting: 'Connecting…', live: 'Live (demo data)', reconnecting: 'Reconnecting…', offline: 'Backend offline', badData: 'Bad data, showing the last good town' }[this.status]
     const dot = this.status === 'live' ? 'live' : this.status === 'offline' || this.status === 'badData' ? '' : 'wait'
     const day = s ? clock(s.dayFraction) : ''
-    const stale = s ? staleCount(s) : 0
+    // what the numbers count, in words, for the tooltips
+    const filtered = (s?.view?.islands.length ?? 0) > 0
+    const scope = filtered ? 'Counts only the islands on screen. ' : ''
+    const share = t && t.tenantShare < 1 ? `${Math.round(t.tenantShare * 100)}% of the environment's traffic, for the tenants chosen. ` : ''
+    const wide = t && (t.tenantShare < 1 || this.view().hideTest || this.view().tenants.length > 0) ? 'Not split by tenant: counts all tenants. ' : ''
     $('topbar-left').innerHTML = `
-      ${s ? `<span class="town">${escapeHtml(s.townName)}</span>` : ''}`
+      ${s ? `<span class="town" id="town-name" title="${escapeHtml(s.townName)}">${escapeHtml(s.townName)}</span>` : ''}`
     $('topbar-right').innerHTML = `
       <span class="spacer"></span>
       ${t ? `
-        <div class="chip"><b>${formatRate(t.requestsPerSecond)}</b><span>req/s</span></div>
-        <div class="chip ${t.errorRate >= 0.05 ? 'bad' : t.errorRate >= 0.01 ? 'warn' : ''}"><b>${(t.errorRate * 100).toFixed(1)}%</b><span>errors</span></div>
-        <div class="chip p99"><b>${formatMs(t.p99Ms)}</b><span>p99</span></div>
-        <div class="chip dlq ${t.deadLetters > 0 ? 'bad' : ''}" title="Messages in dead-letter queues, town-wide"><b>${formatRate(t.deadLetters)}</b><span>DLQ</span></div>
+        <div class="chip" id="chip-requests" title="${escapeHtml(scope + share)}"><b>${formatRate(t.requestsPerSecond)}</b><span>req/s</span></div>
+        <div class="chip ${t.errorRate >= 0.05 ? 'bad' : t.errorRate >= 0.01 ? 'warn' : ''}" title="${escapeHtml(scope + wide)}"><b>${(t.errorRate * 100).toFixed(1)}%</b><span>errors</span></div>
+        <div class="chip p99" title="${escapeHtml(scope + wide)}"><b>${formatMs(t.p99Ms)}</b><span>p99</span></div>
+        <div class="chip dlq ${t.deadLetters > 0 ? 'bad' : ''}" title="${escapeHtml(`Messages in dead-letter queues. ${scope}${wide}`)}"><b>${formatRate(t.deadLetters)}</b><span>DLQ</span></div>
         <button class="chip clickable ${t.degraded ? 'warn' : ''}" data-list="Degraded" title="Show the degraded systems"><b>${t.degraded}</b><span>degraded</span></button>
         <button class="chip clickable ${t.down ? 'bad' : ''}" data-list="Down" title="Show the systems that are down"><b>${t.down}</b><span>down</span></button>
-        <button class="chip clickable ${stale ? 'stale' : ''}" data-list="Stale" title="Show the systems with no fresh data"><b>${stale}</b><span>no data</span></button>
+        <button class="chip clickable ${t.stale ? 'stale' : ''}" data-list="Stale" title="Show the systems with no fresh data"><b>${t.stale}</b><span>no data</span></button>
         <button class="chip clickable ${t.incidents ? 'warn' : ''}" data-list="Incidents" title="Show the islands with open incidents"><b>${t.incidents}</b><span>incidents</span></button>
         <div class="chip time"><b>${day}</b><span>town time</span></div>` : ''}
-      <span class="status" title="${label}"><i class="dot ${dot}"></i><span class="label">${label}</span></span>
-      <button id="deps" class="${this.deps ? 'on' : ''}" title="Draw an arc between islands that call each other, thicker for more traffic">Dependencies</button>
-      <button id="home" title="Frame the whole town">Home</button>`
-    this.el.querySelector('#home')!.addEventListener('click', this.onHome)
-    this.el.querySelector('#deps')!.addEventListener('click', () => {
-      this.deps = !this.deps
-      this.onDependencies(this.deps)
-      this.render()
-    })
+      <span class="status" title="${label}"><i class="dot ${dot}"></i><span class="label">${label}</span></span>`
   }
 }
 
@@ -98,10 +98,7 @@ export class NoticesPanel {
   }
 }
 
-/** Systems (and third parties) whose readings are too old or missing: shown grey, never healthy. */
-export function staleCount(s: Snapshot): number {
-  return s.groups.reduce((a, g) => a + g.nodes.filter((n) => n.state === 'Stale').length, 0) + s.vendors.filter((v) => v.node.state === 'Stale').length
-}
+export { staleCount } from './viewTotals'
 
 function clock(fraction: number): string {
   const minutes = Math.floor(fraction * 24 * 60)

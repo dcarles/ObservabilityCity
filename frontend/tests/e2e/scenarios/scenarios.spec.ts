@@ -537,12 +537,13 @@ test.describe('the other signals', () => {
   test('the dependency switch shows dashed arcs between callers and what they call, and hides them again', async ({ town, page }) => {
     await town.open()
     expect(await page.evaluate(() => (window as any).city.overlay().visible)).toBe(false)
-    await page.locator('#deps').click()
+    await page.locator('#layers-button').click()
+    await page.locator('#layer-dependencies').click()
     await town.step(1)
     const on = await page.evaluate(() => (window as any).city.overlay())
     expect(on.visible).toBe(true)
     expect(on.arcs.length).toBeGreaterThan(0)
-    await page.locator('#deps').click()
+    await page.locator('#layer-dependencies').click()
     expect((await page.evaluate(() => (window as any).city.overlay())).visible).toBe(false)
   })
 

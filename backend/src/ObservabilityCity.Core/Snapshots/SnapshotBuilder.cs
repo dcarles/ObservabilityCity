@@ -23,18 +23,33 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
     /// <summary>Where open incidents come from. Without a source, the sky is clear.</summary>
     public IReadOnlyList<IIncidentSource> IncidentSources { get; init; } = [];
 
-    public Snapshot Build()
+    /// <summary>
+    /// The whole town, or with <paramref name="islands"/> only those islands (and always the hub). What is left out is left out of everything: the
+    /// totals count only what is on screen, and a third party shows only while one of the islands that call it does. The traffic that crosses the edge
+    /// is listed in <see cref="Snapshot.View"/>, so the renderer can show where it goes. Ids the town does not have are ignored and reported.
+    /// </summary>
+    public Snapshot Build(IReadOnlyCollection<string>? islands = null)
     {
         var now = clock.GetUtcNow();
         var registry = registries.Current;
         var incidents = OpenIncidents(registry);
         var links = TownLinks.Of(registry);
-        var groups = registry.Groups
+        var allGroups = registry.Groups
             .Select(g => new GroupSnapshot(g.Id, g.DisplayName, g.Color, g.IsHub, g.IsLostFound, g.ConfigError,
                 incidents.GetValueOrDefault(g.Id) ?? [], links[g.Id].HasBridge, MessagingOf(registry, g),
                 g.Nodes.Select(n => ToNode(n, now, registry)).ToList()))
             .ToList();
-        var vendors = registry.Vendors.Select(v => new VendorSnapshot(ToNode(v.Node, now, registry), v.CalledBy)).ToList();
+        var allVendors = registry.Vendors.Select(v => new VendorSnapshot(ToNode(v.Node, now, registry), v.CalledBy)).ToList();
+        var allNodes = allGroups.SelectMany(g => g.Nodes).ToList();
+        var everyone = allNodes.Concat(allVendors.Select(v => v.Node)).ToDictionary(n => n.Id);
+
+        var filter = islands is { Count: > 0 } ? islands.Select(i => i.Trim()).Where(i => i.Length > 0).Distinct().Order(StringComparer.Ordinal).ToList() : null;
+        var shown = filter is null ? allGroups : allGroups.Where(g => g.IsHub || filter.Contains(g.Id)).ToList();
+        var shownIds = shown.SelectMany(g => g.Nodes).Select(n => n.Id).ToHashSet();
+        var vendors = filter is null ? allVendors
+            : allVendors.Where(v => v.CalledBy.Any(shownIds.Contains)).Select(v => v with { CalledBy = v.CalledBy.Where(shownIds.Contains).ToList() }).ToList();
+        var visible = shownIds.Concat(vendors.Select(v => v.Node.Id)).ToHashSet();
+        var groups = shown;
 
         var nodes = groups.SelectMany(g => g.Nodes).ToList();
         var live = nodes.Where(n => n.State != HealthState.Stale).ToList();
@@ -50,14 +65,64 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
             groups.Sum(g => g.Incidents.Count),
             live.Where(n => registry.ConsumerIds.Contains(n.Id)).Sum(n => n.DeadLetters ?? 0));
 
-        var byId = nodes.Concat(vendors.Select(v => v.Node)).ToDictionary(n => n.Id);
         var env = registry.ActiveEnvironment;
         var environments = registry.Environments.Count > 0
             ? registry.Environments.Select(e => new EnvironmentInfo(e.Id, e.Name, e.Id == registry.DefaultEnvironmentId)).ToList()
             : [new EnvironmentInfo(Environment, Environment, true)];
-        return new Snapshot(registry.Town.Id, registry.Town.Name, registry.Town.GroupLabel, env?.Id ?? Environment, now, DayFraction(), totals, registries.Notices, groups,
-            vendors, ExternalCallers(registry, byId), Dependencies(registry, byId), registry.RingCapacity,
-            env?.Name ?? Environment, environments, TenantsOf(env, nodes));
+
+        // what is not on screen does not count: not in the airport's rate, and not in an arc
+        var onScreenNodes = everyone.Where(kv => visible.Contains(kv.Key)).ToDictionary(kv => kv.Key, kv => kv.Value);
+        var callers = ExternalCallers(registry, onScreenNodes);
+        var dependencies = Dependencies(registry, onScreenNodes);
+        var view = new ViewInfo([], [], [], []);
+        var notices = registries.Notices;
+        if (filter is not null)
+        {
+            var known = allGroups.Where(g => !g.IsHub).Select(g => g.Id).ToHashSet();
+            var unknown = filter.Where(i => i != "hub" && !known.Contains(i)).ToList();
+            var hidden = allGroups.Where(g => !g.IsHub && !filter.Contains(g.Id)).Select(g => new HiddenIsland(g.Id, g.DisplayName)).ToList();
+            var onScreen = groups.Select(g => g.Id).Concat(vendors.Select(v => v.Node.Id)).ToHashSet();
+            callers = callers.Select(c => c with { Calls = c.Calls.Where(visible.Contains).ToList() }).ToList();
+            dependencies = dependencies.Where(d => onScreen.Contains(d.From) && onScreen.Contains(d.To)).ToList();
+            view = new ViewInfo(filter.Where(known.Contains).ToList(), unknown, hidden, OffscreenLinks(registry, everyone, shownIds, hidden));
+            if (unknown.Count > 0)
+                notices = [.. notices, .. unknown.Select(i => $"Island '{i}' is not in this town, so the island filter ignores it.")];
+        }
+
+        return new Snapshot(registry.Town.Id, registry.Town.Name, registry.Town.GroupLabel, env?.Id ?? Environment, now, DayFraction(), totals, notices, groups,
+            vendors, callers, dependencies, registry.RingCapacity,
+            env?.Name ?? Environment, environments, TenantsOf(env, allNodes), registry.Town.Topology, view);
+    }
+
+    /// <summary>
+    /// The calls that cross the edge of the screen: from a system on screen to a system on a hidden island, and from a hidden island to a system on
+    /// screen. A callee's rate is shared evenly between its callers, as in the dependency overlay. One entry for each system on screen and hidden island.
+    /// </summary>
+    private static List<OffscreenLink> OffscreenLinks(Registry.Registry registry, Dictionary<string, NodeSnapshot> byId, HashSet<string> shown, List<HiddenIsland> hidden)
+    {
+        var hiddenNames = hidden.ToDictionary(h => h.Id, h => h.DisplayName);
+        var callersOf = new Dictionary<string, List<RegistryNode>>();
+        foreach (var n in registry.AllNodes)
+            foreach (var callee in n.Calls.Concat(n.GatewayCalls).Distinct())
+                (callersOf.TryGetValue(callee, out var l) ? l : callersOf[callee] = []).Add(n);
+        var links = new Dictionary<(string Node, string Island, bool Incoming), double>();
+        foreach (var (callee, from) in callersOf)
+        {
+            var calleeNode = registry.AllNodes.FirstOrDefault(n => n.Id == callee);
+            if (calleeNode is null || !byId.TryGetValue(callee, out var snap)) continue;
+            var share = snap.State == HealthState.Stale ? 0 : snap.RequestsPerSecond / from.Count;
+            foreach (var caller in from)
+            {
+                var callerShown = shown.Contains(caller.Id);
+                var calleeShown = shown.Contains(callee);
+                if (callerShown && !calleeShown && hiddenNames.ContainsKey(calleeNode.GroupId))
+                    links[(caller.Id, calleeNode.GroupId, false)] = links.GetValueOrDefault((caller.Id, calleeNode.GroupId, false)) + share;
+                else if (!callerShown && calleeShown && hiddenNames.ContainsKey(caller.GroupId))
+                    links[(callee, caller.GroupId, true)] = links.GetValueOrDefault((callee, caller.GroupId, true)) + share;
+            }
+        }
+        return links.OrderBy(kv => kv.Key.Node, StringComparer.Ordinal).ThenBy(kv => kv.Key.Island, StringComparer.Ordinal).ThenBy(kv => kv.Key.Incoming)
+            .Select(kv => new OffscreenLink(kv.Key.Node, kv.Key.Island, hiddenNames[kv.Key.Island], kv.Key.Incoming, kv.Value)).ToList();
     }
 
     /// <summary>

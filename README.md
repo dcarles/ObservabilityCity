@@ -141,6 +141,8 @@ cd frontend && npm test          # visual rules, snapshot guard, island layout (
 cd frontend && npm run e2e       # browser scenarios on a small town (break things, check the town, calm it down), then the link rules on a town with an island for each case, then the environment, tenant and service rules (about 3 minutes)
 cd frontend && npm run e2e:links # the link rules alone: pier, bridge and buildings follow real links
 cd frontend && npm run e2e:tenants # environments, tenant yards, tenant traffic and service groups, on a town with three environments
+cd frontend && npm run e2e:ui      # top bar, island filter, layers, inspector drawer, legend, Day/Dusk
+cd frontend && npm run e2e:direct  # signposts for hidden islands in a town without a hub
 cd frontend && npm run e2e:slow  # 23- and 35-island stress towns and the full sample town, with screenshots (a few minutes)
 dotnet run --project backend/tools/ObservabilityCity.Validate -- --all   # check every registry folder in the repo
 ```
@@ -238,6 +240,16 @@ fake: { undeclaredTenants: [zeta-trading] }   # fake source only: a tenant that 
 - A database with `tenantPattern: "merchant-{tenant}-db"` has a database for each tenant. It is drawn as a storage yard with a unit for each tenant (height is how much of its capacity it uses, colour is its state) and a sign, "N tenants, M throttled". A tenant found in the readings but not on the list is a purple unit marked "?". Test tenants are paler and striped, and their trouble is amber at worst: it never turns the store or its service red. The store itself shows the worst of its customers.
 - Cars carry the tenant their request is for. The tenant dropdown in the top bar lists tenants by display name with the id beside it, in groups (customers, test tenants, unknown ones), with a search box (name or id), a tick box for each tenant and a dot on any tenant in trouble. Tick one or more to follow them: the other units dim and only their cars are drawn. *Hide test tenants* is a switch in the same list.
 - A service is the systems that share a `service:` name, on one pad wherever they stand in the file (more than three take more pads). A low sign in front of the pad names it and shows its worst state; click the sign or the hedge to open the service's panel. A system with no service stands on a pad of its own. The validator warns when one service is split across pillars.
+
+### The top bar, the drawer and the legend
+
+- **Top bar:** the town name; dropdowns for the environment, tenants, islands, layers and theme; a search box (`/`); the totals (requests per second, errors, p99, dead letters, degraded, down, no data, incidents); the connection state; Day/Dusk, the legend (`?`) and Home. On a narrow window the bar wraps to more rows and the panels start below it.
+- **Totals follow what you look at.** With the island filter on they count only the islands on screen (and the third parties a visible island calls). With tenants followed, requests per second are those tenants' share and degraded/down follow their own databases; errors, p99, dead letters and incidents are not split by tenant, and the tooltips say so.
+- **Island filter** (`?islands=cl,pay`, or the Islands dropdown): the backend sends a town with only those islands and the hub, so it also counts only what is on screen. In a hub-and-spoke town a call to a hidden island ends at the hub plaza, and a call from one starts there. In a town whose islands call each other directly, an island with traffic to or from a hidden island gets a signpost naming it. An id the town does not have is ignored and the page says so. Over SignalR the choice is `?islands=` on connect and the `SetIslands` hub method after; `GET /api/snapshot/latest?env=&islands=` does the same over HTTP.
+- **Layers** (`?hide=traffic,workers`, `?show=dependencies`): Traffic (cars), Messaging (boats, crates, the dead-letter pen, the lighthouse, the port board), Databases, Workers, and Dependencies (off until shown). A hidden family cannot be hovered or clicked.
+- **Inspector drawer:** click a building, pick it in the search or a counter list, or follow a link. Overview (key numbers, and in words why it is not healthy, tenants, open incidents), Links (who it calls and who calls it, through the gateway or not, messaging; a link to something the island filter hides is marked and does not open), Logs (the latest lines, read on demand every couple of seconds, filter by level; logs never decide the colours) and Config (each setting with the file layer it comes from). Behind it: `GET /api/systems/{id}?env=` and `GET /api/systems/{id}/logs?env=&limit=`. Esc, the cross or a click on the sea closes it.
+- **Legend:** the `?` button opens a card saying what each thing means; the first visit from a browser opens it by itself.
+- **Day and Dusk** (`?light=day|dusk`, remembered per browser) and the **theme picker** (`?theme=`; one theme so far, the picker is ready for more).
 
 ### Performance
 

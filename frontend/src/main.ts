@@ -7,6 +7,15 @@ import { Connection, requestedEnv } from './connection'
 import { NoticesPanel, PreviewPanel, Search, ServicePanel, showTooltip, StateList, TopBar, type SearchItem } from './ui'
 import { ALL_TENANTS, pruneTenants, type TenantView } from './tenants'
 import { ViewBar } from './viewbar'
+import { Inspector } from './inspector'
+import { LegendCard } from './legendCard'
+import { LEGEND_SEEN_KEY } from './legend'
+import { browserStore, otherLighting, saveLighting, startLighting } from './lighting'
+import { saveTheme, startTheme, themeById } from './themes'
+import { parseLayers, toggleLayer, type Layer } from './layers'
+import { islandChoices, parseIslands, pruneIslands } from './islands'
+import { withView } from './address'
+import { viewTotals } from './viewTotals'
 import type { PickItem } from './picker'
 import type { Snapshot, TenantInfo } from './types'
 import { checkSnapshot } from './snapshotGuard'
@@ -21,21 +30,53 @@ async function start(): Promise<void> {
   const town = new Town()
   stage.scene.add(town.root)
 
-  stage.onQualityStep = (to) => {
-    const banner = document.getElementById('banner')
-    if (!banner) return
-    banner.textContent = to === 'medium'
-      ? 'Running slowly, so shadows now update a few times a second. Add ?quality=high to the address to keep full detail.'
-      : 'Still slow: shadows are off. Add ?quality=high to the address to keep full detail.'
+  // what the address and this browser say about how to look at the town
+  const query = window.location.search
+  const params = new URLSearchParams(query)
+  const testMode = params.has('test')
+  const store = browserStore()
+  let islands: readonly string[] = parseIslands(query)
+  let layers = parseLayers(query)
+  let lighting = startLighting(query, store)
+  const themeAsked = startTheme(query, store)
+  let theme = themeAsked.theme
+  town.setLayers(layers)
+  stage.setLighting(lighting, true)
+  document.documentElement.dataset.theme = theme.id
+
+  /** The space under the top bar, which wraps to more rows on a narrow window: panels start below it. */
+  const bar = document.getElementById('topbar')!
+  const measureBar = (): void => document.documentElement.style.setProperty('--bar-h', `${bar.offsetHeight}px`)
+  measureBar()
+  new ResizeObserver(measureBar).observe(bar)
+
+  const banner = document.getElementById('banner')!
+  let bannerTimer: number | undefined
+  /** A line at the bottom of the page that goes away by itself. */
+  function say(text: string, ms = 9000): void {
+    banner.textContent = text
     banner.hidden = false
-    window.setTimeout(() => { banner.hidden = true }, 9000)
+    window.clearTimeout(bannerTimer)
+    bannerTimer = window.setTimeout(() => { banner.hidden = true }, ms)
   }
+  if (themeAsked.unknown) say(`There is no theme "${themeAsked.unknown}". Showing ${theme.name}.`)
+
+  /** Keeps the islands and layers in the address, so the view can be bookmarked and shared. */
+  function syncAddress(): void {
+    const next = withView(window.location.search, { islands, layers })
+    if (next !== window.location.search) window.history.replaceState(null, '', `${window.location.pathname}${next}${window.location.hash}`)
+  }
+
+  stage.onQualityStep = (to) => say(to === 'medium'
+    ? 'Running slowly, so shadows now update a few times a second. Add ?quality=high to the address to keep full detail.'
+    : 'Still slow: shadows are off. Add ?quality=high to the address to keep full detail.')
 
   /** Glides the camera to an island or a building and keeps its name board up. */
   function goTo(item: PickItem): void {
     const focus = item.kind === 'island' ? town.islandFocusOf(item.id) : town.focusOf(item.id)
     town.select(item.kind === 'building' ? item.id : null)
     if (focus) stage.focus(focus.target, focus.distance)
+    if (item.kind === 'building') { servicePanel.close(); inspector.open(item.id) } else inspector.close()
   }
 
   const stateList = new StateList(
@@ -49,7 +90,9 @@ async function start(): Promise<void> {
     },
     goTo,
   )
-  const topbar = new TopBar(() => stage.home(), (state, anchor) => stateList.toggle(state, anchor), (on) => { town.overlay.visible = on })
+  let tenantView: TenantView = ALL_TENANTS
+  const topbar = new TopBar((state, anchor) => stateList.toggle(state, anchor), () => tenantView)
+  document.getElementById('home')!.addEventListener('click', () => stage.home())
   const notices = new NoticesPanel()
   const buildingItems = (): SearchItem[] => {
     const items: SearchItem[] = []
@@ -62,10 +105,16 @@ async function start(): Promise<void> {
   const islandItems = (): SearchItem[] => town.islands.map((i) => ({ kind: 'island', id: i.group.id, name: i.group.displayName, where: i.group.displayName }))
   const airportItem = (): SearchItem[] => (town.airport ? [{ kind: 'island', id: 'airport', name: 'Airport', where: 'Outside callers' }] : [])
   const env = requestedEnv()
-  let tenantView: TenantView = ALL_TENANTS
   const setTenantView = (v: TenantView): void => {
     tenantView = v
     town.setTenantView(v)
+    topbar.refresh()
+    viewBar.refresh()
+  }
+  const setIslands = (ids: readonly string[]): void => {
+    islands = ids
+    connection.setIslands(ids)
+    syncAddress()
     viewBar.refresh()
   }
   const viewBar = new ViewBar({
@@ -78,7 +127,47 @@ async function start(): Promise<void> {
       u.searchParams.set('env', id)
       window.location.href = u.toString()
     },
+    islands: () => islands,
+    setIslands: (ids) => setIslands(ids),
+    layers: () => layers,
+    toggleLayer: (layer: Layer) => {
+      layers = toggleLayer(layers, layer)
+      town.setLayers(layers)
+      syncAddress()
+      viewBar.refresh()
+    },
+    theme: () => theme,
+    setTheme: (id) => {
+      theme = themeById(id) ?? theme
+      saveTheme(theme.id, store)
+      document.documentElement.dataset.theme = theme.id
+      viewBar.refresh()
+    },
   })
+  const inspector = new Inspector({
+    env,
+    onScreen: (id) => town.buildings.has(id),
+    go: (id) => goTo({ kind: 'building', id, name: id, where: '' }),
+    view: () => tenantView,
+    closed: () => town.select(null),
+  })
+  const legend = new LegendCard((open) => {
+    document.getElementById('legend-button')?.classList.toggle('on', open)
+    if (open) try { store?.setItem(LEGEND_SEEN_KEY, '1') } catch { /* storage blocked */ }
+  })
+  document.getElementById('legend-button')!.addEventListener('click', () => legend.toggle())
+  const lightingButton = document.getElementById('lighting')!
+  const showLighting = (): void => { lightingButton.textContent = lighting === 'day' ? 'Day' : 'Dusk'; lightingButton.classList.toggle('on', lighting === 'dusk') }
+  showLighting()
+  lightingButton.addEventListener('click', () => {
+    lighting = otherLighting(lighting)
+    stage.setLighting(lighting)
+    saveLighting(store, lighting)
+    showLighting()
+  })
+  // the first visit from this browser opens the legend by itself; automated runs skip that unless they ask (?legend=first)
+  const firstVisit = (() => { try { return !!store && store.getItem(LEGEND_SEEN_KEY) === null } catch { return false } })()
+  if ((firstVisit && (!testMode || params.get('legend') === 'first')) || params.get('legend') === '1') legend.open()
   const servicePanel = new ServicePanel((id) => goTo({ kind: 'building', id, name: id, where: '' }))
   const preview = new PreviewPanel(() => [
     { kind: 'town', id: '*', name: 'Whole town', where: '' },
@@ -130,7 +219,13 @@ async function start(): Promise<void> {
       // a followed tenant that left the environment can no longer be followed
       const pruned = pruneTenants(tenantView, s.tenants ?? [])
       if (pruned !== tenantView) setTenantView(pruned)
+      // islands asked for that the town does not have are let go, and the viewer is told
+      const kept = pruneIslands(islands, islandChoices(s))
+      if (kept !== islands) setIslands(kept)
+      if ((s.view?.unknown.length ?? 0) > 0) say(`Not an island of this town, so left out: ${s.view!.unknown.join(', ')}.`)
       viewBar.update(s)
+      topbar.refresh()
+      inspector.update(s)
       const open = servicePanel.key
       if (open) {
         const sv = town.serviceSummary(open, s)
@@ -154,11 +249,9 @@ async function start(): Promise<void> {
   }
 
   const connection = new Connection(onSnapshot, (st) => topbar.setStatus(st), env, (e) => {
-    const banner = document.getElementById('banner')
-    if (!banner) return
     banner.textContent = `There is no environment "${e.requested ?? ''}". Available: ${e.environments.join(', ') || 'none'}.`
     banner.hidden = false
-  })
+  }, islands)
   connection.start()
 
   // Hover: name and numbers for the building under the pointer.
@@ -180,13 +273,14 @@ async function start(): Promise<void> {
     down = null
     pointer.set((e.clientX / window.innerWidth) * 2 - 1, -(e.clientY / window.innerHeight) * 2 + 1)
     ray.setFromCamera(pointer, stage.camera)
-    const hit = ray.intersectObjects([...town.buildings.values()].map((b) => b.hit), false)[0]
+    const hit = ray.intersectObjects(town.hitMeshes(), false)[0]
     const b = hit?.object.userData.building as Building | undefined
     // nothing but a service's sign or hedge under the pointer: open that service
     const svc = b ? undefined : ray.intersectObjects(town.serviceHits(), false)[0]?.object.userData.serviceKey as string | undefined
     const sv = svc && seen.last ? town.serviceSummary(svc, seen.last) : null
-    if (sv) servicePanel.show(sv)
-    else if (!b) servicePanel.close()
+    if (b) { servicePanel.close(); inspector.open(b.id) }
+    else if (sv) { inspector.close(); servicePanel.show(sv) }
+    else { servicePanel.close(); inspector.close() }
     town.select(b?.id ?? null)
     const focus = b ? town.focusOf(b.id) : null
     if (focus) stage.focus(focus.target, focus.distance)
@@ -196,7 +290,7 @@ async function start(): Promise<void> {
     if (!dirty) return
     dirty = false
     ray.setFromCamera(pointer, stage.camera)
-    const hits = ray.intersectObjects([...town.buildings.values()].map((b) => b.hit), false)
+    const hits = ray.intersectObjects(town.hitMeshes(), false)
     const b = hits[0]?.object.userData.building as Building | undefined
     showTooltip(b?.node ?? null, pointerPx.x, pointerPx.y, tenantView)
     const overService = !b && ray.intersectObjects(town.serviceHits(), false).length > 0
@@ -205,7 +299,6 @@ async function start(): Promise<void> {
 
   // ?test=1 is for automated tests: nothing is drawn on its own, and time moves only when the test calls city.step(seconds).
   // Software rendering draws a frame in seconds, so tests read the scene's state instead of waiting for frames.
-  const testMode = new URLSearchParams(window.location.search).has('test')
   let simTime = 0
   function step(seconds: number, dt = 0.1): void {
     for (let t = 0; t < seconds - 1e-9; t += dt) {
@@ -225,8 +318,22 @@ async function start(): Promise<void> {
     inspectAirport: () => town.inspectAirport(),
     inspectServices: (id: string) => town.inspectServices(id),
     /** Open a service's panel as a click on its sign would. */
-    openService: (key: string) => { const sv = seen.last ? town.serviceSummary(key, seen.last) : null; if (sv) servicePanel.show(sv); return sv },
+    openService: (key: string) => { const sv = seen.last ? town.serviceSummary(key, seen.last) : null; if (sv) { inspector.close(); servicePanel.show(sv) } return sv },
     tenantView: () => tenantView,
+    layers: () => layers,
+    /** The headline numbers as the top bar shows them for the tenants chosen. */
+    totals: () => (seen.last ? viewTotals(seen.last, tenantView) : null),
+    lighting: () => lighting,
+    themeId: () => theme.id,
+    islands: () => islands,
+    /** Every island of the town, on screen or not. */
+    islandChoices: () => viewBar.islandList,
+    setIslands,
+    inspectLayers: () => town.inspectLayers(),
+    inspectEdge: () => town.inspectEdge(),
+    inspector: () => ({ id: inspector.openId, tab: inspector.activeTab }),
+    openSystem: (id: string, tab?: 'overview' | 'links' | 'logs' | 'config') => { servicePanel.close(); inspector.open(id, tab) },
+    legendOpen: () => legend.isOpen,
     /** The tenants the top bar's list shows, grouped as it groups them. */
     tenantList: () => viewBar.listed,
     setTenantView,

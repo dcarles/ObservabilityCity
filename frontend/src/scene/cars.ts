@@ -31,6 +31,8 @@ export interface Route {
   /** Share of the destination's traffic that takes this route. */
   share: number
   bay?: Bay
+  /** Set for cars that leave the picture: they end at the hub plaza because their destination is on an island the filter hides. */
+  edge?: boolean
 }
 
 interface Planned {
@@ -143,6 +145,10 @@ export class CarSystem {
   /** Cars drawn in the last frame, so tests can tell whether the filter hides them. */
   private shown = 0
   private time = 0
+  /** False while the Traffic layer is off: no car appears and none is drawn. */
+  private enabled = true
+  /** Buildings a layer hides: no car drives to or from them. */
+  private hidden: ReadonlySet<Building> = new Set()
   /** Failed requests that stopped at the door and drove back the way they came, since the town was built. For tests. */
   turnedAway = 0
   /** Cars drawn with a red flag right now. For tests. */
@@ -200,9 +206,39 @@ export class CarSystem {
     this.markers.clear()
   }
 
+  /** Turns all traffic on or off. Turning it off takes the cars away, so turning it on starts afresh. */
+  setEnabled(on: boolean): void {
+    if (on === this.enabled) return
+    this.enabled = on
+    this.object.visible = on
+    if (!on) this.clear()
+  }
+
+  /** Stops cars to and from these buildings, and takes away the ones already on their way. */
+  setHidden(buildings: ReadonlySet<Building>): void {
+    this.hidden = buildings
+    for (const c of this.cars) {
+      const r = c.plan.route
+      if (c.fade < 0 && (buildings.has(r.dest) || buildings.has(r.source as Building))) c.fade = 0.3
+    }
+  }
+
+  private clear(): void {
+    this.cars.length = 0
+    this.acc.clear()
+    this.shown = 0
+    for (const mk of this.markers.values()) this.object.remove(mk.sprite)
+    this.markers.clear()
+    this.meshes.forEach((im) => { im.count = 0 })
+    this.flags.count = 0
+    this.lights.count = 0
+  }
+
   update(dt: number): void {
+    if (!this.enabled) return
     this.time += dt
     for (const plan of this.plans) {
+      if (this.hidden.has(plan.route.dest) || this.hidden.has(plan.route.source as Building)) continue
       const n = plan.route.dest.node
       if (!n || (n.state !== 'Healthy' && n.state !== 'Degraded')) continue
       const a = (this.acc.get(plan) ?? Math.random()) + spawnRate(n.requestsPerSecond) * TRAFFIC * plan.route.share * dt

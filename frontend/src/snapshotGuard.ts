@@ -3,7 +3,7 @@
 // with no id), and a snapshot with nothing usable in it is refused so the town keeps showing the last good one.
 
 import { DEFAULT_RING_CAPACITY, MAX_RING_CAPACITY, MIN_RING_CAPACITY, maxPillars } from './scene/layout'
-import type { DependencySnapshot, EnvironmentInfo, ExternalCallerSnapshot, GroupSnapshot, IncidentSnapshot, MessagingSnapshot, NodeSnapshot, Snapshot, TenantInfo, TenantUnitSnapshot, VendorSnapshot } from './types'
+import type { DependencySnapshot, EnvironmentInfo, OffscreenLink, ViewInfo, ExternalCallerSnapshot, GroupSnapshot, IncidentSnapshot, MessagingSnapshot, NodeSnapshot, Snapshot, TenantInfo, TenantUnitSnapshot, VendorSnapshot } from './types'
 
 const KINDS = ['Api', 'Worker', 'Database', 'Cache', 'Cron', 'Gateway', 'Broker', 'Egress']
 const STATES = ['Healthy', 'Degraded', 'Down', 'Stale']
@@ -68,6 +68,8 @@ export function checkSnapshot(raw: unknown): Checked {
     environments: (Array.isArray(raw.environments) ? raw.environments : []).filter(isObject).filter((e) => typeof e.id === 'string' && e.id !== '')
       .map<EnvironmentInfo>((e) => ({ id: e.id as string, name: str(e.name) || (e.id as string), isDefault: e.isDefault === true })),
     tenants: checkTenants(raw.tenants, problems),
+    topology: str(raw.topology) || 'direct',
+    view: checkView(raw.view),
     generatedAt: str(raw.generatedAt),
     dayFraction: isFiniteNumber(raw.dayFraction) ? raw.dayFraction : 0.5,
     totals: {
@@ -91,6 +93,23 @@ export function checkSnapshot(raw: unknown): Checked {
       .map<DependencySnapshot>((d) => ({ from: d.from as string, to: d.to as string, requestsPerSecond: num(d.requestsPerSecond) })),
   }
   return { snapshot, problems }
+}
+
+/** Which islands the snapshot shows. A snapshot that does not say shows the whole town. */
+function checkView(v: unknown): ViewInfo {
+  const raw = isObject(v) ? v : {}
+  return {
+    islands: strings(raw.islands),
+    unknown: strings(raw.unknown),
+    hidden: (Array.isArray(raw.hidden) ? raw.hidden : []).filter(isObject).filter((h) => typeof h.id === 'string' && h.id !== '')
+      .map((h) => ({ id: h.id as string, displayName: str(h.displayName) || (h.id as string) })),
+    links: (Array.isArray(raw.links) ? raw.links : []).filter(isObject)
+      .filter((l) => typeof l.nodeId === 'string' && l.nodeId !== '' && typeof l.islandId === 'string' && l.islandId !== '')
+      .map<OffscreenLink>((l) => ({
+        nodeId: l.nodeId as string, islandId: l.islandId as string, islandName: str(l.islandName) || (l.islandId as string),
+        incoming: l.incoming === true, requestsPerSecond: isFiniteNumber(l.requestsPerSecond) ? l.requestsPerSecond : 0,
+      })),
+  }
 }
 
 function checkGroup(g: unknown, seen: Set<string>, problems: string[]): GroupSnapshot | null {

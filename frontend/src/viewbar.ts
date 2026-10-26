@@ -1,6 +1,9 @@
 import type { EnvironmentInfo, Snapshot, TenantInfo } from './types'
 import { escapeHtml } from './picker'
 import { groupTenants, tenantLabel, tenantTrouble, toggleTenant, type TenantView } from './tenants'
+import { islandChoices, islandsLabel, searchIslands, type IslandChoice } from './islands'
+import { LAYERS, layersLabel, type Layer, type LayerState } from './layers'
+import { THEMES, type ThemeInfo } from './themes'
 
 /** What the view bar needs from the page. */
 export interface ViewBarHost {
@@ -9,13 +12,21 @@ export interface ViewBarHost {
   view(): TenantView
   setView(v: TenantView): void
   switchEnv(id: string): void
+  /** The islands chosen (none means all of them). */
+  islands(): readonly string[]
+  setIslands(ids: string[]): void
+  layers(): LayerState
+  toggleLayer(layer: Layer): void
+  theme(): ThemeInfo
+  setTheme(id: string): void
 }
 
-type Open = 'env' | 'tenant' | null
+type Open = 'env' | 'tenant' | 'islands' | 'layers' | 'theme' | null
 
 /**
- * The two dropdowns in the top bar: the environment, and the tenants to follow. It lives outside the halves of the bar that are redrawn with
- * every snapshot, so an open list keeps its place and its typed text, and it only redraws when what it shows has changed.
+ * The dropdowns in the top bar: the environment, the tenants and the islands to look at, the layers to draw and the theme. It lives outside the
+ * halves of the bar that are redrawn with every snapshot, so an open list keeps its place and its typed text, and it only redraws when what it shows
+ * has changed.
  */
 export class ViewBar {
   private readonly el = document.getElementById('view-bar') as HTMLElement
@@ -25,6 +36,7 @@ export class ViewBar {
   private environments: EnvironmentInfo[] = []
   private current = ''
   private tenants: TenantInfo[] = []
+  private choices: IslandChoice[] = []
   private trouble = new Map<string, 'amber' | 'red'>()
 
   constructor(private readonly host: ViewBarHost) {
@@ -35,7 +47,7 @@ export class ViewBar {
     this.el.addEventListener('click', (e) => this.click(e.target as HTMLElement))
     this.el.addEventListener('input', (e) => {
       const t = e.target as HTMLInputElement
-      if (t.id !== 'tenant-query') return
+      if (t.id !== 'tenant-query' && t.id !== 'island-query') return
       this.query = t.value
       this.render(true)
     })
@@ -46,10 +58,16 @@ export class ViewBar {
     return this.tenants
   }
 
+  /** Every island of the town, on screen or not. For tests. */
+  get islandList(): IslandChoice[] {
+    return this.choices
+  }
+
   update(s: Snapshot): void {
     this.environments = s.environments
     this.current = s.environment
     this.tenants = s.tenants
+    this.choices = islandChoices(s)
     this.trouble = tenantTrouble(s.groups.flatMap((g) => g.nodes))
     this.render()
   }
@@ -66,39 +84,83 @@ export class ViewBar {
     this.render()
   }
 
+  private toggle(which: Exclude<Open, null>): void {
+    this.open = this.open === which ? null : which
+    this.query = ''
+    this.render()
+  }
+
   private click(t: HTMLElement): void {
     const act = t.closest<HTMLElement>('[data-act]')
     if (!act) return
     const view = this.host.view()
     switch (act.dataset.act) {
-      case 'open-env': this.open = this.open === 'env' ? null : 'env'; this.query = ''; this.render(); break
-      case 'open-tenant': this.open = this.open === 'tenant' ? null : 'tenant'; this.query = ''; this.render(); break
+      case 'open-env': this.toggle('env'); break
+      case 'open-tenant': this.toggle('tenant'); break
+      case 'open-islands': this.toggle('islands'); break
+      case 'open-layers': this.toggle('layers'); break
+      case 'open-theme': this.toggle('theme'); break
       case 'env': this.open = null; if (act.dataset.id !== this.current) this.host.switchEnv(act.dataset.id!); else this.render(); break
       case 'tenant': this.host.setView(toggleTenant(view, act.dataset.id!)); break
       case 'all': this.host.setView({ ...view, tenants: [] }); break
       case 'hide-test': this.host.setView({ ...view, hideTest: !view.hideTest }); break
+      case 'island': {
+        const id = act.dataset.id!
+        const now = this.host.islands()
+        this.host.setIslands(now.includes(id) ? now.filter((x) => x !== id) : [...now, id])
+        break
+      }
+      case 'all-islands': this.host.setIslands([]); break
+      case 'layer': this.host.toggleLayer(act.dataset.id as Layer); break
+      case 'theme': this.open = null; this.host.setTheme(act.dataset.id!); this.render(); break
     }
   }
 
   private render(keepFocus = false): void {
     const view = this.host.view()
-    const key = JSON.stringify([this.open, this.query, this.current, this.environments, this.tenants.map((t) => t.id + t.kind), view, [...this.trouble]])
+    const islands = this.host.islands()
+    const layers = this.host.layers()
+    const theme = this.host.theme()
+    const key = JSON.stringify([this.open, this.query, this.current, this.environments, this.tenants.map((t) => t.id + t.kind), view, [...this.trouble], this.choices, islands, layers, theme.id])
     if (key === this.key) return
     this.key = key
     const envName = this.environments.find((e) => e.id === this.current)?.name ?? this.current
+    const button = (act: string, id: string, label: string, title: string, on: boolean) =>
+      `<button data-act="${act}" id="${id}" class="vb-btn ${on ? 'on' : ''}" title="${title}">${escapeHtml(label)} <i>▾</i></button>`
     const envBtn = this.environments.length > 1
-      ? `<div class="vb"><button data-act="open-env" id="env-button" class="vb-btn ${this.open === 'env' ? 'on' : ''}" title="Environment">${escapeHtml(envName)} <i>▾</i></button>
+      ? `<div class="vb">${button('open-env', 'env-button', envName, 'Environment', this.open === 'env')}
           ${this.open === 'env' ? `<div class="vb-list" id="env-list">${this.environments.map((e) => `<div class="vb-row ${e.id === this.current ? 'sel' : ''}" data-act="env" data-id="${escapeHtml(e.id)}"><span>${escapeHtml(e.name)}</span><small>${escapeHtml(e.id)}${e.isDefault ? ' · default' : ''}</small></div>`).join('')}</div>` : ''}</div>`
       : ''
     const tenantBtn = this.tenants.length > 0
-      ? `<div class="vb"><button data-act="open-tenant" id="tenant-button" class="vb-btn ${this.open === 'tenant' ? 'on' : ''}" title="Tenants to show">${escapeHtml(tenantLabel(view, this.tenants))} <i>▾</i></button>
+      ? `<div class="vb">${button('open-tenant', 'tenant-button', tenantLabel(view, this.tenants), 'Tenants to show', this.open === 'tenant')}
           ${this.open === 'tenant' ? this.tenantList(view) : ''}</div>`
       : ''
-    this.el.innerHTML = envBtn + tenantBtn
+    const islandBtn = this.choices.length > 1
+      ? `<div class="vb">${button('open-islands', 'islands-button', islandsLabel(islands, this.choices), 'Islands to show. The numbers in the top bar count only what is on screen', this.open === 'islands')}
+          ${this.open === 'islands' ? this.islandRows(islands) : ''}</div>`
+      : ''
+    const layerBtn = `<div class="vb">${button('open-layers', 'layers-button', layersLabel(layers), 'Layers to draw', this.open === 'layers')}
+          ${this.open === 'layers' ? `<div class="vb-list" id="layers-list">${LAYERS.map((l) => `<div class="vb-row" data-act="layer" data-id="${l.id}" id="layer-${l.id}"><input type="checkbox" ${layers[l.id] ? 'checked' : ''} tabindex="-1" /><span>${l.label}<br /><small class="hint">${escapeHtml(l.hint)}</small></span></div>`).join('')}</div>` : ''}</div>`
+    const themeBtn = `<div class="vb">${button('open-theme', 'theme-button', theme.name, 'Theme', this.open === 'theme')}
+          ${this.open === 'theme' ? `<div class="vb-list" id="theme-list">${THEMES.map((th) => `<div class="vb-row ${th.id === theme.id ? 'sel' : ''}" data-act="theme" data-id="${th.id}"><span>${escapeHtml(th.name)}<br /><small class="hint">${escapeHtml(th.blurb)}</small></span></div>`).join('')}</div>` : ''}</div>`
+    this.el.innerHTML = envBtn + tenantBtn + islandBtn + layerBtn + themeBtn
     if (keepFocus) {
-      const input = this.el.querySelector<HTMLInputElement>('#tenant-query')
+      const input = this.el.querySelector<HTMLInputElement>('.vb-list input[type=search]')
       if (input) { input.focus(); input.setSelectionRange(this.query.length, this.query.length) }
-    } else if (this.open === 'tenant') this.el.querySelector<HTMLInputElement>('#tenant-query')?.focus()
+    } else if (this.open === 'tenant' || this.open === 'islands') this.el.querySelector<HTMLInputElement>('.vb-list input[type=search]')?.focus()
+  }
+
+  private islandRows(selected: readonly string[]): string {
+    const rows = searchIslands(this.choices, this.query)
+    const row = (c: IslandChoice) => {
+      const on = selected.includes(c.id)
+      return `<div class="vb-row ${on ? 'sel' : ''}" data-act="island" data-id="${escapeHtml(c.id)}"><input type="checkbox" ${on ? 'checked' : ''} tabindex="-1" /><span>${escapeHtml(c.name)}</span><small>${c.shown ? escapeHtml(c.id) : `${escapeHtml(c.id)} · hidden`}</small></div>`
+    }
+    return `<div class="vb-list wide" id="islands-list">
+      <input id="island-query" type="search" placeholder="Find an island by name or id" value="${escapeHtml(this.query)}" autocomplete="off" spellcheck="false" />
+      <div class="vb-row ${selected.length === 0 ? 'sel' : ''}" data-act="all-islands"><span>All islands</span></div>
+      ${rows.map(row).join('') || '<div class="vb-none">No island matches.</div>'}
+    </div>`
   }
 
   private tenantList(view: TenantView): string {

@@ -58,7 +58,8 @@ export class Picker<T extends PickItem> {
     input.addEventListener('input', () => this.update())
     input.addEventListener('focus', () => { if (o.label) input.select(); this.update() })
     input.addEventListener('click', () => this.update())
-    input.addEventListener('blur', () => window.setTimeout(() => { this.close(); this.reset() }, 120))
+    // the short wait lets a click on a row land first; coming back to the box in that time keeps the list
+    input.addEventListener('blur', () => window.setTimeout(() => { if (document.activeElement === input) return; this.close(); this.reset() }, 120))
     input.addEventListener('keydown', (e) => {
       if (e.key === 'ArrowDown') { this.active = Math.min(this.matches.length - 1, this.active + 1); this.draw(); e.preventDefault() }
       else if (e.key === 'ArrowUp') { this.active = Math.max(0, this.active - 1); this.draw(); e.preventDefault() }

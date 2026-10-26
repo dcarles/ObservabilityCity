@@ -204,6 +204,9 @@ public sealed record TownTotals(
 /// Vendors are the third parties, ExternalCallers feed the airport, and Dependencies are the cross-group traffic the overlay draws.
 /// Environment is the id of the environment this snapshot shows (EnvironmentName its display name); Environments lists every environment the server
 /// serves. Tenants are the tenants of this environment, the unknown ones the data shows included; it is empty for an environment without tenants.
+/// Topology says how islands reach each other: "hub-and-spoke" (every call between islands goes through the hub's gateway) or "direct".
+/// View says which islands this snapshot shows. Without a filter it is empty and the whole town is here; with one, the groups, vendors, totals,
+/// callers and dependencies hold only what is on screen, and View lists what was left out and the traffic that crosses the edge.
 /// </summary>
 public sealed record Snapshot(
     string TownId,
@@ -221,4 +224,86 @@ public sealed record Snapshot(
     int RingCapacity,
     string EnvironmentName,
     IReadOnlyList<EnvironmentInfo> Environments,
-    IReadOnlyList<TenantInfo> Tenants);
+    IReadOnlyList<TenantInfo> Tenants,
+    string Topology,
+    ViewInfo View);
+
+/// <summary>An island the island filter left out.</summary>
+public sealed record HiddenIsland(string Id, string DisplayName);
+
+/// <summary>
+/// Traffic between a system on screen and an island the filter left out. NodeId is the system on screen. Incoming is false when it calls a system on
+/// the hidden island and true when a system there calls it. RequestsPerSecond is the traffic on the link (the callee's rate, shared evenly between its callers).
+/// </summary>
+public sealed record OffscreenLink(string NodeId, string IslandId, string IslandName, bool Incoming, double RequestsPerSecond);
+
+/// <summary>
+/// Which islands a snapshot shows. Islands is the filter that was asked for and found (empty when there is none and the whole town is shown),
+/// Unknown the ids it named that the town does not have (they are ignored), Hidden the islands left out, and Links the traffic that crosses the
+/// edge of the screen. The hub is always shown.
+/// </summary>
+public sealed record ViewInfo(
+    IReadOnlyList<string> Islands,
+    IReadOnlyList<string> Unknown,
+    IReadOnlyList<HiddenIsland> Hidden,
+    IReadOnlyList<OffscreenLink> Links);
+
+/// <summary>Where a setting's value comes from: the system's own entry, its pillar's defaults, the app-wide defaults.yaml, or the built-in default.</summary>
+[JsonConverter(typeof(JsonStringEnumConverter))]
+public enum SettingLayer
+{
+    System,
+    Pillar,
+    App,
+    BuiltIn,
+}
+
+/// <summary>
+/// One effective setting of a system. Key is its name in the YAML (errors.amber), Value what the app uses, formatted for people (5%, 300 ms),
+/// Layer which file layer it came from and Source that layer in words (pillars/cl.yaml, defaults for api).
+/// </summary>
+public sealed record ConfigValue(string Key, string Value, SettingLayer Layer, string Source);
+
+[JsonConverter(typeof(JsonStringEnumConverter))]
+public enum LinkKind
+{
+    System,
+    Vendor,
+}
+
+/// <summary>A system (or third party) another system is linked to, with the island it stands on.</summary>
+public sealed record LinkRef(string Id, string Name, LinkKind Kind, string IslandId, string IslandName);
+
+/// <summary>
+/// What the inspector shows beyond the live numbers: the system's links and its effective settings with where each came from.
+/// Calls holds the systems it calls directly (third parties included) and CalledBy the systems that call it; GatewayCalls and GatewayCalledBy are
+/// the same through the API gateway. OutsideCallers names the outside callers that reach it. ServiceTopics are the topics its service publishes.
+/// File is the registry file the system is declared in.
+/// </summary>
+public sealed record SystemDetail(
+    string Id,
+    string Name,
+    NodeKind Kind,
+    string? Service,
+    string IslandId,
+    string IslandName,
+    string File,
+    IReadOnlyList<ConfigValue> Config,
+    IReadOnlyList<LinkRef> Calls,
+    IReadOnlyList<LinkRef> CalledBy,
+    IReadOnlyList<LinkRef> GatewayCalls,
+    IReadOnlyList<LinkRef> GatewayCalledBy,
+    IReadOnlyList<string> OutsideCallers,
+    IReadOnlyList<string> ServiceTopics,
+    IReadOnlyList<SubscriptionSnapshot> Subscriptions);
+
+[JsonConverter(typeof(JsonStringEnumConverter))]
+public enum LogLevel
+{
+    Info,
+    Warn,
+    Error,
+}
+
+/// <summary>One line of a system's recent logs, newest first in a list.</summary>
+public sealed record LogLine(DateTimeOffset At, LogLevel Level, string Message);

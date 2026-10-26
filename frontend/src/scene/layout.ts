@@ -145,7 +145,12 @@ export function layoutTown(sizes: IslandSize[], capacity = DEFAULT_RING_CAPACITY
   if (capacity < MIN_RING_CAPACITY || capacity > MAX_RING_CAPACITY) throw new Error(`ring capacity ${capacity} is outside ${MIN_RING_CAPACITY} to ${MAX_RING_CAPACITY}`)
   if (pillars > maxPillars(capacity)) throw new Error(`${pillars} pillars do not fit on two rings of ${capacity} (at most ${maxPillars(capacity)})`)
   const hub = hubGeometry(pillars + (hasAirport ? 1 : 0))
-  if (pillars === 0) return { hub, islands: [], airport: null }
+  if (pillars === 0) {
+    // nothing but the hub (the island filter can leave only that): the airport, when there is one, stands alone on the first ring
+    if (!hasAirport) return { hub, islands: [], airport: null }
+    const [port] = spokeAngles([0], keepClear(hub.buildingR))
+    return { hub, islands: [], airport: { angle: 0, radius: hub.rz + SEA_LANE + airportSize.rz, portAngle: port, ring: 1 } }
+  }
 
   const all = hasAirport ? [...sizes, airportSize] : sizes
   const n = all.length
