@@ -2,7 +2,7 @@ import * as THREE from 'three'
 import type { BuildingModel, TenantYardStatus } from '../../buildings/model'
 import type { TenantUnitSnapshot } from '../../types'
 import { at, box, canvasTexture, cyl, flat, group, roundRect } from '../../buildings/mk'
-import { isShown, isThrottled, fillOf, tenantLevel, yardLayout, yardSummary, type TenantLevel, type TenantView } from '../../tenants'
+import { isFollowed, isFollowing, isShown, isThrottled, fillOf, tenantLevel, yardLayout, yardSummary, type TenantLevel, type TenantView } from '../../tenants'
 
 const W = 7.0
 const D = 6.4
@@ -125,7 +125,7 @@ export function storageYard(accent: string): BuildingModel {
   const roof = group(at(cyl(0.07, 0.09, 3.4, flat('#8a949e'), {}, 6), W / 2 - 0.4, 0, -D / 2 + 0.5))
   const units = new Map<string, Unit>()
   let status: TenantYardStatus = { units: [], sign: { text: 'no tenants', note: '' } }
-  let view: TenantView = { hideTest: false, tenant: null }
+  let view: TenantView = { hideTest: false, tenants: [] }
   let pulse = 0
 
   const frameGeo = new THREE.EdgesGeometry(new THREE.BoxGeometry(1, TALL, 1))
@@ -182,7 +182,7 @@ export function storageYard(accent: string): BuildingModel {
       const slot = slotOf.get(u.id)
       unit.shown = slot !== undefined && isShown(u, view)
       unit.object.visible = unit.shown
-      unit.dimmed = view.tenant !== null && view.tenant !== u.id
+      unit.dimmed = isFollowing(view) && !isFollowed(view, u.id)
       if (slot) {
         unit.object.position.set(slot.x, 0, slot.z)
         unit.size = slot.size
@@ -230,7 +230,7 @@ export function storageYard(accent: string): BuildingModel {
         const hot = unit.level === 'amber' || unit.level === 'red'
         unit.material.emissive.set(unit.level === 'red' ? '#ff2020' : '#ff9a10')
         unit.material.emissiveIntensity = hot ? (unit.throttled ? 0.25 + 0.35 * pulse : 0.18) : 0
-        if (view.tenant !== null && view.tenant === unit.id) {
+        if (isFollowing(view) && isFollowed(view, unit.id)) {
           unit.material.emissive.set('#ffffff')
           unit.material.emissiveIntensity = 0.25
         }

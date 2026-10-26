@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { ALL_TENANTS, carShown, fillOf, pickTenant, shownUnits, tenantLevel, yardLayout, yardSummary, type TenantView } from '../../src/tenants'
+import { ALL_TENANTS, carShown, fillOf, groupTenants, pickTenant, pruneTenants, shownUnits, tenantLabel, tenantLevel, tenantTrouble, toggleTenant, yardLayout, yardSummary, type TenantView } from '../../src/tenants'
 import { planPads, planIsland } from '../../src/scene/plan'
 import { summariseService } from '../../src/scene/service'
 import { worstState } from '../../src/visuals'
@@ -42,7 +42,7 @@ describe('the yard sign', () => {
     expect(yardSummary([unit('Customer', 'Healthy')], ALL_TENANTS, 0.05).text).toBe('1 tenant, 0 throttled')
   })
   it('leaves hidden test tenants out of the counts and says so', () => {
-    const s = yardSummary(units, { hideTest: true, tenant: null }, 0.05)
+    const s = yardSummary(units, { hideTest: true, tenants: [] }, 0.05)
     expect(s.text).toBe('3 tenants, 1 throttled')
     expect(s.note).toBe('1 unknown · 1 test hidden')
   })
@@ -51,7 +51,7 @@ describe('the yard sign', () => {
     expect(yardSummary([unit('Customer', 'Healthy', null)], ALL_TENANTS, 0.05).throttled).toBe(0)
   })
   it('hides only test tenants', () => {
-    expect(shownUnits(units, { hideTest: true, tenant: null }).map((u) => u.kind)).toEqual(['Customer', 'Customer', 'Unknown'])
+    expect(shownUnits(units, { hideTest: true, tenants: [] }).map((u) => u.kind)).toEqual(['Customer', 'Customer', 'Unknown'])
   })
   it('stands a unit as high as the capacity it uses, and low when there is no reading', () => {
     expect(fillOf({ utilisation: 0.8 })).toBe(0.8)
@@ -100,15 +100,20 @@ describe('the tenant of a car', () => {
     expect(carShown('q', kinds, ALL_TENANTS)).toBe(true)
     expect(carShown(null, kinds, ALL_TENANTS)).toBe(true)
   })
+  it('draws the cars of every followed tenant, and of nobody else', () => {
+    expect(carShown('a', kinds, view({ tenants: ['a', 'q'] }))).toBe(true)
+    expect(carShown('q', kinds, view({ tenants: ['a', 'q'] }))).toBe(true)
+    expect(carShown('z', kinds, view({ tenants: ['a', 'q'] }))).toBe(false)
+  })
   it('draws only the followed tenant', () => {
-    expect(carShown('a', kinds, view({ tenant: 'a' }))).toBe(true)
-    expect(carShown('q', kinds, view({ tenant: 'a' }))).toBe(false)
-    expect(carShown(null, kinds, view({ tenant: 'a' }))).toBe(false)
+    expect(carShown('a', kinds, view({ tenants: ['a'] }))).toBe(true)
+    expect(carShown('q', kinds, view({ tenants: ['a'] }))).toBe(false)
+    expect(carShown(null, kinds, view({ tenants: ['a'] }))).toBe(false)
   })
   it('leaves out test tenants when they are hidden, even a followed one', () => {
     expect(carShown('q', kinds, view({ hideTest: true }))).toBe(false)
     expect(carShown('a', kinds, view({ hideTest: true }))).toBe(true)
-    expect(carShown('q', kinds, view({ hideTest: true, tenant: 'q' }))).toBe(false)
+    expect(carShown('q', kinds, view({ hideTest: true, tenants: ['q'] }))).toBe(false)
   })
 })
 
@@ -190,5 +195,57 @@ describe('the tenants the backend sends (tenants-town)', () => {
     bad.groups.find((g: { id: string }) => g.id === 'aa').nodes.find((x: { id: string }) => x.id === 'aa.orders-db').tenants = [{ id: 1 }]
     const { snapshot, problems } = checkSnapshot(bad)
     expect(snapshot === null || problems.length > 0).toBe(true)
+  })
+})
+
+describe('the tenant dropdown', () => {
+  const list: TenantInfo[] = [
+    { id: '7f3a-guid', name: 'Zed Bank', kind: 'Customer', share: 0.4 },
+    { id: 'acme', name: 'Acme', kind: 'Customer', share: 0.4 },
+    { id: 'qa', name: 'QA run', kind: 'Test', share: 0.05 },
+    { id: 'ghost', name: 'ghost', kind: 'Unknown', share: 0.15 },
+  ]
+  it('groups customers, then test tenants, then unknown ones, each by name', () => {
+    const g = groupTenants(list)
+    expect(g.map((x) => x.key)).toEqual(['Customer', 'Test', 'Unknown'])
+    expect(g[0].tenants.map((t) => t.name)).toEqual(['Acme', 'Zed Bank'])
+  })
+  it('finds a tenant by a part of its name or of its id, and leaves empty groups out', () => {
+    expect(groupTenants(list, 'zed').flatMap((g) => g.tenants.map((t) => t.id))).toEqual(['7f3a-guid'])
+    expect(groupTenants(list, '7f3a').flatMap((g) => g.tenants.map((t) => t.id))).toEqual(['7f3a-guid'])
+    expect(groupTenants(list, 'bank zed').length).toBe(1)
+    expect(groupTenants(list, 'nothing')).toEqual([])
+  })
+  it('ticks and unticks tenants one at a time', () => {
+    const one = toggleTenant(ALL_TENANTS, 'acme')
+    const two = toggleTenant(one, 'qa')
+    expect(two.tenants).toEqual(['acme', 'qa'])
+    expect(toggleTenant(two, 'acme').tenants).toEqual(['qa'])
+    expect(ALL_TENANTS.tenants).toEqual([])
+  })
+  it('lets go of followed tenants the environment no longer lists', () => {
+    const v = { hideTest: true, tenants: ['acme', 'gone'] }
+    expect(pruneTenants(v, list).tenants).toEqual(['acme'])
+    expect(pruneTenants({ hideTest: false, tenants: ['acme'] }, list)).toEqual({ hideTest: false, tenants: ['acme'] })
+  })
+  it('labels the button', () => {
+    expect(tenantLabel(ALL_TENANTS, list)).toBe('All tenants')
+    expect(tenantLabel({ hideTest: false, tenants: ['acme'] }, list)).toBe('Acme')
+    expect(tenantLabel({ hideTest: false, tenants: ['acme', 'qa'] }, list)).toBe('2 tenants')
+    expect(tenantLabel({ hideTest: true, tenants: [] }, list)).toBe('All tenants · no test')
+  })
+  it('marks the tenants in trouble, the worst unit deciding, and never a test tenant red', () => {
+    const u = (id: string, kind: TenantUnitSnapshot['kind'], state: TenantUnitSnapshot['state']) => ({ ...unit(kind, state), id })
+    const t = tenantTrouble([
+      { tenants: [u('acme', 'Customer', 'Degraded'), u('ok', 'Customer', 'Healthy'), u('qa', 'Test', 'Down')] },
+      { tenants: [u('acme', 'Customer', 'Down')] },
+      { tenants: null },
+    ])
+    expect(Object.fromEntries(t)).toEqual({ acme: 'red', qa: 'amber' })
+  })
+  it('reads the staging fixture: ghost-co is unknown and test tenants are grouped apart', () => {
+    const g = groupTenants(staging.tenants)
+    expect(g.map((x) => x.key)).toEqual(['Customer', 'Test', 'Unknown'])
+    expect(g[2].tenants.map((t) => t.id)).toEqual(['ghost-co'])
   })
 })

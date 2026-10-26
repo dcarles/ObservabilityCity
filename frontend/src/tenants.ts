@@ -1,20 +1,26 @@
 // How tenants look, as pure functions: units from a snapshot in, colours, heights, counts and sign text out.
 // Nothing here touches three.js, so it is unit tested against the same golden fixture as the backend.
 
-import type { TenantInfo, TenantUnitSnapshot } from './types'
+import type { NodeSnapshot, TenantInfo, TenantUnitSnapshot } from './types'
 import { clamp } from './visuals'
 
 /** The colour of a tenant's unit. Grey is a database that was not found or has no fresh data. */
 export type TenantLevel = 'green' | 'amber' | 'red' | 'grey'
 
-/** What the viewer chose to see of the tenants: hide the test ones, and/or follow one tenant. */
+/** What the viewer chose to see of the tenants: hide the test ones, and/or follow some tenants. */
 export interface TenantView {
   hideTest: boolean
-  /** The tenant to follow, or null for all of them. Everything else is dimmed, and only its cars are drawn. */
-  tenant: string | null
+  /** The tenants to follow; empty for all of them. Every other tenant's unit is dimmed, and only the followed tenants' cars are drawn. */
+  tenants: readonly string[]
 }
 
-export const ALL_TENANTS: TenantView = { hideTest: false, tenant: null }
+export const ALL_TENANTS: TenantView = { hideTest: false, tenants: [] }
+
+/** True when the viewer follows some tenants (and not simply all of them). */
+export const isFollowing = (view: TenantView): boolean => view.tenants.length > 0
+
+/** True when this tenant is one the viewer follows. Nobody is followed when the selection is empty. */
+export const isFollowed = (view: TenantView, id: string): boolean => view.tenants.includes(id)
 
 /**
  * Green, amber or red from the unit's state, which the backend worked out against the store's thresholds. A test tenant is amber at worst
@@ -129,7 +135,56 @@ export function pickTenant(tenants: readonly Pick<TenantInfo, 'id' | 'share'>[],
 
 /** Whether a car carrying this tenant is drawn. A car with no tenant (an environment without tenants) always is. */
 export function carShown(tenant: string | null, kinds: ReadonlyMap<string, TenantInfo['kind']>, view: TenantView): boolean {
-  if (tenant === null) return view.tenant === null
-  if (view.tenant !== null && tenant !== view.tenant) return false
+  if (tenant === null) return !isFollowing(view)
+  if (isFollowing(view) && !isFollowed(view, tenant)) return false
   return !(view.hideTest && kinds.get(tenant) === 'Test')
+}
+
+/** Adds the tenant to the followed ones, or takes it out when it is already followed. */
+export function toggleTenant(view: TenantView, id: string): TenantView {
+  return { ...view, tenants: isFollowed(view, id) ? view.tenants.filter((t) => t !== id) : [...view.tenants, id] }
+}
+
+/** Drops followed tenants the environment no longer lists. Returns the same view when nothing changed. */
+export function pruneTenants(view: TenantView, listed: readonly Pick<TenantInfo, 'id'>[]): TenantView {
+  const keep = view.tenants.filter((id) => listed.some((t) => t.id === id))
+  return keep.length === view.tenants.length ? view : { ...view, tenants: keep }
+}
+
+export interface TenantGroup {
+  key: 'Customer' | 'Test' | 'Unknown'
+  title: string
+  tenants: TenantInfo[]
+}
+
+/** The tenants whose name or id contains every word typed, in groups: customers first, then test tenants, then ones nobody listed. Empty groups are left out. */
+export function groupTenants(list: readonly TenantInfo[], query = ''): TenantGroup[] {
+  const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean)
+  const match = (t: TenantInfo) => words.every((w) => `${t.name} ${t.id}`.toLowerCase().includes(w))
+  const groups: TenantGroup[] = [
+    { key: 'Customer', title: 'Customers', tenants: [] },
+    { key: 'Test', title: 'Test tenants', tenants: [] },
+    { key: 'Unknown', title: 'Unknown (not on the list)', tenants: [] },
+  ]
+  for (const t of list) if (match(t)) groups.find((g) => g.key === t.kind)!.tenants.push(t)
+  for (const g of groups) g.tenants.sort((a, b) => a.name.localeCompare(b.name))
+  return groups.filter((g) => g.tenants.length > 0)
+}
+
+/** The tenants in trouble right now, by id: the worst unit of that tenant on any tenant database. Tenants that are fine are not in the map. */
+export function tenantTrouble(nodes: readonly Pick<NodeSnapshot, 'tenants'>[]): Map<string, 'amber' | 'red'> {
+  const out = new Map<string, 'amber' | 'red'>()
+  for (const n of nodes)
+    for (const u of n.tenants ?? []) {
+      const level = tenantLevel(u)
+      if (level !== 'amber' && level !== 'red') continue
+      if (level === 'red' || !out.has(u.id)) out.set(u.id, level)
+    }
+  return out
+}
+
+/** What the tenant button says: "All tenants", the one followed, or how many. */
+export function tenantLabel(view: TenantView, list: readonly Pick<TenantInfo, 'id' | 'name'>[]): string {
+  const base = view.tenants.length === 0 ? 'All tenants' : view.tenants.length === 1 ? (list.find((t) => t.id === view.tenants[0])?.name ?? view.tenants[0]) : `${view.tenants.length} tenants`
+  return view.hideTest ? `${base} · no test` : base
 }

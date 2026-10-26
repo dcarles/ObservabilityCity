@@ -47,9 +47,7 @@ export class TopBar {
     const day = s ? clock(s.dayFraction) : ''
     const stale = s ? staleCount(s) : 0
     $('topbar-left').innerHTML = `
-      <span class="brand">Observability City</span>
-      ${s ? `<span class="town">${escapeHtml(s.townName)}</span>` : ''}
-      ${s && s.environments.length > 1 ? `<span class="env" id="env-label" title="The environment this page shows">${escapeHtml(s.environmentName)}</span>` : ''}`
+      ${s ? `<span class="town">${escapeHtml(s.townName)}</span>` : ''}`
     $('topbar-right').innerHTML = `
       <span class="spacer"></span>
       ${t ? `
@@ -120,7 +118,7 @@ function tenantRows(n: NodeSnapshot, view: TenantView): string {
     worst.map((u) => `<div class="row"><span>${escapeHtml(u.name)}${u.kind === 'Test' ? ' (test)' : u.kind === 'Unknown' ? ' (unknown)' : ''}</span><span>${u.utilisation == null ? '–' : `${Math.round(u.utilisation * 100)}%`}${(u.throttled ?? 0) > 0 ? ` · ${(u.throttled! * 100).toFixed(0)}% refused` : ''}</span></div>`).join('')
 }
 
-export function showTooltip(n: NodeSnapshot | null, x: number, y: number, view: TenantView = { hideTest: false, tenant: null }): void {
+export function showTooltip(n: NodeSnapshot | null, x: number, y: number, view: TenantView = { hideTest: false, tenants: [] }): void {
   const el = $('tooltip')
   if (!n) { el.hidden = true; return }
   const cls = n.state === 'Healthy' ? 'ok' : n.state === 'Degraded' ? 'warn' : n.state === 'Down' ? 'bad' : 'stale'
@@ -139,15 +137,12 @@ export function showTooltip(n: NodeSnapshot | null, x: number, y: number, view: 
   el.style.top = `${Math.min(y + 16, window.innerHeight - h - 8)}px`
 }
 
-/** What the panel needs from the page to pick an environment and a tenant. */
+/** What the panel needs from the page: the environment to steer, and the tenants and the view the top bar picked. */
 export interface ViewControls {
   /** The environment the page asked for (null for the default). */
   env: string | null
-  environments(): { id: string; name: string; current: boolean }[]
   tenants(): TenantInfo[]
   view(): TenantView
-  setView(v: TenantView): void
-  switchEnv(id: string): void
 }
 
 interface FxState { calm: boolean; effects: { id: string; target: string; kind: string; intensity: number }[] }
@@ -180,35 +175,11 @@ export class PreviewPanel {
     await this.refresh()
   }
 
-  /** The environment picker and the tenant filter, at the top of the panel. */
-  private viewHtml(): string {
-    const v = this.view
-    const envs = v.environments()
-    const tenants = v.tenants()
-    const sel = v.view()
-    return `
-      ${envs.length > 1 ? `<label>Environment</label>
-      <select id="env-select">${envs.map((e) => `<option value="${escapeHtml(e.id)}" ${e.current ? 'selected' : ''}>${escapeHtml(e.name)}</option>`).join('')}</select>` : ''}
-      ${tenants.length > 0 ? `<label>Tenant</label>
-      <select id="tenant-select"><option value="">All tenants</option>${tenants.map((t) => `<option value="${escapeHtml(t.id)}" ${t.id === sel.tenant ? 'selected' : ''}>${escapeHtml(t.name)}${t.kind === 'Test' ? ' (test)' : t.kind === 'Unknown' ? ' (unknown)' : ''}</option>`).join('')}</select>
-      <label class="check"><input type="checkbox" id="hide-test" ${sel.hideTest ? 'checked' : ''} /> Hide test tenants</label>` : ''}`
-  }
-
-  private wireView(): void {
-    const v = this.view
-    this.el.querySelector<HTMLSelectElement>('#env-select')?.addEventListener('change', (e) => v.switchEnv((e.target as HTMLSelectElement).value))
-    this.el.querySelector<HTMLSelectElement>('#tenant-select')?.addEventListener('change', (e) => {
-      v.setView({ ...v.view(), tenant: (e.target as HTMLSelectElement).value || null })
-    })
-    this.el.querySelector<HTMLInputElement>('#hide-test')?.addEventListener('change', (e) => v.setView({ ...v.view(), hideTest: (e.target as HTMLInputElement).checked }))
-  }
-
   render(): void {
     this.el.dataset.collapsed = String(this.collapsed)
     this.el.innerHTML = `
       <div class="head"><h3>Try it (preview)</h3><button id="fold">${this.collapsed ? '▾' : '▴'}</button></div>
       <p class="note">Temporary controls for this slice. The final Break things panel comes later.</p>
-      ${this.viewHtml()}
       <label>Target</label>
       <div class="combo"><input id="target" type="text" placeholder="Type to find a target" autocomplete="off" spellcheck="false" /><div id="target-results" class="picker-results" hidden></div></div>
       <div class="grid">
@@ -219,7 +190,7 @@ export class PreviewPanel {
         <button data-fx="HighCpu" data-i="1">High CPU</button>
         <button data-fx="HighMemory" data-i="1">High memory</button>
         <button data-fx="Saturate" data-i="1">DB saturated</button>
-        <button id="tenant-throttle" title="Saturate the chosen target's database for the tenant picked above (or the first customer)">Tenant DB throttled</button>
+        <button id="tenant-throttle" title="Saturate the chosen target's database for the tenant picked in the top bar (or the first customer if none or several)">Tenant DB throttled</button>
         <button data-fx="Backlog" data-i="1">Queue backs up</button>
         <button data-fx="Poison" data-i="1">Dead letters</button>
         <button data-fx="Down" data-i="1">Down</button>
@@ -240,11 +211,11 @@ export class PreviewPanel {
     this.el.querySelectorAll<HTMLButtonElement>('[data-fx]').forEach((b) =>
       b.addEventListener('click', () => void this.send('/effects', 'POST', { target: this.target, kind: b.dataset.fx, intensity: Number(b.dataset.i) })))
     this.el.querySelector('#tenant-throttle')!.addEventListener('click', () => {
-      const tenant = this.view.view().tenant ?? this.view.tenants().find((t) => t.kind === 'Customer')?.id
+      const followed = this.view.view().tenants
+      const tenant = followed.length === 1 ? followed[0] : this.view.tenants().find((t) => t.kind === 'Customer')?.id
       if (!tenant) return
       void this.send('/effects', 'POST', { target: `${this.target}#${tenant}`, kind: 'Saturate', intensity: 1 })
     })
-    this.wireView()
     this.el.querySelector('#reset')!.addEventListener('click', () => void this.send('/effects', 'DELETE'))
     this.el.querySelector('#calm')!.addEventListener('click', () => void this.send('/calm', 'POST', { on: !this.state.calm }))
     this.el.querySelectorAll<HTMLElement>('.fxchip').forEach((c) => c.addEventListener('click', () => void this.send(`/effects/${c.dataset.id}`, 'DELETE')))

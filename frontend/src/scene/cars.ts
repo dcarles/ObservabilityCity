@@ -139,7 +139,7 @@ export class CarSystem {
   private nextId = 1
   private tenants: readonly TenantInfo[] = []
   private readonly tenantKinds = new Map<string, TenantInfo['kind']>()
-  private view: TenantView = { hideTest: false, tenant: null }
+  private view: TenantView = { hideTest: false, tenants: [] }
   /** Cars drawn in the last frame, so tests can tell whether the filter hides them. */
   private shown = 0
   private time = 0

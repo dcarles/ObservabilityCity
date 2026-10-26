@@ -5,7 +5,8 @@ import { Town } from './scene/town'
 import { loadKit } from './assets/kit'
 import { Connection, requestedEnv } from './connection'
 import { NoticesPanel, PreviewPanel, Search, ServicePanel, showTooltip, StateList, TopBar, type SearchItem } from './ui'
-import { ALL_TENANTS, type TenantView } from './tenants'
+import { ALL_TENANTS, pruneTenants, type TenantView } from './tenants'
+import { ViewBar } from './viewbar'
 import type { PickItem } from './picker'
 import type { Snapshot, TenantInfo } from './types'
 import { checkSnapshot } from './snapshotGuard'
@@ -65,8 +66,19 @@ async function start(): Promise<void> {
   const setTenantView = (v: TenantView): void => {
     tenantView = v
     town.setTenantView(v)
-    void preview.render()
+    viewBar.refresh()
   }
+  const viewBar = new ViewBar({
+    env,
+    view: () => tenantView,
+    setView: (v) => setTenantView(v),
+    // a different environment is a different town: load the page again for it, so nothing of the old one is left behind
+    switchEnv: (id) => {
+      const u = new URL(window.location.href)
+      u.searchParams.set('env', id)
+      window.location.href = u.toString()
+    },
+  })
   const servicePanel = new ServicePanel((id) => goTo({ kind: 'building', id, name: id, where: '' }))
   const preview = new PreviewPanel(() => [
     { kind: 'town', id: '*', name: 'Whole town', where: '' },
@@ -75,16 +87,8 @@ async function start(): Promise<void> {
     ...buildingItems(),
   ], {
     env,
-    environments: () => (seen.last?.environments ?? []).map((e) => ({ id: e.id, name: e.name, current: e.id === seen.last?.environment })),
     tenants: () => (seen.last?.tenants ?? []) as TenantInfo[],
     view: () => tenantView,
-    setView: setTenantView,
-    // a different environment is a different town: load the page again for it, so nothing of the old one is left behind
-    switchEnv: (id) => {
-      const u = new URL(window.location.href)
-      u.searchParams.set('env', id)
-      window.location.href = u.toString()
-    },
   })
 
   const search = new Search(() => [...islandItems(), ...airportItem(), ...buildingItems()], goTo)
@@ -93,7 +97,6 @@ async function start(): Promise<void> {
   // What the page has shown so far, for tests and for poking from the console.
   const seen = { snapshots: 0, rejected: 0, buildErrors: 0, buildMs: 0, last: null as Snapshot | null }
   const reportedProblems = new Set<string>()
-  let tenantsShown = 0
 
   function onSnapshot(raw: unknown): void {
     // A snapshot that cannot be drawn is dropped and the town keeps showing the last good one.
@@ -124,9 +127,10 @@ async function start(): Promise<void> {
         servicePanel.close()
       }
       town.apply(s)
-      // a tenant that left the environment can no longer be followed
-      if (tenantView.tenant && !(s.tenants ?? []).some((t) => t.id === tenantView.tenant)) setTenantView({ ...tenantView, tenant: null })
-      else if ((s.tenants ?? []).length !== tenantsShown) { tenantsShown = (s.tenants ?? []).length; void preview.render() }
+      // a followed tenant that left the environment can no longer be followed
+      const pruned = pruneTenants(tenantView, s.tenants ?? [])
+      if (pruned !== tenantView) setTenantView(pruned)
+      viewBar.update(s)
       const open = servicePanel.key
       if (open) {
         const sv = town.serviceSummary(open, s)
@@ -223,6 +227,8 @@ async function start(): Promise<void> {
     /** Open a service's panel as a click on its sign would. */
     openService: (key: string) => { const sv = seen.last ? town.serviceSummary(key, seen.last) : null; if (sv) servicePanel.show(sv); return sv },
     tenantView: () => tenantView,
+    /** The tenants the top bar's list shows, grouped as it groups them. */
+    tenantList: () => viewBar.listed,
     setTenantView,
     drawnCars: () => ({ drawn: town.cars.drawn, byTenant: town.cars.tenantCounts() }),
     inspectVendors: () => town.inspectVendors(),
