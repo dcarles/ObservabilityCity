@@ -104,6 +104,9 @@ public sealed record TenantUnitSnapshot(
     double? Throttled,
     double RequestsPerSecond);
 
+/// <summary>A town the server can show (Galactic Credit, Droid Shop). Each has its own registry, its own environments and its own stream of snapshots.</summary>
+public sealed record TownSummary(string Id, string Name, bool IsDefault);
+
 /// <summary>An environment the server can show (dev, staging, prod). Each has its own sources, its own tenants and its own stream of snapshots.</summary>
 public sealed record EnvironmentInfo(string Id, string Name, bool IsDefault);
 
@@ -207,6 +210,9 @@ public sealed record TownTotals(
 /// Topology says how islands reach each other: "hub-and-spoke" (every call between islands goes through the hub's gateway) or "direct".
 /// View says which islands this snapshot shows. Without a filter it is empty and the whole town is here; with one, the groups, vendors, totals,
 /// callers and dependencies hold only what is on screen, and View lists what was left out and the traffic that crosses the edge.
+/// IncidentFreeSince is when the islands shown last had an open incident (or, when they never did, when the server started watching); it is null while
+/// one of them has one open. IncidentsSeen says whether any of them has had one since the server started, so "N hours since the last incident" is
+/// not claimed for a town that has simply not been watched for long.
 /// </summary>
 public sealed record Snapshot(
     string TownId,
@@ -226,7 +232,9 @@ public sealed record Snapshot(
     IReadOnlyList<EnvironmentInfo> Environments,
     IReadOnlyList<TenantInfo> Tenants,
     string Topology,
-    ViewInfo View);
+    ViewInfo View,
+    DateTimeOffset? IncidentFreeSince,
+    bool IncidentsSeen);
 
 /// <summary>An island the island filter left out.</summary>
 public sealed record HiddenIsland(string Id, string DisplayName);

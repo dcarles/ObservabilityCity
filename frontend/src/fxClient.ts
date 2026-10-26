@@ -1,4 +1,5 @@
 import type { StoryState, StorySummary } from './story'
+import { scopeParams, type Scope } from './scope'
 
 export interface FxEffect { id: string; target: string; kind: string; intensity: number }
 
@@ -10,16 +11,17 @@ export interface FxState {
   story: StoryState
 }
 
-/** Talks to the fake generator's steering endpoints for the environment the page shows. Every call ends with the state as it is then. */
+/** Talks to the fake generator's steering endpoints for the town and environment the page shows. Every call ends with the state as it is then. */
 export class FxClient {
   private listeners: ((s: FxState) => void)[] = []
   private timer: number | undefined
   state: FxState | null = null
 
-  constructor(private readonly env: string | null, private readonly pollMs = 600) {}
+  constructor(private readonly scope: Scope, private readonly pollMs = 600) {}
 
   private url(path: string): string {
-    return `/api/fake${path}${this.env ? `?env=${encodeURIComponent(this.env)}` : ''}`
+    const query = scopeParams(this.scope)
+    return `/api/fake${path}${query ? `?${query}` : ''}`
   }
 
   onState(fn: (s: FxState) => void): void {

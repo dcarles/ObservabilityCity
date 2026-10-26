@@ -5,6 +5,29 @@
     "version": "1.0"
   },
   "paths": {
+    "/api/towns": {
+      "get": {
+        "tags": [
+          "ObservabilityCity.Host, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+        ],
+        "operationId": "GetTowns",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TownSummary"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/environments": {
       "get": {
         "tags": [
@@ -666,6 +689,7 @@
           "generatedAt",
           "groupLabel",
           "groups",
+          "incidentsSeen",
           "notices",
           "ringCapacity",
           "tenants",
@@ -755,6 +779,14 @@
           },
           "view": {
             "$ref": "#/components/schemas/ViewInfo"
+          },
+          "incidentFreeSince": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "incidentsSeen": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false
@@ -963,6 +995,26 @@
           },
           "service": {
             "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "TownSummary": {
+        "required": [
+          "id",
+          "isDefault",
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "isDefault": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false

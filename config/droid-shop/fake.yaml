@@ -1,0 +1,31 @@
+# Baseline numbers for the fake source only. Anything left out comes from the role.
+hub.edge:               { rps: 240, p99Ms: 60,  minInstances: 3 }
+hub.kafka:              { rps: 180, p99Ms: 8,   minInstances: 3 }
+hub.accounts-db:        { rps: 150, p99Ms: 18,  minInstances: 2 }
+web.storefront-api:     { rps: 210, p99Ms: 220, minInstances: 3 }
+web.catalog-api:        { rps: 190, p99Ms: 110, minInstances: 3 }
+web.catalog-worker:     { rps: 30,  p99Ms: 3500, minInstances: 1 }
+web.catalog-db:         { rps: 260, p99Ms: 16,  minInstances: 2 }
+web.search-cache:       { rps: 500, p99Ms: 2,   minInstances: 2 }
+mob.app-api:            { rps: 140, p99Ms: 260, minInstances: 2 }
+mob.app-db:             { rps: 120, p99Ms: 20,  minInstances: 1 }
+mob.session-cache:      { rps: 260, p99Ms: 2,   minInstances: 1 }
+chk.cart-api:           { rps: 90,  p99Ms: 160, minInstances: 2 }
+chk.cart-cache:         { rps: 300, p99Ms: 2,   minInstances: 2 }
+chk.orders-api:         { rps: 40,  p99Ms: 340, minInstances: 2, perInstanceRps: 30 }
+chk.orders-worker:      { rps: 36,  p99Ms: 4200, minInstances: 2 }
+chk.orders-db:          { rps: 80,  p99Ms: 24,  minInstances: 2 }
+inv.stock-api:          { rps: 170, p99Ms: 90,  minInstances: 3 }
+inv.stock-worker:       { rps: 38,  p99Ms: 3000, minInstances: 2 }
+inv.stock-db:           { rps: 210, p99Ms: 14,  minInstances: 2 }
+inv.sync-cron:          { rps: 0.2, p99Ms: 25000, minInstances: 1 }
+shp.shipments-api:      { rps: 30,  p99Ms: 150, minInstances: 1 }
+shp.shipments-worker:   { rps: 34,  p99Ms: 6000, minInstances: 2 }
+shp.shipments-db:       { rps: 50,  p99Ms: 22,  minInstances: 1 }
+shp.tracking-api:       { rps: 60,  p99Ms: 130, minInstances: 2 }
+ntf.dispatch-api:       { rps: 12,  p99Ms: 120, minInstances: 1 }
+ntf.dispatch-worker:    { rps: 70,  p99Ms: 2500, minInstances: 2 }
+ntf.dispatch-db:        { rps: 40,  p99Ms: 18,  minInstances: 1 }
+ext.payment-gateway:    { rps: 76,  p99Ms: 700, errorRate: 0.002 }
+ext.courier:            { rps: 40,  p99Ms: 1100, errorRate: 0.003 }
+ext.push:               { rps: 70,  p99Ms: 500, errorRate: 0.004 }

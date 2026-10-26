@@ -1,0 +1,39 @@
+# yaml-language-server: $schema=../schema/story.schema.json
+id: flash-sale
+name: The flash sale
+description: A sale starts, checkout feels it, the payment gateway slows, and shipping falls behind on Kafka.
+steps:
+  - at: 0
+    caption: A quiet evening. The shop hums along.
+    camera: web
+  - at: 6
+    caption: The flash sale starts. Shoppers pour into the storefront.
+    camera: web.storefront-api
+    ramp:
+      - { target: web.storefront-api, kind: Traffic, from: 0, to: 0.8, over: 14 }
+      - { target: chk.cart-api, kind: Traffic, from: 0, to: 0.6, over: 14 }
+  - at: 22
+    caption: Orders flood checkout, and the payment gateway starts to slow.
+    camera: ext.payment-gateway
+    apply:
+      - { target: chk.orders-api, kind: Traffic, intensity: 0.7 }
+      - { target: ext.payment-gateway, kind: Latency, intensity: 0.7 }
+  - at: 34
+    caption: Shipping cannot keep up with the orders topic. Its queue grows.
+    camera: shp.shipments-worker
+    apply:
+      - { target: shp.shipments-worker, kind: Backlog, intensity: 1 }
+  - at: 46
+    caption: The payment gateway is failing. Checkout is in trouble.
+    camera: chk
+    apply:
+      - { target: ext.payment-gateway, kind: Errors, intensity: 0.8 }
+      - { target: chk, kind: Incident, intensity: 0.8 }
+  - at: 62
+    caption: The sale ends and the gateway recovers. Shipping works through its backlog.
+    camera: shp
+    clear:
+      - { all: true }
+  - at: 72
+    caption: Back to normal.
+length: 78

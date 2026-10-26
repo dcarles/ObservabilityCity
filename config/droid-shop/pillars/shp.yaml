@@ -1,0 +1,14 @@
+# yaml-language-server: $schema=../schema/pillar.schema.json
+pillar: shp
+displayName: Shipping
+color: "#ffd166"
+systems:
+  - { id: shp.shipments-api, service: shipments, name: Shipments API, role: api, calls: [shp.shipments-db, ntf.dispatch-api] }
+  - { id: shp.shipments-worker, service: shipments, name: Shipments worker, role: worker, calls: [shp.shipments-db] }
+  - { id: shp.shipments-db, service: shipments, name: Shipments DB, role: db }
+  - { id: shp.tracking-api, service: tracking, name: Tracking API, role: api, external: true, calls: [shp.shipments-api] }
+messaging:
+  topics: [shipments]
+  subscriptions:
+    - { topic: chk-orders-outbox, consumer: shp.shipments-worker }
+    - { topic: inv-stock-outbox, consumer: shp.shipments-worker }

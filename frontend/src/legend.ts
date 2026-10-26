@@ -28,7 +28,7 @@ export const LEGEND: readonly LegendSection[] = [
       { id: 'database', sees: 'Tanks', means: 'A database. One tank for each tenant where each has its own', tone: 'neutral' },
       { id: 'cache', sees: 'Water tower', means: 'A cache', tone: 'neutral' },
       { id: 'cron', sees: 'Clock tower', means: 'A scheduled job', tone: 'neutral' },
-      { id: 'hub', sees: 'The island in the middle', means: 'The platform hub: API gateway, Service Bus port, central egress, shared database', tone: 'neutral' },
+      { id: 'hub', sees: 'The island in the middle', means: 'The platform hub: API gateway, message broker port (Service Bus, Kafka), central egress, shared database', tone: 'neutral' },
     ],
   },
   {
@@ -60,7 +60,7 @@ export const LEGEND: readonly LegendSection[] = [
     id: 'messaging',
     title: 'Messaging',
     entries: [
-      { id: 'boat', sees: 'Boats from the port to a pier', means: 'Messages: async traffic from the Service Bus', tone: 'neutral' },
+      { id: 'boat', sees: 'Boats from the port to a pier', means: 'Messages: async traffic from the message broker', tone: 'neutral' },
       { id: 'crates', sees: 'Crates piling up on a pier', means: 'A backlog: messages waiting for a worker', tone: 'amber' },
       { id: 'pen', sees: 'Broken crates in a pen, a red beam and a count', means: 'Dead letters', tone: 'red' },
       { id: 'pennant', sees: 'Amber pennant', means: 'A worker still reads the old egress topic: a legacy route to migrate', tone: 'amber' },

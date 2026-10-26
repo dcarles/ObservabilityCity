@@ -149,6 +149,10 @@ export class CarSystem {
   private enabled = true
   /** Buildings a layer hides: no car drives to or from them. */
   private hidden: ReadonlySet<Building> = new Set()
+  /** The share of the usual number of cars that are sent out: 1 for every car, less on a weak PC (see the quality presets). */
+  density = 1
+  /** Cars sent out since the town was built. For tests. */
+  sent = 0
   /** Failed requests that stopped at the door and drove back the way they came, since the town was built. For tests. */
   turnedAway = 0
   /** Cars drawn with a red flag right now. For tests. */
@@ -241,7 +245,7 @@ export class CarSystem {
       if (this.hidden.has(plan.route.dest) || this.hidden.has(plan.route.source as Building)) continue
       const n = plan.route.dest.node
       if (!n || (n.state !== 'Healthy' && n.state !== 'Degraded')) continue
-      const a = (this.acc.get(plan) ?? Math.random()) + spawnRate(n.requestsPerSecond) * TRAFFIC * plan.route.share * dt
+      const a = (this.acc.get(plan) ?? Math.random()) + spawnRate(n.requestsPerSecond) * TRAFFIC * this.density * plan.route.share * dt
       // a car that cannot leave yet (the road is not clear) waits its turn, up to a few
       let owed = a
       while (owed >= 1 && this.cars.length < this.max && this.spawn(plan)) owed -= 1
@@ -447,6 +451,7 @@ export class CarSystem {
     const len = Math.hypot(car.dx, car.dz) || 1
     car.dx /= len; car.dz /= len
     this.cars.push(car)
+    this.sent++
     return true
   }
 

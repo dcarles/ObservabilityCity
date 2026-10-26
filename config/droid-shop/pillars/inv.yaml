@@ -1,0 +1,13 @@
+# yaml-language-server: $schema=../schema/pillar.schema.json
+pillar: inv
+displayName: Inventory
+color: "#4dc3c9"
+systems:
+  - { id: inv.stock-api, service: stock, name: Stock API, role: api, calls: [inv.stock-db] }
+  - { id: inv.stock-worker, service: stock, name: Stock worker, role: worker, calls: [inv.stock-db] }
+  - { id: inv.stock-db, service: stock, name: Stock DB, role: db }
+  - { id: inv.sync-cron, name: Warehouse sync, role: cron, calls: [inv.stock-api] }
+messaging:
+  topics: [stock]
+  subscriptions:
+    - { topic: chk-orders-outbox, consumer: inv.stock-worker }

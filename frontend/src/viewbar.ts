@@ -4,11 +4,14 @@ import { groupTenants, tenantLabel, tenantTrouble, toggleTenant, type TenantView
 import { islandChoices, islandsLabel, searchIslands, type IslandChoice } from './islands'
 import { LAYERS, layersLabel, type Layer, type LayerState } from './layers'
 import { THEMES, type ThemeInfo } from './themes'
+import { QUALITIES, qualityName, type Quality } from './quality'
+import type { TownChoice } from './scope'
 
 /** What the view bar needs from the page. */
 export interface ViewBarHost {
-  /** The environment the page asked for (null for the default). */
-  env: string | null
+  /** The towns the server runs (none or one means there is nothing to switch to). */
+  towns(): TownChoice[]
+  switchTown(town: TownChoice): void
   view(): TenantView
   setView(v: TenantView): void
   switchEnv(id: string): void
@@ -19,12 +22,14 @@ export interface ViewBarHost {
   toggleLayer(layer: Layer): void
   theme(): ThemeInfo
   setTheme(id: string): void
+  quality(): Quality
+  setQuality(q: Quality): void
 }
 
-type Open = 'env' | 'tenant' | 'islands' | 'layers' | 'theme' | null
+type Open = 'town' | 'env' | 'tenant' | 'islands' | 'layers' | 'theme' | 'quality' | null
 
 /**
- * The dropdowns in the top bar: the environment, the tenants and the islands to look at, the layers to draw and the theme. It lives outside the
+ * The dropdowns in the top bar: the town, the environment, the tenants and the islands to look at, the layers to draw, the theme and the quality. It lives outside the
  * halves of the bar that are redrawn with every snapshot, so an open list keeps its place and its typed text, and it only redraws when what it shows
  * has changed.
  */
@@ -35,6 +40,8 @@ export class ViewBar {
   private key = ''
   private environments: EnvironmentInfo[] = []
   private current = ''
+  private townId = ''
+  private townName = ''
   private tenants: TenantInfo[] = []
   private choices: IslandChoice[] = []
   private trouble = new Map<string, 'amber' | 'red'>()
@@ -66,6 +73,8 @@ export class ViewBar {
   update(s: Snapshot): void {
     this.environments = s.environments
     this.current = s.environment
+    this.townId = s.townId
+    this.townName = s.townName
     this.tenants = s.tenants
     this.choices = islandChoices(s)
     this.trouble = tenantTrouble(s.groups.flatMap((g) => g.nodes))
@@ -95,11 +104,21 @@ export class ViewBar {
     if (!act) return
     const view = this.host.view()
     switch (act.dataset.act) {
+      case 'open-town': this.toggle('town'); break
       case 'open-env': this.toggle('env'); break
       case 'open-tenant': this.toggle('tenant'); break
       case 'open-islands': this.toggle('islands'); break
       case 'open-layers': this.toggle('layers'); break
       case 'open-theme': this.toggle('theme'); break
+      case 'open-quality': this.toggle('quality'); break
+      case 'town': {
+        this.open = null
+        const town = this.host.towns().find((t) => t.id === act.dataset.id)
+        if (town && town.id !== this.townId) this.host.switchTown(town)
+        else this.render()
+        break
+      }
+      case 'quality': this.open = null; this.host.setQuality(act.dataset.id as Quality); this.render(); break
       case 'env': this.open = null; if (act.dataset.id !== this.current) this.host.switchEnv(act.dataset.id!); else this.render(); break
       case 'tenant': this.host.setView(toggleTenant(view, act.dataset.id!)); break
       case 'all': this.host.setView({ ...view, tenants: [] }); break
@@ -121,12 +140,18 @@ export class ViewBar {
     const islands = this.host.islands()
     const layers = this.host.layers()
     const theme = this.host.theme()
-    const key = JSON.stringify([this.open, this.query, this.current, this.environments, this.tenants.map((t) => t.id + t.kind), view, [...this.trouble], this.choices, islands, layers, theme.id])
+    const towns = this.host.towns()
+    const quality = this.host.quality()
+    const key = JSON.stringify([this.open, this.query, this.townId, towns, quality, this.current, this.environments, this.tenants.map((t) => t.id + t.kind), view, [...this.trouble], this.choices, islands, layers, theme.id])
     if (key === this.key) return
     this.key = key
     const envName = this.environments.find((e) => e.id === this.current)?.name ?? this.current
     const button = (act: string, id: string, label: string, title: string, on: boolean) =>
       `<button data-act="${act}" id="${id}" class="vb-btn ${on ? 'on' : ''}" title="${title}">${escapeHtml(label)} <i>▾</i></button>`
+    const townBtn = towns.length > 1
+      ? `<div class="vb">${button('open-town', 'town-button', this.townName || this.townId, 'Town', this.open === 'town')}
+          ${this.open === 'town' ? `<div class="vb-list" id="town-list">${towns.map((t) => `<div class="vb-row ${t.id === this.townId ? 'sel' : ''}" data-act="town" data-id="${escapeHtml(t.id)}"><span>${escapeHtml(t.name)}</span><small>${escapeHtml(t.id)}${t.isDefault ? ' · default' : ''}</small></div>`).join('')}</div>` : ''}</div>`
+      : ''
     const envBtn = this.environments.length > 1
       ? `<div class="vb">${button('open-env', 'env-button', envName, 'Environment', this.open === 'env')}
           ${this.open === 'env' ? `<div class="vb-list" id="env-list">${this.environments.map((e) => `<div class="vb-row ${e.id === this.current ? 'sel' : ''}" data-act="env" data-id="${escapeHtml(e.id)}"><span>${escapeHtml(e.name)}</span><small>${escapeHtml(e.id)}${e.isDefault ? ' · default' : ''}</small></div>`).join('')}</div>` : ''}</div>`
@@ -143,7 +168,9 @@ export class ViewBar {
           ${this.open === 'layers' ? `<div class="vb-list" id="layers-list">${LAYERS.map((l) => `<div class="vb-row" data-act="layer" data-id="${l.id}" id="layer-${l.id}"><input type="checkbox" ${layers[l.id] ? 'checked' : ''} tabindex="-1" /><span>${l.label}<br /><small class="hint">${escapeHtml(l.hint)}</small></span></div>`).join('')}</div>` : ''}</div>`
     const themeBtn = `<div class="vb">${button('open-theme', 'theme-button', theme.name, 'Theme', this.open === 'theme')}
           ${this.open === 'theme' ? `<div class="vb-list" id="theme-list">${THEMES.map((th) => `<div class="vb-row ${th.id === theme.id ? 'sel' : ''}" data-act="theme" data-id="${th.id}"><span>${escapeHtml(th.name)}<br /><small class="hint">${escapeHtml(th.blurb)}</small></span></div>`).join('')}</div>` : ''}</div>`
-    this.el.innerHTML = envBtn + tenantBtn + islandBtn + layerBtn + themeBtn
+    const qualityBtn = `<div class="vb">${button('open-quality', 'quality-button', qualityName(quality), 'Quality: how much detail the town is drawn with. Lower it on a weak PC', this.open === 'quality')}
+          ${this.open === 'quality' ? `<div class="vb-list" id="quality-list">${QUALITIES.map((q) => `<div class="vb-row ${q.id === quality ? 'sel' : ''}" data-act="quality" data-id="${q.id}"><span>${escapeHtml(q.name)}<br /><small class="hint">${escapeHtml(q.hint)}</small></span></div>`).join('')}</div>` : ''}</div>`
+    this.el.innerHTML = townBtn + envBtn + tenantBtn + islandBtn + layerBtn + themeBtn + qualityBtn
     if (keepFocus) {
       const input = this.el.querySelector<HTMLInputElement>('.vb-list input[type=search]')
       if (input) { input.focus(); input.setSelectionRange(this.query.length, this.query.length) }

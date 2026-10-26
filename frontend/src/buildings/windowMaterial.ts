@@ -9,6 +9,12 @@ export interface WindowUniforms {
   uSeed: { value: number }
 }
 
+/**
+ * How strongly lit windows glow, shared by every building. The stage moves it with the lighting: a low sun makes the windows brighter, so a town
+ * at dusk still reads from far away.
+ */
+export const WINDOW_GLOW = { value: 1 }
+
 export interface WindowSpec {
   /** Wall colour. */
   color: string
@@ -55,6 +61,7 @@ export function makeWindowMaterial(spec: WindowSpec): { material: THREE.MeshStan
 
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms, {
+      uGlow: WINDOW_GLOW,
       uCell: { value: new THREE.Vector2(cell, spec.floorHeight) },
       uWin: { value: new THREE.Vector2(win[0], win[1]) },
       uOffX: { value: odd(spec.width) },
@@ -78,6 +85,7 @@ export function makeWindowMaterial(spec: WindowSpec): { material: THREE.MeshStan
 varying vec3 vObjNormal;
 varying vec3 vLocal;
 varying vec2 vWinUv;
+uniform float uGlow;
 uniform float uLit, uDark, uStale, uSeed, uOffX, uOffZ, uRadial, uBrick, uLodNear, uLodFar;
 uniform vec2 uCell, uWin;
 uniform vec3 uGlass, uLitColor, uDeadColor, uTrim;
@@ -140,7 +148,7 @@ float crack = 0.0;`,
       .replace(
         '#include <emissivemap_fragment>',
         `#include <emissivemap_fragment>
-totalEmissiveRadiance += uLitColor * winLit * 1.5;`,
+totalEmissiveRadiance += uLitColor * winLit * 1.5 * uGlow;`,
       )
   }
   material.customProgramCacheKey = () => key

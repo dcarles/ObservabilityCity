@@ -2,10 +2,11 @@ import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { palette } from '../themes/harbour-town/palette'
 import { LIGHTING, type Lighting } from '../lighting'
+import { WINDOW_GLOW } from '../buildings/windowMaterial'
+import { QUALITY_PRESETS, pixelRatioFor, stepDown, type Quality, type QualityPreset } from '../quality'
 
-export type Quality = 'high' | 'medium' | 'low'
+export type { Quality }
 
-const QUALITY_STEPS: Quality[] = ['high', 'medium', 'low']
 /** Average frame time (ms) over the sample window above which quality steps down one level. About 30 frames a second. */
 const SLOW_FRAME_MS = 33
 const SAMPLE_FRAMES = 90
@@ -20,6 +21,8 @@ export class Stage {
   quality: Quality = 'high'
   /** Called when quality steps down on its own, so the page can say so. */
   onQualityStep: ((to: Quality) => void) | null = null
+  /** Called whenever the quality changes, by hand or by itself, so the parts of the town that depend on it can follow. */
+  onQualityChange: ((preset: QualityPreset) => void) | null = null
   private autoQuality = true
   private frameTimes: number[] = []
   private lastFrame = 0
@@ -35,6 +38,8 @@ export class Stage {
   /** The lighting the town is moving toward (Day or Dusk), and how far along the fade is. */
   lighting: Lighting = 'day'
   private lightingFade = 1
+  /** Where the sun stands relative to the middle of the town; moves toward the preset's with the rest of the lighting. */
+  private readonly sunOffset = new THREE.Vector3(-70, 110, 60)
   private homeTarget = new THREE.Vector3(0, 0, -30)
   private homeDistance = 105
   private homeAzimuth = 0
@@ -81,13 +86,6 @@ export class Stage {
     this.sun.target.position.set(0, 0, -30)
     this.scene.add(this.sun, this.sun.target)
 
-    // ?quality=high|medium|low pins the level and turns the automatic step-down off
-    const asked = new URLSearchParams(window.location.search).get('quality')
-    if (asked === 'high' || asked === 'medium' || asked === 'low') {
-      this.autoQuality = false
-      this.setQuality(asked)
-    }
-
     this.home(true)
     window.addEventListener('resize', () => this.resize())
     this.resize()
@@ -120,6 +118,9 @@ export class Stage {
     this.sun.color.lerp(new THREE.Color(p.sun.color), k)
     this.sun.intensity += (p.sun.intensity - this.sun.intensity) * k
     this.renderer.toneMappingExposure += (p.exposure - this.renderer.toneMappingExposure) * k
+    WINDOW_GLOW.value += (p.windowGlow - WINDOW_GLOW.value) * k
+    this.sunOffset.lerp(new THREE.Vector3(p.sunOffset.x, p.sunOffset.y, p.sunOffset.z), k)
+    this.sun.position.copy(this.sun.target.position).add(this.sunOffset)
   }
 
   /** How far the fade to the chosen lighting has got, from 0 to 1. For tests. */
@@ -140,7 +141,7 @@ export class Stage {
       this.scene.fog.far = Math.max(520, distance * 3.4)
     }
     this.sun.target.position.copy(target)
-    this.sun.position.copy(target).add(new THREE.Vector3(-70, 110, 60))
+    this.sun.position.copy(target).add(this.sunOffset)
     // shadows cover the whole town, however big it is
     const ext = Math.max(110, distance * 0.62)
     const sc = this.sun.shadow.camera
@@ -190,12 +191,18 @@ export class Stage {
   }
 
   /** Glides to look at a point from the current side, standing `distance` away at a comfortable angle. */
-  focus(target: THREE.Vector3, distance: number): void {
+  focus(target: THREE.Vector3, distance: number, instant = false): void {
     const offset = this.camera.position.clone().sub(this.controls.target)
     const sph = new THREE.Spherical().setFromVector3(offset)
     sph.radius = THREE.MathUtils.clamp(distance, this.controls.minDistance, this.controls.maxDistance)
     sph.phi = THREE.MathUtils.clamp(sph.phi, THREE.MathUtils.degToRad(40), THREE.MathUtils.degToRad(62))
-    this.glideTo(target, target.clone().add(new THREE.Vector3().setFromSpherical(sph)))
+    const position = target.clone().add(new THREE.Vector3().setFromSpherical(sph))
+    if (!instant) { this.glideTo(target, position); return }
+    // a cut: no glide, the camera is there at once
+    this.glide = null
+    this.camera.position.copy(position)
+    this.controls.target.copy(target)
+    this.controls.update()
   }
 
   private glide: { fromPos: THREE.Vector3; toPos: THREE.Vector3; fromT: THREE.Vector3; toT: THREE.Vector3; t: number } | null = null
@@ -249,17 +256,25 @@ export class Stage {
   }
 
   /**
-   * High: full resolution and shadows redrawn every frame. Medium: slightly lower resolution, and shadows redrawn a few times
-   * a second (buildings never move, so only the cars' shadows lag). Low: normal resolution and no shadows.
+   * Applies a quality preset (see quality.ts): resolution, how often shadows are redrawn (or none) and how big their map is. The traffic share is
+   * the town's to apply, through onQualityChange. A level chosen on purpose is `pinned`: the stage then never steps down by itself.
    */
-  setQuality(q: Quality): void {
+  setQuality(q: Quality, pinned = false): void {
+    if (pinned) this.autoQuality = false
+    const preset = QUALITY_PRESETS[q]
     this.quality = q
-    const dpr = window.devicePixelRatio
-    this.renderer.setPixelRatio(q === 'high' ? Math.min(dpr, 2) : q === 'medium' ? Math.min(dpr, 1.5) : 1)
-    this.renderer.shadowMap.autoUpdate = q === 'high'
+    this.renderer.setPixelRatio(pixelRatioFor(q, window.devicePixelRatio))
+    this.renderer.shadowMap.autoUpdate = preset.shadows === 'every-frame'
     this.renderer.shadowMap.needsUpdate = true
-    this.sun.castShadow = q !== 'low'
+    this.sun.castShadow = preset.shadows !== 'off'
+    if (this.sun.shadow.mapSize.x !== preset.shadowMapSize) {
+      this.sun.shadow.mapSize.set(preset.shadowMapSize, preset.shadowMapSize)
+      // the old map has the old size: let the renderer make a new one
+      this.sun.shadow.map?.dispose()
+      this.sun.shadow.map = null
+    }
     this.resize()
+    this.onQualityChange?.(preset)
   }
 
   render(): void {
@@ -272,7 +287,7 @@ export class Stage {
     const now = performance.now()
     const dt = now - this.lastFrame
     this.lastFrame = now
-    if (this.quality === 'medium') {
+    if (QUALITY_PRESETS[this.quality].shadows === 'few-per-second') {
       this.sinceShadow += dt
       if (this.sinceShadow > 160) { this.renderer.shadowMap.needsUpdate = true; this.sinceShadow = 0 }
     }
@@ -284,7 +299,8 @@ export class Stage {
     const avg = this.frameTimes.reduce((a, b) => a + b, 0) / this.frameTimes.length
     this.frameTimes = []
     if (avg > SLOW_FRAME_MS) {
-      const next = QUALITY_STEPS[QUALITY_STEPS.indexOf(this.quality) + 1]
+      const next = stepDown(this.quality)
+      if (!next) return
       this.setQuality(next)
       this.warmup = 30
       this.onQualityStep?.(next)

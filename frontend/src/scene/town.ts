@@ -28,6 +28,7 @@ import type { TenantView } from '../tenants'
 import { DEFAULT_LAYERS, buildingShown, type LayerState } from '../layers'
 import { edgeKey, edgeLinks, edgeMode, signLines, type EdgeMode } from '../edgeTraffic'
 import { Signpost } from './signpost'
+import { portSignText } from '../portSign'
 
 const QUAY = 9
 /** Traffic that crosses the hub drives a long way, so fewer cars are drawn for it than a short trip would need. */
@@ -106,6 +107,8 @@ export class Town {
   private snapshotId = ''
   private hubDeadLetters = 0
   private hubBoard: { sprite: THREE.Sprite; key: string } | null = null
+  /** The hub's message broker by name (Service Bus, Kafka, ...), for the port's board. */
+  private brokerName: string | null = null
   private lighthouse: Lighthouse | null = null
   private port: PortSummary = { topics: 0, subscriptions: 0, piers: 0, legacy: 0 }
   /** The islands that have a sea lane for boats, and how many car routes cross each one's bridge. */
@@ -213,6 +216,7 @@ export class Town {
     this.root.add(hubRoot)
     this.expandBounds(this.hubOutline, new THREE.Vector3(), 0)
     const broker = hubBuildings.find((b) => b.kind === 'Broker')
+    this.brokerName = broker?.node?.name ?? null
     this.hubBoard = null
     this.lighthouse?.set(0)
     if (broker) {
@@ -377,7 +381,13 @@ export class Town {
     this.setLayers(this.layers)
   }
 
-  /** The Service Bus port's board: how many topics and subscriptions the town has, and how many piers they reach. */
+  /** The words on the broker port: what the broker building's own sign says (its model is built knowing the broker's name). */
+  private brokerSign(): string {
+    const broker = [...this.buildings.values()].find((b) => b.kind === 'Broker')
+    return broker?.model.signText ?? portSignText(this.brokerName)
+  }
+
+  /** The message broker port's board: how many topics and subscriptions the town has, and how many piers they reach. */
   private updateHubBoard(camera: THREE.Camera): void {
     const hb = this.hubBoard
     if (!hb) return
@@ -396,7 +406,7 @@ export class Town {
     ctx.strokeStyle = p.legacy > 0 ? '#ffb830' : '#9fb4cc'; ctx.lineWidth = 6; ctx.stroke()
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
     ctx.fillStyle = '#fff'; ctx.font = '800 32px system-ui, sans-serif'
-    ctx.fillText('SERVICE BUS', 200, 38)
+    ctx.fillText(this.brokerSign(), 200, 38, 370)
     ctx.fillStyle = '#b8c7da'; ctx.font = '700 26px system-ui, sans-serif'
     ctx.fillText(`${p.topics} topics · ${p.subscriptions} subscriptions`, 200, 72, 370)
     ctx.fillStyle = p.legacy > 0 ? '#ffb830' : '#b8c7da'
@@ -518,8 +528,9 @@ export class Town {
   }
 
   /** What the Service Bus port and the lighthouse show: topics, subscriptions, piers, the old-route reads, and the dead-letter total. For tests. */
-  inspectHub(): PortSummary & { lighthouse: { total: number; alarm: boolean } | null; boats: number } {
-    return { ...this.port, lighthouse: this.lighthouse?.status() ?? null, boats: this.boatLanes.size }
+  inspectHub(): PortSummary & { lighthouse: { total: number; alarm: boolean } | null; boats: number; sign: { board: string; model: string | null } } {
+    const broker = [...this.buildings.values()].find((b) => b.kind === 'Broker')
+    return { ...this.port, lighthouse: this.lighthouse?.status() ?? null, boats: this.boatLanes.size, sign: { board: this.brokerSign(), model: broker?.model.signText ?? null } }
   }
 
   /** What the airport shows right now. For tests. */
@@ -577,7 +588,7 @@ export class Town {
         continue
       }
       seen.add(n.kind)
-      const b = new Building(n.id, n.kind, hub?.color ?? palette.flagFallback)
+      const b = new Building(n.id, n.kind, hub?.color ?? palette.flagFallback, false, n.name)
       b.root.position.set(spot.x, GROUND, spot.z)
       b.root.rotation.y = spot.yaw
       hubRoot.add(b.root)
@@ -1087,6 +1098,7 @@ export class Town {
 
   /** The same for a whole island, standing back far enough to show it. */
   islandFocusOf(groupId: string): { target: THREE.Vector3; distance: number } | null {
+    if (groupId === 'hub') return { target: new THREE.Vector3(0, 0, 0), distance: Math.max(this.hubGeo.rx, this.hubGeo.rz) * 2.6 }
     if (groupId === 'airport' && this.airport) return { target: this.airport.root.getWorldPosition(new THREE.Vector3()).setY(0), distance: this.airport.rx * 2.2 }
     const isl = this.islands.find((i) => i.group.id === groupId)
     if (!isl) return null

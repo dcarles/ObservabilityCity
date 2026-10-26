@@ -6,6 +6,7 @@ import { makeWindowMaterial } from '../../buildings/windowMaterial'
 import { kit } from '../../assets/kit'
 import { palette } from './palette'
 import { storageYard } from './yard'
+import { portSignText } from '../../portSign'
 
 const P = palette.building
 const v = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z)
@@ -14,7 +15,7 @@ const v = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z)
 const CELL = 1.2
 
 /** Builds the model for a building kind. The accent is the owning island's flag colour. */
-export function buildModel(kind: NodeKind, accent: string, opts: { tenanted?: boolean } = {}): BuildingModel {
+export function buildModel(kind: NodeKind, accent: string, opts: { tenanted?: boolean; name?: string } = {}): BuildingModel {
   // a data store with a database for each tenant stands as a yard of storage units
   if (kind === 'Database' && opts.tenanted) return storageYard(accent)
   switch (kind) {
@@ -24,7 +25,7 @@ export function buildModel(kind: NodeKind, accent: string, opts: { tenanted?: bo
     case 'Cache': return waterTower()
     case 'Cron': return clockTower()
     case 'Gateway': return gateway(accent)
-    case 'Broker': return port()
+    case 'Broker': return port(opts.name)
     case 'Egress': return egress(accent)
   }
 }
@@ -402,7 +403,7 @@ function gateway(accent: string): BuildingModel {
 
 // ── Broker: the port, a warehouse on a jetty with a crane ───────────────────
 
-function port(): BuildingModel {
+function port(name?: string): BuildingModel {
   const FH = 1.5
   const W = 6 * CELL, D = 4 * CELL
   const boxColors = ['#e0573f', '#3f8fd9', '#f2b632', '#4fb37a', '#e0573f', '#8e6bd9']
@@ -429,7 +430,7 @@ function port(): BuildingModel {
   const sign = canvasTexture(256, 64, (ctx) => {
     ctx.fillStyle = '#f4efe2'; ctx.fillRect(0, 0, 256, 64)
     ctx.fillStyle = '#26364f'; ctx.font = '700 36px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-    ctx.fillText('SERVICE BUS', 128, 34)
+    ctx.fillText(portSignText(name), 128, 34, 240)
   })
   const signMesh = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 0.8), new THREE.MeshBasicMaterial({ map: sign }))
   signMesh.position.set(0, 1.5, D / 2 + 0.35)
@@ -449,6 +450,7 @@ function port(): BuildingModel {
     doorDir: v(0, 0, -1),
     plaque: { position: v(-3.0, 0.55, -(D / 2 + 0.35)), width: 1.4, rotY: Math.PI },
     radius: 4.5,
+    signText: portSignText(name),
     animate: (time) => { crane.rotation.y = Math.sin(time * 0.25) * 0.5 },
   }
 }

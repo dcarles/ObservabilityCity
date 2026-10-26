@@ -1,0 +1,12 @@
+# yaml-language-server: $schema=../schema/pillar.schema.json
+pillar: ntf
+displayName: Notifications
+color: "#ff6b9d"
+systems:
+  - { id: ntf.dispatch-api, service: dispatch, name: Dispatch API, role: api, calls: [ntf.dispatch-db] }
+  - { id: ntf.dispatch-worker, service: dispatch, name: Dispatch worker, role: worker, calls: [ntf.dispatch-db] }
+  - { id: ntf.dispatch-db, service: dispatch, name: Dispatch DB, role: db }
+messaging:
+  subscriptions:
+    - { topic: chk-orders-outbox, consumer: ntf.dispatch-worker }
+    - { topic: shp-shipments-outbox, consumer: ntf.dispatch-worker }

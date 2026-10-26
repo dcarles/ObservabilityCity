@@ -3,7 +3,11 @@ import * as THREE from 'three'
 import { Stage } from './scene/stage'
 import { Town } from './scene/town'
 import { loadKit } from './assets/kit'
-import { Connection, requestedEnv } from './connection'
+import { Connection } from './connection'
+import { addressForTown, fetchTowns, requestedScope, type TownChoice } from './scope'
+import { saveQuality, startQuality, type Quality } from './quality'
+import { parseWall } from './wall/params'
+import { WallMode } from './wall/wall'
 import { NoticesPanel, Search, ServicePanel, showTooltip, StateList, TopBar, type SearchItem } from './ui'
 import { ALL_TENANTS, pruneTenants, type TenantView } from './tenants'
 import { ViewBar } from './viewbar'
@@ -23,6 +27,7 @@ import type { PickItem } from './picker'
 import type { Snapshot, TenantInfo } from './types'
 import { checkSnapshot } from './snapshotGuard'
 import { Building } from './buildings/building'
+import { WINDOW_GLOW } from './buildings/windowMaterial'
 
 void start()
 
@@ -38,9 +43,11 @@ async function start(): Promise<void> {
   const params = new URLSearchParams(query)
   const testMode = params.has('test')
   const store = browserStore()
+  const wallParams = parseWall(query)
   let islands: readonly string[] = parseIslands(query)
   let layers = parseLayers(query)
-  let lighting = startLighting(query, store)
+  // a wall opens on Dusk whatever this browser last chose, unless the address says otherwise
+  let lighting = wallParams.on ? startLighting(query, null, 'dusk') : startLighting(query, store)
   const themeAsked = startTheme(query, store)
   let theme = themeAsked.theme
   town.setLayers(layers)
@@ -107,7 +114,9 @@ async function start(): Promise<void> {
   }
   const islandItems = (): SearchItem[] => town.islands.map((i) => ({ kind: 'island', id: i.group.id, name: i.group.displayName, where: i.group.displayName }))
   const airportItem = (): SearchItem[] => (town.airport ? [{ kind: 'island', id: 'airport', name: 'Airport', where: 'Outside callers' }] : [])
-  const env = requestedEnv()
+  const scope = requestedScope()
+  let towns: TownChoice[] = []
+  let quality: Quality = 'high'
   const setTenantView = (v: TenantView): void => {
     tenantView = v
     town.setTenantView(v)
@@ -121,7 +130,14 @@ async function start(): Promise<void> {
     viewBar.refresh()
   }
   const viewBar = new ViewBar({
-    env,
+    towns: () => towns,
+    // a different town is a different page: load it again, so nothing of the old one is left behind
+    switchTown: (town) => { window.location.href = `${window.location.pathname}${addressForTown(window.location.search, town)}${window.location.hash}` },
+    quality: () => quality,
+    setQuality: (q) => {
+      saveQuality(store, q)
+      stage.setQuality(q, true)
+    },
     view: () => tenantView,
     setView: (v) => setTenantView(v),
     // a different environment is a different town: load the page again for it, so nothing of the old one is left behind
@@ -148,7 +164,7 @@ async function start(): Promise<void> {
     },
   })
   const inspector = new Inspector({
-    env,
+    scope,
     onScreen: (id) => town.buildings.has(id),
     go: (id) => goTo({ kind: 'building', id, name: id, where: '' }),
     view: () => tenantView,
@@ -170,9 +186,9 @@ async function start(): Promise<void> {
   })
   // the first visit from this browser opens the legend by itself; automated runs skip that unless they ask (?legend=first)
   const firstVisit = (() => { try { return !!store && store.getItem(LEGEND_SEEN_KEY) === null } catch { return false } })()
-  if ((firstVisit && (!testMode || params.get('legend') === 'first')) || params.get('legend') === '1') legend.open()
+  if (!wallParams.on && ((firstVisit && (!testMode || params.get('legend') === 'first')) || params.get('legend') === '1')) legend.open()
   const servicePanel = new ServicePanel((id) => goTo({ kind: 'building', id, name: id, where: '' }))
-  const fx = new FxClient(env)
+  const fx = new FxClient(scope)
   const breakPanel = new BreakPanel(fx, {
     targets: () => [
       { kind: 'town', id: '*', name: 'Whole town', where: '' },
@@ -210,6 +226,7 @@ async function start(): Promise<void> {
     if (!s) {
       seen.rejected++
       topbar.setStatus('badData')
+      wall?.setConnection('badData')
       return
     }
     try {
@@ -255,16 +272,42 @@ async function start(): Promise<void> {
     seen.snapshots++
     seen.last = s
     topbar.setStatus('live') // a good snapshot just arrived, whatever the last bad one said
+    wall?.setConnection('live')
+    wall?.onSnapshot(s, nowSeconds())
     topbar.setSnapshot(s)
     stateList.refresh()
     notices.show(s.notices)
   }
 
-  const connection = new Connection(onSnapshot, (st) => topbar.setStatus(st), env, (e) => {
-    banner.textContent = `There is no environment "${e.requested ?? ''}". Available: ${e.environments.join(', ') || 'none'}.`
+  const connection = new Connection(onSnapshot, (st) => { topbar.setStatus(st); wall?.setConnection(st) }, scope, (e) => {
+    banner.textContent = e.environments.length === 0 && e.towns
+      ? `There is no town "${e.requestedTown ?? ''}". Available: ${e.towns.join(', ') || 'none'}.`
+      : `There is no environment "${e.requested ?? ''}". Available: ${e.environments.join(', ') || 'none'}.`
     banner.hidden = false
-  }, islands)
+  }, islands, { persistent: wallParams.on, retryMs: wallParams.retry * 1000 })
   connection.start()
+  void fetchTowns().then((list) => { towns = list; viewBar.refresh() })
+
+  // Wall mode: a tour, a status strip and change cues, over the same town.
+  const nowSeconds = (): number => (testMode ? simTime : clock.elapsedTime)
+  const wall = wallParams.on
+    ? new WallMode(wallParams.hold, {
+        focusOf: (f) => (f.kind === 'building' ? town.focusOf(f.id) : town.islandFocusOf(f.id)),
+        go: (target, distance, cut) => stage.focus(target, distance, cut),
+        home: (cut) => stage.home(cut),
+        select: (id) => town.select(id),
+      })
+    : null
+
+  // Quality: the preset the page opens with, and what depends on it. A level chosen on purpose is never stepped down from.
+  const qualityStart = startQuality(query, store, wallParams.on ? 'medium' : 'high')
+  stage.onQualityChange = (preset) => {
+    quality = preset.id
+    town.cars.density = preset.traffic
+    town.boats.density = preset.traffic
+    viewBar.refresh()
+  }
+  stage.setQuality(qualityStart.quality, qualityStart.chosen)
 
   // Hover: name and numbers for the building under the pointer.
   const ray = new THREE.Raycaster()
@@ -322,6 +365,7 @@ async function start(): Promise<void> {
       simTime += dt
       stage.tick(dt, simTime)
       town.update(dt, simTime, stage.camera)
+      wall?.tick(simTime)
     }
   }
 
@@ -350,6 +394,15 @@ async function start(): Promise<void> {
     /** The headline numbers as the top bar shows them for the tenants chosen. */
     totals: () => (seen.last ? viewTotals(seen.last, tenantView) : null),
     lighting: () => lighting,
+    /** What the wall is doing (mode, stop, caption, note, the strip's words); null when wall mode is off. */
+    wall: () => wall?.status() ?? null,
+    quality: () => quality,
+    /** Opens the live socket again counts: how many times it was opened. */
+    connectionOpened: () => connection.opened,
+    dropConnection: () => connection.drop(),
+    /** How strongly lit windows glow right now (Dusk makes them glow more). */
+    windowGlow: () => WINDOW_GLOW.value,
+    towns: () => towns,
     themeId: () => theme.id,
     islands: () => islands,
     /** Every island of the town, on screen or not. */
@@ -363,7 +416,7 @@ async function start(): Promise<void> {
     /** The tenants the top bar's list shows, grouped as it groups them. */
     tenantList: () => viewBar.listed,
     setTenantView,
-    drawnCars: () => ({ drawn: town.cars.drawn, byTenant: town.cars.tenantCounts() }),
+    drawnCars: () => ({ drawn: town.cars.drawn, sent: town.cars.sent, byTenant: town.cars.tenantCounts() }),
     inspectVendors: () => town.inspectVendors(),
     overlay: () => town.overlay.status(),
     /** Draw once and say how much that took: draw calls, triangles and milliseconds. */
@@ -386,6 +439,7 @@ async function start(): Promise<void> {
     try {
       stage.tick(dt, time)
       town.update(dt, time, stage.camera)
+      wall?.tick(time)
       hover()
       stage.render()
     } catch (e) {

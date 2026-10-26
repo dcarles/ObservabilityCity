@@ -593,5 +593,7 @@
         "requestsPerSecond": 32
       }
     ]
-  }
+  },
+  "incidentFreeSince": "2026-10-25T12:00:00+00:00",
+  "incidentsSeen": false
 }

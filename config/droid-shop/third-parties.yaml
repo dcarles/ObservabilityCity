@@ -1,0 +1,6 @@
+# yaml-language-server: $schema=schema/third-parties.schema.json
+# Vendors outside the shop. Each stands on a small island of its own, and its health is read from the calls our systems make to it.
+vendors:
+  - { id: ext.payment-gateway, name: Payment gateway, calledBy: [chk.orders-api, chk.orders-worker], slaP99Ms: 1200 }
+  - { id: ext.courier, name: Courier, calledBy: [shp.shipments-worker, shp.tracking-api], slaP99Ms: 2500 }
+  - { id: ext.push, name: Push service, calledBy: [ntf.dispatch-worker], slaP99Ms: 1500, errors: { amber: 0.03, red: 0.1 } }

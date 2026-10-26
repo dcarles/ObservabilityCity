@@ -1,0 +1,3 @@
+# yaml-language-server: $schema=schema/layout.schema.json
+# Islands in the order they stand round the platform.
+islands: [web, mob, chk, inv, shp, ntf]

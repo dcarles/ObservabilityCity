@@ -1,0 +1,13 @@
+# yaml-language-server: $schema=../schema/pillar.schema.json
+pillar: web
+displayName: Web
+color: "#5aa9ff"
+systems:
+  - { id: web.storefront-api, service: storefront, name: Storefront API, role: api, external: true, calls: [web.catalog-api, chk.cart-api, inv.stock-api, hub.accounts-db] }
+  - { id: web.catalog-api, service: catalog, name: Catalog API, role: api, calls: [web.catalog-db, web.search-cache] }
+  - { id: web.catalog-worker, service: catalog, name: Catalog worker, role: worker, calls: [web.catalog-db, web.search-cache] }
+  - { id: web.catalog-db, service: catalog, name: Catalog DB, role: db }
+  - { id: web.search-cache, service: catalog, name: Search cache, role: cache }
+messaging:
+  subscriptions:
+    - { topic: inv-stock-outbox, consumer: web.catalog-worker }

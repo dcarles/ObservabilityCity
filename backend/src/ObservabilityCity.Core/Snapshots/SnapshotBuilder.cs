@@ -13,6 +13,10 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
     {
     }
 
+    private readonly DateTimeOffset _startedAt = clock.GetUtcNow();
+    private readonly object _incidentGate = new();
+    private readonly Dictionary<string, DateTimeOffset> _lastIncident = new();
+
     /// <summary>Readings older than this are shown as stale, never as healthy.</summary>
     public TimeSpan StaleAfter { get; init; } = TimeSpan.FromSeconds(30);
 
@@ -33,6 +37,7 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
         var now = clock.GetUtcNow();
         var registry = registries.Current;
         var incidents = OpenIncidents(registry);
+        NoteIncidents(incidents.Where(kv => kv.Value.Count > 0).Select(kv => kv.Key), now);
         var links = TownLinks.Of(registry);
         var allGroups = registry.Groups
             .Select(g => new GroupSnapshot(g.Id, g.DisplayName, g.Color, g.IsHub, g.IsLostFound, g.ConfigError,
@@ -89,9 +94,29 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
                 notices = [.. notices, .. unknown.Select(i => $"Island '{i}' is not in this town, so the island filter ignores it.")];
         }
 
+        var (incidentFreeSince, incidentsSeen) = IncidentHistory(groups.Select(g => g.Id), groups.Any(g => g.Incidents.Count > 0));
+
         return new Snapshot(registry.Town.Id, registry.Town.Name, registry.Town.GroupLabel, env?.Id ?? Environment, now, DayFraction(), totals, notices, groups,
             vendors, callers, dependencies, registry.RingCapacity,
-            env?.Name ?? Environment, environments, TenantsOf(env, allNodes), registry.Town.Topology, view);
+            env?.Name ?? Environment, environments, TenantsOf(env, allNodes), registry.Town.Topology, view, incidentFreeSince, incidentsSeen);
+    }
+
+    /// <summary>Remembers when each island last had an open incident. Every full build calls this, so the memory does not depend on who is looking.</summary>
+    private void NoteIncidents(IEnumerable<string> groupsWithIncidents, DateTimeOffset now)
+    {
+        lock (_incidentGate)
+            foreach (var id in groupsWithIncidents) _lastIncident[id] = now;
+    }
+
+    /// <summary>For the islands on screen: since when none has had an incident (null while one is open), and whether any has had one since the server started.</summary>
+    private (DateTimeOffset? FreeSince, bool Seen) IncidentHistory(IEnumerable<string> shown, bool openNow)
+    {
+        lock (_incidentGate)
+        {
+            var times = shown.Where(_lastIncident.ContainsKey).Select(id => _lastIncident[id]).ToList();
+            if (openNow) return (null, true);
+            return (times.Count > 0 ? times.Max() : _startedAt, times.Count > 0);
+        }
     }
 
     /// <summary>

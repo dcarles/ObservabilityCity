@@ -1,0 +1,63 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$comment": "Generated from this registry. Run: dotnet run --project src/ObservabilityCity.Host -- --write-schema",
+  "$defs": {
+    "systemId": {
+      "anyOf": [
+        {
+          "enum": [
+            "chk.cart-api",
+            "chk.cart-cache",
+            "chk.orders-api",
+            "chk.orders-db",
+            "chk.orders-worker",
+            "hub.accounts-db",
+            "hub.edge",
+            "hub.kafka",
+            "inv.stock-api",
+            "inv.stock-db",
+            "inv.stock-worker",
+            "inv.sync-cron",
+            "mob.app-api",
+            "mob.app-db",
+            "mob.session-cache",
+            "ntf.dispatch-api",
+            "ntf.dispatch-db",
+            "ntf.dispatch-worker",
+            "shp.shipments-api",
+            "shp.shipments-db",
+            "shp.shipments-worker",
+            "shp.tracking-api",
+            "web.catalog-api",
+            "web.catalog-db",
+            "web.catalog-worker",
+            "web.search-cache",
+            "web.storefront-api"
+          ]
+        },
+        {
+          "type": "string",
+          "pattern": "^[a-z0-9-]\u002B\\.[a-z0-9-]\u002B$"
+        }
+      ]
+    },
+    "pillarId": {
+      "anyOf": [
+        {
+          "enum": [
+            "web",
+            "mob",
+            "chk",
+            "inv",
+            "shp",
+            "ntf"
+          ]
+        },
+        {
+          "type": "string",
+          "pattern": "^[a-z0-9-]\u002B$"
+        }
+      ]
+    }
+  }
+}

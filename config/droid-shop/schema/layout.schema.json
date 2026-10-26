@@ -1,0 +1,20 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Layout file: the order of the islands and how many fit on a ring",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "ringCapacity": {
+      "type": "integer",
+      "minimum": 6,
+      "maximum": 18,
+      "default": 12,
+      "description": "Islands on the first ring. The second ring holds one fewer, because the airport takes a place there, so a town holds at most 2 x ringCapacity - 1 pillars (23 at 12, 35 at 18). Lost & found counts as a pillar."
+    },
+    "islands": {
+      "type": "array",
+      "description": "Pillar codes in the order they stand round the hub: the first ringCapacity on the first ring, the rest on a staggered second ring.",
+      "items": { "$ref": "system-ids.schema.json#/$defs/pillarId" }
+    }
+  }
+}

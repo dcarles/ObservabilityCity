@@ -1,0 +1,57 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Environment file: dev, staging, prod",
+  "description": "One file for each environment, named after it (prod.yaml). Pillars and systems are shared by every environment; this file says what differs.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "name": { "type": "string", "description": "Name in the environment picker. Defaults to the file name." },
+    "order": { "type": "integer", "description": "Where it stands in the picker, lowest first. Ties go by id." },
+    "default": { "type": "boolean", "description": "The environment shown when none is asked for. Without one, the first." },
+    "sources": {
+      "type": "object",
+      "description": "Where this environment's numbers come from, by signal.",
+      "propertyNames": { "enum": ["metrics", "incidents", "messaging"] },
+      "additionalProperties": {
+        "type": "object",
+        "required": ["kind"],
+        "additionalProperties": false,
+        "properties": {
+          "kind": { "enum": ["fake"], "description": "The kind of source. Only fake exists so far." },
+          "connection": { "type": "string", "description": "How to reach it (a workspace, an endpoint). Not used by the fake source." }
+        }
+      }
+    },
+    "tenants": {
+      "type": "array",
+      "description": "The tenants of this environment. Each has a database in every system with a tenantPattern.",
+      "items": {
+        "type": "object",
+        "required": ["id"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "$ref": "defs.schema.json#/$defs/kebabName", "description": "Goes into the database name where the tenantPattern has {tenant}." },
+          "name": { "type": "string", "description": "What the tenant is called on screen." },
+          "kind": { "enum": ["customer", "test"], "default": "customer", "description": "A test tenant (smoke tests, QA, sandboxes) is drawn paler and striped, can be hidden, and shows amber at worst, never red." }
+        }
+      }
+    },
+    "exclude": {
+      "type": "array",
+      "description": "Systems that are not deployed in this environment. They are left out of its town, and an island with no system left is not on the map.",
+      "items": { "$ref": "system-ids.schema.json#/$defs/systemId" }
+    },
+    "fake": {
+      "type": "object",
+      "description": "Settings for the fake source only.",
+      "additionalProperties": false,
+      "properties": {
+        "undeclaredTenants": {
+          "type": "array",
+          "description": "Tenants the fake source finds in the data that the tenants list does not name, so the town can show an unknown tenant.",
+          "items": { "$ref": "defs.schema.json#/$defs/kebabName" }
+        }
+      }
+    }
+  }
+}
