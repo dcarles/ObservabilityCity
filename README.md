@@ -152,7 +152,8 @@ frontend/                          Vite + TypeScript + three.js browser app
 config/galactic-credit/            registry (YAML): town, defaults, hub, layout, pillars, schemas, fake-data baselines
 contracts/openapi.json             generated from the C# records
 shared-test-data/                  fixtures used by both sides: registries, golden snapshots, layout golden
-docs/                              plan, decision log, previews, connect-your-company runbook
+docs/                              plan, decision log, previews, connect-your-company runbook, write-an-adapter guide
+templates/adapter/                 a working source adapter to copy into extensions/
 extensions/                        a company fork's own code (empty upstream)
 AGENTS.md, .github/copilot-instructions.md   instructions for coding assistants
 ```

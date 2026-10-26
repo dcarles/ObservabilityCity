@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    A starting point for a source adapter. Copy this folder to extensions/<company>.<name>/ in your fork and rename it (see README.md).
+    The file name of the built assembly must contain "Adapters": the host only looks at such files in adapters/<name>/.
+    It lives outside backend/, so it carries its own settings and needs no package versions from there.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <!-- Loaded by the host from adapters/<name>/, so the module's own dependencies must sit beside it. -->
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\backend\src\ObservabilityCity.Core\ObservabilityCity.Core.csproj" />
+  </ItemGroup>
+</Project>
