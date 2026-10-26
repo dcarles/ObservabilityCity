@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { palette } from '../themes/harbour-town/palette'
+import { palette } from '../themes/active'
 import { circleNoise, rng } from './random'
 
 export interface Outline {
@@ -80,7 +80,7 @@ export function buildIslandBody(outline: Outline): THREE.Group {
   const g = new THREE.Group()
   g.add(
     flatLayer(offsetPolygon(outline.points, 6.5), palette.sea.shallow, 0.22, 0.05, 1),
-    flatLayer(offsetPolygon(outline.points, 3.6), '#8fe3ea', 0.34, 0.1, 2),
+    flatLayer(offsetPolygon(outline.points, 3.6), palette.sea.mid, 0.34, 0.1, 2),
     flatLayer(offsetPolygon(outline.points, 1.7), palette.sea.foam, 0.8, 0.15, 3),
     slab(offsetPolygon(outline.points, 1.15), 0.34, -1.2, c.sand, c.sand),
     slab(outline.points, GROUND, -1.6, c.grass, c.cliff),

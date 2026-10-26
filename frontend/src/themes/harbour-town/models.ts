@@ -4,7 +4,7 @@ import type { BuildingModel } from '../../buildings/model'
 import { at, box, canvasTexture, cone, cyl, dome, flat, group, sphere } from '../../buildings/mk'
 import { makeWindowMaterial } from '../../buildings/windowMaterial'
 import { kit } from '../../assets/kit'
-import { palette } from './palette'
+import { palette } from '../active'
 import { storageYard } from './yard'
 import { portSignText } from '../../portSign'
 
@@ -15,7 +15,7 @@ const v = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z)
 const CELL = 1.2
 
 /** Builds the model for a building kind. The accent is the owning island's flag colour. */
-export function buildModel(kind: NodeKind, accent: string, opts: { tenanted?: boolean; name?: string } = {}): BuildingModel {
+export function harbourModel(kind: NodeKind, accent: string, opts: { tenanted?: boolean; name?: string } = {}): BuildingModel {
   // a data store with a database for each tenant stands as a yard of storage units
   if (kind === 'Database' && opts.tenanted) return storageYard(accent)
   switch (kind) {

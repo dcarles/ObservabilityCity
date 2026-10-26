@@ -3,7 +3,7 @@ import { Building, type BuildingStatus } from '../buildings/building'
 import { box, canvasTexture, cyl, flat, group, roundRect } from '../buildings/mk'
 import { kit } from '../assets/kit'
 import type { GroupSnapshot, NodeSnapshot, Snapshot } from '../types'
-import { palette } from '../themes/harbour-town/palette'
+import { palette } from '../themes/active'
 import { blockPad, bench, bridge, crates, fountain, junction, lamp, pier, prop, ring, roadBetween, ROAD_W, serviceLane, street, streetX } from './props'
 import { buildIslandBody, GROUND, makeOutline, scatterNature, type Outline, type Rect } from './island'
 import { COL_X, CURB, LANE_Z, PAD_D, PAD_W, coastScan, planIsland, type Placed, type Plan } from './plan'
@@ -1139,7 +1139,7 @@ export function wrapText(text: string, width: number): string[] {
 function parkProps(x: number, z: number): THREE.Object3D[] {
   const out: THREE.Object3D[] = []
   const trunk = new THREE.MeshStandardMaterial({ color: palette.tree.trunk, flatShading: true })
-  const leaf = new THREE.MeshStandardMaterial({ color: '#58b85a', flatShading: true })
+  const leaf = new THREE.MeshStandardMaterial({ color: palette.tree.park, flatShading: true })
   for (const [dx, dz, s] of [[-6, -1.5, 1.35], [5.5, 1.2, 1.05], [-1, 2.2, 0.9], [8, -2, 1.2]] as const) {
     const t = new THREE.Group()
     const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.2, 1.1, 5), trunk); tr.position.y = 0.55; tr.castShadow = true

@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { canvasTexture, roundRect } from '../buildings/mk'
-import { palette } from '../themes/harbour-town/palette'
+import { palette } from '../themes/active'
 import { GROUND } from './island'
 
 /** One thick post with a board on it, standing on the ground. */

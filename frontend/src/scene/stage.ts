@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
-import { palette } from '../themes/harbour-town/palette'
+import { activeKit, palette } from '../themes/active'
 import { LIGHTING, type Lighting } from '../lighting'
 import { WINDOW_GLOW } from '../buildings/windowMaterial'
 import { QUALITY_PRESETS, pixelRatioFor, stepDown, type Quality, type QualityPreset } from '../quality'
@@ -324,6 +324,30 @@ export class Stage {
     const sky = new THREE.Mesh(geo, mat)
     sky.renderOrder = -10
     this.scene.add(sky)
+    if (activeKit().stars) this.scene.add(this.stars())
+  }
+
+  /** A scatter of fixed stars over the upper half of the sky, for a theme set in space. */
+  private stars(): THREE.Points {
+    const n = 1400
+    const pos = new Float32Array(n * 3)
+    // a fixed pattern, so the sky looks the same every time the page opens
+    let seed = 7
+    const rand = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647 }
+    for (let i = 0; i < n; i++) {
+      const y = 0.02 + rand() * 0.98
+      const a = rand() * Math.PI * 2
+      const r = Math.sqrt(1 - y * y)
+      pos[i * 3] = Math.cos(a) * r * 2500
+      pos[i * 3 + 1] = y * 2500
+      pos[i * 3 + 2] = Math.sin(a) * r * 2500
+    }
+    const geo = new THREE.BufferGeometry()
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3))
+    const points = new THREE.Points(geo, new THREE.PointsMaterial({ color: '#ffffff', size: 1.6, sizeAttenuation: false, fog: false, depthWrite: false, transparent: true, opacity: 0.85 }))
+    points.renderOrder = -9
+    points.name = 'stars'
+    return points
   }
 
   private sea(): void {
@@ -336,12 +360,13 @@ export class Stage {
       shader.uniforms.uTime = this.seaUniforms.uTime
       shader.uniforms.uDeep = { value: deep }
       shader.uniforms.uShallow = { value: shallow }
+      shader.uniforms.uSparkle = { value: palette.sea.sparkle }
       shader.vertexShader = shader.vertexShader
         .replace('#include <common>', '#include <common>\nvarying vec3 vSeaPos;')
         .replace('#include <begin_vertex>', '#include <begin_vertex>\nvSeaPos = (modelMatrix * vec4(position, 1.0)).xyz;')
       shader.fragmentShader = shader.fragmentShader
         .replace('#include <common>', `#include <common>
-varying vec3 vSeaPos; uniform float uTime; uniform vec3 uDeep; uniform vec3 uShallow;
+varying vec3 vSeaPos; uniform float uTime; uniform vec3 uDeep; uniform vec3 uShallow; uniform float uSparkle;
 float h2(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453); }
 float n2(vec2 p){ vec2 i = floor(p); vec2 f = fract(p); f = f*f*(3.0-2.0*f);
   return mix(mix(h2(i), h2(i+vec2(1,0)), f.x), mix(h2(i+vec2(0,1)), h2(i+vec2(1,1)), f.x), f.y); }`)
@@ -354,7 +379,7 @@ float n2(vec2 p){ vec2 i = floor(p); vec2 f = fract(p); f = f*f*(3.0-2.0*f);
   vec3 col = mix(uDeep, uShallow, smoothstep(0.3, 0.8, tone) * 0.35);
   // faint, sparse sparkles that drift
   float crest = smoothstep(0.86, 0.95, n2(p * 0.55 + vec2(uTime * 0.08, -uTime * 0.05)) * 0.7 + w2 * 0.35);
-  col += crest * 0.10;
+  col += crest * uSparkle;
   diffuseColor.rgb = col;
 }`)
     }

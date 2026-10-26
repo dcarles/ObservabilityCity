@@ -18,7 +18,8 @@ export interface LightingPreset {
   page: string
 }
 
-export const LIGHTING: Record<Lighting, LightingPreset> = {
+/** The harbour town's presets; a theme brings its own. */
+export const HARBOUR_LIGHTING: Record<Lighting, LightingPreset> = {
   day: {
     name: 'Day',
     sky: { top: '#5eb8f2', horizon: '#e4f4ff' },
@@ -44,6 +45,9 @@ export const LIGHTING: Record<Lighting, LightingPreset> = {
     page: '#2b3260',
   },
 }
+
+/** The presets in use: the active theme's (see themes/active.ts). */
+export const LIGHTING: Record<Lighting, LightingPreset> = structuredClone(HARBOUR_LIGHTING)
 
 export const LIGHTING_KEY = 'oc.lighting'
 

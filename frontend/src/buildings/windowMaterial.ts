@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { palette } from '../themes/harbour-town/palette'
+import { palette } from '../themes/active'
 
 /** Per-floor knobs the shader reads. Tweened by the building each frame. */
 export interface WindowUniforms {

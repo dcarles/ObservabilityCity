@@ -1,9 +1,9 @@
-// Colours for the harbour-town theme. Kept in one place so Day and (later) Dusk can restyle everything.
+// Colours for the harbour-town theme. Kept in one place so a theme can restyle everything.
 
-export const palette = {
+export const harbourPalette = {
   sky: { top: '#5eb8f2', horizon: '#e4f4ff' },
   fog: '#d9efff',
-  sea: { deep: '#2b8fc4', shallow: '#4fc3d9', foam: '#ffffff' },
+  sea: { deep: '#2b8fc4', shallow: '#4fc3d9', mid: '#8fe3ea', foam: '#ffffff', sparkle: 0.1 },
   island: {
     grass: '#8bd05f',
     grassDark: '#74bd4f',
@@ -18,7 +18,8 @@ export const palette = {
     hill: '#7fc65a',
     rock: '#9aa1ab',
   },
-  tree: { trunk: '#8a5a38', leaves: ['#4fae52', '#5fbf5a', '#3f9c4f', '#79c85a'], pine: ['#2f8f55', '#3aa064'] },
+  hedge: '#5a9f4a',
+  tree: { park: '#58b85a', trunk: '#8a5a38', leaves: ['#4fae52', '#5fbf5a', '#3f9c4f', '#79c85a'], pine: ['#2f8f55', '#3aa064'] },
   beacon: { green: '#47e07a', amber: '#ffb830', red: '#ff3d3d', grey: '#8d949e', off: '#2a2d33' },
   window: { glass: '#35557d', lit: '#ffe29a', dead: '#2a2f38' },
   wood: '#b58a58',
@@ -45,3 +46,4 @@ export const palette = {
   flagFallback: '#8ab4ff',
   walker: { skin: '#f2c9a0', failed: '#ff3d3d' },
 }
+

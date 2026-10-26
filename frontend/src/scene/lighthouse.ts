@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { canvasTexture, cyl, flat, roundRect } from '../buildings/mk'
-import { palette } from '../themes/harbour-town/palette'
+import { palette } from '../themes/active'
 import { clamp, formatRate } from '../visuals'
 import { GROUND } from './island'
 import { halo } from './harbour'

@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { box, canvasTexture, flat, roundRect } from '../buildings/mk'
-import { palette } from '../themes/harbour-town/palette'
+import { palette } from '../themes/active'
 import type { HealthState, NodeSnapshot } from '../types'
 import { worstState } from '../visuals'
 import { GROUND } from './island'
@@ -71,7 +71,7 @@ export class ServiceSign {
     this.object.add(sign)
     this.hits.push(this.hitBox(SIGN_W + 0.4, 1.8, 0.8, x, GROUND + 0.9, zFront - 0.55))
     // three sides of hedge, open at the front
-    const hedge = flat('#5a9f4a', { roughness: 1 })
+    const hedge = flat(palette.hedge, { roughness: 1 })
     const t = 0.7, h = 0.85
     const back = box(width - 0.4, h, t, hedge, { x, y: GROUND + 0.08, z: zFront - depth + t })
     const left = box(t, h, depth - 2.4, hedge, { x: x - width / 2 + 0.55, y: GROUND + 0.08, z: zFront - depth / 2 - 1.1 })

@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { box, canvasTexture, cyl, flat, roundRect } from '../buildings/mk'
 import type { MessagingSnapshot, NodeSnapshot } from '../types'
-import { palette } from '../themes/harbour-town/palette'
+import { palette } from '../themes/active'
 import { clamp, formatAge, formatRate } from '../visuals'
 import { GROUND } from './island'
 
