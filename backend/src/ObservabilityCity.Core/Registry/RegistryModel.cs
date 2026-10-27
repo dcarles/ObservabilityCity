@@ -190,8 +190,8 @@ public sealed record RegistrySource(string Name, string Kind, string? Connection
     public TimeSpan Timeout => TimeSpan.FromSeconds(TimeoutSeconds ?? DefaultTimeoutSeconds);
 }
 
-/// <summary>The metrics of the resources one rule of <c>scope.resources</c> finds, by signal (cpu, memory, utilisation, throttled, requests, and limit, the provisioned size shown as a number). <c>Interval</c> is the time grain they are asked at; none means the adapter's default (one minute).</summary>
-public sealed record MetricGroup(string Resources, string? Namespace, IReadOnlyDictionary<string, MetricSignal> Signals, TimeSpan? Interval = null)
+/// <summary>The metrics of the resources one rule of <c>scope.resources</c> finds, by signal (cpu, memory, utilisation, throttled, requests, and limit, the provisioned size shown as a number). <c>Interval</c> is the time grain they are asked at; none means the adapter's default (one minute). <c>Window</c> is how far back the entry looks; none means the source's own window.</summary>
+public sealed record MetricGroup(string Resources, string? Namespace, IReadOnlyDictionary<string, MetricSignal> Signals, TimeSpan? Interval = null, TimeSpan? Window = null)
 {
     /// <summary>The grains the metrics API offers. Which of them a metric supports depends on the metric: some allow a minute, some only five or more.</summary>
     public static readonly int[] IntervalMinutes = [1, 5, 15, 30, 60, 360, 720, 1440];

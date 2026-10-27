@@ -159,7 +159,7 @@ public sealed class AzureMonitorSource(
         var readings = new Dictionary<string, NodeReading>();
         foreach (var system in read.GroupBy(r => r.Target.SystemId))
         {
-            var values = system.Select(r => Values(r.Target, r.Series, Window)).ToList();
+            var values = system.Select(r => Values(r.Target, r.Series, r.Target.Group.Window ?? Window)).ToList();
             double? Worst(string signal) => Max(values, signal);
             var cpu = Worst("cpu");
             var memory = Worst("memory");
@@ -199,7 +199,7 @@ public sealed class AzureMonitorSource(
     {
         var all = new List<MetricSeries>();
         foreach (var (call, metrics) in Calls(target.Group))
-            all.AddRange(await reader.ReadAsync(target.Resource.Id, call, metrics, at, Window, ct));
+            all.AddRange(await reader.ReadAsync(target.Resource.Id, call, metrics, at, target.Group.Window ?? Window, ct));
         return all;
     }
 
