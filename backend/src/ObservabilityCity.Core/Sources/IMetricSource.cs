@@ -28,9 +28,10 @@ public sealed record NodeReading(
 
 /// <summary>
 /// One tenant's database of a data store that keeps one per tenant: how much of its provisioned capacity it uses, how much it turns away and the
-/// request rate it sees. TenantId is whatever the source found in the database name; the environment may not list it.
+/// request rate it sees. TenantId is whatever the source found in the database name; the environment may not list it. Name is what the source
+/// knows the tenant as (a tag on the database, say), so a tenant the environment does not list can still be shown by name.
 /// </summary>
-public sealed record TenantReading(string TenantId, double? Utilisation, double? Throttled, double RequestsPerSecond);
+public sealed record TenantReading(string TenantId, double? Utilisation, double? Throttled, double RequestsPerSecond, string? Name = null);
 
 /// <summary>
 /// One data source behind the town. The renderer never knows which one produced a number.
