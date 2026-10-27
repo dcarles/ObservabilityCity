@@ -137,7 +137,7 @@ test.describe('the tenant yard', () => {
     await expect(rows.filter({ hasText: ' 0% throttled' }).first()).toBeVisible()
     await expect(rows.filter({ hasText: 'refused' })).toHaveCount(0)
     // the Overview names who throttles, and the yard sign names them too
-    await expect(page.locator('#inspector .row', { hasText: 'Throttled' }).first()).toContainText(await rows.first().locator('span').first().textContent() ?? '')
+    await expect(page.locator('#inspector .row', { has: page.getByText('Throttled', { exact: true }) })).toContainText(await rows.first().locator('span').first().textContent() ?? '')
     expect((await town.yard(DB)).sign.note).toContain('throttled:')
   })
 
