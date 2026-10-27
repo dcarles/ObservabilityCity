@@ -12,7 +12,6 @@ import { clamp, speedFactor } from '../visuals'
 import { CarSystem, type Route } from './cars'
 import { BoatSystem, type BoatRoute } from './boats'
 import { consumersOf, HarbourStatus, messagingOf, type Messaging } from './harbour'
-import { Lighthouse } from './lighthouse'
 import { connectorsOf, portSummary, type Connectors, type PortSummary } from './links'
 import { findLane, type SeaMap } from './sea'
 import { mergeStatic } from './merge'
@@ -109,11 +108,9 @@ export class Town {
   /** Points along every coast, for working out how far back the camera must stand to show the whole town. */
   readonly extent: THREE.Vector3[] = []
   private snapshotId = ''
-  private hubDeadLetters = 0
   private hubBoard: { sprite: THREE.Sprite; key: string } | null = null
   /** The hub's message broker by name (Service Bus, Kafka, ...), for the port's board. */
   private brokerName: string | null = null
-  private lighthouse: Lighthouse | null = null
   private port: PortSummary = { topics: 0, subscriptions: 0, piers: 0, legacy: 0 }
   /** The islands that have a sea lane for boats, and how many car routes cross each one's bridge. */
   private readonly boatLanes = new Set<string>()
@@ -241,7 +238,6 @@ export class Town {
     const broker = hubBuildings.find((b) => b.kind === 'Broker')
     this.brokerName = broker?.node?.name ?? null
     this.hubBoard = null
-    this.lighthouse?.set(0)
     if (broker) {
       const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: canvasTexture(400, 130, () => {}), transparent: true, depthTest: false, toneMapped: false }))
       sprite.renderOrder = 10
@@ -471,9 +467,6 @@ export class Town {
       const links = edgeLinks(s)
       for (const isl of this.islands) if (isl.signpost) this.guard(`signpost ${isl.group.id}`, () => isl.signpost!.set(signLines(links, isl.nodeIds)))
     }
-    // the lighthouse shows the town-wide total, the same number the snapshot's totals carry
-    this.hubDeadLetters = s.totals.deadLetters
-    this.lighthouse?.set(this.hubDeadLetters)
     for (const v of s.vendors) this.guard(`apply ${v.node.id}`, () => this.buildings.get(v.node.id)?.setNode(v.node))
     this.guard('airport', () => this.airport?.setCallers(s.externalCallers))
     this.guard('overlay', () => this.overlay.set(s.dependencies))
@@ -488,7 +481,6 @@ export class Town {
     for (const [id, b] of this.buildings) this.guard(`update ${id}`, () => b.update(dt, time, camera))
     for (const isl of this.islands) this.guard(`harbour ${isl.group.id}`, () => isl.harbour?.update(isl.messaging, time, camera))
     this.guard('hub board', () => this.updateHubBoard(camera))
-    this.guard('lighthouse', () => this.lighthouse?.update(time, camera))
     for (const isl of this.islands) this.guard(`weather ${isl.group.id}`, () => isl.weather.update(dt, time, camera))
     this.guard('weather hub', () => this.hubWeather?.update(dt, time, camera))
     this.guard('airport', () => this.airport?.update(dt, time, camera))
@@ -565,10 +557,10 @@ export class Town {
     for (const b of this.buildings.values()) b.setTenantView(view)
   }
 
-  /** What the Service Bus port and the lighthouse show: topics, subscriptions, piers, the old-route reads, and the dead-letter total. For tests. */
-  inspectHub(): PortSummary & { lighthouse: { total: number; alarm: boolean } | null; boats: number; sign: { board: string; model: string | null } } {
+  /** What the Service Bus port shows: topics, subscriptions, piers and the old-route reads. For tests. */
+  inspectHub(): PortSummary & { boats: number; sign: { board: string; model: string | null } } {
     const broker = [...this.buildings.values()].find((b) => b.kind === 'Broker')
-    return { ...this.port, lighthouse: this.lighthouse?.status() ?? null, boats: this.boatLanes.size, sign: { board: this.brokerSign(), model: broker?.model.signText ?? null } }
+    return { ...this.port, boats: this.boatLanes.size, sign: { board: this.brokerSign(), model: broker?.model.signText ?? null } }
   }
 
   /** What the airport shows right now. For tests. */
@@ -612,11 +604,6 @@ export class Town {
       Database: { x: 0, z: CZ + 14 * f, yaw: Math.PI },
     }
     const avoid: Rect[] = [{ x: 0, z: CZ, w: 20 * f, d: 20 * f }, { x: 0, z: CZ - 15 * f, w: 6, d: 14 }]
-    // the lighthouse stands beside the Service Bus port, just off its axis where no spoke road runs
-    const lx = spots.Broker.x + 1.5, lz = CZ - 7.7
-    this.lighthouse = new Lighthouse(lx, lz)
-    hubRoot.add(this.lighthouse.group)
-    avoid.push({ x: lx, z: lz, w: 6, d: 6 })
     const seen = new Set<string>()
     for (const n of hub?.nodes ?? []) {
       const spot = spots[n.kind]
@@ -1111,7 +1098,7 @@ export class Town {
   }
 
   /**
-   * Shows or hides whole families of things. Traffic stops and its cars go; Messaging hides the boats, crates, pen, lighthouse and port board; Databases
+   * Shows or hides whole families of things. Traffic stops and its cars go; Messaging hides the boats, crates, pen and port board; Databases
    * and Workers hide those buildings, and the cars that were headed to or from them.
    */
   setLayers(state: LayerState): void {
@@ -1126,7 +1113,6 @@ export class Town {
     this.cars.setHidden(hidden)
     this.boats.setEnabled(state.messaging)
     for (const isl of this.islands) if (isl.harbour) isl.harbour.group.visible = state.messaging
-    if (this.lighthouse) this.lighthouse.group.visible = state.messaging
     this.overlay.visible = state.dependencies
   }
 
@@ -1136,12 +1122,11 @@ export class Town {
   }
 
   /** What the layers show right now, as plain values. For tests. */
-  inspectLayers(): { layers: LayerState; hiddenBuildings: string[]; cars: number; boats: number; boatsDrawn: boolean; lighthouse: boolean | null; harbours: boolean[]; overlay: boolean } {
+  inspectLayers(): { layers: LayerState; hiddenBuildings: string[]; cars: number; boats: number; boatsDrawn: boolean; harbours: boolean[]; overlay: boolean } {
     return {
       layers: this.layers,
       hiddenBuildings: [...this.buildings].filter(([, b]) => !b.root.visible).map(([id]) => id),
       cars: this.cars.count, boats: this.boats.count, boatsDrawn: this.boats.object.visible,
-      lighthouse: this.lighthouse ? this.lighthouse.group.visible : null,
       harbours: this.islands.filter((i) => i.harbour).map((i) => i.harbour!.group.visible),
       overlay: this.overlay.visible,
     }
