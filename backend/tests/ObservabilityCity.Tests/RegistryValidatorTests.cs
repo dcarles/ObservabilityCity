@@ -14,6 +14,7 @@ public class RegistryValidatorTests
     [InlineData("shared-test-data/registries/mini-town")]
     [InlineData("shared-test-data/registries/tenants-town")]
     [InlineData("shared-test-data/registries/live-town")]
+    [InlineData("shared-test-data/registries/links-town")]
     [InlineData("shared-test-data/registries/stress-23")]
     [InlineData("shared-test-data/registries/stress-35")]
     public void Every_registry_in_the_repo_is_clean(string folder)
@@ -21,6 +22,106 @@ public class RegistryValidatorTests
         var r = RegistryValidator.Validate(Path.Combine(TestPaths.RepoRoot, folder));
 
         Assert.True(r.Findings.Count == 0, string.Join("\n", r.Findings.Select(f => $"{f.File}:{f.Line} [{f.Rule}] {f.Message}")));
+    }
+
+    [Fact]
+    public void A_warning_the_town_expects_is_left_out_of_the_report_and_counted()
+    {
+        var r = RegistryValidator.Validate(TestPaths.LinksTown);
+
+        Assert.Empty(r.Findings);
+        var hit = Assert.Single(r.ExpectedFindings!);
+        Assert.Equal("standalone", hit.Rule);
+        Assert.Equal("pillars/sta.yaml", hit.File);
+        Assert.Equal(1, r.Expected);
+        Assert.Equal(0, r.Warnings);
+    }
+
+    [Fact]
+    public void An_expected_warning_that_does_not_appear_is_an_error_on_its_entry()
+    {
+        using var copy = new RegistryCopy(TestPaths.LinksTown);
+        copy.Replace("town.yaml", "{ rule: standalone, file: pillars/sta.yaml }", "{ rule: uncalled, file: pillars/sta.yaml }");
+
+        var r = Check(copy);
+
+        var e = Single(r, "expected-warning");
+        Assert.Equal(Severity.Error, e.Severity);
+        Assert.Equal("town.yaml", e.File);
+        Assert.Contains("'uncalled'", e.Message);
+        Assert.Contains("pillars/sta.yaml", e.Message);
+        // the standalone warning it was not told to expect is back in the report
+        Assert.Contains(r.Findings, f => f.Rule == "standalone" && f.Severity == Severity.Warning);
+    }
+
+    [Fact]
+    public void An_expected_warning_can_name_a_rule_without_a_file()
+    {
+        using var copy = new RegistryCopy(TestPaths.LinksTown);
+        copy.Replace("town.yaml", "{ rule: standalone, file: pillars/sta.yaml }", "{ rule: standalone }");
+
+        var r = Check(copy);
+
+        Assert.Empty(r.Findings);
+        Assert.Equal(1, r.Expected);
+    }
+
+    [Fact]
+    public void An_expected_warning_in_another_file_does_not_hide_the_warning()
+    {
+        using var copy = new RegistryCopy(TestPaths.LinksTown);
+        copy.Replace("town.yaml", "file: pillars/sta.yaml", "file: pillars/wrk.yaml");
+
+        var r = Check(copy);
+
+        Assert.Contains(r.Findings, f => f.Rule == "standalone" && f.File == "pillars/sta.yaml");
+        Assert.Contains(r.Findings, f => f.Rule == "expected-warning" && f.Severity == Severity.Error);
+    }
+
+    [Fact]
+    public void An_error_cannot_be_expected_away()
+    {
+        using var copy = new RegistryCopy(TestPaths.LinksTown);
+        copy.Replace("town.yaml", "topology: hub-and-spoke", "topology: sideways");
+        copy.Replace("town.yaml", "{ rule: standalone, file: pillars/sta.yaml }", "{ rule: topology }");
+
+        var r = Check(copy);
+
+        Assert.Contains(r.Findings, f => f.Rule == "topology" && f.Severity == Severity.Error);
+        Assert.Contains(r.Findings, f => f.Rule == "expected-warning" && f.Severity == Severity.Error);
+    }
+
+    [Fact]
+    public void An_expectation_without_a_rule_is_an_error()
+    {
+        using var copy = new RegistryCopy(TestPaths.LinksTown);
+        copy.Replace("town.yaml", "{ rule: standalone, file: pillars/sta.yaml }", "{ file: pillars/sta.yaml }");
+
+        var e = Single(Check(copy), "expected-warning");
+
+        Assert.Contains("needs a 'rule'", e.Message);
+    }
+
+    [Fact]
+    public void The_pull_request_comment_counts_expected_warnings_and_does_not_list_them()
+    {
+        var results = new[] { RegistryValidator.Validate(TestPaths.LinksTown) };
+
+        var text = Report.Markdown(results, TestPaths.RepoRoot);
+
+        Assert.Contains("all clear", text);
+        Assert.Contains("1 expected", text);
+        Assert.DoesNotContain("pillars/sta.yaml", text);
+    }
+
+    [Fact]
+    public void The_console_report_says_how_many_warnings_were_expected()
+    {
+        var w = new StringWriter();
+
+        Report.WriteText(RegistryValidator.Validate(TestPaths.LinksTown), TestPaths.RepoRoot, w);
+
+        Assert.Contains("0 warning(s), 1 expected", w.ToString());
     }
 
     [Fact]

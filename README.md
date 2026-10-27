@@ -185,6 +185,8 @@ dotnet run --project backend/tools/ObservabilityCity.Validate -- --all   # check
 dotnet run --project backend/tools/ObservabilityCity.Validate -- --sources config/<town>   # probe each configured source with your Azure login (see docs/connect-your-company.md)
 ```
 
+A test registry that shows a validator rule on purpose (for example an island that stands alone) lists the warning under `expectedWarnings` in its `town.yaml`, as `{ rule: standalone, file: pillars/sta.yaml }`. The warning then stays out of the report and the pull request comment, and an expected warning that stops appearing is an error, so the rule is still proven.
+
 To refresh the golden fixtures (calm town, a bad day across several islands, and the editor schemas) after an intended change: `UPDATE_GOLDEN=1 dotnet test --solution backend/ObservabilityCity.slnx`. The island layout golden is refreshed with `cd frontend && UPDATE_GOLDEN=1 npm test`.
 
 **Browser tests** (`frontend/tests/e2e/`, Playwright) start the real backend with the fake source and the real page, steer the fake source through `/api/fake/effects`, and read the scene's state through `window.city` (beacon colour, dark floors, closed sign, queue warning, crates, dead-letter light) instead of pixels. With `?test=1` the page draws nothing on its own and time moves only when a test calls `city.step(seconds)`, so tests do not depend on a GPU. The first run needs the browser: `cd frontend && npx playwright install chromium` (once, and again when the Playwright version changes). Set `E2E_NO_BUILD=1` once the backend is built in Release.
