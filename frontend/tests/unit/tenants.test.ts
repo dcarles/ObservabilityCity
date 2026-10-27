@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { ALL_TENANTS, carShown, fillOf, groupTenants, pickTenant, pruneTenants, shownUnits, tenantLabel, tenantLevel, tenantListOrder, tenantTrouble, toggleTenant, yardLayout, yardSummary, type TenantView } from '../../src/tenants'
+import { ALL_TENANTS, carShown, fillOf, groupTenants, pickTenant, pruneTenants, shownUnits, tenantLabel, tenantLevel, tenantListOrder, tenantTrouble, throttleWho, throttledText, throttledUnits, toggleTenant, yardLayout, yardSummary, type TenantView } from '../../src/tenants'
 import { planPads, planIsland } from '../../src/scene/plan'
 import { summariseService } from '../../src/scene/service'
 import { worstState } from '../../src/visuals'
@@ -36,7 +36,7 @@ describe('the yard sign', () => {
   it('says how many tenants and how many are throttled', () => {
     const s = yardSummary(units, ALL_TENANTS, 0.05)
     expect(s.text).toBe('4 tenants, 2 throttled')
-    expect(s.note).toBe('1 unknown')
+    expect(s.note).toBe('2 throttled: X, X · 1 unknown')
   })
   it('uses the singular for one tenant', () => {
     expect(yardSummary([unit('Customer', 'Healthy')], ALL_TENANTS, 0.05).text).toBe('1 tenant, 0 throttled')
@@ -44,7 +44,7 @@ describe('the yard sign', () => {
   it('leaves hidden test tenants out of the counts and says so', () => {
     const s = yardSummary(units, { hideTest: true, tenants: [] }, 0.05)
     expect(s.text).toBe('3 tenants, 1 throttled')
-    expect(s.note).toBe('1 unknown · 1 test hidden')
+    expect(s.note).toBe('1 throttled: X · 1 unknown · 1 test hidden')
   })
   it('counts nothing as throttled until it reaches the amber threshold', () => {
     expect(yardSummary([unit('Customer', 'Healthy', 0.01)], ALL_TENANTS, 0.05).throttled).toBe(0)
@@ -263,5 +263,29 @@ describe('the order the inspector lists tenants in', () => {
     const units = [named('none', 'Stale', null, null), named('some', 'Healthy', 0, 0.3)]
     expect(tenantListOrder(units).map((u) => u.name)).toEqual(['some', 'none'])
     expect(units.map((u) => u.name)).toEqual(['none', 'some'])
+  })
+})
+
+describe('saying which tenant throttles', () => {
+  const named = (name: string, throttled: number | null) => ({ ...unit('Customer', 'Healthy', throttled), id: name, name })
+  const units = [named('Lloyds', 0.02), named('Boohoo', 0.032), named('Argos', 0), named('Next', 0.04)]
+  it('orders the throttled tenants worst first and skips the ones under the amber share', () => {
+    expect(throttledUnits(units, 0.03).map((u) => u.name)).toEqual(['Next', 'Boohoo'])
+  })
+  it('names the worst tenant and counts the others', () => {
+    expect(throttleWho(units, 0.03)).toBe('4.0% · Next +1 more')
+    expect(throttleWho([units[1]], 0.03)).toBe('3.2% · Boohoo')
+    expect(throttleWho([units[2]], 0.03)).toBeNull()
+  })
+  it('shows a tenant its own figure, 0% included', () => {
+    expect(throttledText(named('a', 0))).toBe('0% throttled')
+    expect(throttledText(named('a', 0.4))).toBe('40% throttled')
+    expect(throttledText(named('a', 0.032))).toBe('3.2% throttled')
+  })
+  it('puts the throttled tenants on the yard sign when there are only a few', () => {
+    expect(yardSummary(units, ALL_TENANTS, 0.03).note).toBe('2 throttled: Next, Boohoo')
+    const many = Array.from({ length: 5 }, (_, i) => named(`T${i}`, 0.2))
+    expect(yardSummary(many, ALL_TENANTS, 0.03).note).toBe('')
+    expect(yardSummary(many, ALL_TENANTS, 0.03).text).toBe('5 tenants, 5 throttled')
   })
 })

@@ -1,6 +1,7 @@
 // What the inspector drawer says, as pure functions: a system's numbers in, rows and sentences out.
 
 import type { ConfigValue, HealthState, IncidentSnapshot, LinkRef, LogLine, NodeSnapshot, ScopeInfo, ScopeResource, SettingLayer, SystemDetail } from './types'
+import { throttleWho } from './tenants'
 import { isAbsent, isUnmonitored, QUIET_TEXT } from './signals'
 import { formatAge, formatMs, formatRate, plaqueText, resourceUse } from './visuals'
 
@@ -50,7 +51,7 @@ export function overviewRows(n: NodeSnapshot): Row[] {
   if (n.cpu != null && !isAbsent(n, 'cpu')) rows.push({ label: 'CPU', value: pct(n.cpu), tone: hot(n.cpu) })
   if (n.memory != null && !isAbsent(n, 'memory')) rows.push({ label: 'Memory', value: pct(n.memory), tone: hot(n.memory) })
   if (n.utilisation != null && !isAbsent(n, 'utilisation')) rows.push({ label: 'Capacity used', value: pct(n.utilisation), tone: hot(n.utilisation) })
-  if (n.throttled != null && !isAbsent(n, 'throttled')) rows.push({ label: 'Throttled', value: pct(n.throttled, 1), tone: n.throttled >= n.throttleRed ? 'bad' : n.throttled >= n.throttleAmber && n.throttled > 0 ? 'warn' : '' })
+  if (n.throttled != null && !isAbsent(n, 'throttled')) rows.push({ label: 'Throttled', value: throttleWho(n.tenants ?? [], n.throttleAmber) ?? pct(n.throttled, 1), tone: n.throttled >= n.throttleRed ? 'bad' : n.throttled >= n.throttleAmber && n.throttled > 0 ? 'warn' : '' })
   if (n.queueDepth != null && !isAbsent(n, 'backlog')) rows.push({ label: 'Waiting', value: `${formatRate(n.queueDepth)} messages`, tone: '' })
   if (n.oldestMessageSeconds != null && !isAbsent(n, 'backlog')) rows.push({ label: 'Oldest message', value: formatAge(n.oldestMessageSeconds), tone: n.oldestMessageSeconds >= n.backlogRed ? 'bad' : n.oldestMessageSeconds >= n.backlogAmber ? 'warn' : '' })
   if (n.deadLetters != null && !isAbsent(n, 'deadLetters')) rows.push({ label: 'Dead letters', value: formatRate(n.deadLetters), tone: n.deadLetters > 0 ? 'bad' : '' })

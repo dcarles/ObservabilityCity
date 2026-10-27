@@ -1,7 +1,7 @@
 import type { GroupSnapshot, LogLine, NodeSnapshot, Snapshot, SystemDetail } from './types'
 import { escapeHtml } from './picker'
 import { scopeParams, type Scope } from './scope'
-import { tenantListOrder, yardSummary, type TenantView } from './tenants'
+import { tenantListOrder, throttledText, yardSummary, type TenantView } from './tenants'
 import { ago, clockTime, configOrder, filterLogs, incidentSummary, LAYER_WORD, linkSections, overviewRows, reasons, scopeView, SEVERITY_WORD, stateTone, type LogFilter } from './inspectorModel'
 
 export type InspectorTab = 'overview' | 'links' | 'logs' | 'config'
@@ -210,7 +210,7 @@ export class Inspector {
     const shown = n.tenants.filter((u) => !(view.hideTest && u.kind === 'Test'))
     const worst = tenantListOrder(shown).slice(0, 8)
     return `<h4>Tenants <small>${escapeHtml(sum.text)}${sum.note ? ` · ${escapeHtml(sum.note)}` : ''}</small></h4>` +
-      worst.map((u) => `<div class="row"><span>${escapeHtml(u.name)}${u.kind === 'Test' ? ' (test)' : u.kind === 'Unknown' ? ' (unknown)' : ''}</span><span class="${u.state === 'Down' ? 'bad' : u.state === 'Degraded' ? 'warn' : ''}">${u.utilisation == null ? '–' : `${Math.round(u.utilisation * 100)}%`}${(u.throttled ?? 0) > 0 ? ` · ${(u.throttled! * 100).toFixed(0)}% refused` : ''}</span></div>`).join('')
+      worst.map((u) => `<div class="row"><span>${escapeHtml(u.name)}${u.kind === 'Test' ? ' (test)' : u.kind === 'Unknown' ? ' (unknown)' : ''}</span><span class="${u.state === 'Down' ? 'bad' : u.state === 'Degraded' ? 'warn' : ''}">${u.utilisation == null ? '–' : `${Math.round(u.utilisation * 100)}%`}${u.throttled == null ? '' : ` · ${throttledText(u)}`}</span></div>`).join('')
   }
 
   private links(): string {
