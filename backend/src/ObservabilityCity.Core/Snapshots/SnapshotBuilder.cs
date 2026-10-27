@@ -366,7 +366,7 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
             : u >= n.ResourceAmber || th >= n.ThrottleAmber ? HealthState.Degraded
             : HealthState.Healthy;
         if (kind == TenantKind.Test && state == HealthState.Down) state = HealthState.Degraded; // test tenants raise amber at most
-        return new TenantUnitSnapshot(t.TenantId, name, kind, RegistryEnvironment.DatabaseName(n.TenantPattern!, t.TenantId), state, t.Utilisation, t.Throttled, t.RequestsPerSecond);
+        return new TenantUnitSnapshot(t.TenantId, name, kind, RegistryEnvironment.DatabaseName(n.TenantPattern!, t.TenantId), state, t.Utilisation, t.Throttled, t.RequestsPerSecond, t.Limit);
     }
 
     /// <summary>

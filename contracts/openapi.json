@@ -1089,6 +1089,11 @@
           "requestsPerSecond": {
             "type": "number",
             "format": "double"
+          },
+          "limit": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
           }
         },
         "additionalProperties": false

@@ -61,6 +61,15 @@ describe('the overview rows', () => {
     expect(overviewRows(node({ throttled: 0.032 })).find((r) => r.label === 'Throttled')!.value).toBe('3.2%')
   })
 
+  it('shows what the tenant databases are provisioned at, one size or the range', () => {
+    const t = (limit: number | null) => ({ id: String(limit), name: 'T', kind: 'Customer' as const, database: 'd', state: 'Healthy' as const, utilisation: 0.5, throttled: 0, requestsPerSecond: 1, limit })
+    const row = (limits: (number | null)[]) => overviewRows(node({ tenants: limits.map(t) })).find((r) => r.label === 'Provisioned')?.value
+    expect(row([20000, 20000])).toBe('20,000 RU/s')
+    expect(row([4000, 20000])).toBe('4,000 to 20,000 RU/s')
+    expect(row([null])).toBeUndefined()
+    expect(overviewRows(node({})).map((r) => r.label)).not.toContain('Provisioned')
+  })
+
   it('adds what a source reports, and leaves out what it does not', () => {
     const rows = overviewRows(node({ cpu: 0.5, memory: 0.9, utilisation: 0.4, throttled: 0.02, throttleRed: 0.02, queueDepth: 12, oldestMessageSeconds: 30, deadLetters: 4 }))
     const labels = rows.map((r) => r.label)
