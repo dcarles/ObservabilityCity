@@ -155,6 +155,7 @@ public sealed class AzureMonitorSource(
         var seriesOf = done.ToDictionary(d => (d.Target.Resource.Id, d.Target.Group), d => d.Series);
         var read = targets.Select(t => (Target: t, Series: seriesOf[(t.Resource.Id, t.Group)])).ToList();
 
+        var names = resolution.TenantNames.ToDictionary(t => t.Id, t => t.Name);
         var readings = new Dictionary<string, NodeReading>();
         foreach (var system in read.GroupBy(r => r.Target.SystemId))
         {
@@ -166,7 +167,7 @@ public sealed class AzureMonitorSource(
             var throttled = Worst("throttled");
             if (cpu is null && memory is null && utilisation is null && throttled is null) continue;
             var tenants = values.Where(v => v.Tenant is not null).GroupBy(v => v.Tenant!)
-                .Select(g => new TenantReading(g.Key, Max(g, "utilisation"), Max(g, "throttled"), g.Sum(v => v.Signals.GetValueOrDefault("requests") ?? 0))).ToList();
+                .Select(g => new TenantReading(g.Key, Max(g, "utilisation"), Max(g, "throttled"), g.Sum(v => v.Signals.GetValueOrDefault("requests") ?? 0), names.GetValueOrDefault(g.Key))).ToList();
             readings[system.Key] = new NodeReading(at, true, 0, 0, 0, 0, 0, 0, cpu, memory, utilisation, throttled, Tenants: tenants.Count == 0 ? null : tenants);
         }
         return readings;

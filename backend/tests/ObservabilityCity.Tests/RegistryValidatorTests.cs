@@ -367,6 +367,14 @@ public class RegistryValidatorTests
     }
 
     [Fact]
+    public void An_environment_whose_scope_finds_the_tenants_needs_no_list()
+    {
+        using var f = new RegistryCopy(Path.Combine(TestPaths.RepoRoot, "shared-test-data", "registries", "scope-town-a"));
+
+        Assert.DoesNotContain(Check(f).Findings, x => x.Rule == "tenants");
+    }
+
+    [Fact]
     public void A_tenant_pattern_in_a_town_without_environments_is_a_warning_on_the_system()
     {
         using var f = new RegistryCopy(TestPaths.MiniTown);

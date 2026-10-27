@@ -170,20 +170,23 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
     /// </summary>
     internal static List<TenantInfo> TenantsOf(RegistryEnvironment? env, IReadOnlyList<NodeSnapshot> nodes)
     {
-        var seen = new Dictionary<string, double>(); // tenant id to the request rate its databases see
-        var unknown = new SortedSet<string>(StringComparer.Ordinal);
+        var declared = env?.Tenants ?? [];
+        var declaredKeys = declared.Select(t => Scope.ScopeResolver.TenantKey(t.Id)).ToHashSet();
+        var seen = new Dictionary<string, double>(); // tenant key to the request rate its databases see
+        var found = new SortedDictionary<string, (string Id, string Name, TenantKind Kind)>(StringComparer.Ordinal); // tenants the list lacks
         foreach (var unit in nodes.Where(n => n.State != HealthState.Stale).SelectMany(n => n.Tenants ?? []))
         {
-            seen[unit.Id] = seen.GetValueOrDefault(unit.Id) + unit.RequestsPerSecond;
-            if (unit.Kind == TenantKind.Unknown) unknown.Add(unit.Id);
+            var key = Scope.ScopeResolver.TenantKey(unit.Id);
+            seen[key] = seen.GetValueOrDefault(key) + unit.RequestsPerSecond;
+            if (!declaredKeys.Contains(key)) found.TryAdd(key, (unit.Id, unit.Name, unit.Kind));
         }
-        var declared = env?.Tenants ?? [];
-        var all = declared.Select(t => (Id: t.Id, Name: t.Name, Kind: t.Kind)).Concat(unknown.Select(id => (Id: id, Name: id, Kind: TenantKind.Unknown))).ToList();
+        var all = declared.Select(t => (Key: Scope.ScopeResolver.TenantKey(t.Id), Id: t.Id, Name: t.Name, Kind: t.Kind))
+            .Concat(found.Select(f => (Key: f.Key, Id: f.Value.Id, Name: f.Value.Name, Kind: f.Value.Kind))).ToList();
         if (all.Count == 0) return [];
-        var total = all.Sum(t => seen.GetValueOrDefault(t.Id));
-        double Weight(string id, TenantKind kind) => total > 0 ? seen.GetValueOrDefault(id) : kind == TenantKind.Test ? 0.1 : 1.0;
-        var sum = all.Sum(t => Weight(t.Id, t.Kind));
-        return all.Select(t => new TenantInfo(t.Id, t.Name, t.Kind, sum > 0 ? Weight(t.Id, t.Kind) / sum : 0)).ToList();
+        var total = all.Sum(t => seen.GetValueOrDefault(t.Key));
+        double Weight(string key, TenantKind kind) => total > 0 ? seen.GetValueOrDefault(key) : kind == TenantKind.Test ? 0.1 : 1.0;
+        var sum = all.Sum(t => Weight(t.Key, t.Kind));
+        return all.Select(t => new TenantInfo(t.Id, t.Name, t.Kind, sum > 0 ? Weight(t.Key, t.Kind) / sum : 0)).ToList();
     }
 
     private static MessagingSnapshot MessagingOf(Registry.Registry registry, RegistryGroup g) => new(
@@ -337,7 +340,7 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
 
     /// <summary>
     /// One unit for each tenant: first the tenants the environment lists, in its order (grey when no database was found for one), then the ones the
-    /// data shows that it does not list, as unknown. A unit is amber when its database runs hot or throttles and red when it is past the red
+    /// data shows that it does not list: a customer under the name the source gave it, or unknown when the source has no name for it. A unit is amber when its database runs hot or throttles and red when it is past the red
     /// thresholds; a test tenant is never red.
     /// </summary>
     private static List<TenantUnitSnapshot> TenantUnits(RegistryNode n, NodeReading r, RegistryEnvironment? env)
@@ -351,7 +354,7 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
                 : new TenantUnitSnapshot(t.Id, t.Name, t.Kind, RegistryEnvironment.DatabaseName(n.TenantPattern!, t.Id), HealthState.Stale, null, null, 0));
         var listed = (env?.Tenants ?? []).Select(t => Scope.ScopeResolver.TenantKey(t.Id)).ToHashSet();
         foreach (var reading in found.Values.Where(t => !listed.Contains(Scope.ScopeResolver.TenantKey(t.TenantId))).OrderBy(t => t.TenantId, StringComparer.Ordinal))
-            units.Add(Unit(n, r, reading, reading.TenantId, TenantKind.Unknown));
+            units.Add(reading.Name is { Length: > 0 } known ? Unit(n, r, reading, known, TenantKind.Customer) : Unit(n, r, reading, reading.TenantId, TenantKind.Unknown));
         return units;
     }
 
