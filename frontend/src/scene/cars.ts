@@ -150,6 +150,8 @@ export class CarSystem {
   private hidden: ReadonlySet<Building> = new Set()
   /** The share of the usual number of cars that are sent out: 1 for every car, less on a weak PC (see the quality presets). */
   density = 1
+  /** Where the dice come from: which cars fail, when they leave, which tenant they carry. Tests swap in a seeded one so a run repeats. */
+  random: () => number = Math.random
   /** Cars sent out since the town was built. For tests. */
   sent = 0
   /** Failed requests that stopped at the door and drove back the way they came, since the town was built. For tests. */
@@ -243,7 +245,7 @@ export class CarSystem {
       if (this.hidden.has(plan.route.dest) || this.hidden.has(plan.route.source as Building)) continue
       const n = plan.route.dest.node
       if (!n || (n.state !== 'Healthy' && n.state !== 'Degraded')) continue
-      const a = (this.acc.get(plan) ?? Math.random()) + spawnRate(n.requestsPerSecond) * TRAFFIC * this.density * plan.route.share * dt
+      const a = (this.acc.get(plan) ?? this.random()) + spawnRate(n.requestsPerSecond) * TRAFFIC * this.density * plan.route.share * dt
       // a car that cannot leave yet (the road is not clear) waits its turn, up to a few
       let owed = a
       while (owed >= 1 && this.cars.length < this.max && this.spawn(plan)) owed -= 1
@@ -437,14 +439,14 @@ export class CarSystem {
     if (near >= CROWD_MAX) return false
     const first = points[1].clone().sub(points[0])
     const n = plan.route.dest.node
-    const failed = Math.random() < (n?.errorRate ?? 0)
+    const failed = this.random() < (n?.errorRate ?? 0)
     const car: Car = {
       id: this.nextId++, plan, points, lengths: segmentLengths(points), total: polyLength(points), dist: 0,
       stage: 'there', committed: false, timer: 0,
       model: plan.route.origin === 'external' ? 1 : 0, failed,
       yaw: Math.atan2(first.x, first.z), x: start.x, z: start.z, dx: first.x, dz: first.z,
-      speed: 0, stuck: 0, standoff: 0, fade: -1, lookX: new Array(LOOK).fill(start.x), lookZ: new Array(LOOK).fill(start.z), pace: 0.95 + Math.random() * 0.1, wait: 0, age: 0,
-      tenant: pickTenant(this.tenants, Math.random()),
+      speed: 0, stuck: 0, standoff: 0, fade: -1, lookX: new Array(LOOK).fill(start.x), lookZ: new Array(LOOK).fill(start.z), pace: 0.95 + this.random() * 0.1, wait: 0, age: 0,
+      tenant: pickTenant(this.tenants, this.random()),
     }
     const len = Math.hypot(car.dx, car.dz) || 1
     car.dx /= len; car.dz /= len
