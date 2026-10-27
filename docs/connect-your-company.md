@@ -171,6 +171,15 @@ To let the inventory supply the floors of the buildings, count the instances in 
 - **Telemetry names.** A system says what its telemetry calls it with `telemetry: { role: ... }` in its pillar file; one that does not takes the `telemetryRole` template. Two systems with the same name are reported, since their telemetry would be read as one.
 - **Queries.** The adapter's own two queries (subscriptions, then the resources of the chosen subscriptions) can be replaced under `scope.queries`; every page of the answer is read.
 
+- **Links.** `links:` makes an address per resource that opens it somewhere else, such as its page in a cloud portal or console. Each link has a `name` (the words shown), a `url` template and optionally `types` (only resources of those types). The template starts with `https://` written out and can use `{resourceId}`, `{name}`, `{type}`, `{region}`, `{subscriptionId}`, `{tenantId}`, `{tenantName}`, `{environment}` and your `variables`; values are percent-encoded. A tenant database account gets its own link. Nothing is shown without `links:`. The town only shows the address; it never opens it and holds no credentials for it.
+
+```yaml
+scope:
+  variables: { directory: example.test }
+  links:
+    - { name: Cloud portal, url: "https://portal.example.test/#@{directory}/resource{resourceId}" }
+```
+
 Each system's **Config** tab in the town then has a *Where it lives* part with the subscription, workspace, service code, telemetry role and resources, and says how each was found. An environment without `scope:` shows nothing there.
 
 #### `resourcegraph` (the inventory)

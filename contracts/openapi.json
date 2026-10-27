@@ -684,6 +684,22 @@
         },
         "additionalProperties": false
       },
+      "ResourceLink": {
+        "required": [
+          "name",
+          "url"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
       "ScopeInfo": {
         "required": [
           "inventoryState",
@@ -767,6 +783,13 @@
           "instances": {
             "type": "integer",
             "format": "int32",
+            "nullable": true
+          },
+          "links": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ResourceLink"
+            },
             "nullable": true
           }
         },

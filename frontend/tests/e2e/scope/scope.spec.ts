@@ -7,8 +7,8 @@ import { API } from '../support/city'
 
 const B = process.env.E2E_SUITE === 'scopeb'
 const town = B
-  ? { subscription: 'Alpha Production', via: 'found by its tag', workspace: 'law-live-prod', workspaceVia: 'id', workspaceNote: 'its id is given, so nothing is looked up', apiRole: 'OrdersAPI', apiNote: 'derived from the environment template', apiResources: ['orders-api'], dbResources: 3, countedText: /3 instances/ }
-  : { subscription: 'acme-eu-prd-al', via: 'found by its name', workspace: 'ws-prd-main', workspaceVia: 'name', workspaceNote: 'found by its name', apiRole: 'OrdersApi', apiNote: 'set on this system', apiResources: ['api-acme-al-ord-northeurope1x', 'plan-cf-acme-al-ord-northeurope1x', 'plan-cf-acme-al-ord-westeurope9z'], dbResources: 3, countedText: /1 instance.*2 instances|2 instances.*1 instance/ }
+  ? { subscription: 'Alpha Production', via: 'found by its tag', workspace: 'law-live-prod', workspaceVia: 'id', workspaceNote: 'its id is given, so nothing is looked up', apiRole: 'OrdersAPI', apiNote: 'derived from the environment template', apiResources: ['orders-api'], dbResources: 3, countedText: /3 instances/, apiLink: ['Console', /^https:\/\/console\.example\.test\/subscriptions\/[0-9a-f-]+\/apps\/orders-api$/], dbLink: ['Customer page', /^https:\/\/admin\.example\.test\/customers\/.+\?name=.+&env=prod$/] }
+  : { subscription: 'acme-eu-prd-al', via: 'found by its name', workspace: 'ws-prd-main', workspaceVia: 'name', workspaceNote: 'found by its name', apiRole: 'OrdersApi', apiNote: 'set on this system', apiResources: ['api-acme-al-ord-northeurope1x', 'plan-cf-acme-al-ord-northeurope1x', 'plan-cf-acme-al-ord-westeurope9z'], dbResources: 3, countedText: /1 instance.*2 instances|2 instances.*1 instance/, apiLink: ['Cloud portal', /^https:\/\/portal\.example\.test\/#@example\.test\/resource\/subscriptions\/.+\/sites\/api-acme-al-ord-northeurope1x$/], dbLink: ['Cloud portal', /^https:\/\/portal\.example\.test\/#@example\.test\/resource\/subscriptions\/.+\/databaseaccounts\/[0-9a-f]{32}-al-ord$/] }
 
 async function openConfig(page: Page, name: string): Promise<void> {
   await page.goto('/?test=1&quality=low')
@@ -53,6 +53,48 @@ test.describe(`a live town with scope rules (${B ? 'tags and derived names' : 'n
     await expect(rows).toHaveCount(town.dbResources)
     const text = (await rows.allTextContents()).join(' ')
     for (const customer of ['Acme Bank', 'Borealis Credit Union', 'Cygnus Finance']) expect(text).toContain(customer)
+  })
+
+  // The environment's link rules turn each resource into addresses; the program only shows them (it never opens or fetches one).
+  test('the server sends the links the rules make for each resource', async ({ request }) => {
+    await expect.poll(async () => (await (await request.get(`${API}/api/systems/aa.orders-api`)).json()).scope?.inventoryState, { timeout: 15_000 }).toBe('read')
+    const scope = (await (await request.get(`${API}/api/systems/aa.orders-api`)).json()).scope
+    const links = scope.resources.flatMap((r: any) => r.links ?? [])
+    expect(links.length).toBeGreaterThan(0)
+    for (const l of links) expect(l.url).toMatch(/^https:\/\//)
+  })
+
+  test('the Config tab puts a link on each resource row, opening in a new tab without access to this page', async ({ page }) => {
+    await openConfig(page, 'Orders API')
+    const link = page.locator(`#inspector .cfg-row.res[data-resource="${town.apiResources[0]}"] a.out`)
+    await expect(link).toHaveText(`${town.apiLink[0]} ↗`)
+    await expect(link).toHaveAttribute('href', town.apiLink[1] as RegExp)
+    await expect(link).toHaveAttribute('target', '_blank')
+    await expect(link).toHaveAttribute('rel', /noopener/)
+    await expect(link).toHaveAttribute('rel', /noreferrer/)
+  })
+
+  test('each tenant database account has its own link', async ({ page }) => {
+    await openConfig(page, 'Orders DB')
+    const links = page.locator('#inspector .cfg-row.res a.out')
+    await expect(links).toHaveCount(town.dbResources)
+    const hrefs = await links.evaluateAll((els) => els.map((e) => (e as HTMLAnchorElement).getAttribute('href')!))
+    expect(new Set(hrefs).size).toBe(town.dbResources)
+    for (const h of hrefs) expect(h).toMatch(town.dbLink[1] as RegExp)
+  })
+
+  test('the Overview tab says where to open the system, and points a tenant database to the Config tab', async ({ page }) => {
+    await page.goto('/?test=1&quality=low')
+    await page.waitForFunction(() => (window as any).city?.seen.snapshots > 0)
+    await page.locator('#search-input').fill('Orders API')
+    await page.locator('#search-results .hit').first().click()
+    await expect(page.locator('#inspector h4', { hasText: 'Open in' })).toBeVisible()
+    await expect(page.locator('#inspector .row.open-in a.out').first()).toHaveAttribute('href', town.apiLink[1] as RegExp)
+    await page.locator('#search-input').fill('Orders DB')
+    await page.locator('#search-results .hit').first().click()
+    await expect(page.locator('#inspector h4', { hasText: 'Open in' })).toBeVisible()
+    await expect(page.locator('#inspector .row.open-in')).toHaveCount(0)
+    await expect(page.locator('#inspector')).toContainText('3 tenant resources have their own links on the Config tab')
   })
 
   // Nobody listed these tenants. The accounts' tag names them, so they stand in the yard as customers under those names, not as unknown "?" pods.

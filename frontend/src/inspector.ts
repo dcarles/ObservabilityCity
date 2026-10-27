@@ -1,8 +1,8 @@
-import type { GroupSnapshot, LogLine, NodeSnapshot, Snapshot, SystemDetail } from './types'
+import type { GroupSnapshot, LogLine, NodeSnapshot, ScopeResource, Snapshot, SystemDetail } from './types'
 import { escapeHtml } from './picker'
 import { scopeParams, type Scope } from './scope'
 import { tenantListOrder, tenantFigures, yardSummary, type TenantView } from './tenants'
-import { ago, clockTime, configOrder, filterLogs, incidentSummary, LAYER_WORD, linkSections, overviewRows, reasons, scopeView, SEVERITY_WORD, stateTone, type LogFilter } from './inspectorModel'
+import { ago, clockTime, configOrder, filterLogs, incidentSummary, LAYER_WORD, linkSections, overviewLinks, overviewRows, reasons, resourceLinks, scopeView, SEVERITY_WORD, stateTone, type LogFilter } from './inspectorModel'
 
 export type InspectorTab = 'overview' | 'links' | 'logs' | 'config'
 const TABS: { id: InspectorTab; label: string }[] = [
@@ -199,8 +199,23 @@ export class Inspector {
       ${why.length === 0 ? '<p class="fine">Nothing to flag: every number is inside its lines.</p>' : `<ul class="why">${why.map((w) => `<li>${escapeHtml(w)}</li>`).join('')}</ul>`}
       <div class="rows">${overviewRows(n).map((r) => `<div class="row"><span>${r.label}</span><span class="${r.tone}">${escapeHtml(r.value)}</span></div>`).join('')}</div>
       ${tenants}
+      ${this.openIn()}
       ${incidents.length === 0 ? '' : `<h4>Incidents on this island <small>${escapeHtml(incidentSummary(incidents))}</small></h4>
         ${incidents.map((i) => `<div class="row"><span>${escapeHtml(i.title)}</span><span class="warn">sev ${i.severity}${SEVERITY_WORD[i.severity] ? ` · ${SEVERITY_WORD[i.severity]}` : ''} · since ${escapeHtml(clockTime(i.startedAt))}</span></div>`).join('')}`}`
+  }
+
+  /** Links that open the system's resources in a portal or console, from the environment's link rules. Nothing without them. */
+  private openIn(): string {
+    const v = overviewLinks(this.detail?.scope)
+    if (!v) return ''
+    const rows = v.items.map((i) => `<div class="row open-in" data-resource="${escapeHtml(i.resource)}"><span>${escapeHtml(i.resource)}</span><span>${this.anchor(i.link.name, i.link.url)}</span></div>`).join('')
+    const tenants = v.tenantResources === 0 ? '' : `<p class="note">${v.tenantResources} tenant ${v.tenantResources === 1 ? 'resource has its' : 'resources have their'} own link${v.tenantResources === 1 ? '' : 's'} on the Config tab.</p>`
+    const more = v.more === 0 ? '' : `<p class="note">${v.more} more on the Config tab.</p>`
+    return `<h4>Open in</h4>${rows}${more}${tenants}`
+  }
+
+  private anchor(name: string, url: string): string {
+    return `<a class="out" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(name)} ↗</a>`
   }
 
   private tenantBlock(n: NodeSnapshot): string {
@@ -246,12 +261,17 @@ export class Inspector {
       <div class="cfg">${configOrder(d.config).map((c) => `<div class="cfg-row" data-key="${escapeHtml(c.key)}"><span class="k">${escapeHtml(c.key)}</span><span class="v">${escapeHtml(c.value)}</span><span class="o ${c.layer.toLowerCase()}" title="${escapeHtml(c.source)}">${LAYER_WORD[c.layer]}</span></div>`).join('')}</div>${this.scope(d)}`
   }
 
+  private resourceLinkRow(r: ScopeResource): string {
+    const links = resourceLinks(r)
+    return links.length === 0 ? '' : `<span class="rlinks">${links.map((l) => this.anchor(l.name, l.url)).join(' ')}</span>`
+  }
+
   /** Where the system lives and what its telemetry calls it, when the environment has scope rules. A town without them shows nothing here. */
   private scope(d: SystemDetail): string {
     const v = scopeView(d.scope)
     if (!v) return ''
     const rows = v.rows.map((r) => `<div class="cfg-row" data-key="${escapeHtml(r.key)}"><span class="k">${escapeHtml(r.key)}</span><span class="v">${escapeHtml(r.value)}</span><span class="o">${escapeHtml(r.note)}</span></div>`).join('')
-    const resources = v.resources.map((r) => `<div class="cfg-row res" data-resource="${escapeHtml(r.name)}"><span class="k">${escapeHtml(r.name)}</span><span class="v">${escapeHtml([r.tenant, r.region, r.instances == null ? '' : `${r.instances} ${r.instances === 1 ? 'instance' : 'instances'}`].filter(Boolean).join(' · '))}</span><span class="o">${escapeHtml(r.type)}</span></div>`).join('')
+    const resources = v.resources.map((r) => `<div class="cfg-row res" data-resource="${escapeHtml(r.name)}"><span class="k">${escapeHtml(r.name)}</span><span class="v">${escapeHtml([r.tenant, r.region, r.instances == null ? '' : `${r.instances} ${r.instances === 1 ? 'instance' : 'instances'}`].filter(Boolean).join(' · '))}</span><span class="o">${escapeHtml(r.type)}</span>${this.resourceLinkRow(r)}</div>`).join('')
     return `<h4 class="scope-title">Where it lives</h4>
       ${v.status ? `<p class="note scope-status">${escapeHtml(v.status)}</p>` : ''}
       <div class="cfg scope-rows">${rows}${resources}</div>

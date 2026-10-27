@@ -35,6 +35,9 @@ public sealed record ScopeRules
     /// <summary>What the telemetry calls a system that does not say (<c>telemetry.role</c>), a template over the system's own words. Null: it is not derived.</summary>
     public string? TelemetryRole { get; init; }
 
+    /// <summary>Addresses that open a resource somewhere else (a portal, a console). None: no link is shown.</summary>
+    public IReadOnlyList<ResourceLinkRule> Links { get; init; } = [];
+
     /// <summary>Overrides for the queries the inventory source sends. Null: the adapter's own.</summary>
     public ScopeQueries Queries { get; init; } = new(null, null);
 
@@ -42,6 +45,8 @@ public sealed record ScopeRules
 
     public const string EnvironmentVariable = "environment";
     public static readonly string[] PillarVariables = ["pillar", "pillarId"];
+    /// <summary>What a link template can use besides the environment's variables and {environment}: the resource's own words.</summary>
+    public static readonly string[] LinkVariables = ["resourceId", "name", "type", "region", "subscriptionId", "tenantId", "tenantName"];
     public static readonly string[] SystemVariables = ["system", "service", "name", "role", "pillar", "pillarId"];
 }
 
@@ -56,6 +61,12 @@ public sealed record SubscriptionRule(string? NameLike, string? TagKey, string? 
 /// the instances one resource of this rule runs (a plan's workers, an app's replicas); the instances of a system are the sum over its resources of such rules.
 /// </summary>
 public sealed record ResourceRule(string Name, IReadOnlyList<string> Types, string Pattern, IReadOnlyList<string> Roles, string? ServiceTag, string? TenantNameTag, string? Instances = null);
+
+/// <summary>
+/// One address to make for a resource. <see cref="Url"/> is a template over <see cref="ScopeRules.LinkVariables"/>, {environment} and the environment's variables; it starts with
+/// http:// or https://. <see cref="Types"/> limits it to resources of those types (empty: every resource).
+/// </summary>
+public sealed record ResourceLinkRule(string Name, string Url, IReadOnlyList<string> Types);
 
 /// <summary>Query templates for the inventory source. {types} stands for the quoted resource types the rules name; {instances} for the expression that counts the instances of each (from the rules' <c>instances</c>). The workspaces query returns id, name and customerId (the workspace id) of every workspace, and the name is matched here.</summary>
 public sealed record ScopeQueries(string? Subscriptions, string? Resources, string? Workspaces = null);

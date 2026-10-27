@@ -1,6 +1,6 @@
 // What the inspector drawer says, as pure functions: a system's numbers in, rows and sentences out.
 
-import type { ConfigValue, HealthState, IncidentSnapshot, LinkRef, LogLine, NodeSnapshot, ScopeInfo, ScopeResource, SettingLayer, SystemDetail } from './types'
+import type { ConfigValue, HealthState, IncidentSnapshot, LinkRef, LogLine, NodeSnapshot, ResourceLink, ScopeInfo, ScopeResource, SettingLayer, SystemDetail } from './types'
 import { limitRange, throttleWho } from './tenants'
 import { isAbsent, isUnmonitored, QUIET_TEXT } from './signals'
 import { formatAge, formatMs, formatRate, plaqueText, resourceUse } from './visuals'
@@ -187,4 +187,39 @@ export function scopeView(s: ScopeInfo | null | undefined): ScopeView | null {
   if (s.instances != null) rows.push({ key: 'instances', value: String(s.instances), note: 'added up over the resources that are counted' })
   const resources = [...s.resources].sort((a, b) => a.name.localeCompare(b.name))
   return { rows, resources, problems: [...s.problems], status: INVENTORY[s.inventoryState] ?? '' }
+}
+
+/** Only http and https addresses become links, whatever the server sent. */
+export function isWebAddress(url: string): boolean {
+  try {
+    const u = new URL(url)
+    return u.protocol === 'https:' || u.protocol === 'http:'
+  } catch {
+    return false
+  }
+}
+
+/** The links of one resource that are safe to draw. None when the environment has no link rules for it. */
+export function resourceLinks(r: ScopeResource): ResourceLink[] {
+  return (r.links ?? []).filter((l) => l.name.length > 0 && isWebAddress(l.url))
+}
+
+export interface OverviewLinks {
+  /** One entry per link of a resource that does not belong to a tenant, in resource order. */
+  items: { resource: string; link: ResourceLink }[]
+  /** How many tenant resources have links; their links are on the Config tab, one row each. */
+  tenantResources: number
+  /** Links beyond the ones listed. */
+  more: number
+}
+
+const OVERVIEW_LINK_LIMIT = 6
+
+/** The "open in" part of the Overview tab. Null when no resource has a link, so a town without link rules shows nothing. */
+export function overviewLinks(s: ScopeInfo | null | undefined): OverviewLinks | null {
+  if (!s) return null
+  const own = s.resources.filter((r) => !r.tenant).flatMap((r) => resourceLinks(r).map((link) => ({ resource: r.name, link })))
+  const tenantResources = s.resources.filter((r) => r.tenant && resourceLinks(r).length > 0).length
+  if (own.length === 0 && tenantResources === 0) return null
+  return { items: own.slice(0, OVERVIEW_LINK_LIMIT), tenantResources, more: Math.max(0, own.length - OVERVIEW_LINK_LIMIT) }
 }
