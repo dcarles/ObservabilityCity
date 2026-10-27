@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { ALL_TENANTS, carShown, fillOf, groupTenants, pickTenant, pruneTenants, shownUnits, tenantLabel, tenantLevel, tenantTrouble, toggleTenant, yardLayout, yardSummary, type TenantView } from '../../src/tenants'
+import { ALL_TENANTS, carShown, fillOf, groupTenants, pickTenant, pruneTenants, shownUnits, tenantLabel, tenantLevel, tenantListOrder, tenantTrouble, toggleTenant, yardLayout, yardSummary, type TenantView } from '../../src/tenants'
 import { planPads, planIsland } from '../../src/scene/plan'
 import { summariseService } from '../../src/scene/service'
 import { worstState } from '../../src/visuals'
@@ -247,5 +247,21 @@ describe('the tenant dropdown', () => {
     const g = groupTenants(staging.tenants)
     expect(g.map((x) => x.key)).toEqual(['Customer', 'Test', 'Unknown'])
     expect(g[2].tenants.map((t) => t.id)).toEqual(['ghost-co'])
+  })
+})
+
+describe('the order the inspector lists tenants in', () => {
+  const named = (name: string, state: TenantUnitSnapshot['state'], throttled: number | null, utilisation: number | null): TenantUnitSnapshot =>
+    ({ ...unit('Customer', state, throttled, utilisation), id: name, name })
+
+  it('puts the tenant that is down first, then degraded, then any turning requests away, then the busiest of the rest', () => {
+    const units = [named('quiet', 'Healthy', 0, 0.1), named('busy', 'Healthy', 0, 0.6), named('refusing', 'Healthy', 0.02, 0.2), named('hot', 'Degraded', 0, 0.8), named('red', 'Down', 0, 0.9)]
+    expect(tenantListOrder(units).map((u) => u.name)).toEqual(['red', 'hot', 'refusing', 'busy', 'quiet'])
+  })
+
+  it('keeps a tenant with no reading at the end and does not change the list it is given', () => {
+    const units = [named('none', 'Stale', null, null), named('some', 'Healthy', 0, 0.3)]
+    expect(tenantListOrder(units).map((u) => u.name)).toEqual(['some', 'none'])
+    expect(units.map((u) => u.name)).toEqual(['none', 'some'])
   })
 })

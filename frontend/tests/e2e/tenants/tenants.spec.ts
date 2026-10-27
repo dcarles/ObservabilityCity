@@ -121,6 +121,20 @@ test.describe('the tenant yard', () => {
     expect((await town.yard('bb.billing-db')).sign.text).toBe('5 tenants, 0 throttled')
   })
 
+  test('the inspector lists the tenant that is turning requests away first, with its own figure', async ({ town, page }) => {
+    await town.effect(`${DB}#borealis`, 'Saturate')
+    await town.until(DB, (n) => (n.throttled ?? 0) > 0)
+    await town.step(8)
+    await page.locator('#search-input').fill('Orders DB')
+    await page.locator('#search-results .hit').first().click()
+    const rows = page.locator('#inspector h4', { hasText: 'Tenants' }).locator('~ .row')
+    await expect(rows.first()).toContainText('refused')
+    const names = await page.evaluate(() => (window as any).city.seen.last.tenants.map((t: any) => t.name))
+    expect(names).toContain((await rows.first().locator('span').first().textContent())!.trim())
+    // the others turn nothing away, so none of them says so
+    await expect(rows.filter({ hasText: 'refused' })).toHaveCount(1)
+  })
+
   test('the store follows its worst customer, and the service sign with it', async ({ town }) => {
     await town.effect(`${DB}#acme`, 'Saturate')
     await town.until(DB, (n) => n.state !== 'Healthy')

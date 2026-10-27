@@ -43,6 +43,15 @@ export function shownUnits(units: readonly TenantUnitSnapshot[], view: TenantVie
 /** A unit is throttling when its database turns away at least the store's amber share of requests. */
 export const isThrottled = (u: Pick<TenantUnitSnapshot, 'throttled'>, throttleAmber: number): boolean => (u.throttled ?? 0) >= throttleAmber && (u.throttled ?? 0) > 0
 
+/**
+ * The tenants in the order the inspector lists them: the ones in trouble first (down, then degraded, then any that is turning requests away),
+ * then the rest by how much of their capacity they use. A short list never hides the tenant that is throttling.
+ */
+export function tenantListOrder(units: readonly TenantUnitSnapshot[]): TenantUnitSnapshot[] {
+  const rank = (u: TenantUnitSnapshot): number => (u.state === 'Down' ? 0 : u.state === 'Degraded' ? 1 : (u.throttled ?? 0) > 0 ? 2 : 3)
+  return [...units].sort((a, b) => rank(a) - rank(b) || (b.utilisation ?? 0) - (a.utilisation ?? 0))
+}
+
 export interface YardSummary {
   /** Units drawn. */
   tenants: number
