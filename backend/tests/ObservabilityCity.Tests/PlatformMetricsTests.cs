@@ -117,7 +117,6 @@ public class PlatformMetricsTests
     public async Task A_tenant_the_list_spells_with_dashes_is_the_tenant_the_source_found_without_them()
     {
         using var copy = new RegistryCopy(TownA);
-        copy.Replace("pillars/aa.yaml", "name: Orders DB, role: db }", "name: Orders DB, role: db, tenantPattern: \"{tenant}-al-ord\" }");
         copy.Replace("environments/prod.yaml", "signals: {", "tenants:\n  - { id: 22222222-2222-2222-2222-222222222222, name: Borealis Credit Union }\nsignals: {");
 
         var snapshot = await TownSnapshot(copy.Path, new FakeTimeProvider(T0));
@@ -126,7 +125,36 @@ public class PlatformMetricsTests
         var borealis = Assert.Single(units, u => u.Name == "Borealis Credit Union");
         Assert.Equal(0.95, borealis.Utilisation!.Value, 6);
         Assert.Equal(HealthState.Down, borealis.State); // 95% is the red line, and a tenth of its requests turned away is past it too
-        Assert.Equal(2, units.Count(u => u.Kind == TenantKind.Unknown)); // the other two accounts are tenants nobody listed, each shown once
+        Assert.DoesNotContain(units, u => u.Kind == TenantKind.Unknown); // the other two accounts are not listed, but their tag names them
+    }
+
+    [Fact]
+    public async Task A_tenant_nobody_lists_but_the_accounts_tag_names_is_a_customer_with_that_name()
+    {
+        using var copy = new RegistryCopy(TownA);
+
+        var snapshot = await TownSnapshot(copy.Path, new FakeTimeProvider(T0));
+
+        var units = Node(snapshot, "aa.orders-db").Tenants!;
+        Assert.Equal(["Acme Bank", "Borealis Credit Union", "Cygnus Finance"], units.Select(u => u.Name).Order().ToList());
+        Assert.All(units, u => Assert.Equal(TenantKind.Customer, u.Kind));
+        // and the top bar's tenant list has them too, by name, with the id the units carry
+        Assert.Equal(units.Select(u => u.Id).Order(), snapshot.Tenants.Select(t => t.Id).Order());
+        Assert.Contains(snapshot.Tenants, t => t.Name == "Cygnus Finance" && t.Kind == TenantKind.Customer);
+    }
+
+    [Fact]
+    public async Task A_tenant_nobody_lists_and_nothing_names_stays_unknown_under_its_id()
+    {
+        using var copy = new RegistryCopy(TownA);
+        copy.Replace("environments/prod.yaml", ", tenantNameTag: tenant", "");
+
+        var snapshot = await TownSnapshot(copy.Path, new FakeTimeProvider(T0));
+
+        var units = Node(snapshot, "aa.orders-db").Tenants!;
+        Assert.Equal(3, units.Count(u => u.Kind == TenantKind.Unknown));
+        Assert.All(units, u => Assert.Equal(u.Id, u.Name));
+        Assert.All(snapshot.Tenants, t => Assert.Equal(TenantKind.Unknown, t.Kind));
     }
 
     // ---- nothing is built in ----

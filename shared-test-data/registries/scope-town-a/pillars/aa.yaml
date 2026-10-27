@@ -5,7 +5,7 @@ scope: { code: al }
 systems:
   - { id: aa.orders-api, service: orders, serviceCode: ord, name: Orders API, role: api, external: true, calls: [aa.orders-db], telemetry: { role: OrdersApi } }
   - { id: aa.orders-worker, service: orders, serviceCode: ord, name: Orders worker, role: worker, calls: [aa.orders-db], telemetry: { role: OrdersWorker } }
-  - { id: aa.orders-db, service: orders, serviceCode: ord, name: Orders DB, role: db }
+  - { id: aa.orders-db, service: orders, serviceCode: ord, name: Orders DB, role: db, tenantPattern: "{tenant}-al-ord" }
 messaging:
   topics: [orders]
   subscriptions:

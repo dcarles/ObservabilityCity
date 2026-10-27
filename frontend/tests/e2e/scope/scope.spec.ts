@@ -55,6 +55,23 @@ test.describe(`a live town with scope rules (${B ? 'tags and derived names' : 'n
     for (const customer of ['Acme Bank', 'Borealis Credit Union', 'Cygnus Finance']) expect(text).toContain(customer)
   })
 
+  // Nobody listed these tenants. The accounts' tag names them, so they stand in the yard as customers under those names, not as unknown "?" pods.
+  test('tenants nobody listed are shown under the name the accounts are tagged with', async ({ page }) => {
+    test.skip(B, 'town B has no tenant database in its pillar file')
+    await page.goto('/?test=1&quality=low')
+    await page.waitForFunction(() => (window as any).city?.seen.snapshots > 0)
+    await expect.poll(async () => page.evaluate(() => (window as any).city.seen.last.tenants.map((t: any) => t.name).sort()), { timeout: 20_000 })
+      .toEqual(['Acme Bank', 'Borealis Credit Union', 'Cygnus Finance'])
+    expect(await page.evaluate(() => (window as any).city.seen.last.tenants.every((t: any) => t.kind === 'Customer'))).toBe(true)
+    await page.locator('#search-input').fill('Orders DB')
+    await page.locator('#search-results .hit').first().click()
+    const list = page.locator('#inspector h4', { hasText: 'Tenants' }).locator('~ .row')
+    await expect(list).toHaveCount(3)
+    const text = (await list.allTextContents()).join(' ')
+    for (const customer of ['Acme Bank', 'Borealis Credit Union', 'Cygnus Finance']) expect(text).toContain(customer)
+    expect(text).not.toContain('unknown')
+  })
+
   // Long resource names and types used to squeeze the tenant text to one letter wide. The rows wrap instead, at the drawer's width and at a narrow one.
   for (const width of [1280, 520]) {
     test(`resource rows wrap inside the drawer and keep the tenant readable (${width}px wide)`, async ({ page }) => {
