@@ -96,6 +96,11 @@ describe('the plaque', () => {
     expect(plaqueText({ ...n, instancesTotal: 0, instancesHealthy: 0, absent: ['instances'] })).toBe('')
   })
 
+  it('says the instances are unknown when they were asked for and not counted, not 0/0 healthy', () => {
+    expect(plaqueText({ ...n, state: 'Healthy', instancesTotal: 0, instancesHealthy: 0, absent: [] })).toBe('instances unknown')
+    expect(plaqueText({ ...n, state: 'Healthy', instancesTotal: 3, instancesHealthy: 3, absent: [] })).toBe('3/3 healthy')
+  })
+
   it('still says no data when a configured source is silent', () => {
     expect(plaqueText({ ...n, state: 'Stale', absent: ['cpu'] })).toBe('no data')
   })

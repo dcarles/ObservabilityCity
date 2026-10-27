@@ -20,6 +20,16 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
     /// <summary>Readings older than this are shown as stale, never as healthy.</summary>
     public TimeSpan StaleAfter { get; init; } = TimeSpan.FromSeconds(30);
 
+    /// <summary>
+    /// How often each source is asked, by source name. A source asked rarely (the inventory, every few minutes) is not stale in between: its readings
+    /// stand for twice its interval, or <see cref="StaleAfter"/> if that is longer. A source not listed here stands for <see cref="StaleAfter"/>.
+    /// </summary>
+    public IReadOnlyDictionary<string, TimeSpan> SourceIntervals { get; init; } = new Dictionary<string, TimeSpan>();
+
+    /// <summary>How long a reading from this source counts as fresh.</summary>
+    internal TimeSpan FreshFor(string source) =>
+        SourceIntervals.TryGetValue(source, out var interval) && interval * 2 > StaleAfter ? interval * 2 : StaleAfter;
+
     public string Environment { get; init; } = "demo";
 
     /// <summary>The mode the server runs in. Fixed when the server starts, so a registry reload cannot turn a live server into a demo one. Without it, the town's own mode.</summary>
@@ -249,10 +259,11 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
     private NodeSnapshot ToNode(RegistryNode n, DateTimeOffset now, Registry.Registry registry)
     {
         var absent = registry.AbsentSignals(n);
-        var r = state.Get(n.Id);
+        var bySource = state.GetAll(n.Id);
+        var r = ReadingMerge.Merge(bySource, signal => registry.SourceFor(n, signal));
         var env = registry.ActiveEnvironment;
         if (r is not null) r = WithoutAbsent(r, absent);
-        if (r is null || absent.Count == Signals.All.Length || now - r.At > StaleAfter)
+        if (r is null || absent.Count == Signals.All.Length || IsStale(n, registry, bySource, r, now))
         {
             // No fresh data: keep the last numbers out of it. Grey, never green.
             return new NodeSnapshot(n.Id, n.Name, n.Kind, n.Service, n.External, HealthState.Stale, 0, 0, 0, null, null, null, null, null, null, null, 0, 0, 0,
@@ -276,6 +287,17 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
         return new NodeSnapshot(n.Id, n.Name, n.Kind, n.Service, n.External, health, r.InstancesTotal, r.InstancesHealthy,
             r.Load, r.Cpu, r.Memory, utilisation, throttled, r.QueueDepth, r.OldestMessageSeconds, r.DeadLetters, r.RequestsPerSecond, r.ErrorRate, r.P99Ms, n.SlaP99Ms, n.ErrorAmber, n.ErrorRed,
             n.ResourceAmber, n.ResourceRed, n.ThrottleAmber, n.ThrottleRed, n.BacklogAmber, n.BacklogRed, n.Calls, n.GatewayCalls, r.At, tenants, absent);
+    }
+
+    /// <summary>
+    /// Whether the reading is too old to show. Each source that supplies a signal has its own limit (see <see cref="FreshFor"/>) and one stale source
+    /// greys the building however fresh the others are. A single source's reading is judged by that source's limit.
+    /// </summary>
+    private bool IsStale(RegistryNode n, Registry.Registry registry, IReadOnlyDictionary<string, NodeReading> bySource, NodeReading merged, DateTimeOffset now)
+    {
+        var used = bySource.Count == 1 ? bySource.Keys.ToList()
+            : Signals.All.Select(s => registry.SourceFor(n, s)).OfType<string>().Where(bySource.ContainsKey).Distinct().ToList();
+        return used.Count == 0 ? now - merged.At > StaleAfter : used.Any(s => now - bySource[s].At > FreshFor(s));
     }
 
     /// <summary>

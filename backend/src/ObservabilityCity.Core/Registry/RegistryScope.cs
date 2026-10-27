@@ -49,11 +49,12 @@ public sealed record SubscriptionRule(string? NameLike, string? TagKey, string? 
 /// One kind of resource that belongs to a service. <see cref="Pattern"/> is a regular expression over the resource's name with the named groups
 /// <c>service</c> (required), and optionally <c>role</c>, <c>pillar</c>, <c>region</c> and <c>tenant</c>. <see cref="Roles"/> limits it to systems of
 /// those roles (api, worker, db...). <see cref="ServiceTag"/> is a fallback: a resource whose name does not match but whose tag says the service.
-/// <see cref="TenantNameTag"/> is the tag that holds the tenant's friendly name.
+/// <see cref="TenantNameTag"/> is the tag that holds the tenant's friendly name. <see cref="Instances"/> is the expression the inventory query uses to count
+/// the instances one resource of this rule runs (a plan's workers, an app's replicas); the instances of a system are the sum over its resources of such rules.
 /// </summary>
-public sealed record ResourceRule(string Name, IReadOnlyList<string> Types, string Pattern, IReadOnlyList<string> Roles, string? ServiceTag, string? TenantNameTag);
+public sealed record ResourceRule(string Name, IReadOnlyList<string> Types, string Pattern, IReadOnlyList<string> Roles, string? ServiceTag, string? TenantNameTag, string? Instances = null);
 
-/// <summary>Query templates for the inventory source. {types} stands for the quoted resource types the rules name.</summary>
+/// <summary>Query templates for the inventory source. {types} stands for the quoted resource types the rules name; {instances} for the expression that counts the instances of each (from the rules' <c>instances</c>).</summary>
 public sealed record ScopeQueries(string? Subscriptions, string? Resources);
 
 /// <summary>Templates with {variable} and {variable|filter} holes. Filters: nospace, lower, upper.</summary>

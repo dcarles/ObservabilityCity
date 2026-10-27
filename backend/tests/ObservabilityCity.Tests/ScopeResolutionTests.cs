@@ -426,7 +426,7 @@ public class ScopeResolutionTests
 
         var readings = await source.PollAsync(RegistryLoader.Load(TownA), CancellationToken.None);
 
-        Assert.Empty(readings);
+        Assert.Equal(["aa.orders-api", "aa.orders-worker", "bb.ledger-api", "bb.ledger-worker"], readings.Keys.Order()); // the instance counts
         Assert.Equal(time.GetUtcNow(), store.ReadAt);
         Assert.Equal("OrdersApi", store.Resolve(Prod(TownA)).System("aa.orders-api")!.TelemetryRole);
         Assert.Equal(3, store.Resolve(Prod(TownA)).System("aa.orders-db")!.Resources.Count);

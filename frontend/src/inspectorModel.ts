@@ -176,6 +176,7 @@ export function scopeView(s: ScopeInfo | null | undefined): ScopeView | null {
   if (s.workspace) rows.push({ key: 'workspace', value: s.workspace, note: 'from the environment' })
   if (s.serviceCode) rows.push({ key: 'service code', value: s.serviceCode, note: 'matched against resource names' })
   if (s.telemetryRole) rows.push({ key: 'telemetry role', value: s.telemetryRole, note: VIA[s.telemetryRoleVia ?? ''] ?? '' })
+  if (s.instances != null) rows.push({ key: 'instances', value: String(s.instances), note: 'added up over the resources that are counted' })
   const resources = [...s.resources].sort((a, b) => a.name.localeCompare(b.name))
   return { rows, resources, problems: [...s.problems], status: INVENTORY[s.inventoryState] ?? '' }
 }

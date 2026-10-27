@@ -148,7 +148,7 @@ describe('the links tab', () => {
 describe('the scope rows', () => {
   const scope = (patch: Partial<ScopeInfo> = {}): ScopeInfo => ({
     subscription: 'sub-name', subscriptionVia: 'name', workspace: 'ws-prd', serviceCode: 'ord', telemetryRole: 'OrdersApi', telemetryRoleVia: 'telemetry.role',
-    resources: [], problems: [], inventoryState: 'read', ...patch,
+    resources: [], instances: null, problems: [], inventoryState: 'read', ...patch,
   })
 
   it('draws nothing for an environment without scope rules', () => {
@@ -171,12 +171,24 @@ describe('the scope rows', () => {
     expect(rows).toEqual([])
   })
 
+  it('adds the instance count as a row when the rules count one, and leaves it out when they do not', () => {
+    expect(scopeView(scope({ instances: 3 }))!.rows.at(-1)).toEqual({ key: 'instances', value: '3', note: 'added up over the resources that are counted' })
+    expect(scopeView(scope({ instances: 0 }))!.rows.at(-1)!.value).toBe('0') // a plan that runs nothing is a count, not a missing one
+    expect(scopeView(scope({ instances: null }))!.rows.map((r) => r.key)).not.toContain('instances')
+  })
+
+  it('keeps the count of each resource', () => {
+    const v = scopeView(scope({ resources: [{ name: 'a', type: 't', region: 'r', tenant: null, instances: 2 }, { name: 'b', type: 't', region: null, tenant: null, instances: null }] }))!
+
+    expect(v.resources.map((r) => r.instances)).toEqual([2, null])
+  })
+
   it('says where a derived role came from', () => {
     expect(scopeView(scope({ telemetryRoleVia: 'scope.telemetryRole' }))!.rows.at(-1)!.note).toBe('derived from the environment template')
   })
 
   it('sorts the resources by name and keeps the tenant', () => {
-    const v = scopeView(scope({ resources: [{ name: 'b', type: 't', region: 'r', tenant: 'Acme Bank' }, { name: 'a', type: 't', region: null, tenant: null }] }))!
+    const v = scopeView(scope({ resources: [{ name: 'b', type: 't', region: 'r', tenant: 'Acme Bank', instances: null }, { name: 'a', type: 't', region: null, tenant: null, instances: null }] }))!
 
     expect(v.resources.map((r) => r.name)).toEqual(['a', 'b'])
     expect(v.resources[1].tenant).toBe('Acme Bank')

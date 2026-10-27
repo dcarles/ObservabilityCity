@@ -718,6 +718,11 @@
               "$ref": "#/components/schemas/ScopeResource"
             }
           },
+          "instances": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
           "problems": {
             "type": "array",
             "items": {
@@ -749,6 +754,11 @@
           },
           "tenant": {
             "type": "string",
+            "nullable": true
+          },
+          "instances": {
+            "type": "integer",
+            "format": "int32",
             "nullable": true
           }
         },

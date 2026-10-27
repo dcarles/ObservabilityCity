@@ -328,11 +328,12 @@ public sealed record ScopeInfo(
     string? TelemetryRole,
     string? TelemetryRoleVia,
     IReadOnlyList<ScopeResource> Resources,
+    int? Instances,
     IReadOnlyList<string> Problems,
     string InventoryState);
 
 /// <summary>A resource that belongs to a system. Tenant is the tenant's friendly name when the rules found one, else its id.</summary>
-public sealed record ScopeResource(string Name, string Type, string? Region, string? Tenant);
+public sealed record ScopeResource(string Name, string Type, string? Region, string? Tenant, int? Instances);
 
 [JsonConverter(typeof(JsonStringEnumConverter))]
 public enum LogLevel

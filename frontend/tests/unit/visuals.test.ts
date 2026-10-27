@@ -5,6 +5,13 @@ import { beaconLevel, darkFloorsFor, floorsFor, formatAge, litFraction, speedFac
 import type { Snapshot } from '../../src/types'
 
 describe('floors', () => {
+  it('follow the counted instances: 3 plans and 5 plans give 3 and 4 floors, and an uncounted system keeps one', () => {
+    expect(floorsFor(3)).toBe(3)
+    expect(floorsFor(5)).toBe(4)
+    expect(floorsFor(0 || 1)).toBe(1)
+  })
+
+
   it('follows the doubling scale', () => {
     const expected: Record<number, number> = { 1: 1, 2: 2, 3: 3, 4: 3, 5: 4, 8: 4, 9: 5, 16: 5, 17: 6, 32: 6, 33: 7, 64: 7, 65: 8, 500: 8 }
     for (const [instances, floors] of Object.entries(expected)) expect(floorsFor(Number(instances))).toBe(floors)

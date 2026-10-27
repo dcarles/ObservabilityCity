@@ -97,7 +97,8 @@
               "pattern": { "type": "string", "description": "A regular expression over the resource's name, ignoring case. Named groups: service (required) is matched with a system's serviceCode; role (api, worker...), pillar, region and tenant are optional." },
               "roles": { "type": "array", "items": { "enum": ["api", "worker", "db", "cache", "cron", "gateway", "broker", "egress"] }, "description": "Only systems of these roles. Without it, all." },
               "serviceTag": { "type": "string", "description": "A tag that names the service, for a resource whose name does not match the pattern." },
-              "tenantNameTag": { "type": "string", "description": "The tag that holds a tenant's friendly name, on resources whose pattern has a tenant group." }
+              "tenantNameTag": { "type": "string", "description": "The tag that holds a tenant's friendly name, on resources whose pattern has a tenant group." },
+              "instances": { "type": "string", "description": "A query expression that counts the instances one resource runs (for example a plan's workers). A system's instances are the sum over its resources of rules that have one." }
             }
           }
         },

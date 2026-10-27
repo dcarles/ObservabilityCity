@@ -73,6 +73,11 @@ foreach (var (folder, registry) in loaded)
     {
         var view = new EnvironmentRegistry(registries, environmentId);
         var fake = demo ? new FakeSource(fakeProfiles, fakeOptions, TimeProvider.System, stories) : null;
+        // a live environment polls what its file defines; a demo town has the fake source and nothing else
+        var set = fake is not null || registry.Environments.FirstOrDefault(e => e.Id == environmentId) is not { } environment
+            ? new SourceSet(fake is null ? [] : [fake], [])
+            : sourceCatalog.Build(environment, folder);
+        foreach (var problem in set.Problems) Console.Error.WriteLine($"Source notice ({registry.Town.Id}): {problem}");
         var state = new LatestState();
         var store = new SnapshotStore();
         var snapshots = new SnapshotBuilder(view, state, TimeProvider.System)
@@ -81,15 +86,11 @@ foreach (var (folder, registry) in loaded)
             Environment = environmentId,
             Mode = mode,
             StaleAfter = staleAfter,
+            SourceIntervals = set.Sources.GroupBy(s => s.Name).ToDictionary(g => g.Key, g => g.First().PollInterval),
             // a demo town has its own sped-up day; a live one shows the real time of day
             DayFraction = fake is null ? () => TimeProvider.System.GetLocalNow().TimeOfDay.TotalDays : () => fake.DayFraction,
         };
         ILogSource logs = fake is null ? new NoLogSource() : new FakeLogSource(state, TimeProvider.System, staleAfter);
-        // a live environment polls what its file defines; a demo town has the fake source and nothing else
-        var set = fake is not null || registry.Environments.FirstOrDefault(e => e.Id == environmentId) is not { } environment
-            ? new SourceSet(fake is null ? [] : [fake], [])
-            : sourceCatalog.Build(environment, folder);
-        foreach (var problem in set.Problems) Console.Error.WriteLine($"Source notice ({registry.Town.Id}): {problem}");
         runtimes.Add(new EnvironmentRuntime(registry.Town.Id, environmentId, view, fake, state, snapshots, store, logs, set.Sources, set.Problems, set.Scope));
     }
     var town = new TownRuntime(registry.Town.Id, registry.Town.Name, folder, registries, new EnvironmentSet(runtimes, registry.DefaultEnvironmentId, registry.Town.Id));

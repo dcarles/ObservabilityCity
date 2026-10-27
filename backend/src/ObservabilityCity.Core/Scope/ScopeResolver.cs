@@ -137,7 +137,7 @@ public static class ScopeResolver
                     else if (rule.ServiceTag is not { } tag || TagValue(resource, tag) is not { } said || !Compact(said).Equals(Compact(serviceCode), StringComparison.OrdinalIgnoreCase))
                         continue;
 
-                    resources.Add(new ResolvedResource(resource.Id, resource.Name, resource.Type, region, tenant, rule.Name));
+                    resources.Add(new ResolvedResource(resource.Id, resource.Name, resource.Type, region, tenant, rule.Name, rule.Instances is null ? null : resource.Instances));
                     if (tenant is not null && rule.TenantNameTag is { } nameTag && TagValue(resource, nameTag) is { Length: > 0 } friendly)
                         tenantNames.TryAdd(tenant, friendly);
                 }

@@ -71,6 +71,7 @@ export function plaqueText(n: Pick<NodeSnapshot, 'state' | 'instancesTotal' | 'i
   if (isUnmonitored(n)) return 'not monitored'
   if (isAbsent(n, 'instances')) return n.state === 'Stale' ? 'no data' : ''
   if (n.state === 'Stale') return 'no data'
+  if (n.instancesTotal <= 0) return 'instances unknown' // asked for and not counted (a plan that gives no number): never "0/0 healthy"
   return `${n.instancesHealthy}/${n.instancesTotal} healthy`
 }
 

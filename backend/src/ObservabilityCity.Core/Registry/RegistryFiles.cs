@@ -202,6 +202,8 @@ internal sealed class ResourceRuleFile
     public List<string> Roles { get; set; } = [];
     public string? ServiceTag { get; set; }
     public string? TenantNameTag { get; set; }
+    /// <summary>A query expression that gives, for one resource of this rule, how many instances it runs. Resources of a rule without it carry no count.</summary>
+    public string? Instances { get; set; }
 }
 
 internal sealed class ScopeQueriesFile
