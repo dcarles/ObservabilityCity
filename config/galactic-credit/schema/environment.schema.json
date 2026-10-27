@@ -166,6 +166,20 @@
           }
         },
         "telemetryRole": { "type": "string", "description": "What the telemetry calls a system that has no telemetry.role of its own: a template over {system}, {service}, {name}, {role}, {pillar}, {pillarId}, {environment} and variables." },
+        "links": {
+          "type": "array",
+          "description": "Addresses that open a resource somewhere else, such as its page in a cloud portal or console. They show next to each resource in the inspector's Config tab. The program only shows them as links (it never calls them) and holds no credentials for them. Without links, none is shown.",
+          "items": {
+            "type": "object",
+            "required": ["name", "url"],
+            "additionalProperties": false,
+            "properties": {
+              "name": { "type": "string", "description": "The words on the link, for example Cloud portal." },
+              "url": { "type": "string", "pattern": "^https?://", "description": "A template that starts with https:// (or http://) written out. Holes: {resourceId}, {name}, {type}, {region}, {subscriptionId}, {tenantId}, {tenantName}, {environment} and your variables. Values are percent-encoded; a resource id keeps its slashes." },
+              "types": { "type": "array", "items": { "type": "string" }, "description": "Only resources of these types. Without it, every resource." }
+            }
+          }
+        },
         "queries": {
           "type": "object",
           "additionalProperties": false,

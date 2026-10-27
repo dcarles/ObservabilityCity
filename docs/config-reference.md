@@ -266,6 +266,7 @@ sources:
 | `pillars` | no | none | Pillar id → the id of the subscription that holds its resources. |
 | `resources` | no | none | Rules that find a system's cloud resources. |
 | `telemetryRole` | no | none | Template for a system's telemetry name when it gives none. |
+| `links` | no | none | Addresses that open a resource in a portal or console, shown beside each resource in the Config tab. |
 | `queries` | no | built-in | Replace the inventory queries. |
 
 <!-- file: SubscriptionRuleFile -->
@@ -290,6 +291,13 @@ sources:
 | `serviceTag` | no | none | Tag that carries the service. |
 | `tenantNameTag` | no | none | Tag that carries a tenant's friendly name. |
 | `instances` | no | none | Query expression for how many instances a resource runs. |
+
+<!-- file: ResourceLinkFile -->
+| Key | Required | Default | Meaning |
+|---|---|---|---|
+| `name` | yes | | The words on the link, for example `Cloud portal`. |
+| `url` | yes | | A template that starts with `https://` (or `http://`) written out. Holes: `{resourceId}`, `{name}`, `{type}`, `{region}`, `{subscriptionId}`, `{tenantId}`, `{tenantName}`, `{environment}` and your `variables`. Values are percent-encoded (a resource id keeps its slashes). An address that does not come out as a valid `http`/`https` address is dropped for that resource. The app never calls it. |
+| `types` | no | all types | Only resources of these types get the link. |
 
 <!-- file: ScopeQueriesFile -->
 | Key | Required | Default | Meaning |
