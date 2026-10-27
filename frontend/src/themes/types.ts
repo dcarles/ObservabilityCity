@@ -2,6 +2,7 @@ import type * as THREE from 'three'
 import type { NodeKind } from '../types'
 import type { BuildingModel } from '../buildings/model'
 import type { Lighting, LightingPreset } from '../lighting'
+import type { Rect } from '../scene/island'
 import type { harbourPalette } from './harbour-town/palette'
 
 type Widen<T> = T extends string ? string : T extends readonly (infer U)[] ? Widen<U>[] : { [K in keyof T]: Widen<T[K]> }
@@ -36,6 +37,32 @@ export interface BridgeStyle {
   dress(deck: THREE.Group, len: number, width: number, ends: boolean): void
 }
 
+/** Where things stand on the airport island, island-local: the runway runs along x, the terminal stands behind the apron, and the gate is where the bridge starts. */
+export interface AirportSite {
+  runwayZ: number
+  runwayHalf: number
+  terminalZ: number
+  apronZ: number
+  gateZ: number
+}
+
+/** How an arriving craft comes down: a plane lands on the runway and taxis in, a ship drops onto one of the pads and waits there. */
+export type Landing = { kind: 'runway' } | { kind: 'pads'; x: number[] }
+
+/**
+ * The airport island in the theme's own look: the landing strip or pads, the terminal, the tower and what stands beside them, and the
+ * craft that arrive. How often they arrive and what the board says are the same in every theme.
+ */
+export interface AirportKit {
+  /** What arrives, for tests and the legend: a plane, a cargo plane, a flying saucer. */
+  look: string
+  landing: Landing
+  /** Dresses the island's decor. Returns the ground the scenery must keep clear, and an optional step for anything that moves (a sock, a dish). */
+  dress(decor: THREE.Group, site: AirportSite): { avoid: Rect[]; tick?: (time: number) => void }
+  /** One arriving craft. Meshes with `userData.tail` take the airline colour; a `userData.beam` mesh shows only while the craft hovers. */
+  craft(): THREE.Group
+}
+
 export interface ThemeKit {
   id: string
   palette: Palette
@@ -45,6 +72,7 @@ export interface ThemeKit {
   bridge: BridgeStyle
   /** The jetty a sea lane ends on, running along +z. */
   pier(length: number): THREE.Group
+  airport: AirportKit
   /** Colour multiplied into the kit's road tiles and lamps, so the roads belong to the theme. */
   roadTint: string | null
   /** Draw stars in the sky. */

@@ -95,9 +95,9 @@ test.describe('backlog and dead letters on a pier', () => {
     expect((await town.island('wrk')).crates).toBe(0)
   })
 
-  test('dead letters fill the pen of the right pier, light the hub lighthouse with the town total, and stay until cleared', async ({ town, page }) => {
+  test('dead letters fill the pen of the right pier, show the town total in the top bar, and stay until cleared', async ({ town, page }) => {
     await town.open()
-    expect((await town.hub()).lighthouse).toEqual({ total: 0, alarm: false })
+    await expect(page.locator('#topbar .chip.dlq')).not.toHaveClass(/bad/)
 
     await town.effect('wrk.batch-worker', 'Poison')
     await town.effect('leg.feed-worker', 'Poison')
@@ -111,10 +111,9 @@ test.describe('backlog and dead letters on a pier', () => {
       expect.soft(i.brokenCrates, `${id} pen`).toBeGreaterThan(0)
     }
     expect((await town.island('ful')).alarm).toBe(false)
-    // the lighthouse and the top bar show the same town-wide total the snapshot carries
+    // the top bar shows the same town-wide total the snapshot carries
     const total = await page.evaluate(() => (window as any).city.seen.last.totals.deadLetters as number)
     expect(total).toBeGreaterThanOrEqual(40)
-    expect((await town.hub()).lighthouse).toEqual({ total: Math.round(total), alarm: true })
     await expect(page.locator('#topbar .chip.dlq')).toContainText('DLQ')
     await expect(page.locator('#topbar .chip.dlq')).toHaveClass(/bad/)
 
@@ -122,14 +121,13 @@ test.describe('backlog and dead letters on a pier', () => {
     await town.removeEffects()
     await town.nextSnapshot()
     await town.step(5)
-    expect((await town.hub()).lighthouse?.alarm).toBe(true)
+    await expect(page.locator('#topbar .chip.dlq')).toHaveClass(/bad/)
 
     await town.reset()
     await town.until('wrk.batch-worker', (n) => (n.deadLetters ?? 0) === 0)
     await town.until('leg.feed-worker', (n) => (n.deadLetters ?? 0) === 0)
     await page.waitForFunction(() => (window as any).city.seen.last.totals.deadLetters === 0)
     await town.step(5)
-    expect((await town.hub()).lighthouse).toEqual({ total: 0, alarm: false })
     await expect(page.locator('#topbar .chip.dlq')).not.toHaveClass(/bad/)
   })
 })

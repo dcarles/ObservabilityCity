@@ -55,7 +55,6 @@ export interface HubStatus {
   legacy: number
   /** Islands with a sea lane. */
   boats: number
-  lighthouse: { total: number; alarm: boolean } | null
   sign: { board: string; model: string | null }
 }
 
@@ -151,7 +150,7 @@ export class Town {
     return s as IslandStatus
   }
 
-  /** What the Service Bus port and the lighthouse show. */
+  /** What the Service Bus port shows. */
   async hub(): Promise<HubStatus> {
     return (await this.page.evaluate(() => (window as any).city.town.inspectHub())) as HubStatus
   }
