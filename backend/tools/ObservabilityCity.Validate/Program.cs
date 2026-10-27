@@ -45,11 +45,12 @@ if (folders.Count == 0)
 if (sources)
 {
     using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
-    var probes = SourceProbes.Default(http, new AzureTokenProvider());
+    var tokens = new AzureTokenProvider();
+    var probes = SourceProbes.Default(http, tokens);
     var checks = new List<SourceCheckResult>();
     foreach (var folder in folders)
     {
-        var check = await SourceCheck.RunAsync(folder, probes, TimeSpan.FromSeconds(30), CancellationToken.None, adapters.SourceKindNames);
+        var check = await SourceCheck.RunAsync(folder, probes, TimeSpan.FromSeconds(30), CancellationToken.None, adapters.SourceKindNames, new ResourceGraphWorkspaceLookup(http, tokens));
         SourceCheck.WriteText(check, root, Console.Out);
         checks.Add(check);
     }

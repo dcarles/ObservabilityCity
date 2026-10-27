@@ -251,7 +251,7 @@ export class Inspector {
     const v = scopeView(d.scope)
     if (!v) return ''
     const rows = v.rows.map((r) => `<div class="cfg-row" data-key="${escapeHtml(r.key)}"><span class="k">${escapeHtml(r.key)}</span><span class="v">${escapeHtml(r.value)}</span><span class="o">${escapeHtml(r.note)}</span></div>`).join('')
-    const resources = v.resources.map((r) => `<div class="cfg-row" data-resource="${escapeHtml(r.name)}"><span class="k">${escapeHtml(r.name)}</span><span class="v">${escapeHtml([r.tenant, r.region, r.instances == null ? '' : `${r.instances} ${r.instances === 1 ? 'instance' : 'instances'}`].filter(Boolean).join(' · '))}</span><span class="o">${escapeHtml(r.type)}</span></div>`).join('')
+    const resources = v.resources.map((r) => `<div class="cfg-row res" data-resource="${escapeHtml(r.name)}"><span class="k">${escapeHtml(r.name)}</span><span class="v">${escapeHtml([r.tenant, r.region, r.instances == null ? '' : `${r.instances} ${r.instances === 1 ? 'instance' : 'instances'}`].filter(Boolean).join(' · '))}</span><span class="o">${escapeHtml(r.type)}</span></div>`).join('')
     return `<h4 class="scope-title">Where it lives</h4>
       ${v.status ? `<p class="note scope-status">${escapeHtml(v.status)}</p>` : ''}
       <div class="cfg scope-rows">${rows}${resources}</div>

@@ -1,3 +1,5 @@
+using ObservabilityCity.Core.Registry;
+using ObservabilityCity.Core.Scope;
 using YamlDotNet.RepresentationModel;
 
 namespace ObservabilityCity.Validate;
@@ -21,7 +23,7 @@ public static class SourceCheck
     /// <summary>The sources an environment is reported on even when it does not define them: what the signals use unless told otherwise.</summary>
     public static readonly string[] Signals = ["metrics", "incidents", "messaging"];
 
-    public static async Task<SourceCheckResult> RunAsync(string folder, IReadOnlyList<ISourceProbe> probes, TimeSpan timeout, CancellationToken ct, IReadOnlyCollection<string>? knownKinds = null)
+    public static async Task<SourceCheckResult> RunAsync(string folder, IReadOnlyList<ISourceProbe> probes, TimeSpan timeout, CancellationToken ct, IReadOnlyCollection<string>? knownKinds = null, IWorkspaceLookup? workspaces = null)
     {
         var findings = new List<SourceFinding>();
         var dir = Path.Combine(folder, "environments");
@@ -52,12 +54,43 @@ public static class SourceCheck
                 using var limit = CancellationTokenSource.CreateLinkedTokenSource(ct);
                 limit.CancelAfter(timeout);
                 ProbeResult result;
-                try { result = await probe.ProbeAsync(source.Connection ?? "", limit.Token); }
+                try
+                {
+                    var connection = source.Connection ?? "";
+                    var note = "";
+                    if (string.IsNullOrWhiteSpace(connection) && source.Kind == "loganalytics" && workspaces is not null)
+                        (connection, note) = await ScopeWorkspace(file, env, workspaces, limit.Token);
+                    if (connection.Length == 0 && note.Length > 0) result = new ProbeResult(ProbeStatus.Unreachable, note);
+                    else
+                    {
+                        result = await probe.ProbeAsync(connection, limit.Token);
+                        if (note.Length > 0 && result.Status == ProbeStatus.Connected) result = result with { Detail = note };
+                    }
+                }
                 catch (OperationCanceledException) when (!ct.IsCancellationRequested) { result = new ProbeResult(ProbeStatus.Unreachable, "timed out"); }
                 findings.Add(new SourceFinding(env, signal, source.Kind, result));
             }
         }
         return new SourceCheckResult(folder, findings);
+    }
+
+    /// <summary>
+    /// The workspace an environment's scope names, for a source that gives no connection: scope.workspaceId as it is, else scope.workspace (an id as it is, a name or
+    /// wildcard looked up through Resource Graph). Nothing is looked up when the scope names no workspace.
+    /// </summary>
+    private static async Task<(string Connection, string Note)> ScopeWorkspace(string file, string env, IWorkspaceLookup lookup, CancellationToken ct)
+    {
+        if (RawYaml.Get(RawYaml.Load(file).Root, "scope") is not YamlMappingNode scope) return ("", "");
+        var variables = new Dictionary<string, string?> { ["environment"] = env };
+        if (RawYaml.Get(scope, "variables") is YamlMappingNode vars)
+            foreach (var (k, v) in vars.Children) variables[((YamlScalarNode)k).Value ?? ""] = (v as YamlScalarNode)?.Value;
+        string? Render(string key) => RawYaml.Str(RawYaml.Get(scope, key)) is { } text ? ScopeTemplate.Render(text, name => variables.GetValueOrDefault(name)).Trim() : null;
+
+        if (Render("workspaceId") is { Length: > 0 } id) return (id, "the workspace id from scope.workspaceId");
+        if (Render("workspace") is not { Length: > 0 } workspace) return ("", "");
+        if (ScopeResolver.IsWorkspaceId(workspace)) return (workspace, "the workspace id from scope.workspace");
+        var answer = await lookup.FindAsync(workspace, ct);
+        return (answer.Id ?? "", answer.Detail);
     }
 
     private static Dictionary<string, (string Kind, string? Connection)> ReadSources(string file)
