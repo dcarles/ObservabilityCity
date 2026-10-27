@@ -9,6 +9,19 @@
     "name": { "type": "string" },
     "groupLabel": { "type": "string", "description": "What an island is called in this town (Pillar, Team, ...)." },
     "mode": { "enum": ["demo", "live"], "default": "live", "description": "demo: the town runs on fake data and has the Break things panel and the story bar. live (the default when this is left out): real sources only, nothing to break. Read when the server starts." },
-    "topology": { "enum": ["hub-and-spoke", "direct"], "description": "Whether calls between islands go through the hub." }
+    "topology": { "enum": ["hub-and-spoke", "direct"], "description": "Whether calls between islands go through the hub." },
+    "expectedWarnings": {
+      "type": "array",
+      "description": "Warnings the validator should expect here: a test registry that shows a rule on purpose. They are left out of the report; if one stops appearing, that is an error.",
+      "items": {
+        "type": "object",
+        "required": ["rule"],
+        "additionalProperties": false,
+        "properties": {
+          "rule": { "type": "string", "description": "The rule name shown in the warning, for example standalone." },
+          "file": { "type": "string", "description": "The file it is expected in, relative to the registry folder, for example pillars/sta.yaml. Leave out for any file." }
+        }
+      }
+    }
   }
 }

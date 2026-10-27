@@ -57,7 +57,41 @@ public static class RegistryValidator
         CheckServices(ctx, registry);
         CheckEnvironments(ctx, registry, adapters);
         CheckFake(ctx, registry);
-        return ctx.Result();
+        return ApplyExpectedWarnings(ctx, ctx.Result());
+    }
+
+    /// <summary>
+    /// A registry that shows a rule on purpose (a test town with a standalone island) lists the warning under expectedWarnings in town.yaml.
+    /// The warning then leaves the report, and an expected warning that no longer appears is an error, so the rule is still proven.
+    /// </summary>
+    private static ValidationResult ApplyExpectedWarnings(Context c, ValidationResult result)
+    {
+        var town = c.Raw("town.yaml");
+        var listed = RawYaml.Get(town.Root, "expectedWarnings");
+        if (listed is null) return result;
+        var findings = result.Findings.ToList();
+        var expected = new List<Finding>();
+        var problems = new List<Finding>();
+        foreach (var entry in RawYaml.Items(listed))
+        {
+            var rule = RawYaml.Str(RawYaml.Get(entry as YamlMappingNode, "rule"));
+            var file = RawYaml.Str(RawYaml.Get(entry as YamlMappingNode, "file"));
+            var line = RawYaml.Line(entry);
+            if (string.IsNullOrWhiteSpace(rule))
+            {
+                problems.Add(new Finding(Severity.Error, "town.yaml", line, "expected-warning", "An expectedWarnings entry needs a 'rule', for example { rule: standalone, file: pillars/sta.yaml }."));
+                continue;
+            }
+            var hits = findings.Where(f => f.Severity == Severity.Warning && f.Rule == rule && (file is null || f.File == file.Replace('\\', '/'))).ToList();
+            if (hits.Count == 0)
+            {
+                problems.Add(new Finding(Severity.Error, "town.yaml", line, "expected-warning", $"Expected a '{rule}' warning{(file is null ? "" : $" in {file}")}, but there is none. If the rule no longer applies here, remove this entry; if it should, this registry has stopped showing it."));
+                continue;
+            }
+            foreach (var hit in hits) { findings.Remove(hit); expected.Add(hit); }
+        }
+        findings.AddRange(problems);
+        return new ValidationResult(result.Folder, findings.OrderBy(f => f.File, StringComparer.Ordinal).ThenBy(f => f.Line).ToList(), expected);
     }
 
     // ── town, names, colours ────────────────────────────────────────────────
