@@ -270,4 +270,23 @@ public class RegistryValidationTests
 
         Assert.Throws<RegistryException>(() => RegistryLoader.LoadResilient(f.Path));
     }
+
+    [Fact]
+    public void The_config_reference_lists_every_key_the_loader_reads()
+    {
+        // each section of docs/config-reference.md is tagged with the file type it describes; its table must name exactly that type's keys
+        var doc = File.ReadAllText(Path.Combine(TestPaths.RepoRoot, "docs", "config-reference.md")).ReplaceLineEndings("\n");
+        var sections = System.Text.RegularExpressions.Regex.Matches(doc, @"<!-- file: (\w+) -->\n((?:\|.*\n?)+)");
+        var documented = sections.ToDictionary(m => m.Groups[1].Value, m => System.Text.RegularExpressions.Regex.Matches(m.Groups[2].Value, @"^\| `(\w+)` \|", System.Text.RegularExpressions.RegexOptions.Multiline).Select(k => k.Groups[1].Value).Order().ToList());
+        var types = typeof(RegistryLoader).Assembly.GetTypes()
+            .Where(t => t.Namespace == "ObservabilityCity.Core.Registry" && t.Name.EndsWith("File", StringComparison.Ordinal) && t.IsClass)
+            .Where(t => t.Name != "DefaultsFile");
+
+        foreach (var type in types)
+        {
+            Assert.True(documented.ContainsKey(type.Name), $"docs/config-reference.md has no section tagged <!-- file: {type.Name} -->");
+            var keys = type.GetProperties().Select(p => char.ToLowerInvariant(p.Name[0]) + p.Name[1..]).Order().ToList();
+            Assert.Equal(keys, documented[type.Name]);
+        }
+    }
 }

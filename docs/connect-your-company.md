@@ -2,6 +2,8 @@
 
 How to take a fork of Observability City from the fake town to your own Azure and Grafana, one source at a time. Nothing in this runbook needs a secret in the repository.
 
+Every key of every config file, with its default and whether it is required, is in the [config reference](config-reference.md).
+
 What works today: the town runs on fake data, and `validate --sources` tells you whether your Azure login can reach each source you configure. The adapters that turn real data into the town arrive phase by phase (real metrics, then messaging, then incidents); each one is added by the same steps, and a source you have not enabled yet stays out of the town.
 
 ## The shape of a fork
