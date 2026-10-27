@@ -39,13 +39,15 @@ public sealed partial record Registry
         return view with { Warnings = [.. TownLinks.Warnings(view), .. EnvironmentWarnings(env, view), .. view.UnknownSourceWarnings(env), .. view.UnusedSourceWarnings(env)] };
     }
 
-    /// <summary>Things worth fixing about an environment that do not stop it: tenant databases but no tenants listed.</summary>
+    /// <summary>Things worth fixing about an environment that do not stop it: tenant databases but no tenants listed or found by the scope.</summary>
     internal static IEnumerable<string> EnvironmentWarnings(RegistryEnvironment env, Registry view)
     {
         foreach (var pillar in env.Scope.PillarSubscriptions.Keys.Where(p => view.Groups.All(g => g.Id != p)))
             yield return $"Environment '{env.Id}': scope.pillars names '{pillar}', which is not a pillar of this town (or is not deployed here).{DidYouMean.Hint(pillar, view.Groups.Select(g => g.Id))}";
         var tenanted = view.AllNodes.Where(n => n.TenantPattern is not null).ToList();
-        if (tenanted.Count > 0 && env.Tenants.Count == 0 && env.UndeclaredTenants.Count == 0)
+        // a scope rule with a tenant group finds the tenants in the cloud, so the list may stay empty
+        var found = env.Scope.Resources.Any(r => r.Pattern.Contains("(?<tenant>", StringComparison.Ordinal));
+        if (tenanted.Count > 0 && env.Tenants.Count == 0 && env.UndeclaredTenants.Count == 0 && !found)
             yield return $"Environment '{env.Id}' lists no tenants, so its {tenanted.Count} tenant database{(tenanted.Count == 1 ? "" : "s")} show an empty yard. Add tenants to environments/{env.Id}.yaml.";
     }
 }
