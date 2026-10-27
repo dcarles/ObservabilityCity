@@ -10,6 +10,14 @@ internal sealed class TownFile
     public string Topology { get; set; } = "direct";
     /// <summary>"demo" (a town with a fake source and the Break things panel) or "live". A town that does not say is live.</summary>
     public string Mode { get; set; } = "live";
+    /// <summary>Warnings the validator should expect in this registry (a test registry that shows a rule on purpose). Read by the validator only.</summary>
+    public List<ExpectedWarningFile> ExpectedWarnings { get; set; } = [];
+}
+
+internal sealed class ExpectedWarningFile
+{
+    public string Rule { get; set; } = "";
+    public string? File { get; set; }
 }
 
 internal sealed class ErrorThresholdsFile
@@ -254,6 +262,8 @@ internal sealed class MetricGroupFile
     public MetricSignalFile? Throttled { get; set; }
     /// <summary>The request rate of a store, shown per tenant database.</summary>
     public MetricSignalFile? Requests { get; set; }
+    /// <summary>The provisioned capacity as a plain number (for Cosmos, the ProvisionedThroughput metric with maximum), shown beside each tenant database. Not a health signal.</summary>
+    public MetricSignalFile? Limit { get; set; }
 }
 
 internal sealed class MetricSignalFile

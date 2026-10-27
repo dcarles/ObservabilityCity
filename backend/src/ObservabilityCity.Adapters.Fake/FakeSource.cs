@@ -212,7 +212,7 @@ public sealed class FakeSource(
                         var own = fx.Where(e => e.Kind == FakeEffectKind.Saturate && e.Tenant == tn.Id).Sum(e => 0.6 * e.Intensity);
                         var u = Math.Clamp(rps / provisioned * skew + saturate + own, 0, 1.2);
                         var th = u > 0.95 ? Math.Min(0.6, (u - 0.95) * 2.4) : 0;
-                        tenantReadings.Add(new TenantReading(tn.Id, u, th, rps * weights[tn.Id] / sum));
+                        tenantReadings.Add(new TenantReading(tn.Id, u, th, rps * weights[tn.Id] / sum, Limit: FakeLimits[StableHash(node.Id + "/" + tn.Id + "/limit") % FakeLimits.Length]));
                     }
                     // the store's own numbers follow its customers; the snapshot builder works out the same from the units
                     var customers = tenantReadings.Where(r => tenants.First(tn => tn.Id == r.TenantId).Kind != TenantKind.Test).ToList();
@@ -281,6 +281,9 @@ public sealed class FakeSource(
     };
 
     /// <summary>Smooth, repeatable wobble in -1..1 that differs per node.</summary>
+    /// <summary>The sizes a made-up tenant database can be provisioned at, so the town shows different limits side by side.</summary>
+    private static readonly double[] FakeLimits = [4000, 10000, 20000];
+
     private static double Wobble(string id, double t, double period)
     {
         var h = StableHash(id);

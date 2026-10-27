@@ -67,6 +67,22 @@ export function throttleWho(units: readonly TenantUnitSnapshot[], throttleAmber:
 /** A tenant's own throttled figure, always shown (0% included): "0% throttled". */
 export const throttledText = (u: Pick<TenantUnitSnapshot, 'throttled'>): string => `${((u.throttled ?? 0) * 100).toFixed(u.throttled != null && u.throttled > 0 && u.throttled < 0.1 ? 1 : 0)}% throttled`
 
+/** A provisioned size as the tenant rows show it: "20,000 RU/s". */
+export const limitText = (limit: number): string => `${Math.round(limit).toLocaleString('en-US')} RU/s`
+
+/** What the units are provisioned at, for the Overview: one size ("20,000 RU/s") or the range of them ("4,000 to 20,000 RU/s"). Null when no unit reports one. */
+export function limitRange(units: readonly Pick<TenantUnitSnapshot, 'limit'>[]): string | null {
+  const limits = units.map((u) => u.limit).filter((l): l is number => l != null && l > 0)
+  if (limits.length === 0) return null
+  const low = Math.min(...limits), high = Math.max(...limits)
+  return low === high ? limitText(high) : `${Math.round(low).toLocaleString('en-US')} to ${limitText(high)}`
+}
+
+/** The figures on a tenant's row, in order: what it is provisioned at, how much of that it uses, and how much it turns away. Each is left out when unknown, apart from the use, which shows a dash. */
+export function tenantFigures(u: Pick<TenantUnitSnapshot, 'limit' | 'utilisation' | 'throttled'>): string {
+  return [u.limit == null ? null : limitText(u.limit), u.utilisation == null ? '–' : `${Math.round(u.utilisation * 100)}%`, u.throttled == null ? null : throttledText(u)].filter(Boolean).join(' · ')
+}
+
 /** Most throttled tenants the yard sign names; past this it gives only the count. */
 export const SIGN_NAMES = 3
 

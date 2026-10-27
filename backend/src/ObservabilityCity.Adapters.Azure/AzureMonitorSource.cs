@@ -167,7 +167,7 @@ public sealed class AzureMonitorSource(
             var throttled = Worst("throttled");
             if (cpu is null && memory is null && utilisation is null && throttled is null) continue;
             var tenants = values.Where(v => v.Tenant is not null).GroupBy(v => v.Tenant!)
-                .Select(g => new TenantReading(g.Key, Max(g, "utilisation"), Max(g, "throttled"), g.Sum(v => v.Signals.GetValueOrDefault("requests") ?? 0), names.GetValueOrDefault(g.Key))).ToList();
+                .Select(g => new TenantReading(g.Key, Max(g, "utilisation"), Max(g, "throttled"), g.Sum(v => v.Signals.GetValueOrDefault("requests") ?? 0), names.GetValueOrDefault(g.Key), Max(g, "limit"))).ToList();
             readings[system.Key] = new NodeReading(at, true, 0, 0, 0, 0, 0, 0, cpu, memory, utilisation, throttled, Tenants: tenants.Count == 0 ? null : tenants);
         }
         return readings;

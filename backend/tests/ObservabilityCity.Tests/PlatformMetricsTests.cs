@@ -114,6 +114,28 @@ public class PlatformMetricsTests
     }
 
     [Fact]
+    public async Task A_limit_entry_gives_each_tenants_provisioned_size_as_a_plain_number_and_leaves_the_health_alone()
+    {
+        var (source, registry) = await Platform(TownA);
+
+        var readings = await source.PollAsync(registry, CancellationToken.None);
+
+        var orders = readings["aa.orders-db"];
+        Assert.All(orders.Tenants!, t => Assert.Equal(1000, t.Limit));
+        Assert.Equal(0.95, Math.Round(orders.Utilisation!.Value, 6)); // the limit is not a share and does not move the worst
+    }
+
+    [Fact]
+    public async Task Without_a_limit_entry_a_tenant_has_no_limit()
+    {
+        var (source, registry) = await Platform(TownB);
+
+        var readings = await source.PollAsync(registry, CancellationToken.None);
+
+        Assert.All(readings["aa.orders-db"].Tenants!, t => Assert.Null(t.Limit));
+    }
+
+    [Fact]
     public async Task A_tenant_the_list_spells_with_dashes_is_the_tenant_the_source_found_without_them()
     {
         using var copy = new RegistryCopy(TownA);

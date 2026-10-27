@@ -129,6 +129,9 @@ test.describe('the tenant yard', () => {
     await page.locator('#search-results .hit').first().click()
     const rows = page.locator('#inspector h4', { hasText: 'Tenants' }).locator('~ .row')
     await expect(rows.first()).toContainText('% throttled')
+    // every row also says what its database is provisioned at, and the Overview gives the size or the range
+    await expect(rows.filter({ hasText: 'RU/s' })).toHaveCount(await rows.count())
+    await expect(page.locator('#inspector .row', { has: page.getByText('Provisioned', { exact: true }) })).toContainText('RU/s')
     const names = await page.evaluate(() => (window as any).city.seen.last.tenants.map((t: any) => t.name))
     expect(names).toContain((await rows.first().locator('span').first().textContent())!.trim())
     // every tenant shows its own figure, the others at 0%

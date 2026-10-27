@@ -325,6 +325,8 @@ export interface components {
             throttled?: number | null;
             /** Format: double */
             requestsPerSecond: number;
+            /** Format: double */
+            limit?: number | null;
         };
         TopicSnapshot: {
             name: string;
