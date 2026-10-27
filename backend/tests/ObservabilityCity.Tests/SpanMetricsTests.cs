@@ -62,7 +62,7 @@ public class SpanMetricsTests
         var gateway = Node(snapshot, "hub.apim");
         Assert.Equal(20, gateway.RequestsPerSecond);
         Assert.Equal(HealthState.Healthy, gateway.State);
-        Assert.Equal(HealthState.Stale, Node(snapshot, "aa.orders-db").State); // a database has no span metrics: grey, not quiet
+        Assert.Equal(HealthState.Degraded, Node(snapshot, "aa.orders-db").State); // a database has no span metrics (not quiet), and one tenant's account runs at 95% of what is provisioned
 
         var worker = Node(snapshot, "aa.orders-worker");
         Assert.Equal(HealthState.Healthy, worker.State);
@@ -201,7 +201,7 @@ public class SpanMetricsTests
     public void When_requests_have_no_source_nothing_is_quiet()
     {
         using var copy = new RegistryCopy(TownA);
-        copy.Replace("environments/prod.yaml", "signals: { instances: inventory, requests: telemetry, errors: telemetry, latency: telemetry }", "signals: { instances: inventory }");
+        copy.Replace("environments/prod.yaml", "signals: { instances: inventory, requests: telemetry, errors: telemetry, latency: telemetry, cpu: platform, memory: platform, utilisation: platform, throttled: platform }", "signals: { instances: inventory }");
         var registry = Prod(copy.Path);
         var state = new LatestState();
         state.Update("inventory", new Dictionary<string, NodeReading> { ["bb.ledger-api"] = new(T0, true, 5, 5, 0, 0, 0, 0, Calls: 1) });
@@ -438,7 +438,7 @@ public class SpanMetricsTests
     [Fact]
     public void A_window_must_be_a_number_and_a_unit()
     {
-        var message = Problems(c => c.Replace("environments/prod.yaml", "window: 5m", "window: soon"));
+        var message = Problems(c => c.Replace("environments/prod.yaml", "window: 5m\n    query: |", "window: soon\n    query: |"));
 
         Assert.Contains("source 'telemetry' has window 'soon'", message);
     }

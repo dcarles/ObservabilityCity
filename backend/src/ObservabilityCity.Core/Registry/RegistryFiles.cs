@@ -176,7 +176,10 @@ internal sealed class EnvironmentFile
 internal sealed class ScopeFile
 {
     public string? Inventory { get; set; }
+    /// <summary>The workspace by name or wildcard pattern (a template). A name is looked up in the inventory; an id or resource id is used as it is.</summary>
     public string? Workspace { get; set; }
+    /// <summary>The workspace's id (a GUID or a resource id), a template. When it is set the name is not looked up.</summary>
+    public string? WorkspaceId { get; set; }
     public Dictionary<string, string> Variables { get; set; } = new();
     public SubscriptionRuleFile? Subscription { get; set; }
     public Dictionary<string, string> Pillars { get; set; } = new();
@@ -213,6 +216,7 @@ internal sealed class ScopeQueriesFile
 {
     public string? Subscriptions { get; set; }
     public string? Resources { get; set; }
+    public string? Workspaces { get; set; }
 }
 
 internal sealed class SourceFile
@@ -231,6 +235,39 @@ internal sealed class SourceFile
     public string? Query { get; set; }
     /// <summary>Query sources only: how far back one answer looks, for example 5m. Default 5m.</summary>
     public string? Window { get; set; }
+    /// <summary>Platform-metric sources only (azuremonitor): which metric of which resources fills which signal. Everything about the metrics is written here; the program knows none.</summary>
+    public List<MetricGroupFile> Metrics { get; set; } = [];
+}
+
+/// <summary>The metrics of one kind of resource: <see cref="Resources"/> names a rule of scope.resources, and each signal says where its number comes from.</summary>
+internal sealed class MetricGroupFile
+{
+    /// <summary>The name of a scope.resources rule: the resources it finds for a system are the ones asked.</summary>
+    public string Resources { get; set; } = "";
+    /// <summary>The metric namespace, for a resource type that has more than one. Usually left out.</summary>
+    public string? Namespace { get; set; }
+    public MetricSignalFile? Cpu { get; set; }
+    public MetricSignalFile? Memory { get; set; }
+    public MetricSignalFile? Utilisation { get; set; }
+    public MetricSignalFile? Throttled { get; set; }
+    /// <summary>The request rate of a store, shown per tenant database.</summary>
+    public MetricSignalFile? Requests { get; set; }
+}
+
+internal sealed class MetricSignalFile
+{
+    /// <summary>The metric's name as the cloud spells it.</summary>
+    public string Metric { get; set; } = "";
+    /// <summary>average, total, count, maximum or minimum: how the points of the window are added up.</summary>
+    public string Aggregation { get; set; } = "average";
+    /// <summary>A dimension filter, for example <c>StatusCode eq '429'</c>.</summary>
+    public string? Filter { get; set; }
+    /// <summary>Multiplies the value. The town reads fractions (0.42 is 42%), so a percentage has scale 0.01.</summary>
+    public double Scale { get; set; } = 1;
+    /// <summary>Divide a total over the window by its seconds, to get a rate.</summary>
+    public bool PerSecond { get; set; }
+    /// <summary>Another metric the value is divided by (provisioned capacity, all requests), to give a share.</summary>
+    public MetricSignalFile? Over { get; set; }
 }
 
 internal sealed class CredentialFile

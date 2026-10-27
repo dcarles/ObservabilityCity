@@ -13,12 +13,13 @@ public static partial class RegistryLoader
         {
             Inventory = f.Inventory,
             Workspace = f.Workspace,
+            WorkspaceId = f.WorkspaceId,
             Variables = f.Variables,
             Subscription = f.Subscription is null ? null : new SubscriptionRule(f.Subscription.NameLike, f.Subscription.Tag?.Key, f.Subscription.Tag?.Value),
             PillarSubscriptions = f.Pillars,
             Resources = f.Resources.Select(r => new ResourceRule(r.Name, r.Types, r.Pattern, r.Roles.Select(x => x.ToLowerInvariant()).ToList(), r.ServiceTag, r.TenantNameTag, string.IsNullOrWhiteSpace(r.Instances) ? null : r.Instances.Trim())).ToList(),
             TelemetryRole = f.TelemetryRole,
-            Queries = new ScopeQueries(f.Queries?.Subscriptions, f.Queries?.Resources),
+            Queries = new ScopeQueries(f.Queries?.Subscriptions, f.Queries?.Resources, f.Queries?.Workspaces),
         };
 
     private static void CheckQuery(EnvironmentFile f, SourceFile def, string source, string name, List<string> errors)
@@ -29,6 +30,50 @@ public static partial class RegistryLoader
         if (query.Trim().Length == 0) errors.Add($"{name}: source '{source}' has an empty query; give the query to send, or leave it out");
         var known = f.Scope?.Variables.Keys.Append(ScopeRules.EnvironmentVariable).Concat(SourceQuery.Variables) ?? [ScopeRules.EnvironmentVariable, .. SourceQuery.Variables];
         foreach (var problem in ScopeTemplate.Check(query, known)) errors.Add($"{name}: source '{source}' query: {problem}");
+    }
+
+    private static MetricSignal? ToSignal(MetricSignalFile? f) =>
+        f is null ? null : new MetricSignal(f.Metric.Trim(), f.Aggregation.Trim().ToLowerInvariant(), string.IsNullOrWhiteSpace(f.Filter) ? null : f.Filter.Trim(), f.Scale, f.PerSecond, ToSignal(f.Over));
+
+    private static List<MetricGroup> ToMetrics(List<MetricGroupFile> files) =>
+        files.Select(g => new MetricGroup(g.Resources, string.IsNullOrWhiteSpace(g.Namespace) ? null : g.Namespace.Trim(),
+            new[] { ("cpu", g.Cpu), ("memory", g.Memory), ("utilisation", g.Utilisation), ("throttled", g.Throttled), ("requests", g.Requests) }
+                .Where(x => x.Item2 is not null).ToDictionary(x => x.Item1, x => ToSignal(x.Item2)!))).ToList();
+
+    private static void CheckMetrics(EnvironmentFile f, SourceFile def, string source, string name, List<string> errors)
+    {
+        if (def.Metrics.Count == 0) return;
+        var rules = f.Scope?.Resources.Select(r => r.Name).ToList() ?? [];
+        var known = f.Scope?.Variables.Keys.Append(ScopeRules.EnvironmentVariable).ToList() ?? [ScopeRules.EnvironmentVariable];
+        for (var i = 0; i < def.Metrics.Count; i++)
+        {
+            var group = def.Metrics[i];
+            var at = $"{name}: source '{source}' metrics[{i}]";
+            if (!rules.Contains(group.Resources))
+                errors.Add($"{at}: resources '{group.Resources}' is not a rule of scope.resources.{(rules.Count == 0 ? " This file has no scope.resources." : $" Use {string.Join(", ", rules)}.")}{DidYouMean.Hint(group.Resources, rules)}");
+            var signals = new[] { ("cpu", group.Cpu), ("memory", group.Memory), ("utilisation", group.Utilisation), ("throttled", group.Throttled), ("requests", group.Requests) }.Where(x => x.Item2 is not null).ToList();
+            if (signals.Count == 0) errors.Add($"{at}: it asks for no signal. Give at least one of {string.Join(", ", MetricGroup.SignalNames)}");
+            foreach (var (signal, spec) in signals)
+            {
+                CheckSignal(spec!, $"{at}.{signal}", false);
+            }
+        }
+
+        void CheckSignal(MetricSignalFile spec, string at, bool isOver)
+        {
+            if (string.IsNullOrWhiteSpace(spec.Metric)) errors.Add($"{at}: metric is empty; give the metric's name");
+            if (!MetricGroup.Aggregations.Contains(spec.Aggregation.Trim().ToLowerInvariant()))
+                errors.Add($"{at}: aggregation '{spec.Aggregation}'. Use {string.Join(", ", MetricGroup.Aggregations)}.{DidYouMean.Hint(spec.Aggregation, MetricGroup.Aggregations)}");
+            if (!double.IsFinite(spec.Scale) || spec.Scale <= 0) errors.Add($"{at}: scale must be above 0 (0.01 turns a percentage into a fraction)");
+            if (spec.Filter is { } filter)
+                foreach (var problem in ScopeTemplate.Check(filter, known)) errors.Add($"{at}.filter: {problem}");
+            if (spec.Over is { } over)
+            {
+                if (isOver) errors.Add($"{at}: over cannot have an over of its own");
+                else CheckSignal(over, $"{at}.over", true);
+                if (over.PerSecond || over.Scale != 1) errors.Add($"{at}.over: the divisor is used as it is; put scale and perSecond on the metric itself");
+            }
+        }
     }
 
     private static void CheckScope(EnvironmentFile f, string name, List<string> errors)
@@ -49,6 +94,9 @@ public static partial class RegistryLoader
             foreach (var problem in ScopeTemplate.Check(text, known)) errors.Add($"{at}.{where}: {problem}");
         }
         Template(s.Workspace, "workspace", own);
+        Template(s.WorkspaceId, "workspaceId", own);
+        if (s.Workspace is { } named && named.Trim().Length == 0) errors.Add($"{at}.workspace is empty; give the workspace's name (or a pattern like law-*-prod), or leave it out");
+        if (s.WorkspaceId is { } given && given.Trim().Length == 0) errors.Add($"{at}.workspaceId is empty; give the workspace id (a GUID) or leave it out");
         Template(s.TelemetryRole, "telemetryRole", own.Concat(ScopeRules.SystemVariables));
         if (s.Subscription is { } sub)
         {

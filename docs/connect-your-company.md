@@ -84,7 +84,7 @@ sources:
 
 | Signal | Kinds | `connection` is |
 | --- | --- | --- |
-| `metrics` | `prometheus`, `loganalytics` | The Prometheus query endpoint URL, or the Log Analytics workspace id |
+| `metrics` | `prometheus`, `loganalytics`, `azuremonitor` | The Prometheus query endpoint URL, the Log Analytics workspace id, or (platform metrics) nothing: the resources come from the scope |
 | `messaging` | `servicebus` | The namespace host name, for example `sb-example.servicebus.windows.net` |
 | `incidents` | `grafana-irm` | The Grafana URL (token in the `GRAFANA_TOKEN` environment variable) |
 | any | `fake` | Nothing; keeps fake data for that signal |
@@ -150,7 +150,8 @@ sources:
 scope:
   inventory: inventory
   variables: { env: prod }
-  workspace: "workspace-{env}"                          # the Log Analytics workspace of this environment
+  workspace: "workspace-{env}"                          # the Log Analytics workspace by name (or a pattern like log-*-{env}): looked up in the inventory
+  # workspaceId: "<workspace id>"                       # or its id, used as it is (wins when both are given; nothing is looked up)
   subscription: { nameLike: "*-{env}-{pillar}" }        # or: { tag: { key: pillar, value: "{pillarId}" } }
   pillars: { acme: 00000000-0000-0000-0000-000000000000 }  # a pillar named instead of found (optional)
   telemetryRole: "{name|nospace}"                       # what the telemetry calls a system that does not say
@@ -164,6 +165,7 @@ To let the inventory supply the floors of the buildings, count the instances in 
 - **Pillar to subscription.** `subscription` finds it by name (a wildcard, any case) or by a tag on the subscription; `{pillar}` is the pillar's `scope: { code: ... }` (else its id) and `{pillarId}` its id. `pillars:` names a subscription outright and wins. A pillar that no subscription, or more than one, matches is reported and not guessed.
 - **Service to resources.** A `pattern` is a regular expression over a resource's name (any case) with named groups: `service` (required) is compared with the system's `serviceCode:` (else its `service:`); `role`, `pillar`, `region` and `tenant` are optional and narrow the match. `roles:` limits a rule to systems of those roles. `serviceTag:` finds a resource whose name does not match by a tag, and `tenantNameTag:` reads a tenant's friendly name from a tag, so the town can show it.
 - **Instances.** A rule with `instances:` counts the instances of each of its resources, with an expression of the inventory query (a plan's workers, an app's replicas). The inventory query is built from the rules' expressions, so another company writes another expression for another resource type. A system's instances are the sum over its resources of such rules, so a service on two regions adds both. A system with no counted resource has an unknown count, which is not 0; a resource the cloud gives no number for adds nothing. The count is what is configured: the inventory cannot say which instances are unhealthy, so all count as healthy until a source that measures health says otherwise.
+- **Workspace.** `workspace` is the workspace's name, or a wildcard pattern (`log-*-{env}`), and the inventory source looks it up through Resource Graph (the workspace's own `customerId` is the id the query API takes). Exactly one workspace must match; none or several are reported, with the names, and nothing is guessed. `workspaceId` gives the id outright (a GUID, or a resource id starting with `/subscriptions`) and is used as it is: when both are given the id wins and the lookup is skipped. A GUID or resource id written under `workspace` is taken as an id as well. The Config tab says which way it was settled. A source's own `connection` still wins over both. The lookup query can be replaced under `scope.queries.workspaces` (it returns `id`, `name` and `customerId`).
 - **Telemetry names.** A system says what its telemetry calls it with `telemetry: { role: ... }` in its pillar file; one that does not takes the `telemetryRole` template. Two systems with the same name are reported, since their telemetry would be read as one.
 - **Queries.** The adapter's own two queries (subscriptions, then the resources of the chosen subscriptions) can be replaced under `scope.queries`; every page of the answer is read.
 
@@ -185,7 +187,7 @@ To try rules without Azure, keep a recording in the town folder, `{ "subscriptio
 | | |
 | --- | --- |
 | Permission | Log Analytics Reader on the workspace |
-| `connection` | The workspace id (a GUID) or its resource id (starting with `/subscriptions`). Empty: the environment's `scope.workspace`, which must then be one of those. A workspace *name* cannot be queried. `file:name.json` replays a recorded answer kept beside the town's files |
+| `connection` | The workspace id (a GUID) or its resource id (starting with `/subscriptions`). Empty: the workspace the environment's scope settles, either `scope.workspaceId` or the id found for the name in `scope.workspace` (see Workspace above). A bare name cannot be queried, so the first poll waits briefly for the inventory to be read. `file:name.json` replays a recorded answer kept beside the town's files |
 | `query` | The query to send, a template (below). There is no default: which table, metric names and properties hold your span metrics is yours to say |
 | `window` | How far back one answer looks: a number and a unit, `30s`, `5m`, `1h`. Default `5m` |
 | `pollSeconds`, `timeoutSeconds` | 30 and 20 suit it; the query summarises, so keep it short in time |
@@ -210,6 +212,46 @@ Use unsampled metrics (pre-aggregated span metrics), never a table that sampling
 **Quiet.** A system with fewer calls in the window than its `minCalls` is *quiet*: its rate is shown, but its error share and latency are left out, and it is never amber because of them, since an error share on 3 calls means nothing. Set `minCalls` in `defaults.yaml` per role, in a pillar's `defaults`, or on one system; it counts at least 1, so a window with no calls is always quiet. The inspector's Errors and p99 rows say *quiet: too few calls to judge*, the service card says *quiet*, and the Config tab shows the minimum and which file it came from. A source that does not count calls never makes a system quiet.
 
 To try a query's shape offline, keep a recorded answer in the town folder (`{ "tables": [ { "columns": [ { "name": "role" }, ... ], "rows": [ [ "Name", 120, 3, 85.5 ] ] } ] }`, the shape the API returns) and point the source at it with `file:`. `scope-town-a` and `scope-town-b` do this with two different queries.
+
+#### `azuremonitor` (CPU, memory, capacity used and throttling)
+
+| | |
+| --- | --- |
+| Permission | Monitoring Reader on the subscriptions of the resources |
+| `connection` | Nothing: the resources come from the scope (the resources each system owns). `file:name.json` replays recorded series kept beside the town's files |
+| `metrics` | Which metric of which resources fills which signal (below). There is no default: metric names, aggregations and filters are yours to say |
+| `window` | How far back one answer looks. Default `5m`. The metrics are asked at a one-minute grain |
+| `pollSeconds`, `timeoutSeconds` | 60 and 30 suit it: platform metrics have a one-minute grain, and a poll makes one call for each resource and kind of question |
+| Fills | `cpu`, `memory`, `utilisation` (capacity used) and `throttled` of the systems whose resources an entry names (point `signals: { cpu: ..., memory: ..., utilisation: ..., throttled: ... }` at it) |
+
+Each entry under `metrics` takes the resources that one rule of `scope.resources` finds for a system, and says for each signal which metric it is. The program knows no metric name, so another company, or another kind of resource, writes other entries:
+
+```yaml
+sources:
+  platform:
+    kind: azuremonitor
+    window: 5m
+    metrics:
+      - resources: plans                       # the name of a scope.resources rule
+        cpu: { metric: <cpu metric>, aggregation: average, scale: 0.01 }          # a percentage becomes the fraction the town reads
+        memory: { metric: <memory metric>, aggregation: average, scale: 0.01 }
+      - resources: accounts
+        # request units used per second, as a share of what is provisioned
+        utilisation: { metric: <request units>, aggregation: total, perSecond: true, over: { metric: <provisioned throughput>, aggregation: maximum } }
+        # requests answered with 429, as a share of all requests
+        throttled: { metric: <requests>, aggregation: count, filter: "<dimension> eq '429'", over: { metric: <requests>, aggregation: count } }
+        requests: { metric: <requests>, aggregation: count, perSecond: true }   # per tenant database
+signals: { cpu: platform, memory: platform, utilisation: platform, throttled: platform }
+```
+
+A signal has the `metric` (as the cloud spells it), the `aggregation` that adds the window's points up (`average`, `total`, `count`, `maximum`, `minimum`), an optional dimension `filter`, and how the number becomes what the town reads: `over` divides by another metric (a share), `perSecond` divides a total by the window's seconds (a rate), and `scale` multiplies (a percentage is `0.01`). CPU, memory, capacity used and throttling are fractions held between 0 and 1. An entry may name a `namespace` for a resource type that has more than one. Metrics that agree on aggregation and filter share one call.
+
+- **Several resources.** A system with several resources (a service on two regions, a tenant database in each account) is as busy as its busiest. If any of them gives no number, the signal is unknown for the system rather than taken from the others, since the one without a number could be the one in trouble. A resource shared by several systems (one plan, two services) is read once.
+- **A filter that matches nothing.** No request answered with 429 gives no points at all. When the whole it is a share of has points, the share is 0: no throttling, not an unknown.
+- **Tenants.** A data account whose rule has a `tenant` group is read on its own, so the town can show whose is hot: the tenant list may spell an id with or without dashes.
+- **A read that fails** fails the poll, naming how many reads failed and what the cloud answered, and the building greys when its data goes stale.
+
+To try entries offline, keep recorded series in the town folder, `{ "<resource name>": [ { "metric": "...", "aggregation": "average", "filter": null, "points": [40, 44, 42] } ] }`, and point the source at it with `file:`. `scope-town-a` and `scope-town-b` do this with two differently shaped sets of entries (percentages and request units over provisioned throughput; cores and bytes over limits and a normalised consumption metric) and show the same town.
 
 ### What each adapter's runbook section contains
 

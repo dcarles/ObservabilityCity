@@ -95,6 +95,8 @@ public sealed class LogAnalyticsSource(
     public async Task<IReadOnlyDictionary<string, NodeReading>> PollAsync(TownRegistry registry, CancellationToken ct)
     {
         var view = registry.ForEnvironment(environmentId);
+        // a workspace given by name is looked up in the inventory, which is read at the same moment the first poll starts
+        if (recording is null && string.IsNullOrWhiteSpace(definition.Connection) && store.Inventory is null) await store.WaitForReadAsync(Timeout / 2, ct);
         var resolution = store.Resolve(view);
         var serving = view.AllNodes.Where(n => n.Kind is NodeKind.Api or NodeKind.Worker or NodeKind.Gateway or NodeKind.Cron).Select(n => n.Id).ToHashSet();
         var asked = resolution.Systems.Where(s => serving.Contains(s.SystemId) && !string.IsNullOrWhiteSpace(s.TelemetryRole)).ToList();
@@ -112,14 +114,25 @@ public sealed class LogAnalyticsSource(
         return Readings(asked, rows, Window, time.GetUtcNow());
     }
 
+    /// <summary>
+    /// The workspace to query: the source's own connection, else the id the environment's scope settles (an explicit <c>workspaceId</c>, or the id of the
+    /// workspace found by its name). A name that has not been looked up yet is a wait, not a mistake in the files, and the message says so.
+    /// </summary>
     private string Workspace(Resolution resolution)
     {
         var connection = definition.Connection;
-        var workspace = string.IsNullOrWhiteSpace(connection) ? resolution.Workspace : connection.Trim();
+        var workspace = string.IsNullOrWhiteSpace(connection) ? resolution.WorkspaceId : connection.Trim();
         if (string.IsNullOrWhiteSpace(workspace))
-            throw new InvalidOperationException($"source '{name}' has no workspace. Set its connection, or scope.workspace in the environment file");
-        if (!workspace.StartsWith('/') && !Guid.TryParse(workspace, out _))
-            throw new InvalidOperationException($"the workspace '{workspace}' is a name; Log Analytics is queried by workspace id (a GUID) or by resource id (starting with /subscriptions)");
+        {
+            var named = resolution.Workspace;
+            if (string.IsNullOrWhiteSpace(named))
+                throw new InvalidOperationException($"source '{name}' has no workspace. Set its connection, or scope.workspaceId (or scope.workspace, a name to look up) in the environment file");
+            var why = resolution.Problems.FirstOrDefault(p => p.Contains("Log Analytics workspace")) ??
+                      (resolution.InventoryRead ? "the inventory has no workspace by that name" : "the inventory has not been read yet, so the name could not be looked up");
+            throw new InvalidOperationException($"the workspace '{named}' is a name and has no workspace id yet: {why}. Log Analytics is queried by workspace id (a GUID) or by resource id (starting with /subscriptions)");
+        }
+        if (!ScopeResolver.IsWorkspaceId(workspace))
+            throw new InvalidOperationException($"the workspace '{workspace}' is a name; Log Analytics is queried by workspace id (a GUID) or by resource id (starting with /subscriptions). Give the id under scope.workspaceId, or the name under scope.workspace to have it looked up");
         return workspace;
     }
 

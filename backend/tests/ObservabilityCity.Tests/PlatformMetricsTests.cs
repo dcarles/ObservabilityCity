@@ -1,0 +1,404 @@
+using System.Net;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using Microsoft.Extensions.Time.Testing;
+using ObservabilityCity.AdapterKit;
+using ObservabilityCity.Adapters.Azure;
+using ObservabilityCity.Contracts;
+using ObservabilityCity.Core.Registry;
+using ObservabilityCity.Core.Scope;
+using ObservabilityCity.Core.Snapshots;
+using ObservabilityCity.Core.Sources;
+using TownRegistry = ObservabilityCity.Core.Registry.Registry;
+
+namespace ObservabilityCity.Tests;
+
+/// <summary>
+/// Phase 2, slice 5: the lights of a building (CPU and memory of the plans it runs on, request units and throttling of its data accounts) come from the
+/// platform metrics API. The program knows no metric name, aggregation, filter or divisor: the environment's <c>metrics</c> entries say them. Two towns
+/// with differently shaped entries (percentages from plans and request units over provisioned throughput; cores and bytes over limits and a normalised
+/// consumption metric) read the same recorded numbers and show the same town, which is the proof.
+/// </summary>
+public class PlatformMetricsTests
+{
+    private static string TownA => Path.Combine(TestPaths.RepoRoot, "shared-test-data", "registries", "scope-town-a");
+    private static string TownB => Path.Combine(TestPaths.RepoRoot, "shared-test-data", "registries", "scope-town-b");
+    private static readonly DateTimeOffset T0 = DateTimeOffset.Parse("2026-01-01T00:00:00Z");
+
+    private static TownRegistry Prod(string folder) => RegistryLoader.Load(folder).ForEnvironment("prod");
+    private static NodeSnapshot Node(Snapshot s, string id) => s.Groups.SelectMany(g => g.Nodes).First(n => n.Id == id);
+
+    private static async Task<Snapshot> TownSnapshot(string folder, FakeTimeProvider time)
+    {
+        var registry = Prod(folder);
+        var set = new AdapterCatalog([new AzureAdapters()]).Build(registry.ActiveEnvironment!, folder);
+        Assert.Empty(set.Problems);
+        var state = new LatestState();
+        foreach (var source in set.Sources) state.Update(source.Name, await source.PollAsync(registry, CancellationToken.None));
+        return new SnapshotBuilder(registry, state, time) { Environment = "prod" }.Build();
+    }
+
+    /// <summary>The platform source of a town, started over the inventory its recording gives, with the HTTP it is handed (none: it replays its recording).</summary>
+    private static async Task<(IMetricSource Source, TownRegistry Registry)> Platform(string folder, CannedHttp? http = null, ICredentialSource? login = null)
+    {
+        var registry = Prod(folder);
+        var env = registry.ActiveEnvironment!;
+        var set = new AdapterCatalog([new AzureAdapters()]).Build(env, folder);
+        await set.Sources.Single(s => s.Name == "inventory").PollAsync(registry, CancellationToken.None);
+        if (http is null) return (set.Sources.Single(s => s.Name == "platform"), registry);
+        var definition = env.Sources.Single(s => s.Name == "platform") with { Connection = null };
+        var source = new AzureMonitorSourceFactory(new HttpClient(http), new FakeTimeProvider(T0)).Create(new SourceContext("prod", definition, login, env.Scope, set.Scope, folder));
+        return (source, registry);
+    }
+
+    // ---- the town, whatever the metrics ----
+
+    [Theory]
+    [InlineData("a")]
+    [InlineData("b")]
+    public async Task Two_towns_with_differently_shaped_metrics_show_the_same_lights(string town)
+    {
+        var snapshot = await TownSnapshot(town == "a" ? TownA : TownB, new FakeTimeProvider(T0));
+
+        // a system with two plans (or two container apps' worth) is as busy as its busiest
+        var api = Node(snapshot, "aa.orders-api");
+        Assert.Equal(0.64, api.Cpu!.Value, 6);
+        Assert.Equal(0.71, api.Memory!.Value, 6);
+        Assert.Equal(0.64, Node(snapshot, "aa.orders-worker").Cpu!.Value, 6);
+        var ledger = Node(snapshot, "bb.ledger-api");
+        Assert.Equal(0.40, ledger.Cpu!.Value, 6);
+        Assert.Equal(0.52, ledger.Memory!.Value, 6);
+
+        // the worst tenant's account decides: Borealis uses 95% of what it has and 10% of its requests are turned away
+        var orders = Node(snapshot, "aa.orders-db");
+        Assert.Equal(0.95, orders.Utilisation!.Value, 6);
+        Assert.Equal(0.1, orders.Throttled!.Value, 6);
+        Assert.Equal(HealthState.Degraded, orders.State);
+        var ledgerDb = Node(snapshot, "bb.ledger-db");
+        Assert.Equal(0.5, ledgerDb.Utilisation!.Value, 6);
+        Assert.Equal(0, ledgerDb.Throttled!.Value); // a filter that matches no request at all is no throttling, not an unknown
+        Assert.Equal(HealthState.Healthy, ledgerDb.State);
+
+        // the other sources still fill their own signals
+        Assert.Equal(3, api.InstancesTotal);
+        Assert.Equal(10, api.RequestsPerSecond);
+    }
+
+    [Theory]
+    [InlineData("a")]
+    [InlineData("b")]
+    public async Task A_source_reports_only_the_systems_its_entries_cover_and_every_reading_passes_the_contract(string town)
+    {
+        var (source, registry) = await Platform(town == "a" ? TownA : TownB);
+
+        var readings = await source.PollAsync(registry, CancellationToken.None);
+
+        Assert.Equal(["aa.orders-api", "aa.orders-db", "aa.orders-worker", "bb.ledger-api", "bb.ledger-db", "bb.ledger-worker"], readings.Keys.Order());
+        AdapterContract.AssertReadings(readings, registry);
+        Assert.Null(readings["aa.orders-api"].Utilisation); // a plan has no request units
+        Assert.Null(readings["aa.orders-db"].Cpu); // an account has no CPU
+    }
+
+    [Fact]
+    public async Task Each_tenants_account_is_read_on_its_own_so_the_town_can_show_whose_is_hot()
+    {
+        var (source, registry) = await Platform(TownA);
+
+        var readings = await source.PollAsync(registry, CancellationToken.None);
+
+        var tenants = readings["aa.orders-db"].Tenants!.OrderBy(t => t.TenantId).ToList();
+        Assert.Equal(["11111111111111111111111111111111", "22222222222222222222222222222222", "33333333333333333333333333333333"], tenants.Select(t => t.TenantId));
+        Assert.Equal([0.2, 0.95, 0.4], tenants.Select(t => t.Utilisation!.Value).Select(v => Math.Round(v, 6)));
+        Assert.Equal([0, 0.1, 0], tenants.Select(t => Math.Round(t.Throttled!.Value, 6)));
+        Assert.Equal([10, 5, 6], tenants.Select(t => Math.Round(t.RequestsPerSecond, 6))); // requests counted over the 5 minutes
+    }
+
+    [Fact]
+    public async Task A_tenant_the_list_spells_with_dashes_is_the_tenant_the_source_found_without_them()
+    {
+        using var copy = new RegistryCopy(TownA);
+        copy.Replace("pillars/aa.yaml", "name: Orders DB, role: db }", "name: Orders DB, role: db, tenantPattern: \"{tenant}-al-ord\" }");
+        copy.Replace("environments/prod.yaml", "signals: {", "tenants:\n  - { id: 22222222-2222-2222-2222-222222222222, name: Borealis Credit Union }\nsignals: {");
+
+        var snapshot = await TownSnapshot(copy.Path, new FakeTimeProvider(T0));
+
+        var units = Node(snapshot, "aa.orders-db").Tenants!;
+        var borealis = Assert.Single(units, u => u.Name == "Borealis Credit Union");
+        Assert.Equal(0.95, borealis.Utilisation!.Value, 6);
+        Assert.Equal(HealthState.Down, borealis.State); // 95% is the red line, and a tenth of its requests turned away is past it too
+        Assert.Equal(2, units.Count(u => u.Kind == TenantKind.Unknown)); // the other two accounts are tenants nobody listed, each shown once
+    }
+
+    // ---- nothing is built in ----
+
+    [Fact]
+    public async Task A_metric_name_is_only_ever_the_environments_word()
+    {
+        using var copy = new RegistryCopy(TownA);
+        copy.Replace("environments/prod.yaml", "metric: CpuPercentage", "metric: cpu_pct_of_plan");
+        copy.Write("platform.json", copy.Read("platform.json").Replace("CpuPercentage", "cpu_pct_of_plan"));
+
+        var snapshot = await TownSnapshot(copy.Path, new FakeTimeProvider(T0));
+
+        Assert.Equal(0.64, Node(snapshot, "aa.orders-api").Cpu!.Value, 6);
+    }
+
+    [Fact]
+    public async Task A_metric_the_recording_does_not_have_leaves_that_signal_unknown_and_the_others_alone()
+    {
+        using var copy = new RegistryCopy(TownA);
+        copy.Replace("environments/prod.yaml", "metric: CpuPercentage", "metric: not_a_metric");
+
+        var snapshot = await TownSnapshot(copy.Path, new FakeTimeProvider(T0));
+
+        var api = Node(snapshot, "aa.orders-api");
+        Assert.Null(api.Cpu);
+        Assert.Equal(0.71, api.Memory!.Value, 6);
+    }
+
+    [Fact]
+    public async Task One_resource_with_no_number_makes_the_systems_number_unknown_instead_of_hiding_behind_the_others()
+    {
+        using var copy = new RegistryCopy(TownA);
+        EditRecording(copy, doc => doc["plan-cf-acme-al-ord-westeurope9z"]!.AsArray().Remove(doc["plan-cf-acme-al-ord-westeurope9z"]!.AsArray().First(s => (string?)s!["metric"] == "CpuPercentage")));
+
+        var snapshot = await TownSnapshot(copy.Path, new FakeTimeProvider(T0));
+
+        var api = Node(snapshot, "aa.orders-api");
+        Assert.Null(api.Cpu); // the western plan could be the hot one
+        Assert.Equal(0.71, api.Memory!.Value, 6);
+    }
+
+    [Fact]
+    public async Task A_share_above_the_whole_is_held_at_the_whole()
+    {
+        using var copy = new RegistryCopy(TownA);
+        EditRecording(copy, doc =>
+        {
+            foreach (var series in doc["22222222222222222222222222222222-al-ord"]!.AsArray().Where(s => (string?)s!["metric"] == "ProvisionedThroughput"))
+                series!["points"] = new JsonArray(100, 100, 100); // 950 request units a second against 100 provisioned
+        });
+
+        var snapshot = await TownSnapshot(copy.Path, new FakeTimeProvider(T0));
+
+        Assert.Equal(1.0, Node(snapshot, "aa.orders-db").Utilisation!.Value);
+    }
+
+    // ---- sources start together ----
+
+    [Fact]
+    public async Task A_poll_that_starts_before_the_inventory_is_read_waits_for_it_instead_of_reporting_nothing()
+    {
+        var registry = Prod(TownA);
+        var set = new AdapterCatalog([new AzureAdapters()]).Build(registry.ActiveEnvironment!, TownA);
+        var inventory = set.Sources.Single(s => s.Name == "inventory");
+        var platform = set.Sources.Single(s => s.Name == "platform");
+
+        var polling = platform.PollAsync(registry, CancellationToken.None); // started first, as the host starts them
+        await Task.Delay(150, TestContext.Current.CancellationToken);
+        Assert.False(polling.IsCompleted);
+        await inventory.PollAsync(registry, CancellationToken.None);
+
+        Assert.Equal(6, (await polling).Count);
+    }
+
+    [Fact]
+    public async Task A_poll_gives_up_waiting_after_half_its_time_and_reports_nothing_when_the_inventory_never_comes()
+    {
+        var registry = Prod(TownA);
+        var env = registry.ActiveEnvironment!;
+        var definition = env.Sources.Single(s => s.Name == "platform") with { TimeoutSeconds = 0.4 };
+        var source = new AzureMonitorSourceFactory().Create(new SourceContext("prod", definition, null, env.Scope, new ScopeStore(), TownA));
+
+        var readings = await source.PollAsync(registry, CancellationToken.None);
+
+        Assert.Empty(readings);
+    }
+
+    // ---- the real API ----
+
+    /// <summary>Answers a metrics request from the recording: the series of the resource and metrics named in the URL, in the shape the API gives them.</summary>
+    private static HttpResponseMessage FromRecording(SentRequest request, IReadOnlyDictionary<string, IReadOnlyList<MetricSeries>> recording)
+    {
+        var segments = request.Uri!.AbsolutePath.Split('/');
+        var resource = segments[Array.LastIndexOf(segments, "providers") - 1];
+        var query = System.Web.HttpUtility.ParseQueryString(request.Uri.Query);
+        var aggregation = query["aggregation"]!.ToLowerInvariant();
+        var filter = query["$filter"];
+        var names = query["metricnames"]!.Split(',');
+        var value = names.Select(name =>
+        {
+            var points = recording.GetValueOrDefault(resource)?.Where(s => s.Metric == name && s.Aggregation == aggregation && s.Filter == filter).SelectMany(s => s.Points).ToList() ?? [];
+            return new
+            {
+                name = new { value = name, localizedValue = name },
+                timeseries = points.Count == 0 ? Array.Empty<object>() : [new { data = points.Select(p => new Dictionary<string, object> { ["timeStamp"] = "2026-01-01T00:00:00Z", [aggregation] = p }).ToList() }],
+            };
+        });
+        return CannedHttp.Reply(JsonSerializer.Serialize(new { cost = 0, timespan = query["timespan"], interval = "PT1M", value }));
+    }
+
+    [Fact]
+    public async Task The_adapter_asks_the_metrics_api_once_per_resource_and_kind_of_question_and_reads_the_same_numbers_as_the_recording()
+    {
+        var recording = AzureMonitorSource.ReadRecording(File.ReadAllText(Path.Combine(TownA, "platform.json")));
+        var http = new CannedHttp().Respond(r => FromRecording(r, recording));
+        var login = new StaticLogin("secret-token");
+        var (source, registry) = await Platform(TownA, http, login);
+        var (replay, _) = await Platform(TownA);
+
+        var readings = await source.PollAsync(registry, CancellationToken.None);
+
+        var expected = await replay.PollAsync(registry, CancellationToken.None);
+        Assert.Equal(expected.Keys.Order(), readings.Keys.Order());
+        foreach (var (id, reading) in expected)
+        {
+            Assert.Equal(reading.Cpu, readings[id].Cpu);
+            Assert.Equal(reading.Memory, readings[id].Memory);
+            Assert.Equal(reading.Utilisation, readings[id].Utilisation);
+            Assert.Equal(reading.Throttled, readings[id].Throttled);
+        }
+        // a plan: CPU and memory share one call; an account: request units, provisioned throughput, all requests and the throttled ones are four
+        Assert.Equal(4 * 1 + 5 * 4, http.Sent.Count);
+        Assert.All(http.Sent, r => Assert.Equal("Bearer secret-token", r.Headers["Authorization"]));
+        Assert.Equal(["https://management.azure.com/.default"], login.Scopes.Distinct());
+        var plan = http.Sent.First(r => r.Uri!.AbsolutePath.Contains("/serverfarms/plan-cf-acme-al-ord-northeurope1x/"));
+        Assert.StartsWith("https://management.azure.com/subscriptions/00000000-0000-0000-0000-0000000000a1/resourceGroups/rg/providers/microsoft.web/serverfarms/plan-cf-acme-al-ord-northeurope1x/providers/Microsoft.Insights/metrics?api-version=2018-01-01", plan.Uri!.ToString());
+        var query = System.Web.HttpUtility.ParseQueryString(plan.Uri.Query);
+        Assert.Equal("CpuPercentage,MemoryPercentage", query["metricnames"]);
+        Assert.Equal("Average", query["aggregation"]);
+        Assert.Equal("PT1M", query["interval"]);
+        Assert.Equal("2025-12-31T23:55:00Z/2026-01-01T00:00:00Z", query["timespan"]); // the 5 minute window ending now
+        Assert.Null(query["$filter"]);
+        var filtered = http.Sent.Where(r => System.Web.HttpUtility.ParseQueryString(r.Uri!.Query)["$filter"] == "StatusCode eq '429'").ToList();
+        Assert.Equal(5, filtered.Count);
+        Assert.All(filtered, r => Assert.Equal("TotalRequests", System.Web.HttpUtility.ParseQueryString(r.Uri!.Query)["metricnames"]));
+    }
+
+    [Fact]
+    public async Task A_namespace_in_the_entry_is_sent_and_nothing_is_sent_when_it_is_left_out()
+    {
+        var http = new CannedHttp().Respond(_ => CannedHttp.Reply("""{"value":[]}"""));
+        var (source, registry) = await Platform(TownB, http);
+
+        await source.PollAsync(registry, CancellationToken.None);
+
+        var app = http.Sent.First(r => r.Uri!.AbsolutePath.Contains("/containerapps/"));
+        Assert.Equal("microsoft.app/containerapps", System.Web.HttpUtility.ParseQueryString(app.Uri!.Query)["metricnamespace"]);
+        var account = http.Sent.First(r => r.Uri!.AbsolutePath.Contains("/databaseaccounts/"));
+        Assert.Null(System.Web.HttpUtility.ParseQueryString(account.Uri!.Query)["metricnamespace"]);
+    }
+
+    [Fact]
+    public async Task A_refused_read_fails_the_poll_and_says_how_many_and_what_the_cloud_answered()
+    {
+        var http = new CannedHttp().Respond(r => r.Uri!.AbsolutePath.Contains("westeurope9z")
+            ? CannedHttp.Reply("""{"error":{"code":"AuthorizationFailed"}}""", HttpStatusCode.Forbidden)
+            : CannedHttp.Reply("""{"value":[]}"""));
+        var (source, registry) = await Platform(TownA, http);
+
+        var e = await Assert.ThrowsAsync<HttpRequestException>(() => source.PollAsync(registry, CancellationToken.None));
+
+        Assert.Contains("2 of 9 resource reads failed", e.Message); // the two western plans
+        Assert.Contains("403", e.Message);
+        Assert.Contains("AuthorizationFailed", e.Message);
+    }
+
+    [Fact]
+    public void An_answer_that_is_not_a_metrics_answer_is_named_as_such()
+    {
+        var e = Assert.Throws<InvalidOperationException>(() => AzureMonitorReader.Parse("""{"tables":[]}""", new MetricCall(null, "average", null)));
+
+        Assert.Contains("metrics answer", e.Message);
+    }
+
+    [Fact]
+    public void A_point_the_cloud_gave_no_value_for_is_a_gap_and_the_points_are_added_up_as_the_aggregation_says()
+    {
+        var json = """{"value":[{"name":{"value":"M"},"timeseries":[{"data":[{"timeStamp":"t1","total":4},{"timeStamp":"t2"},{"timeStamp":"t3","total":6}]}]}]}""";
+
+        var series = Assert.Single(AzureMonitorReader.Parse(json, new MetricCall(null, "total", null)));
+
+        Assert.Equal([4, 6], series.Points);
+        Assert.Equal(10, AzureMonitorReader.Reduce(series.Points, "total"));
+        Assert.Equal(5, AzureMonitorReader.Reduce(series.Points, "average"));
+        Assert.Equal(6, AzureMonitorReader.Reduce(series.Points, "maximum"));
+        Assert.Equal(4, AzureMonitorReader.Reduce(series.Points, "minimum"));
+        Assert.Null(AzureMonitorReader.Reduce([], "average"));
+    }
+
+    // ---- the files ----
+
+    private static string LoadError(Func<RegistryCopy, string[]> change)
+    {
+        using var copy = new RegistryCopy(TownA);
+        var edit = change(copy);
+        copy.Replace("environments/prod.yaml", edit[0], edit[1]);
+        return Assert.Throws<RegistryException>(() => RegistryLoader.Load(copy.Path)).Message;
+    }
+
+    [Fact]
+    public void An_entry_must_name_a_rule_of_scope_resources()
+    {
+        var message = LoadError(_ => ["- resources: plans", "- resources: planz"]);
+
+        Assert.Contains("source 'platform' metrics[0]: resources 'planz' is not a rule of scope.resources", message);
+        Assert.Contains("plans", message);
+    }
+
+    [Fact]
+    public void An_aggregation_must_be_one_the_api_knows_and_a_scale_must_be_above_zero()
+    {
+        var message = LoadError(_ => ["cpu: { metric: CpuPercentage, aggregation: average, scale: 0.01 }", "cpu: { metric: CpuPercentage, aggregation: avrage, scale: 0 }"]);
+
+        Assert.Contains("metrics[0].cpu: aggregation 'avrage'", message);
+        Assert.Contains("Did you mean 'average'", message);
+        Assert.Contains("metrics[0].cpu: scale must be above 0", message);
+    }
+
+    [Fact]
+    public void An_entry_that_asks_for_nothing_and_a_metric_with_no_name_are_mistakes()
+    {
+        var empty = LoadError(_ => ["      - resources: plans\n        cpu: { metric: CpuPercentage, aggregation: average, scale: 0.01 }\n        memory: { metric: MemoryPercentage, aggregation: average, scale: 0.01 }", "      - resources: plans"]);
+        var unnamed = LoadError(_ => ["cpu: { metric: CpuPercentage, aggregation: average, scale: 0.01 }", "cpu: { aggregation: average }"]);
+
+        Assert.Contains("it asks for no signal", empty);
+        Assert.Contains("metrics[0].cpu: metric is empty", unnamed);
+    }
+
+    [Fact]
+    public void A_divisor_is_used_as_it_is_and_cannot_have_a_divisor_of_its_own()
+    {
+        var message = LoadError(_ => ["over: { metric: ProvisionedThroughput, aggregation: maximum }", "over: { metric: ProvisionedThroughput, aggregation: maximum, scale: 2, over: { metric: X } }"]);
+
+        Assert.Contains("over cannot have an over of its own", message);
+        Assert.Contains("the divisor is used as it is", message);
+    }
+
+    [Fact]
+    public void A_filter_may_use_the_environments_variables_and_nothing_else()
+    {
+        var message = LoadError(_ => ["filter: \"StatusCode eq '429'\"", "filter: \"StatusCode eq '{code}'\""]);
+
+        Assert.Contains("filter: {code} is not a variable here", message);
+    }
+
+    [Fact]
+    public void A_platform_source_with_no_metrics_cannot_start_and_says_so()
+    {
+        var env = RegistryLoader.Load(TownA).Environments.Single();
+        var bare = env with { Sources = env.Sources.Select(s => s.Name == "platform" ? s with { Metrics = [] } : s).ToList() };
+
+        var set = new AdapterCatalog([new AzureAdapters()]).Build(bare, TownA);
+
+        Assert.Contains(set.Problems, p => p.Contains("source 'platform' could not start") && p.Contains("no metrics"));
+        Assert.DoesNotContain(set.Sources, s => s.Name == "platform");
+    }
+
+    private static void EditRecording(RegistryCopy copy, Action<JsonObject> change)
+    {
+        var doc = JsonNode.Parse(copy.Read("platform.json"))!.AsObject();
+        change(doc);
+        copy.Write("platform.json", doc.ToJsonString());
+    }
+}

@@ -355,11 +355,11 @@ public class ScopeResolutionTests
     public async Task The_adapter_asks_for_subscriptions_then_for_the_resources_of_the_ones_the_rules_chose()
     {
         var recorded = Recorded(TownA);
-        var (reader, graph) = Reader((_, body) => Json(new { data = body.RootElement.GetProperty("query").GetString()!.StartsWith("resourcecontainers") ? Rows(recorded, true) : Rows(recorded, false) }));
+        var (reader, graph) = Reader((_, body) => Json(new { data = body.RootElement.GetProperty("query").GetString()!.StartsWith("resourcecontainers") ? Rows(recorded, true) : body.RootElement.GetProperty("query").GetString()!.Contains("operationalinsights") ? new object[0] : Rows(recorded, false) }));
 
         var inventory = await reader.ReadAsync(Prod(TownA), CancellationToken.None);
 
-        Assert.Equal(2, graph.Calls.Count);
+        Assert.Equal(3, graph.Calls.Count); // the third looks the workspace up by its name (town A writes a name)
         Assert.Contains("resourcecontainers", graph.Calls[0].Body.RootElement.GetProperty("query").GetString());
         Assert.False(graph.Calls[0].Body.RootElement.TryGetProperty("subscriptions", out _)); // nothing limits the first: the login's own subscriptions
         var second = graph.Calls[1].Body.RootElement;
@@ -457,9 +457,10 @@ public class ScopeResolutionTests
     {
         var set = new AdapterCatalog([new AzureAdapters()]).Build(RegistryLoader.Load(TownA).Environments.Single(), TownA);
 
-        Assert.Equal(2, set.Sources.Count);
+        Assert.Equal(3, set.Sources.Count);
         Assert.IsType<ResourceGraphSource>(set.Sources[0]);
         Assert.IsType<LogAnalyticsSource>(set.Sources[1]);
+        Assert.IsType<AzureMonitorSource>(set.Sources[2]);
         Assert.NotNull(set.Scope);
     }
 
