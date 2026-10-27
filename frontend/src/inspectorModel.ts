@@ -158,6 +158,11 @@ const VIA: Record<string, string> = {
   'scope.telemetryRole': 'derived from the environment template',
 }
 
+const WORKSPACE_VIA: Record<string, string> = {
+  id: 'its id is given, so nothing is looked up',
+  name: 'found by its name',
+}
+
 const INVENTORY: Record<string, string> = {
   none: 'No inventory source is configured, so only what the rules say on their own is shown.',
   waiting: 'Waiting for the first read of the inventory.',
@@ -173,7 +178,7 @@ export function scopeView(s: ScopeInfo | null | undefined): ScopeView | null {
   if (!s) return null
   const rows: ScopeRow[] = []
   if (s.subscription) rows.push({ key: 'subscription', value: s.subscription, note: VIA[s.subscriptionVia ?? ''] ?? '' })
-  if (s.workspace) rows.push({ key: 'workspace', value: s.workspace, note: 'from the environment' })
+  if (s.workspace) rows.push({ key: 'workspace', value: s.workspace, note: WORKSPACE_VIA[s.workspaceVia ?? ''] ?? 'from the environment' })
   if (s.serviceCode) rows.push({ key: 'service code', value: s.serviceCode, note: 'matched against resource names' })
   if (s.telemetryRole) rows.push({ key: 'telemetry role', value: s.telemetryRole, note: VIA[s.telemetryRoleVia ?? ''] ?? '' })
   if (s.instances != null) rows.push({ key: 'instances', value: String(s.instances), note: 'added up over the resources that are counted' })

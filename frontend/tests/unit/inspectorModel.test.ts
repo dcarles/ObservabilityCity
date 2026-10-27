@@ -165,6 +165,15 @@ describe('the scope rows', () => {
     ])
   })
 
+  it('says how the workspace was settled: by its name, or by an id that is given outright', () => {
+    const note = (via: string | null) => scopeView(scope({ workspaceVia: via }))!.rows.find((r) => r.key === 'workspace')!.note
+
+    expect(note('name')).toBe('found by its name')
+    expect(note('id')).toBe('its id is given, so nothing is looked up')
+    expect(note(null)).toBe('from the environment')
+    expect(note('something-new')).toBe('from the environment')
+  })
+
   it('leaves out a value the rules do not give instead of showing it empty', () => {
     const rows = scopeView(scope({ subscription: null, subscriptionVia: null, workspace: null, serviceCode: null, telemetryRole: null, telemetryRoleVia: null }))!.rows
 

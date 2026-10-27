@@ -7,8 +7,8 @@ import { API } from '../support/city'
 
 const B = process.env.E2E_SUITE === 'scopeb'
 const town = B
-  ? { subscription: 'Alpha Production', via: 'found by its tag', workspace: 'law-live-prod', apiRole: 'OrdersAPI', apiNote: 'derived from the environment template', apiResources: ['orders-api'], dbResources: 3, countedText: /3 instances/ }
-  : { subscription: 'acme-eu-prd-al', via: 'found by its name', workspace: 'ws-prd-main', apiRole: 'OrdersApi', apiNote: 'set on this system', apiResources: ['api-acme-al-ord-northeurope1x', 'plan-cf-acme-al-ord-northeurope1x', 'plan-cf-acme-al-ord-westeurope9z'], dbResources: 3, countedText: /1 instance.*2 instances|2 instances.*1 instance/ }
+  ? { subscription: 'Alpha Production', via: 'found by its tag', workspace: 'law-live-prod', workspaceVia: 'id', workspaceNote: 'its id is given, so nothing is looked up', apiRole: 'OrdersAPI', apiNote: 'derived from the environment template', apiResources: ['orders-api'], dbResources: 3, countedText: /3 instances/ }
+  : { subscription: 'acme-eu-prd-al', via: 'found by its name', workspace: 'ws-prd-main', workspaceVia: 'name', workspaceNote: 'found by its name', apiRole: 'OrdersApi', apiNote: 'set on this system', apiResources: ['api-acme-al-ord-northeurope1x', 'plan-cf-acme-al-ord-northeurope1x', 'plan-cf-acme-al-ord-westeurope9z'], dbResources: 3, countedText: /1 instance.*2 instances|2 instances.*1 instance/ }
 
 async function openConfig(page: Page, name: string): Promise<void> {
   await page.goto('/?test=1&quality=low')
@@ -25,6 +25,7 @@ test.describe(`a live town with scope rules (${B ? 'tags and derived names' : 'n
     const scope = (await (await request.get(`${API}/api/systems/aa.orders-api`)).json()).scope
     expect(scope.subscription).toBe(town.subscription)
     expect(scope.workspace).toBe(town.workspace)
+    expect(scope.workspaceVia).toBe(town.workspaceVia)
     expect(scope.telemetryRole).toBe(town.apiRole)
     expect(scope.resources.map((r: any) => r.name)).toEqual(town.apiResources)
     expect(scope.problems).toEqual([])
@@ -37,7 +38,9 @@ test.describe(`a live town with scope rules (${B ? 'tags and derived names' : 'n
     const sub = page.locator('#inspector .cfg-row[data-key="subscription"]')
     await expect(sub).toContainText(town.subscription)
     await expect(sub.locator('.o')).toHaveText(town.via)
-    await expect(page.locator('#inspector .cfg-row[data-key="workspace"]')).toContainText(town.workspace)
+    const workspace = page.locator('#inspector .cfg-row[data-key="workspace"]')
+    await expect(workspace).toContainText(town.workspace)
+    await expect(workspace.locator('.o')).toHaveText(town.workspaceNote) // by name in one town, by an id given outright in the other
     const role = page.locator('#inspector .cfg-row[data-key="telemetry role"]')
     await expect(role).toContainText(town.apiRole)
     await expect(role.locator('.o')).toHaveText(town.apiNote)
@@ -65,7 +68,7 @@ test.describe(`a live town with scope rules (${B ? 'tags and derived names' : 'n
       return Object.fromEntries(snap.groups.flatMap((g: any) => g.nodes).map((n: any) => [n.id, `${n.state}:${n.instancesHealthy}/${n.instancesTotal}`]))
     }, { timeout: 15_000 }).toMatchObject({
       'aa.orders-api': 'Degraded:3/3', 'aa.orders-worker': 'Healthy:3/3', 'bb.ledger-api': 'Healthy:5/5', 'bb.ledger-worker': 'Healthy:5/5', // the API's 2% errors are past the amber line (slice 4)
-      'aa.orders-db': 'Stale:0/0', // an account has no instances to count: grey, never healthy
+      'aa.orders-db': 'Degraded:0/0', // an account has no instances to count (slice 5: a tenant at 95% of its capacity makes it amber)
     })
   })
 
@@ -108,8 +111,8 @@ test.describe(`a live town with scope rules (${B ? 'tags and derived names' : 'n
     expect(nodes['bb.ledger-api'].requestsPerSecond).toBeCloseTo(4 / 300, 6)
     // no row at all: no calls in the window
     expect(nodes['bb.ledger-worker']).toMatchObject({ state: 'Healthy', quiet: true, requestsPerSecond: 0 })
-    // a database has no span metrics: grey, not quiet
-    expect(nodes['aa.orders-db']).toMatchObject({ state: 'Stale', quiet: false })
+    // a database has no span metrics, so it is never quiet (slice 5: its state comes from the platform metrics)
+    expect(nodes['aa.orders-db']).toMatchObject({ state: 'Degraded', quiet: false })
   })
 
   test('the inspector shows the real numbers of a busy system and says quiet for a quiet one', async ({ page }) => {
@@ -139,6 +142,52 @@ test.describe(`a live town with scope rules (${B ? 'tags and derived names' : 'n
     const quiet = await page.evaluate(() => (window as any).city.inspect('bb.ledger-api'))
     expect(busy).toMatchObject({ beacon: 'amber', quiet: false })
     expect(quiet).toMatchObject({ state: 'Healthy', beacon: 'green', quiet: true })
+  })
+
+  // Phase 2, slice 5: CPU, memory, capacity used and throttling come from recorded platform metrics, each town with its own metric entries (percentages of
+  // plans and request units over provisioned throughput; cores and bytes over limits and a normalised consumption metric). Both show the same lights.
+  test('the server reads CPU and memory of the plans and capacity and throttling of the accounts, the busiest resource deciding', async ({ request }) => {
+    await expect.poll(async () => {
+      const snap = await (await request.get(`${API}/api/snapshot/latest`)).json()
+      return snap.groups.flatMap((g: any) => g.nodes).find((x: any) => x.id === 'aa.orders-api').cpu
+    }, { timeout: 15_000 }).not.toBeUndefined()
+    const snap = await (await request.get(`${API}/api/snapshot/latest`)).json()
+    const nodes = Object.fromEntries(snap.groups.flatMap((g: any) => g.nodes).map((n: any) => [n.id, n]))
+
+    expect(nodes['aa.orders-api'].cpu).toBeCloseTo(0.64, 6) // the western plan, not the northern one at 42%
+    expect(nodes['aa.orders-api'].memory).toBeCloseTo(0.71, 6)
+    expect(nodes['bb.ledger-api'].cpu).toBeCloseTo(0.4, 6)
+    expect(nodes['bb.ledger-api'].memory).toBeCloseTo(0.52, 6)
+    expect(nodes['aa.orders-db']).toMatchObject({ state: 'Degraded' })
+    expect(nodes['aa.orders-db'].utilisation).toBeCloseTo(0.95, 6) // Borealis uses 95% of its provisioned throughput
+    expect(nodes['aa.orders-db'].throttled).toBeCloseTo(0.1, 6) // and a tenth of its requests are turned away
+    expect(nodes['bb.ledger-db'].utilisation).toBeCloseTo(0.5, 6)
+    expect(nodes['bb.ledger-db'].throttled).toBe(0)
+    expect(nodes['bb.ledger-db'].state).toBe('Healthy')
+    // the databases and plans are not asked for each other's signals
+    expect(nodes['aa.orders-api'].utilisation ?? null).toBeNull()
+    expect(nodes['aa.orders-db'].cpu ?? null).toBeNull()
+  })
+
+  test('the inspector shows the plan and the account with their tones', async ({ page }) => {
+    await openOverview(page, 'Orders API')
+    await expect(page.locator('#inspector .row', { hasText: 'CPU' })).toContainText('64%')
+    await expect(page.locator('#inspector .row', { hasText: 'Memory' })).toContainText('71%')
+
+    await openOverview(page, 'Orders DB')
+    await expect(page.locator('#inspector .row', { hasText: 'Capacity used' })).toContainText('95%')
+    await expect(page.locator('#inspector .row', { hasText: 'Throttled' })).toContainText('10.0%')
+  })
+
+  test('the beacon of a throttled account is red and a calm plan is green', async ({ page }) => {
+    await page.goto('/?test=1&quality=low')
+    await page.waitForFunction(() => (window as any).city?.seen.snapshots > 0)
+    await page.waitForFunction(() => (window as any).city.inspect('aa.orders-db')?.state === 'Degraded')
+    await page.evaluate(() => (window as any).city.step(2))
+    const db = await page.evaluate(() => (window as any).city.inspect('aa.orders-db'))
+    const ledger = await page.evaluate(() => (window as any).city.inspect('bb.ledger-api'))
+    expect(db).toMatchObject({ beacon: 'red' })
+    expect(ledger).toMatchObject({ beacon: 'green', quiet: true })
   })
 })
 

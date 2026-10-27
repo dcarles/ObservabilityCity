@@ -4,6 +4,32 @@
   "description": "One file for each environment, named after it (prod.yaml). Pillars and systems are shared by every environment; this file says what differs.",
   "type": "object",
   "additionalProperties": false,
+  "$defs": {
+    "metricSignal": {
+      "type": "object",
+      "required": ["metric"],
+      "additionalProperties": false,
+      "description": "Where one signal's number comes from. The town reads fractions (0.42 is 42%) and rates per second.",
+      "properties": {
+        "metric": { "type": "string", "description": "The metric's name as the cloud spells it." },
+        "aggregation": { "enum": ["average", "total", "count", "maximum", "minimum"], "description": "How the points of the window are added up. Default average." },
+        "filter": { "type": "string", "description": "A dimension filter, for example StatusCode eq '429'." },
+        "scale": { "type": "number", "exclusiveMinimum": 0, "description": "Multiplies the value. A percentage has scale 0.01. Default 1." },
+        "perSecond": { "type": "boolean", "description": "Divide by the seconds of the window, to turn a total into a rate." },
+        "over": {
+          "type": "object",
+          "required": ["metric"],
+          "additionalProperties": false,
+          "description": "Another metric the value is divided by (provisioned capacity, all requests), which gives a share.",
+          "properties": {
+            "metric": { "type": "string" },
+            "aggregation": { "enum": ["average", "total", "count", "maximum", "minimum"] },
+            "filter": { "type": "string" }
+          }
+        }
+      }
+    }
+  },
   "properties": {
     "name": { "type": "string", "description": "Name in the environment picker. Defaults to the file name." },
     "order": { "type": "integer", "description": "Where it stands in the picker, lowest first. Ties go by id." },
@@ -23,7 +49,25 @@
           "pollSeconds": { "type": "number", "exclusiveMinimum": 0, "description": "How often the source is asked. Default 30." },
           "timeoutSeconds": { "type": "number", "exclusiveMinimum": 0, "description": "How long one ask may take before it is given up. Default 10." },
           "query": { "type": "string", "description": "Sources that send a query (loganalytics): the query, a template. {window} and {windowSeconds} stand for the window, {roles} for the telemetry names of the systems asked about (double-quoted, comma separated); scope variables and {environment} work too. It returns one row per telemetry name with the columns role, calls, errors and latencyMs." },
-          "window": { "type": "string", "pattern": "^[0-9]+(\\.[0-9]+)?[smh]$", "description": "Query sources: how far back one answer looks, a number and a unit (30s, 5m, 1h). Default 5m. A system with fewer calls than its minCalls in this window is quiet." }
+          "window": { "type": "string", "pattern": "^[0-9]+(\\.[0-9]+)?[smh]$", "description": "Query sources: how far back one answer looks, a number and a unit (30s, 5m, 1h). Default 5m. A system with fewer calls than its minCalls in this window is quiet. Platform-metric sources (azuremonitor) look back this far too." },
+          "metrics": {
+            "type": "array",
+            "description": "Platform-metric sources (azuremonitor): which metric of which resources fills which signal. The program knows no metric name; everything is written here. Each entry takes the resources one rule of scope.resources finds for a system; a system's value is the worst (highest) over its resources.",
+            "items": {
+              "type": "object",
+              "required": ["resources"],
+              "additionalProperties": false,
+              "properties": {
+                "resources": { "type": "string", "description": "The name of a scope.resources rule." },
+                "namespace": { "type": "string", "description": "The metric namespace, for a resource type that has more than one. Usually left out." },
+                "cpu": { "$ref": "#/$defs/metricSignal" },
+                "memory": { "$ref": "#/$defs/metricSignal" },
+                "utilisation": { "$ref": "#/$defs/metricSignal" },
+                "throttled": { "$ref": "#/$defs/metricSignal" },
+                "requests": { "$ref": "#/$defs/metricSignal" }
+              }
+            }
+          }
         }
       }
     },
@@ -69,7 +113,8 @@
       "description": "How this environment's pillars and systems map onto the cloud: the subscription of each pillar, the workspace, which resources belong to a service and what the telemetry calls each system. Every convention is a rule or a template here; the program assumes none. Templates have {variable} and {variable|filter} holes (filters: nospace, lower, upper); {environment} is this file's id and variables are your own.",
       "properties": {
         "inventory": { "type": "string", "description": "The source (from sources) that reads the inventory, a resourcegraph source. Without it, the only one." },
-        "workspace": { "type": "string", "description": "The workspace the telemetry is in, a template over {environment} and variables." },
+        "workspace": { "type": "string", "description": "The workspace the telemetry is in, by name or wildcard pattern (for example log-*-{env}), a template over {environment} and variables. A name is looked up in the inventory (through Resource Graph) and exactly one workspace must match. An id or resource id written here is used as it is." },
+        "workspaceId": { "type": "string", "description": "The workspace's id (a GUID, or a resource id), a template. When it is given it is used as it is and the name is not looked up." },
         "variables": { "type": "object", "description": "Your own words for the templates, for example env: prd.", "additionalProperties": { "type": "string" } },
         "subscription": {
           "type": "object",
@@ -109,7 +154,11 @@
           "type": "object",
           "additionalProperties": false,
           "description": "Replaces the inventory source's own queries. {types} in resources stands for the quoted resource types the rules name.",
-          "properties": { "subscriptions": { "type": "string" }, "resources": { "type": "string" } }
+          "properties": {
+            "subscriptions": { "type": "string" },
+            "resources": { "type": "string" },
+            "workspaces": { "type": "string", "description": "Returns id, name and customerId (the workspace id) of every workspace; the name is matched against scope.workspace." }
+          }
         }
       }
     },

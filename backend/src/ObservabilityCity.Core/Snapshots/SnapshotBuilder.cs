@@ -342,14 +342,15 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
     /// </summary>
     private static List<TenantUnitSnapshot> TenantUnits(RegistryNode n, NodeReading r, RegistryEnvironment? env)
     {
-        var found = (r.Tenants ?? []).GroupBy(t => t.TenantId).ToDictionary(g => g.Key, g => g.First());
+        // a source finds a tenant id with or without dashes and in any case; the list may spell it either way
+        var found = (r.Tenants ?? []).GroupBy(t => Scope.ScopeResolver.TenantKey(t.TenantId)).ToDictionary(g => g.Key, g => g.First());
         var units = new List<TenantUnitSnapshot>();
         foreach (var t in env?.Tenants ?? [])
-            units.Add(found.TryGetValue(t.Id, out var reading)
+            units.Add(found.TryGetValue(Scope.ScopeResolver.TenantKey(t.Id), out var reading)
                 ? Unit(n, r, reading, t.Name, t.Kind)
                 : new TenantUnitSnapshot(t.Id, t.Name, t.Kind, RegistryEnvironment.DatabaseName(n.TenantPattern!, t.Id), HealthState.Stale, null, null, 0));
-        var listed = (env?.Tenants ?? []).Select(t => t.Id).ToHashSet();
-        foreach (var reading in found.Values.Where(t => !listed.Contains(t.TenantId)).OrderBy(t => t.TenantId, StringComparer.Ordinal))
+        var listed = (env?.Tenants ?? []).Select(t => Scope.ScopeResolver.TenantKey(t.Id)).ToHashSet();
+        foreach (var reading in found.Values.Where(t => !listed.Contains(Scope.ScopeResolver.TenantKey(t.TenantId))).OrderBy(t => t.TenantId, StringComparer.Ordinal))
             units.Add(Unit(n, r, reading, reading.TenantId, TenantKind.Unknown));
         return units;
     }

@@ -24,6 +24,7 @@ public static class ScopeResolver
         var problems = new List<string>();
         string? Custom(string name) => name == ScopeRules.EnvironmentVariable ? env.Id : rules.Variables.GetValueOrDefault(name);
         var workspace = rules.Workspace is null ? null : ScopeTemplate.Render(rules.Workspace, Custom);
+        var (workspaceId, workspaceVia) = ResolveWorkspace(rules, workspace, Custom, inventory, problems);
 
         var pillars = new List<PillarScope>();
         foreach (var group in view.Groups)
@@ -35,13 +36,41 @@ public static class ScopeResolver
         {
             var pillar = pillars.First(p => p.PillarId == group.Id);
             foreach (var node in group.Nodes)
-                systems.Add(ResolveSystem(node, group, pillar, rules, Custom, workspace, inventory, tenantNames, problems));
+                systems.Add(ResolveSystem(node, group, pillar, rules, Custom, workspace ?? workspaceId, inventory, tenantNames, problems));
         }
 
         foreach (var clash in systems.Where(s => s.TelemetryRole is not null).GroupBy(s => s.TelemetryRole!, StringComparer.OrdinalIgnoreCase).Where(g => g.Count() > 1))
             problems.Add($"Telemetry role '{clash.Key}' is used by {string.Join(" and ", clash.Select(s => $"'{s.SystemId}'"))}; the telemetry of one would be read as the other. Give each its own telemetry.role.");
 
-        return new Resolution(pillars, systems, tenantNames.Select(kv => new TenantName(kv.Key, kv.Value)).OrderBy(t => t.Id, StringComparer.Ordinal).ToList(), problems, inventory is not null, workspace);
+        return new Resolution(pillars, systems, tenantNames.Select(kv => new TenantName(kv.Key, kv.Value)).OrderBy(t => t.Id, StringComparer.Ordinal).ToList(), problems, inventory is not null, workspace ?? workspaceId, workspaceId, workspaceVia);
+    }
+
+    /// <summary>A GUID or a resource id (starting with a slash) is a workspace id; anything else is a name.</summary>
+    public static bool IsWorkspaceId(string text) => text.StartsWith('/') || Guid.TryParse(text, out _);
+
+    /// <summary>
+    /// The id a workspace is queried by. An explicit <c>workspaceId</c> wins and is used as it is. Otherwise <c>workspace</c> is used as an id when it is
+    /// one, and when it is a name or wildcard pattern it is looked up in the inventory's workspaces: exactly one must match. Until the inventory has been
+    /// read (or when it was not asked for workspaces) there is no id yet, which is not a problem to report.
+    /// </summary>
+    private static (string? Id, string? Via) ResolveWorkspace(ScopeRules rules, string? workspace, Func<string, string?> custom, Inventory? inventory, List<string> problems)
+    {
+        if (rules.WorkspaceId is { } given && ScopeTemplate.Render(given, custom).Trim() is { Length: > 0 } id) return (id, "id");
+        if (string.IsNullOrWhiteSpace(workspace)) return (null, null);
+        var text = workspace.Trim();
+        if (IsWorkspaceId(text)) return (text, "id");
+        if (inventory?.Workspaces is not { } known) return (null, null);
+        var found = known.Where(w => ScopeTemplate.Like(w.Name, text)).ToList();
+        switch (found.Count)
+        {
+            case 1: return (found[0].CustomerId ?? found[0].Id, "name");
+            case 0:
+                problems.Add($"No Log Analytics workspace is named '{text}'. Check scope.workspace, or give the workspace's id under scope.workspaceId.");
+                return (null, null);
+            default:
+                problems.Add($"{found.Count} Log Analytics workspaces match '{text}' ({string.Join(", ", found.Select(w => w.Name).Order(StringComparer.Ordinal))}). Make scope.workspace narrower, or give the workspace's id under scope.workspaceId.");
+                return (null, null);
+        }
     }
 
     private static PillarScope ResolvePillar(RegistryGroup group, ScopeRules rules, Func<string, string?> custom, Inventory? inventory, List<string> problems)

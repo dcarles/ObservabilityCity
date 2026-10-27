@@ -23,6 +23,9 @@ public sealed class ResourceGraphInventory(HttpClient http, ICredentialSource? c
     public const string DefaultSubscriptionsQuery =
         "resourcecontainers | where type =~ 'microsoft.resources/subscriptions' | project id = subscriptionId, name, tags";
 
+    public const string DefaultWorkspacesQuery =
+        "resources | where type =~ 'microsoft.operationalinsights/workspaces' | project id, name, customerId = tostring(properties.customerId)";
+
     public const string DefaultResourcesQuery =
         "resources | where type in~ ({types}) | extend instances = {instances} | project id, name, type, subscriptionId, location, tags, instances";
 
@@ -45,8 +48,12 @@ public sealed class ResourceGraphInventory(HttpClient http, ICredentialSource? c
             foreach (var batch in wanted.Chunk(MaxSubscriptionsPerCall))
                 resources.AddRange((await Query(query, batch, ct)).Select(ToResource));
         }
-        return new Inventory(subscriptions, resources);
+        return new Inventory(subscriptions, resources, NeedsWorkspaceLookup(rules) ? (await Query(rules.Queries.Workspaces ?? DefaultWorkspacesQuery, Scope, ct)).Select(ToWorkspace).ToList() : null);
     }
+
+    /// <summary>A workspace is looked up by name only when it is given as a name and no explicit id is: an id is used as it is, so nothing is asked.</summary>
+    public static bool NeedsWorkspaceLookup(ScopeRules rules) =>
+        string.IsNullOrWhiteSpace(rules.WorkspaceId) && !string.IsNullOrWhiteSpace(rules.Workspace) && !ScopeResolver.IsWorkspaceId(rules.Workspace.Trim());
 
     private static string Quote(string text) => "'" + text.Replace("'", "''") + "'";
 
@@ -94,6 +101,8 @@ public sealed class ResourceGraphInventory(HttpClient http, ICredentialSource? c
 
     private static InventorySubscription ToSubscription(JsonElement e) => new(Text(e, "id") ?? "", Text(e, "name") ?? "", Tags(e));
 
+    private static InventoryWorkspace ToWorkspace(JsonElement e) => new(Text(e, "id") ?? "", Text(e, "name") ?? "", Text(e, "customerId") is { Length: > 0 } c ? c : null);
+
     private static InventoryResource ToResource(JsonElement e) =>
         new(Text(e, "id") ?? "", Text(e, "name") ?? "", Text(e, "type") ?? "", Text(e, "subscriptionId") ?? "", Text(e, "location"), Tags(e), Count(e, "instances"));
 
@@ -112,12 +121,13 @@ public sealed class ResourceGraphInventory(HttpClient http, ICredentialSource? c
         return tags;
     }
 
-    /// <summary>Reads a recorded response instead of asking Azure, for trying rules offline and for tests: the rows of one or both queries as <c>{ "subscriptions": [...], "resources": [...] }</c>.</summary>
+    /// <summary>Reads a recorded response instead of asking Azure, for trying rules offline and for tests: the rows of one or both queries as <c>{ "subscriptions": [...], "resources": [...], "workspaces": [...] }</c> (workspaces only when a workspace is to be found by its name).</summary>
     public static Inventory FromRecording(string json)
     {
         using var doc = JsonDocument.Parse(json);
         IEnumerable<JsonElement> Rows(string name) => doc.RootElement.TryGetProperty(name, out var a) ? a.EnumerateArray().Select(x => x.Clone()).ToList() : [];
-        return new Inventory(Rows("subscriptions").Select(ToSubscription).ToList(), Rows("resources").Select(ToResource).ToList());
+        return new Inventory(Rows("subscriptions").Select(ToSubscription).ToList(), Rows("resources").Select(ToResource).ToList(),
+            doc.RootElement.TryGetProperty("workspaces", out _) ? Rows("workspaces").Select(ToWorkspace).ToList() : null);
     }
 }
 

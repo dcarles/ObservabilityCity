@@ -144,5 +144,17 @@
       "tags": {},
       "instances": 9
     }
+  ],
+  "workspaces": [
+    {
+      "id": "/subscriptions/00000000-0000-0000-0000-0000000000f1/resourceGroups/rg/providers/microsoft.operationalinsights/workspaces/ws-prd-main",
+      "name": "ws-prd-main",
+      "customerId": "00000000-0000-0000-0000-00000000c0de"
+    },
+    {
+      "id": "/subscriptions/00000000-0000-0000-0000-0000000000f1/resourceGroups/rg/providers/microsoft.operationalinsights/workspaces/ws-stg-main",
+      "name": "ws-stg-main",
+      "customerId": "00000000-0000-0000-0000-00000000c1de"
+    }
   ]
 }

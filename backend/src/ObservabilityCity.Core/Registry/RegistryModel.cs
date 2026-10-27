@@ -180,12 +180,28 @@ public sealed record RegistrySource(string Name, string Kind, string? Connection
     public string? Query { get; init; }
     public string? Window { get; init; }
 
+    /// <summary>For a platform-metric source: which metric of which resources fills which signal. Empty for every other kind of source.</summary>
+    public IReadOnlyList<MetricGroup> Metrics { get; init; } = [];
+
     public const double DefaultPollSeconds = 30;
     public const double DefaultTimeoutSeconds = 10;
 
     public TimeSpan PollInterval => TimeSpan.FromSeconds(PollSeconds ?? DefaultPollSeconds);
     public TimeSpan Timeout => TimeSpan.FromSeconds(TimeoutSeconds ?? DefaultTimeoutSeconds);
 }
+
+/// <summary>The metrics of the resources one rule of <c>scope.resources</c> finds, by signal (cpu, memory, utilisation, throttled, requests).</summary>
+public sealed record MetricGroup(string Resources, string? Namespace, IReadOnlyDictionary<string, MetricSignal> Signals)
+{
+    public static readonly string[] SignalNames = ["cpu", "memory", "utilisation", "throttled", "requests"];
+    public static readonly string[] Aggregations = ["average", "total", "count", "maximum", "minimum"];
+}
+
+/// <summary>
+/// Where one signal's number comes from: a metric, how its points are added up, an optional dimension filter, and how it becomes the fraction or rate the
+/// town reads (divided by <see cref="Over"/>, per second, times <see cref="Scale"/>).
+/// </summary>
+public sealed record MetricSignal(string Metric, string Aggregation, string? Filter, double Scale, bool PerSecond, MetricSignal? Over);
 
 /// <summary>A way to sign in to Azure, named in the environment file. Secrets are not here: ClientSecretEnv names the variable that holds one.</summary>
 public sealed record RegistryCredential(string Name, string Kind, string? TenantId, string? ClientId, string? ClientSecretEnv);

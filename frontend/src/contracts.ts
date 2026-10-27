@@ -233,6 +233,7 @@ export interface components {
             subscription?: string | null;
             subscriptionVia?: string | null;
             workspace?: string | null;
+            workspaceVia?: string | null;
             serviceCode?: string | null;
             telemetryRole?: string | null;
             telemetryRoleVia?: string | null;

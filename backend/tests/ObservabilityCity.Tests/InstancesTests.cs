@@ -309,7 +309,7 @@ public class InstancesTests
         Assert.Equal(12, api.RequestsPerSecond);
         Assert.Equal(0.001, api.ErrorRate);
         Assert.DoesNotContain("instances", api.Absent!);
-        Assert.Contains("cpu", api.Absent!); // nothing was asked to supply it
+        Assert.Contains("backlog", api.Absent!); // nothing was asked to supply it
         Assert.Equal(5, Node(snapshot, "bb.ledger-worker").InstancesTotal);
     }
 

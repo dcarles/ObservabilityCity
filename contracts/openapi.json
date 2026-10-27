@@ -704,6 +704,10 @@
             "type": "string",
             "nullable": true
           },
+          "workspaceVia": {
+            "type": "string",
+            "nullable": true
+          },
           "serviceCode": {
             "type": "string",
             "nullable": true

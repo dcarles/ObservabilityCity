@@ -17,6 +17,9 @@ public sealed record ScopeRules
     /// <summary>The workspace the telemetry is in, a template over <see cref="Variables"/> and {environment}. Null: none is configured.</summary>
     public string? Workspace { get; init; }
 
+    /// <summary>The workspace's id (a GUID, or a resource id), a template. When it is given it is used as it is and the name is not looked up.</summary>
+    public string? WorkspaceId { get; init; }
+
     /// <summary>Your own words for the templates: {env} and so on. Values are plain text.</summary>
     public IReadOnlyDictionary<string, string> Variables { get; init; } = new Dictionary<string, string>();
 
@@ -35,7 +38,7 @@ public sealed record ScopeRules
     /// <summary>Overrides for the queries the inventory source sends. Null: the adapter's own.</summary>
     public ScopeQueries Queries { get; init; } = new(null, null);
 
-    public bool IsEmpty => Inventory is null && Workspace is null && Subscription is null && PillarSubscriptions.Count == 0 && Resources.Count == 0 && TelemetryRole is null;
+    public bool IsEmpty => Inventory is null && Workspace is null && WorkspaceId is null && Subscription is null && PillarSubscriptions.Count == 0 && Resources.Count == 0 && TelemetryRole is null;
 
     public const string EnvironmentVariable = "environment";
     public static readonly string[] PillarVariables = ["pillar", "pillarId"];
@@ -54,8 +57,8 @@ public sealed record SubscriptionRule(string? NameLike, string? TagKey, string? 
 /// </summary>
 public sealed record ResourceRule(string Name, IReadOnlyList<string> Types, string Pattern, IReadOnlyList<string> Roles, string? ServiceTag, string? TenantNameTag, string? Instances = null);
 
-/// <summary>Query templates for the inventory source. {types} stands for the quoted resource types the rules name; {instances} for the expression that counts the instances of each (from the rules' <c>instances</c>).</summary>
-public sealed record ScopeQueries(string? Subscriptions, string? Resources);
+/// <summary>Query templates for the inventory source. {types} stands for the quoted resource types the rules name; {instances} for the expression that counts the instances of each (from the rules' <c>instances</c>). The workspaces query returns id, name and customerId (the workspace id) of every workspace, and the name is matched here.</summary>
+public sealed record ScopeQueries(string? Subscriptions, string? Resources, string? Workspaces = null);
 
 /// <summary>Templates with {variable} and {variable|filter} holes. Filters: nospace, lower, upper.</summary>
 public static partial class ScopeTemplate

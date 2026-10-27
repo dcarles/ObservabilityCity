@@ -26,7 +26,9 @@ public sealed record TenantName(string Id, string Name);
 /// <summary>
 /// The scope of every pillar and system of one environment. <see cref="InventoryRead"/> is false until the inventory has been read; the parts that need
 /// it (found subscriptions, resources, tenant names) are then missing, which is not a problem. <see cref="Problems"/> are things the rules could not
-/// settle: a pillar no subscription matches, two systems with the same telemetry role.
+/// settle: a pillar no subscription matches, two systems with the same telemetry role. <see cref="Workspace"/> is the workspace as the environment names
+/// it; <see cref="WorkspaceId"/> is the id a query goes to (null while it is not known) and <see cref="WorkspaceVia"/> says how it was settled: "id" (given
+/// as an id) or "name" (found in the inventory by its name).
 /// </summary>
 public sealed record Resolution(
     IReadOnlyList<PillarScope> Pillars,
@@ -34,7 +36,9 @@ public sealed record Resolution(
     IReadOnlyList<TenantName> TenantNames,
     IReadOnlyList<string> Problems,
     bool InventoryRead,
-    string? Workspace)
+    string? Workspace,
+    string? WorkspaceId = null,
+    string? WorkspaceVia = null)
 {
     public static Resolution Empty { get; } = new([], [], [], [], false, null);
     public SystemScope? System(string id) => Systems.FirstOrDefault(s => s.SystemId == id);

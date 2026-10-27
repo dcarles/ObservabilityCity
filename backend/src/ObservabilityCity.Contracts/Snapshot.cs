@@ -318,13 +318,14 @@ public sealed record SystemDetail(
 
 /// <summary>
 /// Where a system lives and what its telemetry calls it, as the environment's scope rules resolve it. Null on a system when the environment has no
-/// scope rules. Subscription and Workspace are null when the rules do not give one; InventoryState is "none" (no inventory source), "waiting" (not read yet),
+/// scope rules. Subscription and Workspace are null when the rules do not give one (WorkspaceVia: "id" when it was given as an id, "name" when it was found by its name); InventoryState is "none" (no inventory source), "waiting" (not read yet),
 /// "read" or "failed". Problems are things the rules could not settle for this system.
 /// </summary>
 public sealed record ScopeInfo(
     string? Subscription,
     string? SubscriptionVia,
     string? Workspace,
+    string? WorkspaceVia,
     string? ServiceCode,
     string? TelemetryRole,
     string? TelemetryRoleVia,
