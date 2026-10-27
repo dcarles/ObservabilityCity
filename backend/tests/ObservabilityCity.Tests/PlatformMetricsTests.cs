@@ -389,6 +389,32 @@ public class PlatformMetricsTests
         Assert.All(plans, r => Assert.Equal("PT1M", Interval(r)));
     }
 
+    [Fact]
+    public async Task An_entry_with_a_window_looks_that_far_back_and_the_others_keep_the_sources()
+    {
+        using var copy = new RegistryCopy(TownA);
+        copy.Replace("environments/prod.yaml", "- resources: accounts", "- resources: accounts\n        interval: 5m\n        window: 1h");
+        var recording = AzureMonitorSource.ReadRecording(File.ReadAllText(Path.Combine(TownA, "platform.json")));
+        var http = new CannedHttp().Respond(r => FromRecording(r, recording));
+        var (source, registry) = await Platform(copy.Path, http);
+
+        await source.PollAsync(registry, CancellationToken.None);
+
+        string Span(SentRequest r) => System.Web.HttpUtility.ParseQueryString(r.Uri!.Query)["timespan"]!;
+        Assert.All(http.Sent.Where(r => r.Uri!.AbsolutePath.Contains("/databaseaccounts/")), r => Assert.Equal("2025-12-31T23:00:00Z/2026-01-01T00:00:00Z", Span(r)));
+        Assert.All(http.Sent.Where(r => r.Uri!.AbsolutePath.Contains("/serverfarms/")), r => Assert.Equal("2025-12-31T23:55:00Z/2026-01-01T00:00:00Z", Span(r)));
+    }
+
+    [Fact]
+    public void An_entry_window_must_hold_two_points_of_its_interval_and_be_a_time()
+    {
+        var short1 = LoadError(_ => ["- resources: accounts", "- resources: accounts\n        interval: 5m\n        window: 5m"]);
+        Assert.Contains("metrics[1]: window '5m' holds fewer than two points of its 5m interval; make it at least 10m", short1);
+
+        var bad = LoadError(_ => ["- resources: accounts", "- resources: accounts\n        window: lots"]);
+        Assert.Contains("metrics[1]: window 'lots' is not a number and a unit like 15m or 1h", bad);
+    }
+
     [Theory]
     [InlineData("1m", "PT1M")]
     [InlineData("15m", "PT15M")]

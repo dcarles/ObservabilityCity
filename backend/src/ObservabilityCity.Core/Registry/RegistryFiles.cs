@@ -256,6 +256,8 @@ internal sealed class MetricGroupFile
     public string? Namespace { get; set; }
     /// <summary>The time grain the metrics are asked at, for example 5m. Some metrics do not support a minute. Default: one minute.</summary>
     public string? Interval { get; set; }
+    /// <summary>How far back this entry looks, for example 1h: the worst or total of that long. Without it the source's <c>window</c> applies. It must hold at least two points of the entry's interval.</summary>
+    public string? Window { get; set; }
     public MetricSignalFile? Cpu { get; set; }
     public MetricSignalFile? Memory { get; set; }
     public MetricSignalFile? Utilisation { get; set; }
