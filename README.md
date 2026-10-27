@@ -145,7 +145,7 @@ backend/                           .NET solution (ObservabilityCity.slnx)
   src/ObservabilityCity.AppHost      .NET Aspire: starts the host and the frontend together
   tests/ObservabilityCity.Tests      xunit v3 tests (Microsoft Testing Platform)
   tools/ObservabilityCity.Validate   registry checker
-frontend/                          Vite + TypeScript + three.js browser app
+frontend/                          Vite + TypeScript + three.js browser app (see docs/frontend-stack.md)
   src/                               app code
   tests/unit/                        Vitest unit tests
   tests/e2e/                         Playwright browser tests

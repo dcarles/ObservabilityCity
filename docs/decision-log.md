@@ -14,7 +14,7 @@ Decisions Dan made on 2026-10-24, in the planning thread:
 - Backend: .NET preferred (Dan's strength), unless there's a strong reason otherwise.
 - Runs locally on a developer PC for now. No SSO. Hosting in Azure comes later.
 
-- Rendering: 3D low-poly with Three.js/react-three-fiber. Frontend in TypeScript, backend ASP.NET Core + SignalR.
+- Rendering: 3D low-poly with Three.js used directly, with no UI framework (see [frontend-stack.md](frontend-stack.md)). Frontend in TypeScript, backend ASP.NET Core + SignalR.
 - DLQs: a loading dock and red skip beside each subscriber, in its team's district. The depot only shows a warning light.
 - Team layout: districts ring the depot. Systems declare calls/publishes/subscribes by system id, team closeness is computed from those links, and layout.yaml can pin positions.
 
