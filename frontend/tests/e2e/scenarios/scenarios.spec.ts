@@ -387,7 +387,9 @@ test.describe('cars', () => {
       const cars = city.town.cars
       let flagged = 0, back = 0, lost = 0
       let before = new Map<number, string>()
-      for (let i = 0; i < 900; i++) {
+      // 90 s of town time at least, then on until a failed car has been turned away: how many reach the door in a given
+      // stretch is a matter of chance, and the point of the test is what happens when one does (capped at 10 minutes)
+      for (let i = 0; i < 6000 && (i < 900 || cars.turnedAway === 0); i++) {
         city.step(0.1)
         flagged = Math.max(flagged, cars.flagged)
         const now = new Map<number, string>()
