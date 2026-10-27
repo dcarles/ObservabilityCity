@@ -97,6 +97,8 @@ public sealed record NodeSnapshot(
 /// One tenant's database of a multi-tenant data store. Database is its real name (the store's tenantPattern with the tenant id put in).
 /// State is Healthy, Degraded (amber: running hot or throttling), Down (red: past the red thresholds, never for a test tenant) or Stale (no database found, or no fresh data).
 /// Utilisation and Throttled are this database's own share of provisioned capacity in use and share of requests turned away.
+/// Limit is the capacity provisioned for it as a number in the store's own unit (request units per second for Cosmos), when the source reads one;
+/// null for a serverless database or a source that is not asked for it.
 /// Kind Unknown is a tenant the data shows that the environment does not list.
 /// </summary>
 public sealed record TenantUnitSnapshot(
@@ -107,7 +109,8 @@ public sealed record TenantUnitSnapshot(
     HealthState State,
     double? Utilisation,
     double? Throttled,
-    double RequestsPerSecond);
+    double RequestsPerSecond,
+    double? Limit = null);
 
 /// <summary>A town the server can show (Galactic Credit, Droid Shop). Each has its own registry, its own environments and its own stream of snapshots.</summary>
 public sealed record TownSummary(string Id, string Name, bool IsDefault);

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { ALL_TENANTS, carShown, fillOf, groupTenants, pickTenant, pruneTenants, shownUnits, tenantLabel, tenantLevel, tenantListOrder, tenantTrouble, throttleWho, throttledText, throttledUnits, toggleTenant, yardLayout, yardSummary, type TenantView } from '../../src/tenants'
+import { ALL_TENANTS, carShown, fillOf, groupTenants, pickTenant, pruneTenants, shownUnits, tenantLabel, tenantLevel, tenantListOrder, tenantTrouble, limitRange, limitText, tenantFigures, throttleWho, throttledText, throttledUnits, toggleTenant, yardLayout, yardSummary, type TenantView } from '../../src/tenants'
 import { planPads, planIsland } from '../../src/scene/plan'
 import { summariseService } from '../../src/scene/service'
 import { worstState } from '../../src/visuals'
@@ -287,5 +287,25 @@ describe('saying which tenant throttles', () => {
     const many = Array.from({ length: 5 }, (_, i) => named(`T${i}`, 0.2))
     expect(yardSummary(many, ALL_TENANTS, 0.03).note).toBe('')
     expect(yardSummary(many, ALL_TENANTS, 0.03).text).toBe('5 tenants, 5 throttled')
+  })
+})
+
+describe('showing what a tenant database is provisioned at', () => {
+  const sized = (limit: number | null) => ({ ...unit('Customer', 'Healthy'), limit })
+  it('writes a size with thousands separators and the unit', () => {
+    expect(limitText(20000)).toBe('20,000 RU/s')
+    expect(limitText(400)).toBe('400 RU/s')
+  })
+  it('gives the one size, or the range when the databases differ, and nothing when none is known', () => {
+    expect(limitRange([sized(20000), sized(20000)])).toBe('20,000 RU/s')
+    expect(limitRange([sized(4000), sized(20000), sized(10000)])).toBe('4,000 to 20,000 RU/s')
+    expect(limitRange([sized(null), sized(10000)])).toBe('10,000 RU/s')
+    expect(limitRange([sized(null)])).toBeNull()
+    expect(limitRange([])).toBeNull()
+  })
+  it('puts the size first on a tenant row, then the use and the throttling', () => {
+    expect(tenantFigures({ limit: 20000, utilisation: 0.4, throttled: 0.032 })).toBe('20,000 RU/s · 40% · 3.2% throttled')
+    expect(tenantFigures({ limit: null, utilisation: 0.4, throttled: 0 })).toBe('40% · 0% throttled')
+    expect(tenantFigures({ limit: null, utilisation: null, throttled: null })).toBe('–')
   })
 })
