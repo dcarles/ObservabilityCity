@@ -202,9 +202,9 @@ public sealed record MetricGroup(string Resources, string? Namespace, IReadOnlyD
 
 /// <summary>
 /// Where one signal's number comes from: a metric, how its points are added up, an optional dimension filter, and how it becomes the fraction or rate the
-/// town reads (divided by <see cref="Over"/>, per second, times <see cref="Scale"/>).
+/// town reads (divided by <see cref="Over"/>, per second, times <see cref="Scale"/>). <see cref="OrElse"/> is read in its place when the metric gives no number or 0.
 /// </summary>
-public sealed record MetricSignal(string Metric, string Aggregation, string? Filter, double Scale, bool PerSecond, MetricSignal? Over);
+public sealed record MetricSignal(string Metric, string Aggregation, string? Filter, double Scale, bool PerSecond, MetricSignal? Over, MetricSignal? OrElse = null);
 
 /// <summary>A way to sign in to Azure, named in the environment file. Secrets are not here: ClientSecretEnv names the variable that holds one.</summary>
 public sealed record RegistryCredential(string Name, string Kind, string? TenantId, string? ClientId, string? ClientSecretEnv);

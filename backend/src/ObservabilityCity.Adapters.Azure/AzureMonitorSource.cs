@@ -187,9 +187,13 @@ public sealed class AzureMonitorSource(
 
     /// <summary>The metric specs of an entry with the call each needs. Specs that agree on namespace, aggregation and filter are asked together.</summary>
     private static IEnumerable<(MetricCall Call, IReadOnlyList<string> Metrics)> Calls(MetricGroup group) =>
-        group.Signals.Values.SelectMany(s => s.Over is null ? [s] : new[] { s, s.Over })
+        group.Signals.Values.SelectMany(Flatten)
             .GroupBy(s => MetricCall.Of(group.Namespace, s, group.Interval))
             .Select(g => (g.Key, (IReadOnlyList<string>)g.Select(s => s.Metric).Distinct(StringComparer.OrdinalIgnoreCase).ToList()));
+
+    /// <summary>A signal's metric and the metrics it divides by or falls back to, each of which needs reading.</summary>
+    private static IEnumerable<MetricSignal> Flatten(MetricSignal s) =>
+        new[] { s }.Concat(s.Over is null ? [] : Flatten(s.Over)).Concat(s.OrElse is null ? [] : Flatten(s.OrElse));
 
     private async Task<IReadOnlyList<MetricSeries>> ReadResource(Target target, DateTimeOffset at, CancellationToken ct)
     {
@@ -201,8 +205,10 @@ public sealed class AzureMonitorSource(
 
     private static ResourceValues Values(Target target, IReadOnlyList<MetricSeries> series, TimeSpan window)
     {
-        double? Of(MetricSignal spec) =>
+        double? Own(MetricSignal spec) =>
             AzureMonitorReader.Reduce(series.Where(s => Same(s, spec)).SelectMany(s => s.Points).ToList(), spec.Aggregation);
+        // a metric with no number or 0 gives way to its orElse, when it has one
+        double? Of(MetricSignal spec) => Own(spec) is { } own && (own > 0 || spec.OrElse is null) ? own : spec.OrElse is { } alt ? Of(alt) ?? Own(spec) : Own(spec);
 
         var signals = new Dictionary<string, double?>();
         foreach (var (signal, spec) in target.Group.Signals)
