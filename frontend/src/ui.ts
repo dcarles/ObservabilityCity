@@ -3,7 +3,7 @@ import type { Snapshot, NodeSnapshot } from './types'
 import type { ConnectionState } from './connection'
 import { formatMs, formatRate } from './visuals'
 import { escapeHtml, Picker, type PickItem } from './picker'
-import { yardSummary, type TenantView } from './tenants'
+import { throttledText, yardSummary, type TenantView } from './tenants'
 import { systemNumbers, type ServiceSummary } from './scene/service'
 import { viewTotals } from './viewTotals'
 
@@ -113,7 +113,7 @@ function tenantRows(n: NodeSnapshot, view: TenantView): string {
   const shown = n.tenants.filter((u) => !(view.hideTest && u.kind === 'Test'))
   const worst = [...shown].sort((a, b) => (b.utilisation ?? 0) - (a.utilisation ?? 0)).slice(0, 4)
   return `<div class="row tenants"><span>tenants</span><span>${escapeHtml(sum.text)}${sum.note ? ` · ${escapeHtml(sum.note)}` : ''}</span></div>` +
-    worst.map((u) => `<div class="row"><span>${escapeHtml(u.name)}${u.kind === 'Test' ? ' (test)' : u.kind === 'Unknown' ? ' (unknown)' : ''}</span><span>${u.utilisation == null ? '–' : `${Math.round(u.utilisation * 100)}%`}${(u.throttled ?? 0) > 0 ? ` · ${(u.throttled! * 100).toFixed(0)}% refused` : ''}</span></div>`).join('')
+    worst.map((u) => `<div class="row"><span>${escapeHtml(u.name)}${u.kind === 'Test' ? ' (test)' : u.kind === 'Unknown' ? ' (unknown)' : ''}</span><span>${u.utilisation == null ? '–' : `${Math.round(u.utilisation * 100)}%`}${u.throttled == null ? '' : ` · ${throttledText(u)}`}</span></div>`).join('')
 }
 
 export function showTooltip(n: NodeSnapshot | null, x: number, y: number, view: TenantView = { hideTest: false, tenants: [] }): void {

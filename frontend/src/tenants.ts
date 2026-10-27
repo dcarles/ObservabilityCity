@@ -52,6 +52,24 @@ export function tenantListOrder(units: readonly TenantUnitSnapshot[]): TenantUni
   return [...units].sort((a, b) => rank(a) - rank(b) || (b.utilisation ?? 0) - (a.utilisation ?? 0))
 }
 
+/** The throttled units, worst first (most requests turned away). */
+export function throttledUnits(units: readonly TenantUnitSnapshot[], throttleAmber: number): TenantUnitSnapshot[] {
+  return units.filter((u) => isThrottled(u, throttleAmber)).sort((a, b) => (b.throttled ?? 0) - (a.throttled ?? 0))
+}
+
+/** The Overview's throttled figure naming the worst tenant: "3.2% · Boohoo", with "+N more" when others throttle too. Null when none does. */
+export function throttleWho(units: readonly TenantUnitSnapshot[], throttleAmber: number): string | null {
+  const t = throttledUnits(units, throttleAmber)
+  if (t.length === 0) return null
+  return `${(t[0].throttled! * 100).toFixed(1)}% · ${t[0].name}${t.length > 1 ? ` +${t.length - 1} more` : ''}`
+}
+
+/** A tenant's own throttled figure, always shown (0% included): "0% throttled". */
+export const throttledText = (u: Pick<TenantUnitSnapshot, 'throttled'>): string => `${((u.throttled ?? 0) * 100).toFixed(u.throttled != null && u.throttled > 0 && u.throttled < 0.1 ? 1 : 0)}% throttled`
+
+/** Most throttled tenants the yard sign names; past this it gives only the count. */
+export const SIGN_NAMES = 3
+
 export interface YardSummary {
   /** Units drawn. */
   tenants: number
@@ -72,6 +90,8 @@ export function yardSummary(units: readonly TenantUnitSnapshot[], view: TenantVi
   const hiddenTest = units.length - shown.length
   const unknown = shown.filter((u) => u.kind === 'Unknown').length
   const notes: string[] = []
+  const who = throttledUnits(shown, throttleAmber)
+  if (who.length > 0 && who.length <= SIGN_NAMES) notes.push(`${who.length} throttled: ${who.map((u) => u.name).join(', ')}`)
   if (unknown > 0) notes.push(`${unknown} unknown`)
   if (hiddenTest > 0) notes.push(`${hiddenTest} test hidden`)
   return {
