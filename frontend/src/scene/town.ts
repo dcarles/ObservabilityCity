@@ -27,7 +27,7 @@ import type { TenantView } from '../tenants'
 import { DEFAULT_LAYERS, buildingShown, type LayerState } from '../layers'
 import { edgeKey, edgeLinks, edgeMode, signLines, type EdgeMode } from '../edgeTraffic'
 import { Signpost } from './signpost'
-import { portSignText } from '../portSign'
+import { portCountsLine, portSignText } from '../portSign'
 
 const QUAY = 9
 /** Traffic that crosses the hub drives a long way, so fewer cars are drawn for it than a short trip would need. */
@@ -108,7 +108,6 @@ export class Town {
   /** Points along every coast, for working out how far back the camera must stand to show the whole town. */
   readonly extent: THREE.Vector3[] = []
   private snapshotId = ''
-  private hubBoard: { sprite: THREE.Sprite; key: string } | null = null
   /** The hub's message broker by name (Service Bus, Kafka, ...), for the port's board. */
   private brokerName: string | null = null
   private port: PortSummary = { topics: 0, subscriptions: 0, piers: 0, legacy: 0 }
@@ -237,15 +236,6 @@ export class Town {
     this.expandBounds(this.hubOutline, new THREE.Vector3(), 0)
     const broker = hubBuildings.find((b) => b.kind === 'Broker')
     this.brokerName = broker?.node?.name ?? null
-    this.hubBoard = null
-    if (broker) {
-      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: canvasTexture(400, 130, () => {}), transparent: true, depthTest: false, toneMapped: false }))
-      sprite.renderOrder = 10
-      sprite.scale.set(4.4, 1.43, 1)
-      sprite.position.copy(broker.root.position).add(new THREE.Vector3(0, 8.4, 0))
-      hubRoot.add(sprite)
-      this.hubBoard = { sprite, key: '' }
-    }
 
     // ── Islands ──────────────────────────────────────────────────────────────
     const bridgeDecor = new THREE.Group()
@@ -421,31 +411,10 @@ export class Town {
     return broker?.model.signText ?? portSignText(this.brokerName)
   }
 
-  /** The message broker port's board: how many topics and subscriptions the town has, and how many piers they reach. */
-  private updateHubBoard(camera: THREE.Camera): void {
-    const hb = this.hubBoard
-    if (!hb) return
-    const p = this.port
-    const key = `${p.topics}|${p.subscriptions}|${p.piers}|${p.legacy}`
-    const d = camera.position.distanceTo(hb.sprite.getWorldPosition(new THREE.Vector3()))
-    const opacity = 1 - clamp((d - 70) / 40, 0, 1)
-    ;(hb.sprite.material as THREE.SpriteMaterial).opacity = opacity
-    hb.sprite.visible = opacity > 0.02 && this.layers.messaging
-    if (key === hb.key) return
-    hb.key = key
-    const tex = (hb.sprite.material as THREE.SpriteMaterial).map as THREE.CanvasTexture
-    const ctx = (tex.image as HTMLCanvasElement).getContext('2d')!
-    ctx.clearRect(0, 0, 400, 130)
-    ctx.fillStyle = 'rgba(20,28,40,0.92)'; roundRect(ctx, 4, 6, 392, 118, 24); ctx.fill()
-    ctx.strokeStyle = p.legacy > 0 ? '#ffb830' : '#9fb4cc'; ctx.lineWidth = 6; ctx.stroke()
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-    ctx.fillStyle = '#fff'; ctx.font = '800 32px system-ui, sans-serif'
-    ctx.fillText(this.brokerSign(), 200, 38, 370)
-    ctx.fillStyle = '#b8c7da'; ctx.font = '700 26px system-ui, sans-serif'
-    ctx.fillText(`${p.topics} topics · ${p.subscriptions} subscriptions`, 200, 72, 370)
-    ctx.fillStyle = p.legacy > 0 ? '#ffb830' : '#b8c7da'
-    ctx.fillText(`${p.piers} pier${p.piers === 1 ? '' : 's'}${p.legacy > 0 ? ` · ${p.legacy} legacy` : ''}`, 200, 102, 370)
-    tex.needsUpdate = true
+  /** The broker's counts, as the last line of its billboard: nothing when nothing is configured or the Messaging layer is off. */
+  private applyPortLine(): void {
+    const broker = [...this.buildings.values()].find((b) => b.kind === 'Broker')
+    broker?.setExtra(this.layers.messaging ? portCountsLine(this.port) : null)
   }
 
   /** Feed a snapshot into the existing buildings. */
@@ -480,7 +449,6 @@ export class Town {
   update(dt: number, time: number, camera: THREE.Camera): void {
     for (const [id, b] of this.buildings) this.guard(`update ${id}`, () => b.update(dt, time, camera))
     for (const isl of this.islands) this.guard(`harbour ${isl.group.id}`, () => isl.harbour?.update(isl.messaging, time, camera))
-    this.guard('hub board', () => this.updateHubBoard(camera))
     for (const isl of this.islands) this.guard(`weather ${isl.group.id}`, () => isl.weather.update(dt, time, camera))
     this.guard('weather hub', () => this.hubWeather?.update(dt, time, camera))
     this.guard('airport', () => this.airport?.update(dt, time, camera))
@@ -558,9 +526,9 @@ export class Town {
   }
 
   /** What the Service Bus port shows: topics, subscriptions, piers and the old-route reads. For tests. */
-  inspectHub(): PortSummary & { boats: number; sign: { board: string; model: string | null } } {
+  inspectHub(): PortSummary & { boats: number; sign: { board: string; model: string | null; counts: string | null } } {
     const broker = [...this.buildings.values()].find((b) => b.kind === 'Broker')
-    return { ...this.port, boats: this.boatLanes.size, sign: { board: this.brokerSign(), model: broker?.model.signText ?? null } }
+    return { ...this.port, boats: this.boatLanes.size, sign: { board: this.brokerSign(), model: broker?.model.signText ?? null, counts: broker?.extraLine() ?? null } }
   }
 
   /** What the airport shows right now. For tests. */
@@ -1113,6 +1081,7 @@ export class Town {
     this.cars.setHidden(hidden)
     this.boats.setEnabled(state.messaging)
     for (const isl of this.islands) if (isl.harbour) isl.harbour.group.visible = state.messaging
+    this.applyPortLine()
     this.overlay.visible = state.dependencies
   }
 

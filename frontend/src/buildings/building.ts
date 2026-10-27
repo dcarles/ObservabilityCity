@@ -76,6 +76,7 @@ export class Building {
   private readonly closedSign: THREE.Group
   private label: THREE.Sprite | null = null
   private labelKey = ''
+  private extra: { text: string; hot: boolean } | null = null
   readonly hit: THREE.Mesh
   /** True while the building is selected: its name board stays readable from any distance. */
   pinned = false
@@ -369,6 +370,18 @@ export class Building {
    * CPU and memory for services, utilisation and throttling for data stores. It fades out when the camera is
    * far away, except for troubled buildings.
    */
+  /** One more line at the foot of the billboard (the broker's counts), or none. */
+  setExtra(line: { text: string; hot: boolean } | null): void {
+    if (this.extra?.text === line?.text && this.extra?.hot === line?.hot) return
+    this.extra = line
+    this.updateLabel()
+  }
+
+  /** The extra line as drawn, for tests. */
+  extraLine(): string | null {
+    return this.extra?.text ?? null
+  }
+
   private updateLabel(): void {
     const n = this.node
     if (!n) return
@@ -380,7 +393,7 @@ export class Building {
     // the error bar and the p99 note are drawn only for what a source supplies
     const hasHealth = live && (!isAbsent(n, 'errors') || !isAbsent(n, 'latency'))
     const key = [n.name, text, warn, pct(n.cpu), pct(n.memory), pct(n.utilisation), Math.round((n.throttled ?? 0) * 1000),
-      Math.round(n.errorRate * 1000), Math.round(n.p99Ms / 10), Math.round((n.queueDepth ?? -1) / 5), Math.round((n.oldestMessageSeconds ?? -1) / 2), n.deadLetters ?? -1].join('|')
+      Math.round(n.errorRate * 1000), Math.round(n.p99Ms / 10), Math.round((n.queueDepth ?? -1) / 5), Math.round((n.oldestMessageSeconds ?? -1) / 2), n.deadLetters ?? -1, this.extra?.text ?? '', this.extra?.hot ?? ''].join('|')
     const hasMeters = live && (n.cpu != null || n.utilisation != null)
     const hasQueue = live && n.queueDepth != null
     if (!this.label) {
@@ -397,7 +410,7 @@ export class Building {
     const ctx = (tex.image as HTMLCanvasElement).getContext('2d')!
     ctx.clearRect(0, 0, 512, 256)
     const color = { down: '#d63a2f', stale: '#8d949e', warn: '#e8a21a', ok: '#9fb4cc' }[warn]
-    const rows = (hasMeters ? 1 : 0) + (hasHealth ? 1 : 0) + (hasQueue ? 1 : 0)
+    const rows = (hasMeters ? 1 : 0) + (hasHealth ? 1 : 0) + (hasQueue ? 1 : 0) + (this.extra ? 1 : 0)
     const h = 116 + rows * 38
     const y0 = 256 - h - 6
     ctx.fillStyle = 'rgba(20,28,40,0.9)'; roundRect(ctx, 4, y0, 504, h, 24); ctx.fill()
@@ -441,6 +454,11 @@ export class Building {
       const late = (n.oldestMessageSeconds ?? 0) >= n.backlogAmber
       note(24, `QUEUE ${formatRate(n.queueDepth ?? 0)}${n.oldestMessageSeconds ? ` · oldest ${formatAge(n.oldestMessageSeconds)}` : ''}`, late)
       note(300, `DLQ ${formatRate(n.deadLetters ?? 0)}`, (n.deadLetters ?? 0) > 0)
+      top += 38
+    }
+    if (this.extra) {
+      ctx.fillStyle = this.extra.hot ? '#ffb830' : '#b8c7da'; ctx.font = '700 22px system-ui, sans-serif'; ctx.textAlign = 'center'
+      ctx.fillText(this.extra.text, 256, top + 15, 470)
     }
     tex.needsUpdate = true
   }
