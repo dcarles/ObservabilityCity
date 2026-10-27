@@ -128,11 +128,17 @@ test.describe('the tenant yard', () => {
     await page.locator('#search-input').fill('Orders DB')
     await page.locator('#search-results .hit').first().click()
     const rows = page.locator('#inspector h4', { hasText: 'Tenants' }).locator('~ .row')
-    await expect(rows.first()).toContainText('refused')
+    await expect(rows.first()).toContainText('% throttled')
     const names = await page.evaluate(() => (window as any).city.seen.last.tenants.map((t: any) => t.name))
     expect(names).toContain((await rows.first().locator('span').first().textContent())!.trim())
-    // the others turn nothing away, so none of them says so
-    await expect(rows.filter({ hasText: 'refused' })).toHaveCount(1)
+    // every tenant shows its own figure, the others at 0%
+    const total = await rows.count()
+    await expect(rows.filter({ hasText: 'throttled' })).toHaveCount(total)
+    await expect(rows.filter({ hasText: ' 0% throttled' }).first()).toBeVisible()
+    await expect(rows.filter({ hasText: 'refused' })).toHaveCount(0)
+    // the Overview names who throttles, and the yard sign names them too
+    await expect(page.locator('#inspector .row', { has: page.getByText('Throttled', { exact: true }) })).toContainText(await rows.first().locator('span').first().textContent() ?? '')
+    expect((await town.yard(DB)).sign.note).toContain('throttled:')
   })
 
   test('the store follows its worst customer, and the service sign with it', async ({ town }) => {

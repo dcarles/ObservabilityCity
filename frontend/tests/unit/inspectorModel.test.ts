@@ -53,6 +53,14 @@ describe('the overview rows', () => {
     expect(rows.find((r) => r.label === 'p99 / SLA')).toMatchObject({ value: '100 ms / 300 ms', tone: '' })
   })
 
+  it('names the worst throttled tenant on the Throttled row', () => {
+    const t = (name: string, throttled: number) => ({ id: name, name, kind: 'Customer' as const, database: 'd', state: 'Healthy' as const, utilisation: 0.5, throttled, requestsPerSecond: 1 })
+    const row = (tenants: ReturnType<typeof t>[]) => overviewRows(node({ throttled: 0.032, throttleAmber: 0.01, throttleRed: 0.1, tenants })).find((r) => r.label === 'Throttled')!.value
+    expect(row([t('Boohoo', 0.032), t('Lloyds', 0)])).toBe('3.2% · Boohoo')
+    expect(row([t('Boohoo', 0.032), t('Lloyds', 0.02)])).toBe('3.2% · Boohoo +1 more')
+    expect(overviewRows(node({ throttled: 0.032 })).find((r) => r.label === 'Throttled')!.value).toBe('3.2%')
+  })
+
   it('adds what a source reports, and leaves out what it does not', () => {
     const rows = overviewRows(node({ cpu: 0.5, memory: 0.9, utilisation: 0.4, throttled: 0.02, throttleRed: 0.02, queueDepth: 12, oldestMessageSeconds: 30, deadLetters: 4 }))
     const labels = rows.map((r) => r.label)

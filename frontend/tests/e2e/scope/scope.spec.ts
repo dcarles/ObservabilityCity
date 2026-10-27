@@ -212,7 +212,7 @@ test.describe(`a live town with scope rules (${B ? 'tags and derived names' : 'n
 
     await openOverview(page, 'Orders DB')
     await expect(page.locator('#inspector .row', { hasText: 'Capacity used' })).toContainText('95%')
-    await expect(page.locator('#inspector .row', { hasText: 'Throttled' })).toContainText('10.0%')
+    await expect(page.locator('#inspector .row', { has: page.getByText('Throttled', { exact: true }) })).toContainText('10.0%')
   })
 
   test('the beacon of a throttled account is red and a calm plan is green', async ({ page }) => {
