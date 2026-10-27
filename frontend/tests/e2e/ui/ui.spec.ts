@@ -170,7 +170,7 @@ test.describe('the layers', () => {
     expect(hidden.sort()).toEqual(['aa.orders-worker', 'bb.ledger-worker', 'cc.notify-worker'])
   })
 
-  test('Messaging off hides the boats, the harbours and the lighthouse', async ({ town, page }) => {
+  test('Messaging off hides the boats and the harbours', async ({ town, page }) => {
     await town.open()
     await town.step(10)
     const on = await page.evaluate(() => (window as any).city.inspectLayers())
@@ -183,7 +183,6 @@ test.describe('the layers', () => {
     expect(off.boatsDrawn).toBe(false)
     expect(off.boats).toBe(0)
     expect(off.harbours.some((h: boolean) => h)).toBe(false)
-    expect(off.lighthouse).not.toBe(true)
   })
 
   test('the layers in the address are the layers on the page', async ({ town, page }) => {

@@ -35,7 +35,7 @@ Each signal gets exactly one visual meaning, agreed signal by signal with Dan on
 | Over SLA | The queued crowd turns angry: stamping, with an amber "!" bubble (`slaP99Ms`, default 1 s) |
 | Failed calls | Red walkers |
 | Messaging | Service Bus = port on the hub. Cargo boats sail to each subscriber team's pier, and backlog = crates stacking on the pier. Water = async, bridges = sync |
-| Dead letters | A red quarantine pen on the pier fills with broken crates, a red lighthouse beam flashes when above 0, and a floating count badge shows the number ("DLQ 37"). The hub shows the total |
+| Dead letters | A red quarantine pen on the pier fills with broken crates, a red lighthouse beam flashes when above 0, and a floating count badge shows the number ("DLQ 37"). The top bar shows the town-wide total |
 | Incident | Weather over the assigned team's island only: sev4 light cloud, sev3 overcast, sev2 rain, sev1 storm with lightning. The worst wins, the island sign shows a count, and the rest of the town stays sunny |
 | Outside callers | An airport at the map edge (plane rate = inbound traffic, with an arrivals board). Passengers walk over main bridges to islands with external systems |
 | Cross-team calls | Hub and spoke, as in reality: one bridge per island to the hub, through the APIM gateway building. Walkers carry their team's flag colour. A dependency overlay draws dashed arcs from team to team, sized by volume. Calls that bypass APIM get their own direct bridge |
@@ -175,7 +175,7 @@ Previews used for these decisions: [style and lighting](https://claude.ai/artifa
 
 1. **The bar.** Solution skeleton (Aspire, contract, SignalR), the fake generator, and the hub plus one Galactic Credit island at final art quality, with floors, beacons and walkers driven by live fake data. This proves the look and the pipeline together.
 2. **All islands.** Registry loader with validation, the full Galactic Credit registry, ring layout, organic islands with plots and streets, bridges and the camera.
-3. **Messaging.** Service Bus port, boats, piers, crates, the DLQ pen, lighthouse and count badge.
+3. **Messaging.** Service Bus port, boats, piers, crates, the DLQ pen and count badge.
 4. **The other signals.** Down and instance health, latency queues and angry crowds, incident weather, the airport, vendor islands, the dependency overlay and stale grey.
 5. **UI.** Top bar, inspector drawer, legend and search.
 6. **Scenarios and stories.** Break things panel, chips, the story player, the daily cycle and the Calm toggle.

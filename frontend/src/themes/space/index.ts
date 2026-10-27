@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { box, cyl, flat, group, sphere } from '../../buildings/mk'
+import { spaceAirport } from './airport'
 import type { ThemeKit } from '../types'
 import { glow } from '../common'
 import { spaceLighting, spacePalette } from './palette'
@@ -31,6 +32,7 @@ export const spaceColony: ThemeKit = {
   vehicles: spaceVehicles,
   bridge: spaceBridge,
   pier: spacePier,
+  airport: spaceAirport,
   roadTint: '#9ea9d6',
   stars: true,
   prop: spaceProp,

@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { box, cyl, flat, group } from '../../buildings/mk'
+import { factoryAirport } from './airport'
 import type { ThemeKit } from '../types'
 import { factoryLighting, factoryPalette } from './palette'
 import { factoryModel } from './models'
@@ -24,6 +25,7 @@ export const factoryWorks: ThemeKit = {
   vehicles: factoryVehicles,
   bridge: factoryBridge,
   pier: factoryPier,
+  airport: factoryAirport,
   roadTint: null,
   stars: false,
   prop: factoryProp,

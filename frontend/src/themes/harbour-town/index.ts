@@ -1,4 +1,5 @@
 import { HARBOUR_LIGHTING } from '../../lighting'
+import { harbourAirport } from './airport'
 import type { ThemeKit } from '../types'
 import { harbourPalette } from './palette'
 import { harbourModel } from './models'
@@ -14,6 +15,7 @@ export const harbourTown: ThemeKit = {
   vehicles: harbourVehicles,
   bridge: harbourBridge,
   pier: harbourPier,
+  airport: harbourAirport,
   roadTint: null,
   stars: false,
   prop: () => null,

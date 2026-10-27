@@ -3,6 +3,7 @@ import { isUnmonitored } from './signals'
 import * as THREE from 'three'
 import { Stage } from './scene/stage'
 import { Town } from './scene/town'
+import { rng } from './scene/random'
 import { loadKit } from './assets/kit'
 import { Connection } from './connection'
 import { addressForTown, fetchTowns, requestedScope, type TownChoice } from './scope'
@@ -48,6 +49,8 @@ async function start(): Promise<void> {
   const query = window.location.search
   const params = new URLSearchParams(query)
   const testMode = params.has('test')
+  // a test run repeats: which requests fail and when cars leave come from a seeded generator, not from Math.random
+  if (testMode) town.cars.random = rng(1)
   const store = browserStore()
   const wallParams = parseWall(query)
   let islands: readonly string[] = parseIslands(query)

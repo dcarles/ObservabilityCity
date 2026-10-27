@@ -16,7 +16,7 @@ export interface LayerInfo {
 
 export const LAYERS: readonly LayerInfo[] = [
   { id: 'traffic', label: 'Traffic', hint: 'The cars: requests on the roads', on: true },
-  { id: 'messaging', label: 'Messaging', hint: 'Boats, crates, the dead-letter pen and the lighthouse', on: true },
+  { id: 'messaging', label: 'Messaging', hint: 'Boats, crates, the dead-letter pen and the port board', on: true },
   { id: 'databases', label: 'Databases', hint: 'Data stores and caches, with their tenant yards', on: true },
   { id: 'workers', label: 'Workers', hint: 'Workers and scheduled jobs', on: true },
   { id: 'dependencies', label: 'Dependencies', hint: 'An arc between islands that call each other, thicker for more traffic', on: false },

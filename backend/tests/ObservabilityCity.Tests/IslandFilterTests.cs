@@ -148,7 +148,7 @@ public class IslandFilterTests
     }
 
     [Fact]
-    public async Task Dead_letters_off_screen_do_not_light_the_lighthouse_total()
+    public async Task Dead_letters_off_screen_do_not_count_in_the_town_total()
     {
         var rig = new Rig();
         rig.Fake.Add("cc.notify-worker", FakeEffectKind.Poison, 1);

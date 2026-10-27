@@ -15,7 +15,7 @@ test('the sample town renders, calm and on a bad day', async ({ town, page }, in
   // the two islands that show the link rule: a worker-only pillar with a pier and no bridge, a pillar with no messaging that has a bridge and no pier
   expect(await town.island('rcn')).toMatchObject({ bridge: false, pier: true, lane: true })
   expect(await town.island('reg')).toMatchObject({ bridge: true, pier: false, lane: false })
-  expect(await town.hub()).toMatchObject({ piers: 16, legacy: 1, lighthouse: { total: 0, alarm: false } })
+  expect(await town.hub()).toMatchObject({ piers: 16, legacy: 1 })
 
   const cost = await frameCost(page)
   note(info, 'draw calls', String(cost.calls))
@@ -36,5 +36,5 @@ test('the sample town renders, calm and on a bad day', async ({ town, page }, in
   expect((await town.inspect('dsp.disputes-api')).closedSign).toBe(true)
   expect((await town.inspect('pay.payments-api')).beacon).toBe('red')
   expect((await town.island('col')).alarm).toBe(true)
-  expect((await town.hub()).lighthouse?.alarm).toBe(true)
+  await expect(page.locator('#topbar .chip.dlq')).toHaveClass(/bad/)
 })
