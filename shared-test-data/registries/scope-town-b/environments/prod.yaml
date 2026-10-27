@@ -11,6 +11,7 @@ scope:
   pillars: { bb: 00000000-0000-0000-0000-0000000000b2 }
   telemetryRole: "{name|nospace}"
   resources:
-    - { name: container-apps, types: [microsoft.app/containerapps], roles: [api, worker], pattern: '^(?<service>[a-z]+)-(?<role>api|worker)$' }
+    - { name: container-apps, types: [microsoft.app/containerapps], roles: [api, worker], pattern: '^(?<service>[a-z]+)-(?<role>api|worker)$', instances: "toint(properties.template.scale.minReplicas)" }
     - { name: accounts, types: [microsoft.documentdb/databaseaccounts], roles: [db], pattern: '^cosmos-(?<service>[a-z]+)-(?<tenant>[a-z0-9]+)$', tenantNameTag: customer }
+signals: { instances: inventory }
 exclude: [cc.notify-api, cc.notify-worker, cc.notify-db]

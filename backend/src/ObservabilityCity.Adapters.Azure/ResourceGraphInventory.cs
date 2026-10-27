@@ -24,7 +24,7 @@ public sealed class ResourceGraphInventory(HttpClient http, ICredentialSource? c
         "resourcecontainers | where type =~ 'microsoft.resources/subscriptions' | project id = subscriptionId, name, tags";
 
     public const string DefaultResourcesQuery =
-        "resources | where type in~ ({types}) | project id, name, type, subscriptionId, location, tags";
+        "resources | where type in~ ({types}) | extend instances = {instances} | project id, name, type, subscriptionId, location, tags, instances";
 
     /// <summary>The scope the source is limited to: subscription ids, comma separated; empty means everything the login can read.</summary>
     private IReadOnlyList<string> Scope =>
@@ -39,11 +39,28 @@ public sealed class ResourceGraphInventory(HttpClient http, ICredentialSource? c
         var resources = new List<InventoryResource>();
         if (wanted.Count > 0 && types.Count > 0)
         {
-            var query = (rules.Queries.Resources ?? DefaultResourcesQuery).Replace("{types}", string.Join(", ", types.Select(t => "'" + t.Replace("'", "''") + "'")));
+            var query = (rules.Queries.Resources ?? DefaultResourcesQuery)
+                .Replace("{types}", string.Join(", ", types.Select(Quote)))
+                .Replace("{instances}", InstancesExpression(rules));
             foreach (var batch in wanted.Chunk(MaxSubscriptionsPerCall))
                 resources.AddRange((await Query(query, batch, ct)).Select(ToResource));
         }
         return new Inventory(subscriptions, resources);
+    }
+
+    private static string Quote(string text) => "'" + text.Replace("'", "''") + "'";
+
+    /// <summary>
+    /// The expression that counts a resource's instances: each type takes the expression of the first rule that names it (the rules are the company's, so
+    /// a plan and an app can count differently), and a type no rule counts gives null, which is "unknown" and never 0.
+    /// </summary>
+    public static string InstancesExpression(ScopeRules rules)
+    {
+        var counted = rules.Resources.Where(r => r.Instances is not null)
+            .SelectMany(r => r.Types.Select(t => (Type: t.ToLowerInvariant(), r.Instances)))
+            .GroupBy(x => x.Type).Select(g => g.First()).ToList();
+        return counted.Count == 0 ? "int(null)"
+            : $"case({string.Join(", ", counted.Select(c => $"type =~ {Quote(c.Type)}, toint({c.Instances})"))}, int(null))";
     }
 
     private async Task<List<JsonElement>> Query(string query, IReadOnlyList<string> subscriptions, CancellationToken ct)
@@ -78,7 +95,11 @@ public sealed class ResourceGraphInventory(HttpClient http, ICredentialSource? c
     private static InventorySubscription ToSubscription(JsonElement e) => new(Text(e, "id") ?? "", Text(e, "name") ?? "", Tags(e));
 
     private static InventoryResource ToResource(JsonElement e) =>
-        new(Text(e, "id") ?? "", Text(e, "name") ?? "", Text(e, "type") ?? "", Text(e, "subscriptionId") ?? "", Text(e, "location"), Tags(e));
+        new(Text(e, "id") ?? "", Text(e, "name") ?? "", Text(e, "type") ?? "", Text(e, "subscriptionId") ?? "", Text(e, "location"), Tags(e), Count(e, "instances"));
+
+    /// <summary>A whole number, or null when the field is missing, null or not a number (a plan the cloud gives no count for).</summary>
+    private static int? Count(JsonElement e, string name) =>
+        e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.Number && v.TryGetDouble(out var d) && d >= 0 && d <= int.MaxValue ? (int)Math.Round(d) : null;
 
     private static string? Text(JsonElement e, string name) => e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
 
@@ -102,8 +123,8 @@ public sealed class ResourceGraphInventory(HttpClient http, ICredentialSource? c
 
 /// <summary>
 /// The inventory source. It fills no readings: what it reads goes to the environment's <see cref="ScopeStore"/>, where the rules turn it into scopes
-/// and the other adapters look their systems up. Its connection is the subscription ids it may read, comma separated (none: everything the login can
-/// read), or <c>file:name.json</c> to replay a recording kept beside the town's files.
+/// and the other adapters look their systems up, and it reports each system's instance count for the instances signal. Its connection is the subscription
+/// ids it may read, comma separated (none: everything the login can read), or <c>file:name.json</c> to replay a recording kept beside the town's files.
 /// </summary>
 public sealed class ResourceGraphSource(string name, string environmentId, RegistrySource definition, ResourceGraphInventory reader, ScopeStore store, string? recording, TimeProvider time) : IMetricSource
 {
@@ -113,9 +134,11 @@ public sealed class ResourceGraphSource(string name, string environmentId, Regis
 
     public async Task<IReadOnlyDictionary<string, NodeReading>> PollAsync(TownRegistry registry, CancellationToken ct)
     {
+        Inventory inventory;
+        var view = registry.ForEnvironment(environmentId);
         try
         {
-            var inventory = recording is not null ? ResourceGraphInventory.FromRecording(await File.ReadAllTextAsync(recording, ct)) : await reader.ReadAsync(registry.ForEnvironment(environmentId), ct);
+            inventory = recording is not null ? ResourceGraphInventory.FromRecording(await File.ReadAllTextAsync(recording, ct)) : await reader.ReadAsync(view, ct);
             store.Update(inventory, time.GetUtcNow());
         }
         catch (Exception e) when (e is not OperationCanceledException || !ct.IsCancellationRequested)
@@ -123,8 +146,16 @@ public sealed class ResourceGraphSource(string name, string environmentId, Regis
             store.Fail(e.Message);
             throw;
         }
-        return new Dictionary<string, NodeReading>();
+        return InstanceReadings(ScopeResolver.Resolve(view, inventory), time.GetUtcNow());
     }
+
+    /// <summary>
+    /// What the inventory knows of a system's signals: how many instances it runs. Only a system with a counted resource gets a reading; the count is
+    /// what is configured (a plan's workers), so every instance counts as healthy: health is for the sources that measure it.
+    /// </summary>
+    public static IReadOnlyDictionary<string, NodeReading> InstanceReadings(Resolution resolution, DateTimeOffset at) =>
+        resolution.Systems.Where(s => s.Instances is not null)
+            .ToDictionary(s => s.SystemId, s => new NodeReading(at, true, s.Instances!.Value, s.Instances.Value, 0, 0, 0, 0));
 }
 
 public sealed class ResourceGraphSourceFactory(HttpClient? http = null, TimeProvider? time = null) : IMetricSourceFactory

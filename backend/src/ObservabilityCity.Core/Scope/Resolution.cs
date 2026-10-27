@@ -4,7 +4,7 @@ namespace ObservabilityCity.Core.Scope;
 public sealed record PillarScope(string PillarId, string Code, string? SubscriptionId, string? SubscriptionName, string Via);
 
 /// <summary>A resource that belongs to a system, and the rule that said so. Tenant is the tenant id without dashes, lowercase; null when the rule has none.</summary>
-public sealed record ResolvedResource(string Id, string Name, string Type, string? Region, string? Tenant, string Rule);
+public sealed record ResolvedResource(string Id, string Name, string Type, string? Region, string? Tenant, string Rule, int? Instances = null);
 
 /// <summary>Everything the sources need to know about one system: where it is, what its telemetry calls it and which resources are its.</summary>
 public sealed record SystemScope(
@@ -14,7 +14,11 @@ public sealed record SystemScope(
     string? TelemetryRoleVia,
     string? SubscriptionId,
     string? Workspace,
-    IReadOnlyList<ResolvedResource> Resources);
+    IReadOnlyList<ResolvedResource> Resources)
+{
+    /// <summary>How many instances the system runs: the sum over its resources that carry a count. Null when none does, so the number is unknown rather than zero.</summary>
+    public int? Instances => Resources.Any(r => r.Instances is not null) ? Resources.Sum(r => r.Instances ?? 0) : null;
+}
 
 /// <summary>A tenant's friendly name, read from a tag on its resources. Id is lowercase without dashes (see <see cref="ScopeResolver.TenantKey"/>).</summary>
 public sealed record TenantName(string Id, string Name);

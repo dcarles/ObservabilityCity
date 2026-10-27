@@ -236,6 +236,8 @@ export interface components {
             telemetryRole?: string | null;
             telemetryRoleVia?: string | null;
             resources: components["schemas"]["ScopeResource"][];
+            /** Format: int32 */
+            instances?: number | null;
             problems: string[];
             inventoryState: string;
         };
@@ -244,6 +246,8 @@ export interface components {
             type: string;
             region?: string | null;
             tenant?: string | null;
+            /** Format: int32 */
+            instances?: number | null;
         };
         /** @enum {string} */
         SettingLayer: "System" | "Pillar" | "App" | "BuiltIn";

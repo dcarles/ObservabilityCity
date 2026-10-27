@@ -159,8 +159,11 @@ scope:
     - { name: accounts, types: [microsoft.documentdb/databaseaccounts], roles: [db], pattern: '^(?<tenant>[0-9a-f]{32})-(?<service>[a-z]+)$', tenantNameTag: customer }
 ```
 
+To let the inventory supply the floors of the buildings, count the instances in a rule (`instances: "toint(sku.capacity)"` on the rule that matches the plans) and point the signal at the inventory source (`signals: { instances: inventory }` in the environment file, or in a pillar or system). The other signals can come from other sources: each signal is read from its own source. A building turns grey when any source it reads is stale; a source asked every five minutes stays fresh for ten.
+
 - **Pillar to subscription.** `subscription` finds it by name (a wildcard, any case) or by a tag on the subscription; `{pillar}` is the pillar's `scope: { code: ... }` (else its id) and `{pillarId}` its id. `pillars:` names a subscription outright and wins. A pillar that no subscription, or more than one, matches is reported and not guessed.
 - **Service to resources.** A `pattern` is a regular expression over a resource's name (any case) with named groups: `service` (required) is compared with the system's `serviceCode:` (else its `service:`); `role`, `pillar`, `region` and `tenant` are optional and narrow the match. `roles:` limits a rule to systems of those roles. `serviceTag:` finds a resource whose name does not match by a tag, and `tenantNameTag:` reads a tenant's friendly name from a tag, so the town can show it.
+- **Instances.** A rule with `instances:` counts the instances of each of its resources, with an expression of the inventory query (a plan's workers, an app's replicas). The inventory query is built from the rules' expressions, so another company writes another expression for another resource type. A system's instances are the sum over its resources of such rules, so a service on two regions adds both. A system with no counted resource has an unknown count, which is not 0; a resource the cloud gives no number for adds nothing. The count is what is configured: the inventory cannot say which instances are unhealthy, so all count as healthy until a source that measures health says otherwise.
 - **Telemetry names.** A system says what its telemetry calls it with `telemetry: { role: ... }` in its pillar file; one that does not takes the `telemetryRole` template. Two systems with the same name are reported, since their telemetry would be read as one.
 - **Queries.** The adapter's own two queries (subscriptions, then the resources of the chosen subscriptions) can be replaced under `scope.queries`; every page of the answer is read.
 
@@ -173,9 +176,9 @@ Each system's **Config** tab in the town then has a *Where it lives* part with t
 | Permission | Reader on the subscriptions to read (or on the management group above them) |
 | `connection` | Empty for every subscription the login can read; subscription ids, comma separated, to limit it; `file:name.json` to replay a recording kept beside the town's files |
 | `pollSeconds`, `timeoutSeconds` | The inventory changes slowly: 300 and 30 suit it |
-| Fills | No readings. It fills the scope above, which the adapters that read signals use to find their systems |
+| Fills | The scope above, which the adapters that read signals use to find their systems; and the `instances` signal of each system whose rules count instances (point `signals: { instances: <source name> }` at it) |
 
-To try rules without Azure, keep a recording in the town folder, `{ "subscriptions": [ { "id", "name", "tags" } ], "resources": [ { "id", "name", "type", "subscriptionId", "location", "tags" } ] }`, and point the source at it with `file:`. The sample towns `scope-town-a` and `scope-town-b` under `shared-test-data/registries/` do exactly that, with opposite conventions.
+To try rules without Azure, keep a recording in the town folder, `{ "subscriptions": [ { "id", "name", "tags" } ], "resources": [ { "id", "name", "type", "subscriptionId", "location", "tags", "instances" } ] }`, and point the source at it with `file:`. The sample towns `scope-town-a` and `scope-town-b` under `shared-test-data/registries/` do exactly that, with opposite conventions.
 
 ### What each adapter's runbook section contains
 

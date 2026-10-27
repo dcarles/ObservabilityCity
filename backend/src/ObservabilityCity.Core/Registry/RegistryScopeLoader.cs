@@ -15,7 +15,7 @@ public static partial class RegistryLoader
             Variables = f.Variables,
             Subscription = f.Subscription is null ? null : new SubscriptionRule(f.Subscription.NameLike, f.Subscription.Tag?.Key, f.Subscription.Tag?.Value),
             PillarSubscriptions = f.Pillars,
-            Resources = f.Resources.Select(r => new ResourceRule(r.Name, r.Types, r.Pattern, r.Roles.Select(x => x.ToLowerInvariant()).ToList(), r.ServiceTag, r.TenantNameTag)).ToList(),
+            Resources = f.Resources.Select(r => new ResourceRule(r.Name, r.Types, r.Pattern, r.Roles.Select(x => x.ToLowerInvariant()).ToList(), r.ServiceTag, r.TenantNameTag, string.IsNullOrWhiteSpace(r.Instances) ? null : r.Instances.Trim())).ToList(),
             TelemetryRole = f.TelemetryRole,
             Queries = new ScopeQueries(f.Queries?.Subscriptions, f.Queries?.Resources),
         };
@@ -63,6 +63,7 @@ public static partial class RegistryLoader
             if (!KebabId.IsMatch(r.Name)) errors.Add($"{at}.resources: name '{r.Name}' must be lowercase kebab-case");
             else if (!seen.Add(r.Name)) errors.Add($"{at}.resources: '{r.Name}' is listed twice");
             if (r.Types.Count == 0) errors.Add($"{rule} needs types (the resource types it applies to, for example a plan or an account type)");
+            if (r.Instances is { } counting && counting.Trim().Length == 0) errors.Add($"{rule}: instances is empty; give the expression that counts a resource's instances, or leave it out");
             foreach (var role in r.Roles)
                 if (!SystemRoles.Contains(role, StringComparer.OrdinalIgnoreCase))
                     errors.Add($"{rule}: roles has '{role}'. Use {string.Join(", ", SystemRoles)}.{DidYouMean.Hint(role, SystemRoles)}");

@@ -29,7 +29,8 @@
       "type": "microsoft.app/containerapps",
       "subscriptionId": "00000000-0000-0000-0000-0000000000b1",
       "location": "westeurope",
-      "tags": {}
+      "tags": {},
+      "instances": 3
     },
     {
       "id": "/subscriptions/00000000-0000-0000-0000-0000000000b1/resourceGroups/rg/providers/microsoft.app/containerapps/orders-worker",
@@ -37,7 +38,8 @@
       "type": "microsoft.app/containerapps",
       "subscriptionId": "00000000-0000-0000-0000-0000000000b1",
       "location": "westeurope",
-      "tags": {}
+      "tags": {},
+      "instances": 3
     },
     {
       "id": "/subscriptions/00000000-0000-0000-0000-0000000000b1/resourceGroups/rg/providers/microsoft.documentdb/databaseaccounts/cosmos-orders-acmebank",
@@ -75,7 +77,8 @@
       "type": "microsoft.app/containerapps",
       "subscriptionId": "00000000-0000-0000-0000-0000000000b2",
       "location": "westeurope",
-      "tags": {}
+      "tags": {},
+      "instances": 5
     },
     {
       "id": "/subscriptions/00000000-0000-0000-0000-0000000000b2/resourceGroups/rg/providers/microsoft.app/containerapps/ledger-worker",
@@ -83,7 +86,8 @@
       "type": "microsoft.app/containerapps",
       "subscriptionId": "00000000-0000-0000-0000-0000000000b2",
       "location": "westeurope",
-      "tags": {}
+      "tags": {},
+      "instances": 5
     },
     {
       "id": "/subscriptions/00000000-0000-0000-0000-0000000000b2/resourceGroups/rg/providers/microsoft.documentdb/databaseaccounts/cosmos-ledger-acmebank",
@@ -111,7 +115,8 @@
       "type": "microsoft.app/containerapps",
       "subscriptionId": "00000000-0000-0000-0000-0000000000b3",
       "location": "westeurope",
-      "tags": {}
+      "tags": {},
+      "instances": 9
     }
   ]
 }
