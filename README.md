@@ -326,6 +326,8 @@ Set them with environment variables (`Registry__Path=...`) or in `appsettings.js
 
 The core knows only generic concepts (groups, systems, resources, links). Everything specific to an organisation is configuration: add your own town folder next to the sample in `config/`, point `Registry:Path` at it, and add company-only adapters under `extensions/`. Never edit the core files, so `git pull upstream` stays clean. Details are in the [plan](docs/observability-city-plan.md).
 
+The repo's `nuget.config` uses only nuget.org (this also hides any feed set in your machine-wide NuGet config, which avoids the NU1507 warning). If your extensions need a private feed, add it to that file together with a `<packageSourceMapping>` section that maps your own package ids to it and `*` to nuget.org.
+
 ## Assets and licences
 
 The harbour-town theme uses roads, cars and street props from the CC0 [KayKit City Builder Bits](https://kaylousberg.itch.io/city-builder-bits) pack by Kay Lousberg (only the files in use, with the pack's licence beside them in `frontend/public/themes/harbour-town/kaykit/`). The buildings themselves are built from code in the same style. The space colony and works themes are drawn from code only (no model files). More free CC0 kits can be added through the theme system, one folder under `frontend/src/themes/` and a line in `themes/kits.ts`. Commercial model packs belong in a private fork and are git-ignored (`themes-private/`).
