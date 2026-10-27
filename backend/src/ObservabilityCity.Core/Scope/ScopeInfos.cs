@@ -22,7 +22,11 @@ public static class ScopeInfos
         return new ScopeInfo(
             pillar?.SubscriptionName ?? pillar?.SubscriptionId, pillar is { Via.Length: > 0 } ? pillar.Via : null,
             scope.Workspace, resolution.WorkspaceVia, scope.ServiceCode, scope.TelemetryRole, scope.TelemetryRoleVia,
-            scope.Resources.Select(r => new ScopeResource(r.Name, r.Type, r.Region, r.Tenant is null ? null : names.GetValueOrDefault(r.Tenant, r.Tenant), r.Instances)).ToList(),
+            scope.Resources.Select(r =>
+            {
+                var tenant = r.Tenant is null ? null : names.GetValueOrDefault(r.Tenant, r.Tenant);
+                return new ScopeResource(r.Name, r.Type, r.Region, tenant, r.Instances, ScopeLinks.For(env.Scope, env.Id, r, scope.SubscriptionId, tenant));
+            }).ToList(),
             scope.Instances, problems, state);
     }
 }

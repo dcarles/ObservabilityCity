@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { ago, clockTime, configOrder, filterLogs, incidentSummary, linkSections, overviewRows, reasons, scopeView, stateTone } from '../../src/inspectorModel'
-import type { ConfigValue, LogLine, ScopeInfo, SystemDetail, NodeSnapshot, Snapshot } from '../../src/types'
+import { ago, clockTime, configOrder, filterLogs, incidentSummary, linkSections, isWebAddress, overviewLinks, overviewRows, reasons, resourceLinks, scopeView, stateTone } from '../../src/inspectorModel'
+import type { ConfigValue, LogLine, ScopeInfo, ScopeResource, SystemDetail, NodeSnapshot, Snapshot } from '../../src/types'
 
 const bad = JSON.parse(readFileSync(resolve(__dirname, '../../../shared-test-data/snapshots/bad-day.json'), 'utf8')) as Snapshot
 const all = bad.groups.flatMap((g) => g.nodes)
@@ -229,5 +229,52 @@ describe('the scope rows', () => {
 
   it('passes on the problems the rules could not settle', () => {
     expect(scopeView(scope({ problems: ['No resource found for x'] }))!.problems).toEqual(['No resource found for x'])
+  })
+})
+
+describe('the links to a system\'s resources', () => {
+  const res = (name: string, patch: Partial<ScopeResource> = {}): ScopeResource => ({ name, type: 't', ...patch })
+  const portal = (name: string) => ({ name: 'Portal', url: `https://portal.example.test/${name}` })
+  const scope = (resources: ScopeResource[]): ScopeInfo => ({
+    subscription: null, subscriptionVia: null, workspace: null, serviceCode: null, telemetryRole: null, telemetryRoleVia: null,
+    resources, instances: null, problems: [], inventoryState: 'read',
+  })
+
+  it('accepts only http and https addresses', () => {
+    expect(isWebAddress('https://portal.example.test/x')).toBe(true)
+    expect(isWebAddress('http://intranet.example.test/x')).toBe(true)
+    expect(isWebAddress('javascript:alert(1)')).toBe(false)
+    expect(isWebAddress('data:text/html,hi')).toBe(false)
+    expect(isWebAddress('/relative')).toBe(false)
+    expect(isWebAddress('')).toBe(false)
+  })
+
+  it('keeps the safe links of a resource and drops the rest', () => {
+    const r = res('a', { links: [portal('a'), { name: 'Bad', url: 'javascript:alert(1)' }, { name: '', url: 'https://x.example.test/' }] })
+    expect(resourceLinks(r)).toEqual([portal('a')])
+  })
+
+  it('has no links for a resource without link rules', () => {
+    expect(resourceLinks(res('a'))).toEqual([])
+    expect(resourceLinks(res('a', { links: null }))).toEqual([])
+  })
+
+  it('shows nothing on the overview when no resource has a link', () => {
+    expect(overviewLinks(null)).toBeNull()
+    expect(overviewLinks(scope([res('a'), res('b', { tenant: 'Acme' })]))).toBeNull()
+  })
+
+  it('lists the links of resources without a tenant and counts the tenant ones', () => {
+    const v = overviewLinks(scope([res('a', { links: [portal('a')] }), res('t1', { tenant: 'Acme', links: [portal('t1')] }), res('t2', { tenant: 'Borealis', links: [portal('t2')] })]))!
+    expect(v.items).toEqual([{ resource: 'a', link: portal('a') }])
+    expect(v.tenantResources).toBe(2)
+    expect(v.more).toBe(0)
+  })
+
+  it('lists only the first few and says how many more there are', () => {
+    const many = Array.from({ length: 9 }, (_, i) => res(`r${i}`, { links: [portal(`r${i}`)] }))
+    const v = overviewLinks(scope(many))!
+    expect(v.items).toHaveLength(6)
+    expect(v.more).toBe(3)
   })
 })

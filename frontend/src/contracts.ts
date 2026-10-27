@@ -229,6 +229,10 @@ export interface components {
             /** Format: double */
             requestsPerSecond: number;
         };
+        ResourceLink: {
+            name: string;
+            url: string;
+        };
         ScopeInfo: {
             subscription?: string | null;
             subscriptionVia?: string | null;
@@ -250,6 +254,7 @@ export interface components {
             tenant?: string | null;
             /** Format: int32 */
             instances?: number | null;
+            links?: components["schemas"]["ResourceLink"][] | null;
         };
         /** @enum {string} */
         SettingLayer: "System" | "Pillar" | "App" | "BuiltIn";

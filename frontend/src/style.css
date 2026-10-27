@@ -166,6 +166,9 @@ button.chip.clickable:focus-visible { outline: 2px solid var(--accent); }
 #inspector .cfg-row.res .k { grid-column: 1 / -1; overflow-wrap: anywhere; }
 #inspector .cfg-row.res .v { min-width: 0; overflow-wrap: anywhere; }
 #inspector .cfg-row.res .o { white-space: normal; overflow-wrap: anywhere; max-width: 60vw; }
+#inspector .cfg-row.res .rlinks { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 4px 12px; }
+#inspector a.out { color: #1f6fb2; text-decoration: none; font-weight: 600; }
+#inspector a.out:hover, #inspector a.out:focus-visible { text-decoration: underline; }
 #inspector .scope-title { margin: 14px 0 4px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; opacity: 0.7; }
 #inspector .scope-problem { color: #b4501c; }
 #inspector .cfg .k { font-family: ui-monospace, monospace; font-size: 12px; }

@@ -337,8 +337,14 @@ public sealed record ScopeInfo(
     IReadOnlyList<string> Problems,
     string InventoryState);
 
-/// <summary>A resource that belongs to a system. Tenant is the tenant's friendly name when the rules found one, else its id.</summary>
-public sealed record ScopeResource(string Name, string Type, string? Region, string? Tenant, int? Instances);
+/// <summary>
+/// A resource that belongs to a system. Tenant is the tenant's friendly name when the rules found one, else its id. Links are the addresses the
+/// environment's <c>scope.links</c> make for it (a portal page, a runbook); null when the environment has none for this resource.
+/// </summary>
+public sealed record ScopeResource(string Name, string Type, string? Region, string? Tenant, int? Instances, IReadOnlyList<ResourceLink>? Links = null);
+
+/// <summary>An address that opens a resource somewhere else (a cloud portal, a console), already filled in. The browser only shows it as a link.</summary>
+public sealed record ResourceLink(string Name, string Url);
 
 [JsonConverter(typeof(JsonStringEnumConverter))]
 public enum LogLevel

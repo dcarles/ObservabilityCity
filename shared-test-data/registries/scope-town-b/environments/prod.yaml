@@ -36,5 +36,9 @@ scope:
   resources:
     - { name: container-apps, types: [microsoft.app/containerapps], roles: [api, worker], pattern: '^(?<service>[a-z]+)-(?<role>api|worker)$', instances: "toint(properties.template.scale.minReplicas)" }
     - { name: accounts, types: [microsoft.documentdb/databaseaccounts], roles: [db], pattern: '^cosmos-(?<service>[a-z]+)-(?<tenant>[a-z0-9]+)$', tenantNameTag: customer }
+  # other address shapes: one per resource type, built from names and ids instead of the resource id
+  links:
+    - { name: Console, url: "https://console.example.test/subscriptions/{subscriptionId}/apps/{name}", types: [microsoft.app/containerapps] }
+    - { name: Customer page, url: "https://admin.example.test/customers/{tenantId}?name={tenantName}&env={environment}", types: [microsoft.documentdb/databaseaccounts] }
 signals: { instances: inventory, requests: telemetry, errors: telemetry, latency: telemetry, cpu: platform, memory: platform, utilisation: platform, throttled: platform }
 exclude: [cc.notify-api, cc.notify-worker, cc.notify-db]
