@@ -19,6 +19,7 @@ public static partial class RegistryLoader
             PillarSubscriptions = f.Pillars,
             Resources = f.Resources.Select(r => new ResourceRule(r.Name, r.Types, r.Pattern, r.Roles.Select(x => x.ToLowerInvariant()).ToList(), r.ServiceTag, r.TenantNameTag, string.IsNullOrWhiteSpace(r.Instances) ? null : r.Instances.Trim())).ToList(),
             TelemetryRole = f.TelemetryRole,
+            Links = f.Links.Select(l => new ResourceLinkRule(l.Name, l.Url.Trim(), l.Types)).ToList(),
             Queries = new ScopeQueries(f.Queries?.Subscriptions, f.Queries?.Resources, f.Queries?.Workspaces),
         };
 
@@ -129,6 +130,18 @@ public static partial class RegistryLoader
         {
             if (!KebabId.IsMatch(pillar)) errors.Add($"{at}.pillars: '{pillar}' must be a pillar id (lowercase kebab-case)");
             if (subscription.Trim().Length == 0) errors.Add($"{at}.pillars.{pillar} is empty; name a subscription id or leave the pillar out");
+        }
+        var linkNames = new HashSet<string>();
+        foreach (var l in s.Links)
+        {
+            var link = $"{at}.links '{l.Name}'";
+            if (l.Name.Trim().Length == 0) errors.Add($"{at}.links: a link needs a name, the words on the link");
+            else if (!linkNames.Add(l.Name)) errors.Add($"{at}.links: '{l.Name}' is listed twice");
+            var url = l.Url.Trim();
+            if (!url.StartsWith("https://", StringComparison.OrdinalIgnoreCase) && !url.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
+                errors.Add($"{link}: url must start with https:// (or http://) written out, so a variable can never choose the scheme or host");
+            foreach (var problem in ScopeTemplate.Check(url, own.Concat(ScopeRules.LinkVariables))) errors.Add($"{link}.url: {problem}");
+            if (l.Types.Any(t => t.Trim().Length == 0)) errors.Add($"{link}: types has an empty entry");
         }
         var seen = new HashSet<string>();
         foreach (var r in s.Resources)

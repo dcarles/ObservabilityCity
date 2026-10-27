@@ -194,6 +194,15 @@ internal sealed class ScopeFile
     public List<ResourceRuleFile> Resources { get; set; } = [];
     public string? TelemetryRole { get; set; }
     public ScopeQueriesFile? Queries { get; set; }
+    /// <summary>Addresses that open a resource in a portal or console. A template over the resource's words; without any, no link is shown.</summary>
+    public List<ResourceLinkFile> Links { get; set; } = [];
+}
+
+internal sealed class ResourceLinkFile
+{
+    public string Name { get; set; } = "";
+    public string Url { get; set; } = "";
+    public List<string> Types { get; set; } = [];
 }
 
 internal sealed class SubscriptionRuleFile
