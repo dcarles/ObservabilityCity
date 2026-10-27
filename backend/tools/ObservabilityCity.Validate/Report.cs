@@ -24,11 +24,13 @@ public static class Report
 
     public static string RelativePath(string root, string path) => Path.GetRelativePath(root, path).Replace('\\', '/');
 
+    private static string Expected(ValidationResult r) => r.Expected > 0 ? $", {r.Expected} expected" : "";
+
     private static string FilePath(ValidationResult r, Finding f, string root) => RelativePath(root, Path.Combine(r.Folder, f.File));
 
     public static void WriteText(ValidationResult r, string root, TextWriter w)
     {
-        w.WriteLine($"{RelativePath(root, r.Folder)}: {r.Errors} error(s), {r.Warnings} warning(s)");
+        w.WriteLine($"{RelativePath(root, r.Folder)}: {r.Errors} error(s), {r.Warnings} warning(s){Expected(r)}");
         foreach (var f in r.Findings.OrderByDescending(f => f.Severity))
             w.WriteLine($"  {(f.Severity == Severity.Error ? "error  " : "warning")} {FilePath(r, f, root)}:{f.Line}  [{f.Rule}] {f.Message}");
     }
@@ -53,11 +55,12 @@ public static class Report
 
         var errors = results.Sum(r => r.Errors);
         var warnings = results.Sum(r => r.Warnings);
+        var expected = results.Sum(r => r.Expected);
         var sb = new StringBuilder();
         sb.AppendLine(CommentMarker);
         sb.AppendLine(errors > 0 ? "### Registry check: problems to fix" : warnings > 0 ? "### Registry check: passed with warnings" : "### Registry check: all clear");
         sb.AppendLine();
-        sb.AppendLine($"{results.Count} registr{(results.Count == 1 ? "y" : "ies")} checked: **{errors} error(s)**, {warnings} warning(s). Errors block the merge; warnings do not.");
+        sb.AppendLine($"{results.Count} registr{(results.Count == 1 ? "y" : "ies")} checked: **{errors} error(s)**, {warnings} warning(s){(expected > 0 ? $", {expected} expected (listed under expectedWarnings in a town.yaml, so not shown)" : "")}. Errors block the merge; warnings do not.");
         foreach (var r in results.Where(r => r.Findings.Count > 0))
         {
             sb.AppendLine();

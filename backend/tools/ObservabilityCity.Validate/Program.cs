@@ -66,5 +66,6 @@ if (markdownPath is not null) File.WriteAllText(markdownPath, Report.Markdown(re
 
 var errors = results.Sum(r => r.Errors);
 var warnings = results.Sum(r => r.Warnings);
-Console.WriteLine($"\n{results.Count} registr{(results.Count == 1 ? "y" : "ies")} checked: {errors} error(s), {warnings} warning(s).");
+var expected = results.Sum(r => r.Expected);
+Console.WriteLine($"\n{results.Count} registr{(results.Count == 1 ? "y" : "ies")} checked: {errors} error(s), {warnings} warning(s){(expected > 0 ? $", {expected} expected" : "")}.");
 return errors > 0 ? 1 : 0;

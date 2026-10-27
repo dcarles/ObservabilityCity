@@ -27,7 +27,7 @@ public static partial class RegistryLoader
     // Every key a registry file may use, for suggesting the right one when a key is misspelt.
     private static readonly string[] KnownKeys =
     [
-        "id", "name", "groupLabel", "topology", "pillar", "displayName", "color", "external", "defaults", "systems", "resources",
+        "id", "name", "groupLabel", "topology", "expectedWarnings", "rule", "file", "pillar", "displayName", "color", "external", "defaults", "systems", "resources",
         "externalCallers", "islands", "role", "service", "slaP99Ms", "errors", "resources", "throttle", "backlog", "calls", "aliases",
         "amber", "red", "vendors", "calledBy", "gatewayCalls", "messaging", "topics", "subscriptions", "topic", "consumer", "legacy",
         "tenantPattern", "order", "default", "sources", "kind", "connection", "tenants", "exclude", "fake", "undeclaredTenants",

@@ -131,7 +131,10 @@ public class MessagingTests
     [Fact]
     public void The_validator_reports_a_standalone_island_as_a_warning_on_its_file()
     {
-        var result = RegistryValidator.Validate(TestPaths.LinksTown);
+        // links-town lists the warning under expectedWarnings, so take that out to see the warning itself
+        using var copy = new RegistryCopy(TestPaths.LinksTown);
+        copy.Write("town.yaml", copy.Read("town.yaml").Split("# the island")[0]);
+        var result = RegistryValidator.Validate(copy.Path);
 
         var hit = Assert.Single(result.Findings, f => f.Rule == "standalone");
         Assert.Equal(Severity.Warning, hit.Severity);
