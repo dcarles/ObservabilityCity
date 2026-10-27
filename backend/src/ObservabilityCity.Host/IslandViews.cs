@@ -10,8 +10,8 @@ public sealed class IslandViews
     private readonly Dictionary<(string Env, string Key), (IReadOnlyList<string> Islands, int Viewers)> _active = new();
 
     /// <summary>The island ids as written in an address or sent by a browser (commas and spaces round them), without blanks and repeats, in a fixed order.</summary>
-    public static IReadOnlyList<string> Parse(IEnumerable<string>? raw) =>
-        (raw ?? []).SelectMany(r => r.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)).Distinct().Order(StringComparer.Ordinal).ToList();
+    public static IReadOnlyList<string> Parse(IEnumerable<string?>? raw) =>
+        (raw ?? []).OfType<string>().SelectMany(r => r.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)).Distinct().Order(StringComparer.Ordinal).ToList();
 
     /// <summary>The SignalR group of the browsers looking at this environment through this filter. No filter is the environment's own group.</summary>
     public static string GroupOf(string env, IReadOnlyList<string> islands) => islands.Count == 0 ? env : $"{env}|{string.Join(',', islands)}";

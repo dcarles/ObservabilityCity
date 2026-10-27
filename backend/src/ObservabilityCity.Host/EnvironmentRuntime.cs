@@ -47,7 +47,7 @@ public sealed class EnvironmentSet(IReadOnlyList<EnvironmentRuntime> all, string
     public IReadOnlyList<EnvironmentRuntime> All { get; } = all;
     public EnvironmentRuntime Default => Find(defaultId)!;
     /// <summary>Whether this is the set of a town that exists (false for the empty set an unknown ?town= gets).</summary>
-    public bool Exists => all.Count > 0;
+    public bool Exists => All.Count > 0;
 
     /// <summary>The environment with this id, or null. Asking for none gives the default one.</summary>
     public EnvironmentRuntime? Find(string? id) =>
