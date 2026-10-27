@@ -271,6 +271,11 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
                 n.TenantPattern is null ? null : StaleUnits(n, env), absent);
         }
 
+        // Quiet: too few calls in the source's window for its error share and latency to mean anything. The numbers are left out (0 is no trouble to
+        // any threshold), the rate stays, and nothing else about the building changes.
+        var quiet = r.Calls is { } calls && calls < n.MinCalls;
+        if (quiet) r = r with { ErrorRate = 0, P99Ms = 0 };
+
         // A store with a database for each tenant: each unit gets its own state, and the store's numbers are the worst that count.
         var tenants = n.TenantPattern is null ? null : TenantUnits(n, r, env);
         var utilisation = r.Utilisation;
@@ -286,7 +291,7 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
 
         return new NodeSnapshot(n.Id, n.Name, n.Kind, n.Service, n.External, health, r.InstancesTotal, r.InstancesHealthy,
             r.Load, r.Cpu, r.Memory, utilisation, throttled, r.QueueDepth, r.OldestMessageSeconds, r.DeadLetters, r.RequestsPerSecond, r.ErrorRate, r.P99Ms, n.SlaP99Ms, n.ErrorAmber, n.ErrorRed,
-            n.ResourceAmber, n.ResourceRed, n.ThrottleAmber, n.ThrottleRed, n.BacklogAmber, n.BacklogRed, n.Calls, n.GatewayCalls, r.At, tenants, absent);
+            n.ResourceAmber, n.ResourceRed, n.ThrottleAmber, n.ThrottleRed, n.BacklogAmber, n.BacklogRed, n.Calls, n.GatewayCalls, r.At, tenants, absent, quiet);
     }
 
     /// <summary>
@@ -311,6 +316,7 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
         return r with
         {
             RequestsPerSecond = Gone(Signals.Requests) ? 0 : r.RequestsPerSecond,
+            Calls = Gone(Signals.Requests) ? null : r.Calls,
             ErrorRate = Gone(Signals.Errors) ? 0 : r.ErrorRate,
             P99Ms = Gone(Signals.Latency) ? 0 : r.P99Ms,
             InstancesTotal = Gone(Signals.Instances) ? 0 : r.InstancesTotal,

@@ -52,6 +52,7 @@
       "additionalProperties": false,
       "properties": {
         "slaP99Ms": { "type": "number", "description": "p99 latency the system should stay under, in milliseconds." },
+        "minCalls": { "type": "integer", "minimum": 1, "description": "The fewest calls in a source's window that make the error share and latency worth judging. A system below it is shown as quiet: its rate stays, its error share and latency are left out and it is never amber or red because of them. Default 1." },
         "errors": { "$ref": "#/$defs/thresholds", "description": "Share of failed requests (0 to 1)." },
         "resources": { "$ref": "#/$defs/thresholds", "description": "CPU, memory or data store utilisation (0 to 1)." },
         "throttle": { "$ref": "#/$defs/thresholds", "description": "Share of throttled requests (0 to 1)." },

@@ -21,7 +21,9 @@
           "connection": { "type": "string", "description": "How to reach it (a workspace, an endpoint). Not used by the fake source." },
           "credential": { "type": "string", "description": "Sources that sign in only: the login to use, by name from credentials. Without it, the one called default, else the kind's usual login (the Azure CLI, az login, for Azure sources)." },
           "pollSeconds": { "type": "number", "exclusiveMinimum": 0, "description": "How often the source is asked. Default 30." },
-          "timeoutSeconds": { "type": "number", "exclusiveMinimum": 0, "description": "How long one ask may take before it is given up. Default 10." }
+          "timeoutSeconds": { "type": "number", "exclusiveMinimum": 0, "description": "How long one ask may take before it is given up. Default 10." },
+          "query": { "type": "string", "description": "Sources that send a query (loganalytics): the query, a template. {window} and {windowSeconds} stand for the window, {roles} for the telemetry names of the systems asked about (double-quoted, comma separated); scope variables and {environment} work too. It returns one row per telemetry name with the columns role, calls, errors and latencyMs." },
+          "window": { "type": "string", "pattern": "^[0-9]+(\\.[0-9]+)?[smh]$", "description": "Query sources: how far back one answer looks, a number and a unit (30s, 5m, 1h). Default 5m. A system with fewer calls than its minCalls in this window is quiet." }
         }
       }
     },

@@ -457,8 +457,9 @@ public class ScopeResolutionTests
     {
         var set = new AdapterCatalog([new AzureAdapters()]).Build(RegistryLoader.Load(TownA).Environments.Single(), TownA);
 
-        Assert.Single(set.Sources);
+        Assert.Equal(2, set.Sources.Count);
         Assert.IsType<ResourceGraphSource>(set.Sources[0]);
+        Assert.IsType<LogAnalyticsSource>(set.Sources[1]);
         Assert.NotNull(set.Scope);
     }
 

@@ -22,6 +22,8 @@ export interface BuildingStatus {
   /** Only data stores have a barrier: down while they turn requests away. */
   barrierDown: boolean | null
   plaque: string
+  /** Too few calls to judge errors and latency: the building stays as it is and says so. */
+  quiet: boolean
   /** Only a data store with a database for each tenant: its units and sign. Null for every other building. */
   tenants: TenantYardStatus | null
 }
@@ -234,6 +236,7 @@ export class Building {
       closedSign: this.closedSign.visible,
       barrierDown: this.gate ? this.gateAngle < 0.4 : null,
       plaque: plaqueText(n),
+      quiet: n.quiet === true,
       tenants: this.model.tenantStatus?.() ?? null,
     }
   }

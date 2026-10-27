@@ -2,7 +2,11 @@ using ObservabilityCity.Core.Registry;
 
 namespace ObservabilityCity.Core.Sources;
 
-/// <summary>What one source knows about one node at one moment.</summary>
+/// <summary>
+/// What one source knows about one node at one moment. <c>Calls</c> is how many requests the rate, error share and latency were measured over (a source
+/// that counts them over a window says so here); the town compares it with the system's <c>minCalls</c> and calls a system with fewer quiet. Null: the
+/// source does not count, so nothing is ever quiet.
+/// </summary>
 public sealed record NodeReading(
     DateTimeOffset At,
     bool Up,
@@ -19,7 +23,8 @@ public sealed record NodeReading(
     double? QueueDepth = null,
     double? OldestMessageSeconds = null,
     double? DeadLetters = null,
-    IReadOnlyList<TenantReading>? Tenants = null);
+    IReadOnlyList<TenantReading>? Tenants = null,
+    double? Calls = null);
 
 /// <summary>
 /// One tenant's database of a data store that keeps one per tenant: how much of its provisioned capacity it uses, how much it turns away and the

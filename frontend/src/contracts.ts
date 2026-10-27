@@ -219,6 +219,7 @@ export interface components {
             lastUpdated?: string | null;
             tenants?: components["schemas"]["TenantUnitSnapshot"][] | null;
             absent: string[];
+            quiet: boolean;
         };
         OffscreenLink: {
             nodeId: string;

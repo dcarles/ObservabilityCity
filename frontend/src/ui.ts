@@ -1,4 +1,4 @@
-import { absentEverywhere, isAbsent, isUnmonitored, type Signal } from './signals'
+import { absentEverywhere, isAbsent, isUnmonitored, QUIET_TEXT, type Signal } from './signals'
 import type { Snapshot, NodeSnapshot } from './types'
 import type { ConnectionState } from './connection'
 import { formatMs, formatRate } from './visuals'
@@ -128,8 +128,8 @@ export function showTooltip(n: NodeSnapshot | null, x: number, y: number, view: 
     <div class="row"><span>id</span><span>${n.id}</span></div>
     ${row('instances', `<div class="row"><span>instances</span><span>${n.instancesHealthy}/${n.instancesTotal} healthy</span></div>`)}
     ${row('requests', `<div class="row"><span>requests</span><span>${formatRate(n.requestsPerSecond)}/s</span></div>`)}
-    ${row('errors', `<div class="row"><span>errors</span><span class="${n.errorRate >= n.errorRed ? 'bad' : n.errorRate >= n.errorAmber ? 'warn' : ''}">${(n.errorRate * 100).toFixed(2)}%</span></div>`)}
-    ${row('latency', `<div class="row"><span>p99 / SLA</span><span class="${slow ? 'warn' : ''}">${formatMs(n.p99Ms)} / ${formatMs(n.slaP99Ms)}</span></div>`)}
+    ${row('errors', n.quiet ? `<div class="row"><span>errors</span><span>${QUIET_TEXT}</span></div>` : `<div class="row"><span>errors</span><span class="${n.errorRate >= n.errorRed ? 'bad' : n.errorRate >= n.errorAmber ? 'warn' : ''}">${(n.errorRate * 100).toFixed(2)}%</span></div>`)}
+    ${row('latency', n.quiet ? `<div class="row"><span>p99 / SLA</span><span>${QUIET_TEXT}</span></div>` : `<div class="row"><span>p99 / SLA</span><span class="${slow ? 'warn' : ''}">${formatMs(n.p99Ms)} / ${formatMs(n.slaP99Ms)}</span></div>`)}
     ${isAbsent(n, 'requests') || isAbsent(n, 'instances') ? '' : `<div class="row"><span>load</span><span>${Math.round(n.load * 100)}%</span></div>`}${tenantRows(n, view)}`
   el.hidden = false
   const w = el.offsetWidth, h = el.offsetHeight

@@ -17,6 +17,7 @@
           "name": { "type": "string" },
           "role": { "$ref": "defs.schema.json#/$defs/role" },
           "slaP99Ms": { "type": "number" },
+          "minCalls": { "type": "integer", "minimum": 1 },
           "errors": { "$ref": "defs.schema.json#/$defs/thresholds" },
           "resources": { "$ref": "defs.schema.json#/$defs/thresholds" },
           "throttle": { "$ref": "defs.schema.json#/$defs/thresholds" },

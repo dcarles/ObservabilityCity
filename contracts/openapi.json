@@ -494,6 +494,7 @@
           "load",
           "name",
           "p99Ms",
+          "quiet",
           "requestsPerSecond",
           "resourceAmber",
           "resourceRed",
@@ -647,6 +648,9 @@
             "items": {
               "type": "string"
             }
+          },
+          "quiet": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false

@@ -4,6 +4,19 @@ name: Production
 default: true
 sources:
   inventory: { kind: resourcegraph, connection: "file:inventory.json" }
+  # the recording stands in for the workspace so the town runs without Azure; with a workspace id as the connection the same query is sent for real
+  telemetry:
+    kind: loganalytics
+    connection: "file:telemetry.json"
+    window: 5m
+    query: |
+      AppMetrics
+      | where TimeGenerated > ago({window}) and AppRoleName in ({roles})
+      | where Name in ("request.calls", "request.duration")
+      | extend status = toint(Properties["status.code"])
+      | summarize calls = sumif(Sum, Name == "request.calls"), errors = sumif(Sum, Name == "request.calls" and status >= 500),
+                  total = sumif(Sum, Name == "request.duration"), n = sumif(ItemCount, Name == "request.duration") by role = AppRoleName
+      | project role, calls, errors, latencyMs = iff(n > 0, total / n, 0.0)
 scope:
   inventory: inventory
   variables: { env: prd }
@@ -13,5 +26,5 @@ scope:
     - { name: plans, types: [microsoft.web/serverfarms], roles: [api, worker], pattern: '^plan-cf-[^-]+-(?<pillar>[^-]+)-(?<service>[^-]+)-(?<region>[a-z]+)', instances: "coalesce(toint(properties.numberOfWorkers), toint(sku.capacity))" }
     - { name: apps, types: [microsoft.web/sites], roles: [api, worker], pattern: '^(?<role>api|worker)-[^-]+-(?<pillar>[^-]+)-(?<service>[^-]+)-(?<region>[a-z]+)' }
     - { name: accounts, types: [microsoft.documentdb/databaseaccounts], roles: [db], pattern: '^(?<tenant>[0-9a-f]{32})-(?<pillar>[^-]+)-(?<service>[^-]+)$', tenantNameTag: tenant }
-signals: { instances: inventory }
+signals: { instances: inventory, requests: telemetry, errors: telemetry, latency: telemetry }
 exclude: [cc.notify-api, cc.notify-worker, cc.notify-db]

@@ -4,6 +4,14 @@ name: Production
 default: true
 sources:
   inventory: { kind: resourcegraph, connection: "file:inventory.json" }
+  # a different table, different column names and a window in seconds: the adapter only needs the four result columns back
+  telemetry:
+    kind: loganalytics
+    connection: "file:telemetry.json"
+    window: 300s
+    query: >-
+      Telemetry_CL | where TimeGenerated > ago({windowSeconds}s) and service_s in ({roles})
+      | summarize calls = sum(requests_d), errors = sum(failed_d), latencyMs = avg(latency_ms_d) by role = service_s
 scope:
   variables: { stage: live }
   workspace: "law-{stage}-{environment}"
@@ -13,5 +21,5 @@ scope:
   resources:
     - { name: container-apps, types: [microsoft.app/containerapps], roles: [api, worker], pattern: '^(?<service>[a-z]+)-(?<role>api|worker)$', instances: "toint(properties.template.scale.minReplicas)" }
     - { name: accounts, types: [microsoft.documentdb/databaseaccounts], roles: [db], pattern: '^cosmos-(?<service>[a-z]+)-(?<tenant>[a-z0-9]+)$', tenantNameTag: customer }
-signals: { instances: inventory }
+signals: { instances: inventory, requests: telemetry, errors: telemetry, latency: telemetry }
 exclude: [cc.notify-api, cc.notify-worker, cc.notify-db]

@@ -197,6 +197,8 @@ function checkNode(n: unknown, groupId: string, ids: Set<string>, problems: stri
     lastUpdated: typeof n.lastUpdated === 'string' ? n.lastUpdated : null,
     // an older server that does not say has every signal present
     absent: strings(n.absent).filter((s) => (SIGNALS as readonly string[]).includes(s)),
+    // an older server that does not say has no quiet system
+    quiet: n.quiet === true,
   }
   for (const key of REQUIRED_NUMBERS) {
     out[key] = isFiniteNumber(n[key]) ? n[key] : 0
