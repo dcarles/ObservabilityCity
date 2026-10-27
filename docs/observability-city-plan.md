@@ -8,7 +8,7 @@ Observability City is a locally run browser app that shows our Azure estate as a
 
 | Topic | Decision |
 | --- | --- |
-| Rendering | 3D low-poly with Three.js (react-three-fiber), using free CC0 model kits through swappable themes. Day lighting by default with a Dusk toggle |
+| Rendering | 3D low-poly with Three.js directly (no React), using free CC0 model kits through swappable themes. Day lighting by default with a Dusk toggle |
 | Layout | An island per pillar on a ring around a central hub island (Service Bus port, APIM, shared infra). An airport at the edge for outside callers, and third parties on offshore islands |
 | Incidents | From Grafana IRM, shown as weather over the assigned team's island only |
 | Messaging | Async = boats from the Service Bus port to team piers. Sync = walkers over bridges. DLQs are a quarantine pen with a count on the subscriber team's pier |
@@ -61,7 +61,7 @@ flowchart LR
     AD --> ST[Latest-state table] --> SB[Snapshot builder + rules] --> HUB[SignalR hub]
   end
   subgraph Browser["Browser (TypeScript)"]
-    LS[Live snapshot] --> ME[Motion engine] --> TW[Three.js town] -->|click| RP[React panels]
+    LS[Live snapshot] --> ME[Motion engine] --> TW[Three.js town] -->|click| RP[HTML panels]
   end
   R --> RL
   F & P & L & S & I --> AD
@@ -72,7 +72,7 @@ The registry tells the backend what to watch. Each adapter polls on its own time
 
 | Topic | Decision |
 | --- | --- |
-| Solution | .NET Aspire AppHost starts everything with one F5: the Host (API + SignalR), Core (registry, rules, snapshot builder), one Adapters project per source, Contracts, and the `frontend/` Vite + React + react-three-fiber frontend. `azd up` to Azure Container Apps later |
+| Solution | .NET Aspire AppHost starts everything with one F5: the Host (API + SignalR), Core (registry, rules, snapshot builder), one Adapters project per source, Contracts, and the `frontend/` Vite + TypeScript + Three.js frontend. `azd up` to Azure Container Apps later |
 | Live push | SignalR: groups (per-pillar filtering, live log tail for an open drawer), two-way on one connection, Azure SignalR for scale-out. The snapshot builder doesn't know the transport |
 | Contract | C# `Snapshot` records are the source of truth. The build emits OpenAPI for `/api/snapshot/latest`, and openapi-typescript generates `contracts.ts`, so drift is a build error. Golden snapshot fixtures per scenario are tested in both C# and TypeScript |
 | Adapters | Poll per source: each source has its own background loop, interval, timeout and retry, with one batched query for all systems. A failing source greys out only its own values. No webhooks while it runs on a dev PC |
