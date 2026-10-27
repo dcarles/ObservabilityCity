@@ -159,6 +159,7 @@ public sealed class FakeSource(
                 p.MinInstances = p.MaxInstances = 1;
                 p.PerInstanceRps = p.Rps!.Value * 2;
             }
+            var perInstanceRps = p.PerInstanceRps!.Value; // Fill gives every profile one
             var fx = effects.Where(e => Applies(e, node)).ToList();
             if (fx.Any(e => e.Kind == FakeEffectKind.Stale)) continue; // the source says nothing about this node
 
@@ -172,10 +173,10 @@ public sealed class FakeSource(
 
             // Autoscale one step per poll toward what the load needs.
             var isStore = node.Kind == NodeKind.Database;
-            var wanted = isStore ? p.MinInstances!.Value : (int)Math.Clamp(Math.Ceiling(rps / (p.PerInstanceRps!.Value * TargetUtilisation)), p.MinInstances!.Value, p.MaxInstances!.Value);
+            var wanted = isStore ? p.MinInstances!.Value : (int)Math.Clamp(Math.Ceiling(rps / (perInstanceRps * TargetUtilisation)), p.MinInstances!.Value, p.MaxInstances!.Value);
             var current = _instances.GetOrAdd(node.Id, _ => Math.Max(wanted, p.MinInstances.Value));
             if (!Calm) current += Math.Sign(wanted - current);
-            else current = Math.Max(p.MinInstances.Value, (int)Math.Ceiling(p.Rps!.Value * 0.8 / (p.PerInstanceRps!.Value * TargetUtilisation)));
+            else current = Math.Max(p.MinInstances.Value, (int)Math.Ceiling(p.Rps!.Value * 0.8 / (perInstanceRps * TargetUtilisation)));
             _instances[node.Id] = current;
 
             var unhealthyShare = down ? 1.0 : Math.Clamp(fx.Where(e => e.Kind == FakeEffectKind.UnhealthyInstances).Sum(e => e.Intensity), 0, 1);
@@ -187,7 +188,7 @@ public sealed class FakeSource(
 
             var latencyFx = fx.Where(e => e.Kind == FakeEffectKind.Latency).Sum(e => 9 * e.Intensity);
             // Latency rises a little when instances are saturated, and with load on a degraded fleet.
-            var saturation = healthy > 0 ? Math.Min(2.0, rps / (healthy * p.PerInstanceRps.Value)) : 2.0;
+            var saturation = healthy > 0 ? Math.Min(2.0, rps / (healthy * perInstanceRps)) : 2.0;
             var p99 = p.P99Ms!.Value * (1 + latencyFx) * (0.9 + 0.2 * saturation) * (Calm ? 1 : 1 + 0.05 * Wobble(node.Id, t, 5));
 
             double? cpu = null, memory = null, utilisation = null, throttled = null;
@@ -239,7 +240,7 @@ public sealed class FakeSource(
             {
                 // A consumer: messages arrive at the request rate and leave at what its healthy instances can take.
                 var slow = fx.Where(e => e.Kind == FakeEffectKind.Backlog).Sum(e => 0.95 * e.Intensity);
-                var serviceRate = down ? 0 : healthy * p.PerInstanceRps!.Value * (1 - Math.Clamp(slow, 0, 0.95));
+                var serviceRate = down ? 0 : healthy * perInstanceRps * (1 - Math.Clamp(slow, 0, 0.95));
                 var arrival = down ? p.Rps!.Value * cycle : rps;
                 var behind = _backlog.GetValueOrDefault(node.Id);
                 behind = Math.Clamp(behind + (arrival - serviceRate) * dt, 0, 250_000);
