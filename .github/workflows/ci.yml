@@ -69,10 +69,21 @@ jobs:
         run: npm run build
         working-directory: frontend
 
+  # The browser suites take turns on one worker each (they steer one fake source), so they are spread over runners instead:
+  # the wait is the slowest group, about three minutes. Every suite is in exactly one group (npm run e2e runs them all in a row).
   ui-scenarios:
-    name: UI scenario tests
+    name: UI scenario tests (${{ matrix.group }})
     runs-on: ubuntu-latest
-    timeout-minutes: 16
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { group: scenarios, suites: 'scenarios' }
+          - { group: ui, suites: 'ui' }
+          - { group: towns, suites: 'towns' }
+          - { group: links and tenants, suites: 'links tenants' }
+          - { group: other towns, suites: 'direct live sources scope' }
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-dotnet@v6
@@ -109,7 +120,11 @@ jobs:
       - name: Build the backend
         run: dotnet build backend/src/ObservabilityCity.Host -c Release
       - name: UI scenarios
-        run: npm run e2e
+        # every suite of the group runs, even when one fails, so a run shows all that is broken
+        run: |
+          fail=0
+          for suite in ${{ matrix.suites }}; do npm run "e2e:$suite" || fail=1; done
+          exit $fail
         working-directory: frontend
         env:
           E2E_NO_BUILD: '1'
@@ -117,7 +132,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: ui-scenarios-report
+          name: ui-scenarios-report-${{ matrix.group }}
           path: |
             frontend/playwright-report
             frontend/test-results
