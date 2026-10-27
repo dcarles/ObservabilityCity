@@ -1,7 +1,7 @@
 displayName: Platform hub
 color: "#f5c26b"
 resources:
-  - { id: hub.apim, name: API gateway, role: gateway }
+  - { id: hub.apim, name: API gateway, role: gateway, telemetry: { role: ApiGateway } }
   - { id: hub.service-bus, name: Service Bus, role: broker }
   - { id: hub.egress, name: Central egress, role: egress }
   - { id: hub.customer-db, name: Shared customer DB, role: db }

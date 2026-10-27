@@ -33,7 +33,7 @@ public static partial class RegistryLoader
         "tenantPattern", "order", "default", "sources", "kind", "connection", "tenants", "exclude", "fake", "undeclaredTenants",
         "signals", "credentials", "credential", "pollSeconds", "timeoutSeconds", "tenantId", "clientId", "clientSecretEnv",
         "scope", "inventory", "workspace", "variables", "subscription", "pillars", "types", "pattern", "roles", "serviceTag", "tenantNameTag",
-        "telemetryRole", "queries", "nameLike", "tag", "key", "value", "code", "serviceCode", "telemetry",
+        "telemetryRole", "queries", "nameLike", "tag", "key", "value", "code", "serviceCode", "telemetry", "minCalls", "query", "window",
     ];
 
     // Last resort when defaults.yaml is missing or silent about a role.
@@ -44,6 +44,7 @@ public static partial class RegistryLoader
         Resources = new ErrorThresholdsFile { Amber = 0.80, Red = 0.95 },
         Throttle = new ErrorThresholdsFile { Amber = 0.001, Red = 0.02 },
         Backlog = new ErrorThresholdsFile { Amber = 60, Red = 300 },
+        MinCalls = 1,
     };
 
     /// <summary>Strict load: any problem in any file fails the whole load, with every problem listed. This is what CI and the validator use.</summary>
@@ -280,7 +281,7 @@ public static partial class RegistryLoader
             parsed.Add((new RegistryEnvironment(
                 stem, f.Name ?? stem, f.Default,
                 f.Sources.Select(kv => new RegistrySource(kv.Key, kv.Value.Kind.ToLowerInvariant(), kv.Value.Connection)
-                    { Credential = kv.Value.Credential, PollSeconds = kv.Value.PollSeconds, TimeoutSeconds = kv.Value.TimeoutSeconds }).ToList(),
+                    { Credential = kv.Value.Credential, PollSeconds = kv.Value.PollSeconds, TimeoutSeconds = kv.Value.TimeoutSeconds, Query = kv.Value.Query, Window = kv.Value.Window }).ToList(),
                 f.Tenants.Select(t => new RegistryTenant(t.Id, t.Name ?? t.Id, t.Kind.Equals("test", StringComparison.OrdinalIgnoreCase) ? TenantKind.Test : TenantKind.Customer)).ToList(),
                 excluded, f.Fake?.UndeclaredTenants ?? [])
             {
@@ -306,6 +307,7 @@ public static partial class RegistryLoader
                 errors.Add($"{name}: source '{source}' has kind '{def.Kind}', which must be lowercase kebab-case. Which kinds exist depends on the adapters loaded; `validate` checks that");
             if (def.PollSeconds is <= 0) errors.Add($"{name}: source '{source}' has pollSeconds {def.PollSeconds}; it must be above 0");
             if (def.TimeoutSeconds is <= 0) errors.Add($"{name}: source '{source}' has timeoutSeconds {def.TimeoutSeconds}; it must be above 0");
+            CheckQuery(f, def, source, name, errors);
             if (def.Credential is not null && !f.Credentials.ContainsKey(def.Credential))
                 errors.Add($"{name}: source '{source}' uses credential '{def.Credential}', which this file does not define.{DidYouMean.Hint(def.Credential, f.Credentials.Keys)}");
         }
@@ -570,6 +572,7 @@ public static partial class RegistryLoader
             Resolve("backlog.red", d => d?.Backlog?.Red, s.Backlog?.Red),
             s.Calls)
         {
+            MinCalls = Math.Max(1, (int)Resolve("minCalls", d => d?.MinCalls, s.MinCalls)),
             GatewayCalls = s.GatewayCalls,
             ServiceCode = s.ServiceCode,
             TelemetryRole = s.Telemetry?.Role,

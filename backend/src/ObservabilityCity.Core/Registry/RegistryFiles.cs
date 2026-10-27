@@ -28,6 +28,8 @@ internal sealed class RoleDefaultsFile
     public ErrorThresholdsFile? Throttle { get; set; }
     /// <summary>When the oldest waiting message of a consumer turns amber and red, in seconds.</summary>
     public ErrorThresholdsFile? Backlog { get; set; }
+    /// <summary>The fewest calls in a source's window that make the error share and latency worth judging. With fewer, the system is quiet.</summary>
+    public int? MinCalls { get; set; }
 }
 
 /// <summary>defaults.yaml and the "defaults" block of a pillar file: role name to defaults.</summary>
@@ -48,6 +50,7 @@ internal sealed class SystemFile
     public ErrorThresholdsFile? Resources { get; set; }
     public ErrorThresholdsFile? Throttle { get; set; }
     public ErrorThresholdsFile? Backlog { get; set; }
+    public int? MinCalls { get; set; }
     /// <summary>Signal to source name (or none), overriding the pillar's and the environment's choice for this system.</summary>
     public Dictionary<string, string> Signals { get; set; } = new();
     /// <summary>The name this system's resources carry for its service, matched against the service group of the environment's resource patterns. Without it, the service name.</summary>
@@ -224,6 +227,10 @@ internal sealed class SourceFile
     public double? PollSeconds { get; set; }
     /// <summary>How long one ask may take before it is given up, in seconds.</summary>
     public double? TimeoutSeconds { get; set; }
+    /// <summary>Query sources only (loganalytics): the query to send, a template. {window} and {windowSeconds} stand for the window, {roles} for the telemetry names of the systems it is asked about, quoted and separated by commas; scope variables and {environment} work too.</summary>
+    public string? Query { get; set; }
+    /// <summary>Query sources only: how far back one answer looks, for example 5m. Default 5m.</summary>
+    public string? Window { get; set; }
 }
 
 internal sealed class CredentialFile

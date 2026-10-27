@@ -1,0 +1,167 @@
+using System.Globalization;
+using System.Net.Http.Headers;
+using System.Text;
+using System.Text.Json;
+using ObservabilityCity.Contracts;
+using ObservabilityCity.Core.Registry;
+using ObservabilityCity.Core.Scope;
+using ObservabilityCity.Core.Sources;
+using TownRegistry = ObservabilityCity.Core.Registry.Registry;
+
+namespace ObservabilityCity.Adapters.Azure;
+
+/// <summary>
+/// Reads request rate, error share and latency from a Log Analytics workspace, for every system at once. It sends one query, the environment's own
+/// template (<c>query</c> in the source definition), and reads one row per telemetry name with the columns <c>role</c>, <c>calls</c>, <c>errors</c> and
+/// <c>latencyMs</c>. Which table, which metric names and which properties those come from is the query's business, so the adapter knows no company's
+/// telemetry: a different query reads a different shape. The rows are matched to systems by their telemetry name (see <see cref="SystemScope.TelemetryRole"/>);
+/// a system the answer has no row for made no calls in the window, which is reported as zero calls (quiet), not as unknown. Only systems that serve calls
+/// (api, worker, gateway, cron) are asked about: a database or a broker has no span metrics, and gets no reading instead of a quiet one. Every row is read: nothing is cut off.
+/// </summary>
+public sealed class LogAnalyticsReader(HttpClient http, ICredentialSource? credential)
+{
+    public const string TokenScope = "https://api.loganalytics.io/.default";
+    public const string Endpoint = "https://api.loganalytics.io/v1";
+
+    public static readonly string[] Columns = ["role", "calls", "errors", "latencyMs"];
+
+    /// <summary>The workspace is an id (a GUID) or a full resource id starting with a slash; a bare name cannot be queried.</summary>
+    public static string QueryUrl(string workspace) =>
+        workspace.StartsWith('/') ? $"{Endpoint}{workspace.TrimEnd('/')}/query" : $"{Endpoint}/workspaces/{Uri.EscapeDataString(workspace)}/query";
+
+    public async Task<IReadOnlyList<SpanRow>> QueryAsync(string workspace, string query, TimeSpan window, CancellationToken ct)
+    {
+        var body = JsonSerializer.Serialize(new { query, timespan = System.Xml.XmlConvert.ToString(window) });
+        using var request = new HttpRequestMessage(HttpMethod.Post, QueryUrl(workspace)) { Content = new StringContent(body, Encoding.UTF8, "application/json") };
+        if (credential is not null)
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await credential.GetTokenAsync(TokenScope, ct));
+        using var response = await http.SendAsync(request, ct);
+        var text = await response.Content.ReadAsStringAsync(ct);
+        if (!response.IsSuccessStatusCode)
+            throw new HttpRequestException($"Log Analytics answered {(int)response.StatusCode} {response.ReasonPhrase}: {Trim(text)}");
+        return Parse(text);
+    }
+
+    private static string Trim(string text) => text.Length <= 300 ? text : text[..300] + "...";
+
+    /// <summary>The rows of the first table, matched to the columns by name (any case). A column the query does not return is a mistake worth naming; errors and latencyMs may be left out.</summary>
+    public static IReadOnlyList<SpanRow> Parse(string json)
+    {
+        using var doc = JsonDocument.Parse(json);
+        if (!doc.RootElement.TryGetProperty("tables", out var tables) || tables.ValueKind != JsonValueKind.Array || tables.GetArrayLength() == 0)
+            throw new InvalidOperationException("the answer has no table; was the query a query that returns rows?");
+        var table = tables[0];
+        var names = table.GetProperty("columns").EnumerateArray().Select(c => c.GetProperty("name").GetString() ?? "").ToList();
+        int Index(string column) => names.FindIndex(n => n.Equals(column, StringComparison.OrdinalIgnoreCase));
+        var (role, calls, errors, latency) = (Index("role"), Index("calls"), Index("errors"), Index("latencyMs"));
+        if (role < 0 || calls < 0)
+            throw new InvalidOperationException($"the query must return the columns {string.Join(", ", Columns)} (errors and latencyMs may be left out); it returned {string.Join(", ", names)}");
+        var rows = new List<SpanRow>();
+        foreach (var row in table.GetProperty("rows").EnumerateArray())
+        {
+            if (row[role].ValueKind != JsonValueKind.String || row[role].GetString() is not { Length: > 0 } name) continue;
+            rows.Add(new SpanRow(name, Number(row, calls) ?? 0, errors < 0 ? 0 : Number(row, errors) ?? 0, latency < 0 ? null : Number(row, latency)));
+        }
+        return rows;
+    }
+
+    private static double? Number(JsonElement row, int index)
+    {
+        var v = row[index];
+        return v.ValueKind switch
+        {
+            JsonValueKind.Number when v.TryGetDouble(out var d) && double.IsFinite(d) && d >= 0 => d,
+            JsonValueKind.String when double.TryParse(v.GetString(), NumberStyles.Float, CultureInfo.InvariantCulture, out var d) && double.IsFinite(d) && d >= 0 => d,
+            _ => null,
+        };
+    }
+}
+
+/// <summary>One telemetry name's calls in the window, how many of them were errors and their latency in milliseconds (null when the query gave none).</summary>
+public sealed record SpanRow(string Role, double Calls, double Errors, double? LatencyMs);
+
+/// <summary>
+/// The Log Analytics source. Its connection is the workspace (an id or resource id); without one, the environment's <c>scope.workspace</c> is used.
+/// <c>file:name.json</c> replays a recorded answer kept beside the town's files, for trying a query's shape offline and for tests.
+/// </summary>
+public sealed class LogAnalyticsSource(
+    string name, string environmentId, RegistrySource definition, LogAnalyticsReader reader, ScopeStore store, ScopeRules rules, string? recording, TimeProvider time) : IMetricSource
+{
+    public string Name => name;
+    public TimeSpan PollInterval => definition.PollInterval;
+    public TimeSpan Timeout => definition.Timeout;
+    public TimeSpan Window { get; } = SourceQuery.WindowOf(definition);
+
+    public async Task<IReadOnlyDictionary<string, NodeReading>> PollAsync(TownRegistry registry, CancellationToken ct)
+    {
+        var view = registry.ForEnvironment(environmentId);
+        var resolution = store.Resolve(view);
+        var serving = view.AllNodes.Where(n => n.Kind is NodeKind.Api or NodeKind.Worker or NodeKind.Gateway or NodeKind.Cron).Select(n => n.Id).ToHashSet();
+        var asked = resolution.Systems.Where(s => serving.Contains(s.SystemId) && !string.IsNullOrWhiteSpace(s.TelemetryRole)).ToList();
+        if (asked.Count == 0) return new Dictionary<string, NodeReading>();
+
+        IReadOnlyList<SpanRow> rows;
+        if (recording is not null)
+            rows = LogAnalyticsReader.Parse(await File.ReadAllTextAsync(recording, ct));
+        else
+        {
+            var query = definition.Query ?? throw new InvalidOperationException($"source '{name}' has no query. Write the query that returns one row per telemetry name with the columns {string.Join(", ", LogAnalyticsReader.Columns)} (see docs/connect-your-company.md)");
+            var workspace = Workspace(resolution);
+            rows = await reader.QueryAsync(workspace, SourceQuery.Render(query, definition, environmentId, rules, asked.Select(s => s.TelemetryRole!).Distinct(StringComparer.OrdinalIgnoreCase)), Window, ct);
+        }
+        return Readings(asked, rows, Window, time.GetUtcNow());
+    }
+
+    private string Workspace(Resolution resolution)
+    {
+        var connection = definition.Connection;
+        var workspace = string.IsNullOrWhiteSpace(connection) ? resolution.Workspace : connection.Trim();
+        if (string.IsNullOrWhiteSpace(workspace))
+            throw new InvalidOperationException($"source '{name}' has no workspace. Set its connection, or scope.workspace in the environment file");
+        if (!workspace.StartsWith('/') && !Guid.TryParse(workspace, out _))
+            throw new InvalidOperationException($"the workspace '{workspace}' is a name; Log Analytics is queried by workspace id (a GUID) or by resource id (starting with /subscriptions)");
+        return workspace;
+    }
+
+    /// <summary>
+    /// A reading for every asked system: its rows added up (two systems can share a telemetry name, and a name can come back in several rows), the rate over
+    /// the window, the share of calls that were errors and the latency of the rows weighted by their calls. No row means no calls in the window.
+    /// </summary>
+    public static IReadOnlyDictionary<string, NodeReading> Readings(IEnumerable<SystemScope> asked, IReadOnlyList<SpanRow> rows, TimeSpan window, DateTimeOffset at)
+    {
+        var byRole = rows.GroupBy(r => r.Role, StringComparer.OrdinalIgnoreCase).ToDictionary(g => g.Key, g => g.ToList(), StringComparer.OrdinalIgnoreCase);
+        var readings = new Dictionary<string, NodeReading>();
+        foreach (var system in asked)
+        {
+            var mine = byRole.GetValueOrDefault(system.TelemetryRole!) ?? [];
+            var calls = mine.Sum(r => r.Calls);
+            var errors = Math.Min(mine.Sum(r => r.Errors), calls);
+            var latency = calls > 0 ? mine.Where(r => r.LatencyMs is not null).Sum(r => r.LatencyMs!.Value * r.Calls) / calls : 0;
+            readings[system.SystemId] = new NodeReading(at, true, 0, 0, 0, calls / window.TotalSeconds, calls > 0 ? errors / calls : 0, latency, Calls: calls);
+        }
+        return readings;
+    }
+}
+
+public sealed class LogAnalyticsSourceFactory(HttpClient? http = null, TimeProvider? time = null) : IMetricSourceFactory
+{
+    public string Kind => "loganalytics";
+
+    public IMetricSource Create(SourceContext context)
+    {
+        var connection = context.Source.Connection ?? "";
+        string? recording = null;
+        if (connection.StartsWith(ResourceGraphSourceFactory.RecordingPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            var file = connection[ResourceGraphSourceFactory.RecordingPrefix.Length..].Trim();
+            recording = Path.IsPathRooted(file) || context.RegistryFolder is null ? file : Path.Combine(context.RegistryFolder, file);
+            if (!File.Exists(recording)) throw new InvalidOperationException($"the recording {file} does not exist");
+        }
+        else if (context.Source.Query is null)
+            throw new InvalidOperationException("it has no query. Write the query that returns one row per telemetry name with the columns " + string.Join(", ", LogAnalyticsReader.Columns));
+        return new LogAnalyticsSource(context.Source.Name, context.EnvironmentId, context.Source, new LogAnalyticsReader(http ?? Shared, context.Credential),
+            context.Scope ?? new ScopeStore(), context.Rules ?? ScopeRules.None, recording, time ?? TimeProvider.System);
+    }
+
+    private static readonly HttpClient Shared = new();
+}

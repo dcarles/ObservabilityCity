@@ -64,7 +64,8 @@
           "gatewayCalls": [],
           "lastUpdated": "2026-10-25T12:00:02+00:00",
           "tenants": null,
-          "absent": []
+          "absent": [],
+          "quiet": false
         },
         {
           "id": "hub.service-bus",
@@ -99,7 +100,8 @@
           "gatewayCalls": [],
           "lastUpdated": "2026-10-25T12:00:02+00:00",
           "tenants": null,
-          "absent": []
+          "absent": [],
+          "quiet": false
         },
         {
           "id": "hub.egress",
@@ -134,7 +136,8 @@
           "gatewayCalls": [],
           "lastUpdated": "2026-10-25T12:00:02+00:00",
           "tenants": null,
-          "absent": []
+          "absent": [],
+          "quiet": false
         },
         {
           "id": "hub.customer-db",
@@ -169,7 +172,8 @@
           "gatewayCalls": [],
           "lastUpdated": "2026-10-25T12:00:02+00:00",
           "tenants": null,
-          "absent": []
+          "absent": [],
+          "quiet": false
         }
       ]
     },
@@ -235,7 +239,8 @@
           "gatewayCalls": [],
           "lastUpdated": "2026-10-25T12:00:02+00:00",
           "tenants": null,
-          "absent": []
+          "absent": [],
+          "quiet": false
         },
         {
           "id": "aa.orders-worker",
@@ -272,7 +277,8 @@
           "gatewayCalls": [],
           "lastUpdated": "2026-10-25T12:00:02+00:00",
           "tenants": null,
-          "absent": []
+          "absent": [],
+          "quiet": false
         },
         {
           "id": "aa.orders-db",
@@ -307,7 +313,8 @@
           "gatewayCalls": [],
           "lastUpdated": "2026-10-25T12:00:02+00:00",
           "tenants": null,
-          "absent": []
+          "absent": [],
+          "quiet": false
         }
       ]
     },
@@ -382,7 +389,8 @@
           ],
           "lastUpdated": "2026-10-25T12:00:02+00:00",
           "tenants": null,
-          "absent": []
+          "absent": [],
+          "quiet": false
         },
         {
           "id": "cc.notify-worker",
@@ -419,7 +427,8 @@
           "gatewayCalls": [],
           "lastUpdated": "2026-10-25T12:00:02+00:00",
           "tenants": null,
-          "absent": []
+          "absent": [],
+          "quiet": false
         },
         {
           "id": "cc.notify-db",
@@ -454,7 +463,8 @@
           "gatewayCalls": [],
           "lastUpdated": "2026-10-25T12:00:02+00:00",
           "tenants": null,
-          "absent": []
+          "absent": [],
+          "quiet": false
         }
       ]
     }
@@ -494,7 +504,8 @@
         "gatewayCalls": [],
         "lastUpdated": "2026-10-25T12:00:02+00:00",
         "tenants": null,
-        "absent": []
+        "absent": [],
+        "quiet": false
       },
       "calledBy": [
         "aa.orders-api"
@@ -534,7 +545,8 @@
         "gatewayCalls": [],
         "lastUpdated": "2026-10-25T12:00:02+00:00",
         "tenants": null,
-        "absent": []
+        "absent": [],
+        "quiet": false
       },
       "calledBy": [
         "cc.notify-worker"

@@ -52,6 +52,7 @@ public static class ReadingMerge
             backlog?.QueueDepth,
             backlog?.OldestMessageSeconds,
             dead?.DeadLetters,
-            utilisation?.Tenants);
+            utilisation?.Tenants,
+            requests?.Calls);
     }
 }

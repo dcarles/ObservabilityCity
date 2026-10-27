@@ -83,6 +83,8 @@ public static class SystemDetails
             Row("resources.amber", Pct(n.ResourceAmber)),
             Row("resources.red", Pct(n.ResourceRed)),
         };
+        if (n.Kind is NodeKind.Api or NodeKind.Worker or NodeKind.Gateway or NodeKind.Cron)
+            rows.Add(Row("minCalls", n.MinCalls.ToString(CultureInfo.InvariantCulture)));
         if (n.Kind is NodeKind.Database or NodeKind.Cache)
         {
             rows.Add(Row("throttle.amber", Pct(n.ThrottleAmber)));

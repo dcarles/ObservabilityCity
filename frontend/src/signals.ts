@@ -6,6 +6,9 @@ import type { NodeSnapshot } from './types'
 export const SIGNALS = ['requests', 'errors', 'latency', 'instances', 'cpu', 'memory', 'utilisation', 'throttled', 'backlog', 'deadLetters'] as const
 export type Signal = (typeof SIGNALS)[number]
 
+/** Words for a system with too few calls to judge: its error share and latency are left out, not shown as a good 0. */
+export const QUIET_TEXT = 'quiet: too few calls to judge'
+
 type WithAbsent = Pick<NodeSnapshot, never> & { absent?: readonly string[] | null }
 
 export function isAbsent(n: WithAbsent, signal: Signal): boolean {

@@ -19,6 +19,8 @@ export interface ServiceSystem {
   unmonitored: boolean
   /** The signals no source supplies. */
   absent: readonly string[]
+  /** Too few calls in the source's window for the error share and latency to mean anything. */
+  quiet: boolean
   requestsPerSecond: number
   errorRate: number
   p99Ms: number
@@ -43,21 +45,22 @@ export interface ServiceSummary {
 /** What a service is and how it is doing, from the snapshot's nodes. Systems the snapshot no longer has are left out. */
 export function summariseService(pad: Pick<Pad, 'key' | 'name' | 'nodes'>, group: string, groupName: string, nodes: ReadonlyMap<string, NodeSnapshot>): ServiceSummary {
   const systems = pad.nodes.map((p) => nodes.get(p.id)).filter((n): n is NodeSnapshot => !!n).map<ServiceSystem>((n) => ({
-    id: n.id, name: n.name, kind: n.kind, state: n.state, unmonitored: isUnmonitored(n), absent: n.absent ?? [], requestsPerSecond: n.requestsPerSecond, errorRate: n.errorRate, p99Ms: n.p99Ms, slaP99Ms: n.slaP99Ms,
+    id: n.id, name: n.name, kind: n.kind, state: n.state, unmonitored: isUnmonitored(n), absent: n.absent ?? [], quiet: n.quiet === true, requestsPerSecond: n.requestsPerSecond, errorRate: n.errorRate, p99Ms: n.p99Ms, slaP99Ms: n.slaP99Ms,
     tenants: n.tenants ? { total: n.tenants.length, throttled: n.tenants.filter((u) => (u.throttled ?? 0) >= n.throttleAmber && (u.throttled ?? 0) > 0).length } : null,
   }))
   return { key: pad.key, name: pad.name, group, groupName, state: worstState(systems.filter((s) => !s.unmonitored).map((s) => s.state)), monitored: systems.some((s) => !s.unmonitored), systems }
 }
 
 /** What a service card says about one system: its kind and the numbers a source supplies. Absent signals are left out, never printed as zero. */
-export function systemNumbers(m: Pick<ServiceSystem, 'kind' | 'unmonitored' | 'absent' | 'requestsPerSecond' | 'errorRate' | 'p99Ms' | 'tenants'>): string {
+export function systemNumbers(m: Pick<ServiceSystem, 'kind' | 'unmonitored' | 'absent' | 'requestsPerSecond' | 'errorRate' | 'p99Ms' | 'tenants'> & Partial<Pick<ServiceSystem, 'quiet'>>): string {
   if (m.unmonitored) return `${m.kind} · no source configured`
   const has = (signal: Signal) => !m.absent.includes(signal)
   return [
     m.kind,
     has('requests') ? `${formatRate(m.requestsPerSecond)}/s` : null,
-    has('errors') ? `${(m.errorRate * 100).toFixed(2)}% errors` : null,
-    has('latency') ? `p99 ${formatMs(m.p99Ms)}` : null,
+    m.quiet === true ? 'quiet' : null,
+    has('errors') && m.quiet !== true ? `${(m.errorRate * 100).toFixed(2)}% errors` : null,
+    has('latency') && m.quiet !== true ? `p99 ${formatMs(m.p99Ms)}` : null,
     m.tenants ? `${m.tenants.total} tenants, ${m.tenants.throttled} throttled` : null,
   ].filter((p) => p !== null).join(' · ')
 }

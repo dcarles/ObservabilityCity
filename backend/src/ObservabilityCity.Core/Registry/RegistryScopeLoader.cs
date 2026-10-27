@@ -1,3 +1,4 @@
+using ObservabilityCity.Core.Sources;
 using System.Text.RegularExpressions;
 
 namespace ObservabilityCity.Core.Registry;
@@ -19,6 +20,16 @@ public static partial class RegistryLoader
             TelemetryRole = f.TelemetryRole,
             Queries = new ScopeQueries(f.Queries?.Subscriptions, f.Queries?.Resources),
         };
+
+    private static void CheckQuery(EnvironmentFile f, SourceFile def, string source, string name, List<string> errors)
+    {
+        if (def.Window is { } window && !SourceQuery.TryParseWindow(window, out _))
+            errors.Add($"{name}: source '{source}' has window '{window}'. Write a number and a unit: 30s, 5m or 1h");
+        if (def.Query is not { } query) return;
+        if (query.Trim().Length == 0) errors.Add($"{name}: source '{source}' has an empty query; give the query to send, or leave it out");
+        var known = f.Scope?.Variables.Keys.Append(ScopeRules.EnvironmentVariable).Concat(SourceQuery.Variables) ?? [ScopeRules.EnvironmentVariable, .. SourceQuery.Variables];
+        foreach (var problem in ScopeTemplate.Check(query, known)) errors.Add($"{name}: source '{source}' query: {problem}");
+    }
 
     private static void CheckScope(EnvironmentFile f, string name, List<string> errors)
     {

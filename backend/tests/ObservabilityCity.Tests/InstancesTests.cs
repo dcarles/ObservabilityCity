@@ -294,13 +294,10 @@ public class InstancesTests
     [Fact]
     public async Task The_town_shows_the_inventorys_instances_next_to_another_sources_rates()
     {
-        using var copy = new RegistryCopy(TownA);
-        copy.Replace("environments/prod.yaml", "signals: { instances: inventory }", "signals: { instances: inventory, requests: telemetry, errors: telemetry, latency: telemetry }");
-        copy.Replace("environments/prod.yaml", "\nsources:\n", "\nsources:\n  telemetry: { kind: loganalytics }\n");
-        var registry = Prod(copy.Path);
+        var registry = Prod(TownA);
         var time = new FakeTimeProvider(T0);
         var state = new LatestState();
-        state.Update("inventory", await Source(copy.Path, time).PollAsync(registry, CancellationToken.None));
+        state.Update("inventory", await Source(TownA, time).PollAsync(registry, CancellationToken.None));
         state.Update("telemetry", new Dictionary<string, NodeReading> { ["aa.orders-api"] = Reading(at: T0, rps: 12, errors: 0.001, p99: 20) });
 
         var snapshot = new SnapshotBuilder(registry, state, time) { Environment = "prod" }.Build();
@@ -365,13 +362,10 @@ public class InstancesTests
     [Fact]
     public async Task A_slow_source_does_not_keep_a_fast_ones_stale_reading_alive()
     {
-        using var copy = new RegistryCopy(TownA);
-        copy.Replace("environments/prod.yaml", "signals: { instances: inventory }", "signals: { instances: inventory, requests: telemetry }");
-        copy.Replace("environments/prod.yaml", "\nsources:\n", "\nsources:\n  telemetry: { kind: loganalytics }\n");
-        var registry = Prod(copy.Path);
+        var registry = Prod(TownA);
         var time = new FakeTimeProvider(T0);
         var state = new LatestState();
-        state.Update("inventory", await Source(copy.Path, time).PollAsync(registry, CancellationToken.None));
+        state.Update("inventory", await Source(TownA, time).PollAsync(registry, CancellationToken.None));
         state.Update("telemetry", new Dictionary<string, NodeReading> { ["aa.orders-api"] = Reading(at: T0, rps: 12) });
         var builder = new SnapshotBuilder(registry, state, time)
         {
@@ -381,7 +375,7 @@ public class InstancesTests
         };
 
         time.Advance(TimeSpan.FromMinutes(2));
-        state.Update("inventory", await Source(copy.Path, time).PollAsync(registry, CancellationToken.None)); // the inventory is fresh, the telemetry is not
+        state.Update("inventory", await Source(TownA, time).PollAsync(registry, CancellationToken.None)); // the inventory is fresh, the telemetry is not
 
         Assert.Equal(HealthState.Stale, Node(builder.Build(), "aa.orders-api").State);
     }
@@ -400,7 +394,7 @@ public class InstancesTests
         for (var i = 0; i < 100; i++)
         {
             var snapshot = await client.GetFromJsonAsync<Snapshot>("/api/snapshot/latest", Wire, TestContext.Current.CancellationToken);
-            if (snapshot is not null && Node(snapshot, "aa.orders-api").State == HealthState.Healthy)
+            if (snapshot is not null && Node(snapshot, "aa.orders-api").State != HealthState.Stale)
                 return (snapshot, (await client.GetFromJsonAsync<SystemDetail>("/api/systems/aa.orders-api", Wire, TestContext.Current.CancellationToken))!);
             await Task.Delay(100, TestContext.Current.CancellationToken);
         }

@@ -129,6 +129,9 @@ public sealed record RegistryNode(
     double BacklogRed,
     IReadOnlyList<string> Calls)
 {
+    /// <summary>The fewest calls in a source's window that make the error share and latency worth judging. A system below it is quiet. Always at least 1: a window with no calls says nothing.</summary>
+    public int MinCalls { get; init; } = 1;
+
     /// <summary>For a data store with one database per tenant: its name with {tenant} where the tenant id goes. Null for everything else.</summary>
     public string? TenantPattern { get; init; }
 
@@ -172,6 +175,10 @@ public sealed record RegistrySource(string Name, string Kind, string? Connection
     /// <summary>How often it is asked, and how long one ask may take. Null: the default (<see cref="DefaultPollSeconds"/>, <see cref="DefaultTimeoutSeconds"/>).</summary>
     public double? PollSeconds { get; init; }
     public double? TimeoutSeconds { get; init; }
+
+    /// <summary>For a source that sends a query: the query template (see <see cref="SourceQuery"/>) and how far back it looks. Null: the adapter's own, or none.</summary>
+    public string? Query { get; init; }
+    public string? Window { get; init; }
 
     public const double DefaultPollSeconds = 30;
     public const double DefaultTimeoutSeconds = 10;

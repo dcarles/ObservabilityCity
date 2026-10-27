@@ -90,7 +90,8 @@ public sealed record NodeSnapshot(
     IReadOnlyList<string> GatewayCalls,
     DateTimeOffset? LastUpdated,
     IReadOnlyList<TenantUnitSnapshot>? Tenants,
-    IReadOnlyList<string> Absent);
+    IReadOnlyList<string> Absent,
+    bool Quiet = false);
 
 /// <summary>
 /// One tenant's database of a multi-tenant data store. Database is its real name (the store's tenantPattern with the tenant id put in).

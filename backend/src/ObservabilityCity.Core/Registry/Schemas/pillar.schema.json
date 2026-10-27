@@ -40,6 +40,7 @@
           "signals": { "$ref": "defs.schema.json#/$defs/signals" },
           "external": { "type": "boolean", "description": "Reached by callers outside the town." },
           "slaP99Ms": { "type": "number" },
+          "minCalls": { "type": "integer", "minimum": 1 },
           "errors": { "$ref": "defs.schema.json#/$defs/thresholds" },
           "resources": { "$ref": "defs.schema.json#/$defs/thresholds" },
           "throttle": { "$ref": "defs.schema.json#/$defs/thresholds" },

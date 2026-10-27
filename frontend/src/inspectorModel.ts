@@ -1,7 +1,7 @@
 // What the inspector drawer says, as pure functions: a system's numbers in, rows and sentences out.
 
 import type { ConfigValue, HealthState, IncidentSnapshot, LinkRef, LogLine, NodeSnapshot, ScopeInfo, ScopeResource, SettingLayer, SystemDetail } from './types'
-import { isAbsent, isUnmonitored } from './signals'
+import { isAbsent, isUnmonitored, QUIET_TEXT } from './signals'
 import { formatAge, formatMs, formatRate, plaqueText, resourceUse } from './visuals'
 
 export type Tone = 'ok' | 'warn' | 'bad' | 'stale' | ''
@@ -43,8 +43,8 @@ export function overviewRows(n: NodeSnapshot): Row[] {
   const rows: Row[] = []
   if (!isAbsent(n, 'instances')) rows.push({ label: 'Instances', value: plaqueText(n), tone: n.instancesHealthy < n.instancesTotal ? 'warn' : '' })
   if (!isAbsent(n, 'requests')) rows.push({ label: 'Requests', value: `${formatRate(n.requestsPerSecond)}/s`, tone: '' })
-  if (!isAbsent(n, 'errors')) rows.push({ label: 'Errors', value: pct(n.errorRate, 2), tone: n.errorRate >= n.errorRed ? 'bad' : n.errorRate >= n.errorAmber ? 'warn' : '' })
-  if (!isAbsent(n, 'latency')) rows.push({ label: 'p99 / SLA', value: `${formatMs(n.p99Ms)} / ${formatMs(n.slaP99Ms)}`, tone: n.p99Ms > n.slaP99Ms ? 'warn' : '' })
+  if (!isAbsent(n, 'errors')) rows.push(n.quiet ? { label: 'Errors', value: QUIET_TEXT, tone: '' } : { label: 'Errors', value: pct(n.errorRate, 2), tone: n.errorRate >= n.errorRed ? 'bad' : n.errorRate >= n.errorAmber ? 'warn' : '' })
+  if (!isAbsent(n, 'latency')) rows.push(n.quiet ? { label: 'p99 / SLA', value: QUIET_TEXT, tone: '' } : { label: 'p99 / SLA', value: `${formatMs(n.p99Ms)} / ${formatMs(n.slaP99Ms)}`, tone: n.p99Ms > n.slaP99Ms ? 'warn' : '' })
   if (!isAbsent(n, 'requests') && !isAbsent(n, 'instances')) rows.push({ label: 'Load', value: pct(n.load), tone: '' })
   const hot = (v: number) => (v >= n.resourceRed ? 'bad' : v >= n.resourceAmber ? 'warn' : '') as Tone
   if (n.cpu != null && !isAbsent(n, 'cpu')) rows.push({ label: 'CPU', value: pct(n.cpu), tone: hot(n.cpu) })
