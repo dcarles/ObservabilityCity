@@ -290,6 +290,47 @@ public class PlatformMetricsTests
     }
 
     [Fact]
+    public async Task An_entry_with_an_interval_asks_its_calls_at_that_grain_and_the_others_at_a_minute()
+    {
+        using var copy = new RegistryCopy(TownA);
+        copy.Replace("environments/prod.yaml", "- resources: accounts", "- resources: accounts\n        interval: 5m"); // some metrics (provisioned throughput) do not support a minute
+        var recording = AzureMonitorSource.ReadRecording(File.ReadAllText(Path.Combine(TownA, "platform.json")));
+        var http = new CannedHttp().Respond(r => FromRecording(r, recording));
+        var (source, registry) = await Platform(copy.Path, http);
+
+        await source.PollAsync(registry, CancellationToken.None);
+
+        string Interval(SentRequest r) => System.Web.HttpUtility.ParseQueryString(r.Uri!.Query)["interval"]!;
+        var accounts = http.Sent.Where(r => r.Uri!.AbsolutePath.Contains("/databaseaccounts/")).ToList();
+        var plans = http.Sent.Where(r => r.Uri!.AbsolutePath.Contains("/serverfarms/")).ToList();
+        Assert.Equal(5 * 4, accounts.Count);
+        Assert.All(accounts, r => Assert.Equal("PT5M", Interval(r)));
+        Assert.All(plans, r => Assert.Equal("PT1M", Interval(r)));
+    }
+
+    [Theory]
+    [InlineData("1m", "PT1M")]
+    [InlineData("15m", "PT15M")]
+    [InlineData("1h", "PT1H")]
+    [InlineData("6h", "PT6H")]
+    [InlineData("24h", "P1D")]
+    public void A_grain_is_written_the_way_the_metrics_api_takes_it(string text, string iso)
+    {
+        Assert.True(SourceQuery.TryParseWindow(text, out var grain));
+
+        Assert.Equal(iso, AzureMonitorReader.Iso(grain));
+    }
+
+    [Fact]
+    public void An_interval_the_metrics_api_does_not_offer_is_a_mistake_that_lists_the_ones_it_does()
+    {
+        var message = LoadError(_ => ["- resources: accounts", "- resources: accounts\n        interval: 7m"]);
+
+        Assert.Contains("metrics[1]: interval '7m' is not a time grain the metrics API offers", message);
+        Assert.Contains("1m, 5m, 15m, 30m, 1h, 6h, 12h, 1d", message);
+    }
+
+    [Fact]
     public async Task A_refused_read_fails_the_poll_and_says_how_many_and_what_the_cloud_answered()
     {
         var http = new CannedHttp().Respond(r => r.Uri!.AbsolutePath.Contains("westeurope9z")
