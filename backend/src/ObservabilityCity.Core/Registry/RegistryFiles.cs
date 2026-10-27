@@ -262,6 +262,8 @@ internal sealed class MetricGroupFile
     public MetricSignalFile? Throttled { get; set; }
     /// <summary>The request rate of a store, shown per tenant database.</summary>
     public MetricSignalFile? Requests { get; set; }
+    /// <summary>The provisioned capacity as a plain number (for Cosmos, the ProvisionedThroughput metric with maximum), shown beside each tenant database. Not a health signal.</summary>
+    public MetricSignalFile? Limit { get; set; }
 }
 
 internal sealed class MetricSignalFile

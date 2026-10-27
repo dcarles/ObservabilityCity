@@ -32,6 +32,8 @@ sources:
         # requests answered with 429 as a share of all requests
         throttled: { metric: TotalRequests, aggregation: count, filter: "StatusCode eq '429'", over: { metric: TotalRequests, aggregation: count } }
         requests: { metric: TotalRequests, aggregation: count, perSecond: true }
+        # what is provisioned, as a number, to show beside each tenant's database
+        limit: { metric: ProvisionedThroughput, aggregation: maximum }
 scope:
   inventory: inventory
   variables: { env: prd }
