@@ -186,6 +186,20 @@ public class RegistryValidationTests
     }
 
     [Fact]
+    public void The_environment_schema_names_every_key_a_metrics_entry_and_its_signals_can_have()
+    {
+        // the schema is written by hand; without this an editor flags a valid key as a mistake as soon as the loader learns it
+        static IEnumerable<string> Keys(string type) => typeof(RegistryLoader).Assembly.GetType($"ObservabilityCity.Core.Registry.{type}")!
+            .GetProperties().Select(p => char.ToLowerInvariant(p.Name[0]) + p.Name[1..]);
+        var schema = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(Path.Combine(TestPaths.Registry, RegistrySchema.FolderName, "environment.schema.json")))!;
+        var entry = schema["properties"]!["sources"]!["additionalProperties"]!["properties"]!["metrics"]!["items"]!["properties"]!.AsObject().Select(p => p.Key);
+        var signal = schema["$defs"]!["metricSignal"]!["properties"]!.AsObject().Select(p => p.Key);
+
+        Assert.Equal(Keys("MetricGroupFile").Order(), entry.Order());
+        Assert.Equal(Keys("MetricSignalFile").Order(), signal.Order());
+    }
+
+    [Fact]
     public void Every_sample_yaml_file_points_at_its_schema()
     {
         foreach (var file in Directory.GetFiles(TestPaths.Registry, "*.yaml", SearchOption.AllDirectories).Where(f => Path.GetFileName(f) != "fake.yaml"))
@@ -255,5 +269,24 @@ public class RegistryValidationTests
         using var f = new Folder(Pillars(24));
 
         Assert.Throws<RegistryException>(() => RegistryLoader.LoadResilient(f.Path));
+    }
+
+    [Fact]
+    public void The_config_reference_lists_every_key_the_loader_reads()
+    {
+        // each section of docs/config-reference.md is tagged with the file type it describes; its table must name exactly that type's keys
+        var doc = File.ReadAllText(Path.Combine(TestPaths.RepoRoot, "docs", "config-reference.md")).ReplaceLineEndings("\n");
+        var sections = System.Text.RegularExpressions.Regex.Matches(doc, @"<!-- file: (\w+) -->\n((?:\|.*\n?)+)");
+        var documented = sections.ToDictionary(m => m.Groups[1].Value, m => System.Text.RegularExpressions.Regex.Matches(m.Groups[2].Value, @"^\| `(\w+)` \|", System.Text.RegularExpressions.RegexOptions.Multiline).Select(k => k.Groups[1].Value).Order().ToList());
+        var types = typeof(RegistryLoader).Assembly.GetTypes()
+            .Where(t => t.Namespace == "ObservabilityCity.Core.Registry" && t.Name.EndsWith("File", StringComparison.Ordinal) && t.IsClass)
+            .Where(t => t.Name != "DefaultsFile");
+
+        foreach (var type in types)
+        {
+            Assert.True(documented.ContainsKey(type.Name), $"docs/config-reference.md has no section tagged <!-- file: {type.Name} -->");
+            var keys = type.GetProperties().Select(p => char.ToLowerInvariant(p.Name[0]) + p.Name[1..]).Order().ToList();
+            Assert.Equal(keys, documented[type.Name]);
+        }
     }
 }
