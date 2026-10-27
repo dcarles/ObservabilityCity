@@ -62,10 +62,11 @@ test.describe('Droid Shop', () => {
     expect(await page.evaluate(() => (window as any).city.seen.last.groupLabel)).toBe('Team')
   })
 
-  test('has Kafka at the platform, and the port reads KAFKA on its sign and on its board', async ({ town, page }) => {
+  test('has Kafka at the platform, and the port reads KAFKA on its sign and its billboard', async ({ town, page }) => {
     await town.open()
     const hub = await town.hub()
-    expect(hub.sign).toEqual({ board: 'KAFKA', model: 'KAFKA' })
+    expect(hub.sign).toMatchObject({ board: 'KAFKA', model: 'KAFKA' })
+    expect(hub.sign.counts).toBe('3 topics · 6 subscriptions · 5 piers')
     expect(hub).toMatchObject({ topics: 3, subscriptions: 6, piers: 5 })
     const kafka = await town.inspect('hub.kafka')
     expect(kafka.kind).toBe('Broker')
