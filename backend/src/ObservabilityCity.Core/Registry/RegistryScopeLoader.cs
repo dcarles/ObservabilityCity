@@ -38,7 +38,8 @@ public static partial class RegistryLoader
     private static List<MetricGroup> ToMetrics(List<MetricGroupFile> files) =>
         files.Select(g => new MetricGroup(g.Resources, string.IsNullOrWhiteSpace(g.Namespace) ? null : g.Namespace.Trim(),
             new[] { ("cpu", g.Cpu), ("memory", g.Memory), ("utilisation", g.Utilisation), ("throttled", g.Throttled), ("requests", g.Requests) }
-                .Where(x => x.Item2 is not null).ToDictionary(x => x.Item1, x => ToSignal(x.Item2)!))).ToList();
+                .Where(x => x.Item2 is not null).ToDictionary(x => x.Item1, x => ToSignal(x.Item2)!),
+            string.IsNullOrWhiteSpace(g.Interval) ? null : SourceQuery.TryParseWindow(g.Interval, out var interval) ? interval : null)).ToList();
 
     private static void CheckMetrics(EnvironmentFile f, SourceFile def, string source, string name, List<string> errors)
     {
@@ -51,6 +52,8 @@ public static partial class RegistryLoader
             var at = $"{name}: source '{source}' metrics[{i}]";
             if (!rules.Contains(group.Resources))
                 errors.Add($"{at}: resources '{group.Resources}' is not a rule of scope.resources.{(rules.Count == 0 ? " This file has no scope.resources." : $" Use {string.Join(", ", rules)}.")}{DidYouMean.Hint(group.Resources, rules)}");
+            if (group.Interval is { } grain && (!SourceQuery.TryParseWindow(grain, out var parsed) || !MetricGroup.IntervalMinutes.Contains((int)Math.Round(parsed.TotalMinutes)) || Math.Abs(parsed.TotalMinutes - Math.Round(parsed.TotalMinutes)) > 1e-9))
+                errors.Add($"{at}: interval '{grain}' is not a time grain the metrics API offers. Use one of {string.Join(", ", MetricGroup.IntervalMinutes.Select(m => m % 1440 == 0 ? $"{m / 1440}d" : m % 60 == 0 ? $"{m / 60}h" : $"{m}m"))}");
             var signals = new[] { ("cpu", group.Cpu), ("memory", group.Memory), ("utilisation", group.Utilisation), ("throttled", group.Throttled), ("requests", group.Requests) }.Where(x => x.Item2 is not null).ToList();
             if (signals.Count == 0) errors.Add($"{at}: it asks for no signal. Give at least one of {string.Join(", ", MetricGroup.SignalNames)}");
             foreach (var (signal, spec) in signals)

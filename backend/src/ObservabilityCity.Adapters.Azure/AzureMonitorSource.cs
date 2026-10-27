@@ -10,9 +10,10 @@ using TownRegistry = ObservabilityCity.Core.Registry.Registry;
 namespace ObservabilityCity.Adapters.Azure;
 
 /// <summary>One question to the metrics API: these metrics, added up this way, filtered like this. Metrics that agree on the rest share one call.</summary>
-public sealed record MetricCall(string? Namespace, string Aggregation, string? Filter)
+public sealed record MetricCall(string? Namespace, string Aggregation, string? Filter, string Interval = AzureMonitorReader.Interval)
 {
-    public static MetricCall Of(string? ns, MetricSignal spec) => new(ns, spec.Aggregation, spec.Filter);
+    public static MetricCall Of(string? ns, MetricSignal spec, TimeSpan? interval = null) =>
+        new(ns, spec.Aggregation, spec.Filter, interval is { } i ? AzureMonitorReader.Iso(i) : AzureMonitorReader.Interval);
 }
 
 /// <summary>The points one metric gave over the window, as asked: this metric, added up this way, with this filter. No point is a gap the cloud left, not a zero.</summary>
@@ -27,7 +28,12 @@ public sealed class AzureMonitorReader(HttpClient http, ICredentialSource? crede
     public const string TokenScope = "https://management.azure.com/.default";
     public const string Endpoint = "https://management.azure.com";
     public const string ApiVersion = "2018-01-01";
+    /// <summary>The grain asked for when the entry does not say: a minute.</summary>
     public const string Interval = "PT1M";
+
+    /// <summary>A time grain in the ISO form the metrics API takes: PT5M, PT1H, P1D.</summary>
+    public static string Iso(TimeSpan grain) => grain.TotalDays >= 1 && grain.TotalHours % 24 == 0 ? $"P{(int)grain.TotalDays}D"
+        : grain.TotalHours >= 1 && grain.TotalMinutes % 60 == 0 ? $"PT{(int)grain.TotalHours}H" : $"PT{(int)Math.Round(grain.TotalMinutes)}M";
 
     public static string Url(string resourceId, MetricCall call, IEnumerable<string> metrics, DateTimeOffset end, TimeSpan window)
     {
@@ -35,7 +41,7 @@ public sealed class AzureMonitorReader(HttpClient http, ICredentialSource? crede
         var timespan = $"{end.UtcDateTime - window:yyyy-MM-dd'T'HH:mm:ss'Z'}/{end.UtcDateTime.ToString(format, CultureInfo.InvariantCulture)}";
         var url = $"{Endpoint}{resourceId.TrimEnd('/')}/providers/Microsoft.Insights/metrics?api-version={ApiVersion}" +
                   $"&metricnames={string.Join(',', metrics.Select(Uri.EscapeDataString))}&aggregation={Uri.EscapeDataString(Capitalised(call.Aggregation))}" +
-                  $"&timespan={Uri.EscapeDataString(timespan)}&interval={Interval}";
+                  $"&timespan={Uri.EscapeDataString(timespan)}&interval={call.Interval}";
         if (call.Namespace is not null) url += $"&metricnamespace={Uri.EscapeDataString(call.Namespace)}";
         if (call.Filter is not null) url += $"&$filter={Uri.EscapeDataString(call.Filter)}";
         return url;
@@ -181,7 +187,7 @@ public sealed class AzureMonitorSource(
     /// <summary>The metric specs of an entry with the call each needs. Specs that agree on namespace, aggregation and filter are asked together.</summary>
     private static IEnumerable<(MetricCall Call, IReadOnlyList<string> Metrics)> Calls(MetricGroup group) =>
         group.Signals.Values.SelectMany(s => s.Over is null ? [s] : new[] { s, s.Over })
-            .GroupBy(s => MetricCall.Of(group.Namespace, s))
+            .GroupBy(s => MetricCall.Of(group.Namespace, s, group.Interval))
             .Select(g => (g.Key, (IReadOnlyList<string>)g.Select(s => s.Metric).Distinct(StringComparer.OrdinalIgnoreCase).ToList()));
 
     private async Task<IReadOnlyList<MetricSeries>> ReadResource(Target target, DateTimeOffset at, CancellationToken ct)
