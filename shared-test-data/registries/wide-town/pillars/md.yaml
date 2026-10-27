@@ -1,0 +1,35 @@
+# 10 services of an API, a worker and a database each: the island grows with the number of service pads, from two to six pads a row
+pillar: md
+displayName: Pillar MD (10 services)
+color: "#e8a23c"
+systems:
+  - { id: md.s01-api, service: md-s01, name: Service 01 API, role: api, external: true, calls: [md.s01-db, md.s02-api] }
+  - { id: md.s01-worker, service: md-s01, name: Service 01 worker, role: worker, calls: [md.s01-db] }
+  - { id: md.s01-db, service: md-s01, name: Service 01 DB, role: db }
+  - { id: md.s02-api, service: md-s02, name: Service 02 API, role: api, calls: [md.s02-db, md.s03-api] }
+  - { id: md.s02-worker, service: md-s02, name: Service 02 worker, role: worker, calls: [md.s02-db] }
+  - { id: md.s02-db, service: md-s02, name: Service 02 DB, role: db }
+  - { id: md.s03-api, service: md-s03, name: Service 03 API, role: api, calls: [md.s03-db, md.s04-api] }
+  - { id: md.s03-worker, service: md-s03, name: Service 03 worker, role: worker, calls: [md.s03-db] }
+  - { id: md.s03-db, service: md-s03, name: Service 03 DB, role: db }
+  - { id: md.s04-api, service: md-s04, name: Service 04 API, role: api, calls: [md.s04-db, md.s05-api] }
+  - { id: md.s04-worker, service: md-s04, name: Service 04 worker, role: worker, calls: [md.s04-db] }
+  - { id: md.s04-db, service: md-s04, name: Service 04 DB, role: db }
+  - { id: md.s05-api, service: md-s05, name: Service 05 API, role: api, calls: [md.s05-db, md.s06-api] }
+  - { id: md.s05-worker, service: md-s05, name: Service 05 worker, role: worker, calls: [md.s05-db] }
+  - { id: md.s05-db, service: md-s05, name: Service 05 DB, role: db }
+  - { id: md.s06-api, service: md-s06, name: Service 06 API, role: api, calls: [md.s06-db, md.s07-api] }
+  - { id: md.s06-worker, service: md-s06, name: Service 06 worker, role: worker, calls: [md.s06-db] }
+  - { id: md.s06-db, service: md-s06, name: Service 06 DB, role: db }
+  - { id: md.s07-api, service: md-s07, name: Service 07 API, role: api, calls: [md.s07-db, md.s08-api] }
+  - { id: md.s07-worker, service: md-s07, name: Service 07 worker, role: worker, calls: [md.s07-db] }
+  - { id: md.s07-db, service: md-s07, name: Service 07 DB, role: db }
+  - { id: md.s08-api, service: md-s08, name: Service 08 API, role: api, calls: [md.s08-db, md.s09-api] }
+  - { id: md.s08-worker, service: md-s08, name: Service 08 worker, role: worker, calls: [md.s08-db] }
+  - { id: md.s08-db, service: md-s08, name: Service 08 DB, role: db }
+  - { id: md.s09-api, service: md-s09, name: Service 09 API, role: api, calls: [md.s09-db, md.s10-api] }
+  - { id: md.s09-worker, service: md-s09, name: Service 09 worker, role: worker, calls: [md.s09-db] }
+  - { id: md.s09-db, service: md-s09, name: Service 09 DB, role: db }
+  - { id: md.s10-api, service: md-s10, name: Service 10 API, role: api, calls: [md.s10-db] }
+  - { id: md.s10-worker, service: md-s10, name: Service 10 worker, role: worker, calls: [md.s10-db] }
+  - { id: md.s10-db, service: md-s10, name: Service 10 DB, role: db }

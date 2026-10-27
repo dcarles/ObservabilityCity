@@ -1,0 +1,50 @@
+# 15 services of an API, a worker and a database each: the island grows with the number of service pads, from two to six pads a row
+pillar: wd
+displayName: Pillar WD (15 services)
+color: "#4dc3c9"
+systems:
+  - { id: wd.s01-api, service: wd-s01, name: Service 01 API, role: api, external: true, calls: [wd.s01-db, wd.s02-api] }
+  - { id: wd.s01-worker, service: wd-s01, name: Service 01 worker, role: worker, calls: [wd.s01-db] }
+  - { id: wd.s01-db, service: wd-s01, name: Service 01 DB, role: db }
+  - { id: wd.s02-api, service: wd-s02, name: Service 02 API, role: api, calls: [wd.s02-db, wd.s03-api] }
+  - { id: wd.s02-worker, service: wd-s02, name: Service 02 worker, role: worker, calls: [wd.s02-db] }
+  - { id: wd.s02-db, service: wd-s02, name: Service 02 DB, role: db }
+  - { id: wd.s03-api, service: wd-s03, name: Service 03 API, role: api, calls: [wd.s03-db, wd.s04-api] }
+  - { id: wd.s03-worker, service: wd-s03, name: Service 03 worker, role: worker, calls: [wd.s03-db] }
+  - { id: wd.s03-db, service: wd-s03, name: Service 03 DB, role: db }
+  - { id: wd.s04-api, service: wd-s04, name: Service 04 API, role: api, calls: [wd.s04-db, wd.s05-api] }
+  - { id: wd.s04-worker, service: wd-s04, name: Service 04 worker, role: worker, calls: [wd.s04-db] }
+  - { id: wd.s04-db, service: wd-s04, name: Service 04 DB, role: db }
+  - { id: wd.s05-api, service: wd-s05, name: Service 05 API, role: api, calls: [wd.s05-db, wd.s06-api] }
+  - { id: wd.s05-worker, service: wd-s05, name: Service 05 worker, role: worker, calls: [wd.s05-db] }
+  - { id: wd.s05-db, service: wd-s05, name: Service 05 DB, role: db }
+  - { id: wd.s06-api, service: wd-s06, name: Service 06 API, role: api, calls: [wd.s06-db, wd.s07-api] }
+  - { id: wd.s06-worker, service: wd-s06, name: Service 06 worker, role: worker, calls: [wd.s06-db] }
+  - { id: wd.s06-db, service: wd-s06, name: Service 06 DB, role: db }
+  - { id: wd.s07-api, service: wd-s07, name: Service 07 API, role: api, calls: [wd.s07-db, wd.s08-api] }
+  - { id: wd.s07-worker, service: wd-s07, name: Service 07 worker, role: worker, calls: [wd.s07-db] }
+  - { id: wd.s07-db, service: wd-s07, name: Service 07 DB, role: db }
+  - { id: wd.s08-api, service: wd-s08, name: Service 08 API, role: api, calls: [wd.s08-db, wd.s09-api] }
+  - { id: wd.s08-worker, service: wd-s08, name: Service 08 worker, role: worker, calls: [wd.s08-db] }
+  - { id: wd.s08-db, service: wd-s08, name: Service 08 DB, role: db }
+  - { id: wd.s09-api, service: wd-s09, name: Service 09 API, role: api, calls: [wd.s09-db, wd.s10-api] }
+  - { id: wd.s09-worker, service: wd-s09, name: Service 09 worker, role: worker, calls: [wd.s09-db] }
+  - { id: wd.s09-db, service: wd-s09, name: Service 09 DB, role: db }
+  - { id: wd.s10-api, service: wd-s10, name: Service 10 API, role: api, calls: [wd.s10-db, wd.s11-api] }
+  - { id: wd.s10-worker, service: wd-s10, name: Service 10 worker, role: worker, calls: [wd.s10-db] }
+  - { id: wd.s10-db, service: wd-s10, name: Service 10 DB, role: db }
+  - { id: wd.s11-api, service: wd-s11, name: Service 11 API, role: api, calls: [wd.s11-db, wd.s12-api] }
+  - { id: wd.s11-worker, service: wd-s11, name: Service 11 worker, role: worker, calls: [wd.s11-db] }
+  - { id: wd.s11-db, service: wd-s11, name: Service 11 DB, role: db }
+  - { id: wd.s12-api, service: wd-s12, name: Service 12 API, role: api, calls: [wd.s12-db, wd.s13-api] }
+  - { id: wd.s12-worker, service: wd-s12, name: Service 12 worker, role: worker, calls: [wd.s12-db] }
+  - { id: wd.s12-db, service: wd-s12, name: Service 12 DB, role: db }
+  - { id: wd.s13-api, service: wd-s13, name: Service 13 API, role: api, calls: [wd.s13-db, wd.s14-api] }
+  - { id: wd.s13-worker, service: wd-s13, name: Service 13 worker, role: worker, calls: [wd.s13-db] }
+  - { id: wd.s13-db, service: wd-s13, name: Service 13 DB, role: db }
+  - { id: wd.s14-api, service: wd-s14, name: Service 14 API, role: api, calls: [wd.s14-db, wd.s15-api] }
+  - { id: wd.s14-worker, service: wd-s14, name: Service 14 worker, role: worker, calls: [wd.s14-db] }
+  - { id: wd.s14-db, service: wd-s14, name: Service 14 DB, role: db }
+  - { id: wd.s15-api, service: wd-s15, name: Service 15 API, role: api, calls: [wd.s15-db] }
+  - { id: wd.s15-worker, service: wd-s15, name: Service 15 worker, role: worker, calls: [wd.s15-db] }
+  - { id: wd.s15-db, service: wd-s15, name: Service 15 DB, role: db }

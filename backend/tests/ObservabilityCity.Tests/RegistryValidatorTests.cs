@@ -16,6 +16,7 @@ public class RegistryValidatorTests
     [InlineData("shared-test-data/registries/live-town")]
     [InlineData("shared-test-data/registries/links-town")]
     [InlineData("shared-test-data/registries/stress-23")]
+    [InlineData("shared-test-data/registries/wide-town")]
     [InlineData("shared-test-data/registries/stress-35")]
     public void Every_registry_in_the_repo_is_clean(string folder)
     {

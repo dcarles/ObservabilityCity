@@ -7,6 +7,8 @@ export interface BayTarget {
   x: number
   roadZ: number
   col: 0 | 1
+  /** Distance from the spine where the service lane starts, when it is not beside the spine. Queues stay inside it. */
+  laneStart?: number
 }
 
 /**
@@ -18,7 +20,7 @@ export function bayTo(dest: BayTarget, w: (x: number, z: number) => THREE.Vector
   const out = dest.col === 0 ? -1 : 1
   const slot = (k: number) => w(dest.x - out * QUEUE_GAP * k, dest.roadZ - LANE_Z)
   // five cars wait where the lane is long enough, three beside the spine
-  const n = Math.max(3, Math.min(LANE_SLOTS, Math.floor((Math.abs(dest.x) - 5) / QUEUE_GAP) + 1))
+  const n = Math.max(3, Math.min(LANE_SLOTS, Math.floor((Math.abs(dest.x) - (dest.laneStart ?? 5)) / QUEUE_GAP) + 1))
   const tailX = dest.x - out * ((n - 1) * QUEUE_GAP)
   let mergeX = tailX - out * 3.6
   if (Math.abs(mergeX) < 2.8) mergeX = out * 2.8

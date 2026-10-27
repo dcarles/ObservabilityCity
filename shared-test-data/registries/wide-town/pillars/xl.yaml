@@ -1,0 +1,86 @@
+# 27 services of an API, a worker and a database each: the island grows with the number of service pads, from two to six pads a row
+pillar: xl
+displayName: Pillar XL (27 services)
+color: "#b07cf0"
+systems:
+  - { id: xl.s01-api, service: xl-s01, name: Service 01 API, role: api, external: true, calls: [xl.s01-db, xl.s02-api] }
+  - { id: xl.s01-worker, service: xl-s01, name: Service 01 worker, role: worker, calls: [xl.s01-db] }
+  - { id: xl.s01-db, service: xl-s01, name: Service 01 DB, role: db }
+  - { id: xl.s02-api, service: xl-s02, name: Service 02 API, role: api, calls: [xl.s02-db, xl.s03-api] }
+  - { id: xl.s02-worker, service: xl-s02, name: Service 02 worker, role: worker, calls: [xl.s02-db] }
+  - { id: xl.s02-db, service: xl-s02, name: Service 02 DB, role: db }
+  - { id: xl.s03-api, service: xl-s03, name: Service 03 API, role: api, calls: [xl.s03-db, xl.s04-api] }
+  - { id: xl.s03-worker, service: xl-s03, name: Service 03 worker, role: worker, calls: [xl.s03-db] }
+  - { id: xl.s03-db, service: xl-s03, name: Service 03 DB, role: db }
+  - { id: xl.s04-api, service: xl-s04, name: Service 04 API, role: api, calls: [xl.s04-db, xl.s05-api] }
+  - { id: xl.s04-worker, service: xl-s04, name: Service 04 worker, role: worker, calls: [xl.s04-db] }
+  - { id: xl.s04-db, service: xl-s04, name: Service 04 DB, role: db }
+  - { id: xl.s05-api, service: xl-s05, name: Service 05 API, role: api, calls: [xl.s05-db, xl.s06-api] }
+  - { id: xl.s05-worker, service: xl-s05, name: Service 05 worker, role: worker, calls: [xl.s05-db] }
+  - { id: xl.s05-db, service: xl-s05, name: Service 05 DB, role: db }
+  - { id: xl.s06-api, service: xl-s06, name: Service 06 API, role: api, calls: [xl.s06-db, xl.s07-api] }
+  - { id: xl.s06-worker, service: xl-s06, name: Service 06 worker, role: worker, calls: [xl.s06-db] }
+  - { id: xl.s06-db, service: xl-s06, name: Service 06 DB, role: db }
+  - { id: xl.s07-api, service: xl-s07, name: Service 07 API, role: api, calls: [xl.s07-db, xl.s08-api] }
+  - { id: xl.s07-worker, service: xl-s07, name: Service 07 worker, role: worker, calls: [xl.s07-db] }
+  - { id: xl.s07-db, service: xl-s07, name: Service 07 DB, role: db }
+  - { id: xl.s08-api, service: xl-s08, name: Service 08 API, role: api, calls: [xl.s08-db, xl.s09-api] }
+  - { id: xl.s08-worker, service: xl-s08, name: Service 08 worker, role: worker, calls: [xl.s08-db] }
+  - { id: xl.s08-db, service: xl-s08, name: Service 08 DB, role: db }
+  - { id: xl.s09-api, service: xl-s09, name: Service 09 API, role: api, calls: [xl.s09-db, xl.s10-api] }
+  - { id: xl.s09-worker, service: xl-s09, name: Service 09 worker, role: worker, calls: [xl.s09-db] }
+  - { id: xl.s09-db, service: xl-s09, name: Service 09 DB, role: db }
+  - { id: xl.s10-api, service: xl-s10, name: Service 10 API, role: api, calls: [xl.s10-db, xl.s11-api] }
+  - { id: xl.s10-worker, service: xl-s10, name: Service 10 worker, role: worker, calls: [xl.s10-db] }
+  - { id: xl.s10-db, service: xl-s10, name: Service 10 DB, role: db }
+  - { id: xl.s11-api, service: xl-s11, name: Service 11 API, role: api, calls: [xl.s11-db, xl.s12-api] }
+  - { id: xl.s11-worker, service: xl-s11, name: Service 11 worker, role: worker, calls: [xl.s11-db] }
+  - { id: xl.s11-db, service: xl-s11, name: Service 11 DB, role: db }
+  - { id: xl.s12-api, service: xl-s12, name: Service 12 API, role: api, calls: [xl.s12-db, xl.s13-api] }
+  - { id: xl.s12-worker, service: xl-s12, name: Service 12 worker, role: worker, calls: [xl.s12-db] }
+  - { id: xl.s12-db, service: xl-s12, name: Service 12 DB, role: db }
+  - { id: xl.s13-api, service: xl-s13, name: Service 13 API, role: api, calls: [xl.s13-db, xl.s14-api] }
+  - { id: xl.s13-worker, service: xl-s13, name: Service 13 worker, role: worker, calls: [xl.s13-db] }
+  - { id: xl.s13-db, service: xl-s13, name: Service 13 DB, role: db }
+  - { id: xl.s14-api, service: xl-s14, name: Service 14 API, role: api, calls: [xl.s14-db, xl.s15-api] }
+  - { id: xl.s14-worker, service: xl-s14, name: Service 14 worker, role: worker, calls: [xl.s14-db] }
+  - { id: xl.s14-db, service: xl-s14, name: Service 14 DB, role: db }
+  - { id: xl.s15-api, service: xl-s15, name: Service 15 API, role: api, calls: [xl.s15-db, xl.s16-api] }
+  - { id: xl.s15-worker, service: xl-s15, name: Service 15 worker, role: worker, calls: [xl.s15-db] }
+  - { id: xl.s15-db, service: xl-s15, name: Service 15 DB, role: db }
+  - { id: xl.s16-api, service: xl-s16, name: Service 16 API, role: api, calls: [xl.s16-db, xl.s17-api] }
+  - { id: xl.s16-worker, service: xl-s16, name: Service 16 worker, role: worker, calls: [xl.s16-db] }
+  - { id: xl.s16-db, service: xl-s16, name: Service 16 DB, role: db }
+  - { id: xl.s17-api, service: xl-s17, name: Service 17 API, role: api, calls: [xl.s17-db, xl.s18-api] }
+  - { id: xl.s17-worker, service: xl-s17, name: Service 17 worker, role: worker, calls: [xl.s17-db] }
+  - { id: xl.s17-db, service: xl-s17, name: Service 17 DB, role: db }
+  - { id: xl.s18-api, service: xl-s18, name: Service 18 API, role: api, calls: [xl.s18-db, xl.s19-api] }
+  - { id: xl.s18-worker, service: xl-s18, name: Service 18 worker, role: worker, calls: [xl.s18-db] }
+  - { id: xl.s18-db, service: xl-s18, name: Service 18 DB, role: db }
+  - { id: xl.s19-api, service: xl-s19, name: Service 19 API, role: api, calls: [xl.s19-db, xl.s20-api] }
+  - { id: xl.s19-worker, service: xl-s19, name: Service 19 worker, role: worker, calls: [xl.s19-db] }
+  - { id: xl.s19-db, service: xl-s19, name: Service 19 DB, role: db }
+  - { id: xl.s20-api, service: xl-s20, name: Service 20 API, role: api, calls: [xl.s20-db, xl.s21-api] }
+  - { id: xl.s20-worker, service: xl-s20, name: Service 20 worker, role: worker, calls: [xl.s20-db] }
+  - { id: xl.s20-db, service: xl-s20, name: Service 20 DB, role: db }
+  - { id: xl.s21-api, service: xl-s21, name: Service 21 API, role: api, calls: [xl.s21-db, xl.s22-api] }
+  - { id: xl.s21-worker, service: xl-s21, name: Service 21 worker, role: worker, calls: [xl.s21-db] }
+  - { id: xl.s21-db, service: xl-s21, name: Service 21 DB, role: db }
+  - { id: xl.s22-api, service: xl-s22, name: Service 22 API, role: api, calls: [xl.s22-db, xl.s23-api] }
+  - { id: xl.s22-worker, service: xl-s22, name: Service 22 worker, role: worker, calls: [xl.s22-db] }
+  - { id: xl.s22-db, service: xl-s22, name: Service 22 DB, role: db }
+  - { id: xl.s23-api, service: xl-s23, name: Service 23 API, role: api, calls: [xl.s23-db, xl.s24-api] }
+  - { id: xl.s23-worker, service: xl-s23, name: Service 23 worker, role: worker, calls: [xl.s23-db] }
+  - { id: xl.s23-db, service: xl-s23, name: Service 23 DB, role: db }
+  - { id: xl.s24-api, service: xl-s24, name: Service 24 API, role: api, calls: [xl.s24-db, xl.s25-api] }
+  - { id: xl.s24-worker, service: xl-s24, name: Service 24 worker, role: worker, calls: [xl.s24-db] }
+  - { id: xl.s24-db, service: xl-s24, name: Service 24 DB, role: db }
+  - { id: xl.s25-api, service: xl-s25, name: Service 25 API, role: api, calls: [xl.s25-db, xl.s26-api] }
+  - { id: xl.s25-worker, service: xl-s25, name: Service 25 worker, role: worker, calls: [xl.s25-db] }
+  - { id: xl.s25-db, service: xl-s25, name: Service 25 DB, role: db }
+  - { id: xl.s26-api, service: xl-s26, name: Service 26 API, role: api, calls: [xl.s26-db, xl.s27-api] }
+  - { id: xl.s26-worker, service: xl-s26, name: Service 26 worker, role: worker, calls: [xl.s26-db] }
+  - { id: xl.s26-db, service: xl-s26, name: Service 26 DB, role: db }
+  - { id: xl.s27-api, service: xl-s27, name: Service 27 API, role: api, calls: [xl.s27-db] }
+  - { id: xl.s27-worker, service: xl-s27, name: Service 27 worker, role: worker, calls: [xl.s27-db] }
+  - { id: xl.s27-db, service: xl-s27, name: Service 27 DB, role: db }

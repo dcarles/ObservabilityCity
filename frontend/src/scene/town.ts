@@ -6,7 +6,7 @@ import type { GroupSnapshot, NodeSnapshot, Snapshot } from '../types'
 import { palette } from '../themes/active'
 import { blockPad, bench, bridge, crates, fountain, junction, lamp, pier, prop, ring, roadBetween, ROAD_W, serviceLane, street, streetX } from './props'
 import { buildIslandBody, GROUND, makeOutline, scatterNature, type Outline, type Rect } from './island'
-import { COL_X, CURB, LANE_Z, PAD_D, PAD_W, coastScan, planIsland, type Placed, type Plan } from './plan'
+import { CURB, LANE_Z, PAD_D, PAD_W, coastScan, laneStart, padX, planIsland, rowEdge, type Placed, type Plan } from './plan'
 import { hashString } from './random'
 import { clamp, speedFactor } from '../visuals'
 import { CarSystem, type Route } from './cars'
@@ -726,7 +726,7 @@ export class Town {
     root.add(decor)
 
     const { rows, rowRoadZ } = plan
-    const edge = COL_X + PAD_W / 2 + 0.4
+    const edge = rowEdge(plan.pads)
     const gateZ = coastScan(outline, 'z') - 0.6
     const harbourRow = Math.floor((rows - 1) / 2)
     const harbourZ = rowRoadZ[harbourRow]
@@ -764,11 +764,11 @@ export class Town {
     for (const pad of plan.pads) {
       const roadZ = rowRoadZ[pad.row]
       const zf = roadZ - CURB
-      const cx = (pad.col === 0 ? -1 : 1) * COL_X
+      const cx = padX(pad)
       decor.add(blockPad(cx, zf - PAD_D, zf, PAD_W))
       // the service lane in front of the pad: where cars pull in, wait their turn and are served
       const out = pad.col === 0 ? -1 : 1
-      const laneFrom = out * 3.0, laneTo = cx + out * (PAD_W / 2 + 0.4)
+      const laneFrom = pad.ring === 0 ? out * 3.0 : cx - out * (PAD_W / 2 + 0.4), laneTo = cx + out * (PAD_W / 2 + 0.4)
       decor.add(serviceLane((laneFrom + laneTo) / 2, roadZ - LANE_Z, Math.abs(laneTo - laneFrom), CURB - 2.1 - 0.7))
       avoid.push({ x: cx, z: zf - PAD_D / 2, w: PAD_W + 1, d: PAD_D + 1 })
       for (const side of [-1, 1]) decor.add(lamp(cx + side * (PAD_W / 2 - 3.4), zf + 0.45, 0, -Math.PI / 2))
@@ -792,12 +792,13 @@ export class Town {
       if (p.node.kind === 'Worker') decor.add(prop('dumpster', p.x + 2.4, p.z - 3.6, 0.2))
       if (p.node.kind === 'Api') decor.add(prop('firehydrant', p.x + 2.9, zf + 0.5, 0, 2.4))
     }
-    // a spare cell in the grid becomes a small park
-    if (plan.pads.length % 2 === 1) {
-      const row = rows - 1
-      const zf = rowRoadZ[row] - CURB
-      decor.add(...parkProps(COL_X, zf - PAD_D / 2))
-      avoid.push({ x: COL_X, z: zf - PAD_D / 2, w: PAD_W + 1, d: PAD_D + 1 })
+    // the first spare cell of the last row becomes a small park
+    const last = plan.pads[plan.pads.length - 1]
+    const spare = last ? (last.col === 0 ? { col: 1 as const, ring: last.ring } : { col: 0 as const, ring: last.ring + 1 }) : null
+    if (spare && plan.pads.filter((p) => p.row === last.row).length < plan.pads.filter((p) => p.row === 0).length) {
+      const zf = rowRoadZ[last.row] - CURB
+      decor.add(...parkProps(padX(spare), zf - PAD_D / 2))
+      avoid.push({ x: padX(spare), z: zf - PAD_D / 2, w: PAD_W + 1, d: PAD_D + 1 })
     }
 
     // the island's sign: one post, standing on land beside the gate
@@ -964,7 +965,7 @@ export class Town {
     const routes: Route[] = []
     const w = (x: number, z: number) => island.root.localToWorld(new THREE.Vector3(x, GROUND, z))
     // Where a car turns off the road for a destination, and the service lane it then waits in
-    const toDest = (dest: Placed, head: THREE.Vector3[], startX: number | null) => bayTo({ x: dest.x, roadZ: dest.roadZ, col: dest.pad.col }, w, head, startX)
+    const toDest = (dest: Placed, head: THREE.Vector3[], startX: number | null) => bayTo({ x: dest.x, roadZ: dest.roadZ, col: dest.pad.col, laneStart: laneStart(dest.pad) }, w, head, startX)
     /** Over this island's bridge and up the spine to a road, from a start that is already on the hub. */
     const intoIsland = (start: THREE.Vector3[], fromAngle: number, dest: Placed) => direct
       ? [...start, ...this.loopArc(fromAngle, here.ringAngle), this.loopPoint(here.ringAngle), this.backGateOf(here), w(0, dest.roadZ)]
@@ -1033,6 +1034,8 @@ export class Town {
       callers.forEach((from) => {
         const share = (external ? 0.15 : apiShare ? 0.65 : 0.92) / callers.length
         const head = from.roadZ !== dest.roadZ ? [w(from.x, from.roadZ), w(0, from.roadZ), w(0, dest.roadZ)] : [w(from.x, from.roadZ)]
+        // a car on the same road and the same side of the spine drives straight on to a lane that is ahead of it (its own pad's, or one further
+        // out); to a lane behind it (nearer the spine) it has no way in without turning round, so bayTo gives no route
         const same = from.roadZ === dest.roadZ && from.pad.col === dest.pad.col
         const r = toDest(dest, head, same ? from.x : null)
         if (r) routes.push({ dest: b, source: island.buildings.get(from.node.id)!, origin: 'internal', share, ...r })

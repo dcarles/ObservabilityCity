@@ -1,0 +1,2 @@
+vendors:
+  - { id: ext.bureau, name: Credit bureau, calledBy: [wd.s01-api, xl.s01-api], slaP99Ms: 1500 }
