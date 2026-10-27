@@ -55,7 +55,8 @@ export interface HubStatus {
   legacy: number
   /** Islands with a sea lane. */
   boats: number
-  sign: { board: string; model: string | null }
+  /** `counts` is the last line of the broker's one billboard: null when nothing is configured or the Messaging layer is off. */
+  sign: { board: string; model: string | null; counts: string | null }
 }
 
 export interface NodeView {

@@ -68,6 +68,20 @@ test.describe('connectors follow real links', () => {
     expect(await town.mostBoats(120)).toBeGreaterThan(0)
   })
 
+  test('the broker has one billboard: its counts are the last line, and the Messaging layer hides them', async ({ town, page }) => {
+    await town.open()
+    await town.step(2)
+    // the counts sit on the broker's own billboard, with the legacy reads in the same line (there is no separate board)
+    expect((await town.hub()).sign.counts).toBe('3 topics · 3 subscriptions · 3 piers · 1 legacy')
+    await page.locator('#layers-button').click()
+    await page.locator('#layer-messaging').click()
+    await town.step(1)
+    expect((await town.hub()).sign.counts).toBeNull()
+    await page.locator('#layer-messaging').click()
+    await town.step(1)
+    expect((await town.hub()).sign.counts).toBe('3 topics · 3 subscriptions · 3 piers · 1 legacy')
+  })
+
   test('the old egress route is flagged with a pennant on the pier that still uses it', async ({ town }) => {
     await town.open()
     await town.step(5)
