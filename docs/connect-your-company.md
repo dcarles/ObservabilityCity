@@ -277,6 +277,10 @@ For each environment and signal it makes one cheap read with your Azure login an
 
 The exit code is 1 when anything is *no permission*, *unreachable* or *unknown kind* (and, with `--strict`, *empty*), so you can run it in a pipeline.
 
+A `loganalytics` source with no `connection` is probed with the workspace its environment's scope names: `scope.workspaceId` as it is, else `scope.workspace` (an id as it is; a name or wildcard is looked up through Resource Graph, and none or several matches are reported with the names).
+
+The Azure login keeps each token until shortly before it expires, and asks for one at a time per scope, so a login that starts a process for every request (`az login`) is not started once per read.
+
 The normal registry check (`-- config/<company>`) validates the files, including source names, kinds, logins and signal choices, and warns about a signal pointed at a source the environment does not define. `--sources` reads the environment files directly and reports every source you defined, so you can verify connectivity before the adapter lands.
 
 ## 6. Watch the town

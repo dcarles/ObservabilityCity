@@ -55,6 +55,25 @@ test.describe(`a live town with scope rules (${B ? 'tags and derived names' : 'n
     for (const customer of ['Acme Bank', 'Borealis Credit Union', 'Cygnus Finance']) expect(text).toContain(customer)
   })
 
+  // Long resource names and types used to squeeze the tenant text to one letter wide. The rows wrap instead, at the drawer's width and at a narrow one.
+  for (const width of [1280, 520]) {
+    test(`resource rows wrap inside the drawer and keep the tenant readable (${width}px wide)`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 800 })
+      await openConfig(page, 'Orders DB')
+      const rows = page.locator('#inspector .cfg-row.res')
+      await expect(rows).toHaveCount(town.dbResources)
+      const widths = await rows.locator('.v').evaluateAll((els) => els.map((e) => e.getBoundingClientRect().width))
+      for (const w of widths) expect(w).toBeGreaterThan(60)
+      const overflow = await page.locator('#inspector').evaluate((el) => {
+        const box = el.getBoundingClientRect()
+        const wide = [...el.querySelectorAll('.cfg-row.res *')].filter((c) => c.getBoundingClientRect().right > box.right + 1).length
+        return { sideways: el.scrollWidth - el.clientWidth, wide }
+      })
+      expect(overflow.sideways).toBeLessThanOrEqual(1)
+      expect(overflow.wide).toBe(0)
+    })
+  }
+
   test('a system of the other pillar is placed in its own subscription', async ({ page }) => {
     await openConfig(page, 'Ledger API')
     await expect(page.locator('#inspector .cfg-row[data-key="subscription"]')).toContainText(B ? 'Beta Production' : 'acme-eu-prd-be')

@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Azure.Core;
 using Azure.Identity;
 using ObservabilityCity.Core.Registry;
@@ -64,11 +65,40 @@ public sealed class AzureServicePrincipalLogin(Func<string, string?>? environmen
     }
 }
 
-/// <summary>A login seen as the core sees it: a token for a scope.</summary>
-public sealed class TokenCredentialSource(TokenCredential credential) : ICredentialSource
+/// <summary>
+/// A login seen as the core sees it: a token for a scope. A token is kept until shortly before it expires and one request per scope runs at a time, so many
+/// reads at once share one sign-in. Some logins (the Azure CLI one) start a process for every request, which is slow and can time out when asked many times at once.
+/// </summary>
+public sealed class TokenCredentialSource(TokenCredential credential, TimeProvider? clock = null, TimeSpan? refreshBefore = null) : ICredentialSource
 {
+    private sealed record Cached(string Token, DateTimeOffset ExpiresOn);
+
+    private sealed class Entry
+    {
+        public readonly SemaphoreSlim Gate = new(1, 1);
+        public volatile Cached? Token;
+    }
+
+    private readonly TimeProvider time = clock ?? TimeProvider.System;
+    private readonly TimeSpan margin = refreshBefore ?? TimeSpan.FromMinutes(5);
+    private readonly ConcurrentDictionary<string, Entry> entries = new();
+
     public TokenCredential Credential { get; } = credential;
 
-    public async Task<string> GetTokenAsync(string scope, CancellationToken ct) =>
-        (await credential.GetTokenAsync(new TokenRequestContext([scope]), ct)).Token;
+    public async Task<string> GetTokenAsync(string scope, CancellationToken ct)
+    {
+        var entry = entries.GetOrAdd(scope, _ => new Entry());
+        if (Fresh(entry) is { } kept) return kept;
+        await entry.Gate.WaitAsync(ct);
+        try
+        {
+            if (Fresh(entry) is { } again) return again; // another request got one while this one waited
+            var token = await Credential.GetTokenAsync(new TokenRequestContext([scope]), ct);
+            entry.Token = new Cached(token.Token, token.ExpiresOn);
+            return token.Token;
+        }
+        finally { entry.Gate.Release(); }
+    }
+
+    private string? Fresh(Entry entry) => entry.Token is { } t && t.ExpiresOn - margin > time.GetUtcNow() ? t.Token : null;
 }
