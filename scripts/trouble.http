@@ -85,7 +85,7 @@ Content-Type: application/json
 
 { "target": "rcn.matching-worker", "kind": "Backlog", "intensity": 1 }
 
-### Dead letters on the worker-only pillar's pier (broken crates, red beam, hub lighthouse)
+### Dead letters on the worker-only pillar's pier (broken crates, red beam, top-bar DLQ chip)
 POST {{host}}/api/fake/effects
 Content-Type: application/json
 

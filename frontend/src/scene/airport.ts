@@ -1,11 +1,11 @@
 import * as THREE from 'three'
-import { box, canvasTexture, cyl, flat, group, roundRect } from '../buildings/mk'
-import { kit } from '../assets/kit'
+import { canvasTexture, roundRect } from '../buildings/mk'
+import { activeKit } from '../themes/active'
+import type { AirportKit } from '../themes/types'
 import type { ExternalCallerSnapshot } from '../types'
 import { clamp, formatRate } from '../visuals'
 import { buildIslandBody, GROUND, makeOutline, scatterNature, type Outline, type Rect } from './island'
 import { coastScan } from './plan'
-import { blockPad, lamp, street, ROAD_W } from './props'
 import { hashString, rng } from './random'
 import { mergeStatic } from './merge'
 
@@ -16,6 +16,7 @@ const APRON_Z = 8 // the road meets the terminal's front here
 const MAX_PLANES = 4
 /** Seconds a plane takes to land, roll out, taxi to the terminal and park. */
 const APPROACH = 7, ROLLOUT = 4.5, TAXI = 3.5, PARK = 2.5, FADE = 1.2
+const HOVER = 1.5 // how high a ship rides over its pad
 const TAILS = ['#e4572e', '#2e86ab', '#f2b134', '#5cb85c', '#8e6bbf']
 
 /** How many planes land per second for an arrival rate in requests per second: a sample, not a count, like every other mover in the town. */
@@ -29,6 +30,8 @@ export interface AirportStatus {
   callers: number
   /** Planes on the ground or in the air right now. */
   planes: number
+  /** What arrives in this theme: a plane, a cargo plane, a flying saucer. */
+  look: string
   /** Planes that have landed since the town was built. */
   landed: number
   board: string[]
@@ -38,6 +41,8 @@ interface Plane {
   mesh: THREE.Group
   t: number
   tail: number
+  /** The pad a ship comes down on, where the theme lands ships. */
+  pad: number
 }
 
 /**
@@ -59,7 +64,8 @@ export class Airport {
   private callers: ExternalCallerSnapshot[] = []
   private readonly board: { sprite: THREE.Sprite; key: string }
   private readonly rand = rng(hashString('airport'))
-  private readonly sock: THREE.Mesh
+  private readonly kit: AirportKit
+  private readonly tick?: (time: number) => void
 
   constructor() {
     this.outline = makeOutline(hashString('airport'), this.rx, this.rz, 0.045)
@@ -67,68 +73,10 @@ export class Airport {
     this.root.add(buildIslandBody(this.outline))
     const decor = new THREE.Group()
     this.root.add(decor)
-    const avoid: Rect[] = [
-      { x: 0, z: RUNWAY_Z, w: 2 * RUNWAY_HALF + 14, d: 12 },
-      { x: 0, z: (this.gateZ + TERMINAL_Z) / 2, w: 40, d: this.gateZ - TERMINAL_Z + 6 },
-      { x: 0, z: TERMINAL_Z, w: 66, d: 14 },
-    ]
-
-    // runway with edge lines, centre dashes and the numbers at either end
-    const dark = flat('#3b4250', { roughness: 0.95 }), white = flat('#f4f1e8', { roughness: 0.9 })
-    decor.add(box(2 * RUNWAY_HALF + 8, 0.12, 5.4, dark, { y: GROUND - 0.02, z: RUNWAY_Z }))
-    for (let i = -RUNWAY_HALF + 2; i <= RUNWAY_HALF - 2; i += 5.5) decor.add(box(2.6, 0.02, 0.28, white, { x: i, y: GROUND + 0.11, z: RUNWAY_Z }))
-    for (const side of [-1, 1]) {
-      decor.add(box(2 * RUNWAY_HALF + 6, 0.02, 0.14, white, { y: GROUND + 0.11, z: RUNWAY_Z + side * 2.4 }))
-      for (let k = -2; k <= 2; k++) decor.add(box(0.5, 0.02, 3.2, white, { x: side * (RUNWAY_HALF + 1.6), y: GROUND + 0.11, z: RUNWAY_Z + k * 0.9 }))
-    }
-    // the taxiway and the apron in front of the terminal
-    decor.add(blockPad(0, RUNWAY_Z + 3, TERMINAL_Z + 7.5, 46))
-    decor.add(box(4.6, 0.12, 8, dark, { x: 24, y: GROUND - 0.02, z: RUNWAY_Z + 7.4 }))
-
-    // terminal: a long low hall with a glass front, a tower and a hangar
-    const wall = flat('#e9edf2'), roofM = flat('#5b6b82'), glass = flat('#6fb6e0', { emissive: '#2a6fa0', emissiveIntensity: 0.35 }), trim = flat('#ff7a45')
-    const terminal = group(
-      box(24, 4.4, 8, wall, { y: GROUND }),
-      box(25.2, 0.5, 9.4, roofM, { y: GROUND + 4.4 }),
-      box(22, 2.2, 0.2, glass, { y: GROUND + 1.2, z: 4.1 }),
-      box(25.2, 0.28, 0.4, trim, { y: GROUND + 4.9, z: 4.6 }),
-    )
-    terminal.position.z = TERMINAL_Z
-    decor.add(terminal)
-    const tower = group(
-      cyl(1.2, 1.5, 9, wall, { y: GROUND }),
-      cyl(2.6, 2.1, 1.7, glass, { y: GROUND + 9 }),
-      cyl(2.9, 2.9, 0.4, roofM, { y: GROUND + 10.7 }),
-      cyl(0.06, 0.06, 2.2, roofM, { y: GROUND + 11.1 }),
-    )
-    tower.position.set(-17, 0, TERMINAL_Z - 1)
-    decor.add(tower)
-    const hangar = group(box(10, 4.2, 8, flat('#c7ced8'), { y: GROUND }), box(10.4, 1.4, 8.4, roofM, { y: GROUND + 4.2 }), box(6, 3.2, 0.2, flat('#8b95a3'), { y: GROUND, z: 4.1 }))
-    hangar.position.set(21, 0, TERMINAL_Z - 0.5)
-    decor.add(hangar)
-    avoid.push({ x: -17, z: TERMINAL_Z - 1, w: 7, d: 7 }, { x: 21, z: TERMINAL_Z - 0.5, w: 13, d: 11 })
-
-    // a windsock at the runway's end
-    const pole = cyl(0.1, 0.12, 3.4, white, { y: GROUND })
-    this.sock = new THREE.Mesh(new THREE.ConeGeometry(0.46, 1.8, 7, 1, true), new THREE.MeshStandardMaterial({ color: '#ff7a45', side: THREE.DoubleSide, flatShading: true }))
-    this.sock.geometry.rotateZ(-Math.PI / 2)
-    this.sock.position.set(0.9, GROUND + 3.2, 0)
-    const sockGroup = group(pole, this.sock)
-    sockGroup.position.set(RUNWAY_HALF + 6, 0, RUNWAY_Z - 4.5)
-    decor.add(sockGroup)
-
-    // the road from the gate to the terminal, with a small car park beside it
-    decor.add(street(0, APRON_Z, this.gateZ + 0.2))
-    decor.add(blockPad(14, APRON_Z - 1, APRON_Z + 6, 12))
-    for (let i = 0; i < 5; i++) {
-      const car = kit(i % 2 ? 'car_hatchback' : 'car_stationwagon')
-      car.scale.setScalar(0.9)
-      car.position.set(9.5 + i * 2.2, GROUND + 0.1, APRON_Z + 2.2)
-      car.rotation.y = Math.PI / 2
-      decor.add(car)
-    }
-    for (const side of [-1, 1]) decor.add(lamp(side * (ROAD_W / 2 + 1.6), APRON_Z + 3 + (side + 1) * 3, 0))
-    avoid.push({ x: 14, z: APRON_Z + 2.5, w: 14, d: 9 })
+    this.kit = activeKit().airport
+    const look = this.kit.dress(decor, { runwayZ: RUNWAY_Z, runwayHalf: RUNWAY_HALF, terminalZ: TERMINAL_Z, apronZ: APRON_Z, gateZ: this.gateZ })
+    this.tick = look.tick
+    const avoid: Rect[] = look.avoid
     mergeStatic(decor)
     this.root.add(scatterNature(this.outline, avoid, hashString('airport-nature'), { trees: 40, rocks: 10 }))
 
@@ -161,7 +109,7 @@ export class Airport {
   }
 
   status(): AirportStatus {
-    return { requestsPerSecond: this.rps, callers: this.callers.length, planes: this.planes.length, landed: this.landed, board: this.boardLines() }
+    return { requestsPerSecond: this.rps, callers: this.callers.length, planes: this.planes.length, look: this.kit.look, landed: this.landed, board: this.boardLines() }
   }
 
   update(dt: number, time: number, camera: THREE.Camera): void {
@@ -183,26 +131,67 @@ export class Airport {
       }
       this.pose(p)
     }
-    this.sock.rotation.y = Math.sin(time * 0.6) * 0.25
-    this.sock.rotation.z = Math.sin(time * 2.1) * 0.06
+    this.tick?.(time)
     this.fadeBoard(camera)
   }
 
   // ── planes ─────────────────────────────────────────────────────────────────
 
   private spawn(): void {
-    const mesh = this.pool.pop() ?? this.makePlane()
+    const mesh = this.pool.pop() ?? this.kit.craft()
+    mesh.traverse((o) => { if (o.userData.beam) o.visible = false })
     const tail = Math.floor(this.rand() * TAILS.length)
     mesh.traverse((o) => { if (o.userData.tail) ((o as THREE.Mesh).material as THREE.MeshLambertMaterial).color.set(TAILS[tail]) })
     mesh.visible = true
     mesh.scale.setScalar(1)
     this.root.add(mesh)
-    this.planes.push({ mesh, t: 0, tail })
+    this.planes.push({ mesh, t: 0, tail, pad: this.freePad() })
     this.pose(this.planes[this.planes.length - 1])
   }
 
-  /** Where a plane is, a moment into its arrival. It comes in over the sea from the west, lands, rolls out, taxis to the terminal and parks. */
+  /** A pad no ship is using, for a theme that lands ships on pads. */
+  private freePad(): number {
+    const landing = this.kit.landing
+    if (landing.kind !== 'pads') return 0
+    const used = new Set(this.planes.map((p) => p.pad))
+    for (let i = 0; i < landing.x.length; i++) if (!used.has(i)) return i
+    return 0
+  }
+
+  /** Where an arrival is, a moment into its visit. */
   private pose(p: Plane): void {
+    const landing = this.kit.landing
+    if (landing.kind === 'pads') this.poseOnPad(p, landing.x[p.pad % landing.x.length])
+    else this.poseOnRunway(p)
+  }
+
+  /** A ship comes in over the sea from the west, slows above its pad, hovers down onto it, waits, and lifts away as it fades. */
+  private poseOnPad(p: Plane, padX: number): void {
+    const m = p.mesh
+    const ease = (k: number) => 1 - (1 - k) * (1 - k)
+    const beam = m.children.find((c) => c.userData.beam)
+    m.rotation.set(0, 0, 0)
+    if (p.t < APPROACH) {
+      const k = p.t / APPROACH
+      m.position.set(padX - 80 * (1 - ease(k)) ** 2, GROUND + HOVER + 20 * (1 - k) ** 2 + 5 * (1 - ease(k)), RUNWAY_Z)
+      m.rotation.z = -0.2 * (1 - k)
+      if (beam) beam.visible = false
+    } else if (p.t < APPROACH + ROLLOUT) {
+      const k = ease((p.t - APPROACH) / ROLLOUT)
+      m.position.set(padX, GROUND + HOVER + 5 * (1 - k), RUNWAY_Z)
+      if (beam) beam.visible = true
+    } else if (p.t < APPROACH + ROLLOUT + TAXI + PARK) {
+      m.position.set(padX, GROUND + HOVER + 0.12 * Math.sin(p.t * 2 + p.pad), RUNWAY_Z)
+      if (beam) beam.visible = false
+    } else {
+      const k = clamp((p.t - APPROACH - ROLLOUT - TAXI - PARK) / FADE, 0, 1)
+      m.position.set(padX, GROUND + HOVER + 6 * k * k, RUNWAY_Z)
+      m.scale.setScalar(1 - k)
+    }
+  }
+
+  /** A plane comes in over the sea from the west, lands, rolls out, taxis to the terminal and parks. */
+  private poseOnRunway(p: Plane): void {
     const m = p.mesh
     const ease = (k: number) => 1 - (1 - k) * (1 - k)
     const TOUCH = -27, STOP = 15
@@ -227,38 +216,6 @@ export class Airport {
       m.rotation.set(0, -Math.PI / 2, 0)
       m.scale.setScalar(1 - k)
     }
-  }
-
-  private makePlane(): THREE.Group {
-    const body = new THREE.MeshLambertMaterial({ color: '#f6f8fb', flatShading: true })
-    const dark = new THREE.MeshLambertMaterial({ color: '#4d5663', flatShading: true })
-    const tail = new THREE.MeshLambertMaterial({ color: TAILS[0], flatShading: true })
-    const fuselage = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.75, 8, 10), body)
-    fuselage.rotation.z = Math.PI / 2
-    const nose = new THREE.Mesh(new THREE.ConeGeometry(0.75, 1.8, 10), body)
-    nose.rotation.z = -Math.PI / 2
-    nose.position.x = 4.9
-    const cone = new THREE.Mesh(new THREE.ConeGeometry(0.75, 2.4, 10), body)
-    cone.rotation.z = Math.PI / 2
-    cone.position.x = -5.1
-    const wings = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.16, 11), dark)
-    wings.position.set(0.4, -0.15, 0)
-    const fin = new THREE.Mesh(new THREE.BoxGeometry(1.8, 2.1, 0.16), tail)
-    fin.position.set(-4.3, 1.3, 0)
-    fin.userData.tail = true
-    const stab = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.12, 4), dark)
-    stab.position.set(-4.5, 0.5, 0)
-    const engines = [-2.6, 2.6].map((z) => {
-      const e = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 1.6, 8), dark)
-      e.rotation.z = Math.PI / 2
-      e.position.set(0.9, -0.55, z)
-      return e
-    })
-    const g = new THREE.Group()
-    g.add(fuselage, nose, cone, wings, fin, stab, ...engines)
-    g.scale.setScalar(1)
-    g.traverse((o) => { if (o instanceof THREE.Mesh) o.castShadow = true })
-    return g
   }
 
   // ── the arrivals board ──────────────────────────────────────────────────────

@@ -19,6 +19,7 @@ export const THEME_WORDS: Record<string, Words> = {
     boat: { sees: 'Cargo shuttles from the spaceport to a docking gantry' },
     crates: { sees: 'Crates piling up on a docking gantry' },
     vendor: { sees: 'Small platform out in the void' },
+    airport: { sees: 'Spaceport', means: 'Callers from outside. Flying saucers follow the inbound traffic' },
   },
   factory: {
     api: { sees: 'Office block' },
@@ -33,6 +34,7 @@ export const THEME_WORDS: Record<string, Words> = {
     boat: { sees: 'Container barges from the depot to a loading dock' },
     crates: { sees: 'Containers piling up on a loading dock' },
     vendor: { sees: 'Small yard out on the canal' },
+    airport: { sees: 'Air freight field', means: 'Callers from outside. Cargo planes follow the inbound traffic' },
   },
 }
 

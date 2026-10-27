@@ -21,6 +21,9 @@ async function kindsOf(town: Town): Promise<{ kinds: Set<string>; all: Status[] 
   return { kinds: new Set(all.map((b) => b.kind)), all }
 }
 
+// what lands at the airport in each theme
+const AIRPORT_LOOK: Record<string, string> = { 'harbour-town': 'airliner', factory: 'cargo plane', space: 'saucer' }
+
 for (const theme of contract.themes) {
   test.describe(`the ${theme} theme`, () => {
     test('opens from the address, builds the town under its own colours, and logs no errors', async ({ town, page }) => {
@@ -33,6 +36,15 @@ for (const theme of contract.themes) {
       expect(palette.beacon).toMatchObject(contract.beacons)
       expect(await page.evaluate(() => (window as any).city.hasStars())).toBe(theme === 'space')
       expect(await page.evaluate(() => (window as any).city.seen.rejected)).toBe(0)
+    })
+
+    test('the airport is the theme\'s own: its own craft arrive and land', async ({ town, page }) => {
+      await town.open(`&theme=${theme}`)
+      await town.step(60)
+      const a = await page.evaluate(() => (window as any).city.inspectAirport())
+      expect(a.look).toBe(AIRPORT_LOOK[theme])
+      expect(a.landed).toBeGreaterThan(0)
+      expect(a.planes).toBeLessThanOrEqual(4)
     })
 
     test('draws every kind of building, across the two sample towns', async ({ town }) => {
@@ -84,11 +96,11 @@ for (const theme of contract.themes) {
       expect((await town.inspect('pay.refunds-worker')).darkFloors).toBeGreaterThan(0)
       // no fresh data: grey, never healthy
       expect((await town.inspect('cl.session-cache')).beacon).toBe('grey')
-      // dead letters: the pen, the harbour light and the hub's tower
+      // dead letters: the pen, and the harbour light
       const cl = await town.island('cl')
       expect(cl.alarm).toBe(true)
       expect(cl.brokenCrates).toBeGreaterThan(0)
-      expect((await town.hub()).lighthouse?.alarm).toBe(true)
+      await expect(page.locator('#topbar .chip.dlq')).toHaveClass(/bad/)
       // a backlog: crates on the pier
       expect((await town.island('pay')).crates).toBeGreaterThan(0)
       // an incident: weather over that island only
