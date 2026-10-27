@@ -33,7 +33,7 @@ public static partial class RegistryLoader
     }
 
     private static MetricSignal? ToSignal(MetricSignalFile? f) =>
-        f is null ? null : new MetricSignal(f.Metric.Trim(), f.Aggregation.Trim().ToLowerInvariant(), string.IsNullOrWhiteSpace(f.Filter) ? null : f.Filter.Trim(), f.Scale, f.PerSecond, ToSignal(f.Over));
+        f is null ? null : new MetricSignal(f.Metric.Trim(), f.Aggregation.Trim().ToLowerInvariant(), string.IsNullOrWhiteSpace(f.Filter) ? null : f.Filter.Trim(), f.Scale, f.PerSecond, ToSignal(f.Over), ToSignal(f.OrElse));
 
     private static List<MetricGroup> ToMetrics(List<MetricGroupFile> files) =>
         files.Select(g => new MetricGroup(g.Resources, string.IsNullOrWhiteSpace(g.Namespace) ? null : g.Namespace.Trim(),
@@ -70,6 +70,11 @@ public static partial class RegistryLoader
             if (!double.IsFinite(spec.Scale) || spec.Scale <= 0) errors.Add($"{at}: scale must be above 0 (0.01 turns a percentage into a fraction)");
             if (spec.Filter is { } filter)
                 foreach (var problem in ScopeTemplate.Check(filter, known)) errors.Add($"{at}.filter: {problem}");
+            if (spec.OrElse is { } alt)
+            {
+                if (alt.Over is not null || alt.OrElse is not null) errors.Add($"{at}.orElse: it is only another metric to read in place; it cannot have an over or an orElse of its own");
+                else CheckSignal(alt, $"{at}.orElse", true);
+            }
             if (spec.Over is { } over)
             {
                 if (isOver) errors.Add($"{at}: over cannot have an over of its own");

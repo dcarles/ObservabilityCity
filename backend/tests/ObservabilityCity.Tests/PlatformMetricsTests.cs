@@ -136,6 +136,37 @@ public class PlatformMetricsTests
     }
 
     [Fact]
+    public async Task An_or_else_metric_stands_in_where_the_first_gives_no_number_or_zero_for_the_size_and_for_the_share_it_divides_by()
+    {
+        using var copy = new RegistryCopy(TownA);
+        const string ceiling = "{ metric: AutoscaleMaxThroughput, aggregation: maximum, orElse: { metric: ProvisionedThroughput, aggregation: maximum } }";
+        copy.Replace("environments/prod.yaml", "limit: { metric: ProvisionedThroughput, aggregation: maximum }", $"limit: {ceiling}");
+        copy.Replace("environments/prod.yaml", "over: { metric: ProvisionedThroughput, aggregation: maximum } }", $"over: {ceiling} }}");
+        EditRecording(copy, doc =>
+        {
+            // the second account has an autoscale ceiling; the first reports 0 (a fixed throughput); the third has no such series at all
+            doc["22222222222222222222222222222222-al-ord"]!.AsArray().Add(new JsonObject { ["metric"] = "AutoscaleMaxThroughput", ["aggregation"] = "maximum", ["points"] = new JsonArray(10000, 10000, 10000) });
+            doc["11111111111111111111111111111111-al-ord"]!.AsArray().Add(new JsonObject { ["metric"] = "AutoscaleMaxThroughput", ["aggregation"] = "maximum", ["points"] = new JsonArray(0, 0, 0) });
+        });
+        var (source, registry) = await Platform(copy.Path);
+
+        var readings = await source.PollAsync(registry, CancellationToken.None);
+
+        var tenants = readings["aa.orders-db"].Tenants!.OrderBy(t => t.TenantId).ToList();
+        Assert.Equal([1000, 10000, 1000], tenants.Select(t => t.Limit!.Value));
+        Assert.Equal([0.2, 0.095, 0.4], tenants.Select(t => Math.Round(t.Utilisation!.Value, 6))); // the second is a tenth of what it was: its share is of the ceiling
+    }
+
+    [Fact]
+    public void An_or_else_cannot_have_an_over_or_an_or_else_of_its_own()
+    {
+        var message = LoadError(_ => ["limit: { metric: ProvisionedThroughput, aggregation: maximum }",
+            "limit: { metric: A, aggregation: maximum, orElse: { metric: B, aggregation: maximum, orElse: { metric: C, aggregation: maximum } } }"]);
+
+        Assert.Contains("limit.orElse: it is only another metric to read in place; it cannot have an over or an orElse of its own", message);
+    }
+
+    [Fact]
     public async Task A_tenant_the_list_spells_with_dashes_is_the_tenant_the_source_found_without_them()
     {
         using var copy = new RegistryCopy(TownA);

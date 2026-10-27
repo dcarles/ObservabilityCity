@@ -272,6 +272,8 @@ internal sealed class MetricSignalFile
     public bool PerSecond { get; set; }
     /// <summary>Another metric the value is divided by (provisioned capacity, all requests), to give a share.</summary>
     public MetricSignalFile? Over { get; set; }
+    /// <summary>Another metric to read in place of this one when it gives no number or 0 (for example the autoscale ceiling, then the fixed throughput of an account that has none). It cannot have an <c>over</c> or an <c>orElse</c> of its own.</summary>
+    public MetricSignalFile? OrElse { get; set; }
 }
 
 internal sealed class CredentialFile
