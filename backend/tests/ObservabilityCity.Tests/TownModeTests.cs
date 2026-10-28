@@ -44,6 +44,7 @@ public class TownModeTests
     [InlineData("shared-test-data/registries/direct-town")]
     [InlineData("shared-test-data/registries/tenants-town")]
     [InlineData("shared-test-data/registries/stress-23")]
+    [InlineData("shared-test-data/registries/wide-town")]
     [InlineData("shared-test-data/registries/stress-35")]
     public void Every_demo_town_in_the_repo_says_so(string folder)
     {

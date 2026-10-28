@@ -1,0 +1,11 @@
+# 2 services of an API, a worker and a database each: the island grows with the number of service pads, from two to six pads a row
+pillar: sm
+displayName: Pillar SM (2 services)
+color: "#5aa9ff"
+systems:
+  - { id: sm.s01-api, service: sm-s01, name: Service 01 API, role: api, external: true, calls: [sm.s01-db, sm.s02-api] }
+  - { id: sm.s01-worker, service: sm-s01, name: Service 01 worker, role: worker, calls: [sm.s01-db] }
+  - { id: sm.s01-db, service: sm-s01, name: Service 01 DB, role: db }
+  - { id: sm.s02-api, service: sm-s02, name: Service 02 API, role: api, calls: [sm.s02-db] }
+  - { id: sm.s02-worker, service: sm-s02, name: Service 02 worker, role: worker, calls: [sm.s02-db] }
+  - { id: sm.s02-db, service: sm-s02, name: Service 02 DB, role: db }

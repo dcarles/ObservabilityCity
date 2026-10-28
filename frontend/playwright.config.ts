@@ -14,6 +14,7 @@ import { fileURLToPath } from 'node:url'
 //   npm run e2e:scope    two live towns with opposite scope conventions (names; tags): the inspector says where each system lives, from a recorded inventory
 //   npm run e2e:tenants  environments, tenant yards, tenant traffic and service groups, on a town with two pillars and three environments
 //   npm run e2e:towns    the town switcher and the second sample town (Droid Shop, on Kafka), on the server's own config folder with both sample towns
+//   npm run e2e:wide     islands of 2, 10, 15 and 27 services: how many pads a row, every building on land, nothing overlapping, on a town of four islands
 //   npm run e2e:slow     the slow set: the 23-island and 35-island stress towns and the full sample town, with screenshots. Runs on merge to main and nightly.
 // Set E2E_NO_BUILD=1 when the backend is already built in Release (CI does this).
 
@@ -32,6 +33,7 @@ const registries: Record<string, string> = {
   scopeb: 'shared-test-data/registries/scope-town-b',
   // no single folder: the server finds the towns in config/ itself
   towns: '',
+  wide: 'shared-test-data/registries/wide-town',
   stress: 'shared-test-data/registries/stress-23',
   stress35: 'shared-test-data/registries/stress-35',
   town: 'config/galactic-credit',
@@ -59,7 +61,7 @@ export default defineConfig({
   workers: 1,
   fullyParallel: false,
   retries: process.env.CI ? 1 : 0,
-  timeout: ['scenarios', 'links', 'tenants', 'ui', 'direct', 'live', 'sources', 'scope', 'scopeb', 'towns'].includes(suite) ? 60_000 : 240_000,
+  timeout: ['scenarios', 'links', 'tenants', 'ui', 'direct', 'live', 'sources', 'scope', 'scopeb', 'towns', 'wide'].includes(suite) ? 60_000 : 240_000,
   expect: { timeout: 10_000 },
   reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
   outputDir: 'test-results',
