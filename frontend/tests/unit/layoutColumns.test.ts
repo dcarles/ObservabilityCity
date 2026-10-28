@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { COL_X, PAD_PITCH, PAD_W, laneStart, padX, padsPerRow, planIsland, rowEdge } from '../../src/scene/plan'
+import { COL_X, PADS_PER_ROW, PAD_PITCH, PAD_W, laneStart, padX, padsPerRow, planIsland, rowEdge } from '../../src/scene/plan'
 import { makeOutline } from '../../src/scene/island'
 import { hashString } from '../../src/scene/random'
 import type { GroupSnapshot, NodeSnapshot } from '../../src/types'
 
-// An island puts more pads on each row road as it gets bigger: 2, 4 or 6 a row, half on each side of the spine.
+// An island puts more pads on each row road as it gets bigger: 2, 4, 6 or 8 a row, half on each side of the spine, whichever needs the smallest coast.
 
 function node(id: string, kind: NodeSnapshot['kind'], service: string): NodeSnapshot {
   return { id, name: id, kind, service, external: false, state: 'Healthy', calls: [] } as unknown as NodeSnapshot
@@ -18,12 +18,20 @@ function island(code: string, services: number): GroupSnapshot {
 }
 
 describe('pads on a row', () => {
-  it.each([[1, 2], [2, 2], [10, 2], [11, 4], [15, 4], [24, 4], [25, 6], [40, 6]])('%i pads: %i a row', (pads, perRow) => {
+  it.each([[1, 2], [2, 2], [6, 2], [7, 4], [10, 4], [15, 4], [25, 6], [30, 6], [40, 8]])('%i pads: %i a row', (pads, perRow) => {
     expect(padsPerRow(pads)).toBe(perRow)
   })
 
-  it.each([[1, 1], [2, 1], [5, 3], [10, 5], [11, 3], [15, 4], [24, 6], [25, 5], [30, 5]])('%i services fill %i rows', (services, rows) => {
+  it.each([[1, 1], [2, 1], [5, 3], [7, 2], [10, 3], [15, 4], [24, 4], [25, 5], [30, 5], [40, 5]])('%i services fill %i rows', (services, rows) => {
     expect(planIsland(island('p', services)).rows).toBe(rows)
+  })
+
+  it('takes the number a row that needs the smallest coast for its pads, up to 45', () => {
+    const area = (s: number, perRow?: number) => { const p = planIsland(island('p', s), perRow); return p.rx * p.rz }
+    for (let s = 1; s <= 45; s++) {
+      const best = Math.min(...PADS_PER_ROW.map((n) => area(s, n)))
+      expect(area(s), `${s} pads at ${padsPerRow(s)} a row`).toBeLessThanOrEqual(best * 1.03)
+    }
   })
 
   it('keeps a small island exactly as it was: pads alternate left and right of the spine', () => {
@@ -39,7 +47,7 @@ describe('pads on a row', () => {
   })
 
   it('never puts two pads in the same place, and keeps each row road as wide as its outermost pad', () => {
-    for (const services of [3, 10, 11, 15, 24, 25, 27, 40]) {
+    for (const services of [3, 7, 10, 15, 24, 25, 27, 40]) {
       const plan = planIsland(island('p', services))
       const spots = plan.pads.map((p) => `${padX(p)}/${p.row}`)
       expect(new Set(spots).size, `${services} services`).toBe(spots.length)

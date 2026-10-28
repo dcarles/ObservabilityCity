@@ -2,14 +2,14 @@ import { test, expect } from '../support/test'
 import { frameCost, note } from '../support/perf'
 
 // Islands of 2, 10, 15 and 27 services (an API, a worker and a database each). A bigger island gets more pads along each row road
-// (2, 4 or 6 a row) so that it does not turn into a long thin strip on a coast far wider than it. The pads, roads and coast are checked
+// (2, 4, 6 or 8 a row, whichever makes the smallest coast) so that it does not turn into a long thin strip on a coast far wider than it. The pads, roads and coast are checked
 // as the page built them. wide-town has no messaging, so no island has a pier.
 
 const SERVICES: Record<string, number> = { sm: 2, md: 10, wd: 15, xl: 27 }
 
 interface Built { id: string; buildings: number; pads: number; perRow: number; rows: number; rx: number; rz: number; offLand: string[]; x: number; z: number }
 
-test('islands of 2, 10, 15 and 27 services put 2, 2, 4 and 6 pads on a row, and every building stands on land', async ({ town, page }, info) => {
+test('islands of 2, 10, 15 and 27 services put 2, 4, 4 and 6 pads on a row, and every building stands on land', async ({ town, page }, info) => {
   await town.open()
   const built: Built[] = await page.evaluate(async () => {
     const c = (window as any).city
@@ -29,8 +29,8 @@ test('islands of 2, 10, 15 and 27 services put 2, 2, 4 and 6 pads on a row, and 
     expect(by[id].pads, `${id} pads`).toBe(n)
     expect(by[id].offLand, `${id} buildings off the island`).toEqual([])
   }
-  expect([by.sm.perRow, by.md.perRow, by.wd.perRow, by.xl.perRow]).toEqual([2, 2, 4, 6])
-  expect([by.sm.rows, by.md.rows, by.wd.rows, by.xl.rows]).toEqual([1, 5, 4, 5])
+  expect([by.sm.perRow, by.md.perRow, by.wd.perRow, by.xl.perRow]).toEqual([2, 4, 4, 6])
+  expect([by.sm.rows, by.md.rows, by.wd.rows, by.xl.rows]).toEqual([1, 3, 4, 5])
 
   // the 15-service island is not a long thin strip: its coast is about as wide as it is deep, and well inside the old strip's size (about 145 by 121)
   expect(by.wd.rx / by.wd.rz).toBeLessThan(1.4)

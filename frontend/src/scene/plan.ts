@@ -55,12 +55,29 @@ export interface Plan {
   rz: number
 }
 
+/** Pads on one row road, one more pair for each step: half on each side of the spine, so always even. */
+export const PADS_PER_ROW = [2, 4, 6, 8]
+
 /**
- * Pads on one row road, half on each side of the spine, so always even. Small islands keep their two (one each side); a bigger one gets a wider
- * row so that it grows in both directions and stays about as wide as it is deep, instead of a long thin strip on a wide coast.
+ * A measure of how big a coast the grid needs, to compare ways of setting out the same pads: the squared distance of the grid's corner from the
+ * middle of an ellipse of the island's proportions (24 by 20), with the room the gate and the harbour take on the south side.
+ */
+function coastNeed(pads: number, perRow: number): number {
+  const rows = Math.ceil(pads / perRow)
+  const halfWidth = COL_X + (perRow / 2 - 1) * PAD_PITCH + PAD_W / 2 + 0.4
+  const halfDepth = ((rows - 1) * ROW + 2 * CURB + PAD_D) / 2 + 5
+  return (halfWidth / 24) ** 2 + (halfDepth / 20) ** 2
+}
+
+/**
+ * How many pads stand on a row road, half on each side of the spine, so always even. An island takes whichever of 2, 4, 6 or 8 a row needs the
+ * smallest coast for its pads (the fewer on a tie), so a bigger island grows in both directions and stays about as wide as it is deep, instead of a
+ * long thin strip on a coast far wider than it.
  */
 export function padsPerRow(pads: number): number {
-  return pads <= 10 ? 2 : pads <= 24 ? 4 : 6
+  let best = PADS_PER_ROW[0]
+  for (const n of PADS_PER_ROW) if (coastNeed(pads, n) < coastNeed(pads, best) - 1e-9) best = n
+  return best
 }
 
 /** Island-local x of a pad's centre. */
@@ -84,7 +101,7 @@ export function serviceName(service: string): string {
  * registry file, in the order the services first appear. A service of more than three systems takes more pads, each named for it. A system
  * with no service stands on a pad of its own. Pads fill a grid of `padsPerRow` pads a row, nearest the spine first and alternating sides.
  */
-export function planPads(nodes: NodeSnapshot[], groupId = ''): Pad[] {
+export function planPads(nodes: NodeSnapshot[], groupId = '', perRowOverride?: number): Pad[] {
   const order: { service: string | null; nodes: NodeSnapshot[] }[] = []
   const byService = new Map<string, { service: string | null; nodes: NodeSnapshot[] }>()
   for (const n of nodes) {
@@ -114,7 +131,7 @@ export function planPads(nodes: NodeSnapshot[], groupId = ''): Pad[] {
         name: serviceName(e.service) + (parts > 1 ? ` (${part + 1})` : ''),
       })
   }
-  const perRow = padsPerRow(pads.length)
+  const perRow = perRowOverride ?? padsPerRow(pads.length)
   return pads.map((p, i) => ({ ...p, col: (i % 2) as 0 | 1, ring: Math.floor((i % perRow) / 2), row: Math.floor(i / perRow) }))
 }
 
@@ -124,9 +141,9 @@ export function rowEdge(pads: { ring: number }[]): number {
 }
 
 /** Lays out one island's grid and finds the smallest coast that holds it, with room for the gate and the harbour. */
-export function planIsland(g: GroupSnapshot): Plan {
-  const pads = planPads(g.nodes, g.id)
-  const rows = Math.max(1, Math.ceil(pads.length / padsPerRow(pads.length)))
+export function planIsland(g: GroupSnapshot, perRow?: number): Plan {
+  const pads = planPads(g.nodes, g.id, perRow)
+  const rows = Math.max(1, Math.ceil(pads.length / (perRow ?? padsPerRow(pads.length))))
   const span = (rows - 1) * ROW + 2 * CURB + PAD_D
   const roadZ0 = span / 2 - CURB
   const rowRoadZ = Array.from({ length: rows }, (_, r) => roadZ0 - r * ROW)
