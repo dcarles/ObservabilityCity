@@ -38,6 +38,8 @@ internal sealed class RoleDefaultsFile
     public ErrorThresholdsFile? Backlog { get; set; }
     /// <summary>The fewest calls in a source's window that make the error share and latency worth judging. With fewer, the system is quiet.</summary>
     public int? MinCalls { get; set; }
+    /// <summary>Whether link discovery looks for the calls systems of this role make (an api or a worker). Default yes.</summary>
+    public bool? DiscoverLinks { get; set; }
 }
 
 /// <summary>defaults.yaml and the "defaults" block of a pillar file: role name to defaults.</summary>
@@ -59,6 +61,8 @@ internal sealed class SystemFile
     public ErrorThresholdsFile? Throttle { get; set; }
     public ErrorThresholdsFile? Backlog { get; set; }
     public int? MinCalls { get; set; }
+    /// <summary>Whether link discovery looks for the calls this system makes. Without it, the pillar's or the defaults' choice.</summary>
+    public bool? DiscoverLinks { get; set; }
     /// <summary>Signal to source name (or none), overriding the pillar's and the environment's choice for this system.</summary>
     public Dictionary<string, string> Signals { get; set; } = new();
     /// <summary>The name this system's resources carry for its service, matched against the service group of the environment's resource patterns. Without it, the service name.</summary>
@@ -156,6 +160,8 @@ internal sealed class VendorFile
     public List<string> CalledBy { get; set; } = [];
     public double? SlaP99Ms { get; set; }
     public ErrorThresholdsFile? Errors { get; set; }
+    /// <summary>Host names (and everything under them) that belong to this vendor, so a call to one is recognised as a vendor call by link discovery.</summary>
+    public List<string> Domains { get; set; } = [];
 }
 
 /// <summary>environments/{id}.yaml: one environment. The pillar and system files are shared by every environment; this file says what differs.</summary>
@@ -179,6 +185,43 @@ internal sealed class EnvironmentFile
     public EnvironmentFakeFile? Fake { get; set; }
     /// <summary>How pillars and systems map onto the cloud: subscriptions, workspace, resources and telemetry names.</summary>
     public ScopeFile? Scope { get; set; }
+    /// <summary>How the calls the systems make are found in the telemetry. Without it the environment has only the declared links.</summary>
+    public LinksFile? Links { get; set; }
+}
+
+/// <summary>The <c>links:</c> block of an environment file.</summary>
+internal sealed class LinksFile
+{
+    /// <summary>The name of a loganalytics source of this file. Its connection and login are used.</summary>
+    public string Source { get; set; } = "";
+    /// <summary>The query to send, a template ({roles}, {from}, {to}, scope variables, {environment}). One row for each caller and address: caller, host, days; path and calls optional.</summary>
+    public string Query { get; set; } = "";
+    /// <summary>How often it reads, for example 1h. Default 1h.</summary>
+    public string? Interval { get; set; }
+    /// <summary>How far back the first read looks, and the longest gap a later read covers. Default 7d.</summary>
+    public string? FirstRead { get; set; }
+    /// <summary>The fewest different days a call must be seen on to be drawn. Default 2.</summary>
+    public int? MinDays { get; set; }
+    /// <summary>How long a link stays after it was last seen. Default 30d.</summary>
+    public string? KeepFor { get; set; }
+    /// <summary>Regular expressions for addresses that are platform noise, not calls between systems.</summary>
+    public List<string> IgnoreHosts { get; set; } = [];
+    /// <summary>The ways an address becomes a system, tried in order.</summary>
+    public List<LinkRuleFile> Rules { get; set; } = [];
+    /// <summary>Words the address uses that the registry spells differently, applied to every captured group.</summary>
+    public Dictionary<string, string> Aliases { get; set; } = new();
+}
+
+internal sealed class LinkRuleFile
+{
+    /// <summary>A regular expression over the host, with named groups.</summary>
+    public string Host { get; set; } = "";
+    /// <summary>A regular expression over the path, with named groups, for a gateway that names the destination in the path.</summary>
+    public string? Path { get; set; }
+    /// <summary>The system id, with {group} holes for the named groups and {callerPillar}.</summary>
+    public string Target { get; set; } = "";
+    /// <summary>The call goes through the API gateway.</summary>
+    public bool Gateway { get; set; }
 }
 
 internal sealed class ScopeFile

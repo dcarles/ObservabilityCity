@@ -2,7 +2,7 @@ import type { GroupSnapshot, LogLine, NodeSnapshot, ScopeResource, Snapshot, Sys
 import { escapeHtml } from './picker'
 import { scopeParams, type Scope } from './scope'
 import { tenantListOrder, tenantFigures, yardSummary, type TenantView } from './tenants'
-import { ago, clockTime, configOrder, filterLogs, incidentSummary, LAYER_WORD, linkSections, overviewLinks, overviewRows, reasons, resourceLinks, scopeView, SEVERITY_WORD, stateTone, type LogFilter } from './inspectorModel'
+import { ago, clockTime, configOrder, filterLogs, incidentSummary, LAYER_WORD, linkSections, originLabel, type LinkItem, overviewLinks, overviewRows, reasons, resourceLinks, scopeView, SEVERITY_WORD, stateTone, type LogFilter } from './inspectorModel'
 
 export type InspectorTab = 'overview' | 'links' | 'logs' | 'config'
 const TABS: { id: InspectorTab; label: string }[] = [
@@ -236,8 +236,14 @@ export class Inspector {
     return sections.map((s) => `<h4>${escapeHtml(s.title)}</h4>${s.items.map((i) => {
       if (i.id === null) return `<div class="link plain"><b>${escapeHtml(i.name)}</b><span>${escapeHtml(i.where)}</span></div>`
       const on = this.host.onScreen(i.id)
-      return `<div class="link ${on ? '' : 'off'}" data-go="${escapeHtml(i.id)}" ${on ? '' : 'title="Not on screen: the island filter hides it"'}><b>${escapeHtml(i.name)}</b><span>${escapeHtml(i.where)}${on ? '' : ' · not on screen'}</span></div>`
+      return `<div class="link ${on ? '' : 'off'}" data-go="${escapeHtml(i.id)}" ${on ? '' : 'title="Not on screen: the island filter hides it"'}><b>${escapeHtml(i.name)}</b><span>${this.originTag(i.origin)}${escapeHtml(i.where)}${on ? '' : ' · not on screen'}</span></div>`
     }).join('')}`).join('')
+  }
+
+  private originTag(origin: LinkItem['origin']): string {
+    if (!origin) return ''
+    const { text, title } = originLabel(origin)
+    return `<i class="origin ${origin.found ? 'found' : 'declared'}" title="${escapeHtml(title)}">${escapeHtml(text)}</i> `
   }
 
   private logLines(n: NodeSnapshot): string {

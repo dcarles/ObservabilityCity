@@ -50,6 +50,7 @@ A map from a role name (`api`, `worker`, `db`, `cache`, `cron`, `gateway`, `brok
 | `throttle` | no | none | `amber` and `red` for the share of throttled requests (0 to 1). |
 | `backlog` | no | none | `amber` and `red` for the age of the oldest waiting message, in seconds. |
 | `minCalls` | no | none | The fewest calls in a window that make the error share and latency worth judging. With fewer the system is quiet, not red. |
+| `discoverLinks` | no | `true` | Whether link discovery looks for the calls systems of this role make. Only an `api` or a `worker` makes calls worth finding; it does nothing in an environment without a `links` block. |
 
 <!-- file: ErrorThresholdsFile -->
 | Key | Required | Default | Meaning |
@@ -94,6 +95,7 @@ One island. The file name is the pillar id.
 | `throttle` | no | role default | Throttling thresholds. |
 | `backlog` | no | role default | Backlog thresholds. |
 | `minCalls` | no | role default | See above. |
+| `discoverLinks` | no | pillar or role default | See above. Set `false` on a system whose calls should only be the declared ones. |
 | `signals` | no | none | Signal → source name (or `none`) for this system alone. |
 | `serviceCode` | no | the service | The name its cloud resources carry for the service. |
 | `telemetry` | no | none | What the telemetry calls it. |
@@ -158,6 +160,7 @@ One island. The file name is the pillar id.
 | `calledBy` | no | none | Ids of our systems that call it. Its health is read from those calls. |
 | `slaP99Ms` | no | none | Latency target. |
 | `errors` | no | none | Error thresholds. |
+| `domains` | no | none | Host names (and everything under them) that belong to this vendor. Link discovery recognises a call to one as a vendor call instead of reporting it as unresolved. |
 
 ## environments/&lt;id&gt;.yaml
 One file per environment. The pillar and system files are shared; this file says what differs: where the numbers come from, which tenants exist, which systems are not deployed.
@@ -174,6 +177,7 @@ One file per environment. The pillar and system files are shared; this file says
 | `tenants` | no | none | The tenants listed here. Others are found from the cloud when a scope allows. |
 | `exclude` | no | none | Ids of systems not deployed in this environment. |
 | `fake` | no | none | Settings for the fake source only. |
+| `links` | no | none | How the calls the systems make are found in the telemetry (see `links` below). |
 | `scope` | no | none | How pillars and systems map onto the cloud. |
 
 <!-- file: TenantFile -->
@@ -243,6 +247,49 @@ sources:
           metric: AutoscaleMaxThroughput
           aggregation: maximum
           orElse: { metric: ProvisionedThroughput, aggregation: maximum }
+```
+
+### links
+Finds the calls the systems really make, from the dependency data in the telemetry, and adds them to the declared `calls` and `gatewayCalls`. Without this block an environment has only the declared links.
+
+<!-- file: LinksFile -->
+| Key | Required | Default | Meaning |
+|---|---|---|---|
+| `source` | yes | | Name of a `loganalytics` source of this file. Its workspace and login are used. |
+| `query` | yes | | The query to send, a template. Holes: `{roles}` (the telemetry names of the systems asked about, double-quoted, separated by commas), `{from}` and `{to}` (UTC, ISO 8601), `{environment}` and your `scope.variables`. It returns one row for each caller and address with the columns `caller` (a telemetry name), `host` and `days` (an array of the days it was seen on); `path` and `calls` may be left out. Azure does the counting; no raw rows come back. |
+| `interval` | no | `1h` | How often it reads, for example `30m`. A number and `s`, `m`, `h` or `d`. |
+| `firstRead` | no | `7d` | How far back the first read looks, and the longest gap a later read covers. After that each read starts where the last ended. |
+| `minDays` | no | `2` | The fewest different days a call must be seen on to be drawn. |
+| `keepFor` | no | `30d` | How long a link stays after it was last seen. |
+| `ignoreHosts` | no | none | Regular expressions for addresses that are platform noise. |
+| `rules` | no | none | The ways an address becomes a system, tried in order. |
+| `aliases` | no | none | Words the address uses that the registry spells differently, applied to every captured group. |
+
+<!-- file: LinkRuleFile -->
+| Key | Required | Default | Meaning |
+|---|---|---|---|
+| `host` | yes | | A regular expression over the host, with named groups `(?<name>...)`. |
+| `path` | no | none | A regular expression over the path, for a gateway that names the destination in it. |
+| `target` | yes | | The system id, written with `{name}` holes for the named groups and `{callerPillar}` for the pillar of the caller. A rule whose result is not a system of the town is skipped. |
+| `gateway` | no | `false` | The call goes through the API gateway, so it is drawn as one (to a system on another island). |
+
+Found links are saved under `_discovered/links/<environment>/` in the town's folder (one file for each pillar, plus `state.yaml`), never in a pillar file, and are meant to stay out of version control. Addresses no rule explains, no ignore pattern covers and no vendor `domains` entry names are listed under Notices.
+
+```yaml
+links:
+  source: logs
+  query: |
+    AppDependencies
+    | where TimeGenerated between (datetime({from}) .. datetime({to}))
+    | where AppRoleName in~ ({roles})
+    | extend u = parse_url(Data)
+    | summarize days = make_set(startofday(TimeGenerated)), calls = sum(ItemCount)
+        by caller = AppRoleName, host = tostring(u.Host), path = tostring(u.Path)
+  ignoreHosts: ['^169\.254\.']
+  rules:
+    - { host: '^(?<service>[a-z-]+)\.services\.example\.test$', target: '{callerPillar}.{service}' }
+    - { host: '^gateway\.example\.test$', path: '^/(?<pillar>[a-z]+)/(?<service>[a-z-]+)/', target: '{pillar}.{service}', gateway: true }
+  aliases: { pay: payments }
 ```
 
 ### credentials

@@ -292,8 +292,11 @@ public enum LinkKind
     Vendor,
 }
 
-/// <summary>A system (or third party) another system is linked to, with the island it stands on.</summary>
-public sealed record LinkRef(string Id, string Name, LinkKind Kind, string IslandId, string IslandName);
+/// <summary>
+/// A system (or third party) another system is linked to, with the island it stands on. Found is true for a link only link discovery knows (no file
+/// declares it) and LastSeen is then the last day the telemetry showed it (yyyy-MM-dd); a declared link has neither.
+/// </summary>
+public sealed record LinkRef(string Id, string Name, LinkKind Kind, string IslandId, string IslandName, bool Found = false, string? LastSeen = null);
 
 /// <summary>
 /// What the inspector shows beyond the live numbers: the system's links and its effective settings with where each came from.

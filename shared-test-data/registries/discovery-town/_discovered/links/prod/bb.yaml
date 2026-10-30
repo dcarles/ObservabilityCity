@@ -1,0 +1,8 @@
+links:
+- caller: bb.ledger-worker
+  target: bb.ledger-api
+  gateway: false
+  lastSeen: 2026-10-02
+  days:
+  - 2026-10-01
+  - 2026-10-02

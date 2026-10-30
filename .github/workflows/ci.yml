@@ -83,7 +83,7 @@ jobs:
           - { group: ui, suites: 'ui' }
           - { group: towns, suites: 'towns' }
           - { group: links and tenants, suites: 'links tenants' }
-          - { group: other towns, suites: 'direct live sources scope wide' }
+          - { group: other towns, suites: 'direct live sources discovery scope wide' }
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-dotnet@v6

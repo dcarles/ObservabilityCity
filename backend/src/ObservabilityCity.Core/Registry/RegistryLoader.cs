@@ -33,7 +33,7 @@ public static partial class RegistryLoader
         "tenantPattern", "order", "default", "sources", "kind", "connection", "tenants", "exclude", "fake", "undeclaredTenants",
         "signals", "credentials", "credential", "pollSeconds", "timeoutSeconds", "tenantId", "clientId", "clientSecretEnv",
         "scope", "inventory", "workspace", "variables", "subscription", "pillars", "types", "pattern", "roles", "serviceTag", "tenantNameTag",
-        "telemetryRole", "queries", "links", "url", "nameLike", "tag", "key", "value", "code", "serviceCode", "telemetry", "minCalls", "query", "window",
+        "telemetryRole", "queries", "links", "url", "nameLike", "tag", "key", "value", "code", "serviceCode", "telemetry", "minCalls", "query", "window", "discoverLinks", "minDays", "keepFor", "firstRead", "interval", "ignoreHosts", "rules", "host", "path", "target", "gateway", "domains",
     ];
 
     // Last resort when defaults.yaml is missing or silent about a role.
@@ -235,7 +235,7 @@ public static partial class RegistryLoader
                 else calledBy.Add(target);
             }
             if (v.CalledBy.Count == 0) Problem($"third-parties.yaml: '{v.Id}' needs calledBy: the systems whose calls show how it is doing");
-            vendors.Add(new RegistryVendor(node, calledBy.Distinct().ToList()));
+            vendors.Add(new RegistryVendor(node, calledBy.Distinct().ToList()) { Domains = v.Domains });
         }
 
         var (topics, subscriptions) = ResolveMessaging(groups, brokenPillars, resilient, Problem);
@@ -288,12 +288,70 @@ public static partial class RegistryLoader
                 Credentials = f.Credentials.Select(kv => new RegistryCredential(kv.Key, kv.Value.Kind.ToLowerInvariant(), kv.Value.TenantId, kv.Value.ClientId, kv.Value.ClientSecretEnv)).ToList(),
                 Signals = f.Signals,
                 Scope = ToScope(f.Scope),
+                Links = ToLinks(f.Links),
             }, f.Order ?? 100));
         }
         var ordered = parsed.OrderBy(p => p.Order).ThenBy(p => p.Env.Id, StringComparer.Ordinal).Select(p => p.Env).ToList();
         if (ordered.Count(e => e.IsDefault) > 1)
             problem($"environments: {string.Join(" and ", ordered.Where(e => e.IsDefault).Select(e => $"'{e.Id}'"))} are all marked default: only one environment can be");
         return ordered;
+    }
+
+    private static ObservabilityCity.Core.Links.LinkDiscovery? ToLinks(LinksFile? f) => f is null ? null : new ObservabilityCity.Core.Links.LinkDiscovery(
+        f.Source, f.Query,
+        Duration(f.Interval, ObservabilityCity.Core.Links.LinkDiscovery.DefaultInterval),
+        Duration(f.FirstRead, ObservabilityCity.Core.Links.LinkDiscovery.DefaultFirstRead),
+        f.MinDays ?? ObservabilityCity.Core.Links.LinkDiscovery.DefaultMinDays,
+        Duration(f.KeepFor, ObservabilityCity.Core.Links.LinkDiscovery.DefaultKeepFor),
+        f.IgnoreHosts,
+        f.Rules.Select(r => new ObservabilityCity.Core.Links.LinkRule(r.Host, r.Path, r.Target, r.Gateway)).ToList(),
+        f.Aliases);
+
+    private static TimeSpan Duration(string? text, TimeSpan fallback) =>
+        text is not null && SourceQuery.TryParseWindow(text, out var d) ? d : fallback;
+
+    private static void CheckLinks(EnvironmentFile f, string name, List<string> errors)
+    {
+        if (f.Links is not { } links) return;
+        var owner = $"{name}: links";
+        if (!f.Sources.TryGetValue(links.Source, out var source))
+            errors.Add($"{owner}.source '{links.Source}' is not a source of this file.{DidYouMean.Hint(links.Source, f.Sources.Keys)}");
+        else if (!source.Kind.Equals("loganalytics", StringComparison.OrdinalIgnoreCase))
+            errors.Add($"{owner}.source '{links.Source}' is a {source.Kind} source; link discovery reads dependencies from a loganalytics source");
+        if (string.IsNullOrWhiteSpace(links.Query)) errors.Add($"{owner}.query is empty. Write the query that returns one row for each caller and address with the columns {string.Join(", ", ObservabilityCity.Core.Links.LinkQuery.Columns)}");
+        else
+        {
+            var known = ObservabilityCity.Core.Links.LinkQuery.Variables.Append(ScopeRules.EnvironmentVariable).Concat((IEnumerable<string>?)f.Scope?.Variables.Keys ?? []);
+            foreach (var problem in ScopeTemplate.Check(links.Query, known)) errors.Add($"{owner}.query: {problem}");
+        }
+        foreach (var (key, text) in new[] { ("interval", links.Interval), ("firstRead", links.FirstRead), ("keepFor", links.KeepFor) })
+            if (text is not null && !SourceQuery.TryParseWindow(text, out _)) errors.Add($"{owner}.{key} '{text}' is not a number and a unit like 1h or 7d");
+        if (links.MinDays is < 1) errors.Add($"{owner}.minDays is {links.MinDays}; it must be at least 1");
+        foreach (var pattern in links.IgnoreHosts)
+            if (!TryRegex(pattern, out var problem)) errors.Add($"{owner}.ignoreHosts '{pattern}': {problem}");
+        for (var i = 0; i < links.Rules.Count; i++)
+        {
+            var rule = links.Rules[i];
+            var at = $"{owner}.rules[{i}]";
+            var groups = new List<string> { ObservabilityCity.Core.Links.LinkRules.CallerPillar };
+            if (string.IsNullOrWhiteSpace(rule.Host)) errors.Add($"{at} needs a host pattern");
+            else if (!TryRegex(rule.Host, out var problem)) errors.Add($"{at}.host '{rule.Host}': {problem}");
+            else groups.AddRange(ObservabilityCity.Core.Links.LinkRules.GroupNames(rule.Host));
+            if (rule.Path is not null)
+            {
+                if (!TryRegex(rule.Path, out var problem)) errors.Add($"{at}.path '{rule.Path}': {problem}");
+                else groups.AddRange(ObservabilityCity.Core.Links.LinkRules.GroupNames(rule.Path));
+            }
+            if (string.IsNullOrWhiteSpace(rule.Target)) errors.Add($"{at} needs a target: the system id, with {{group}} holes for what the patterns capture");
+            else foreach (var problem in ScopeTemplate.Check(rule.Target, groups)) errors.Add($"{at}.target: {problem} Name the group in the host or path pattern, as (?<name>...)");
+        }
+    }
+
+    private static bool TryRegex(string pattern, out string problem)
+    {
+        problem = "";
+        try { _ = new System.Text.RegularExpressions.Regex(pattern, System.Text.RegularExpressions.RegexOptions.None, ObservabilityCity.Core.Links.LinkDiscovery.RegexTimeout); return true; }
+        catch (ArgumentException e) { problem = $"is not a valid regular expression ({e.Message})"; return false; }
     }
 
     private static void CheckEnvironment(EnvironmentFile f, string stem, string name, HashSet<string> ids, Dictionary<string, string> aliases, List<string> errors)
@@ -325,6 +383,7 @@ public static partial class RegistryLoader
                 errors.Add($"{name}: signal '{signal}' comes from source '{source}', which this file does not define.{DidYouMean.Hint(source, f.Sources.Keys)}");
         }
         CheckScope(f, name, errors);
+        CheckLinks(f, name, errors);
         var seen = new HashSet<string>();
         foreach (var t in f.Tenants)
         {
@@ -550,6 +609,15 @@ public static partial class RegistryLoader
             return pick(BuiltIn)!.Value;
         }
 
+        bool ResolveFlag(string key, Func<RoleDefaultsFile?, bool?> pick, bool? own, bool fallback)
+        {
+            if (own is { } mine) { origins[key] = new SettingOrigin(SettingLayer.System, fileName); return mine; }
+            if (pick(pillar) is { } fromPillar) { origins[key] = new SettingOrigin(SettingLayer.Pillar, fileName); return fromPillar; }
+            if (pick(app) is { } fromApp) { origins[key] = new SettingOrigin(SettingLayer.App, "defaults.yaml"); return fromApp; }
+            origins[key] = new SettingOrigin(SettingLayer.BuiltIn, null);
+            return fallback;
+        }
+
         origins["role"] = new SettingOrigin(SettingLayer.System, fileName);
         origins["external"] = s.External is not null ? new SettingOrigin(SettingLayer.System, fileName)
             : pillarExternal ? new SettingOrigin(SettingLayer.Pillar, fileName)
@@ -574,6 +642,7 @@ public static partial class RegistryLoader
             s.Calls)
         {
             MinCalls = Math.Max(1, (int)Resolve("minCalls", d => d?.MinCalls, s.MinCalls)),
+            DiscoverLinks = ResolveFlag("discoverLinks", d => d?.DiscoverLinks, s.DiscoverLinks, true),
             GatewayCalls = s.GatewayCalls,
             ServiceCode = s.ServiceCode,
             TelemetryRole = s.Telemetry?.Role,

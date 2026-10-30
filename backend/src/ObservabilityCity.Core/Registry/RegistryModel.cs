@@ -103,6 +103,9 @@ public sealed record RegistryGroup(
 /// <summary>A third party (a credit bureau, a data warehouse). Its Node uses the group id <see cref="GroupId"/>; CalledBy lists our systems that call it.</summary>
 public sealed record RegistryVendor(RegistryNode Node, IReadOnlyList<string> CalledBy)
 {
+    /// <summary>Host names (and everything under them) that belong to this vendor, so link discovery knows a call to one is not an unexplained address.</summary>
+    public IReadOnlyList<string> Domains { get; init; } = [];
+
     /// <summary>The group id every vendor id starts with (ext.snowflake).</summary>
     public const string GroupId = "ext";
 }
@@ -134,6 +137,15 @@ public sealed record RegistryNode(
 
     /// <summary>For a data store with one database per tenant: its name with {tenant} where the tenant id goes. Null for everything else.</summary>
     public string? TenantPattern { get; init; }
+
+    /// <summary>Whether link discovery looks for the calls this system makes (<c>discoverLinks</c>, through the defaults cascade). Only an API or a worker makes calls worth finding.</summary>
+    public bool DiscoverLinks { get; init; } = true;
+
+    /// <summary>The links in <see cref="Calls"/> that link discovery found and no file declares, each with the last day it was seen. Empty for a registry without discovery.</summary>
+    public IReadOnlyDictionary<string, DateOnly> FoundCalls { get; init; } = new Dictionary<string, DateOnly>();
+
+    /// <summary>The same for <see cref="GatewayCalls"/>.</summary>
+    public IReadOnlyDictionary<string, DateOnly> FoundGatewayCalls { get; init; } = new Dictionary<string, DateOnly>();
 
     /// <summary>Systems on other islands this one reaches through the API gateway. Only the dependency overlay and the cars' origins use them.</summary>
     public IReadOnlyList<string> GatewayCalls { get; init; } = [];
@@ -235,4 +247,7 @@ public sealed record RegistryEnvironment(
 
     /// <summary>How this environment maps pillars and systems onto the cloud (<c>scope:</c>). Empty when the file has none.</summary>
     public ScopeRules Scope { get; init; } = ScopeRules.None;
+
+    /// <summary>How this environment finds the calls its systems make (<c>links:</c>). Null: it does not, and the links are the declared ones.</summary>
+    public ObservabilityCity.Core.Links.LinkDiscovery? Links { get; init; }
 }

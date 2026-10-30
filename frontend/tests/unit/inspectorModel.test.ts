@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { ago, clockTime, configOrder, filterLogs, incidentSummary, linkSections, isWebAddress, overviewLinks, overviewRows, reasons, resourceLinks, scopeView, stateTone } from '../../src/inspectorModel'
+import { ago, clockTime, configOrder, filterLogs, incidentSummary, linkSections, originLabel, isWebAddress, overviewLinks, overviewRows, reasons, resourceLinks, scopeView, stateTone } from '../../src/inspectorModel'
 import type { ConfigValue, LogLine, ScopeInfo, ScopeResource, SystemDetail, NodeSnapshot, Snapshot } from '../../src/types'
 
 const bad = JSON.parse(readFileSync(resolve(__dirname, '../../../shared-test-data/snapshots/bad-day.json'), 'utf8')) as Snapshot
@@ -137,8 +137,8 @@ describe('the config rows', () => {
 describe('the links tab', () => {
   const detail: SystemDetail = {
     id: 'aa.api', name: 'Aa API', kind: 'Api', islandId: 'aa', islandName: 'Alpha', file: 'pillars/aa.yaml', config: [],
-    calls: [{ id: 'hub.db', name: 'Hub DB', kind: 'System', islandId: 'hub', islandName: 'Platform hub' }, { id: 'ext.bureau', name: 'Bureau', kind: 'Vendor', islandId: '', islandName: '' }],
-    calledBy: [], gatewayCalls: [], gatewayCalledBy: [{ id: 'bb.api', name: 'Bb API', kind: 'System', islandId: 'bb', islandName: 'Beta' }],
+    calls: [{ id: 'hub.db', name: 'Hub DB', kind: 'System', islandId: 'hub', islandName: 'Platform hub', found: false, lastSeen: null }, { id: 'ext.bureau', name: 'Bureau', kind: 'Vendor', islandId: '', islandName: '', found: false, lastSeen: null }],
+    calledBy: [], gatewayCalls: [], gatewayCalledBy: [{ id: 'bb.api', name: 'Bb API', kind: 'System', islandId: 'bb', islandName: 'Beta', found: true, lastSeen: '2026-10-29' }],
     outsideCallers: ['mobile-app'], serviceTopics: ['aa.events'], subscriptions: [{ topic: 'aa.events', publisher: 'aa.api', consumer: 'bb.worker', legacy: true }],
   }
 
@@ -155,6 +155,20 @@ describe('the links tab', () => {
   it('says which subscriptions are legacy', () => {
     const subs = linkSections(detail).find((s) => s.id === 'subscriptions')!
     expect(subs.items[0]).toEqual({ id: null, name: 'aa.events (legacy)', where: 'aa.api → bb.worker' })
+  })
+
+  it('tags a link found in the telemetry with the day it was last seen, and a declared link as declared', () => {
+    const [calls, gatewayCalledBy] = linkSections(detail)
+
+    expect(calls.items.map((i) => i.origin)).toEqual([{ found: false, lastSeen: null }, { found: false, lastSeen: null }])
+    expect(gatewayCalledBy.items[0].origin).toEqual({ found: true, lastSeen: '2026-10-29' })
+    expect(originLabel(gatewayCalledBy.items[0].origin!)).toEqual({ text: 'Seen in calls', title: 'Found in the telemetry, last seen 2026-10-29' })
+    expect(originLabel(calls.items[0].origin!)).toEqual({ text: 'Declared', title: 'Written in a registry file' })
+  })
+
+  it('gives words that are not links no origin', () => {
+    const outside = linkSections(detail).find((s) => s.id === 'outside')!
+    expect(outside.items[0].origin).toBeUndefined()
   })
 
   it('has nothing for a system with no links at all', () => {

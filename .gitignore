@@ -9,5 +9,7 @@ frontend/dist/
 secrets.json
 # Commercial or private model packs live here, never in the public repo
 themes-private/
+# What link discovery found in a running town (the fixture towns under shared-test-data keep theirs on purpose)
+config/**/_discovered/
 frontend/test-results/
 frontend/playwright-report/

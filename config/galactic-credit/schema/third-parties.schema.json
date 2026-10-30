@@ -15,7 +15,8 @@
           "name": { "type": "string" },
           "calledBy": { "type": "array", "description": "Our systems that call this vendor. Its health is read from the errors and latency of those calls.", "items": { "$ref": "system-ids.schema.json#/$defs/systemId" } },
           "slaP99Ms": { "type": "number", "description": "How slow the vendor may get before it counts as degraded." },
-          "errors": { "$ref": "defs.schema.json#/$defs/thresholds" }
+          "errors": { "$ref": "defs.schema.json#/$defs/thresholds" },
+          "domains": { "type": "array", "description": "Host names (and everything under them) that belong to this vendor, so link discovery recognises a call to one as a vendor call instead of reporting it as unresolved.", "items": { "type": "string" } }
         }
       }
     }

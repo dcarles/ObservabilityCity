@@ -110,6 +110,14 @@ export interface LinkItem {
   id: string | null
   name: string
   where: string
+  /** Where a link between systems comes from: written in a registry file, or found in the telemetry (with the last day it was seen). Absent for lines that are not links. */
+  origin?: LinkOrigin
+}
+
+export interface LinkOrigin {
+  found: boolean
+  /** yyyy-MM-dd of the last day the telemetry showed a found link; null for a declared one. */
+  lastSeen: string | null
 }
 
 export interface LinkSection {
@@ -118,7 +126,19 @@ export interface LinkSection {
   items: LinkItem[]
 }
 
-const linkItem = (l: LinkRef): LinkItem => ({ id: l.id, name: l.name, where: l.kind === 'Vendor' ? 'Third party' : l.islandName })
+const linkItem = (l: LinkRef): LinkItem => ({
+  id: l.id,
+  name: l.name,
+  where: l.kind === 'Vendor' ? 'Third party' : l.islandName,
+  origin: { found: l.found, lastSeen: l.lastSeen ?? null },
+})
+
+/** The words on a link's tag, and the hover text that says when it was last seen. */
+export function originLabel(o: LinkOrigin): { text: string; title: string } {
+  return o.found
+    ? { text: 'Seen in calls', title: o.lastSeen ? `Found in the telemetry, last seen ${o.lastSeen}` : 'Found in the telemetry' }
+    : { text: 'Declared', title: 'Written in a registry file' }
+}
 
 /** The Links tab: who this system calls and who calls it, through the gateway or not, and its messaging. Empty sections are left out. */
 export function linkSections(d: SystemDetail): LinkSection[] {
