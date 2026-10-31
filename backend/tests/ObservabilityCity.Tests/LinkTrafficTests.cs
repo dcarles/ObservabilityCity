@@ -51,6 +51,37 @@ public class LinkTrafficTests
     }
 
     [Fact]
+    public void A_seeded_rate_keeps_the_share_steady_from_the_first_minute_and_the_town_history_takes_over_later()
+    {
+        // the API averaged 2.5 a second over the hour before the town started; its caller sends 2
+        var traffic = Traffic(20, ("a.x", "t.api", 7200));
+        traffic.Seed(new Dictionary<string, double> { ["t.api"] = 2.5 });
+
+        var first = traffic.Split("t.api", 1.0, Now)!; // the few minutes just now happen to be quiet
+        var next = traffic.Split("t.api", 4.0, Now.AddMinutes(1))!; // and then busy
+
+        Assert.Equal(0.2, first.Outside / 1.0, 6); // 1 - 2 / 2.5, whatever the current rate is
+        Assert.Equal(0.2, next.Outside / 4.0, 6);
+
+        // after ten minutes of watching, the town's own mean is used and the seed is not
+        for (var minute = 2; minute <= 12; minute++) traffic.Split("t.api", 8.0, Now.AddMinutes(minute));
+        var later = traffic.Split("t.api", 8.0, Now.AddMinutes(13))!;
+        Assert.NotEqual(0.2, later.Outside / 8.0, 3);
+    }
+
+    [Fact]
+    public void A_seed_is_per_api_and_an_unseeded_api_follows_its_current_rate()
+    {
+        var traffic = Traffic(20, ("a.x", "t.api", 7200), ("a.x", "u.api", 7200));
+        traffic.Seed(new Dictionary<string, double> { ["t.api"] = 2.5 });
+
+        Assert.Equal(0.2, traffic.Split("t.api", 1.0, Now)!.Outside, 6); // a fifth of what the API gets now, as 2 of the usual 2.5 are explained
+        Assert.Equal(2.0, traffic.Split("u.api", 4.0, Now)!.Outside, 6);
+        Assert.True(traffic.Seeded);
+        Assert.False(new LinkTraffic().Seeded);
+    }
+
+    [Fact]
     public void Without_enough_history_the_current_rate_is_used_as_before()
     {
         var traffic = Traffic(20, ("a.x", "t.api", 7200));
@@ -230,6 +261,19 @@ public class LinkTrafficTests
         }
     }
 
+    private sealed class FakeHistory(Func<IReadOnlyDictionary<string, double>> answer) : IRateHistory
+    {
+        public bool CanReadRates { get; set; } = true;
+        public bool Fails { get; set; }
+        public List<TimeSpan> Asked { get; } = [];
+
+        public Task<IReadOnlyDictionary<string, double>> ReadAverageRatesAsync(TownRegistry registry, TimeSpan window, CancellationToken ct)
+        {
+            Asked.Add(window);
+            return Fails ? throw new HttpRequestException("Log Analytics answered 500") : Task.FromResult(answer());
+        }
+    }
+
     private sealed class Town(string folder, bool a, FakeTimeProvider time) : IDisposable
     {
         /// <summary>The share window of the town's traffic block, which turns a rate into the calls its query counts.</summary>
@@ -245,8 +289,8 @@ public class LinkTrafficTests
         public IReadOnlyList<DependencyRow> Rows(params (string Caller, string Target, bool Gateway, double Calls)[] calls) =>
             calls.Select(c => new DependencyRow(Roles[c.Caller], Host(a, c.Target, c.Gateway, out var path), path, [], c.Calls * WindowSeconds / 3600)).ToList();
 
-        public LinkTrafficRunner Runner(IDependencySource source, FakeTimeProvider clock) =>
-            new(source, Scope, View, Store.Traffic, clock, NullLogger<LinkTrafficRunner>.Instance);
+        public LinkTrafficRunner Runner(IDependencySource source, FakeTimeProvider clock, IRateHistory? history = null) =>
+            new(source, Scope, View, Store.Traffic, clock, NullLogger<LinkTrafficRunner>.Instance, history);
 
         public void Dispose() => Copy?.Dispose();
     }
@@ -317,6 +361,62 @@ public class LinkTrafficTests
 
         Assert.Equal(1.0, Rate(town.Store.Traffic.Split("bb.ledger-api", 2.0)!, "aa.orders-worker") * 2, 6);
         Assert.DoesNotContain(town.Store.Traffic.Split("bb.ledger-api", 2.0)!.Callers, c => c.From == "bb.ledger-api");
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task The_average_rates_are_read_once_over_the_share_window_and_steady_the_split_at_once(bool a)
+    {
+        var clock = new FakeTimeProvider(Now);
+        using var town = Make(a, clock);
+        var source = new FakeDependencies(() => town.Rows(Calls));
+        var history = new FakeHistory(() => new Dictionary<string, double> { ["bb.ledger-api"] = 1.0 });
+        var runner = town.Runner(source, clock, history);
+
+        await runner.RunOnceAsync(TestContext.Current.CancellationToken);
+        await runner.RunOnceAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal([TimeSpan.FromSeconds(town.WindowSeconds)], history.Asked); // once, over the window the callers were counted in
+        var quiet = town.Store.Traffic.Split("bb.ledger-api", 0.1, Now)!; // the last few minutes were quiet
+        Assert.Equal(0.025, quiet.Outside, 6); // the usual quarter of the traffic is outside: a quarter of 0.1
+        Assert.Equal(0.05, Rate(quiet, "aa.orders-worker"), 6);
+    }
+
+    [Fact]
+    public async Task A_history_that_cannot_be_read_leaves_the_split_on_the_current_rate_and_is_asked_again_next_time()
+    {
+        var clock = new FakeTimeProvider(Now);
+        using var town = Make(true, clock);
+        var source = new FakeDependencies(() => town.Rows(Calls));
+        var history = new FakeHistory(() => new Dictionary<string, double> { ["bb.ledger-api"] = 1.0 }) { Fails = true };
+        var runner = town.Runner(source, clock, history);
+
+        await runner.CycleAsync(TestContext.Current.CancellationToken);
+
+        Assert.True(town.Store.Traffic.Measured); // the callers were still read
+        Assert.False(town.Store.Traffic.Seeded);
+        Assert.Equal(0.25, town.Store.Traffic.Split("bb.ledger-api", 1.0, Now)!.Outside, 6); // as before the seed existed
+        Assert.Empty(town.Store.Notices(2)); // not a config problem: the town works without it
+
+        history.Fails = false;
+        await runner.CycleAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(2, history.Asked.Count);
+        Assert.True(town.Store.Traffic.Seeded);
+    }
+
+    [Fact]
+    public async Task A_source_that_replays_a_recording_is_not_asked_for_a_history()
+    {
+        var clock = new FakeTimeProvider(Now);
+        using var town = Make(true, clock);
+        var history = new FakeHistory(() => new Dictionary<string, double>()) { CanReadRates = false };
+
+        await town.Runner(new FakeDependencies(() => town.Rows(Calls)), clock, history).RunOnceAsync(TestContext.Current.CancellationToken);
+
+        Assert.Empty(history.Asked);
+        Assert.False(town.Store.Traffic.Seeded);
     }
 
     [Fact]
