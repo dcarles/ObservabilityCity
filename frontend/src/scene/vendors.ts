@@ -18,34 +18,52 @@ const BX = 8 // a building's centre, from the spine
 const ROAD_Z = 1 // the road in front of the first row of buildings, island-local
 const ROW_PITCH = 2 * CURB + PAD_D // from one row road to the next
 
-/** Where the k-th building of an island stands: buildings fill a row from the left of the spine to the right, then the next row up the spine. */
-export function vendorSlot(k: number): BayTarget {
+const PAD_PITCH = PAD_WIDTH + 2 // one plot's centre to the next along a row road
+const PER_ROW = [2, 4, 6, 8] // plots on a row road, half on each side of the spine
+
+/** Where the k-th building of an island stands: rows of `perRow` plots, half each side of the spine, filled from the spine outwards, then the next row up. */
+export function vendorSlot(k: number, perRow = 2): BayTarget {
   const col = (k % 2) as 0 | 1
-  return { x: col === 0 ? -BX : BX, roadZ: ROAD_Z - Math.floor(k / 2) * ROW_PITCH, col }
+  const ring = Math.floor((k % perRow) / 2)
+  const x = (col === 0 ? -1 : 1) * (BX + ring * PAD_PITCH)
+  return { x, roadZ: ROAD_Z - Math.floor(k / perRow) * ROW_PITCH, col, laneStart: ring === 0 ? 5 : Math.abs(x) - PAD_WIDTH / 2 - 0.4 }
 }
 
-/** The size and shape of a vendor island that holds `count` buildings, worked out from sizes alone so it can be tested without a renderer. */
-export function planVendorIsland(id: string, count: number) {
-  const slots = Array.from({ length: count }, (_, k) => vendorSlot(k))
-  const rows = Math.ceil(count / 2)
+function fitIsland(id: string, count: number, perRow: number) {
+  const slots = Array.from({ length: count }, (_, k) => vendorSlot(k, perRow))
+  const rows = Math.ceil(count / perRow)
   const wide = count > 1
   // the smallest island that holds the plots, the roads and the gate
   const southZ = ROAD_Z + CURB
   const northZ = ROAD_Z - (rows - 1) * ROW_PITCH - CURB - PAD_D
-  const edge = BX + PAD_WIDTH / 2 + 0.4
+  const edge = Math.max(BX, ...slots.map((t) => Math.abs(t.x))) + PAD_WIDTH / 2 + 0.4
   const check: [number, number][] = [[-edge, southZ], [3, southZ], [-edge, northZ], [3, northZ], [0, northZ - 3]]
   if (wide) check.push([edge, southZ], [edge, northZ])
   let k = 1
   let rx = 17, rz = 15
   let outline = makeOutline(hashString(id), rx, rz, 0.06)
-  for (let i = 0; i < 200; i++) {
+  for (let i = 0; i < 400; i++) {
     rx = 17 * k
     rz = 15 * k
     outline = makeOutline(hashString(id), rx, rz, 0.06)
     if (check.every(([x, z]) => outline.contains(x, z, 2)) && coastScan(outline, 'z') - 0.6 - southZ >= 7) break
     k *= 1.02
   }
-  return { slots, rows, wide, outline, rx, rz, gateZ: coastScan(outline, 'z') - 0.6, edge }
+  return { slots, rows, wide, outline, rx, rz, gateZ: coastScan(outline, 'z') - 0.6, edge, perRow }
+}
+
+/**
+ * The size and shape of a vendor island that holds `count` buildings, worked out from sizes alone so it can be tested without a renderer. Like a
+ * pillar's island it takes whichever of 2, 4, 6 or 8 plots to a row gives the smallest island, so many buildings make a grid, not a long strip.
+ */
+export function planVendorIsland(id: string, count: number) {
+  let best = fitIsland(id, count, PER_ROW[0])
+  for (const n of PER_ROW.slice(1)) {
+    if (n > Math.max(2, count + 1)) break
+    const plan = fitIsland(id, count, n)
+    if (plan.rx * plan.rz < best.rx * best.rz - 1e-9) best = plan
+  }
+  return best
 }
 
 /**
@@ -66,7 +84,7 @@ export class VendorIsland {
   readonly targets = new Map<string, BayTarget>()
 
   constructor(readonly id: string, name: string, nodes: NodeSnapshot[]) {
-    const { slots, rows, outline, rx, rz, gateZ, edge } = planVendorIsland(id, nodes.length)
+    const { slots, rows, outline, rx, rz, gateZ, edge, perRow } = planVendorIsland(id, nodes.length)
     this.outline = outline
     this.rx = rx
     this.rz = rz
@@ -86,10 +104,12 @@ export class VendorIsland {
       const slot = slots[i]
       const out = slot.col === 0 ? -1 : 1
       const zf = slot.roadZ - CURB
-      if (i >= 2 && i % 2 === 0) decor.add(junction(0, slot.roadZ, true))
-      decor.add(streetX(slot.roadZ, out * half, out * edge, [-1]))
+      if (i >= perRow && i % perRow === 0) decor.add(junction(0, slot.roadZ, true))
+      if (slot.laneStart === 5) decor.add(streetX(slot.roadZ, out * half, out * edge, [-1]))
       decor.add(blockPad(slot.x, zf - PAD_D, zf, PAD_WIDTH))
-      decor.add(serviceLane(out * (3 + Math.abs(slot.x) + PAD_WIDTH / 2 + 0.4) / 2, slot.roadZ - LANE_Z, Math.abs(slot.x) + PAD_WIDTH / 2 + 0.4 - 3, CURB - 2.1 - 0.7))
+      const laneFrom = slot.laneStart === 5 ? 3 : slot.laneStart!
+      const laneTo = Math.abs(slot.x) + PAD_WIDTH / 2 + 0.4
+      decor.add(serviceLane(out * (laneFrom + laneTo) / 2, slot.roadZ - LANE_Z, laneTo - laneFrom, CURB - 2.1 - 0.7))
       avoid.push({ x: slot.x, z: zf - PAD_D / 2, w: PAD_WIDTH + 1, d: PAD_D + 1 }, { x: out * edge / 2, z: slot.roadZ, w: edge + 2, d: 2 * CURB + 1 })
       decor.add(prop('bush', slot.x - 2.2, zf - 0.9, 0, 2.2), prop('bush', slot.x + 2.8, zf - 0.9, 0, 1.8), lamp(slot.x - out * (PAD_WIDTH / 2 - 3.4), zf + 0.45, 0, -Math.PI / 2))
       const building = new Building(node.id, node.kind, VENDOR_COLOR)

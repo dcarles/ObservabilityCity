@@ -61,12 +61,12 @@ describe('vendors that share an island', () => {
 
 describe('the buildings of a vendor island', () => {
   it('keep the old plot for a single building: left of the spine, on the first road', () => {
-    expect(vendorSlot(0)).toEqual({ x: -8, roadZ: 1, col: 0 })
-    expect(planVendorIsland('ext.solo', 1).slots).toEqual([{ x: -8, roadZ: 1, col: 0 }])
+    expect(vendorSlot(0)).toEqual({ x: -8, roadZ: 1, col: 0, laneStart: 5 })
+    expect(planVendorIsland('ext.solo', 1).slots).toEqual([{ x: -8, roadZ: 1, col: 0, laneStart: 5 }])
   })
 
   it('fill a row left then right, then the next row up the spine', () => {
-    const slots = [0, 1, 2, 3, 4].map(vendorSlot)
+    const slots = [0, 1, 2, 3, 4].map((k) => vendorSlot(k))
 
     expect(slots.map((s) => s.col)).toEqual([0, 1, 0, 1, 0])
     expect(slots.map((s) => Math.sign(s.x))).toEqual([-1, 1, -1, 1, -1])
@@ -84,6 +84,25 @@ describe('the buildings of a vendor island', () => {
       for (const dx of [-6, 6]) for (const z of [t.roadZ + 2, t.roadZ - 14]) expect(plan.outline.contains(t.x + dx, z, 2), `${t.x + dx},${z}`).toBe(true)
     }
     expect(plan.gateZ).toBeGreaterThan(Math.max(...plan.slots.map((t) => t.roadZ)) + 7)
+  })
+
+  it('fill a wider row from the spine outwards, alternating sides, with each lane starting at its own plot', () => {
+    const slots = [0, 1, 2, 3, 4, 5].map((k) => vendorSlot(k, 4))
+
+    expect(slots.slice(0, 4).map((s) => s.roadZ)).toEqual([1, 1, 1, 1])
+    expect(slots.slice(0, 4).map((s) => s.x)).toEqual([-8, 8, -22, 22])
+    expect(slots[4].roadZ).toBeLessThan(1)
+    expect(slots[4].x).toBe(-8)
+    expect(slots.map((s) => s.laneStart)).toEqual([5, 5, 22 - 6 - 0.4, 22 - 6 - 0.4, 5, 5])
+  })
+
+  it('stay compact for a big vendor such as a company\'s 33 internal services: more than two to a row, about as wide as deep', () => {
+    const plan = planVendorIsland('ext.big', 33)
+
+    expect(Math.max(...plan.slots.map((s) => Math.abs(s.x)))).toBeGreaterThan(8)
+    expect(plan.rz / plan.rx).toBeLessThan(2.5)
+    expect(plan.rx * plan.rz).toBeLessThan(planVendorIsland('ext.big', 17).rx * planVendorIsland('ext.big', 17).rz * 3)
+    expect(Math.max(plan.rx, plan.rz)).toBeLessThan(160)
   })
 
   it('make the island no bigger than the buildings need: one more row, a bigger island', () => {

@@ -4,6 +4,7 @@ using ObservabilityCity.Contracts;
 using ObservabilityCity.Core.Links;
 using ObservabilityCity.Core.Registry;
 using ObservabilityCity.Core.Scope;
+using ObservabilityCity.Core.Sources;
 using ObservabilityCity.Core.Snapshots;
 using TownRegistry = ObservabilityCity.Core.Registry.Registry;
 
@@ -122,6 +123,20 @@ public class VendorIslandTests
         var e = Assert.Throws<RegistryException>(() => RegistryLoader.Load(copy.Path));
 
         Assert.Contains("path '(^/credit' is not a valid pattern", e.Message);
+    }
+
+    [Fact]
+    public void A_vendors_buildings_take_no_signals_from_the_environment()
+    {
+        using var town = new Harness(true, ServicesA);
+        var registry = town.View.Current;
+        var vendor = registry.Vendors.First(v => v.IslandId == "ext.shared").Node;
+        var system = registry.AllNodes.First();
+
+        // the environment names sources for the town's own systems; nothing reads them for a third party's building
+        Assert.NotNull(registry.SourceFor(system, Signals.Requests));
+        Assert.All(Signals.All, signal => Assert.Null(registry.SourceFor(vendor, signal)));
+        Assert.Equal(Signals.All.Length, registry.AbsentSignals(vendor).Count);
     }
 
     // ---- the classifier ----
