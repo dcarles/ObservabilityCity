@@ -79,6 +79,15 @@ test.describe(`functions and regions (${B ? 'tags, Started, a region tag' : 'nam
     await expect(page.locator('#inspector .why li')).toHaveCount(2)
   })
 
+  test('a job time that is not today names its date, and shows no seconds', async ({ page }) => {
+    await open(page)
+    await page.evaluate(() => (window as any).city.openSystem('aa.sched-fn'))
+    const text = await page.locator('#inspector .job').allTextContents()
+
+    expect(text.length).toBe(3)
+    for (const t of text) expect(t).toMatch(/ran \d{1,2} [A-Z][a-z]{2} \d\d:\d\d(?!:)/)
+  })
+
   test('a late job alone makes the building amber', async ({ page }) => {
     await open(page)
     const report = await inspect(page, 'aa.report-fn')
