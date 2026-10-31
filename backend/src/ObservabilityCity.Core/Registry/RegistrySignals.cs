@@ -6,14 +6,17 @@ public sealed partial record Registry
 {
     /// <summary>
     /// The source a signal of a system comes from in this environment, or null when it has none. The first of these that answers wins: the system's
-    /// own <c>signals</c>, its pillar's, the environment's, then the environment's source called metrics (or messaging for the queue signals).
+    /// own <c>signals</c>, its pillar's, the environment's (not for a third party's building, which only its own entry can give a source), then the environment's source called metrics (or messaging for the queue signals).
     /// A source that is named but not defined by the environment gives nothing. In a demo town the fake source fills whatever nothing else does;
     /// in a live town nothing does, so the signal is absent.
     /// </summary>
     public string? SourceFor(RegistryNode node, string signal)
     {
         var env = ActiveEnvironment;
-        var named = node.Signals.GetValueOrDefault(signal) ?? env?.Signals.GetValueOrDefault(signal);
+        // a third party's building is not one the town's sources measure: the environment's choices are for the town's own systems
+        var isVendor = node.GroupId == RegistryVendor.GroupId;
+        var named = node.Signals.GetValueOrDefault(signal) ?? (isVendor ? null : env?.Signals.GetValueOrDefault(signal));
+        if (isVendor && named is null) return Town.IsDemo ? SourceKinds.Fake : null;
         var chosen = named ?? Signals.DefaultSourceName(signal);
         if (chosen == Signals.None) return null;
         if (env?.Sources.Any(s => s.Name == chosen) == true) return chosen;
