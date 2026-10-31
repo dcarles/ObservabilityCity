@@ -33,7 +33,7 @@ public static partial class RegistryLoader
         "tenantPattern", "order", "default", "sources", "kind", "connection", "tenants", "exclude", "fake", "undeclaredTenants",
         "signals", "credentials", "credential", "pollSeconds", "timeoutSeconds", "tenantId", "clientId", "clientSecretEnv",
         "scope", "inventory", "workspace", "variables", "subscription", "pillars", "types", "pattern", "roles", "serviceTag", "tenantNameTag",
-        "telemetryRole", "queries", "links", "url", "nameLike", "tag", "key", "value", "code", "serviceCode", "telemetry", "minCalls", "query", "window", "discoverLinks", "regions", "tag", "names", "skew", "state", "running", "minDays", "keepFor", "firstRead", "interval", "ignoreHosts", "rules", "host", "path", "target", "gateway", "domains", "traffic", "shareWindow",
+        "telemetryRole", "queries", "links", "url", "nameLike", "tag", "key", "value", "code", "serviceCode", "telemetry", "minCalls", "query", "window", "discoverLinks", "regions", "tag", "names", "skew", "state", "running", "minDays", "keepFor", "firstRead", "interval", "ignoreHosts", "rules", "host", "path", "target", "gateway", "domains", "services", "internal", "match", "traffic", "shareWindow",
     ];
 
     // Last resort when defaults.yaml is missing or silent about a role.
@@ -219,23 +219,47 @@ public static partial class RegistryLoader
         var vendors = new List<RegistryVendor>();
         foreach (var v in thirdParties.Vendors)
         {
-            var node = ToNode(new SystemFile { Id = v.Id, Name = v.Name, Role = "api", SlaP99Ms = v.SlaP99Ms, Errors = v.Errors }, RegistryVendor.GroupId,
-                "third-parties.yaml", RegistryVendor.GroupId, defaults, new DefaultsFile(), false, new Dictionary<string, string>(), ids, aliases, errors);
-            if (node is null) continue;
-            var calledBy = new List<string>();
-            foreach (var caller in v.CalledBy)
+            // a vendor with services is one island with a building for each; without them it is one building
+            var units = v.Services.Count == 0
+                ? [(Id: v.Id, Name: v.Name, CalledBy: v.CalledBy, Sla: v.SlaP99Ms, Errors: v.Errors, Matches: (IReadOnlyList<VendorMatch>)[], Service: false)]
+                : v.Services.Select(s => (Id: v.Id + "-" + s.Id, Name: s.Name ?? s.Id, CalledBy: s.CalledBy, Sla: s.SlaP99Ms ?? v.SlaP99Ms, Errors: s.Errors ?? v.Errors,
+                    Matches: (IReadOnlyList<VendorMatch>)s.Match.Select(m => new VendorMatch(m.Host, m.Path)).ToList(), Service: true)).ToList();
+            if (v.Services.Count > 0 && v.CalledBy.Count > 0) Problem($"third-parties.yaml: '{v.Id}' has services, so calledBy goes on each service, not on the vendor");
+            foreach (var s in v.Services)
             {
-                var target = ids.Contains(caller) ? caller : aliases.GetValueOrDefault(caller);
-                if (target is null)
+                if (s.Id.Length == 0) Problem($"third-parties.yaml: a service of '{v.Id}' has no id");
+                if (s.Match.Count == 0) Problem($"third-parties.yaml: service '{s.Id}' of '{v.Id}' needs match: the host (and optional path) its calls go to");
+                foreach (var m in s.Match)
                 {
-                    if (resilient && brokenPillars.Contains(caller.Split('.')[0])) continue;
-                    Problem($"third-parties.yaml: '{v.Id}' is called by '{caller}', which is not in this town.{DidYouMean.Hint(caller, ids.Concat(aliases.Keys))}");
+                    if (m.Host.Trim().Length == 0) Problem($"third-parties.yaml: service '{s.Id}' of '{v.Id}' has a match with no host");
+                    if (m.Path is not null) try { _ = new System.Text.RegularExpressions.Regex(m.Path); } catch (ArgumentException e) { Problem($"third-parties.yaml: service '{s.Id}' of '{v.Id}': path '{m.Path}' is not a valid pattern ({e.Message})"); }
                 }
-                else if (target.StartsWith(RegistryVendor.GroupId + ".")) Problem($"third-parties.yaml: '{v.Id}' is called by '{target}', which is another third party");
-                else calledBy.Add(target);
             }
-            if (v.CalledBy.Count == 0) Problem($"third-parties.yaml: '{v.Id}' needs calledBy: the systems whose calls show how it is doing");
-            vendors.Add(new RegistryVendor(node, calledBy.Distinct().ToList()) { Domains = v.Domains });
+            foreach (var u in units)
+            {
+                var node = ToNode(new SystemFile { Id = u.Id, Name = u.Name, Role = "api", SlaP99Ms = u.Sla, Errors = u.Errors }, RegistryVendor.GroupId,
+                    "third-parties.yaml", RegistryVendor.GroupId, defaults, new DefaultsFile(), false, new Dictionary<string, string>(), ids, aliases, errors);
+                if (node is null) continue;
+                var calledBy = new List<string>();
+                foreach (var caller in u.CalledBy)
+                {
+                    var target = ids.Contains(caller) ? caller : aliases.GetValueOrDefault(caller);
+                    if (target is null)
+                    {
+                        if (resilient && brokenPillars.Contains(caller.Split('.')[0])) continue;
+                        Problem($"third-parties.yaml: '{u.Id}' is called by '{caller}', which is not in this town.{DidYouMean.Hint(caller, ids.Concat(aliases.Keys))}");
+                    }
+                    else if (target.StartsWith(RegistryVendor.GroupId + ".")) Problem($"third-parties.yaml: '{u.Id}' is called by '{target}', which is another third party");
+                    else calledBy.Add(target);
+                }
+                // a service is also found by link discovery; a plain vendor reads its health from the callers the file names
+                if (!u.Service && u.CalledBy.Count == 0) Problem($"third-parties.yaml: '{u.Id}' needs calledBy: the systems whose calls show how it is doing");
+                vendors.Add(new RegistryVendor(node, calledBy.Distinct().ToList())
+                {
+                    Domains = v.Domains, Matches = u.Matches, Internal = v.Internal,
+                    IslandId = u.Service ? v.Id : null, IslandName = u.Service ? v.Name ?? v.Id : null,
+                });
+            }
         }
 
         var (topics, subscriptions) = ResolveMessaging(groups, brokenPillars, resilient, Problem);

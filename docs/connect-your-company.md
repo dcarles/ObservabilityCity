@@ -277,6 +277,22 @@ Declared `calls` and `gatewayCalls` are always drawn. An environment can also fi
 - An address no rule explains, no `ignoreHosts` pattern covers and no third party `domains` entry names appears under Notices, so a missing rule shows up as something to add. A wrong link is fixed by tightening a rule or adding an ignore pattern, not link by link.
 - The inspector's Links tab tags each link "Seen in calls" (with the last day it was seen) or "Declared".
 
+#### Services outside the monitored platform
+
+Calls to services that are not systems of the town (a third party, or the company's own services that no pillar file describes) are found by what they are called on. In `third-parties.yaml` give a vendor `services:`, each with a `match` list of a `host` (the host and everything under it) and an optional `path` pattern:
+
+```yaml
+vendors:
+  - id: ext.shared
+    name: Shared services
+    internal: true            # the company's own, not a third party
+    services:
+      - { id: credit, name: Credit, match: [{ host: shared.example.test, path: '^/credit' }] }
+      - { id: identity, name: Identity, match: [{ host: shared.example.test, path: '^/identity' }, { host: id.example.test }] }
+```
+
+The vendor stands on one island out at sea with a building for each service, in rows of 2, 4, 6 or 8 plots (whichever makes the smallest island, as on a pillar's island). Link discovery sends each call it finds to the first service whose match fits it, and the island gets a road and cars from every system that calls it. A service's health is not read yet: its building shows "not monitored", and is not counted as no data, until a source you name on that service reports it. A vendor without `services` is still one building on its own island.
+
 #### Where an API's traffic comes from
 
 An API's total request rate comes from your unsampled metrics. With a `links.traffic` block (see `links` in [config-reference.md](config-reference.md)) the town also learns how much each town system sends to it, from the same dependency table: the query returns one row for each caller and address over the last `shareWindow` with `calls` summed from the sampling-corrected count (`sum(ItemCount)` in KQL). The rest is outside traffic:

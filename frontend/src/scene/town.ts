@@ -17,7 +17,7 @@ import { findLane, type SeaMap } from './sea'
 import { mergeStatic } from './merge'
 import { bayTo } from './bay'
 import { islandSign } from './sign'
-import { backBridgeClear, hubGeometry, layoutTown, loopArc, placeVendorsOnRing, ringRoadRadius, wrapAngle, type Disc, type HubGeometry, type VendorSpec } from './layout'
+import { backBridgeClear, groupVendors, hubGeometry, layoutTown, loopArc, placeVendorsOnRing, ringRoadRadius, wrapAngle, type Disc, type HubGeometry, type VendorSpec } from './layout'
 import { Weather, type SkyStatus } from './weather'
 import { Airport, type AirportStatus } from './airport'
 import { inboundMix } from '../inbound'
@@ -83,6 +83,8 @@ interface Island {
 interface VendorLink {
   group: number
   vendor: VendorIsland
+  /** The building on the vendor's island the calls go to (a vendor island may hold several). */
+  to: string
   /** Ids of the systems on that island that call the vendor. */
   callers: string[]
   /** How many islands have a road to this vendor. The vendor's traffic is shared between them. */
@@ -195,21 +197,23 @@ export class Town {
     const discs: Disc[] = pillars.map((g, i) => ({ id: g.id, x: centres[i].x, z: centres[i].z, r: Math.max(plans[i].rx, plans[i].rz) * 0.95 + 3 }))
     const airportDisc: Disc = { id: 'airport', x: centres[pillars.length].x, z: centres[pillars.length].z, r: Math.max(airport.rx, airport.rz) * 0.95 + 3 }
     const groupOfNode = new Map(s.groups.flatMap((g) => g.nodes.map((n) => [n.id, g.id] as const)))
-    const vendorIslands = s.vendors.map((v) => new VendorIsland(v.node.id, v.node.name, v.node))
+    // a vendor with several services is one island: its buildings share the island id the snapshot gives them
+    const vendorGroups = groupVendors(s.vendors)
+    const vendorIslands = vendorGroups.map((g) => new VendorIsland(g.id, g.name, g.members.map((m) => m.node)))
     const order = pillars.map((g) => g.id)
     const callerIslands = (calledBy: string[]) => [...new Set(calledBy.map((id) => groupOfNode.get(id)).filter((g): g is string => !!g && g !== 'hub' && order.includes(g)))]
     // a direct town always has the ring road: it is how islands, the airport and the third parties reach each other
     const loopR = direct || vendorIslands.length > 0 ? ringRoadRadius([...discs, airportDisc]) : 0
     this.loopR = loopR
-    const specs: VendorSpec[] = s.vendors.map((v, i) => ({
-      id: v.node.id,
-      callerAngles: callerIslands(v.calledBy).map((g) => angles[order.indexOf(g)]),
+    const specs: VendorSpec[] = vendorGroups.map((g, i) => ({
+      id: g.id,
+      callerAngles: callerIslands(g.calledBy).map((g) => angles[order.indexOf(g)]),
       front: vendorIslands[i].gateZ,
     }))
     const spots = placeVendorsOnRing(loopR, specs)
     // an island that calls a third party gets a back gate and a bridge to the ring road, unless a neighbour stands in the way
     const bridgedIslands = new Set<string>()
-    for (const v of s.vendors) {
+    for (const v of vendorGroups) {
       for (const g of callerIslands(v.calledBy)) {
         const i = order.indexOf(g)
         if (bridgedIslands.has(g)) continue
@@ -273,29 +277,36 @@ export class Town {
     const landed = new Set<string>() // islands whose bridge to the ring road is already built
     spots.forEach((spot, i) => {
       const vi = vendorIslands[i]
-      const vendor = s.vendors[i]
+      const group = vendorGroups[i]
       vi.root.position.set(spot.x, 0, spot.z)
       vi.root.rotation.y = Math.atan2(spot.loopX - spot.x, spot.loopZ - spot.z) // local +z faces the ring road
       this.root.add(vi.root)
       vi.root.updateMatrixWorld(true)
       this.expandBounds(vi.outline, vi.root.position, vi.root.rotation.y, 12)
-      this.vendors.set(vendor.node.id, vi)
-      this.buildings.set(vendor.node.id, vi.building)
+      for (const [id, building] of vi.buildings) {
+        this.vendors.set(id, vi)
+        this.buildings.set(id, building)
+      }
       const gate = vi.gate()
       bridgeDecor.add(bridge({ from: new THREE.Vector3(spot.loopX, 0, spot.loopZ), to: gate.clone().setY(0) }))
       bridges.push([new THREE.Vector2(spot.loopX, spot.loopZ), new THREE.Vector2(gate.x, gate.z)])
-      const links = callerIslands(vendor.calledBy).filter((g) => bridgedIslands.has(g))
-      this.vendorBridges.set(vendor.node.id, links.length)
-      for (const id of links) {
+      const landIsland = (id: string) => {
         const index = order.indexOf(id)
+        if (landed.has(id)) return
+        landed.add(id)
         const back = backGate(id)
         const land = loopPoint(angles[index])
-        if (!landed.has(id)) {
-          landed.add(id)
-          bridgeDecor.add(bridge({ from: back.clone().setY(0), to: land.clone().setY(0) }))
-          bridges.push([new THREE.Vector2(back.x, back.z), new THREE.Vector2(land.x, land.z)])
+        bridgeDecor.add(bridge({ from: back.clone().setY(0), to: land.clone().setY(0) }))
+        bridges.push([new THREE.Vector2(back.x, back.z), new THREE.Vector2(land.x, land.z)])
+      }
+      for (const vendor of group.members) {
+        const links = callerIslands(vendor.calledBy).filter((g) => bridgedIslands.has(g))
+        this.vendorBridges.set(vendor.node.id, links.length)
+        for (const id of links) {
+          const index = order.indexOf(id)
+          landIsland(id)
+          vendorLinks.push({ group: index, vendor: vi, to: vendor.node.id, callers: vendor.calledBy.filter((c) => groupOfNode.get(c) === id), of: links.length, islandAngle: angles[index], vendorAngle: spot.angle })
         }
-        vendorLinks.push({ group: index, vendor: vi, callers: vendor.calledBy.filter((c) => groupOfNode.get(c) === id), of: links.length, islandAngle: angles[index], vendorAngle: spot.angle })
       }
     })
     if (direct) {
@@ -350,7 +361,7 @@ export class Town {
       const w = isl.root.localToWorld(new THREE.Vector3(p.x, 0, p.y))
       return new THREE.Vector2(w.x, w.z)
     }))
-    for (const vi of this.vendors.values()) land.push(vi.outline.points.map((p) => {
+    for (const vi of new Set(this.vendors.values())) land.push(vi.outline.points.map((p) => {
       const w = vi.root.localToWorld(new THREE.Vector3(p.x, 0, p.y))
       return new THREE.Vector2(w.x, w.z)
     }))
@@ -577,9 +588,12 @@ export class Town {
     return this.airport ? { ...this.airport.status(), bridge: this.airportPath !== null } : null
   }
 
-  /** Where the third parties stand and what is bridged to them, as plain values. For tests. */
-  inspectVendors(): { id: string; x: number; z: number; bridges: number }[] {
-    return [...this.vendors].map(([id, vi]) => ({ id, x: vi.root.position.x, z: vi.root.position.z, bridges: this.vendorBridges.get(id) ?? 0 }))
+  /** Where the third parties stand (the island's centre and each building) and what is bridged to them, as plain values. For tests. */
+  inspectVendors(): { id: string; island: string; x: number; z: number; bx: number; bz: number; bridges: number }[] {
+    return [...this.vendors].map(([id, vi]) => {
+      const at = vi.buildings.get(id)!.root.getWorldPosition(new THREE.Vector3())
+      return { id, island: vi.id, x: vi.root.position.x, z: vi.root.position.z, bx: at.x, bz: at.z, bridges: this.vendorBridges.get(id) ?? 0 }
+    })
   }
 
   /** Grow the camera framing box by an island's coast, pushed out a little to leave room for piers. */
@@ -677,8 +691,8 @@ export class Town {
     head.push(w(0, island.backGateZ!))
     for (const p of loopArc(loopR, link.islandAngle, link.vendorAngle, GROUND)) head.push(new THREE.Vector3(p.x, p.y, p.z))
     head.push(link.vendor.gate().setY(GROUND))
-    const lane = link.vendor.into(head)
-    return [{ dest: link.vendor.building, source: island.buildings.get(from.node.id)!, origin: 'internal', share: 1 / link.of, ...lane }]
+    const lane = link.vendor.into(head, link.to)
+    return [{ dest: link.vendor.buildings.get(link.to)!, source: island.buildings.get(from.node.id)!, origin: 'internal', share: 1 / link.of, ...lane }]
   }
 
   private ringPoint(a: number): THREE.Vector3 {
@@ -1265,7 +1279,7 @@ function parkProps(x: number, z: number): THREE.Object3D[] {
 
 function layoutKey(s: Snapshot): string {
   const groups = s.groups.map((g) => `${g.id}${g.configError ? '!' : ''}:${g.nodes.map((n) => `${n.id}/${n.kind}/${n.tenants != null ? 'T' : ''}/${n.service ?? ''}/${n.calls.join('+')}/${(n.gatewayCalls ?? []).join('+')}`).join(',')}|${g.hasBridge === false ? 'nb' : 'b'}${g.hasRingBridge ? 'r' : ''}|${(g.assets ?? []).map((a) => `${a.id}/${a.shape}/${a.service ?? ''}`).join('+')}|${(g.messaging?.topics ?? []).map((t) => t.name).join('+')}|${(g.messaging?.subscriptions ?? []).map((x) => `${x.topic}>${x.consumer}${x.legacy ? '!' : ''}`).join('+')}`).join(';')
-  const vendors = (s.vendors ?? []).map((v) => `${v.node.id}<${v.calledBy.join('+')}`).join(';')
+  const vendors = (s.vendors ?? []).map((v) => `${v.node.id}@${v.islandId ?? ''}<${v.calledBy.join('+')}`).join(';')
   return `${s.townId}|${s.environment ?? ''}|${groups}|${vendors}|${edgeKey(s)}`
 }
 

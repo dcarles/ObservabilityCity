@@ -1402,6 +1402,7 @@
       "VendorSnapshot": {
         "required": [
           "calledBy",
+          "internal",
           "node"
         ],
         "type": "object",
@@ -1414,6 +1415,17 @@
             "items": {
               "type": "string"
             }
+          },
+          "islandId": {
+            "type": "string",
+            "nullable": true
+          },
+          "islandName": {
+            "type": "string",
+            "nullable": true
+          },
+          "internal": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false

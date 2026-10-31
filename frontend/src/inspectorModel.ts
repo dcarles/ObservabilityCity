@@ -275,3 +275,8 @@ export function overviewLinks(s: ScopeInfo | null | undefined): OverviewLinks | 
   if (own.length === 0 && tenantResources === 0) return null
   return { items: own.slice(0, OVERVIEW_LINK_LIMIT), tenantResources, more: Math.max(0, own.length - OVERVIEW_LINK_LIMIT) }
 }
+
+/** What kind of outside place a vendor's building is, for the inspector and the lists: a third party, or one of the company's own services outside the monitored platform, with its island when it shares one. */
+export function vendorWhere(v?: { internal: boolean; islandName?: string | null }): string {
+  return (v?.internal ? 'Internal service' : 'Third party') + (v?.islandName ? `, ${v.islandName}` : '')
+}

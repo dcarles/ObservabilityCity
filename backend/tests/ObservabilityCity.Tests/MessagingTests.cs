@@ -74,7 +74,8 @@ public class MessagingTests
     {
         var links = TownLinks.Of(RegistryLoader.Load(TestPaths.LinksTown));
 
-        Assert.Equal(new GroupLinks(true, true, false, true, false), links["ful"]);
+        // it also calls a service of the vendor island, so it has the back gate to the ring road as well
+        Assert.Equal(new GroupLinks(true, true, true, true, true), links["ful"]);
     }
 
     [Fact]

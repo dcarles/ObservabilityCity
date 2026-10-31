@@ -1,0 +1,9 @@
+# One vendor island with three services (two rows of buildings): calls from three islands reach different buildings. Nothing here names a real host.
+vendors:
+  - id: ext.shared
+    name: Shared services
+    internal: true
+    services:
+      - { id: credit, name: Credit, calledBy: [ful.orders-api, nom.catalog-api], match: [{ host: shared.example.test, path: '^/credit' }] }
+      - { id: identity, name: Identity, calledBy: [nom.catalog-api], match: [{ host: shared.example.test, path: '^/identity' }] }
+      - { id: reports, name: Reports, calledBy: [ful.orders-worker], match: [{ host: reports.example.test }] }

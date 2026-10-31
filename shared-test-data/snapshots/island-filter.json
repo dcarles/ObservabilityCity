@@ -578,7 +578,10 @@
       },
       "calledBy": [
         "aa.orders-api"
-      ]
+      ],
+      "islandId": "ext.bureau",
+      "islandName": null,
+      "internal": false
     },
     {
       "node": {
@@ -625,7 +628,10 @@
       },
       "calledBy": [
         "cc.notify-worker"
-      ]
+      ],
+      "islandId": "ext.mailer",
+      "islandName": null,
+      "internal": false
     }
   ],
   "externalCallers": [
