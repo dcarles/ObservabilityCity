@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { isUnmonitored, SIGNALS } from '../../src/signals'
 import { checkSnapshot } from '../../src/snapshotGuard'
-import { jobReasons, jobRows, overviewRows, reasons } from '../../src/inspectorModel'
+import { dayTime, jobReasons, jobRows, overviewRows, reasons } from '../../src/inspectorModel'
 import { regionFigures, regionLine, regionOptions, sharePercent, splitLine, validChoice, withRegion, worstRegion } from '../../src/regions'
 import { notFoundText } from '../../src/inspectorModel'
 import { beaconLevel, plaqueText } from '../../src/visuals'
@@ -226,5 +226,36 @@ describe('resource buildings', () => {
     expect(assetWhere({ groupName: 'Alpha', service: null })).toBe('Resource of Alpha')
     expect(sum.links).toEqual([{ name: 'Portal', url: 'https://portal.example.test/x' }])
     expect(summariseAsset('gone', s.groups)).toBeNull()
+  })
+})
+
+describe('times of jobs name the day when it is not today', () => {
+  const at = (y: number, m: number, d: number, h = 0, min = 0) => new Date(y, m - 1, d, h, min, 7).toISOString()
+  const now = new Date(2026, 9, 31, 19, 54).getTime()
+
+  it('shows only the time for today, without seconds', () => {
+    expect(dayTime(at(2026, 10, 31, 19, 49), now)).toBe('19:49')
+    expect(dayTime(at(2026, 10, 31, 0, 0), now)).toBe('00:00')
+  })
+
+  it('says yesterday and tomorrow for the days either side', () => {
+    expect(dayTime(at(2026, 10, 31 - 1), now)).toBe('yesterday 00:00')
+    expect(dayTime(at(2026, 11, 1), now)).toBe('tomorrow 00:00')
+  })
+
+  it('gives the date for any other day, across a month end', () => {
+    expect(dayTime(at(2026, 10, 29, 6, 5), now)).toBe('29 Oct 06:05')
+    expect(dayTime(at(2026, 11, 3, 12, 30), now)).toBe('3 Nov 12:30')
+  })
+
+  it('gives nothing for a time that is not one', () => {
+    expect(dayTime('soon', now)).toBe('')
+  })
+
+  it('puts the day on the job rows and in the reasons', () => {
+    const n = fn({ state: 'Down', jobs: [{ ...job('daily', 'Overdue', 'North'), lastRun: at(2026, 10, 30), next: at(2026, 10, 31) }] })
+
+    expect(jobRows(n, now)[0]!.value).toBe('overdue · ran yesterday 00:00 · next 00:00')
+    expect(jobReasons(n, now)[0]).toBe('Job daily (North) should have run at 00:00 and has not.')
   })
 })
