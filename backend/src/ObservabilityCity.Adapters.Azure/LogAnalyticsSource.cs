@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using ObservabilityCity.Contracts;
+using ObservabilityCity.Core.Links;
 using ObservabilityCity.Core.Registry;
 using ObservabilityCity.Core.Scope;
 using ObservabilityCity.Core.Sources;
@@ -29,9 +30,16 @@ public sealed class LogAnalyticsReader(HttpClient http, ICredentialSource? crede
     public static string QueryUrl(string workspace) =>
         workspace.StartsWith('/') ? $"{Endpoint}{workspace.TrimEnd('/')}/query" : $"{Endpoint}/workspaces/{Uri.EscapeDataString(workspace)}/query";
 
-    public async Task<IReadOnlyList<SpanRow>> QueryAsync(string workspace, string query, TimeSpan window, CancellationToken ct)
+    public async Task<IReadOnlyList<SpanRow>> QueryAsync(string workspace, string query, TimeSpan window, CancellationToken ct) =>
+        Parse(await SendAsync(workspace, query, System.Xml.XmlConvert.ToString(window), ct));
+
+    /// <summary>The dependency rows of the link discovery query over [from, to).</summary>
+    public async Task<IReadOnlyList<DependencyRow>> QueryDependenciesAsync(string workspace, string query, DateTimeOffset from, DateTimeOffset to, CancellationToken ct) =>
+        ParseDependencies(await SendAsync(workspace, query, $"{LinkQuery.Iso(from)}/{LinkQuery.Iso(to)}", ct));
+
+    private async Task<string> SendAsync(string workspace, string query, string timespan, CancellationToken ct)
     {
-        var body = JsonSerializer.Serialize(new { query, timespan = System.Xml.XmlConvert.ToString(window) });
+        var body = JsonSerializer.Serialize(new { query, timespan });
         using var request = new HttpRequestMessage(HttpMethod.Post, QueryUrl(workspace)) { Content = new StringContent(body, Encoding.UTF8, "application/json") };
         if (credential is not null)
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await credential.GetTokenAsync(TokenScope, ct));
@@ -39,7 +47,7 @@ public sealed class LogAnalyticsReader(HttpClient http, ICredentialSource? crede
         var text = await response.Content.ReadAsStringAsync(ct);
         if (!response.IsSuccessStatusCode)
             throw new HttpRequestException($"Log Analytics answered {(int)response.StatusCode} {response.ReasonPhrase}: {Trim(text)}");
-        return Parse(text);
+        return text;
     }
 
     private static string Trim(string text) => text.Length <= 300 ? text : text[..300] + "...";
@@ -65,6 +73,50 @@ public sealed class LogAnalyticsReader(HttpClient http, ICredentialSource? crede
         return rows;
     }
 
+    /// <summary>
+    /// The rows of the link discovery query: <c>caller</c>, <c>host</c> and <c>days</c> (an array of the days the call was seen on, or one day as text);
+    /// <c>path</c> and <c>calls</c> may be left out. A row without a caller, a host or a day says nothing and is skipped.
+    /// </summary>
+    public static IReadOnlyList<DependencyRow> ParseDependencies(string json)
+    {
+        using var doc = JsonDocument.Parse(json);
+        if (!doc.RootElement.TryGetProperty("tables", out var tables) || tables.ValueKind != JsonValueKind.Array || tables.GetArrayLength() == 0)
+            throw new InvalidOperationException("the answer has no table; was the query a query that returns rows?");
+        var table = tables[0];
+        var names = table.GetProperty("columns").EnumerateArray().Select(c => c.GetProperty("name").GetString() ?? "").ToList();
+        int Index(string column) => names.FindIndex(n => n.Equals(column, StringComparison.OrdinalIgnoreCase));
+        var (caller, host, days, path, calls) = (Index("caller"), Index("host"), Index("days"), Index("path"), Index("calls"));
+        if (caller < 0 || host < 0 || days < 0)
+            throw new InvalidOperationException($"the link query must return the columns caller, host and days (path and calls may be left out); it returned {string.Join(", ", names)}");
+        var rows = new List<DependencyRow>();
+        foreach (var row in table.GetProperty("rows").EnumerateArray())
+        {
+            if (Text(row[caller]) is not { Length: > 0 } who || Text(row[host]) is not { Length: > 0 } where) continue;
+            var seen = Days(row[days]);
+            if (seen.Count == 0) continue;
+            rows.Add(new DependencyRow(who, where, path < 0 ? null : Text(row[path]) is { Length: > 0 } p ? p : null, seen, calls < 0 ? 0 : Number(row, calls) ?? 0));
+        }
+        return rows;
+    }
+
+    private static string? Text(JsonElement v) => v.ValueKind == JsonValueKind.String ? v.GetString() : null;
+
+    // make_set gives a JSON array, or the same array as text; a plain day is accepted too
+    private static List<DateOnly> Days(JsonElement v)
+    {
+        IEnumerable<string?> items = v.ValueKind switch
+        {
+            JsonValueKind.Array => v.EnumerateArray().Select(Text),
+            JsonValueKind.String when v.GetString() is { } s && s.TrimStart().StartsWith('[') => JsonSerializer.Deserialize<List<string?>>(s) ?? [],
+            JsonValueKind.String => [v.GetString()],
+            _ => [],
+        };
+        var days = new List<DateOnly>();
+        foreach (var item in items)
+            if (item is { Length: >= 10 } && DateOnly.TryParse(item[..10], CultureInfo.InvariantCulture, out var day)) days.Add(day);
+        return days;
+    }
+
     private static double? Number(JsonElement row, int index)
     {
         var v = row[index];
@@ -85,8 +137,17 @@ public sealed record SpanRow(string Role, double Calls, double Errors, double? L
 /// <c>file:name.json</c> replays a recorded answer kept beside the town's files, for trying a query's shape offline and for tests.
 /// </summary>
 public sealed class LogAnalyticsSource(
-    string name, string environmentId, RegistrySource definition, LogAnalyticsReader reader, ScopeStore store, ScopeRules rules, string? recording, TimeProvider time) : IMetricSource
+    string name, string environmentId, RegistrySource definition, LogAnalyticsReader reader, ScopeStore store, ScopeRules rules, string? recording, TimeProvider time) : IMetricSource, IDependencySource
 {
+    public bool CanReadDependencies => recording is null;
+
+    public async Task<IReadOnlyList<DependencyRow>> ReadDependenciesAsync(TownRegistry registry, string query, IReadOnlyCollection<string> roles, DateTimeOffset from, DateTimeOffset to, CancellationToken ct)
+    {
+        if (recording is not null) throw new InvalidOperationException($"source '{name}' replays a recording, which has no dependencies to read");
+        var workspace = Workspace(store.Resolve(registry.ForEnvironment(environmentId)));
+        return await reader.QueryDependenciesAsync(workspace, LinkQuery.Render(query, environmentId, rules, roles, from, to), from, to, ct);
+    }
+
     public string Name => name;
     public TimeSpan PollInterval => definition.PollInterval;
     public TimeSpan Timeout => definition.Timeout;

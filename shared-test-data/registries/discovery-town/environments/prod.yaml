@@ -1,0 +1,62 @@
+# A live town whose environment finds links from its dependency data. The recording below stands in for the workspace, so no discovery runs here;
+# what an earlier run found is kept in _discovered/links/prod/ and shown, which is what the browser tests look at.
+# Convention A: everything is in the names. A subscription is named <org>-<region>-<env>-<pillar code>; resources are named <kind>-<org>-<pillar code>-<service code>-<region><hash>;
+# a data account is <tenant id>-<pillar code>-<service code>. The telemetry names are written out on each system.
+name: Production
+default: true
+sources:
+  inventory: { kind: resourcegraph, connection: "file:inventory.json" }
+  # the recording stands in for the workspace so the town runs without Azure; with a workspace id as the connection the same query is sent for real
+  telemetry:
+    kind: loganalytics
+    connection: "file:telemetry.json"
+    window: 5m
+    query: |
+      AppMetrics
+      | where TimeGenerated > ago({window}) and AppRoleName in ({roles})
+      | where Name in ("request.calls", "request.duration")
+      | extend status = toint(Properties["status.code"])
+      | summarize calls = sumif(Sum, Name == "request.calls"), errors = sumif(Sum, Name == "request.calls" and status >= 500),
+                  total = sumif(Sum, Name == "request.duration"), n = sumif(ItemCount, Name == "request.duration") by role = AppRoleName
+      | project role, calls, errors, latencyMs = iff(n > 0, total / n, 0.0)
+  # platform metrics: CPU and memory of the plans, and request units and throttling of the data accounts, from the metrics API (a recording stands in for it)
+  platform:
+    kind: azuremonitor
+    connection: "file:platform.json"
+    window: 5m
+    metrics:
+      - resources: plans
+        cpu: { metric: CpuPercentage, aggregation: average, scale: 0.01 }
+        memory: { metric: MemoryPercentage, aggregation: average, scale: 0.01 }
+      - resources: accounts
+        # request units used per second as a share of the provisioned throughput
+        utilisation: { metric: TotalRequestUnits, aggregation: total, perSecond: true, over: { metric: ProvisionedThroughput, aggregation: maximum } }
+        # requests answered with 429 as a share of all requests
+        throttled: { metric: TotalRequests, aggregation: count, filter: "StatusCode eq '429'", over: { metric: TotalRequests, aggregation: count } }
+        requests: { metric: TotalRequests, aggregation: count, perSecond: true }
+        # what is provisioned, as a number, to show beside each tenant's database
+        limit: { metric: ProvisionedThroughput, aggregation: maximum }
+scope:
+  inventory: inventory
+  variables: { env: prd, directory: example.test }
+  workspace: "ws-{env}-main"
+  subscription: { nameLike: "*-{env}-{pillar}" }
+  resources:
+    - { name: plans, types: [microsoft.web/serverfarms], roles: [api, worker], pattern: '^plan-cf-[^-]+-(?<pillar>[^-]+)-(?<service>[^-]+)-(?<region>[a-z]+)', instances: "coalesce(toint(properties.numberOfWorkers), toint(sku.capacity))" }
+    - { name: apps, types: [microsoft.web/sites], roles: [api, worker], pattern: '^(?<role>api|worker)-[^-]+-(?<pillar>[^-]+)-(?<service>[^-]+)-(?<region>[a-z]+)' }
+    - { name: accounts, types: [microsoft.documentdb/databaseaccounts], roles: [db], pattern: '^(?<tenant>[0-9a-f]{32})-(?<pillar>[^-]+)-(?<service>[^-]+)$', tenantNameTag: tenant }
+  # one address per resource, a portal page pinned to a directory
+  links:
+    - { name: Cloud portal, url: "https://portal.example.test/#@{directory}/resource{resourceId}" }
+signals: { instances: inventory, requests: telemetry, errors: telemetry, latency: telemetry, cpu: platform, memory: platform, utilisation: platform, throttled: platform }
+exclude: [cc.notify-api, cc.notify-worker, cc.notify-db]
+links:
+  source: telemetry
+  query: "AppDependencies | where AppRoleName in ({roles}) | where TimeGenerated between (datetime({from}) .. datetime({to}))"
+  # the saved days are fixed dates, so they must never age out while the tests run
+  keepFor: 36500d
+  ignoreHosts: ['^169\.254\.']
+  rules:
+    - { host: '^(?<service>[a-z]+)-(?<role>api|worker)\.(?<pillar>[a-z]+)\.a\.example\.test$', target: '{pillar}.{service}-{role}' }
+    - { host: '^gw\.a\.example\.test$', path: '^/(?<pillar>[a-z]+)/(?<service>[a-z]+)/(?<role>api|worker)', target: '{pillar}.{service}-{role}', gateway: true }
+  aliases: { al: aa, be: bb }

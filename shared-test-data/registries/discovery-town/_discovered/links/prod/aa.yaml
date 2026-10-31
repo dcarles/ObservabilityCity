@@ -1,0 +1,15 @@
+links:
+- caller: aa.orders-worker
+  target: bb.ledger-api
+  gateway: true
+  lastSeen: 2026-10-03
+  days:
+  - 2026-10-01
+  - 2026-10-02
+  - 2026-10-03
+- caller: aa.orders-api
+  target: bb.ledger-worker
+  gateway: true
+  lastSeen: 2026-10-03
+  days:
+  - 2026-10-03

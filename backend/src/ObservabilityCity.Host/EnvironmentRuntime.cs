@@ -1,5 +1,6 @@
 using ObservabilityCity.Adapters.Fake;
 using ObservabilityCity.Contracts;
+using ObservabilityCity.Core.Links;
 using ObservabilityCity.Core.Registry;
 using ObservabilityCity.Core.Scope;
 using ObservabilityCity.Core.Snapshots;
@@ -11,7 +12,7 @@ namespace ObservabilityCity.Host;
 /// Everything one environment runs on its own: its view of the registry, its source and the readings that source produced, and the stream of
 /// snapshots built from them. Every environment of the town has one, so dev, staging and prod each move on their own.
 /// </summary>
-public sealed class EnvironmentRuntime(string townId, string id, EnvironmentRegistry registry, FakeSource? fake, LatestState state, SnapshotBuilder builder, SnapshotStore store, ILogSource logs, IReadOnlyList<IMetricSource> sources, IReadOnlyList<string> sourceProblems, ScopeStore? scope = null)
+public sealed class EnvironmentRuntime(string townId, string id, EnvironmentRegistry registry, FakeSource? fake, LatestState state, SnapshotBuilder builder, SnapshotStore store, ILogSource logs, IReadOnlyList<IMetricSource> sources, IReadOnlyList<string> sourceProblems, ScopeStore? scope = null, DiscoveredLinks? discovered = null)
 {
     public string TownId { get; } = townId;
     public string Id { get; } = id;
@@ -31,6 +32,8 @@ public sealed class EnvironmentRuntime(string townId, string id, EnvironmentRegi
     public IReadOnlyList<string> SourceProblems { get; } = sourceProblems;
     /// <summary>What the environment's inventory source has read, for the rules that say where each system lives. Empty when it has none.</summary>
     public ScopeStore Scope { get; } = scope ?? new ScopeStore();
+    /// <summary>What link discovery has found for this environment; null when its file has no links block.</summary>
+    public DiscoveredLinks? Discovered { get; } = discovered;
 }
 
 /// <summary>

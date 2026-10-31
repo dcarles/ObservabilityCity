@@ -4,6 +4,7 @@
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="ObservabilityCity.Validate" />
+    <InternalsVisibleTo Include="ObservabilityCity.Tests" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="YamlDotNet" />

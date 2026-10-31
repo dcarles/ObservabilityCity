@@ -266,6 +266,17 @@ A signal has the `metric` (as the cloud spells it), the `aggregation` that adds 
 
 To try entries offline, keep recorded series in the town folder, `{ "<resource name>": [ { "metric": "...", "aggregation": "average", "filter": null, "points": [40, 44, 42] } ] }`, and point the source at it with `file:`. `scope-town-a` and `scope-town-b` do this with two differently shaped sets of entries (percentages and request units over provisioned throughput; cores and bytes over limits and a normalised consumption metric) and show the same town.
 
+### Links: find the calls your systems make
+
+Declared `calls` and `gatewayCalls` are always drawn. An environment can also find the rest from its dependency data: add a `links:` block to its file (see `links` in [config-reference.md](config-reference.md)). It names a `loganalytics` source of the file and a query template that returns one row for each caller and address, with the days it was seen on (`make_set(startofday(TimeGenerated))` in KQL), so Azure does the counting and no raw data comes back. Your own rules turn an address into a system: a regular expression over the host (and over the path, for a gateway that names the destination in it) with named groups, and a `target` template such as `{pillar}.{service}`. Nothing about names is built in.
+
+- It runs in the background and never holds up the town. The first read looks back `firstRead` (7 days); after that each start reads only the gap since the last read, then once every `interval` (1 hour).
+- A link needs both ends to be systems of the town and `minDays` (2) different days in the data. A link not seen for `keepFor` (30 days) drops off.
+- Found links are saved under `_discovered/links/<environment>/` in the town's folder, one file for each pillar, with the days seen. Your pillar files are never edited. Keep the folder out of version control (a fork's `.gitignore` should list it).
+- `discoverLinks: false` (in `defaults.yaml`, a pillar's `defaults` or a system) switches discovery off for the systems it covers. Only an API or a worker makes calls worth finding.
+- An address no rule explains, no `ignoreHosts` pattern covers and no third party `domains` entry names appears under Notices, so a missing rule shows up as something to add. A wrong link is fixed by tightening a rule or adding an ignore pattern, not link by link.
+- The inspector's Links tab tags each link "Seen in calls" (with the last day it was seen) or "Declared".
+
 ### What each adapter's runbook section contains
 
 Each real adapter lands with its own section here, with the same four parts: the permission the login needs, the `connection` value, the `pollSeconds` and `timeoutSeconds` that suit it, and what `--sources` reports for it. Until an adapter has its section, its kind is known to the module but nothing reads it yet.

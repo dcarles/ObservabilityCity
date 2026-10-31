@@ -1,0 +1,10 @@
+readUpTo: 2026-10-04T00:00:00Z
+unresolved:
+- caller: aa.orders-api
+  host: mystery.a.example.test
+  path: /q
+  calls: 900
+  days:
+  - 2026-10-01
+  - 2026-10-02
+  - 2026-10-03

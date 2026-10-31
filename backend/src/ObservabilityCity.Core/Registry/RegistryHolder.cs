@@ -39,11 +39,13 @@ public sealed class RegistryHolder(Registry initial) : IRegistryProvider
 /// The registry as one environment sees it (see <see cref="Registry.ForEnvironment"/>), following the holder through reloads. The view is made
 /// once for each registry the holder has, not once for each snapshot.
 /// </summary>
-public sealed class EnvironmentRegistry(RegistryHolder source, string environmentId) : IRegistryProvider
+public sealed class EnvironmentRegistry(RegistryHolder source, string environmentId, Links.DiscoveredLinks? discovered = null, TimeProvider? time = null) : IRegistryProvider
 {
     private readonly object _gate = new();
     private Registry? _from;
     private Registry? _view;
+    private int _discoveredVersion = -1;
+    private DateOnly _day;
 
     public string EnvironmentId => environmentId;
 
@@ -52,12 +54,20 @@ public sealed class EnvironmentRegistry(RegistryHolder source, string environmen
         get
         {
             var current = source.Current;
+            var version = discovered?.Version ?? 0;
+            var today = DateOnly.FromDateTime((time ?? TimeProvider.System).GetUtcNow().UtcDateTime);
             lock (_gate)
             {
-                if (!ReferenceEquals(current, _from))
+                // a link ages out with the day, so the view is made again when the day changes too
+                if (!ReferenceEquals(current, _from) || version != _discoveredVersion || today != _day)
                 {
-                    _view = current.ForEnvironment(environmentId);
+                    var links = discovered is not null && current.Environments.FirstOrDefault(e => e.Id == environmentId)?.Links is { } config
+                        ? discovered.Found((time ?? TimeProvider.System).GetUtcNow(), config.MinDays, config.KeepFor)
+                        : null;
+                    _view = current.ForEnvironment(environmentId, links);
                     _from = current;
+                    _discoveredVersion = version;
+                    _day = today;
                 }
                 return _view!;
             }
@@ -69,7 +79,8 @@ public sealed class EnvironmentRegistry(RegistryHolder source, string environmen
         get
         {
             var view = Current;
-            return source.ReloadFailure is { } failure ? [failure, .. view.Notices, .. view.Warnings] : [.. view.Notices, .. view.Warnings];
+            var found = discovered is not null && view.ActiveEnvironment?.Links is { } config ? discovered.Notices(config.MinDays) : [];
+            return source.ReloadFailure is { } failure ? [failure, .. view.Notices, .. view.Warnings, .. found] : [.. view.Notices, .. view.Warnings, .. found];
         }
     }
 }
@@ -116,11 +127,16 @@ public sealed class RegistryReloader(RegistryHolder holder, string folder, TimeS
         }
     }
 
+    /// <summary>Where link discovery saves what it found, under the registry folder (see <see cref="Links.DiscoveredLinks"/>).</summary>
+    public const string DiscoveredFolder = "_discovered";
+
     internal static string Fingerprint(string folder)
     {
         try
         {
+            // _discovered holds what link discovery wrote itself; a reload for that would only repeat the last one
             return string.Join('|', Directory.EnumerateFiles(folder, "*.yaml", SearchOption.AllDirectories)
+                .Where(f => !Path.GetRelativePath(folder, f).StartsWith(DiscoveredFolder + Path.DirectorySeparatorChar, StringComparison.Ordinal))
                 .OrderBy(f => f, StringComparer.Ordinal)
                 .Select(f => { var i = new FileInfo(f); return $"{f}:{i.Length}:{i.LastWriteTimeUtc.Ticks}"; }));
         }

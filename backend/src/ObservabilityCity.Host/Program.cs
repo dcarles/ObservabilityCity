@@ -1,5 +1,6 @@
 using ObservabilityCity.Adapters.Fake;
 using ObservabilityCity.Contracts;
+using ObservabilityCity.Core.Links;
 using ObservabilityCity.Core.Registry;
 using ObservabilityCity.Core.Scope;
 using ObservabilityCity.Core.Snapshots;
@@ -71,7 +72,10 @@ foreach (var (folder, registry) in loaded)
     var runtimes = new List<EnvironmentRuntime>();
     foreach (var environmentId in environmentIds)
     {
-        var view = new EnvironmentRegistry(registries, environmentId);
+        // link discovery saves under the town's folder, one folder for each environment; a town without a links block has none
+        var discovered = registry.Environments.FirstOrDefault(e => e.Id == environmentId)?.Links is not null
+            ? new DiscoveredLinks(Path.Combine(folder, RegistryReloader.DiscoveredFolder, "links", environmentId)) : null;
+        var view = new EnvironmentRegistry(registries, environmentId, discovered);
         var fake = demo ? new FakeSource(fakeProfiles, fakeOptions, TimeProvider.System, stories) : null;
         // a live environment polls what its file defines; a demo town has the fake source and nothing else
         var set = fake is not null || registry.Environments.FirstOrDefault(e => e.Id == environmentId) is not { } environment
@@ -91,7 +95,7 @@ foreach (var (folder, registry) in loaded)
             DayFraction = fake is null ? () => TimeProvider.System.GetLocalNow().TimeOfDay.TotalDays : () => fake.DayFraction,
         };
         ILogSource logs = fake is null ? new NoLogSource() : new FakeLogSource(state, TimeProvider.System, staleAfter);
-        runtimes.Add(new EnvironmentRuntime(registry.Town.Id, environmentId, view, fake, state, snapshots, store, logs, set.Sources, set.Problems, set.Scope));
+        runtimes.Add(new EnvironmentRuntime(registry.Town.Id, environmentId, view, fake, state, snapshots, store, logs, set.Sources, set.Problems, set.Scope, discovered));
     }
     var town = new TownRuntime(registry.Town.Id, registry.Town.Name, folder, registries, new EnvironmentSet(runtimes, registry.DefaultEnvironmentId, registry.Town.Id));
     townRuntimes.Add(town);
@@ -112,6 +116,8 @@ foreach (var (town, runtimes) in hostedByTown)
     {
         // AddHostedService would keep only the first of each type, so these are added as plain services
         builder.Services.AddSingleton<IHostedService>(sp => new SourcePoller(rt.Sources, rt.Registry, rt.State, sp.GetRequiredService<ILogger<SourcePoller>>()));
+        if (rt.Discovered is not null && rt.Sources.OfType<IDependencySource>().FirstOrDefault(s => s.CanReadDependencies && ((IMetricSource)s).Name == rt.Registry.Current.ActiveEnvironment?.Links?.Source) is { } dependencies)
+            builder.Services.AddSingleton<IHostedService>(sp => new LinkDiscoveryRunner(dependencies, rt.Scope, rt.Registry, rt.Discovered, TimeProvider.System, sp.GetRequiredService<ILogger<LinkDiscoveryRunner>>()));
         builder.Services.AddSingleton<IHostedService>(sp => new SnapshotPublisher(rt.Builder, rt.Store,
             new SignalRSnapshotNotifier(sp.GetRequiredService<IHubContext<TownHub>>(), town.Environments, sp.GetRequiredService<IslandViews>()),
             snapshotInterval, sp.GetRequiredService<ILogger<SnapshotPublisher>>()));

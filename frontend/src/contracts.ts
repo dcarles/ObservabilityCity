@@ -147,6 +147,8 @@ export interface components {
             kind: components["schemas"]["LinkKind"];
             islandId: string;
             islandName: string;
+            found: boolean;
+            lastSeen?: string | null;
         };
         /** @enum {string} */
         LogLevel: "Info" | "Warn" | "Error";

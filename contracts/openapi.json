@@ -386,6 +386,7 @@
       },
       "LinkRef": {
         "required": [
+          "found",
           "id",
           "islandId",
           "islandName",
@@ -408,6 +409,13 @@
           },
           "islandName": {
             "type": "string"
+          },
+          "found": {
+            "type": "boolean"
+          },
+          "lastSeen": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false

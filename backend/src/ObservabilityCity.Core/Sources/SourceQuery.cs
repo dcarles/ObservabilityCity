@@ -17,7 +17,7 @@ public static class SourceQuery
     /// <summary>The variables a query template may use besides the scope variables and {environment}.</summary>
     public static readonly string[] Variables = [Window, WindowSeconds, Roles];
 
-    /// <summary>A number and a unit: 30s, 5m, 1h.</summary>
+    /// <summary>A number and a unit: 30s, 5m, 1h, 7d.</summary>
     public static bool TryParseWindow(string text, out TimeSpan window)
     {
         window = default;
@@ -28,6 +28,7 @@ public static class SourceQuery
             case 's': window = TimeSpan.FromSeconds(n); return true;
             case 'm': window = TimeSpan.FromMinutes(n); return true;
             case 'h': window = TimeSpan.FromHours(n); return true;
+            case 'd': window = TimeSpan.FromDays(n); return true;
             default: return false;
         }
     }
