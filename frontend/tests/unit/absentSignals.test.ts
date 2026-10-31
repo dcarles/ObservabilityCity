@@ -96,8 +96,8 @@ describe('the plaque', () => {
     expect(plaqueText({ ...n, instancesTotal: 0, instancesHealthy: 0, absent: ['instances'] })).toBe('')
   })
 
-  it('says the instances are unknown when they were asked for and not counted, not 0/0 healthy', () => {
-    expect(plaqueText({ ...n, state: 'Healthy', instancesTotal: 0, instancesHealthy: 0, absent: [] })).toBe('instances unknown')
+  it('says nothing when the instances were asked for and not counted: never 0/0 healthy, and never "unknown"', () => {
+    expect(plaqueText({ ...n, state: 'Healthy', instancesTotal: 0, instancesHealthy: 0, absent: [] })).toBe('')
     expect(plaqueText({ ...n, state: 'Healthy', instancesTotal: 3, instancesHealthy: 3, absent: [] })).toBe('3/3 healthy')
   })
 

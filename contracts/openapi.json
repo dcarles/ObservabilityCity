@@ -175,6 +175,53 @@
   },
   "components": {
     "schemas": {
+      "AppState": {
+        "enum": [
+          "Running",
+          "Stopped",
+          "Missing"
+        ],
+        "type": "string"
+      },
+      "AssetSnapshot": {
+        "required": [
+          "id",
+          "label",
+          "name",
+          "shape"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "shape": {
+            "type": "string"
+          },
+          "service": {
+            "type": "string",
+            "nullable": true
+          },
+          "region": {
+            "type": "string",
+            "nullable": true
+          },
+          "links": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ResourceLink"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "ConfigValue": {
         "required": [
           "key",
@@ -322,6 +369,13 @@
             "items": {
               "$ref": "#/components/schemas/NodeSnapshot"
             }
+          },
+          "assets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssetSnapshot"
+            },
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -393,6 +447,44 @@
           }
         },
         "additionalProperties": false
+      },
+      "JobSnapshot": {
+        "required": [
+          "name",
+          "status"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "region": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/JobStatus"
+          },
+          "lastRun": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "next": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "JobStatus": {
+        "enum": [
+          "Ok",
+          "Failed",
+          "Overdue"
+        ],
+        "type": "string"
       },
       "LinkKind": {
         "enum": [
@@ -494,7 +586,7 @@
           "Worker",
           "Database",
           "Cache",
-          "Cron",
+          "Function",
           "Gateway",
           "Broker",
           "Egress"
@@ -692,6 +784,23 @@
           },
           "inboundEstimated": {
             "type": "boolean"
+          },
+          "app": {
+            "$ref": "#/components/schemas/AppState"
+          },
+          "jobs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/JobSnapshot"
+            },
+            "nullable": true
+          },
+          "regions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RegionSnapshot"
+            },
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -721,6 +830,46 @@
           "requestsPerSecond": {
             "type": "number",
             "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RegionSnapshot": {
+        "required": [
+          "label",
+          "region",
+          "skewed"
+        ],
+        "type": "object",
+        "properties": {
+          "region": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "instances": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "cpu": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "memory": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "share": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "skewed": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false
@@ -962,6 +1111,10 @@
           "outsideRequestsPerSecond": {
             "type": "number",
             "format": "double",
+            "nullable": true
+          },
+          "cloud": {
+            "type": "string",
             "nullable": true
           }
         },

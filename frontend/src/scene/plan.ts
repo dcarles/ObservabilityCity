@@ -1,4 +1,4 @@
-import type { GroupSnapshot, NodeSnapshot } from '../types'
+import type { AssetSnapshot, GroupSnapshot, NodeSnapshot } from '../types'
 import { makeOutline, type Outline } from './island'
 import { hashString } from './random'
 
@@ -46,9 +46,20 @@ export interface Placed {
   roadZ: number
 }
 
+/** A resource that stands as a basic building, and where: behind the pad of its service, or in the back yard of the island when it belongs to no pad. */
+export interface PlacedAsset {
+  asset: AssetSnapshot
+  /** Island-local centre. */
+  x: number
+  z: number
+  /** The pad it stands behind, null in the back yard. */
+  pad: Pad | null
+}
+
 export interface Plan {
   pads: Pad[]
   placed: Placed[]
+  assets: PlacedAsset[]
   rows: number
   rowRoadZ: number[]
   rx: number
@@ -135,6 +146,38 @@ export function planPads(nodes: NodeSnapshot[], groupId = '', perRowOverride?: n
   return pads.map((p, i) => ({ ...p, col: (i % 2) as 0 | 1, ring: Math.floor((i % perRow) / 2), row: Math.floor(i / perRow) }))
 }
 
+export const ASSET_PITCH = 3.4 // centre to centre of two resource buildings in a row
+export const ASSET_BEHIND = 3.0 // from the back edge of a pad to the centre of a resource building behind it
+export const YARD_OFFSET = 5.4 // spine to the first building of the back yard, which keeps clear of a road that may continue along it
+const ASSETS_PER_PAD = Math.floor((PAD_W - 1) / ASSET_PITCH)
+
+/**
+ * Where the island's resource buildings stand. One that names a service stands in a row behind that service's first pad (as many as fit along it); the rest, and
+ * any that do not fit, stand in the back yard beyond the last row, in lines either side of the spine. Pure and ordered by id, so the same snapshot gives the same town.
+ */
+export function placeAssets(assets: readonly AssetSnapshot[], pads: Pad[], rowRoadZ: number[]): PlacedAsset[] {
+  const out: PlacedAsset[] = []
+  const yard: AssetSnapshot[] = []
+  const behind = new Map<string, number>()
+  const sorted = [...assets].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+  for (const asset of sorted) {
+    const pad = asset.service ? pads.find((p) => p.service === asset.service) : undefined
+    const used = pad ? behind.get(pad.key) ?? 0 : 0
+    if (!pad || used >= ASSETS_PER_PAD) { yard.push(asset); continue }
+    behind.set(pad.key, used + 1)
+    const x = padX(pad) + (used - (Math.min(ASSETS_PER_PAD, sorted.filter((a) => a.service === asset.service).length) - 1) / 2) * ASSET_PITCH
+    out.push({ asset, x, z: rowRoadZ[pad.row] - CURB - PAD_D - ASSET_BEHIND, pad })
+  }
+  const lastBack = rowRoadZ[rowRoadZ.length - 1] - CURB - PAD_D
+  const perLine = 6
+  yard.forEach((asset, i) => {
+    const line = Math.floor(i / perLine), slot = i % perLine
+    const side = slot % 2 === 0 ? -1 : 1
+    out.push({ asset, x: side * (YARD_OFFSET + Math.floor(slot / 2) * ASSET_PITCH), z: lastBack - ASSET_BEHIND - 4.4 - line * ASSET_PITCH, pad: null })
+  })
+  return out
+}
+
 /** Distance from the spine to the outer edge of the outermost pad, which is as far as the row roads reach. */
 export function rowEdge(pads: { ring: number }[]): number {
   return COL_X + Math.max(0, ...pads.map((p) => p.ring)) * PAD_PITCH + PAD_W / 2 + 0.4
@@ -153,11 +196,14 @@ export function planIsland(g: GroupSnapshot, perRow?: number): Plan {
     const cx = padX(pad)
     pad.nodes.forEach((node, i) => placed.push({ node, pad, x: cx + (i - (pad.nodes.length - 1) / 2) * SLOT, z: roadZ - CURB - FRONT, roadZ }))
   }
+  const assets = placeAssets(g.assets ?? [], pads, rowRoadZ)
   const edge = rowEdge(pads)
   const southZ = roadZ0 + CURB
   const northZ = rowRoadZ[rows - 1] - CURB - PAD_D
   const harbourZ = rowRoadZ[Math.floor((rows - 1) / 2)]
   const check: [number, number][] = [[-edge, southZ], [edge, southZ], [-edge, northZ], [edge, northZ], [edge + 11, harbourZ], [-edge - 2, harbourZ], [0, northZ - 4]]
+  // every resource building, with room round it, must stand on land
+  for (const a of assets) check.push([a.x - 1.6, a.z - 1.6], [a.x + 1.6, a.z - 1.6])
   let k = 1
   let rx = 24, rz = 20
   for (let i = 0; i < 200; i++) {
@@ -167,7 +213,7 @@ export function planIsland(g: GroupSnapshot, perRow?: number): Plan {
     if (check.every(([x, z]) => o.contains(x, z, 2)) && coastScan(o, 'z') - 0.6 - southZ >= 9) break
     k *= 1.02
   }
-  return { pads, placed, rows, rowRoadZ, rx, rz }
+  return { pads, placed, assets, rows, rowRoadZ, rx, rz }
 }
 
 /** Island-local coast: the far +z edge at x=0 (for 'z'), the far -z edge at x=0 as a distance (for '-z'), or the +x edge at the given z (for 'x'). */

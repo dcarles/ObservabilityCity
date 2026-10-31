@@ -87,7 +87,7 @@ public sealed class FakeLogSource(LatestState state, TimeProvider clock, TimeSpa
                     ? Pick(["Cache hit ratio 0.97 over the last minute", $"Evicted {1 + (int)(Roll(9) * 40)} expired keys", "Replication in sync"], 4)
                     : $"{prefix}{Pick(["Checkpoint complete in " + ms + " ms", "Index maintenance finished", $"Query served in {ms} ms"], 4)}");
             }
-            case NodeKind.Cron:
+            case NodeKind.Function:
             {
                 if (Roll(5) < Math.Min(0.9, r.ErrorRate * 6)) return (LogLevel.Error, "Job failed: timed out waiting for a downstream call");
                 return (LogLevel.Info, $"Job finished in {Math.Max(1, ms / 100)} s");

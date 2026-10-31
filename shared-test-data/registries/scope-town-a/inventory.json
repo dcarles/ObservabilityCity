@@ -22,7 +22,6 @@
       "name": "plan-cf-acme-al-ord-northeurope1x",
       "type": "microsoft.web/serverfarms",
       "subscriptionId": "00000000-0000-0000-0000-0000000000a1",
-      "location": "northeurope",
       "tags": {},
       "instances": 2
     },
@@ -31,7 +30,6 @@
       "name": "plan-cf-acme-al-ord-westeurope9z",
       "type": "microsoft.web/serverfarms",
       "subscriptionId": "00000000-0000-0000-0000-0000000000a1",
-      "location": "westeurope",
       "tags": {},
       "instances": 1
     },
@@ -86,7 +84,6 @@
       "name": "plan-cf-acme-be-led-northeurope1x",
       "type": "microsoft.web/serverfarms",
       "subscriptionId": "00000000-0000-0000-0000-0000000000a2",
-      "location": "northeurope",
       "tags": {},
       "instances": 3
     },
@@ -95,7 +92,6 @@
       "name": "plan-cf-acme-be-led-westeurope9z",
       "type": "microsoft.web/serverfarms",
       "subscriptionId": "00000000-0000-0000-0000-0000000000a2",
-      "location": "westeurope",
       "tags": {},
       "instances": 2
     },
@@ -140,7 +136,6 @@
       "name": "plan-cf-acme-al-ord-northeurope0s",
       "type": "microsoft.web/serverfarms",
       "subscriptionId": "00000000-0000-0000-0000-0000000000a3",
-      "location": "northeurope",
       "tags": {},
       "instances": 9
     }

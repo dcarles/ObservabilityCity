@@ -35,7 +35,7 @@ describe('what a layer covers', () => {
     ['Database', 'databases'],
     ['Cache', 'databases'],
     ['Worker', 'workers'],
-    ['Cron', 'workers'],
+    ['Function', 'workers'],
     ['Api', null],
     ['Gateway', null],
     ['Broker', null],
@@ -52,7 +52,7 @@ describe('what a layer covers', () => {
     expect(buildingShown('Api', noDb)).toBe(true)
     const noWorkers = toggleLayer(DEFAULT_LAYERS, 'workers')
     expect(buildingShown('Worker', noWorkers)).toBe(false)
-    expect(buildingShown('Cron', noWorkers)).toBe(false)
+    expect(buildingShown('Function', noWorkers)).toBe(false)
     expect(buildingShown('Database', noWorkers)).toBe(true)
   })
 

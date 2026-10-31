@@ -6,7 +6,7 @@ systems:
   - { id: inv.stock-api, service: stock, name: Stock API, role: api, calls: [inv.stock-db] }
   - { id: inv.stock-worker, service: stock, name: Stock worker, role: worker, calls: [inv.stock-db] }
   - { id: inv.stock-db, service: stock, name: Stock DB, role: db }
-  - { id: inv.sync-cron, name: Warehouse sync, role: cron, calls: [inv.stock-api] }
+  - { id: inv.sync-cron, name: Warehouse sync, role: function, calls: [inv.stock-api] }
 messaging:
   topics: [stock]
   subscriptions:

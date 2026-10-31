@@ -88,6 +88,17 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @enum {string} */
+        AppState: "Running" | "Stopped" | "Missing";
+        AssetSnapshot: {
+            id: string;
+            name: string;
+            label: string;
+            shape: string;
+            service?: string | null;
+            region?: string | null;
+            links?: components["schemas"]["ResourceLink"][] | null;
+        };
         ConfigValue: {
             key: string;
             value: string;
@@ -124,6 +135,7 @@ export interface components {
             hasRingBridge: boolean;
             messaging: components["schemas"]["MessagingSnapshot"];
             nodes: components["schemas"]["NodeSnapshot"][];
+            assets?: components["schemas"]["AssetSnapshot"][] | null;
         };
         /** @enum {string} */
         HealthState: "Healthy" | "Degraded" | "Down" | "Stale";
@@ -144,6 +156,17 @@ export interface components {
             /** Format: date-time */
             startedAt: string;
         };
+        JobSnapshot: {
+            name: string;
+            region?: string | null;
+            status: components["schemas"]["JobStatus"];
+            /** Format: date-time */
+            lastRun?: string | null;
+            /** Format: date-time */
+            next?: string | null;
+        };
+        /** @enum {string} */
+        JobStatus: "Ok" | "Failed" | "Overdue";
         /** @enum {string} */
         LinkKind: "System" | "Vendor";
         LinkRef: {
@@ -168,7 +191,7 @@ export interface components {
             subscriptions: components["schemas"]["SubscriptionSnapshot"][];
         };
         /** @enum {string} */
-        NodeKind: "Api" | "Worker" | "Database" | "Cache" | "Cron" | "Gateway" | "Broker" | "Egress";
+        NodeKind: "Api" | "Worker" | "Database" | "Cache" | "Function" | "Gateway" | "Broker" | "Egress";
         NodeSnapshot: {
             id: string;
             name: string;
@@ -231,6 +254,9 @@ export interface components {
             outsideRequestsPerSecond?: number | null;
             inbound?: components["schemas"]["InboundLinkSnapshot"][] | null;
             inboundEstimated: boolean;
+            app?: components["schemas"]["AppState"];
+            jobs?: components["schemas"]["JobSnapshot"][] | null;
+            regions?: components["schemas"]["RegionSnapshot"][] | null;
         };
         OffscreenLink: {
             nodeId: string;
@@ -239,6 +265,19 @@ export interface components {
             incoming: boolean;
             /** Format: double */
             requestsPerSecond: number;
+        };
+        RegionSnapshot: {
+            region: string;
+            label: string;
+            /** Format: int32 */
+            instances?: number | null;
+            /** Format: double */
+            cpu?: number | null;
+            /** Format: double */
+            memory?: number | null;
+            /** Format: double */
+            share?: number | null;
+            skewed: boolean;
         };
         ResourceLink: {
             name: string;
@@ -297,6 +336,7 @@ export interface components {
             incidentsSeen: boolean;
             /** Format: double */
             outsideRequestsPerSecond?: number | null;
+            cloud?: string | null;
         };
         SubscriptionSnapshot: {
             topic: string;

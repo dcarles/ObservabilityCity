@@ -37,7 +37,7 @@ export function resourceUse(n: Pick<NodeSnapshot, 'cpu' | 'memory' | 'utilisatio
 }
 
 type BeaconInput = Pick<NodeSnapshot, 'state' | 'errorRate' | 'errorAmber' | 'errorRed'> &
-  Partial<Pick<NodeSnapshot, 'cpu' | 'memory' | 'utilisation' | 'throttled' | 'resourceAmber' | 'throttleAmber' | 'throttleRed' | 'absent'>>
+  Partial<Pick<NodeSnapshot, 'cpu' | 'memory' | 'utilisation' | 'throttled' | 'resourceAmber' | 'throttleAmber' | 'throttleRed' | 'absent' | 'jobs'>>
 
 /**
  * Rooftop beacon colour. Red means requests are failing: a system that is down (the beacon then stays on, steady), errors
@@ -49,8 +49,10 @@ export function beaconLevel(n: BeaconInput): BeaconLevel {
   if (n.state === 'Stale') return 'grey'
   if (n.state === 'Down') return 'red' // a system that is down is red whatever its error rate or silence says
   const throttled = n.throttled ?? 0
+  // a function's scheduled jobs: one that failed its last run is red, one that did not run when it should have is amber
+  if (n.jobs?.some((j) => j.status === 'Failed')) return 'red'
   if (n.errorRate >= n.errorRed || (n.throttleRed !== undefined && throttled >= n.throttleRed)) return 'red'
-  if (n.errorRate >= n.errorAmber) return 'amber'
+  if (n.errorRate >= n.errorAmber || n.jobs?.some((j) => j.status === 'Overdue')) return 'amber'
   if (n.throttleAmber !== undefined && throttled >= n.throttleAmber) return 'amber'
   if (n.resourceAmber !== undefined && resourceUse(n) >= n.resourceAmber) return 'amber'
   return 'green'
@@ -67,11 +69,13 @@ export function spawnRate(rps: number): number {
   return rps <= 0 ? 0 : 0.1 * Math.pow(rps, 0.6)
 }
 
-export function plaqueText(n: Pick<NodeSnapshot, 'state' | 'instancesTotal' | 'instancesHealthy'> & Partial<Pick<NodeSnapshot, 'absent'>>): string {
+export function plaqueText(n: Pick<NodeSnapshot, 'state' | 'instancesTotal' | 'instancesHealthy'> & Partial<Pick<NodeSnapshot, 'absent' | 'app'>>): string {
+  if (n.app === 'Missing') return 'not found'
+  if (n.app === 'Stopped') return 'stopped'
   if (isUnmonitored(n)) return 'not monitored'
   if (isAbsent(n, 'instances')) return n.state === 'Stale' ? 'no data' : ''
   if (n.state === 'Stale') return 'no data'
-  if (n.instancesTotal <= 0) return 'instances unknown' // asked for and not counted (a plan that gives no number): never "0/0 healthy"
+  if (n.instancesTotal <= 0) return '' // asked for and not counted (a plan that gives no number): never "0/0 healthy", and no "unknown" either
   return `${n.instancesHealthy}/${n.instancesTotal} healthy`
 }
 

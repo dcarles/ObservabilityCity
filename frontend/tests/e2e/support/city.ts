@@ -22,6 +22,12 @@ export interface Status {
   bubble: { visible: boolean; honk: boolean; waiting: number } | null
   /** Only a data store with a database for each tenant. */
   tenants: TenantYard | null
+  /** The app is stopped: a half-built shell in scaffolding, unlit, with no beacon. */
+  underConstruction: boolean
+  /** Which region the building's numbers are, for a service in two or more; empty otherwise. */
+  region: string
+  /** How the requests divide between the regions ("⚠ North 95% · West 5%", the warning when one takes too much); empty when nothing measures it. */
+  split: string
 }
 
 export interface TenantYard {

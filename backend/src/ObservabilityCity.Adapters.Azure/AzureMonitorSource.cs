@@ -168,7 +168,10 @@ public sealed class AzureMonitorSource(
             if (cpu is null && memory is null && utilisation is null && throttled is null) continue;
             var tenants = values.Where(v => v.Tenant is not null).GroupBy(v => v.Tenant!)
                 .Select(g => new TenantReading(g.Key, Max(g, "utilisation"), Max(g, "throttled"), g.Sum(v => v.Signals.GetValueOrDefault("requests") ?? 0), names.GetValueOrDefault(g.Key), Max(g, "limit"))).ToList();
-            readings[system.Key] = new NodeReading(at, true, 0, 0, 0, 0, 0, 0, cpu, memory, utilisation, throttled, Tenants: tenants.Count == 0 ? null : tenants);
+            // each region's own CPU and memory, for the resources that report them and say where they are
+            var regions = values.Where(v => v.Region is not null && (v.Signals.ContainsKey("cpu") || v.Signals.ContainsKey("memory"))).GroupBy(v => v.Region!, StringComparer.OrdinalIgnoreCase)
+                .Select(g => new RegionReading(g.Key, null, Max(g, "cpu"), Max(g, "memory"))).OrderBy(r => r.Region, StringComparer.Ordinal).ToList();
+            readings[system.Key] = new NodeReading(at, true, 0, 0, 0, 0, 0, 0, cpu, memory, utilisation, throttled, Tenants: tenants.Count == 0 ? null : tenants, Regions: regions.Count == 0 ? null : regions);
         }
         return readings;
     }
@@ -183,7 +186,7 @@ public sealed class AzureMonitorSource(
         return asked.Count == 0 || asked.Any(x => x is null) ? null : asked.Max(x => x!.Value);
     }
 
-    private sealed record ResourceValues(string? Tenant, IReadOnlyDictionary<string, double?> Signals);
+    private sealed record ResourceValues(string? Tenant, IReadOnlyDictionary<string, double?> Signals, string? Region = null);
 
     /// <summary>The metric specs of an entry with the call each needs. Specs that agree on namespace, aggregation and filter are asked together.</summary>
     private static IEnumerable<(MetricCall Call, IReadOnlyList<string> Metrics)> Calls(MetricGroup group) =>
@@ -223,7 +226,7 @@ public sealed class AzureMonitorSource(
             if (value is not null && signal is "cpu" or "memory" or "utilisation" or "throttled") value = Math.Clamp(value.Value, 0, 1);
             signals[signal] = value is null ? null : Math.Max(0, value.Value);
         }
-        return new ResourceValues(target.Resource.Tenant, signals);
+        return new ResourceValues(target.Resource.Tenant, signals, target.Resource.Region);
     }
 
     private static bool Same(MetricSeries s, MetricSignal spec) =>

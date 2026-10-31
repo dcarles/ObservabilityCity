@@ -1,0 +1,105 @@
+{
+ "subscriptions": [
+  {
+   "id": "00000000-0000-0000-0000-0000000000f1",
+   "name": "acme-eu-prd-al",
+   "tags": {}
+  }
+ ],
+ "resources": [
+  {
+   "id": "/subscriptions/00000000-0000-0000-0000-0000000000f1/resourceGroups/rg/providers/microsoft.web/serverfarms/plan-cf-acme-al-ord-northeurope1x",
+   "name": "plan-cf-acme-al-ord-northeurope1x",
+   "type": "microsoft.web/serverfarms",
+   "subscriptionId": "00000000-0000-0000-0000-0000000000f1",
+   "location": "northeurope",
+   "tags": {},
+   "instances": 2
+  },
+  {
+   "id": "/subscriptions/00000000-0000-0000-0000-0000000000f1/resourceGroups/rg/providers/microsoft.web/serverfarms/plan-cf-acme-al-ord-westeurope9z",
+   "name": "plan-cf-acme-al-ord-westeurope9z",
+   "type": "microsoft.web/serverfarms",
+   "subscriptionId": "00000000-0000-0000-0000-0000000000f1",
+   "location": "westeurope",
+   "tags": {},
+   "instances": 1
+  },
+  {
+   "id": "/subscriptions/00000000-0000-0000-0000-0000000000f1/resourceGroups/rg/providers/microsoft.web/sites/app-acme-al-sch-northeurope1x",
+   "name": "app-acme-al-sch-northeurope1x",
+   "type": "microsoft.web/sites",
+   "subscriptionId": "00000000-0000-0000-0000-0000000000f1",
+   "location": "northeurope",
+   "tags": {},
+   "state": "Running"
+  },
+  {
+   "id": "/subscriptions/00000000-0000-0000-0000-0000000000f1/resourceGroups/rg/providers/microsoft.web/sites/app-acme-al-sch-westeurope9z",
+   "name": "app-acme-al-sch-westeurope9z",
+   "type": "microsoft.web/sites",
+   "subscriptionId": "00000000-0000-0000-0000-0000000000f1",
+   "location": "westeurope",
+   "tags": {},
+   "state": "Running"
+  },
+  {
+   "id": "/subscriptions/00000000-0000-0000-0000-0000000000f1/resourceGroups/rg/providers/microsoft.web/sites/app-acme-al-rpt-westeurope9z",
+   "name": "app-acme-al-rpt-westeurope9z",
+   "type": "microsoft.web/sites",
+   "subscriptionId": "00000000-0000-0000-0000-0000000000f1",
+   "location": "westeurope",
+   "tags": {},
+   "state": "Running"
+  },
+  {
+   "id": "/subscriptions/00000000-0000-0000-0000-0000000000f1/resourceGroups/rg/providers/microsoft.web/sites/app-acme-al-idl-westeurope9z",
+   "name": "app-acme-al-idl-westeurope9z",
+   "type": "microsoft.web/sites",
+   "subscriptionId": "00000000-0000-0000-0000-0000000000f1",
+   "location": "westeurope",
+   "tags": {},
+   "state": "Stopped"
+  },
+  {
+   "id": "/subscriptions/00000000-0000-0000-0000-0000000000f1/resourceGroups/rg/providers/microsoft.keyvault/vaults/kv-acme-al-ord",
+   "name": "kv-acme-al-ord",
+   "type": "microsoft.keyvault/vaults",
+   "subscriptionId": "00000000-0000-0000-0000-0000000000f1",
+   "location": "northeurope",
+   "tags": {}
+  },
+  {
+   "id": "/subscriptions/00000000-0000-0000-0000-0000000000f1/resourceGroups/rg/providers/microsoft.storage/storageaccounts/stacmealord",
+   "name": "stacmealord",
+   "type": "microsoft.storage/storageaccounts",
+   "subscriptionId": "00000000-0000-0000-0000-0000000000f1",
+   "location": "northeurope",
+   "tags": {}
+  },
+  {
+   "id": "/subscriptions/00000000-0000-0000-0000-0000000000f1/resourceGroups/rg/providers/microsoft.keyvault/vaults/kv-acme-al-shared",
+   "name": "kv-acme-al-shared",
+   "type": "microsoft.keyvault/vaults",
+   "subscriptionId": "00000000-0000-0000-0000-0000000000f1",
+   "location": "northeurope",
+   "tags": {}
+  },
+  {
+   "id": "/subscriptions/00000000-0000-0000-0000-0000000000f1/resourceGroups/rg/providers/microsoft.appconfiguration/configurationstores/appcfg-acme-al",
+   "name": "appcfg-acme-al",
+   "type": "microsoft.appconfiguration/configurationstores",
+   "subscriptionId": "00000000-0000-0000-0000-0000000000f1",
+   "location": "northeurope",
+   "tags": {}
+  },
+  {
+   "id": "/subscriptions/00000000-0000-0000-0000-0000000000f1/resourceGroups/rg/providers/microsoft.keyvault/vaults/kv-acme-zz-ord",
+   "name": "kv-acme-zz-ord",
+   "type": "microsoft.keyvault/vaults",
+   "subscriptionId": "00000000-0000-0000-0000-0000000000f1",
+   "location": "northeurope",
+   "tags": {}
+  }
+ ]
+}

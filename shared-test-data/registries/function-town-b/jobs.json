@@ -1,0 +1,66 @@
+{
+  "tables": [
+    {
+      "name": "PrimaryResult",
+      "columns": [
+        {
+          "name": "resourceId",
+          "type": "string"
+        },
+        {
+          "name": "job",
+          "type": "string"
+        },
+        {
+          "name": "lastRun",
+          "type": "datetime"
+        },
+        {
+          "name": "succeeded",
+          "type": "bool"
+        },
+        {
+          "name": "next",
+          "type": "datetime"
+        }
+      ],
+      "rows": [
+        [
+          "/subscriptions/00000000-0000-0000-0000-0000000000f2/resourceGroups/rg/providers/microsoft.app/containerapps/sched-function-dub",
+          "daily",
+          "2025-12-31T23:30:00Z",
+          true,
+          "2099-01-01T23:30:00Z"
+        ],
+        [
+          "/subscriptions/00000000-0000-0000-0000-0000000000f2/resourceGroups/rg/providers/microsoft.app/containerapps/sched-function-ams",
+          "hourly",
+          "2025-12-31T22:00:00Z",
+          true,
+          "2025-12-31T23:00:00Z"
+        ],
+        [
+          "/subscriptions/00000000-0000-0000-0000-0000000000f2/resourceGroups/rg/providers/microsoft.app/containerapps/sched-function-ams",
+          "purge",
+          "2025-12-31T23:55:00Z",
+          false,
+          "2026-01-01T00:55:00Z"
+        ],
+        [
+          "/subscriptions/00000000-0000-0000-0000-0000000000f2/resourceGroups/rg/providers/microsoft.app/containerapps/report-function-dub",
+          "weekly",
+          "2025-12-24T23:00:00Z",
+          true,
+          "2025-12-31T23:00:00Z"
+        ],
+        [
+          "/subscriptions/00000000-0000-0000-0000-0000000000f2/resourceGroups/rg/providers/microsoft.app/containerapps/idle-function-dub",
+          "nightly",
+          "2025-12-30T23:00:00Z",
+          true,
+          "2025-12-31T23:00:00Z"
+        ]
+      ]
+    }
+  ]
+}

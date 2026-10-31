@@ -1,0 +1,45 @@
+# Convention B: a subscription is found by its tag, resources are container apps called <service>-<role>-<datacentre> (the datacentre is a tag), and a function app
+# reports a run status in its own words. The query text and the state words are the environment's; the program knows none of them.
+name: Production
+default: true
+sources:
+  inventory: { kind: resourcegraph, connection: "file:inventory.json" }
+  platform:
+    kind: azuremonitor
+    connection: "file:platform.json"
+    window: 300s
+    metrics:
+      - resources: apps
+        namespace: microsoft.app/containerapps
+        cpu: { metric: UsageNanoCores, aggregation: average, over: { metric: CpuLimitNanoCores, aggregation: average } }
+        memory: { metric: WorkingSetBytes, aggregation: maximum, over: { metric: MemoryLimitBytes, aggregation: maximum } }
+  telemetry:
+    kind: loganalytics
+    connection: "file:telemetry.json"
+    window: 5m
+    query: >-
+      ContainerLog_CL | where TimeGenerated > ago({window}) and App_s in ({roles}) | summarize calls = count() by role = App_s
+    regionQuery: >-
+      ContainerLog_CL | where TimeGenerated > ago({window}) and App_s in ({roles}) | summarize calls = count() by role = App_s, region = Dc_s
+  jobs:
+    kind: functionjobs
+    connection: "file:jobs.json"
+    window: 1d
+    query: >-
+      ContainerLog_CL | where TimeGenerated > ago({window}) and Line_s startswith "job finished"
+      | summarize lastRun = max(TimeGenerated), succeeded = countif(Line_s has "ok") > 0 by resourceId = ResourceId, job = JobName_s
+scope:
+  cloud: Cumulus
+  workspaceId: "00000000-0000-0000-0000-00000000c0de"
+  subscription: { tag: { key: unit, value: "{pillarId}" } }
+  regions: { tag: dc, names: { ams: Amsterdam, dub: Dublin }, skew: 0.7 }
+  resources:
+    - { name: apps, types: [microsoft.app/containerapps], roles: [api], pattern: '^(?<service>[a-z]+)-api-', instances: "toint(properties.template.scale.minReplicas)" }
+    - { name: function-apps, types: [microsoft.app/containerapps], roles: [function], pattern: '^(?<service>[a-z]+)-function-', state: "tostring(properties.runningStatus)", running: [Started] }
+  assets:
+    - { name: vaults, label: Secret store, shape: vault, types: [microsoft.keyvault/vaults], pattern: '^(?<service>[a-z]+)-vault$' }
+    - { name: vaults-shared, label: Shared secret store, shape: vault, types: [microsoft.keyvault/vaults], pattern: '^vault-main$' }
+    - { name: blobs, label: Blob store, shape: store, types: [microsoft.storage/storageaccounts], pattern: '^(?<service>[a-z]+)-blobs$' }
+  links:
+    - { name: Console, url: "https://console.example.test/apps/{name}?env={environment}", types: [microsoft.app/containerapps, microsoft.keyvault/vaults, microsoft.storage/storageaccounts] }
+signals: { requests: telemetry, instances: inventory, cpu: platform, memory: platform, jobs: jobs }

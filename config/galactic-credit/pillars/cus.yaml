@@ -11,7 +11,7 @@ systems:
   - { id: cus.consent-db, service: consent, name: Consent DB, role: db }
   - { id: cus.kyc-api, service: kyc, name: KYC API, role: api, calls: [cus.kyc-db] }
   - { id: cus.kyc-db, service: kyc, name: KYC DB, role: db }
-  - { id: cus.archive-cron, name: Archive run, role: cron, calls: [cus.profile-api] }
+  - { id: cus.archive-cron, name: Archive run, role: function, calls: [cus.profile-api] }
 
 # Messaging: the outboxes this pillar publishes (cus-<service>-outbox) and the topics its workers consume.
 messaging:

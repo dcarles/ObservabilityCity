@@ -50,7 +50,7 @@ describe('the connectors an island gets (links-town)', () => {
 describe('buildings exist only for roles an island has', () => {
   it('draws no factory without a worker and no storage without a database', () => {
     expect(kinds(group(links, 'nom')).sort()).toEqual(['Api', 'Cache'])
-    expect(kinds(group(links, 'hbk'))).toEqual(['Cron'])
+    expect(kinds(group(links, 'hbk'))).toEqual(['Function'])
   })
 
   it('draws no office tower for an island with no API', () => {

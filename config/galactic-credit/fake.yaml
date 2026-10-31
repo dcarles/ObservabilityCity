@@ -3,8 +3,8 @@ hub.apim:               { rps: 520, p99Ms: 80,  minInstances: 4 }
 hub.service-bus:        { rps: 300, p99Ms: 10,  minInstances: 2 }
 hub.egress:             { rps: 70,  p99Ms: 450 }
 hub.customer-db:        { rps: 260, p99Ms: 22,  minInstances: 3 }
-cl.ledger-api:          { rps: 180, p99Ms: 240, minInstances: 3 }
-cl.ledger-worker:       { rps: 60,  p99Ms: 4500, minInstances: 2 }
+cl.ledger-api:          { rps: 180, p99Ms: 240, minInstances: 3, regions: { North Europe: 55, West Europe: 45 } }
+cl.ledger-worker:       { rps: 60,  p99Ms: 4500, minInstances: 2, regions: { North Europe: 50, West Europe: 50 } }
 cl.ledger-db:           { rps: 230, p99Ms: 28,  minInstances: 2 }
 cl.posting-api:         { rps: 140, p99Ms: 120, minInstances: 2, perInstanceRps: 35 }
 cl.posting-worker:      { rps: 90,  p99Ms: 6000, minInstances: 2 }
@@ -14,7 +14,7 @@ cl.statements-worker:   { rps: 8,   p99Ms: 12000, minInstances: 1 }
 cl.statements-db:       { rps: 40,  p99Ms: 30,  minInstances: 1 }
 cl.statement-cron:      { rps: 0.2, p99Ms: 25000, minInstances: 1 }
 cl.session-cache:       { rps: 600, p99Ms: 2,   minInstances: 2 }
-pay.payments-api:       { rps: 210, p99Ms: 310, minInstances: 3 }
+pay.payments-api:       { rps: 210, p99Ms: 310, minInstances: 3, regions: { North Europe: 94, West Europe: 6 } }
 pay.payments-worker:    { rps: 75,  p99Ms: 3500, minInstances: 2 }
 pay.payments-db:        { rps: 280, p99Ms: 26,  minInstances: 2 }
 pay.refunds-api:        { rps: 22,  p99Ms: 200, minInstances: 1 }

@@ -202,7 +202,7 @@ public class RegistryValidationTests
     [Fact]
     public void Every_sample_yaml_file_points_at_its_schema()
     {
-        foreach (var file in Directory.GetFiles(TestPaths.Registry, "*.yaml", SearchOption.AllDirectories).Where(f => Path.GetFileName(f) != "fake.yaml"))
+        foreach (var file in Directory.GetFiles(TestPaths.Registry, "*.yaml", SearchOption.AllDirectories).Where(f => Path.GetFileName(f) is not ("fake.yaml" or "fake-assets.yaml")))
             Assert.StartsWith("# yaml-language-server: $schema=", File.ReadLines(file).First());
     }
 

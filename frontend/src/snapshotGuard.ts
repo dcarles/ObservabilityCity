@@ -2,13 +2,15 @@
 // safe (a missing list becomes an empty one, a number that is not a number becomes 0) and dropped where it is not (a building
 // with no id), and a snapshot with nothing usable in it is refused so the town keeps showing the last good one.
 
-import { SIGNALS } from './signals'
+import { KNOWN_SIGNALS } from './signals'
 import { DEFAULT_RING_CAPACITY, MAX_RING_CAPACITY, MIN_RING_CAPACITY, maxPillars } from './scene/layout'
-import type { DependencySnapshot, EnvironmentInfo, OffscreenLink, ViewInfo, ExternalCallerSnapshot, GroupSnapshot, IncidentSnapshot, MessagingSnapshot, NodeSnapshot, Snapshot, TenantInfo, TenantUnitSnapshot, VendorSnapshot } from './types'
+import type { AssetSnapshot, DependencySnapshot, EnvironmentInfo, OffscreenLink, ViewInfo, ExternalCallerSnapshot, GroupSnapshot, IncidentSnapshot, MessagingSnapshot, NodeSnapshot, Snapshot, TenantInfo, TenantUnitSnapshot, VendorSnapshot } from './types'
 
-const KINDS = ['Api', 'Worker', 'Database', 'Cache', 'Cron', 'Gateway', 'Broker', 'Egress']
+const KINDS = ['Api', 'Worker', 'Database', 'Cache', 'Function', 'Gateway', 'Broker', 'Egress']
 const STATES = ['Healthy', 'Degraded', 'Down', 'Stale']
 const TENANT_KINDS = ['Customer', 'Test', 'Unknown']
+const APP_STATES = ['Running', 'Stopped', 'Missing']
+const JOB_STATUSES = ['Ok', 'Failed', 'Overdue']
 
 /** Numbers every node has. Anything that is not a finite number becomes 0. */
 const REQUIRED_NUMBERS = [
@@ -76,6 +78,8 @@ export function checkSnapshot(raw: unknown): Checked {
     incidentFreeSince: typeof raw.incidentFreeSince === 'string' && Number.isFinite(Date.parse(raw.incidentFreeSince)) ? raw.incidentFreeSince : null,
     incidentsSeen: raw.incidentsSeen === true,
     outsideRequestsPerSecond: isFiniteNumber(raw.outsideRequestsPerSecond) ? raw.outsideRequestsPerSecond : null,
+    // what the environment calls its cloud, for "not found in ..."; null says "the inventory"
+    cloud: typeof raw.cloud === 'string' && raw.cloud.trim() !== '' ? raw.cloud.trim() : null,
     dayFraction: isFiniteNumber(raw.dayFraction) ? raw.dayFraction : 0.5,
     totals: {
       requestsPerSecond: num(totals.requestsPerSecond),
@@ -154,7 +158,27 @@ function checkGroup(g: unknown, seen: Set<string>, problems: string[]): GroupSna
     hasRingBridge: g.hasRingBridge === true,
     messaging: checkMessaging(g.messaging),
     nodes,
+    assets: checkAssets(g.assets),
   }
+}
+
+const ASSET_SHAPES = ['box', 'vault', 'store', 'settings']
+
+/** The island's resources that stand as basic buildings. One without an id or a name cannot be drawn or opened and is dropped; an unknown shape is a plain box. */
+function checkAssets(list: unknown): AssetSnapshot[] {
+  const ids = new Set<string>()
+  const out: AssetSnapshot[] = []
+  for (const a of Array.isArray(list) ? list : []) {
+    if (!isObject(a) || typeof a.id !== 'string' || a.id === '' || ids.has(a.id) || typeof a.name !== 'string' || a.name === '') continue
+    ids.add(a.id)
+    out.push({
+      id: a.id, name: a.name, label: str(a.label) || 'Resource', shape: ASSET_SHAPES.includes(a.shape as string) ? (a.shape as string) : 'box',
+      service: typeof a.service === 'string' && a.service !== '' ? a.service : null, region: typeof a.region === 'string' && a.region !== '' ? a.region : null,
+      links: (Array.isArray(a.links) ? a.links : []).filter(isObject).filter((l) => typeof l.name === 'string' && typeof l.url === 'string' && /^https?:\/\//i.test(l.url as string))
+        .map((l) => ({ name: l.name as string, url: l.url as string })),
+    })
+  }
+  return out
 }
 
 function checkMessaging(m: unknown): MessagingSnapshot {
@@ -197,7 +221,7 @@ function checkNode(n: unknown, groupId: string, ids: Set<string>, problems: stri
     gatewayCalls: strings(n.gatewayCalls),
     lastUpdated: typeof n.lastUpdated === 'string' ? n.lastUpdated : null,
     // an older server that does not say has every signal present
-    absent: strings(n.absent).filter((s) => (SIGNALS as readonly string[]).includes(s)),
+    absent: strings(n.absent).filter((s) => (KNOWN_SIGNALS as readonly string[]).includes(s)),
     // an older server that does not say has no quiet system
     quiet: n.quiet === true,
   }
@@ -211,6 +235,18 @@ function checkNode(n: unknown, groupId: string, ids: Set<string>, problems: stri
     ? n.inbound.filter(isObject).filter((l) => typeof l.from === 'string' && l.from !== '').map((l) => ({ from: l.from as string, requestsPerSecond: isFiniteNumber(l.requestsPerSecond) && l.requestsPerSecond >= 0 ? l.requestsPerSecond : 0 }))
     : null
   out.inboundEstimated = n.inboundEstimated === true
+  // null: nothing says whether the app runs; a job or region list is only there for a function or a service in two regions
+  out.app = APP_STATES.includes(n.app as string) ? n.app : null
+  const optionalNumber = (v: unknown) => (isFiniteNumber(v) ? v : null)
+  const optionalText = (v: unknown) => (typeof v === 'string' && v !== '' ? v : null)
+  out.jobs = Array.isArray(n.jobs)
+    ? n.jobs.filter(isObject).filter((j) => typeof j.name === 'string' && j.name !== '')
+      .map((j) => ({ name: j.name as string, region: optionalText(j.region), status: JOB_STATUSES.includes(j.status as string) ? j.status : 'Ok', lastRun: optionalText(j.lastRun), next: optionalText(j.next) }))
+    : null
+  out.regions = Array.isArray(n.regions)
+    ? n.regions.filter(isObject).filter((r) => typeof r.region === 'string' && r.region !== '')
+      .map((r) => ({ region: r.region as string, label: optionalText(r.label) ?? (r.region as string), instances: optionalNumber(r.instances), cpu: optionalNumber(r.cpu), memory: optionalNumber(r.memory), share: isFiniteNumber(r.share) && r.share >= 0 && r.share <= 1 ? r.share : null, skewed: r.skewed === true }))
+    : null
   // null is a store without tenants; a list, even an empty one, is a store with a database for each tenant
   out.tenants = Array.isArray(n.tenants) ? checkUnits(n.tenants, n.id, problems) : null
   return out as unknown as NodeSnapshot

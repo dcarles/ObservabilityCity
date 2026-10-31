@@ -1,0 +1,4 @@
+displayName: Platform hub
+color: "#f5c26b"
+resources:
+  - { id: hub.apim, name: API gateway, role: gateway }

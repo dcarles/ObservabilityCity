@@ -16,7 +16,7 @@ hub.yaml           optional   shared resources in the middle
 third-parties.yaml optional   vendors outside the town
 pillars/<id>.yaml  required   one island each (at least one)
 environments/<id>.yaml        one per environment (live towns)
-fake.yaml, stories/           demo towns only (mode: demo)
+fake.yaml, fake-assets.yaml, stories/   demo towns only (mode: demo)
 ```
 
 Thresholds cascade: `defaults.yaml` (per role) → the pillar's `defaults` → the system's own keys. The nearest one wins.
@@ -196,12 +196,13 @@ One file per environment. The pillar and system files are shared; this file says
 <!-- file: SourceFile -->
 | Key | Required | Default | Meaning |
 |---|---|---|---|
-| `kind` | yes | | `fake`, `resourcegraph`, `loganalytics`, `azuremonitor`, `servicebus`, `prometheus` or `grafana-irm`. |
+| `regionQuery` | no | none | `loganalytics`: the query that says how a service's requests divide between regions: one row per telemetry name and region with the columns `role`, `region` and `calls`. Sampled counts are fine, only the proportions are used. Same template holes as `query`. With it each region shows its share of the requests. |
+| `kind` | yes | | `fake`, `resourcegraph`, `loganalytics`, `azuremonitor`, `functionjobs`, `servicebus`, `prometheus` or `grafana-irm`. |
 | `connection` | no | from `scope` | How to reach it (a workspace id, an endpoint). Not used by `fake`. |
 | `credential` | no | Azure CLI login | A name from `credentials`. Azure sources only. |
 | `pollSeconds` | no | 30 | How often the source is asked. Above 0. |
 | `timeoutSeconds` | no | 10 | How long one ask may take. Above 0. |
-| `query` | no | none | `loganalytics`: the query to send, a template. `{window}`, `{windowSeconds}`, `{roles}`, scope variables and `{environment}` work. |
+| `query` | no | none | `loganalytics`: the query to send, a template; `functionjobs`: the query that summarises the function apps' logs into one row per app and job (columns `resourceId`, `job`, `lastRun`, `succeeded`, `next`, `region`). `{window}`, `{windowSeconds}`, `{roles}`, scope variables and `{environment}` work. |
 | `window` | no | `5m` | `loganalytics` and `azuremonitor`: how far back one answer looks. |
 | `metrics` | no | none | `azuremonitor`: which metric of which resources fills which signal. |
 
@@ -332,6 +333,9 @@ links:
 | `resources` | no | none | Rules that find a system's cloud resources. |
 | `telemetryRole` | no | none | Template for a system's telemetry name when it gives none. |
 | `links` | no | none | Addresses that open a resource in a portal or console, shown beside each resource in the Config tab. |
+| `cloud` | no | none | What the cloud is called in your words (for example `Azure`). A system whose app the inventory cannot find reads "not found in <cloud>"; without it, "not found in the inventory". |
+| `assets` | no | none | Resources that are not systems but stand as small buildings without health (a key vault, a storage account). See below. |
+| `regions` | no | location, as is | How a service's region is read and named, and when a lopsided split of requests is flagged. |
 | `queries` | no | built-in | Replace the inventory queries. |
 
 <!-- file: SubscriptionRuleFile -->
@@ -356,6 +360,24 @@ links:
 | `serviceTag` | no | none | Tag that carries the service. |
 | `tenantNameTag` | no | none | Tag that carries a tenant's friendly name. |
 | `instances` | no | none | Query expression for how many instances a resource runs. |
+| `state` | no | none | Query expression that reads a resource's app state as text. A system whose rule has it shows Running, Stopped (a building under construction) or, when the inventory has no such app, Missing (grey, "not found in" the `cloud` you name). |
+| `running` | with `state` | | The values of `state` that mean the app runs; any other value is shown as stopped. The core knows no state words. |
+
+<!-- file: AssetRuleFile -->
+| Key | Required | Default | Meaning |
+|---|---|---|---|
+| `name` | yes | | Names the rule (lowercase kebab-case). |
+| `label` | yes | | What the resource is, in the drawer's words (for example `Key vault`). |
+| `shape` | no | `box` | How the building looks: `box`, `vault`, `store` or `settings`. |
+| `types` | yes | | The resource types it applies to. They are looked for in each pillar's subscription. |
+| `pattern` | yes | | Regular expression over the resource's name. Optional named groups: `service` (matched with a system's `serviceCode`; a match stands the building beside that service's pad, otherwise it stands in the pillar's back yard), `pillar` (another pillar's resource is left out) and `region`. |
+
+<!-- file: RegionsFile -->
+| Key | Required | Default | Meaning |
+|---|---|---|---|
+| `tag` | no | none | Tag of a resource that says its region. Without it, the `region` group of the rule's pattern, else the location the cloud gives. |
+| `names` | no | none | Region value → the label to show (for example `northeurope: North`). A value without a label is shown as it is. |
+| `skew` | no | `0.9` | The share of a service's requests one region may take, while another region runs instances, before the town flags it. `1` never flags. Needs the source's `regionQuery`. |
 
 <!-- file: ResourceLinkFile -->
 | Key | Required | Default | Meaning |
@@ -372,4 +394,4 @@ links:
 | `workspaces` | no | built-in | Query that finds the workspace. |
 
 ## fake.yaml and stories/
-Used only by a town with `mode: demo`; the validator rejects them in a live town. They script the fake source and the story bar and are described in the sample folders (`config/galactic-credit/fake.yaml`, `config/galactic-credit/stories/`).
+Used only by a town with `mode: demo`; the validator rejects them in a live town. They script the fake source and the story bar (`fake.yaml` also takes `regions: { name: weight }` per service; `fake-assets.yaml` lists the basic buildings) and are described in the sample folders (`config/galactic-credit/fake.yaml`, `config/galactic-credit/stories/`).

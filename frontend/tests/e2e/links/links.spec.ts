@@ -45,10 +45,10 @@ test.describe('connectors follow real links', () => {
     await town.open()
 
     expect((await town.island('nom')).kinds.sort()).toEqual(['Api', 'Cache']) // no factory, no storage
-    expect((await town.island('hbk')).kinds).toEqual(['Cron'])
+    expect((await town.island('hbk')).kinds).toEqual(['Function'])
     expect((await town.island('wrk')).kinds.sort()).toEqual(['Database', 'Worker']) // no office tower
     expect((await town.island('ful')).kinds.sort()).toEqual(['Api', 'Database', 'Worker'])
-    expect((await town.island('sta')).kinds).toEqual(['Cron'])
+    expect((await town.island('sta')).kinds).toEqual(['Function'])
   })
 
   test('the registry says which island stands alone, in the notices panel', async ({ town, page }) => {
