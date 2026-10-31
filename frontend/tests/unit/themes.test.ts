@@ -17,6 +17,7 @@ import { DEFAULT_THEME, THEMES, startTheme, themeById } from '../../src/themes'
 import { LEGEND } from '../../src/legend'
 import { THEME_WORDS, legendFor } from '../../src/legendWords'
 import { portSignText } from '../../src/portSign'
+import { labelRise } from '../../src/buildings/model'
 import type { NodeKind } from '../../src/types'
 import type { ThemeKit } from '../../src/themes/types'
 
@@ -130,6 +131,9 @@ describe.each(ids)('the %s theme', (id) => {
     expect(meshes(m.base).length).toBeGreaterThan(2)
     expect(meshes(m.roof).length).toBeGreaterThan(0)
     expect(m.beaconAt.y).toBeGreaterThan(0)
+    // the name label starts above the beacon, so a tall tower's light is not hidden behind it
+    expect(labelRise(m.beaconAt.y)).toBeGreaterThanOrEqual(m.beaconAt.y + 0.8)
+    expect(labelRise(m.beaconAt.y)).toBeGreaterThanOrEqual(3.4)
     expect(Math.abs(m.beaconAt.x)).toBeLessThan(m.radius * 2)
     expect(Math.abs(m.beaconAt.z)).toBeLessThan(m.radius * 2)
     // nothing is invented in the numbers
