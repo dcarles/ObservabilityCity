@@ -18,6 +18,9 @@ public sealed record LinkDiscovery(
     IReadOnlyList<LinkRule> Rules,
     IReadOnlyDictionary<string, string> Aliases)
 {
+    /// <summary>How the share of traffic from town systems is measured; without it nothing says where an API's traffic comes from.</summary>
+    public LinkTrafficConfig? Traffic { get; init; }
+
     public static readonly TimeSpan DefaultInterval = TimeSpan.FromHours(1);
     public static readonly TimeSpan DefaultFirstRead = TimeSpan.FromDays(7);
     public static readonly TimeSpan DefaultKeepFor = TimeSpan.FromDays(30);

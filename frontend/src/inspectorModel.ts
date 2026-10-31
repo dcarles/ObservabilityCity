@@ -1,6 +1,7 @@
 // What the inspector drawer says, as pure functions: a system's numbers in, rows and sentences out.
 
 import type { ConfigValue, HealthState, IncidentSnapshot, LinkRef, LogLine, NodeSnapshot, ResourceLink, ScopeInfo, ScopeResource, SettingLayer, SystemDetail } from './types'
+import { inboundSplitText } from './inbound'
 import { limitRange, throttleWho } from './tenants'
 import { isAbsent, isUnmonitored, QUIET_TEXT } from './signals'
 import { formatAge, formatMs, formatRate, plaqueText, resourceUse } from './visuals'
@@ -38,12 +39,14 @@ export interface Row {
 }
 
 /** The key numbers of a system, in reading order. Numbers a source does not give are left out, not shown as zero. */
-export function overviewRows(n: NodeSnapshot): Row[] {
+export function overviewRows(n: NodeSnapshot, nameOf: (id: string) => string = (id) => id): Row[] {
   if (isUnmonitored(n)) return [{ label: 'Data', value: 'no source configured', tone: '' }]
   if (n.state === 'Stale') return [{ label: 'Data', value: 'none fresh', tone: 'stale' }]
   const rows: Row[] = []
   if (!isAbsent(n, 'instances')) rows.push({ label: 'Instances', value: plaqueText(n), tone: n.instancesHealthy < n.instancesTotal ? 'warn' : '' })
   if (!isAbsent(n, 'requests')) rows.push({ label: 'Requests', value: `${formatRate(n.requestsPerSecond)}/s`, tone: '' })
+  const split = isAbsent(n, 'requests') ? null : inboundSplitText(n, nameOf)
+  if (split) rows.push({ label: 'Comes from', value: `${split}${n.inboundEstimated ? ' (estimated)' : ' (measured)'}`, tone: '' })
   if (!isAbsent(n, 'errors')) rows.push(n.quiet ? { label: 'Errors', value: QUIET_TEXT, tone: '' } : { label: 'Errors', value: pct(n.errorRate, 2), tone: n.errorRate >= n.errorRed ? 'bad' : n.errorRate >= n.errorAmber ? 'warn' : '' })
   if (!isAbsent(n, 'latency')) rows.push(n.quiet ? { label: 'p99 / SLA', value: QUIET_TEXT, tone: '' } : { label: 'p99 / SLA', value: `${formatMs(n.p99Ms)} / ${formatMs(n.slaP99Ms)}`, tone: n.p99Ms > n.slaP99Ms ? 'warn' : '' })
   if (!isAbsent(n, 'requests') && !isAbsent(n, 'instances')) rows.push({ label: 'Load', value: pct(n.load), tone: '' })

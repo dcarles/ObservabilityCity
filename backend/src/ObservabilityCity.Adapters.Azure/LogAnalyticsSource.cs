@@ -86,14 +86,14 @@ public sealed class LogAnalyticsReader(HttpClient http, ICredentialSource? crede
         var names = table.GetProperty("columns").EnumerateArray().Select(c => c.GetProperty("name").GetString() ?? "").ToList();
         int Index(string column) => names.FindIndex(n => n.Equals(column, StringComparison.OrdinalIgnoreCase));
         var (caller, host, days, path, calls) = (Index("caller"), Index("host"), Index("days"), Index("path"), Index("calls"));
-        if (caller < 0 || host < 0 || days < 0)
-            throw new InvalidOperationException($"the link query must return the columns caller, host and days (path and calls may be left out); it returned {string.Join(", ", names)}");
+        if (caller < 0 || host < 0 || (days < 0 && calls < 0))
+            throw new InvalidOperationException($"the link query must return the columns caller, host and days (path and calls may be left out; the traffic query returns caller, host and calls instead of days); it returned {string.Join(", ", names)}");
         var rows = new List<DependencyRow>();
         foreach (var row in table.GetProperty("rows").EnumerateArray())
         {
             if (Text(row[caller]) is not { Length: > 0 } who || Text(row[host]) is not { Length: > 0 } where) continue;
-            var seen = Days(row[days]);
-            if (seen.Count == 0) continue;
+            var seen = days < 0 ? [] : Days(row[days]);
+            if (days >= 0 && seen.Count == 0) continue;
             rows.Add(new DependencyRow(who, where, path < 0 ? null : Text(row[path]) is { Length: > 0 } p ? p : null, seen, calls < 0 ? 0 : Number(row, calls) ?? 0));
         }
         return rows;

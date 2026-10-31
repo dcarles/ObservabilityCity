@@ -22,6 +22,10 @@ public sealed class DiscoveredLinks
 
     private readonly object _gate = new();
     private readonly string? _folder;
+
+    /// <summary>Who sends how much to each API. Kept in memory only: it is a rolling measure, not history.</summary>
+    public LinkTraffic Traffic { get; } = new();
+
     private readonly Dictionary<(string Caller, string Target, bool Gateway), SortedSet<DateOnly>> _links = [];
     private readonly Dictionary<(string Caller, string Host, string Path), (SortedSet<DateOnly> Days, double Calls)> _unresolved = [];
     private DateTimeOffset? _readUpTo;
@@ -130,6 +134,7 @@ public sealed class DiscoveredLinks
         {
             var lines = new List<string>();
             if (_error is not null) lines.Add($"Link discovery failed, still showing the links found before: {_error}");
+            if (Traffic.Error is { } trafficError) lines.Add($"Link traffic could not be read, so the split between outside and town callers keeps its last numbers: {trafficError}");
             var open = _unresolved.Where(kv => kv.Value.Days.Count >= minDays).OrderByDescending(kv => kv.Value.Calls).ThenBy(kv => kv.Key.Host, StringComparer.Ordinal).ToList();
             foreach (var ((caller, host, path), (days, calls)) in open.Take(limit))
                 lines.Add($"Unresolved call: '{caller}' calls {host}{path}, about {Math.Round(calls):0} calls on {days.Count} days, and no links rule explains it. Add a rule, an ignore pattern or a third party domain.");

@@ -33,7 +33,7 @@ public static partial class RegistryLoader
         "tenantPattern", "order", "default", "sources", "kind", "connection", "tenants", "exclude", "fake", "undeclaredTenants",
         "signals", "credentials", "credential", "pollSeconds", "timeoutSeconds", "tenantId", "clientId", "clientSecretEnv",
         "scope", "inventory", "workspace", "variables", "subscription", "pillars", "types", "pattern", "roles", "serviceTag", "tenantNameTag",
-        "telemetryRole", "queries", "links", "url", "nameLike", "tag", "key", "value", "code", "serviceCode", "telemetry", "minCalls", "query", "window", "discoverLinks", "minDays", "keepFor", "firstRead", "interval", "ignoreHosts", "rules", "host", "path", "target", "gateway", "domains",
+        "telemetryRole", "queries", "links", "url", "nameLike", "tag", "key", "value", "code", "serviceCode", "telemetry", "minCalls", "query", "window", "discoverLinks", "minDays", "keepFor", "firstRead", "interval", "ignoreHosts", "rules", "host", "path", "target", "gateway", "domains", "traffic", "shareWindow",
     ];
 
     // Last resort when defaults.yaml is missing or silent about a role.
@@ -305,7 +305,14 @@ public static partial class RegistryLoader
         Duration(f.KeepFor, ObservabilityCity.Core.Links.LinkDiscovery.DefaultKeepFor),
         f.IgnoreHosts,
         f.Rules.Select(r => new ObservabilityCity.Core.Links.LinkRule(r.Host, r.Path, r.Target, r.Gateway)).ToList(),
-        f.Aliases);
+        f.Aliases)
+    {
+        Traffic = f.Traffic is null ? null : new ObservabilityCity.Core.Links.LinkTrafficConfig(
+            f.Traffic.Query,
+            Duration(f.Traffic.ShareWindow, ObservabilityCity.Core.Links.LinkTrafficConfig.DefaultShareWindow),
+            f.Traffic.MinCalls ?? ObservabilityCity.Core.Links.LinkTrafficConfig.DefaultMinCalls,
+            Duration(f.Traffic.Interval, ObservabilityCity.Core.Links.LinkTrafficConfig.DefaultInterval)),
+    };
 
     private static TimeSpan Duration(string? text, TimeSpan fallback) =>
         text is not null && SourceQuery.TryParseWindow(text, out var d) ? d : fallback;
@@ -327,6 +334,19 @@ public static partial class RegistryLoader
         foreach (var (key, text) in new[] { ("interval", links.Interval), ("firstRead", links.FirstRead), ("keepFor", links.KeepFor) })
             if (text is not null && !SourceQuery.TryParseWindow(text, out _)) errors.Add($"{owner}.{key} '{text}' is not a number and a unit like 1h or 7d");
         if (links.MinDays is < 1) errors.Add($"{owner}.minDays is {links.MinDays}; it must be at least 1");
+        if (links.Traffic is { } traffic)
+        {
+            var at = $"{owner}.traffic";
+            if (string.IsNullOrWhiteSpace(traffic.Query)) errors.Add($"{at}.query is empty. Write the query that returns one row for each caller and address with the columns caller, host and calls (path for a gateway)");
+            else
+            {
+                var known = ObservabilityCity.Core.Links.LinkQuery.Variables.Append(ScopeRules.EnvironmentVariable).Concat((IEnumerable<string>?)f.Scope?.Variables.Keys ?? []);
+                foreach (var problem in ScopeTemplate.Check(traffic.Query, known)) errors.Add($"{at}.query: {problem}");
+            }
+            foreach (var (key, text) in new[] { ("shareWindow", traffic.ShareWindow), ("interval", traffic.Interval) })
+                if (text is not null && !SourceQuery.TryParseWindow(text, out _)) errors.Add($"{at}.{key} '{text}' is not a number and a unit like 5m or 1h");
+            if (traffic.MinCalls is < 1) errors.Add($"{at}.minCalls is {traffic.MinCalls}; it must be at least 1");
+        }
         foreach (var pattern in links.IgnoreHosts)
             if (!TryRegex(pattern, out var problem)) errors.Add($"{owner}.ignoreHosts '{pattern}': {problem}");
         for (var i = 0; i < links.Rules.Count; i++)

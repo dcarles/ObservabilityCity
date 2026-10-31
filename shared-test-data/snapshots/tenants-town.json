@@ -70,7 +70,10 @@
           "lastUpdated": "2026-10-25T12:00:02+00:00",
           "tenants": null,
           "absent": [],
-          "quiet": false
+          "quiet": false,
+          "outsideRequestsPerSecond": null,
+          "inbound": null,
+          "inboundEstimated": false
         },
         {
           "id": "hub.service-bus",
@@ -106,7 +109,10 @@
           "lastUpdated": "2026-10-25T12:00:02+00:00",
           "tenants": null,
           "absent": [],
-          "quiet": false
+          "quiet": false,
+          "outsideRequestsPerSecond": null,
+          "inbound": null,
+          "inboundEstimated": false
         },
         {
           "id": "hub.egress",
@@ -142,7 +148,10 @@
           "lastUpdated": "2026-10-25T12:00:02+00:00",
           "tenants": null,
           "absent": [],
-          "quiet": false
+          "quiet": false,
+          "outsideRequestsPerSecond": null,
+          "inbound": null,
+          "inboundEstimated": false
         },
         {
           "id": "hub.customer-db",
@@ -178,7 +187,10 @@
           "lastUpdated": "2026-10-25T12:00:02+00:00",
           "tenants": null,
           "absent": [],
-          "quiet": false
+          "quiet": false,
+          "outsideRequestsPerSecond": null,
+          "inbound": null,
+          "inboundEstimated": false
         }
       ]
     },
@@ -239,7 +251,10 @@
           "lastUpdated": "2026-10-25T12:00:02+00:00",
           "tenants": null,
           "absent": [],
-          "quiet": false
+          "quiet": false,
+          "outsideRequestsPerSecond": null,
+          "inbound": null,
+          "inboundEstimated": false
         },
         {
           "id": "aa.audit-cache",
@@ -275,7 +290,10 @@
           "lastUpdated": "2026-10-25T12:00:02+00:00",
           "tenants": null,
           "absent": [],
-          "quiet": false
+          "quiet": false,
+          "outsideRequestsPerSecond": null,
+          "inbound": null,
+          "inboundEstimated": false
         },
         {
           "id": "aa.orders-worker",
@@ -313,7 +331,10 @@
           "lastUpdated": "2026-10-25T12:00:02+00:00",
           "tenants": null,
           "absent": [],
-          "quiet": false
+          "quiet": false,
+          "outsideRequestsPerSecond": null,
+          "inbound": null,
+          "inboundEstimated": false
         },
         {
           "id": "aa.tools-cron",
@@ -351,7 +372,10 @@
           "lastUpdated": "2026-10-25T12:00:02+00:00",
           "tenants": null,
           "absent": [],
-          "quiet": false
+          "quiet": false,
+          "outsideRequestsPerSecond": null,
+          "inbound": null,
+          "inboundEstimated": false
         },
         {
           "id": "aa.orders-db",
@@ -443,7 +467,10 @@
             }
           ],
           "absent": [],
-          "quiet": false
+          "quiet": false,
+          "outsideRequestsPerSecond": null,
+          "inbound": null,
+          "inboundEstimated": false
         }
       ]
     },
@@ -499,7 +526,10 @@
           "lastUpdated": "2026-10-25T12:00:02+00:00",
           "tenants": null,
           "absent": [],
-          "quiet": false
+          "quiet": false,
+          "outsideRequestsPerSecond": null,
+          "inbound": null,
+          "inboundEstimated": false
         },
         {
           "id": "bb.billing-db",
@@ -591,7 +621,10 @@
             }
           ],
           "absent": [],
-          "quiet": false
+          "quiet": false,
+          "outsideRequestsPerSecond": null,
+          "inbound": null,
+          "inboundEstimated": false
         },
         {
           "id": "bb.shared-db",
@@ -627,7 +660,10 @@
           "lastUpdated": "2026-10-25T12:00:02+00:00",
           "tenants": null,
           "absent": [],
-          "quiet": false
+          "quiet": false,
+          "outsideRequestsPerSecond": null,
+          "inbound": null,
+          "inboundEstimated": false
         }
       ]
     }
@@ -705,5 +741,6 @@
     "links": []
   },
   "incidentFreeSince": "2026-10-25T12:00:00+00:00",
-  "incidentsSeen": false
+  "incidentsSeen": false,
+  "outsideRequestsPerSecond": null
 }

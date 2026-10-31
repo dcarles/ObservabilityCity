@@ -264,6 +264,7 @@ Finds the calls the systems really make, from the dependency data in the telemet
 | `ignoreHosts` | no | none | Regular expressions for addresses that are platform noise. |
 | `rules` | no | none | The ways an address becomes a system, tried in order. |
 | `aliases` | no | none | Words the address uses that the registry spells differently, applied to every captured group. |
+| `traffic` | no | none | Measures how much each town system sends to each API, so the outside traffic can be told from the rest (see below). Without it the split is not measured. |
 
 <!-- file: LinkRuleFile -->
 | Key | Required | Default | Meaning |
@@ -272,6 +273,14 @@ Finds the calls the systems really make, from the dependency data in the telemet
 | `path` | no | none | A regular expression over the path, for a gateway that names the destination in it. |
 | `target` | yes | | The system id, written with `{name}` holes for the named groups and `{callerPillar}` for the pillar of the caller. A rule whose result is not a system of the town is skipped. |
 | `gateway` | no | `false` | The call goes through the API gateway, so it is drawn as one (to a system on another island). |
+
+<!-- file: TrafficFile -->
+| Key | Required | Default | Meaning |
+|---|---|---|---|
+| `query` | yes | | The query, a template with the same holes as the links query. It returns one row for each caller and address over the window with the columns `caller`, `host` and `calls` (the estimated calls, corrected for sampling); `path` for a gateway. No `days` column is needed. |
+| `shareWindow` | no | `1h` | How far back each read looks. A longer window gives steadier shares. |
+| `minCalls` | no | `20` | Below this many observed calls to an API the share is too noisy to trust: the last good share stands and is marked estimated. |
+| `interval` | no | `5m` | How often it reads. |
 
 Found links are saved under `_discovered/links/<environment>/` in the town's folder (one file for each pillar, plus `state.yaml`), never in a pillar file, and are meant to stay out of version control. Addresses no rule explains, no ignore pattern covers and no vendor `domains` entry names are listed under Notices.
 
@@ -290,6 +299,15 @@ links:
     - { host: '^(?<service>[a-z-]+)\.services\.example\.test$', target: '{callerPillar}.{service}' }
     - { host: '^gateway\.example\.test$', path: '^/(?<pillar>[a-z]+)/(?<service>[a-z-]+)/', target: '{pillar}.{service}', gateway: true }
   aliases: { pay: payments }
+  traffic:
+    shareWindow: 1h
+    query: |
+      AppDependencies
+      | where TimeGenerated between (datetime({from}) .. datetime({to}))
+      | where AppRoleName in~ ({roles})
+      | extend u = parse_url(Data)
+      | summarize calls = sum(ItemCount)
+          by caller = AppRoleName, host = tostring(u.Host), path = tostring(u.Path)
 ```
 
 ### credentials

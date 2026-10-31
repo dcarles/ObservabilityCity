@@ -98,6 +98,19 @@ describe('arrivals', () => {
     expect(s.board[0]).toContain('ARRIVALS')
   })
 
+  it('arrives at the measured outside traffic when the server gives one, and the board shows the total alone', () => {
+    activateTheme(kitById('harbour-town'))
+    const airport = new Airport()
+
+    airport.setCallers(callers, 7.5)
+
+    expect(airport.status().requestsPerSecond).toBe(7.5)
+    expect(airport.status().board).toHaveLength(1)
+    airport.setCallers(callers, null)
+    expect(airport.status().requestsPerSecond).toBe(40)
+    expect(airport.status().board.length).toBeGreaterThan(1)
+  })
+
   it('arrives at the same rate whatever the theme', () => {
     const landed = themes.map(([id]) => fly(id, 120).airport.status().landed)
     expect(new Set(landed).size).toBe(1)

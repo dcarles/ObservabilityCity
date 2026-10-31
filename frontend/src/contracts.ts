@@ -131,6 +131,11 @@ export interface components {
             id: string;
             displayName: string;
         };
+        InboundLinkSnapshot: {
+            from: string;
+            /** Format: double */
+            requestsPerSecond: number;
+        };
         IncidentSnapshot: {
             id: string;
             title: string;
@@ -222,6 +227,10 @@ export interface components {
             tenants?: components["schemas"]["TenantUnitSnapshot"][] | null;
             absent: string[];
             quiet: boolean;
+            /** Format: double */
+            outsideRequestsPerSecond?: number | null;
+            inbound?: components["schemas"]["InboundLinkSnapshot"][] | null;
+            inboundEstimated: boolean;
         };
         OffscreenLink: {
             nodeId: string;
@@ -286,6 +295,8 @@ export interface components {
             /** Format: date-time */
             incidentFreeSince?: string | null;
             incidentsSeen: boolean;
+            /** Format: double */
+            outsideRequestsPerSecond?: number | null;
         };
         SubscriptionSnapshot: {
             topic: string;

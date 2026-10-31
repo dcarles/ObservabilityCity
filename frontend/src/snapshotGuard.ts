@@ -17,7 +17,7 @@ const REQUIRED_NUMBERS = [
 ] as const
 
 /** Numbers a source may leave out. Anything that is not a finite number becomes null. */
-const OPTIONAL_NUMBERS = ['cpu', 'memory', 'utilisation', 'throttled', 'queueDepth', 'oldestMessageSeconds', 'deadLetters'] as const
+const OPTIONAL_NUMBERS = ['cpu', 'memory', 'utilisation', 'throttled', 'queueDepth', 'oldestMessageSeconds', 'deadLetters', 'outsideRequestsPerSecond'] as const
 
 export interface Checked {
   /** The repaired snapshot, or null when nothing in it can be drawn. */
@@ -75,6 +75,7 @@ export function checkSnapshot(raw: unknown): Checked {
     generatedAt: str(raw.generatedAt),
     incidentFreeSince: typeof raw.incidentFreeSince === 'string' && Number.isFinite(Date.parse(raw.incidentFreeSince)) ? raw.incidentFreeSince : null,
     incidentsSeen: raw.incidentsSeen === true,
+    outsideRequestsPerSecond: isFiniteNumber(raw.outsideRequestsPerSecond) ? raw.outsideRequestsPerSecond : null,
     dayFraction: isFiniteNumber(raw.dayFraction) ? raw.dayFraction : 0.5,
     totals: {
       requestsPerSecond: num(totals.requestsPerSecond),
@@ -205,6 +206,11 @@ function checkNode(n: unknown, groupId: string, ids: Set<string>, problems: stri
     if (!isFiniteNumber(n[key])) problems.push(`'${n.id}' has no usable ${key}`)
   }
   for (const key of OPTIONAL_NUMBERS) out[key] = isFiniteNumber(n[key]) ? n[key] : null
+  // null is traffic that is not measured; a list, even an empty one, is an API whose callers the town knows
+  out.inbound = Array.isArray(n.inbound)
+    ? n.inbound.filter(isObject).filter((l) => typeof l.from === 'string' && l.from !== '').map((l) => ({ from: l.from as string, requestsPerSecond: isFiniteNumber(l.requestsPerSecond) && l.requestsPerSecond >= 0 ? l.requestsPerSecond : 0 }))
+    : null
+  out.inboundEstimated = n.inboundEstimated === true
   // null is a store without tenants; a list, even an empty one, is a store with a database for each tenant
   out.tenants = Array.isArray(n.tenants) ? checkUnits(n.tenants, n.id, problems) : null
   return out as unknown as NodeSnapshot

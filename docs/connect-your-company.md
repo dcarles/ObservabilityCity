@@ -277,6 +277,17 @@ Declared `calls` and `gatewayCalls` are always drawn. An environment can also fi
 - An address no rule explains, no `ignoreHosts` pattern covers and no third party `domains` entry names appears under Notices, so a missing rule shows up as something to add. A wrong link is fixed by tightening a rule or adding an ignore pattern, not link by link.
 - The inspector's Links tab tags each link "Seen in calls" (with the last day it was seen) or "Declared".
 
+#### Where an API's traffic comes from
+
+An API's total request rate comes from your unsampled metrics. With a `links.traffic` block (see `links` in [config-reference.md](config-reference.md)) the town also learns how much each town system sends to it, from the same dependency table: the query returns one row for each caller and address over the last `shareWindow` with `calls` summed from the sampling-corrected count (`sum(ItemCount)` in KQL). The rest is outside traffic:
+
+> outside = the API's measured total, less what the town systems that call it send (never below zero)
+
+- Every API gets its own outside part, not only the ones marked `external`: whatever the town does not explain arrives at the airport. A caller is only known when it is a town system whose own calls the query sees, so a system with `discoverLinks: false` looks like an outside caller.
+- If the callers would add up to more than the API receives (the two are measured differently), they are scaled down together.
+- Below `minCalls` observed calls to an API the share is too noisy: the last good share stands and the inspector marks it "estimated". There is no setting for a share; every number is measured.
+- Without a `traffic` block nothing is measured: each API's rate is shared evenly between the systems that declare a call to it (and the outside, when it is marked `external` or an outside caller reaches it).
+
 ### What each adapter's runbook section contains
 
 Each real adapter lands with its own section here, with the same four parts: the permission the login needs, the `connection` value, the `pollSeconds` and `timeoutSeconds` that suit it, and what `--sources` reports for it. Until an adapter has its section, its kind is known to the module but nothing reads it yet.
