@@ -334,7 +334,7 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
         var quiet = r.Calls is { } calls && calls < n.MinCalls;
         if (quiet) r = r with { ErrorRate = 0, P99Ms = 0 };
 
-        var split = n.Kind == NodeKind.Api && !absent.Contains(Signals.Requests) ? Traffic?.Split(n.Id, r.RequestsPerSecond) : null;
+        var split = n.Kind == NodeKind.Api && !absent.Contains(Signals.Requests) ? Traffic?.Split(n.Id, r.RequestsPerSecond, now) : null;
 
         // A store with a database for each tenant: each unit gets its own state, and the store's numbers are the worst that count.
         var tenants = n.TenantPattern is null ? null : TenantUnits(n, r, env);

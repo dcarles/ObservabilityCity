@@ -31,6 +31,10 @@ public sealed class LinkTraffic
     private readonly object _gate = new();
     private readonly Dictionary<string, Dictionary<string, double>> _calls = []; // target to caller to calls in the window
     private readonly Dictionary<string, Dictionary<string, double>> _lastGood = []; // target to caller to the share of the target's rate
+    private readonly Dictionary<string, List<(DateTimeOffset At, double Total)>> _totals = []; // target to its own rate, one sample for each half minute, over the window
+    private static readonly TimeSpan SampleEvery = TimeSpan.FromSeconds(30);
+    /// <summary>How much history the mean needs before it is trusted. Until then the current rate stands, as before.</summary>
+    private static readonly TimeSpan MinHistory = TimeSpan.FromMinutes(10);
     private TimeSpan _window = LinkTrafficConfig.DefaultShareWindow;
     private int _minCalls = LinkTrafficConfig.DefaultMinCalls;
     private bool _read;
@@ -69,11 +73,12 @@ public sealed class LinkTraffic
     /// Splits <paramref name="total"/> (the API's measured requests per second) between the town systems that call it and the outside. Null until a read has
     /// succeeded: unmeasured is not the same as nobody calls.
     /// </summary>
-    public InboundSplit? Split(string target, double total)
+    public InboundSplit? Split(string target, double total, DateTimeOffset? at = null)
     {
         lock (_gate)
         {
             if (!_read) return null;
+            var basis = Smoothed(target, total, at);
             var seen = _calls.GetValueOrDefault(target) ?? [];
             var observed = seen.Values.Sum();
             var estimated = false;
@@ -86,14 +91,30 @@ public sealed class LinkTraffic
             else
             {
                 var rates = seen.ToDictionary(kv => kv.Key, kv => kv.Value / _window.TotalSeconds);
-                shares = total > 0 ? rates.ToDictionary(kv => kv.Key, kv => kv.Value / total) : [];
+                shares = basis > 0 ? rates.ToDictionary(kv => kv.Key, kv => kv.Value / basis) : [];
                 estimated = observed > 0 && observed < _minCalls;
-                if (!estimated && total > 0) _lastGood[target] = Scaled(shares);
+                if (!estimated && basis > 0) _lastGood[target] = Scaled(shares);
             }
             var scaled = Scaled(shares);
             var callers = scaled.OrderBy(kv => kv.Key, StringComparer.Ordinal).Select(kv => new InboundLinkSnapshot(kv.Key, kv.Value * total)).ToList();
             return new InboundSplit(Math.Max(0, total * (1 - scaled.Values.Sum())), callers, estimated);
         }
+    }
+
+    /// <summary>
+    /// The rate the callers' share is worked out against: the API's own rate averaged over the same window the callers' calls were counted in. The current
+    /// rate alone covers a few minutes and, for a service with few calls, jumps about, which made a steady gateway look like outside traffic whenever a busy
+    /// few minutes came along. Without a clock, or before enough history, it is the current rate.
+    /// </summary>
+    private double Smoothed(string target, double total, DateTimeOffset? at)
+    {
+        if (at is not { } now) return total;
+        if (!_totals.TryGetValue(target, out var samples)) _totals[target] = samples = [];
+        if (samples.Count == 0 || now - samples[^1].At >= SampleEvery) samples.Add((now, total));
+        else samples[^1] = (samples[^1].At, total);
+        samples.RemoveAll(x => x.At < now - _window);
+        if (now - samples[0].At < MinHistory) return total;
+        return samples.Average(x => x.Total);
     }
 
     /// <summary>The shares, scaled down together when the callers would add up to more than the API receives (the two are measured differently).</summary>
