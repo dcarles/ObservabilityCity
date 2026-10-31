@@ -397,6 +397,92 @@ public class LinkDiscoveryTests
     }
 
     [Fact]
+    public void A_rule_that_names_a_pillar_the_town_does_not_have_is_outside_the_town_not_unresolved()
+    {
+        var outside = Classify(Rules([ViaGateway]), "gw.example.test", "/cc/ledger/api/v1/x");
+
+        Assert.Equal(new Classified(LinkOutcome.OutsideTown, "cc.ledger-api", true), outside);
+        Assert.Equal(LinkOutcome.Unresolved, Classify(Rules([ViaGateway]), "gw.example.test", "/bb/missing/api").Outcome); // a pillar the town has: a real gap
+        Assert.Equal(LinkOutcome.Unresolved, Classify(Rules([ViaGateway]), "gw.example.test", "/cc/ledger/other").Outcome); // no rule fits at all
+    }
+
+    [Fact]
+    public void Calls_to_a_pillar_outside_the_town_are_one_note_for_each_pillar_and_never_notices()
+    {
+        var store = new DiscoveredLinks();
+        store.RecordOutside("aa.orders-api", "gw.example.test", "/cc/ledger/api/a", "cc.ledger-api", Days("2026-10-29", "2026-10-30"), 300);
+        store.RecordOutside("aa.orders-api", "gw.example.test", "/cc/vault/api/b", "cc.vault-api", Days("2026-10-29", "2026-10-30"), 200);
+        store.RecordOutside("bb.ledger-api", "gw.example.test", "/cc/ledger/api/a", "cc.ledger-api", Days("2026-10-29", "2026-10-30"), 50);
+        store.RecordOutside("aa.orders-api", "gw.example.test", "/dd/x/api", "dd.x-api", Days("2026-10-29", "2026-10-30"), 9000);
+        store.RecordOutside("aa.orders-api", "gw.example.test", "/ee/x/api", "ee.x-api", Days("2026-10-30"), 99999); // one day only
+
+        var notes = store.Notes(2);
+
+        Assert.Empty(store.Notices(2));
+        Assert.Equal(2, notes.Count);
+        Assert.Contains("'dd'", notes[0]); // the busiest first
+        Assert.Contains("'cc' is not in the town yet: 2 of its services are called by aa.orders-api, bb.ledger-api, about 550 calls", notes[1]);
+    }
+
+    [Fact]
+    public void A_remembered_address_that_a_rule_now_explains_leaves_the_list_and_one_that_now_names_an_outside_pillar_moves_to_the_notes()
+    {
+        var store = new DiscoveredLinks();
+        store.RecordUnresolved("aa.orders-api", "noise.example.test", null, Days("2026-10-29", "2026-10-30"), 90);
+        store.RecordUnresolved("aa.orders-api", "gw.example.test", "/cc/ledger/api", Days("2026-10-29", "2026-10-30"), 60);
+        store.RecordUnresolved("aa.orders-api", "still.example.test", null, Days("2026-10-29", "2026-10-30"), 30);
+        var classifier = new LinkClassifier(Rules([ViaGateway], ignore: ["^noise\\."]), [], Systems);
+
+        store.Revisit((caller, host, path) => classifier.Classify(new DependencyRow(caller, host, path, [], 0), "aa"));
+
+        var notice = Assert.Single(store.Notices(2));
+        Assert.Contains("still.example.test", notice);
+        Assert.Contains("'cc' is not in the town yet", Assert.Single(store.Notes(2)));
+    }
+
+    [Fact]
+    public void Calls_to_a_pillar_outside_the_town_survive_a_restart()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "oc-outside-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var first = new DiscoveredLinks(dir);
+            first.RecordOutside("aa.orders-api", "gw.example.test", "/cc/ledger/api", "cc.ledger-api", Days("2026-10-29", "2026-10-30"), 300);
+            first.Save();
+
+            var second = new DiscoveredLinks(dir);
+
+            Assert.Contains("'cc' is not in the town yet", Assert.Single(second.Notes(2)));
+        }
+        finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
+    }
+
+    [Fact]
+    public async Task A_gateway_call_to_a_pillar_the_town_lacks_is_a_note_and_a_later_ignore_rule_clears_an_old_notice()
+    {
+        var clock = new FakeTimeProvider(Now);
+        var (town, copy) = Make(TownA, true, clock);
+        using var _ = copy;
+        var role = town.Roles["aa.orders-api"];
+        var source = new FakeDependencies(_ => [
+            new DependencyRow(role, "gw.a.example.test", "/zz/ledger/api/v1", Days("2026-10-29", "2026-10-30"), 400),
+            new DependencyRow(role, "mystery.a.example.test", "/q", Days("2026-10-29", "2026-10-30"), 900),
+        ]);
+        var runner = town.Runner(source, clock);
+
+        await runner.RunOnceAsync(CancellationToken.None);
+
+        Assert.DoesNotContain(town.View.Notices, n => n.Contains("/zz/"));
+        Assert.Single(town.View.Notices, n => n.Contains("mystery.a.example.test"));
+        Assert.Contains("'zz' is not in the town yet", Assert.Single(town.View.Notes));
+
+        copy.Write("environments/prod.yaml", copy.Read("environments/prod.yaml").Replace("ignoreHosts: ['^169\\.254\\.']", "ignoreHosts: ['^169\\.254\\.', '^mystery\\.']"));
+        var changed = new Town(copy.Path, true, clock);
+        await changed.Runner(source, clock).RunOnceAsync(CancellationToken.None);
+        Assert.DoesNotContain(changed.View.Notices, n => n.Contains("mystery.a.example.test"));
+    }
+
+    [Fact]
     public async Task A_read_that_fails_keeps_what_was_found_before_and_says_so()
     {
         var clock = new FakeTimeProvider(Now);

@@ -300,7 +300,7 @@ async function start(): Promise<void> {
     wall?.onSnapshot(s, nowSeconds())
     topbar.setSnapshot(s)
     stateList.refresh()
-    notices.show(s.notices)
+    notices.show(s.notices, s.notes ?? [])
   }
 
   const connection = new Connection(onSnapshot, (st) => { topbar.setStatus(st); wall?.setConnection(st) }, scope, (e) => {

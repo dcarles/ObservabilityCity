@@ -337,6 +337,7 @@ export interface components {
             /** Format: double */
             outsideRequestsPerSecond?: number | null;
             cloud?: string | null;
+            notes?: string[] | null;
         };
         SubscriptionSnapshot: {
             topic: string;

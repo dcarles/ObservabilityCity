@@ -313,7 +313,8 @@ public sealed record Snapshot(
     DateTimeOffset? IncidentFreeSince,
     bool IncidentsSeen,
     double? OutsideRequestsPerSecond = null,
-    string? Cloud = null);
+    string? Cloud = null,
+    IReadOnlyList<string>? Notes = null);
 
 /// <summary>An island the island filter left out.</summary>
 public sealed record HiddenIsland(string Id, string DisplayName);

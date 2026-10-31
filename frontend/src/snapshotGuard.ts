@@ -97,6 +97,7 @@ export function checkSnapshot(raw: unknown): Checked {
       deadLetters: num(totals.deadLetters),
     },
     notices: Array.isArray(raw.notices) ? raw.notices.filter((n): n is string => typeof n === 'string') : [],
+    notes: Array.isArray(raw.notes) ? raw.notes.filter((n): n is string => typeof n === 'string') : null,
     groups,
     vendors,
     externalCallers: (Array.isArray(raw.externalCallers) ? raw.externalCallers : []).filter(isObject).filter((c) => typeof c.id === 'string' && c.id !== '').map<ExternalCallerSnapshot>((c) => ({
