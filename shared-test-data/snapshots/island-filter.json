@@ -65,7 +65,10 @@
           "lastUpdated": "2026-10-25T12:00:02+00:00",
           "tenants": null,
           "absent": [],
-          "quiet": false
+          "quiet": false,
+          "outsideRequestsPerSecond": null,
+          "inbound": null,
+          "inboundEstimated": false
         },
         {
           "id": "hub.service-bus",
@@ -101,7 +104,10 @@
           "lastUpdated": "2026-10-25T12:00:02+00:00",
           "tenants": null,
           "absent": [],
-          "quiet": false
+          "quiet": false,
+          "outsideRequestsPerSecond": null,
+          "inbound": null,
+          "inboundEstimated": false
         },
         {
           "id": "hub.egress",
@@ -137,7 +143,10 @@
           "lastUpdated": "2026-10-25T12:00:02+00:00",
           "tenants": null,
           "absent": [],
-          "quiet": false
+          "quiet": false,
+          "outsideRequestsPerSecond": null,
+          "inbound": null,
+          "inboundEstimated": false
         },
         {
           "id": "hub.customer-db",
@@ -173,7 +182,10 @@
           "lastUpdated": "2026-10-25T12:00:02+00:00",
           "tenants": null,
           "absent": [],
-          "quiet": false
+          "quiet": false,
+          "outsideRequestsPerSecond": null,
+          "inbound": null,
+          "inboundEstimated": false
         }
       ]
     },
@@ -240,7 +252,10 @@
           "lastUpdated": "2026-10-25T12:00:02+00:00",
           "tenants": null,
           "absent": [],
-          "quiet": false
+          "quiet": false,
+          "outsideRequestsPerSecond": null,
+          "inbound": null,
+          "inboundEstimated": false
         },
         {
           "id": "aa.orders-worker",
@@ -278,7 +293,10 @@
           "lastUpdated": "2026-10-25T12:00:02+00:00",
           "tenants": null,
           "absent": [],
-          "quiet": false
+          "quiet": false,
+          "outsideRequestsPerSecond": null,
+          "inbound": null,
+          "inboundEstimated": false
         },
         {
           "id": "aa.orders-db",
@@ -314,7 +332,10 @@
           "lastUpdated": "2026-10-25T12:00:02+00:00",
           "tenants": null,
           "absent": [],
-          "quiet": false
+          "quiet": false,
+          "outsideRequestsPerSecond": null,
+          "inbound": null,
+          "inboundEstimated": false
         }
       ]
     },
@@ -390,7 +411,10 @@
           "lastUpdated": "2026-10-25T12:00:02+00:00",
           "tenants": null,
           "absent": [],
-          "quiet": false
+          "quiet": false,
+          "outsideRequestsPerSecond": null,
+          "inbound": null,
+          "inboundEstimated": false
         },
         {
           "id": "cc.notify-worker",
@@ -428,7 +452,10 @@
           "lastUpdated": "2026-10-25T12:00:02+00:00",
           "tenants": null,
           "absent": [],
-          "quiet": false
+          "quiet": false,
+          "outsideRequestsPerSecond": null,
+          "inbound": null,
+          "inboundEstimated": false
         },
         {
           "id": "cc.notify-db",
@@ -464,7 +491,10 @@
           "lastUpdated": "2026-10-25T12:00:02+00:00",
           "tenants": null,
           "absent": [],
-          "quiet": false
+          "quiet": false,
+          "outsideRequestsPerSecond": null,
+          "inbound": null,
+          "inboundEstimated": false
         }
       ]
     }
@@ -505,7 +535,10 @@
         "lastUpdated": "2026-10-25T12:00:02+00:00",
         "tenants": null,
         "absent": [],
-        "quiet": false
+        "quiet": false,
+        "outsideRequestsPerSecond": null,
+        "inbound": null,
+        "inboundEstimated": false
       },
       "calledBy": [
         "aa.orders-api"
@@ -546,7 +579,10 @@
         "lastUpdated": "2026-10-25T12:00:02+00:00",
         "tenants": null,
         "absent": [],
-        "quiet": false
+        "quiet": false,
+        "outsideRequestsPerSecond": null,
+        "inbound": null,
+        "inboundEstimated": false
       },
       "calledBy": [
         "cc.notify-worker"
@@ -623,5 +659,6 @@
     ]
   },
   "incidentFreeSince": "2026-10-25T12:00:00+00:00",
-  "incidentsSeen": false
+  "incidentsSeen": false,
+  "outsideRequestsPerSecond": null
 }

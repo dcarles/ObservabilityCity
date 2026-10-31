@@ -20,6 +20,7 @@ import { islandSign } from './sign'
 import { backBridgeClear, hubGeometry, layoutTown, loopArc, placeVendorsOnRing, ringRoadRadius, wrapAngle, type Disc, type HubGeometry, type VendorSpec } from './layout'
 import { Weather, type SkyStatus } from './weather'
 import { Airport, type AirportStatus } from './airport'
+import { inboundMix } from '../inbound'
 import { VendorIsland, VENDOR_COLOR } from './vendors'
 import { DependencyOverlay } from './overlay'
 import { ServiceSign, summariseService, type ServiceSummary } from './service'
@@ -30,8 +31,6 @@ import { Signpost } from './signpost'
 import { portCountsLine, portSignText } from '../portSign'
 
 const QUAY = 9
-/** Traffic that crosses the hub drives a long way, so fewer cars are drawn for it than a short trip would need. */
-const REMOTE_TRAFFIC = 0.5
 
 /** Where an island's road leaves the hub: the direction it lies in and the point on the hub's coast. */
 interface Port {
@@ -129,6 +128,8 @@ export class Town {
   private loopR = 0
   /** The direction of the airport from the hub's centre, where its bridge meets the ring road (direct towns). */
   private airportAngle = 0
+  /** Systems an outside caller declares a call to: they are reached from outside even when they are not marked external. */
+  private outsideReach = new Set<string>()
   /** How many bridges reach each third party. */
   private readonly vendorBridges = new Map<string, number>()
   /** The tenant filter the buildings and cars follow. */
@@ -390,6 +391,7 @@ export class Town {
     this.root.updateMatrixWorld(true)
     // islands do not go through a gateway in a direct town, whatever the hub has
     const gateway = direct ? undefined : hubBuildings.find((b) => b.kind === 'Gateway')
+    this.outsideReach = new Set(s.externalCallers.flatMap((c) => c.calls))
     gates.forEach((_g, index) => routes.push(...this.islandRoutes(index, gates, gateway)))
     for (const link of vendorLinks) routes.push(...this.vendorRoutes(link, gates, loopR))
     routes.push(...this.hubRoutes(hubBuildings, gates.filter((g) => g.bridged)))
@@ -437,7 +439,7 @@ export class Town {
       for (const isl of this.islands) if (isl.signpost) this.guard(`signpost ${isl.group.id}`, () => isl.signpost!.set(signLines(links, isl.nodeIds)))
     }
     for (const v of s.vendors) this.guard(`apply ${v.node.id}`, () => this.buildings.get(v.node.id)?.setNode(v.node))
-    this.guard('airport', () => this.airport?.setCallers(s.externalCallers))
+    this.guard('airport', () => this.airport?.setCallers(s.externalCallers, s.outsideRequestsPerSecond ?? null))
     this.guard('overlay', () => this.overlay.set(s.dependencies))
     // weather: each island's own open incidents, and nothing anywhere else
     for (const g of s.groups) {
@@ -978,16 +980,21 @@ export class Town {
     for (const dest of plan.placed) {
       const b = island.buildings.get(dest.node.id)!
       if (dest.node.kind === 'Worker' || dest.node.kind === 'Cron' || dest.node.kind === 'Broker') continue
-      const external = dest.node.external
-      const apiShare = dest.node.kind === 'Api'
+      // Who sends this system's traffic. The shares follow the latest snapshot, so a route reads them every time it spawns: measured, they are what the
+      // telemetry shows; not measured, the rate is shared evenly between everything that can be seen to call it (see inboundMix).
+      const outsideReach = dest.node.external || this.outsideReach.has(dest.node.id)
+      const mayBeCalledFromOutside = dest.node.kind === 'Api' || outsideReach
+      const callers = plan.placed.filter((s) => s !== dest && s.node.calls.includes(dest.node.id))
+      // Callers on other islands: the ones that declare a call to it, else one other island picked from its name.
+      const declared: { gate: number; from: Placed }[] = []
+      gates.forEach((g, i) => {
+        if (i === index || !linked(g)) return
+        for (const p of g.plan.placed) if (p.node.calls.includes(dest.node.id) && !declared.some((d) => d.gate === i)) declared.push({ gate: i, from: p })
+      })
+      const callerIds = new Set([...declared.map((d) => d.from.node.id), ...callers.map((c) => c.node.id)])
+      const mix = () => inboundMix(b.node, callerIds, outsideReach)
       // An island with no bridge is reached by no car from outside; only its own systems drive to each other.
       if (linked(here)) {
-        // Callers on other islands: the ones that declare a call to it, else one other island picked from its name.
-        const declared: { gate: number; from: Placed }[] = []
-        gates.forEach((g, i) => {
-          if (i === index || !linked(g)) return
-          for (const p of g.plan.placed) if (p.node.calls.includes(dest.node.id) && !declared.some((d) => d.gate === i)) declared.push({ gate: i, from: p })
-        })
         const remote = declared.slice(0, 3)
         // a system that is called from an island the filter hides is not called by a stand-in picked from the islands on screen
         const hiddenCaller = this.edge.in.has(dest.node.id)
@@ -996,49 +1003,48 @@ export class Town {
           const other = callable[hashString(dest.node.id) % callable.length]
           remote.push({ gate: other, from: this.callerOf(gates[other].plan)! })
         }
-        const remoteShare = (external ? 0.15 : apiShare ? 0.35 : 0.08) * REMOTE_TRAFFIC
-        const outsideShare = external ? 0.85 : 0
+        const fromAirport = direct ? this.airportPath : gateway
         // outside callers (yellow) enter at the API gateway; without one they come from another island like the rest
-        if (external && direct && this.airportPath && this.airport) {
+        if (mayBeCalledFromOutside && direct && this.airportPath && this.airport) {
           // a direct town has no gateway: outside callers come in by the airport and drive round the ring road
           this.cross(island.group.id)
           const head = this.airportPath.map((p) => p.clone())
-          routes.push({ dest: b, source: this.airport, origin: 'external', share: outsideShare, ...toDest(dest, intoIsland(head, this.airportAngle, dest), null)! })
-        } else if (external && gateway) {
+          routes.push({ dest: b, source: this.airport, origin: 'external', share: () => mix().outside, ...toDest(dest, intoIsland(head, this.airportAngle, dest), null)! })
+        } else if (mayBeCalledFromOutside && gateway) {
           // with an airport bridge they come in over it and join the ring road beside the gateway; otherwise they start at the gateway
           const exit = this.airportPath ? this.airportJoin : 0
           const head = this.airportPath ? this.airportPath.map((p) => p.clone()) : [gateway.doorWorld().setY(GROUND), this.ringPoint(exit)]
           this.cross(island.group.id)
-          routes.push({ dest: b, source: this.airportPath && this.airport ? this.airport : gateway, origin: 'external', share: outsideShare, ...toDest(dest, intoIsland(head, exit, dest), null)! })
+          routes.push({ dest: b, source: this.airportPath && this.airport ? this.airport : gateway, origin: 'external', share: () => mix().outside, ...toDest(dest, intoIsland(head, exit, dest), null)! })
         }
         remote.forEach(({ gate, from }) => {
           const g = gates[gate]
           this.cross(island.group.id)
           this.cross(g.island.group.id)
           const head = outOf(g, from)
-          const share = (external && (direct ? this.airportPath : gateway) ? remoteShare : (external ? 0.85 : 0) + remoteShare) / remote.length
+          // with no airport or gateway to come in by, what comes from outside arrives from a calling island, as yellow taxis
+          const outsideHere = !fromAirport && mayBeCalledFromOutside
           routes.push({
-            dest: b, source: g.island.buildings.get(from.node.id)!, origin: external && !(direct ? this.airportPath : gateway) ? 'external' : 'internal',
-            share, ...toDest(dest, intoIsland(head, direct ? g.ringAngle : g.angle, dest), null)!,
+            dest: b, source: g.island.buildings.get(from.node.id)!, origin: outsideHere ? 'external' : 'internal',
+            share: () => { const m = mix(); return (m.caller(from.node.id) + (outsideHere ? m.outside : 0) / remote.length) + m.standIn / remote.length },
+            ...toDest(dest, intoIsland(head, direct ? g.ringAngle : g.angle, dest), null)!,
           })
         })
-        if (remote.length === 0 && gateway && !external && (!hiddenCaller || this.edge.mode === 'plaza')) {
+        if (remote.length === 0 && gateway && !outsideReach && (!hiddenCaller || this.edge.mode === 'plaza')) {
           // with no other island to call it: what comes in comes from the hub gateway
           this.cross(island.group.id)
-          routes.push({ dest: b, source: gateway, origin: 'internal', share: remoteShare, ...toDest(dest, intoIsland([gateway.doorWorld().setY(GROUND), this.ringPoint(0)], 0, dest), null)! })
+          routes.push({ dest: b, source: gateway, origin: 'internal', share: () => mix().standIn, ...toDest(dest, intoIsland([gateway.doorWorld().setY(GROUND), this.ringPoint(0)], 0, dest), null)! })
         }
       }
       // Systems on the same island that declare a call to it drive over from their own doors. Without a declared
-      // caller there is no such traffic. The callee's rate is shared evenly between its callers until a source reports each link's own rate.
-      const callers = plan.placed.filter((s) => s !== dest && s.node.calls.includes(dest.node.id))
+      // caller there is no such traffic.
       callers.forEach((from) => {
-        const share = (external ? 0.15 : apiShare ? 0.65 : 0.92) / callers.length
         const head = from.roadZ !== dest.roadZ ? [w(from.x, from.roadZ), w(0, from.roadZ), w(0, dest.roadZ)] : [w(from.x, from.roadZ)]
         // a car on the same road and the same side of the spine drives straight on to a lane that is ahead of it (its own pad's, or one further
         // out); to a lane behind it (nearer the spine) it has no way in without turning round, so bayTo gives no route
         const same = from.roadZ === dest.roadZ && from.pad.col === dest.pad.col
         const r = toDest(dest, head, same ? from.x : null)
-        if (r) routes.push({ dest: b, source: island.buildings.get(from.node.id)!, origin: 'internal', share, ...r })
+        if (r) routes.push({ dest: b, source: island.buildings.get(from.node.id)!, origin: 'internal', share: () => mix().caller(from.node.id), ...r })
       })
     }
     return routes

@@ -351,6 +351,23 @@
         },
         "additionalProperties": false
       },
+      "InboundLinkSnapshot": {
+        "required": [
+          "from",
+          "requestsPerSecond"
+        ],
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string"
+          },
+          "requestsPerSecond": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
       "IncidentSnapshot": {
         "required": [
           "id",
@@ -496,6 +513,7 @@
           "external",
           "gatewayCalls",
           "id",
+          "inboundEstimated",
           "instancesHealthy",
           "instancesTotal",
           "kind",
@@ -658,6 +676,21 @@
             }
           },
           "quiet": {
+            "type": "boolean"
+          },
+          "outsideRequestsPerSecond": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "inbound": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InboundLinkSnapshot"
+            },
+            "nullable": true
+          },
+          "inboundEstimated": {
             "type": "boolean"
           }
         },
@@ -925,6 +958,11 @@
           },
           "incidentsSeen": {
             "type": "boolean"
+          },
+          "outsideRequestsPerSecond": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
           }
         },
         "additionalProperties": false

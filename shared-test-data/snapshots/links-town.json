@@ -72,7 +72,10 @@
           "lastUpdated": "2026-10-25T12:00:03+00:00",
           "tenants": null,
           "absent": [],
-          "quiet": false
+          "quiet": false,
+          "outsideRequestsPerSecond": null,
+          "inbound": null,
+          "inboundEstimated": false
         },
         {
           "id": "hub.service-bus",
@@ -108,7 +111,10 @@
           "lastUpdated": "2026-10-25T12:00:03+00:00",
           "tenants": null,
           "absent": [],
-          "quiet": false
+          "quiet": false,
+          "outsideRequestsPerSecond": null,
+          "inbound": null,
+          "inboundEstimated": false
         },
         {
           "id": "hub.egress",
@@ -144,7 +150,10 @@
           "lastUpdated": "2026-10-25T12:00:03+00:00",
           "tenants": null,
           "absent": [],
-          "quiet": false
+          "quiet": false,
+          "outsideRequestsPerSecond": null,
+          "inbound": null,
+          "inboundEstimated": false
         },
         {
           "id": "hub.customer-db",
@@ -180,7 +189,10 @@
           "lastUpdated": "2026-10-25T12:00:03+00:00",
           "tenants": null,
           "absent": [],
-          "quiet": false
+          "quiet": false,
+          "outsideRequestsPerSecond": null,
+          "inbound": null,
+          "inboundEstimated": false
         }
       ]
     },
@@ -247,7 +259,10 @@
           "lastUpdated": "2026-10-25T12:00:03+00:00",
           "tenants": null,
           "absent": [],
-          "quiet": false
+          "quiet": false,
+          "outsideRequestsPerSecond": null,
+          "inbound": null,
+          "inboundEstimated": false
         },
         {
           "id": "ful.orders-worker",
@@ -285,7 +300,10 @@
           "lastUpdated": "2026-10-25T12:00:03+00:00",
           "tenants": null,
           "absent": [],
-          "quiet": false
+          "quiet": false,
+          "outsideRequestsPerSecond": null,
+          "inbound": null,
+          "inboundEstimated": false
         },
         {
           "id": "ful.orders-db",
@@ -321,7 +339,10 @@
           "lastUpdated": "2026-10-25T12:00:03+00:00",
           "tenants": null,
           "absent": [],
-          "quiet": false
+          "quiet": false,
+          "outsideRequestsPerSecond": null,
+          "inbound": null,
+          "inboundEstimated": false
         }
       ]
     },
@@ -388,7 +409,10 @@
           "lastUpdated": "2026-10-25T12:00:03+00:00",
           "tenants": null,
           "absent": [],
-          "quiet": false
+          "quiet": false,
+          "outsideRequestsPerSecond": null,
+          "inbound": null,
+          "inboundEstimated": false
         },
         {
           "id": "wrk.batch-db",
@@ -424,7 +448,10 @@
           "lastUpdated": "2026-10-25T12:00:03+00:00",
           "tenants": null,
           "absent": [],
-          "quiet": false
+          "quiet": false,
+          "outsideRequestsPerSecond": null,
+          "inbound": null,
+          "inboundEstimated": false
         }
       ]
     },
@@ -479,7 +506,10 @@
           "lastUpdated": "2026-10-25T12:00:03+00:00",
           "tenants": null,
           "absent": [],
-          "quiet": false
+          "quiet": false,
+          "outsideRequestsPerSecond": null,
+          "inbound": null,
+          "inboundEstimated": false
         },
         {
           "id": "nom.catalog-cache",
@@ -515,7 +545,10 @@
           "lastUpdated": "2026-10-25T12:00:03+00:00",
           "tenants": null,
           "absent": [],
-          "quiet": false
+          "quiet": false,
+          "outsideRequestsPerSecond": null,
+          "inbound": null,
+          "inboundEstimated": false
         }
       ]
     },
@@ -570,7 +603,10 @@
           "lastUpdated": "2026-10-25T12:00:03+00:00",
           "tenants": null,
           "absent": [],
-          "quiet": false
+          "quiet": false,
+          "outsideRequestsPerSecond": null,
+          "inbound": null,
+          "inboundEstimated": false
         }
       ]
     },
@@ -632,7 +668,10 @@
           "lastUpdated": "2026-10-25T12:00:03+00:00",
           "tenants": null,
           "absent": [],
-          "quiet": false
+          "quiet": false,
+          "outsideRequestsPerSecond": null,
+          "inbound": null,
+          "inboundEstimated": false
         },
         {
           "id": "leg.feed-worker",
@@ -670,7 +709,10 @@
           "lastUpdated": "2026-10-25T12:00:03+00:00",
           "tenants": null,
           "absent": [],
-          "quiet": false
+          "quiet": false,
+          "outsideRequestsPerSecond": null,
+          "inbound": null,
+          "inboundEstimated": false
         },
         {
           "id": "leg.feed-db",
@@ -706,7 +748,10 @@
           "lastUpdated": "2026-10-25T12:00:03+00:00",
           "tenants": null,
           "absent": [],
-          "quiet": false
+          "quiet": false,
+          "outsideRequestsPerSecond": null,
+          "inbound": null,
+          "inboundEstimated": false
         }
       ]
     },
@@ -759,7 +804,10 @@
           "lastUpdated": "2026-10-25T12:00:03+00:00",
           "tenants": null,
           "absent": [],
-          "quiet": false
+          "quiet": false,
+          "outsideRequestsPerSecond": null,
+          "inbound": null,
+          "inboundEstimated": false
         }
       ]
     }
@@ -803,5 +851,6 @@
     "links": []
   },
   "incidentFreeSince": "2026-10-25T12:00:00+00:00",
-  "incidentsSeen": false
+  "incidentsSeen": false,
+  "outsideRequestsPerSecond": null
 }

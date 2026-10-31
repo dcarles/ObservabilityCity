@@ -28,11 +28,15 @@ export interface Route {
   origin: Origin
   /** Road centre line from where cars appear to the point where they turn into the bay (or stop, without a bay). */
   path: THREE.Vector3[]
-  /** Share of the destination's traffic that takes this route. */
-  share: number
+  /** Share of the destination's traffic that takes this route. A function when the share follows the latest snapshot (measured traffic). */
+  share: number | (() => number)
   bay?: Bay
   /** Set for cars that leave the picture: they end at the hub plaza because their destination is on an island the filter hides. */
   edge?: boolean
+}
+
+function shareOf(route: Route): number {
+  return typeof route.share === 'function' ? route.share() : route.share
 }
 
 interface Planned {
@@ -245,7 +249,7 @@ export class CarSystem {
       if (this.hidden.has(plan.route.dest) || this.hidden.has(plan.route.source as Building)) continue
       const n = plan.route.dest.node
       if (!n || (n.state !== 'Healthy' && n.state !== 'Degraded')) continue
-      const a = (this.acc.get(plan) ?? this.random()) + spawnRate(n.requestsPerSecond) * TRAFFIC * this.density * plan.route.share * dt
+      const a = (this.acc.get(plan) ?? this.random()) + spawnRate(n.requestsPerSecond) * TRAFFIC * this.density * shareOf(plan.route) * dt
       // a car that cannot leave yet (the road is not clear) waits its turn, up to a few
       let owed = a
       while (owed >= 1 && this.cars.length < this.max && this.spawn(plan)) owed -= 1

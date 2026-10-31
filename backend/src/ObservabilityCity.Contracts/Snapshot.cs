@@ -53,6 +53,9 @@ public enum HealthState
 /// Tenants is set only for a data store that keeps one database per tenant (its registry entry has a tenantPattern): one unit for each tenant, and null
 /// for every other system. Utilisation and Throttled of such a store are the worst of its tenants' that count: customers and unknown tenants, and
 /// test tenants only when there are no others, held below the red thresholds, so a test tenant's trouble shows amber on its own unit and never turns the building red.
+/// OutsideRequestsPerSecond and Inbound say where an API's traffic comes from, once the environment measures it (links.traffic): the part no town system explains,
+/// which arrives at the airport, and the part each town system sends. Both are null while nothing measures it; the renderer then shares the rate evenly between the
+/// declared callers. InboundEstimated says the share stands on too few calls and is the last good one.
 /// Absent lists the signals no source is configured for (requests, errors, latency, instances, cpu, memory, utilisation, throttled, backlog, deadLetters). They are not
 /// zero and not grey: the number in the matching field means nothing, health ignores it and the renderer shows nothing for it. A system whose signals are all absent has no
 /// source at all; it is Stale in State, but it is not grey and it is not counted as missing data.
@@ -91,7 +94,13 @@ public sealed record NodeSnapshot(
     DateTimeOffset? LastUpdated,
     IReadOnlyList<TenantUnitSnapshot>? Tenants,
     IReadOnlyList<string> Absent,
-    bool Quiet = false);
+    bool Quiet = false,
+    double? OutsideRequestsPerSecond = null,
+    IReadOnlyList<InboundLinkSnapshot>? Inbound = null,
+    bool InboundEstimated = false);
+
+/// <summary>What one town system sends to an API, in requests per second.</summary>
+public sealed record InboundLinkSnapshot(string From, double RequestsPerSecond);
 
 /// <summary>
 /// One tenant's database of a multi-tenant data store. Database is its real name (the store's tenantPattern with the tenant id put in).
@@ -225,6 +234,8 @@ public sealed record TownTotals(
 /// IncidentFreeSince is when the islands shown last had an open incident (or, when they never did, when the server started watching); it is null while
 /// one of them has one open. IncidentsSeen says whether any of them has had one since the server started, so "N hours since the last incident" is
 /// not claimed for a town that has simply not been watched for long.
+/// OutsideRequestsPerSecond is the traffic no town system explains, summed over the APIs on screen: what reaches the airport. It is null while the environment
+/// does not measure it (links.traffic), and the airport then adds up what the outside callers bring.
 /// </summary>
 public sealed record Snapshot(
     string TownId,
@@ -247,7 +258,8 @@ public sealed record Snapshot(
     string Mode,
     ViewInfo View,
     DateTimeOffset? IncidentFreeSince,
-    bool IncidentsSeen);
+    bool IncidentsSeen,
+    double? OutsideRequestsPerSecond = null);
 
 /// <summary>An island the island filter left out.</summary>
 public sealed record HiddenIsland(string Id, string DisplayName);

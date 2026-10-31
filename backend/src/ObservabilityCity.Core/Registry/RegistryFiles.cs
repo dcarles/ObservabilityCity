@@ -210,6 +210,21 @@ internal sealed class LinksFile
     public List<LinkRuleFile> Rules { get; set; } = [];
     /// <summary>Words the address uses that the registry spells differently, applied to every captured group.</summary>
     public Dictionary<string, string> Aliases { get; set; } = new();
+    /// <summary>How much each caller sends, so the traffic nobody in the town explains can be told from the rest. Without it that split is not measured.</summary>
+    public TrafficFile? Traffic { get; set; }
+}
+
+/// <summary>The <c>links.traffic</c> block of an environment file.</summary>
+internal sealed class TrafficFile
+{
+    /// <summary>The query, a template like links.query. One row for each caller and address over the window: caller, host, calls; path for a gateway.</summary>
+    public string Query { get; set; } = "";
+    /// <summary>How far back each read looks, which smooths the shares. Default 1h.</summary>
+    public string? ShareWindow { get; set; }
+    /// <summary>Below this many observed calls to an API the share is too noisy: the last good one stands, marked estimated. Default 20.</summary>
+    public int? MinCalls { get; set; }
+    /// <summary>How often it reads. Default 5m.</summary>
+    public string? Interval { get; set; }
 }
 
 internal sealed class LinkRuleFile

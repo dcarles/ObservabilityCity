@@ -197,7 +197,7 @@ export class Inspector {
     const incidents = group?.incidents ?? []
     return `
       ${why.length === 0 ? '<p class="fine">Nothing to flag: every number is inside its lines.</p>' : `<ul class="why">${why.map((w) => `<li>${escapeHtml(w)}</li>`).join('')}</ul>`}
-      <div class="rows">${overviewRows(n).map((r) => `<div class="row"><span>${r.label}</span><span class="${r.tone}">${escapeHtml(r.value)}</span></div>`).join('')}</div>
+      <div class="rows">${overviewRows(n, (id) => this.find(id)?.node.name ?? id).map((r) => `<div class="row"><span>${r.label}</span><span class="${r.tone}">${escapeHtml(r.value)}</span></div>`).join('')}</div>
       ${tenants}
       ${this.openIn()}
       ${incidents.length === 0 ? '' : `<h4>Incidents on this island <small>${escapeHtml(incidentSummary(incidents))}</small></h4>

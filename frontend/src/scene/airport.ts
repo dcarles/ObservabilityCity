@@ -62,6 +62,7 @@ export class Airport {
   private landed = 0
   private rps = 0
   private callers: ExternalCallerSnapshot[] = []
+  private measured = false
   private readonly board: { sprite: THREE.Sprite; key: string }
   private readonly rand = rng(hashString('airport'))
   private readonly kit: AirportKit
@@ -101,10 +102,14 @@ export class Airport {
     return this.root.localToWorld(new THREE.Vector3(0, GROUND, this.gateZ))
   }
 
-  /** The outside traffic coming in: the total, and which callers bring it. */
-  setCallers(callers: readonly ExternalCallerSnapshot[]): void {
+  /**
+   * The outside traffic coming in. When the server measures it, `measured` is the total no town system explains, for every API; the callers
+   * the hub declares are then only names, as there is no way to tell which of them sent what, and the board shows the total alone.
+   */
+  setCallers(callers: readonly ExternalCallerSnapshot[], measured: number | null = null): void {
     this.callers = [...callers].sort((a, b) => b.requestsPerSecond - a.requestsPerSecond)
-    this.rps = this.callers.reduce((a, c) => a + c.requestsPerSecond, 0)
+    this.measured = measured !== null
+    this.rps = measured ?? this.callers.reduce((a, c) => a + c.requestsPerSecond, 0)
     this.drawBoard()
   }
 
@@ -222,7 +227,7 @@ export class Airport {
 
   private boardLines(): string[] {
     const lines = [`ARRIVALS  ${formatRate(this.rps)} req/s`]
-    for (const c of this.callers.slice(0, 4)) lines.push(`${c.name}  ${formatRate(c.requestsPerSecond)}/s`)
+    if (!this.measured) for (const c of this.callers.slice(0, 4)) lines.push(`${c.name}  ${formatRate(c.requestsPerSecond)}/s`)
     return lines
   }
 

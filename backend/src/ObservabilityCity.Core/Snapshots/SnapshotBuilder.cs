@@ -32,6 +32,9 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
 
     public string Environment { get; init; } = "demo";
 
+    /// <summary>Who sends how much to each API. Without it (or until it has read), nothing says where an API's traffic comes from.</summary>
+    public Links.LinkTraffic? Traffic { get; init; }
+
     /// <summary>The mode the server runs in. Fixed when the server starts, so a registry reload cannot turn a live server into a demo one. Without it, the town's own mode.</summary>
     public string? Mode { get; init; }
 
@@ -111,7 +114,8 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
 
         return new Snapshot(registry.Town.Id, registry.Town.Name, registry.Town.GroupLabel, env?.Id ?? Environment, now, DayFraction(), totals, notices, groups,
             vendors, callers, dependencies, registry.RingCapacity,
-            env?.Name ?? Environment, environments, TenantsOf(env, allNodes), registry.Town.Topology, Mode ?? registry.Town.Mode, view, incidentFreeSince, incidentsSeen);
+            env?.Name ?? Environment, environments, TenantsOf(env, allNodes), registry.Town.Topology, Mode ?? registry.Town.Mode, view, incidentFreeSince, incidentsSeen,
+            OutsideRate(onScreenNodes.Values));
     }
 
     /// <summary>Remembers when each island last had an open incident. Every full build calls this, so the memory does not depend on who is looking.</summary>
@@ -148,9 +152,9 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
         {
             var calleeNode = registry.AllNodes.FirstOrDefault(n => n.Id == callee);
             if (calleeNode is null || !byId.TryGetValue(callee, out var snap)) continue;
-            var share = snap.State == HealthState.Stale ? 0 : snap.RequestsPerSecond / from.Count;
             foreach (var caller in from)
             {
+                var share = snap.State == HealthState.Stale ? 0 : LinkRate(snap, caller.Id, from.Count);
                 var callerShown = shown.Contains(caller.Id);
                 var calleeShown = shown.Contains(callee);
                 if (callerShown && !calleeShown && hiddenNames.ContainsKey(calleeNode.GroupId))
@@ -215,9 +219,23 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
     {
         var reached = registry.ExternalCallers.SelectMany(c => c.Calls).GroupBy(id => id).ToDictionary(g => g.Key, g => g.Count());
         return registry.ExternalCallers
-            .Select(c => new ExternalCallerSnapshot(c.Id, c.Name, c.Calls.Sum(id => byId.TryGetValue(id, out var n) ? n.RequestsPerSecond / reached[id] : 0), c.Calls))
+            .Select(c => new ExternalCallerSnapshot(c.Id, c.Name, c.Calls.Sum(id => byId.TryGetValue(id, out var n) ? (n.OutsideRequestsPerSecond ?? n.RequestsPerSecond) / reached[id] : 0), c.Calls))
             .ToList();
     }
+
+    /// <summary>
+    /// What reaches the airport once traffic is measured: the outside part of every API on screen, whichever building it is. Null while nothing is measured,
+    /// and the airport then adds up what the outside callers bring.
+    /// </summary>
+    private static double? OutsideRate(IEnumerable<NodeSnapshot> onScreen)
+    {
+        var measured = onScreen.Where(n => n.State != HealthState.Stale && n.OutsideRequestsPerSecond is not null).ToList();
+        return measured.Count == 0 ? null : measured.Sum(n => n.OutsideRequestsPerSecond!.Value);
+    }
+
+    /// <summary>The rate of one call to a system: what the measurement says that caller sends, else (nothing measured) an even share of the callee's rate.</summary>
+    private static double LinkRate(NodeSnapshot callee, string callerId, int callers) =>
+        callee.Inbound is { } inbound ? inbound.FirstOrDefault(l => l.From == callerId)?.RequestsPerSecond ?? 0 : callee.RequestsPerSecond / callers;
 
     /// <summary>
     /// Traffic between groups, and from groups to vendors, for the dependency overlay. A system's rate is shared evenly between the systems that
@@ -240,10 +258,10 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
         {
             if (!byId.TryGetValue(callee, out var snap) || snap.State == HealthState.Stale) continue;
             var to = groupOf.GetValueOrDefault(callee, callee); // a vendor stands on its own
-            var share = snap.RequestsPerSecond / from.Count;
             foreach (var caller in from)
             {
                 if (caller.GroupId == to) continue;
+                var share = LinkRate(snap, caller.Id, from.Count);
                 links[(caller.GroupId, to)] = links.GetValueOrDefault((caller.GroupId, to)) + share;
             }
         }
@@ -279,6 +297,8 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
         var quiet = r.Calls is { } calls && calls < n.MinCalls;
         if (quiet) r = r with { ErrorRate = 0, P99Ms = 0 };
 
+        var split = n.Kind == NodeKind.Api && !absent.Contains(Signals.Requests) ? Traffic?.Split(n.Id, r.RequestsPerSecond) : null;
+
         // A store with a database for each tenant: each unit gets its own state, and the store's numbers are the worst that count.
         var tenants = n.TenantPattern is null ? null : TenantUnits(n, r, env);
         var utilisation = r.Utilisation;
@@ -294,7 +314,13 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
 
         return new NodeSnapshot(n.Id, n.Name, n.Kind, n.Service, n.External, health, r.InstancesTotal, r.InstancesHealthy,
             r.Load, r.Cpu, r.Memory, utilisation, throttled, r.QueueDepth, r.OldestMessageSeconds, r.DeadLetters, r.RequestsPerSecond, r.ErrorRate, r.P99Ms, n.SlaP99Ms, n.ErrorAmber, n.ErrorRed,
-            n.ResourceAmber, n.ResourceRed, n.ThrottleAmber, n.ThrottleRed, n.BacklogAmber, n.BacklogRed, n.Calls, n.GatewayCalls, r.At, tenants, absent, quiet);
+            n.ResourceAmber, n.ResourceRed, n.ThrottleAmber, n.ThrottleRed, n.BacklogAmber, n.BacklogRed, n.Calls, n.GatewayCalls, r.At, tenants, absent, quiet)
+        {
+            // an API's traffic is its measured total less what town systems send: the rest is outside, whichever building it is
+            OutsideRequestsPerSecond = split?.Outside,
+            Inbound = split?.Callers,
+            InboundEstimated = split?.Estimated ?? false,
+        };
     }
 
     /// <summary>

@@ -151,7 +151,19 @@
             }
           }
         },
-        "aliases": { "type": "object", "description": "Words the address uses that the registry spells differently, applied to every captured group.", "additionalProperties": { "type": "string" } }
+        "aliases": { "type": "object", "description": "Words the address uses that the registry spells differently, applied to every captured group.", "additionalProperties": { "type": "string" } },
+        "traffic": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["query"],
+          "description": "Measures how much each town system sends to each API, so the traffic no town system explains (the outside traffic, drawn at the airport) can be told from the rest: outside = the API's measured total minus what its town callers send. Without it the split is not measured.",
+          "properties": {
+            "query": { "type": "string", "description": "A template like links.query, read over the share window. It returns one row for each caller and address with the columns caller, host and calls (the estimated calls, corrected for sampling); path for a gateway." },
+            "shareWindow": { "type": "string", "pattern": "^[0-9]+(\\.[0-9]+)?[smhd]$", "description": "How far back each read looks, which smooths the shares. Default 1h." },
+            "minCalls": { "type": "integer", "minimum": 1, "description": "Below this many observed calls to an API the share is too noisy: the last good one stands, marked estimated. Default 20." },
+            "interval": { "type": "string", "pattern": "^[0-9]+(\\.[0-9]+)?[smhd]$", "description": "How often it reads. Default 5m." }
+          }
+        }
       }
     },
     "scope": {
