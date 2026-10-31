@@ -73,7 +73,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "hub.service-bus",
@@ -112,7 +115,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "hub.egress",
@@ -151,7 +157,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "hub.customer-db",
@@ -190,9 +199,13 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         }
-      ]
+      ],
+      "assets": []
     },
     {
       "id": "aa",
@@ -254,7 +267,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "aa.audit-cache",
@@ -293,7 +309,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "aa.orders-worker",
@@ -334,12 +353,15 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "aa.tools-cron",
           "name": "Tools run",
-          "kind": "Cron",
+          "kind": "Function",
           "service": null,
           "external": false,
           "state": "Healthy",
@@ -375,7 +397,25 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": "Running",
+          "jobs": [
+            {
+              "name": "daily",
+              "region": null,
+              "status": "Ok",
+              "lastRun": "2026-10-25T11:50:02+00:00",
+              "next": "2026-10-25T12:50:02+00:00"
+            },
+            {
+              "name": "hourly",
+              "region": null,
+              "status": "Ok",
+              "lastRun": "2026-10-25T11:43:02+00:00",
+              "next": "2026-10-25T12:43:02+00:00"
+            }
+          ],
+          "regions": null
         },
         {
           "id": "aa.orders-db",
@@ -470,9 +510,13 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         }
-      ]
+      ],
+      "assets": []
     },
     {
       "id": "bb",
@@ -529,7 +573,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "bb.billing-db",
@@ -624,7 +671,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "bb.shared-db",
@@ -663,9 +713,13 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         }
-      ]
+      ],
+      "assets": []
     }
   ],
   "vendors": [],
@@ -742,5 +796,6 @@
   },
   "incidentFreeSince": "2026-10-25T12:00:00+00:00",
   "incidentsSeen": false,
-  "outsideRequestsPerSecond": null
+  "outsideRequestsPerSecond": null,
+  "cloud": null
 }

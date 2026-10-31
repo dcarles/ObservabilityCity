@@ -40,7 +40,7 @@ scope:
   workspace: "ws-{env}-main"
   subscription: { nameLike: "*-{env}-{pillar}" }
   resources:
-    - { name: plans, types: [microsoft.web/serverfarms], roles: [api, worker], pattern: '^plan-cf-[^-]+-(?<pillar>[^-]+)-(?<service>[^-]+)-(?<region>[a-z]+)', instances: "coalesce(toint(properties.numberOfWorkers), toint(sku.capacity))" }
+    - { name: plans, types: [microsoft.web/serverfarms], roles: [api, worker], pattern: '^plan-cf-[^-]+-(?<pillar>[^-]+)-(?<service>[^-]+)-[a-z]+', instances: "coalesce(toint(properties.numberOfWorkers), toint(sku.capacity))" }
     - { name: apps, types: [microsoft.web/sites], roles: [api, worker], pattern: '^(?<role>api|worker)-[^-]+-(?<pillar>[^-]+)-(?<service>[^-]+)-(?<region>[a-z]+)' }
     - { name: accounts, types: [microsoft.documentdb/databaseaccounts], roles: [db], pattern: '^(?<tenant>[0-9a-f]{32})-(?<pillar>[^-]+)-(?<service>[^-]+)$', tenantNameTag: tenant }
   # one address per resource, a portal page pinned to a directory

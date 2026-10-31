@@ -75,7 +75,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "hub.service-bus",
@@ -114,7 +117,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "hub.egress",
@@ -153,7 +159,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "hub.customer-db",
@@ -192,9 +201,13 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         }
-      ]
+      ],
+      "assets": []
     },
     {
       "id": "ful",
@@ -262,7 +275,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "ful.orders-worker",
@@ -303,7 +319,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "ful.orders-db",
@@ -342,9 +361,13 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         }
-      ]
+      ],
+      "assets": []
     },
     {
       "id": "wrk",
@@ -412,7 +435,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "wrk.batch-db",
@@ -451,9 +477,13 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         }
-      ]
+      ],
+      "assets": []
     },
     {
       "id": "nom",
@@ -509,7 +539,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "nom.catalog-cache",
@@ -548,9 +581,13 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         }
-      ]
+      ],
+      "assets": []
     },
     {
       "id": "hbk",
@@ -570,7 +607,7 @@
         {
           "id": "hbk.sync-cron",
           "name": "Customer sync",
-          "kind": "Cron",
+          "kind": "Function",
           "service": null,
           "external": false,
           "state": "Healthy",
@@ -606,9 +643,28 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": "Running",
+          "jobs": [
+            {
+              "name": "daily",
+              "region": null,
+              "status": "Ok",
+              "lastRun": "2026-10-25T11:50:03+00:00",
+              "next": "2026-10-25T12:50:03+00:00"
+            },
+            {
+              "name": "hourly",
+              "region": null,
+              "status": "Ok",
+              "lastRun": "2026-10-25T11:43:03+00:00",
+              "next": "2026-10-25T12:43:03+00:00"
+            }
+          ],
+          "regions": null
         }
-      ]
+      ],
+      "assets": []
     },
     {
       "id": "leg",
@@ -671,7 +727,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "leg.feed-worker",
@@ -712,7 +771,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "leg.feed-db",
@@ -751,9 +813,13 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         }
-      ]
+      ],
+      "assets": []
     },
     {
       "id": "sta",
@@ -773,7 +839,7 @@
         {
           "id": "sta.idle-cron",
           "name": "Idle job",
-          "kind": "Cron",
+          "kind": "Function",
           "service": null,
           "external": false,
           "state": "Healthy",
@@ -807,9 +873,28 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": "Running",
+          "jobs": [
+            {
+              "name": "daily",
+              "region": null,
+              "status": "Ok",
+              "lastRun": "2026-10-25T11:50:03+00:00",
+              "next": "2026-10-25T12:50:03+00:00"
+            },
+            {
+              "name": "hourly",
+              "region": null,
+              "status": "Ok",
+              "lastRun": "2026-10-25T11:43:03+00:00",
+              "next": "2026-10-25T12:43:03+00:00"
+            }
+          ],
+          "regions": null
         }
-      ]
+      ],
+      "assets": []
     }
   ],
   "vendors": [
@@ -851,7 +936,10 @@
         "quiet": false,
         "outsideRequestsPerSecond": null,
         "inbound": null,
-        "inboundEstimated": false
+        "inboundEstimated": false,
+        "app": null,
+        "jobs": null,
+        "regions": null
       },
       "calledBy": [
         "ful.orders-api",
@@ -899,7 +987,10 @@
         "quiet": false,
         "outsideRequestsPerSecond": null,
         "inbound": null,
-        "inboundEstimated": false
+        "inboundEstimated": false,
+        "app": null,
+        "jobs": null,
+        "regions": null
       },
       "calledBy": [
         "nom.catalog-api"
@@ -946,7 +1037,10 @@
         "quiet": false,
         "outsideRequestsPerSecond": null,
         "inbound": null,
-        "inboundEstimated": false
+        "inboundEstimated": false,
+        "app": null,
+        "jobs": null,
+        "regions": null
       },
       "calledBy": [
         "ful.orders-worker"
@@ -1015,5 +1109,6 @@
   },
   "incidentFreeSince": "2026-10-25T12:00:00+00:00",
   "incidentsSeen": false,
-  "outsideRequestsPerSecond": null
+  "outsideRequestsPerSecond": null,
+  "cloud": null
 }

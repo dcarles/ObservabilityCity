@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using ObservabilityCity.Contracts;
 using ObservabilityCity.Core.Registry;
 using ObservabilityCity.Core.Scope;
 using ObservabilityCity.Core.Sources;
@@ -27,7 +28,7 @@ public sealed class ResourceGraphInventory(HttpClient http, ICredentialSource? c
         "resources | where type =~ 'microsoft.operationalinsights/workspaces' | project id, name, customerId = tostring(properties.customerId)";
 
     public const string DefaultResourcesQuery =
-        "resources | where type in~ ({types}) | extend instances = {instances} | project id, name, type, subscriptionId, location, tags, instances";
+        "resources | where type in~ ({types}) | extend instances = {instances}, state = {state} | project id, name, type, subscriptionId, location, tags, instances, state";
 
     /// <summary>The scope the source is limited to: subscription ids, comma separated; empty means everything the login can read.</summary>
     private IReadOnlyList<string> Scope =>
@@ -38,13 +39,14 @@ public sealed class ResourceGraphInventory(HttpClient http, ICredentialSource? c
         var subscriptions = (await Query(rules.Queries.Subscriptions ?? DefaultSubscriptionsQuery, Scope, ct)).Select(ToSubscription).ToList();
         var found = ScopeResolver.Resolve(registry, new Inventory(subscriptions, []));
         var wanted = found.Pillars.Select(p => p.SubscriptionId).OfType<string>().Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-        var types = rules.Resources.SelectMany(r => r.Types).Select(t => t.ToLowerInvariant()).Distinct().ToList();
+        var types = rules.Resources.SelectMany(r => r.Types).Concat(rules.Assets.SelectMany(a => a.Types)).Select(t => t.ToLowerInvariant()).Distinct().ToList();
         var resources = new List<InventoryResource>();
         if (wanted.Count > 0 && types.Count > 0)
         {
             var query = (rules.Queries.Resources ?? DefaultResourcesQuery)
                 .Replace("{types}", string.Join(", ", types.Select(Quote)))
-                .Replace("{instances}", InstancesExpression(rules));
+                .Replace("{instances}", InstancesExpression(rules))
+                .Replace("{state}", StateExpression(rules));
             foreach (var batch in wanted.Chunk(MaxSubscriptionsPerCall))
                 resources.AddRange((await Query(query, batch, ct)).Select(ToResource));
         }
@@ -68,6 +70,16 @@ public sealed class ResourceGraphInventory(HttpClient http, ICredentialSource? c
             .GroupBy(x => x.Type).Select(g => g.First()).ToList();
         return counted.Count == 0 ? "int(null)"
             : $"case({string.Join(", ", counted.Select(c => $"type =~ {Quote(c.Type)}, toint({c.Instances})"))}, int(null))";
+    }
+
+    /// <summary>The expression that reads a resource's app state as text: each type takes the expression of the first rule that names it; a type no rule reads gives the empty text, which is "unknown".</summary>
+    public static string StateExpression(ScopeRules rules)
+    {
+        var read = rules.Resources.Where(r => r.State is not null)
+            .SelectMany(r => r.Types.Select(t => (Type: t.ToLowerInvariant(), r.State)))
+            .GroupBy(x => x.Type).Select(g => g.First()).ToList();
+        return read.Count == 0 ? "''"
+            : $"case({string.Join(", ", read.Select(c => $"type =~ {Quote(c.Type)}, tostring({c.State})"))}, '')";
     }
 
     private async Task<List<JsonElement>> Query(string query, IReadOnlyList<string> subscriptions, CancellationToken ct)
@@ -104,7 +116,7 @@ public sealed class ResourceGraphInventory(HttpClient http, ICredentialSource? c
     private static InventoryWorkspace ToWorkspace(JsonElement e) => new(Text(e, "id") ?? "", Text(e, "name") ?? "", Text(e, "customerId") is { Length: > 0 } c ? c : null);
 
     private static InventoryResource ToResource(JsonElement e) =>
-        new(Text(e, "id") ?? "", Text(e, "name") ?? "", Text(e, "type") ?? "", Text(e, "subscriptionId") ?? "", Text(e, "location"), Tags(e), Count(e, "instances"));
+        new(Text(e, "id") ?? "", Text(e, "name") ?? "", Text(e, "type") ?? "", Text(e, "subscriptionId") ?? "", Text(e, "location"), Tags(e), Count(e, "instances"), Text(e, "state") is { Length: > 0 } st ? st : null);
 
     /// <summary>A whole number, or null when the field is missing, null or not a number (a plan the cloud gives no count for).</summary>
     private static int? Count(JsonElement e, string name) =>
@@ -164,8 +176,16 @@ public sealed class ResourceGraphSource(string name, string environmentId, Regis
     /// what is configured (a plan's workers), so every instance counts as healthy: health is for the sources that measure it.
     /// </summary>
     public static IReadOnlyDictionary<string, NodeReading> InstanceReadings(Resolution resolution, DateTimeOffset at) =>
-        resolution.Systems.Where(s => s.Instances is not null)
-            .ToDictionary(s => s.SystemId, s => new NodeReading(at, true, s.Instances!.Value, s.Instances.Value, 0, 0, 0, 0));
+        resolution.Systems.Where(s => s.Instances is not null || s.AppState is not null)
+            .ToDictionary(s => s.SystemId, s => new NodeReading(at, true, s.Instances ?? 0, s.Instances ?? 0, 0, 0, 0, 0, App: s.AppState, Regions: RegionInstances(s)));
+
+    /// <summary>The instances in each region the system's counted resources are in (the plans of each region). Null when none of them says a region.</summary>
+    private static IReadOnlyList<RegionReading>? RegionInstances(SystemScope s)
+    {
+        var regions = s.Resources.Where(r => r.Region is { Length: > 0 } && r.Instances is not null).GroupBy(r => r.Region!, StringComparer.OrdinalIgnoreCase)
+            .Select(g => new RegionReading(g.Key, g.Sum(r => r.Instances!.Value), null, null)).OrderBy(r => r.Region, StringComparer.Ordinal).ToList();
+        return regions.Count == 0 ? null : regions;
+    }
 }
 
 public sealed class ResourceGraphSourceFactory(HttpClient? http = null, TimeProvider? time = null) : IMetricSourceFactory

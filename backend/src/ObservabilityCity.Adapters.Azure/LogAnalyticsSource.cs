@@ -37,6 +37,33 @@ public sealed class LogAnalyticsReader(HttpClient http, ICredentialSource? crede
     public async Task<IReadOnlyList<DependencyRow>> QueryDependenciesAsync(string workspace, string query, DateTimeOffset from, DateTimeOffset to, CancellationToken ct) =>
         ParseDependencies(await SendAsync(workspace, query, $"{LinkQuery.Iso(from)}/{LinkQuery.Iso(to)}", ct));
 
+    /// <summary>The job rows of the function job query over the last <paramref name="window"/>.</summary>
+    public async Task<IReadOnlyList<RegionRow>> QueryRegionsAsync(string workspace, string query, TimeSpan window, CancellationToken ct) =>
+        ParseRegions(await SendAsync(workspace, query, System.Xml.XmlConvert.ToString(window), ct));
+
+    public static readonly string[] RegionColumns = ["role", "region", "calls"];
+
+    /// <summary>The rows of the region query: <c>role</c> (the telemetry name), <c>region</c> and <c>calls</c> (counts; only their proportions are used). A row without a role or a region is skipped.</summary>
+    public static IReadOnlyList<RegionRow> ParseRegions(string json)
+    {
+        using var doc = JsonDocument.Parse(json);
+        if (!doc.RootElement.TryGetProperty("tables", out var tables) || tables.ValueKind != JsonValueKind.Array || tables.GetArrayLength() == 0)
+            throw new InvalidOperationException("the answer has no table; was the query a query that returns rows?");
+        var table = tables[0];
+        var names = table.GetProperty("columns").EnumerateArray().Select(c => c.GetProperty("name").GetString() ?? "").ToList();
+        int Index(string column) => names.FindIndex(n => n.Equals(column, StringComparison.OrdinalIgnoreCase));
+        var (role, region, calls) = (Index("role"), Index("region"), Index("calls"));
+        if (role < 0 || region < 0 || calls < 0)
+            throw new InvalidOperationException($"the region query must return the columns {string.Join(", ", RegionColumns)}; it returned {string.Join(", ", names)}");
+        var rows = new List<RegionRow>();
+        foreach (var row in table.GetProperty("rows").EnumerateArray())
+            if (Text(row[role]) is { Length: > 0 } who && Text(row[region]) is { Length: > 0 } where) rows.Add(new RegionRow(who, where, Number(row, calls) ?? 0));
+        return rows;
+    }
+
+    public async Task<IReadOnlyList<JobRow>> QueryJobsAsync(string workspace, string query, TimeSpan window, CancellationToken ct) =>
+        ParseJobs(await SendAsync(workspace, query, System.Xml.XmlConvert.ToString(window), ct));
+
     private async Task<string> SendAsync(string workspace, string query, string timespan, CancellationToken ct)
     {
         var body = JsonSerializer.Serialize(new { query, timespan });
@@ -99,6 +126,41 @@ public sealed class LogAnalyticsReader(HttpClient http, ICredentialSource? crede
         return rows;
     }
 
+    /// <summary>
+    /// The rows of the function job query: <c>resourceId</c> (the function app), <c>job</c>, and optionally <c>lastRun</c> (a time), <c>succeeded</c> (true or false),
+    /// <c>next</c> (a time) and <c>region</c>. A row without a resource or a job says nothing and is skipped.
+    /// </summary>
+    public static IReadOnlyList<JobRow> ParseJobs(string json)
+    {
+        using var doc = JsonDocument.Parse(json);
+        if (!doc.RootElement.TryGetProperty("tables", out var tables) || tables.ValueKind != JsonValueKind.Array || tables.GetArrayLength() == 0)
+            throw new InvalidOperationException("the answer has no table; was the query a query that returns rows?");
+        var table = tables[0];
+        var names = table.GetProperty("columns").EnumerateArray().Select(c => c.GetProperty("name").GetString() ?? "").ToList();
+        int Index(string column) => names.FindIndex(n => n.Equals(column, StringComparison.OrdinalIgnoreCase));
+        var (resource, job, lastRun, succeeded, next, region) = (Index("resourceId"), Index("job"), Index("lastRun"), Index("succeeded"), Index("next"), Index("region"));
+        if (resource < 0 || job < 0)
+            throw new InvalidOperationException($"the job query must return the columns {string.Join(", ", JobColumns)} (lastRun, succeeded, next and region may be left out); it returned {string.Join(", ", names)}");
+        DateTimeOffset? Time(JsonElement row, int index) =>
+            index >= 0 && Text(row[index]) is { Length: > 0 } t && DateTimeOffset.TryParse(t, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var at) ? at : null;
+        bool? Flag(JsonElement row, int index) => index < 0 ? null : row[index].ValueKind switch
+        {
+            JsonValueKind.True => true,
+            JsonValueKind.False => false,
+            JsonValueKind.String when bool.TryParse(row[index].GetString(), out var b) => b,
+            _ => null,
+        };
+        var rows = new List<JobRow>();
+        foreach (var row in table.GetProperty("rows").EnumerateArray())
+        {
+            if (Text(row[resource]) is not { Length: > 0 } id || Text(row[job]) is not { Length: > 0 } name) continue;
+            rows.Add(new JobRow(id, name, Time(row, lastRun), Flag(row, succeeded), Time(row, next), region < 0 ? null : Text(row[region]) is { Length: > 0 } r ? r : null));
+        }
+        return rows;
+    }
+
+    public static readonly string[] JobColumns = ["resourceId", "job", "lastRun", "succeeded", "next", "region"];
+
     private static string? Text(JsonElement v) => v.ValueKind == JsonValueKind.String ? v.GetString() : null;
 
     // make_set gives a JSON array, or the same array as text; a plain day is accepted too
@@ -129,7 +191,13 @@ public sealed class LogAnalyticsReader(HttpClient http, ICredentialSource? crede
     }
 }
 
+/// <summary>One scheduled job of one function app as the log query summarised it: when it last ran, whether that run succeeded and when it runs next.</summary>
+public sealed record JobRow(string ResourceId, string Job, DateTimeOffset? LastRun, bool? Succeeded, DateTimeOffset? Next, string? Region);
+
 /// <summary>One telemetry name's calls in the window, how many of them were errors and their latency in milliseconds (null when the query gave none).</summary>
+/// <summary>How many requests a service (by telemetry name) answered in one region, by the region query.</summary>
+public sealed record RegionRow(string Role, string Region, double Calls);
+
 public sealed record SpanRow(string Role, double Calls, double Errors, double? LatencyMs);
 
 /// <summary>
@@ -159,7 +227,7 @@ public sealed class LogAnalyticsSource(
         // a workspace given by name is looked up in the inventory, which is read at the same moment the first poll starts
         if (recording is null && string.IsNullOrWhiteSpace(definition.Connection) && store.Inventory is null) await store.WaitForReadAsync(Timeout / 2, ct);
         var resolution = store.Resolve(view);
-        var serving = view.AllNodes.Where(n => n.Kind is NodeKind.Api or NodeKind.Worker or NodeKind.Gateway or NodeKind.Cron).Select(n => n.Id).ToHashSet();
+        var serving = view.AllNodes.Where(n => n.Kind is NodeKind.Api or NodeKind.Worker or NodeKind.Gateway or NodeKind.Function).Select(n => n.Id).ToHashSet();
         var asked = resolution.Systems.Where(s => serving.Contains(s.SystemId) && !string.IsNullOrWhiteSpace(s.TelemetryRole)).ToList();
         if (asked.Count == 0) return new Dictionary<string, NodeReading>();
 
@@ -172,14 +240,24 @@ public sealed class LogAnalyticsSource(
             var workspace = Workspace(resolution);
             rows = await reader.QueryAsync(workspace, SourceQuery.Render(query, definition, environmentId, rules, asked.Select(s => s.TelemetryRole!).Distinct(StringComparer.OrdinalIgnoreCase)), Window, ct);
         }
-        return Readings(asked, rows, Window, time.GetUtcNow());
+        IReadOnlyList<RegionRow> regionRows = [];
+        if (recording is not null)
+        {
+            var sibling = Path.ChangeExtension(recording, ".regions.json");
+            if (definition.RegionQuery is not null && File.Exists(sibling)) regionRows = LogAnalyticsReader.ParseRegions(await File.ReadAllTextAsync(sibling, ct));
+        }
+        else if (definition.RegionQuery is { } regionQuery)
+            regionRows = await reader.QueryRegionsAsync(Workspace(resolution), SourceQuery.Render(regionQuery, definition, environmentId, rules, asked.Select(s => s.TelemetryRole!).Distinct(StringComparer.OrdinalIgnoreCase)), Window, ct);
+        return Readings(asked, rows, Window, time.GetUtcNow(), regionRows);
     }
 
     /// <summary>
     /// The workspace to query: the source's own connection, else the id the environment's scope settles (an explicit <c>workspaceId</c>, or the id of the
     /// workspace found by its name). A name that has not been looked up yet is a wait, not a mistake in the files, and the message says so.
     /// </summary>
-    private string Workspace(Resolution resolution)
+    private string Workspace(Resolution resolution) => Workspace(name, definition, resolution);
+
+    internal static string Workspace(string name, RegistrySource definition, Resolution resolution)
     {
         var connection = definition.Connection;
         var workspace = string.IsNullOrWhiteSpace(connection) ? resolution.WorkspaceId : connection.Trim();
@@ -197,11 +275,19 @@ public sealed class LogAnalyticsSource(
         return workspace;
     }
 
+    /// <summary>Each region's part of a service's requests, from the region query's rows (counts added up per region). Null when there are none or they add up to nothing.</summary>
+    private static IReadOnlyList<RegionReading>? Shares(IReadOnlyList<RegionRow>? rows, string role)
+    {
+        var mine = (rows ?? []).Where(r => r.Role.Equals(role, StringComparison.OrdinalIgnoreCase)).GroupBy(r => r.Region, StringComparer.OrdinalIgnoreCase).Select(g => (Region: g.Key, Calls: g.Sum(r => r.Calls))).ToList();
+        var total = mine.Sum(r => r.Calls);
+        return total > 0 ? mine.Select(r => new RegionReading(r.Region, null, null, null, r.Calls / total)).OrderBy(r => r.Region, StringComparer.Ordinal).ToList() : null;
+    }
+
     /// <summary>
     /// A reading for every asked system: its rows added up (two systems can share a telemetry name, and a name can come back in several rows), the rate over
     /// the window, the share of calls that were errors and the latency of the rows weighted by their calls. No row means no calls in the window.
     /// </summary>
-    public static IReadOnlyDictionary<string, NodeReading> Readings(IEnumerable<SystemScope> asked, IReadOnlyList<SpanRow> rows, TimeSpan window, DateTimeOffset at)
+    public static IReadOnlyDictionary<string, NodeReading> Readings(IEnumerable<SystemScope> asked, IReadOnlyList<SpanRow> rows, TimeSpan window, DateTimeOffset at, IReadOnlyList<RegionRow>? regionRows = null)
     {
         var byRole = rows.GroupBy(r => r.Role, StringComparer.OrdinalIgnoreCase).ToDictionary(g => g.Key, g => g.ToList(), StringComparer.OrdinalIgnoreCase);
         var readings = new Dictionary<string, NodeReading>();
@@ -211,7 +297,7 @@ public sealed class LogAnalyticsSource(
             var calls = mine.Sum(r => r.Calls);
             var errors = Math.Min(mine.Sum(r => r.Errors), calls);
             var latency = calls > 0 ? mine.Where(r => r.LatencyMs is not null).Sum(r => r.LatencyMs!.Value * r.Calls) / calls : 0;
-            readings[system.SystemId] = new NodeReading(at, true, 0, 0, 0, calls / window.TotalSeconds, calls > 0 ? errors / calls : 0, latency, Calls: calls);
+            readings[system.SystemId] = new NodeReading(at, true, 0, 0, 0, calls / window.TotalSeconds, calls > 0 ? errors / calls : 0, latency, Calls: calls, Regions: Shares(regionRows, system.TelemetryRole!));
         }
         return readings;
     }

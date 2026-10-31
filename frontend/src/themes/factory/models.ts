@@ -21,7 +21,7 @@ export function factoryModel(kind: NodeKind, accent: string, opts: { tenanted?: 
     case 'Worker': return productionHall(accent)
     case 'Database': return warehouse(accent)
     case 'Cache': return pressureTank()
-    case 'Cron': return timerTower()
+    case 'Function': return timerTower()
     case 'Gateway': return gatehouse(accent)
     case 'Broker': return freightDepot(opts.name)
     case 'Egress': return radioMast(accent)
@@ -207,7 +207,7 @@ function pressureTank(): BuildingModel {
 function timerTower(): BuildingModel {
   const FH = 1.5
   const W = 2 * CELL
-  const concrete = flat(P.cronStone)
+  const concrete = flat(P.functionStone)
   const base = group(
     box(3.0, 0.6, 3.0, flat('#9a9689')),
     box(W, 2.4, W, concrete, { y: 0.6 }),
@@ -242,7 +242,7 @@ function timerTower(): BuildingModel {
     baseHeight: 3.0,
     floorHeight: FH,
     makeFloor: () => {
-      const { material, uniforms } = makeWindowMaterial({ color: P.cronStone, trim: '#f0ece0', floorHeight: FH, width: W, depth: W, cell: CELL, win: [0.5, 0.8] })
+      const { material, uniforms } = makeWindowMaterial({ color: P.functionStone, trim: '#f0ece0', floorHeight: FH, width: W, depth: W, cell: CELL, win: [0.5, 0.8] })
       return { object: box(W - 0.2, FH, W - 0.2, material), uniforms }
     },
     roof,

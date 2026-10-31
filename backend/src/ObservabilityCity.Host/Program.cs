@@ -89,6 +89,8 @@ foreach (var (folder, registry) in loaded)
             IncidentSources = fake is null ? [] : [fake],
             Environment = environmentId,
             Traffic = discovered?.Traffic,
+            ScopeSource = set.Scope,
+            FixedAssets = demo ? FakeAssets.Load(folder) : null,
             Mode = mode,
             StaleAfter = staleAfter,
             SourceIntervals = set.Sources.GroupBy(s => s.Name).ToDictionary(g => g.Key, g => g.First().PollInterval),

@@ -1,0 +1,8 @@
+# Basic buildings the demo shows, as if found by the scope.assets rules. A real town finds them in its inventory (see docs/config-reference.md).
+- { pillar: cl, name: kv-cl-ledger, label: Key vault, shape: vault, service: ledger }
+- { pillar: cl, name: stledgerarchive, label: Storage, shape: store, service: ledger }
+- { pillar: cl, name: kv-cl-posting, label: Key vault, shape: vault, service: posting }
+- { pillar: cl, name: appcfg-cl, label: App Configuration, shape: settings }
+- { pillar: pay, name: kv-pay-payments, label: Key vault, shape: vault, service: payments }
+- { pillar: pay, name: stpaystatements, label: Storage, shape: store }
+- { pillar: frd, name: kv-frd-screening, label: Key vault, shape: vault, service: screening }

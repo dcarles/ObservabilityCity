@@ -1,0 +1,33 @@
+{
+  "tables": [
+    {
+      "name": "PrimaryResult",
+      "columns": [
+        {
+          "name": "role",
+          "type": "string"
+        },
+        {
+          "name": "region",
+          "type": "string"
+        },
+        {
+          "name": "calls",
+          "type": "real"
+        }
+      ],
+      "rows": [
+        [
+          "orders-edge",
+          "ams",
+          750
+        ],
+        [
+          "orders-edge",
+          "dub",
+          2250
+        ]
+      ]
+    }
+  ]
+}

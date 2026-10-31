@@ -180,6 +180,8 @@ async function start(): Promise<void> {
     onScreen: (id) => town.buildings.has(id),
     go: (id) => goTo({ kind: 'building', id, name: id, where: '' }),
     view: () => tenantView,
+    regionChoice: (id) => town.regionChoice(id),
+    setRegion: (id, choice) => town.setRegion(id, choice),
     closed: () => town.select(null),
   })
   const legend = new LegendCard((open) => {
@@ -274,7 +276,11 @@ async function start(): Promise<void> {
       topbar.refresh()
       inspector.update(s)
       const open = servicePanel.key
-      if (open) {
+      if (open?.startsWith('asset:')) {
+        const av = town.assetSummary(open.slice('asset:'.length), s)
+        if (av) servicePanel.showAsset(av)
+        else servicePanel.close()
+      } else if (open) {
         const sv = town.serviceSummary(open, s)
         if (sv) servicePanel.show(sv)
         else servicePanel.close()
@@ -351,6 +357,9 @@ async function start(): Promise<void> {
     // nothing but a service's sign or hedge under the pointer: open that service
     const svc = b ? undefined : ray.intersectObjects(town.serviceHits(), false)[0]?.object.userData.serviceKey as string | undefined
     const sv = svc && seen.last ? town.serviceSummary(svc, seen.last) : null
+    // a resource building (a vault, a storage account) opens its own small card
+    const asset = b || svc ? undefined : ray.intersectObjects(town.assetHits(), false)[0]?.object.userData.assetId as string | undefined
+    const av = asset && seen.last ? town.assetSummary(asset, seen.last) : null
     // a scenario waiting for its target takes the click instead of opening the building
     if (breakPanel?.armed) {
       if (b) breakPanel.aimAt(b.id)
@@ -358,6 +367,7 @@ async function start(): Promise<void> {
     }
     if (b) { servicePanel.close(); inspector.open(b.id) }
     else if (sv) { inspector.close(); servicePanel.show(sv) }
+    else if (av) { inspector.close(); servicePanel.showAsset(av) }
     else { servicePanel.close(); inspector.close() }
     town.select(b?.id ?? null)
     const focus = b ? town.focusOf(b.id) : null
@@ -371,7 +381,7 @@ async function start(): Promise<void> {
     const hits = ray.intersectObjects(town.hitMeshes(), false)
     const b = hits[0]?.object.userData.building as Building | undefined
     showTooltip(b?.node ?? null, pointerPx.x, pointerPx.y, tenantView)
-    const overService = !b && ray.intersectObjects(town.serviceHits(), false).length > 0
+    const overService = !b && (ray.intersectObjects(town.serviceHits(), false).length > 0 || ray.intersectObjects(town.assetHits(), false).length > 0)
     canvas.style.cursor = breakPanel?.armed ? 'crosshair' : b || overService ? 'pointer' : 'grab'
   }
 
@@ -397,8 +407,11 @@ async function start(): Promise<void> {
     inspectAirport: () => town.inspectAirport(),
     inspectRoads: () => town.inspectRoads(),
     inspectServices: (id: string) => town.inspectServices(id),
+    inspectAssets: (id: string) => town.inspectAssets(id),
     /** Open a service's panel as a click on its sign would. */
     openService: (key: string) => { const sv = seen.last ? town.serviceSummary(key, seen.last) : null; if (sv) { inspector.close(); servicePanel.show(sv) } return sv },
+    /** Open a resource building's card as a click on it would. */
+    openAsset: (id: string) => { const av = seen.last ? town.assetSummary(id, seen.last) : null; if (av) { inspector.close(); servicePanel.showAsset(av) } return av },
     tenantView: () => tenantView,
     breakArmed: () => breakPanel?.armed ?? false,
     mode: () => seen.last?.mode ?? null,

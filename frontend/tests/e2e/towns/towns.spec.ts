@@ -203,3 +203,45 @@ test.describe('the town switcher', () => {
     expect(new URL(page.url()).searchParams.get('town')).toBe('droid-shop')
   })
 })
+
+// The demo towns show the region view and the basic buildings without any cloud behind them: the fake source makes up the regions, and fake-assets.yaml lists the buildings.
+test.describe('the sample towns show regions and basic buildings', () => {
+  type Snap = { groups: { id: string; assets: { id: string; shape: string; service: string | null }[]; nodes: { id: string; regions?: { label: string; share: number; skewed: boolean }[] }[] }[] }
+  const snapshot = async (request: any, q: string) => {
+    await expect.poll(async () => (await request.get(`${API}/api/snapshot/latest${q}`)).status(), { timeout: 30_000 }).toBe(200)
+    return (await (await request.get(`${API}/api/snapshot/latest${q}`)).json()) as Snap
+  }
+  const node = (s: Snap, id: string) => s.groups.flatMap((g) => g.nodes).find((n) => n.id === id)!
+
+  test('Galactic Credit: a service in two regions, one that sends nearly all to one of them, and key vaults', async ({ request }) => {
+    const s = await snapshot(request, '')
+
+    const ledger = node(s, 'cl.ledger-api').regions!
+    expect(ledger.length).toBe(2)
+    expect(ledger.reduce((a, r) => a + r.share, 0)).toBeCloseTo(1, 2)
+    expect(ledger.some((r) => r.skewed)).toBe(false)
+    expect(node(s, 'pay.payments-api').regions!.filter((r) => r.skewed).length).toBe(1)
+    expect(node(s, 'cl.statements-api').regions).toBeFalsy()
+    const cl = s.groups.find((g) => g.id === 'cl')!
+    expect(cl.assets.some((a) => a.shape === 'vault' && a.service === 'ledger')).toBe(true)
+    expect(cl.assets.some((a) => a.service === null)).toBe(true)
+  })
+
+  test('Droid Shop: regions on the catalog and a key vault behind it', async ({ request }) => {
+    const s = await snapshot(request, `?town=${SHOP}`)
+
+    expect(node(s, 'web.catalog-api').regions!.length).toBe(2)
+    expect(s.groups.find((g) => g.id === 'web')!.assets.some((a) => a.shape === 'vault' && a.service === 'catalog')).toBe(true)
+  })
+
+  test('the page draws the buildings and the drawer lists the regions with the split', async ({ town, page }) => {
+    await town.reset()
+    await page.goto('/?test=1&quality=low')
+    await page.waitForFunction(() => (window as any).city?.seen.snapshots > 0, null, { timeout: 55_000 })
+
+    const assets = await page.evaluate(() => (window as any).city.inspectAssets('cl') as { id: string }[])
+    expect(assets.map((a) => a.id)).toContain('cl.kv-cl-ledger')
+    const regionLine = await page.evaluate(() => (window as any).city.seen.last.groups.flatMap((g: any) => g.nodes).find((n: any) => n.id === 'pay.payments-api').regions.length)
+    expect(regionLine).toBe(2)
+  })
+})

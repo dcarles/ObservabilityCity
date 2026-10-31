@@ -17,7 +17,7 @@ systems:
   - { id: cl.statements-api, service: statements, name: Statements API, role: api, calls: [cl.statements-db, cl.ledger-api], gatewayCalls: [ntf.dispatch-api] }
   - { id: cl.statements-worker, service: statements, name: Statements worker, role: worker, calls: [cl.statements-db] }
   - { id: cl.statements-db, service: statements, tenantPattern: "merchant-{tenant}-db", name: Statements DB, role: db }
-  - { id: cl.statement-cron, name: Statement run, role: cron, calls: [cl.statements-api] }
+  - { id: cl.statement-cron, name: Statement run, role: function, calls: [cl.statements-api] }
   - { id: cl.session-cache, name: Session cache, role: cache }
 
 # Messaging: the outboxes this pillar publishes (cl-<service>-outbox) and the topics its workers consume.

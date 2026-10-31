@@ -23,7 +23,7 @@ export function harbourModel(kind: NodeKind, accent: string, opts: { tenanted?: 
     case 'Worker': return factory(accent)
     case 'Database': return storage(accent)
     case 'Cache': return waterTower()
-    case 'Cron': return clockTower()
+    case 'Function': return clockTower()
     case 'Gateway': return gateway(accent)
     case 'Broker': return port(opts.name)
     case 'Egress': return egress(accent)
@@ -305,7 +305,7 @@ function waterTower(): BuildingModel {
 function clockTower(): BuildingModel {
   const FH = 1.5
   const W = 2 * CELL
-  const stone = flat(P.cronStone)
+  const stone = flat(P.functionStone)
   const base = group(
     box(3.0, 0.6, 3.0, flat('#b6ab94')),
     box(W, 2.4, W, stone, { y: 0.6 }),
@@ -335,13 +335,13 @@ function clockTower(): BuildingModel {
     roof.add(face)
   }
   hands.position.set(0, 0.95, 1.44)
-  roof.add(hands, cone(2.05, 1.9, flat(P.cronRoof), { y: 1.9, ry: Math.PI / 4 }, 4), at(mast(1.0), 0, 3.6, 0))
+  roof.add(hands, cone(2.05, 1.9, flat(P.functionRoof), { y: 1.9, ry: Math.PI / 4 }, 4), at(mast(1.0), 0, 3.6, 0))
   return {
     base,
     baseHeight: 3.0,
     floorHeight: FH,
     makeFloor: () => {
-      const { material, uniforms } = makeWindowMaterial({ color: P.cronStone, trim: '#f1ece0', floorHeight: FH, width: W, depth: W, cell: CELL, win: [0.5, 0.8] })
+      const { material, uniforms } = makeWindowMaterial({ color: P.functionStone, trim: '#f1ece0', floorHeight: FH, width: W, depth: W, cell: CELL, win: [0.5, 0.8] })
       return { object: box(W - 0.2, FH, W - 0.2, material), uniforms }
     },
     roof,

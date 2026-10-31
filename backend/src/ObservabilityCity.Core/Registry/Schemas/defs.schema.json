@@ -6,12 +6,12 @@
     "signals": {
       "type": "object",
       "description": "Per-signal source choice, overriding the environment's: signal name to a source name defined in the environment files, or none. A system's choice wins over its pillar's.",
-      "propertyNames": { "enum": ["requests", "errors", "latency", "instances", "cpu", "memory", "utilisation", "throttled", "backlog", "deadLetters"] },
+      "propertyNames": { "enum": ["requests", "errors", "latency", "instances", "cpu", "memory", "utilisation", "throttled", "backlog", "deadLetters", "jobs"] },
       "additionalProperties": { "type": "string" }
     },
     "role": {
       "description": "What a system is. It decides the building that stands for it.",
-      "enum": ["api", "worker", "db", "cache", "cron", "gateway", "broker", "egress"]
+      "enum": ["api", "worker", "db", "cache", "function", "cron", "gateway", "broker", "egress"]
     },
     "messaging": {
       "description": "Service Bus topics and subscriptions. A pillar with neither has no pier, and no boats sail to it.",

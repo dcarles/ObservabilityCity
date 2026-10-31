@@ -5,6 +5,7 @@ import { formatMs, formatRate } from './visuals'
 import { escapeHtml, Picker, type PickItem } from './picker'
 import { tenantFigures, yardSummary, type TenantView } from './tenants'
 import { systemNumbers, type ServiceSummary } from './scene/service'
+import { assetWhere, type AssetSummary } from './scene/assets'
 import { viewTotals } from './viewTotals'
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T
@@ -247,6 +248,20 @@ export class ServicePanel {
     this.el.hidden = false
     this.el.querySelector('#service-close')!.addEventListener('click', () => this.close())
     this.el.querySelectorAll<HTMLElement>('.sys').forEach((row) => row.addEventListener('click', () => this.onPick(row.dataset.id!)))
+  }
+
+  /** A resource building: what it is, where it belongs and its addresses. No health, no numbers: it is not monitored. */
+  showAsset(a: AssetSummary): void {
+    this.el.dataset.key = `asset:${a.id}`
+    delete this.el.dataset.state
+    const links = a.links.map((l) => `<div class="line"><span>${escapeHtml(l.name)}</span><a class="out" href="${escapeHtml(l.url)}" target="_blank" rel="noopener noreferrer">Open ↗</a></div>`).join('')
+    this.el.innerHTML = `
+      <div class="head"><div><b>${escapeHtml(a.name)}</b> <span class="stale">· ${escapeHtml(a.label)}</span><div class="where">${escapeHtml(assetWhere(a))}</div></div><button id="service-close" title="Close">✕</button></div>
+      ${a.region ? `<div class="sys"><div class="line"><span>Region</span><span>${escapeHtml(a.region)}</span></div></div>` : ''}
+      <div class="sys"><div class="nums">Not monitored: it stands in the town so the pillar's resources can be found.</div></div>
+      ${links}`
+    this.el.hidden = false
+    this.el.querySelector('#service-close')!.addEventListener('click', () => this.close())
   }
 
   close(): void {

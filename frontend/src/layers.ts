@@ -58,7 +58,7 @@ export function layerOfKind(kind: NodeKind): 'databases' | 'workers' | null {
     case 'Cache':
       return 'databases'
     case 'Worker':
-    case 'Cron':
+    case 'Function':
       return 'workers'
     default:
       return null

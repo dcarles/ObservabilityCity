@@ -14,11 +14,12 @@ public sealed class AzureAdapters : IAdapterModule
 
     public void Register(IAdapterRegistry registry)
     {
-        foreach (var kind in new[] { "resourcegraph", "loganalytics", "azuremonitor", "servicebus" })
+        foreach (var kind in new[] { "resourcegraph", "loganalytics", "azuremonitor", "servicebus", "functionjobs" })
             registry.AddSourceKind(new SourceKindInfo(kind, LoginKind));
         registry.AddSource(new ResourceGraphSourceFactory());
         registry.AddSource(new LogAnalyticsSourceFactory());
         registry.AddSource(new AzureMonitorSourceFactory());
+        registry.AddSource(new FunctionJobsSourceFactory());
         foreach (var login in new AzureLogin[] { new AzureCliLogin(), new AzureDefaultLogin(), new AzureManagedIdentityLogin(), new AzureServicePrincipalLogin() })
             registry.AddCredentialKind(login);
     }

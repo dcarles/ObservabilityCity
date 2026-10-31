@@ -26,6 +26,12 @@ export interface BuildingStatus {
   quiet: boolean
   /** Only a data store with a database for each tenant: its units and sign. Null for every other building. */
   tenants: TenantYardStatus | null
+  /** The app is stopped: the building stands as a half-built shell inside scaffolding, unlit, with no beacon. */
+  underConstruction: boolean
+  /** The line under the name that says which region the numbers are, for a service in two or more regions; empty otherwise. */
+  region: string
+  /** How the requests divide between the regions ("North 95% · West 5%"), with a warning sign in front when one region takes too much; empty when nothing measures it. */
+  split: string
 }
 
 interface FloorState {
@@ -77,6 +83,13 @@ export class Building {
   private label: THREE.Sprite | null = null
   private labelKey = ''
   private extra: { text: string; hot: boolean } | null = null
+  /** Which region the numbers are, for a service in two or more; the last line of the billboard when nothing else is there. */
+  private regionText = ''
+  /** How a service in several regions divides its requests between them, the line below the region; null when nothing measures it. `hot` when one region takes too much. */
+  private split: { text: string; hot: boolean } | null = null
+  /** Eased 0 to 1 while the app is stopped: the scaffolding grows round a half-built shell. */
+  private construction = 0
+  private readonly scaffold: THREE.Group
   readonly hit: THREE.Mesh
   /** True while the building is selected: its name board stays readable from any distance. */
   pinned = false
@@ -119,6 +132,10 @@ export class Building {
     this.closedSign.visible = false
     this.pivot.add(this.closedSign)
 
+    this.scaffold = this.makeScaffold()
+    this.scaffold.visible = false
+    this.pivot.add(this.scaffold)
+
     if (kind === 'Database') this.gate = this.makeGate()
 
     this.hit = new THREE.Mesh(new THREE.CylinderGeometry(m.radius, m.radius, 1, 8), new THREE.MeshBasicMaterial({ visible: false }))
@@ -151,17 +168,22 @@ export class Building {
     if (this.node) this.model.setTenants?.(this.node.tenants ?? [], this.node.throttleAmber, view)
   }
 
-  setNode(n: NodeSnapshot): void {
+  /** `region` is the line that says which region the numbers are (see regionLine); empty for a service in one region. */
+  setNode(n: NodeSnapshot, region = '', split: { text: string; hot: boolean } | null = null): void {
     const first = this.node === null
     this.node = n
+    this.regionText = region
+    this.split = region ? split : null
     this.model.setTenants?.(n.tenants ?? [], n.throttleAmber, this.tenantView)
-    this.floorsWanted = this.model.fixedFloors ?? floorsFor(n.instancesTotal || 1)
+    // a stopped app is a half-built shell: one low floor, however many instances it would have
+    this.floorsWanted = n.app === 'Stopped' ? 1 : this.model.fixedFloors ?? floorsFor(n.instancesTotal || 1)
     this.darkWanted = n.state === 'Down' ? this.floorsWanted : darkFloorsFor(n.instancesTotal, n.instancesHealthy, this.floorsWanted)
     if (first) {
       // Appear fully formed on the first snapshot.
       this.lit = n.state === 'Healthy' || n.state === 'Degraded' ? this.litTarget(n) : 0
       this.errorRate = n.errorRate
       this.stale = isGrey(n) ? 1 : 0
+      this.construction = n.app === 'Stopped' ? 1 : 0
       this.floors.forEach((f, i) => {
         f.height = i < this.floorsWanted ? 1 : 0
         f.dark = i >= this.floorsWanted - this.darkWanted && i < this.floorsWanted ? 1 : 0
@@ -179,7 +201,11 @@ export class Building {
     if (!n) return
     const ease = (rate: number) => 1 - Math.exp(-rate * dt)
 
-    const live = n.state === 'Healthy' || n.state === 'Degraded'
+    const stopped = n.app === 'Stopped'
+    const live = (n.state === 'Healthy' || n.state === 'Degraded') && !stopped
+    this.construction = lerp(this.construction, stopped ? 1 : 0, ease(2))
+    this.scaffold.visible = this.construction > 0.02
+    this.scaffold.scale.y = Math.max(0.001, this.construction)
     this.lit = lerp(this.lit, live ? this.litTarget(n) : 0, ease(1.5))
     this.model.setActivity?.(n.cpu ?? clamp(n.load * 0.6, 0, 1))
     this.updateGate(n, dt)
@@ -191,8 +217,9 @@ export class Building {
     const fh = this.model.floorHeight
     this.floors.forEach((f, i) => {
       const built = i < this.floorsWanted
-      f.height = lerp(f.height, built ? 1 : 0, ease(2.5))
-      if (Math.abs(f.height - (built ? 1 : 0)) < 0.004) f.height = built ? 1 : 0
+      const target = !built ? 0 : stopped ? SHELL_HEIGHT : 1
+      f.height = lerp(f.height, target, ease(2.5))
+      if (Math.abs(f.height - target) < 0.004) f.height = target
       const isDark = built && i >= this.floorsWanted - this.darkWanted
       f.dark = lerp(f.dark, isDark ? 1 : 0, ease(3))
       const obj = f.module.object
@@ -239,6 +266,9 @@ export class Building {
       plaque: plaqueText(n),
       quiet: n.quiet === true,
       tenants: this.model.tenantStatus?.() ?? null,
+      underConstruction: n.app === 'Stopped',
+      region: this.regionText,
+      split: this.split ? (this.split.hot ? '⚠ ' : '') + this.split.text : '',
     }
   }
 
@@ -256,7 +286,7 @@ export class Building {
   }
 
   private updateBeacon(n: NodeSnapshot, time: number, camera: THREE.Camera): void {
-    this.level = beaconLevel({ ...n, errorRate: this.errorRate })
+    this.level = n.app === 'Stopped' ? 'off' : beaconLevel({ ...n, errorRate: this.errorRate }) // a building under construction has no beacon yet
     const color = new THREE.Color(palette.beacon[this.level])
     this.halo.visible = this.level !== 'off'
     let pulse = 1
@@ -337,6 +367,28 @@ export class Building {
     return { arm }
   }
 
+  /** Poles and rails round the building's foot and first floor, for an app that is stopped. Scaled up from the ground as it appears. */
+  private makeScaffold(): THREE.Group {
+    const g = new THREE.Group()
+    const r = this.model.radius * 0.95
+    const h = this.model.baseHeight + this.model.floorHeight * 1.7
+    const wood = new THREE.MeshStandardMaterial({ color: '#c9a56a', flatShading: true })
+    const pole = (x: number, z: number) => {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(0.12, h, 0.12), wood)
+      m.position.set(x, h / 2, z)
+      m.castShadow = true
+      return m
+    }
+    const rail = (y: number, along: 'x' | 'z', at: number) => {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(along === 'x' ? r * 2 : 0.1, 0.1, along === 'z' ? r * 2 : 0.1), wood)
+      m.position.set(along === 'x' ? 0 : at, y, along === 'x' ? at : 0)
+      return m
+    }
+    g.add(pole(-r, -r), pole(r, -r), pole(-r, r), pole(r, r))
+    for (const y of [h * 0.4, h * 0.8]) g.add(rail(y, 'x', -r), rail(y, 'x', r), rail(y, 'z', -r), rail(y, 'z', r))
+    return g
+  }
+
   private makeClosedSign(): THREE.Group {
     const g = new THREE.Group()
     const tex = canvasTexture(256, 128, (ctx) => {
@@ -377,6 +429,11 @@ export class Building {
     this.updateLabel()
   }
 
+  /** The request split line as drawn, for tests. */
+  splitLine(): string | null {
+    return this.split?.text ?? null
+  }
+
   /** The extra line as drawn, for tests. */
   extraLine(): string | null {
     return this.extra?.text ?? null
@@ -392,8 +449,9 @@ export class Building {
     const live = n.state !== 'Stale' && n.state !== 'Down'
     // the error bar and the p99 note are drawn only for what a source supplies
     const hasHealth = live && (!isAbsent(n, 'errors') || !isAbsent(n, 'latency'))
+    const extra = this.extra ?? (n.app === 'Stopped' ? { text: 'UNDER CONSTRUCTION', hot: false } : this.regionText ? { text: this.regionText, hot: false } : null)
     const key = [n.name, text, warn, pct(n.cpu), pct(n.memory), pct(n.utilisation), Math.round((n.throttled ?? 0) * 1000),
-      Math.round(n.errorRate * 1000), Math.round(n.p99Ms / 10), Math.round((n.queueDepth ?? -1) / 5), Math.round((n.oldestMessageSeconds ?? -1) / 2), n.deadLetters ?? -1, this.extra?.text ?? '', this.extra?.hot ?? ''].join('|')
+      Math.round(n.errorRate * 1000), Math.round(n.p99Ms / 10), Math.round((n.queueDepth ?? -1) / 5), Math.round((n.oldestMessageSeconds ?? -1) / 2), n.deadLetters ?? -1, extra?.text ?? '', extra?.hot ?? '', this.split?.text ?? '', this.split?.hot ?? ''].join('|')
     const hasMeters = live && (n.cpu != null || n.utilisation != null)
     const hasQueue = live && n.queueDepth != null
     if (!this.label) {
@@ -410,7 +468,7 @@ export class Building {
     const ctx = (tex.image as HTMLCanvasElement).getContext('2d')!
     ctx.clearRect(0, 0, 512, 256)
     const color = { down: '#d63a2f', stale: '#8d949e', warn: '#e8a21a', ok: '#9fb4cc' }[warn]
-    const rows = (hasMeters ? 1 : 0) + (hasHealth ? 1 : 0) + (hasQueue ? 1 : 0) + (this.extra ? 1 : 0)
+    const rows = (hasMeters ? 1 : 0) + (hasHealth ? 1 : 0) + (hasQueue ? 1 : 0) + (extra ? 1 : 0) + (this.split ? 1 : 0)
     const h = 116 + rows * 38
     const y0 = 256 - h - 6
     ctx.fillStyle = 'rgba(20,28,40,0.9)'; roundRect(ctx, 4, y0, 504, h, 24); ctx.fill()
@@ -456,9 +514,14 @@ export class Building {
       note(300, `DLQ ${formatRate(n.deadLetters ?? 0)}`, (n.deadLetters ?? 0) > 0)
       top += 38
     }
-    if (this.extra) {
-      ctx.fillStyle = this.extra.hot ? '#ffb830' : '#b8c7da'; ctx.font = '700 22px system-ui, sans-serif'; ctx.textAlign = 'center'
-      ctx.fillText(this.extra.text, 256, top + 15, 470)
+    if (extra) {
+      ctx.fillStyle = extra.hot ? '#ffb830' : '#b8c7da'; ctx.font = '700 22px system-ui, sans-serif'; ctx.textAlign = 'center'
+      ctx.fillText(extra.text, 256, top + 15, 470)
+      top += 38
+    }
+    if (this.split) {
+      ctx.fillStyle = this.split.hot ? '#ffb830' : '#b8c7da'; ctx.font = '700 22px system-ui, sans-serif'; ctx.textAlign = 'center'
+      ctx.fillText(this.split.text, 256, top + 15, 470)
     }
     tex.needsUpdate = true
   }
@@ -473,6 +536,9 @@ export class Building {
     this.label.visible = opacity > 0.02
   }
 }
+
+/** How tall the one floor of a stopped app stands, as a share of a full floor: a shell, not a finished building. */
+const SHELL_HEIGHT = 0.55
 
 /** Grey means a source is configured and has nothing fresh to say. A system no source is configured for is not grey: it simply has no readings. */
 function isGrey(n: NodeSnapshot): boolean {

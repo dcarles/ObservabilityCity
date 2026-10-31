@@ -256,11 +256,42 @@ public sealed class FakeSource(
                 deadLetters = Math.Round(dead);
             }
 
-            result[node.Id] = new NodeReading(now, !down, current, healthy, load, rps, errors, p99, cpu, memory, utilisation, throttled, queueDepth, oldest, deadLetters, tenantReadings);
+            // A function runs two jobs. With errors on, its first job fails its last run; with the app down, its jobs are overdue.
+            var jobs = node.Kind != NodeKind.Function ? null : FakeJobs(node, now, fx.Any(e => e.Kind == FakeEffectKind.Errors), down);
+            result[node.Id] = new NodeReading(now, !down, current, healthy, load, rps, errors, p99, cpu, memory, utilisation, throttled, queueDepth, oldest, deadLetters, tenantReadings,
+                App: node.Kind == NodeKind.Function ? AppState.Running : null, Jobs: jobs, Regions: RegionsOf(p.Regions, down ? 0 : current, cpu, memory));
         }
 
         return Task.FromResult<IReadOnlyDictionary<string, NodeReading>>(result);
     }
+
+    /// <summary>
+    /// A service in several regions: the instances divided by weight (each region keeps at least one while the service is up), the busiest region
+    /// running hottest, and each region's share of the requests. Null for a service in fewer than two.
+    /// </summary>
+    private static List<RegionReading>? RegionsOf(Dictionary<string, double>? weights, int instances, double? cpu, double? memory)
+    {
+        if (weights is not { Count: >= 2 }) return null;
+        var total = weights.Values.Sum();
+        var top = weights.Values.Max() / total;
+        var left = instances;
+        var ordered = weights.OrderByDescending(w => w.Value).ToList();
+        var result = new List<RegionReading>();
+        for (var i = 0; i < ordered.Count; i++)
+        {
+            var (name, weight) = (ordered[i].Key, ordered[i].Value);
+            var share = weight / total;
+            var n = instances == 0 ? 0 : i == ordered.Count - 1 ? Math.Max(0, left) : Math.Clamp((int)Math.Round(instances * share), 1, Math.Max(1, left - (ordered.Count - 1 - i)));
+            left -= n;
+            var heat = 0.7 + 0.6 * share / top;
+            result.Add(new RegionReading(name, n, cpu is null ? null : Math.Clamp(cpu.Value * heat, 0.02, 1), memory is null ? null : Math.Clamp(memory.Value * (0.9 + 0.2 * share / top), 0.05, 1), share));
+        }
+        return result;
+    }
+
+    private static List<JobReading> FakeJobs(RegistryNode node, DateTimeOffset now, bool failing, bool down) =>
+        new[] { "daily", "hourly" }.Select((name, i) => new JobReading(name, null,
+            now.AddMinutes(down ? -90 : -(10 + 7 * i)), !(failing && i == 0), now.AddMinutes(down ? -30 : 50 - 7 * i))).ToList();
 
     /// <summary>How badly a vendor is failing, 0 to 1: all of it when down, else the error effects' rate.</summary>
     private static double VendorTrouble(List<FakeEffect> fx) =>

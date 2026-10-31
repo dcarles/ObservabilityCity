@@ -1,0 +1,78 @@
+{
+  "orders-api-dub": [
+    {
+      "metric": "UsageNanoCores",
+      "aggregation": "average",
+      "points": [
+        400000000,
+        440000000,
+        420000000
+      ]
+    },
+    {
+      "metric": "CpuLimitNanoCores",
+      "aggregation": "average",
+      "points": [
+        1000000000,
+        1000000000,
+        1000000000
+      ]
+    },
+    {
+      "metric": "WorkingSetBytes",
+      "aggregation": "maximum",
+      "points": [
+        580000000,
+        580000000,
+        580000000
+      ]
+    },
+    {
+      "metric": "MemoryLimitBytes",
+      "aggregation": "maximum",
+      "points": [
+        1000000000,
+        1000000000,
+        1000000000
+      ]
+    }
+  ],
+  "orders-api-ams": [
+    {
+      "metric": "UsageNanoCores",
+      "aggregation": "average",
+      "points": [
+        620000000,
+        660000000,
+        640000000
+      ]
+    },
+    {
+      "metric": "CpuLimitNanoCores",
+      "aggregation": "average",
+      "points": [
+        1000000000,
+        1000000000,
+        1000000000
+      ]
+    },
+    {
+      "metric": "WorkingSetBytes",
+      "aggregation": "maximum",
+      "points": [
+        600000000,
+        600000000,
+        600000000
+      ]
+    },
+    {
+      "metric": "MemoryLimitBytes",
+      "aggregation": "maximum",
+      "points": [
+        1000000000,
+        1000000000,
+        1000000000
+      ]
+    }
+  ]
+}

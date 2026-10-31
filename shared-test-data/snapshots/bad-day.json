@@ -73,7 +73,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "hub.service-bus",
@@ -112,7 +115,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "hub.egress",
@@ -151,7 +157,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "hub.customer-db",
@@ -190,9 +199,13 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         }
-      ]
+      ],
+      "assets": []
     },
     {
       "id": "cl",
@@ -260,11 +273,11 @@
           "service": "ledger",
           "external": true,
           "state": "Healthy",
-          "instancesTotal": 6,
-          "instancesHealthy": 6,
+          "instancesTotal": 3,
+          "instancesHealthy": 3,
           "load": 0.6,
-          "cpu": 0.4,
-          "memory": 0.38,
+          "cpu": 0.5199999999999999,
+          "memory": 0.41800000000000004,
           "utilisation": null,
           "throttled": null,
           "queueDepth": null,
@@ -294,7 +307,29 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": [
+            {
+              "region": "North Europe",
+              "label": "North Europe",
+              "instances": 3,
+              "cpu": 0.5199999999999999,
+              "memory": 0.41800000000000004,
+              "share": 0.55,
+              "skewed": false
+            },
+            {
+              "region": "West Europe",
+              "label": "West Europe",
+              "instances": 3,
+              "cpu": 0.4763636363636364,
+              "memory": 0.4041818181818182,
+              "share": 0.45,
+              "skewed": false
+            }
+          ]
         },
         {
           "id": "cl.ledger-worker",
@@ -303,11 +338,11 @@
           "service": "ledger",
           "external": false,
           "state": "Healthy",
-          "instancesTotal": 7,
-          "instancesHealthy": 7,
+          "instancesTotal": 4,
+          "instancesHealthy": 4,
           "load": 0.5714285714285714,
-          "cpu": 0.3857142857142857,
-          "memory": 0.46,
+          "cpu": 0.5014285714285713,
+          "memory": 0.5060000000000001,
           "utilisation": null,
           "throttled": null,
           "queueDepth": 2,
@@ -335,7 +370,29 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": [
+            {
+              "region": "North Europe",
+              "label": "North Europe",
+              "instances": 4,
+              "cpu": 0.5014285714285713,
+              "memory": 0.5060000000000001,
+              "share": 0.5,
+              "skewed": false
+            },
+            {
+              "region": "West Europe",
+              "label": "West Europe",
+              "instances": 3,
+              "cpu": 0.5014285714285713,
+              "memory": 0.5060000000000001,
+              "share": 0.5,
+              "skewed": false
+            }
+          ]
         },
         {
           "id": "cl.ledger-db",
@@ -374,7 +431,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "cl.posting-api",
@@ -416,7 +476,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "cl.posting-worker",
@@ -458,7 +521,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "cl.posting-db",
@@ -497,7 +563,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "cl.statements-api",
@@ -541,7 +610,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "cl.statements-worker",
@@ -582,7 +654,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "cl.statements-db",
@@ -621,12 +696,15 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "cl.statement-cron",
           "name": "Statement run",
-          "kind": "Cron",
+          "kind": "Function",
           "service": null,
           "external": false,
           "state": "Healthy",
@@ -662,7 +740,25 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": "Running",
+          "jobs": [
+            {
+              "name": "daily",
+              "region": null,
+              "status": "Ok",
+              "lastRun": "2026-10-24T11:50:01+00:00",
+              "next": "2026-10-24T12:50:01+00:00"
+            },
+            {
+              "name": "hourly",
+              "region": null,
+              "status": "Ok",
+              "lastRun": "2026-10-24T11:43:01+00:00",
+              "next": "2026-10-24T12:43:01+00:00"
+            }
+          ],
+          "regions": null
         },
         {
           "id": "cl.session-cache",
@@ -701,9 +797,13 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         }
-      ]
+      ],
+      "assets": []
     },
     {
       "id": "acc",
@@ -781,7 +881,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "acc.accounts-worker",
@@ -822,7 +925,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "acc.accounts-db",
@@ -861,7 +967,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "acc.limits-api",
@@ -903,7 +1012,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "acc.limits-db",
@@ -942,12 +1054,15 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "acc.interest-cron",
           "name": "Interest run",
-          "kind": "Cron",
+          "kind": "Function",
           "service": null,
           "external": false,
           "state": "Healthy",
@@ -983,7 +1098,25 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": "Running",
+          "jobs": [
+            {
+              "name": "daily",
+              "region": null,
+              "status": "Ok",
+              "lastRun": "2026-10-24T11:50:01+00:00",
+              "next": "2026-10-24T12:50:01+00:00"
+            },
+            {
+              "name": "hourly",
+              "region": null,
+              "status": "Ok",
+              "lastRun": "2026-10-24T11:43:01+00:00",
+              "next": "2026-10-24T12:43:01+00:00"
+            }
+          ],
+          "regions": null
         },
         {
           "id": "acc.accounts-cache",
@@ -1022,9 +1155,13 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         }
-      ]
+      ],
+      "assets": []
     },
     {
       "id": "pay",
@@ -1076,11 +1213,11 @@
           "service": "payments",
           "external": true,
           "state": "Degraded",
-          "instancesTotal": 7,
-          "instancesHealthy": 7,
+          "instancesTotal": 6,
+          "instancesHealthy": 6,
           "load": 0.6,
-          "cpu": 0.4,
-          "memory": 0.38,
+          "cpu": 0.5199999999999999,
+          "memory": 0.41800000000000004,
           "utilisation": null,
           "throttled": null,
           "queueDepth": null,
@@ -1112,7 +1249,29 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": [
+            {
+              "region": "North Europe",
+              "label": "North Europe",
+              "instances": 6,
+              "cpu": 0.5199999999999999,
+              "memory": 0.41800000000000004,
+              "share": 0.94,
+              "skewed": true
+            },
+            {
+              "region": "West Europe",
+              "label": "West Europe",
+              "instances": 1,
+              "cpu": 0.2953191489361702,
+              "memory": 0.34685106382978725,
+              "share": 0.06,
+              "skewed": false
+            }
+          ]
         },
         {
           "id": "pay.payments-worker",
@@ -1153,7 +1312,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "pay.payments-db",
@@ -1192,7 +1354,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "pay.refunds-api",
@@ -1235,7 +1400,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "pay.refunds-worker",
@@ -1276,7 +1444,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "pay.refunds-db",
@@ -1315,9 +1486,13 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         }
-      ]
+      ],
+      "assets": []
     },
     {
       "id": "frd",
@@ -1387,7 +1562,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "frd.screening-worker",
@@ -1428,7 +1606,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "frd.screening-db",
@@ -1467,7 +1648,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "frd.cases-api",
@@ -1510,7 +1694,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "frd.cases-db",
@@ -1549,7 +1736,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "frd.rules-cache",
@@ -1588,9 +1778,13 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         }
-      ]
+      ],
+      "assets": []
     },
     {
       "id": "cus",
@@ -1672,7 +1866,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "cus.profile-worker",
@@ -1713,7 +1910,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "cus.profile-db",
@@ -1752,7 +1952,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "cus.consent-api",
@@ -1793,7 +1996,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "cus.consent-worker",
@@ -1834,7 +2040,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "cus.consent-db",
@@ -1873,7 +2082,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "cus.kyc-api",
@@ -1914,7 +2126,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "cus.kyc-db",
@@ -1953,12 +2168,15 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "cus.archive-cron",
           "name": "Archive run",
-          "kind": "Cron",
+          "kind": "Function",
           "service": null,
           "external": false,
           "state": "Healthy",
@@ -1994,9 +2212,28 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": "Running",
+          "jobs": [
+            {
+              "name": "daily",
+              "region": null,
+              "status": "Ok",
+              "lastRun": "2026-10-24T11:50:01+00:00",
+              "next": "2026-10-24T12:50:01+00:00"
+            },
+            {
+              "name": "hourly",
+              "region": null,
+              "status": "Ok",
+              "lastRun": "2026-10-24T11:43:01+00:00",
+              "next": "2026-10-24T12:43:01+00:00"
+            }
+          ],
+          "regions": null
         }
-      ]
+      ],
+      "assets": []
     },
     {
       "id": "acq",
@@ -2074,7 +2311,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "acq.applications-worker",
@@ -2115,7 +2355,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "acq.applications-db",
@@ -2154,7 +2397,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "acq.offers-api",
@@ -2195,7 +2441,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "acq.offers-db",
@@ -2234,7 +2483,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "acq.leads-api",
@@ -2278,7 +2530,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "acq.leads-worker",
@@ -2319,7 +2574,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "acq.leads-db",
@@ -2358,9 +2616,13 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         }
-      ]
+      ],
+      "assets": []
     },
     {
       "id": "dec",
@@ -2433,7 +2695,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "dec.decision-worker",
@@ -2475,7 +2740,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "dec.decision-db",
@@ -2514,7 +2782,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "dec.scorecards-api",
@@ -2555,7 +2826,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "dec.scorecards-db",
@@ -2594,7 +2868,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "dec.features-cache",
@@ -2633,9 +2910,13 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         }
-      ]
+      ],
+      "assets": []
     },
     {
       "id": "bil",
@@ -2707,7 +2988,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "bil.invoices-worker",
@@ -2748,7 +3032,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "bil.invoices-db",
@@ -2787,7 +3074,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "bil.rating-api",
@@ -2828,7 +3118,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "bil.rating-db",
@@ -2867,12 +3160,15 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "bil.billing-cron",
           "name": "Billing run",
-          "kind": "Cron",
+          "kind": "Function",
           "service": null,
           "external": false,
           "state": "Healthy",
@@ -2908,9 +3204,28 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": "Running",
+          "jobs": [
+            {
+              "name": "daily",
+              "region": null,
+              "status": "Ok",
+              "lastRun": "2026-10-24T11:50:01+00:00",
+              "next": "2026-10-24T12:50:01+00:00"
+            },
+            {
+              "name": "hourly",
+              "region": null,
+              "status": "Ok",
+              "lastRun": "2026-10-24T11:43:01+00:00",
+              "next": "2026-10-24T12:43:01+00:00"
+            }
+          ],
+          "regions": null
         }
-      ]
+      ],
+      "assets": []
     },
     {
       "id": "col",
@@ -2999,7 +3314,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "col.cases-worker",
@@ -3040,7 +3358,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "col.cases-db",
@@ -3079,7 +3400,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "col.dunning-api",
@@ -3124,7 +3448,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "col.dunning-worker",
@@ -3165,7 +3492,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "col.dunning-db",
@@ -3204,7 +3534,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "col.agency-api",
@@ -3245,7 +3578,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "col.agency-worker",
@@ -3287,7 +3623,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "col.agency-db",
@@ -3326,12 +3665,15 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "col.letters-cron",
           "name": "Letter run",
-          "kind": "Cron",
+          "kind": "Function",
           "service": null,
           "external": false,
           "state": "Healthy",
@@ -3368,7 +3710,25 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": "Running",
+          "jobs": [
+            {
+              "name": "daily",
+              "region": null,
+              "status": "Ok",
+              "lastRun": "2026-10-24T11:50:01+00:00",
+              "next": "2026-10-24T12:50:01+00:00"
+            },
+            {
+              "name": "hourly",
+              "region": null,
+              "status": "Ok",
+              "lastRun": "2026-10-24T11:43:01+00:00",
+              "next": "2026-10-24T12:43:01+00:00"
+            }
+          ],
+          "regions": null
         },
         {
           "id": "col.queue-cache",
@@ -3407,9 +3767,13 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         }
-      ]
+      ],
+      "assets": []
     },
     {
       "id": "dsp",
@@ -3481,7 +3845,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "dsp.disputes-worker",
@@ -3522,7 +3889,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "dsp.disputes-db",
@@ -3561,7 +3931,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "dsp.evidence-api",
@@ -3602,7 +3975,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "dsp.evidence-db",
@@ -3641,9 +4017,13 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         }
-      ]
+      ],
+      "assets": []
     },
     {
       "id": "rwd",
@@ -3715,7 +4095,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "rwd.points-worker",
@@ -3756,7 +4139,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "rwd.points-db",
@@ -3795,7 +4181,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "rwd.catalog-api",
@@ -3836,7 +4225,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "rwd.catalog-db",
@@ -3875,7 +4267,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "rwd.points-cache",
@@ -3914,9 +4309,13 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         }
-      ]
+      ],
+      "assets": []
     },
     {
       "id": "obk",
@@ -3985,7 +4384,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "obk.consents-db",
@@ -4024,7 +4426,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "obk.data-api",
@@ -4070,7 +4475,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "obk.data-worker",
@@ -4111,7 +4519,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "obk.data-db",
@@ -4150,7 +4561,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "obk.tokens-cache",
@@ -4189,9 +4603,13 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         }
-      ]
+      ],
+      "assets": []
     },
     {
       "id": "ntf",
@@ -4272,7 +4690,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "ntf.dispatch-worker",
@@ -4313,7 +4734,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "ntf.dispatch-db",
@@ -4352,7 +4776,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "ntf.templates-api",
@@ -4393,7 +4820,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "ntf.templates-db",
@@ -4432,12 +4862,15 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "ntf.digest-cron",
           "name": "Digest run",
-          "kind": "Cron",
+          "kind": "Function",
           "service": null,
           "external": false,
           "state": "Healthy",
@@ -4473,9 +4906,28 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": "Running",
+          "jobs": [
+            {
+              "name": "daily",
+              "region": null,
+              "status": "Ok",
+              "lastRun": "2026-10-24T11:50:01+00:00",
+              "next": "2026-10-24T12:50:01+00:00"
+            },
+            {
+              "name": "hourly",
+              "region": null,
+              "status": "Ok",
+              "lastRun": "2026-10-24T11:43:01+00:00",
+              "next": "2026-10-24T12:43:01+00:00"
+            }
+          ],
+          "regions": null
         }
-      ]
+      ],
+      "assets": []
     },
     {
       "id": "dat",
@@ -4564,7 +5016,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "dat.ingest-worker",
@@ -4605,7 +5060,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "dat.ingest-db",
@@ -4644,7 +5102,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "dat.reports-api",
@@ -4686,7 +5147,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "dat.reports-worker",
@@ -4727,7 +5191,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "dat.reports-db",
@@ -4766,12 +5233,15 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "dat.refresh-cron",
           "name": "Warehouse refresh",
-          "kind": "Cron",
+          "kind": "Function",
           "service": null,
           "external": false,
           "state": "Healthy",
@@ -4807,7 +5277,25 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": "Running",
+          "jobs": [
+            {
+              "name": "daily",
+              "region": null,
+              "status": "Ok",
+              "lastRun": "2026-10-24T11:50:01+00:00",
+              "next": "2026-10-24T12:50:01+00:00"
+            },
+            {
+              "name": "hourly",
+              "region": null,
+              "status": "Ok",
+              "lastRun": "2026-10-24T11:43:01+00:00",
+              "next": "2026-10-24T12:43:01+00:00"
+            }
+          ],
+          "regions": null
         },
         {
           "id": "dat.reports-cache",
@@ -4846,9 +5334,13 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         }
-      ]
+      ],
+      "assets": []
     },
     {
       "id": "rcn",
@@ -4922,7 +5414,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "rcn.matching-db",
@@ -4961,12 +5456,15 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "rcn.settlement-cron",
           "name": "Nightly settlement",
-          "kind": "Cron",
+          "kind": "Function",
           "service": null,
           "external": false,
           "state": "Healthy",
@@ -5002,9 +5500,28 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": "Running",
+          "jobs": [
+            {
+              "name": "daily",
+              "region": null,
+              "status": "Ok",
+              "lastRun": "2026-10-24T11:50:01+00:00",
+              "next": "2026-10-24T12:50:01+00:00"
+            },
+            {
+              "name": "hourly",
+              "region": null,
+              "status": "Ok",
+              "lastRun": "2026-10-24T11:43:01+00:00",
+              "next": "2026-10-24T12:43:01+00:00"
+            }
+          ],
+          "regions": null
         }
-      ]
+      ],
+      "assets": []
     },
     {
       "id": "reg",
@@ -5061,7 +5578,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "reg.rules-cache",
@@ -5100,9 +5620,13 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         }
-      ]
+      ],
+      "assets": []
     },
     {
       "id": "lost-found",
@@ -5165,7 +5689,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "lost-found.batch-gateway-worker",
@@ -5206,7 +5733,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "lost-found.batch-gateway-db",
@@ -5245,7 +5775,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "lost-found.legacy-ftp-api",
@@ -5284,9 +5817,13 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         }
-      ]
+      ],
+      "assets": []
     }
   ],
   "vendors": [
@@ -5328,7 +5865,10 @@
         "quiet": false,
         "outsideRequestsPerSecond": null,
         "inbound": null,
-        "inboundEstimated": false
+        "inboundEstimated": false,
+        "app": null,
+        "jobs": null,
+        "regions": null
       },
       "calledBy": [
         "dec.decision-api",
@@ -5376,7 +5916,10 @@
         "quiet": false,
         "outsideRequestsPerSecond": null,
         "inbound": null,
-        "inboundEstimated": false
+        "inboundEstimated": false,
+        "app": null,
+        "jobs": null,
+        "regions": null
       },
       "calledBy": [
         "pay.payments-api"
@@ -5423,7 +5966,10 @@
         "quiet": false,
         "outsideRequestsPerSecond": null,
         "inbound": null,
-        "inboundEstimated": false
+        "inboundEstimated": false,
+        "app": null,
+        "jobs": null,
+        "regions": null
       },
       "calledBy": [
         "ntf.dispatch-worker"
@@ -5470,7 +6016,10 @@
         "quiet": false,
         "outsideRequestsPerSecond": null,
         "inbound": null,
-        "inboundEstimated": false
+        "inboundEstimated": false,
+        "app": null,
+        "jobs": null,
+        "regions": null
       },
       "calledBy": [
         "dat.ingest-worker",
@@ -5698,5 +6247,6 @@
   },
   "incidentFreeSince": "2026-10-24T12:00:00+00:00",
   "incidentsSeen": false,
-  "outsideRequestsPerSecond": null
+  "outsideRequestsPerSecond": null,
+  "cloud": null
 }

@@ -8,7 +8,7 @@ systems:
   - { id: ntf.dispatch-db, service: dispatch, name: Dispatch DB, role: db }
   - { id: ntf.templates-api, service: templates, name: Templates API, role: api, calls: [ntf.templates-db] }
   - { id: ntf.templates-db, service: templates, name: Templates DB, role: db }
-  - { id: ntf.digest-cron, name: Digest run, role: cron, calls: [ntf.dispatch-api] }
+  - { id: ntf.digest-cron, name: Digest run, role: function, calls: [ntf.dispatch-api] }
 
 # Messaging: the outboxes this pillar publishes (ntf-<service>-outbox) and the topics its workers consume.
 messaging:

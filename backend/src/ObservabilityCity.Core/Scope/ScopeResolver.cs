@@ -42,7 +42,39 @@ public static class ScopeResolver
         foreach (var clash in systems.Where(s => s.TelemetryRole is not null).GroupBy(s => s.TelemetryRole!, StringComparer.OrdinalIgnoreCase).Where(g => g.Count() > 1))
             problems.Add($"Telemetry role '{clash.Key}' is used by {string.Join(" and ", clash.Select(s => $"'{s.SystemId}'"))}; the telemetry of one would be read as the other. Give each its own telemetry.role.");
 
-        return new Resolution(pillars, systems, tenantNames.Select(kv => new TenantName(kv.Key, kv.Value)).OrderBy(t => t.Id, StringComparer.Ordinal).ToList(), problems, inventory is not null, workspace ?? workspaceId, workspaceId, workspaceVia);
+        return new Resolution(pillars, systems, tenantNames.Select(kv => new TenantName(kv.Key, kv.Value)).OrderBy(t => t.Id, StringComparer.Ordinal).ToList(), problems, inventory is not null, workspace ?? workspaceId, workspaceId, workspaceVia,
+            ResolveAssets(view, rules, pillars, inventory));
+    }
+
+    /// <summary>
+    /// The resources that stand as basic buildings: in each pillar's subscription, every resource of a rule's types whose name matches its pattern. A <c>service</c> group that matches a system's serviceCode
+    /// ties the resource to that service; otherwise (or without the group) it belongs to the pillar. A <c>pillar</c> group that names another pillar leaves the resource out.
+    /// </summary>
+    private static List<ResolvedAsset> ResolveAssets(Registry.Registry view, ScopeRules rules, List<PillarScope> pillars, Inventory? inventory)
+    {
+        var found = new List<ResolvedAsset>();
+        if (inventory is null || rules.Assets.Count == 0) return found;
+        foreach (var group in view.Groups.Where(g => !g.IsHub))
+        {
+            var pillar = pillars.First(p => p.PillarId == group.Id);
+            if (pillar.SubscriptionId is not { } subscription) continue;
+            foreach (var rule in rules.Assets)
+            {
+                var regex = new Regex(rule.Pattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, RegexTimeout);
+                foreach (var resource in inventory.Resources.Where(r => r.SubscriptionId.Equals(subscription, StringComparison.OrdinalIgnoreCase) && rule.Types.Contains(r.Type, StringComparer.OrdinalIgnoreCase)))
+                {
+                    var match = regex.Match(resource.Name);
+                    if (!match.Success) continue;
+                    if (Group(match, "pillar") is { Length: > 0 } p && !p.Equals(pillar.Code, StringComparison.OrdinalIgnoreCase) && !p.Equals(group.Id, StringComparison.OrdinalIgnoreCase)) continue;
+                    var said = Group(match, "service");
+                    var owner = said.Length == 0 ? null : group.Nodes.FirstOrDefault(n => (n.ServiceCode ?? n.Service).Equals(said, StringComparison.OrdinalIgnoreCase))?.Service;
+                    var region = Group(match, "region") is { Length: > 0 } g ? g : resource.Region;
+                    if (rules.Regions.Tag is { } regionTag && TagValue(resource, regionTag) is { Length: > 0 } tagged) region = tagged;
+                    found.Add(new ResolvedAsset($"{group.Id}.{resource.Name.ToLowerInvariant()}", group.Id, resource.Name, rule.Label, rule.Shape, resource.Type, owner, region, resource.Id, rule.Name, subscription));
+                }
+            }
+        }
+        return found.OrderBy(a => a.Id, StringComparer.Ordinal).ToList();
     }
 
     /// <summary>A GUID or a resource id (starting with a slash) is a workspace id; anything else is a name.</summary>
@@ -166,16 +198,26 @@ public static class ScopeResolver
                     else if (rule.ServiceTag is not { } tag || TagValue(resource, tag) is not { } said || !Compact(said).Equals(Compact(serviceCode), StringComparison.OrdinalIgnoreCase))
                         continue;
 
-                    resources.Add(new ResolvedResource(resource.Id, resource.Name, resource.Type, region, tenant, rule.Name, rule.Instances is null ? null : resource.Instances));
+                    if (rules.Regions.Tag is { } regionTag && TagValue(resource, regionTag) is { Length: > 0 } tagged) region = tagged;
+                    bool? running = rule.State is null || string.IsNullOrWhiteSpace(resource.State) ? null : rule.Running!.Contains(resource.State, StringComparer.OrdinalIgnoreCase);
+                    resources.Add(new ResolvedResource(resource.Id, resource.Name, resource.Type, region, tenant, rule.Name, rule.Instances is null ? null : resource.Instances, running));
                     if (tenant is not null && rule.TenantNameTag is { } nameTag && TagValue(resource, nameTag) is { Length: > 0 } friendly)
                         tenantNames.TryAdd(tenant, friendly);
                 }
             }
-            if (applicable.Count > 0 && resources.Count == 0 && node.Kind is NodeKind.Api or NodeKind.Worker or NodeKind.Database)
+            if (applicable.Count > 0 && resources.Count == 0 && node.Kind is NodeKind.Api or NodeKind.Worker or NodeKind.Database or NodeKind.Function)
                 problems.Add($"No resource found for '{node.Id}' (service code '{serviceCode}') in {pillar.SubscriptionName ?? pillar.SubscriptionId}. Check serviceCode and the resource patterns under scope.resources.");
         }
 
-        return new SystemScope(node.Id, serviceCode, telemetry, via, pillar.SubscriptionId, workspace, resources.OrderBy(r => r.Name, StringComparer.Ordinal).ToList());
+        // the app's state is known only for a system with a rule that reads one: none of its resources found is a missing app, otherwise it runs while any resource does
+        AppState? app = null;
+        if (inventory is not null && pillar.SubscriptionId is not null && serviceCode is not null && rules.Resources.Any(r => r.State is not null && (r.Roles.Count == 0 || r.Roles.Contains(role, StringComparer.OrdinalIgnoreCase))))
+        {
+            var stated = resources.Where(r => r.Running is not null).ToList();
+            app = stated.Count == 0 ? (resources.Count == 0 ? AppState.Missing : null) : stated.Any(r => r.Running == true) ? AppState.Running : AppState.Stopped;
+        }
+
+        return new SystemScope(node.Id, serviceCode, telemetry, via, pillar.SubscriptionId, workspace, resources.OrderBy(r => r.Name, StringComparer.Ordinal).ToList()) { AppState = app };
     }
 
     private static string Group(Match match, string name) => match.Groups[name].Success ? match.Groups[name].Value : "";

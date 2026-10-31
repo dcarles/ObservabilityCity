@@ -11,7 +11,7 @@ systems:
   - { id: dat.reports-api, service: reports, name: Reports API, role: api, external: true, calls: [dat.reports-db, dat.reports-cache] }
   - { id: dat.reports-worker, service: reports, name: Reports worker, role: worker, calls: [dat.reports-db] }
   - { id: dat.reports-db, service: reports, name: Reports DB, role: db }
-  - { id: dat.refresh-cron, name: Warehouse refresh, role: cron, calls: [dat.ingest-api] }
+  - { id: dat.refresh-cron, name: Warehouse refresh, role: function, calls: [dat.ingest-api] }
   - { id: dat.reports-cache, name: Reports cache, role: cache }
 
 # Messaging: the outboxes this pillar publishes (dat-<service>-outbox) and the topics its workers consume.

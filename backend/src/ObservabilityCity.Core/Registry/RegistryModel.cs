@@ -174,7 +174,7 @@ public sealed record RegistryNode(
     /// <summary>What the telemetry calls this system (<c>telemetry.role</c>). Null: derived from the environment's template, if it has one.</summary>
     public string? TelemetryRole { get; init; }
 
-    /// <summary>The role as the files spell it: api, worker, db, cache, cron, gateway, broker or egress.</summary>
+    /// <summary>The role as the files spell it: api, worker, db, cache, function, gateway, broker or egress.</summary>
     public string RoleName => Kind == NodeKind.Database ? "db" : Kind.ToString().ToLowerInvariant();
 
     /// <summary>The registry file the system is declared in (cl.yaml, hub.yaml, third-parties.yaml).</summary>
@@ -206,6 +206,9 @@ public sealed record RegistrySource(string Name, string Kind, string? Connection
     /// <summary>For a source that sends a query: the query template (see <see cref="SourceQuery"/>) and how far back it looks. Null: the adapter's own, or none.</summary>
     public string? Query { get; init; }
     public string? Window { get; init; }
+
+    /// <summary>For a request source: the query that gives how the requests divide between regions (columns role, region, calls). Null: the split is not measured.</summary>
+    public string? RegionQuery { get; init; }
 
     /// <summary>For a platform-metric source: which metric of which resources fills which signal. Empty for every other kind of source.</summary>
     public IReadOnlyList<MetricGroup> Metrics { get; init; } = [];

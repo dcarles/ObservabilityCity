@@ -2,7 +2,8 @@ import type { GroupSnapshot, LogLine, NodeSnapshot, ScopeResource, Snapshot, Sys
 import { escapeHtml } from './picker'
 import { scopeParams, type Scope } from './scope'
 import { tenantListOrder, tenantFigures, yardSummary, type TenantView } from './tenants'
-import { ago, clockTime, configOrder, filterLogs, incidentSummary, LAYER_WORD, linkSections, originLabel, type LinkItem, overviewLinks, overviewRows, reasons, resourceLinks, scopeView, SEVERITY_WORD, stateTone, vendorWhere, type LogFilter } from './inspectorModel'
+import { regionFigures, regionOptions, validChoice, WORST, type RegionChoice } from './regions'
+import { ago, clockTime, configOrder, filterLogs, incidentSummary, jobRows, LAYER_WORD, linkSections, originLabel, type LinkItem, overviewLinks, overviewRows, reasons, resourceLinks, scopeView, SEVERITY_WORD, stateTone, vendorWhere, type LogFilter } from './inspectorModel'
 
 export type InspectorTab = 'overview' | 'links' | 'logs' | 'config'
 const TABS: { id: InspectorTab; label: string }[] = [
@@ -21,6 +22,9 @@ export interface InspectorHost {
   /** Go to a linked system. */
   go(id: string): void
   view(): TenantView
+  /** Which region of a service in several the building shows, and a way to change it. */
+  regionChoice(id: string): RegionChoice
+  setRegion(id: string, choice: RegionChoice): void
   /** The drawer was closed or its system left the town. */
   closed(): void
 }
@@ -160,6 +164,8 @@ export class Inspector {
     if (tab) { this.setTab(tab.dataset.tab as InspectorTab); return }
     const level = t.closest<HTMLElement>('[data-level]')
     if (level) { this.filter = level.dataset.level as LogFilter; this.render(); return }
+    const region = t.closest<HTMLElement>('[data-region]')
+    if (region && this.id) { this.host.setRegion(this.id, region.dataset.region as RegionChoice); this.render(); return }
     const link = t.closest<HTMLElement>('[data-go]')
     if (link && !link.classList.contains('off')) this.host.go(link.dataset.go!)
   }
@@ -192,16 +198,41 @@ export class Inspector {
   }
 
   private overview(n: NodeSnapshot, group: GroupSnapshot | null): string {
-    const why = reasons(n)
+    const why = reasons(n, this.snap?.cloud)
     const tenants = this.tenantBlock(n)
     const incidents = group?.incidents ?? []
     return `
       ${why.length === 0 ? '<p class="fine">Nothing to flag: every number is inside its lines.</p>' : `<ul class="why">${why.map((w) => `<li>${escapeHtml(w)}</li>`).join('')}</ul>`}
-      <div class="rows">${overviewRows(n, (id) => this.find(id)?.node.name ?? id).map((r) => `<div class="row"><span>${r.label}</span><span class="${r.tone}">${escapeHtml(r.value)}</span></div>`).join('')}</div>
+      <div class="rows">${overviewRows(n, (id) => this.find(id)?.node.name ?? id, this.snap?.cloud).map((r) => `<div class="row"><span>${r.label}</span><span class="${r.tone}">${escapeHtml(r.value)}</span></div>`).join('')}</div>
+      ${this.jobs(n)}
+      ${this.regions(n)}
       ${tenants}
       ${this.openIn()}
       ${incidents.length === 0 ? '' : `<h4>Incidents on this island <small>${escapeHtml(incidentSummary(incidents))}</small></h4>
         ${incidents.map((i) => `<div class="row"><span>${escapeHtml(i.title)}</span><span class="warn">sev ${i.severity}${SEVERITY_WORD[i.severity] ? ` · ${SEVERITY_WORD[i.severity]}` : ''} · since ${escapeHtml(clockTime(i.startedAt))}</span></div>`).join('')}`}`
+  }
+
+  /** A function building's scheduled jobs, one row for each job in each region. Nothing for a building without jobs. */
+  private jobs(n: NodeSnapshot): string {
+    const rows = jobRows(n)
+    if (rows.length === 0) return ''
+    return `<h4>Jobs</h4><div class="jobs">${rows.map((r) => `<div class="row job" data-job="${escapeHtml(r.label)}"><span>${escapeHtml(r.label)}</span><span class="${r.tone}">${escapeHtml(r.value)}</span></div>`).join('')}</div>`
+  }
+
+  /**
+   * A service in two or more regions: the switch for what its building shows (the worst region by default, all of them, or one) and every region side by
+   * side, whatever the switch says. Nothing for a service in one region.
+   */
+  private regions(n: NodeSnapshot): string {
+    const options = regionOptions(n)
+    if (options.length === 0) return ''
+    const chosen = validChoice(n, this.host.regionChoice(n.id))
+    const rows = (n.regions ?? []).map((r) => `<div class="row region${r.skewed ? ' skewed' : ''}" data-region-row="${escapeHtml(r.region)}"><span>${r.skewed ? '⚠ ' : ''}${escapeHtml(r.label)}</span><span class="${r.skewed ? 'warn' : ''}">${escapeHtml(regionFigures(r))}</span></div>`).join('')
+    const skewed = (n.regions ?? []).find((r) => r.skewed)
+    const note = skewed ? `<p class="note region-skew">${escapeHtml(skewed.label)} takes more of the requests than the environment allows while another region is running. Check the routing, or whether the other region is down.</p>` : ''
+    return `<h4>Regions <small>the building shows ${chosen === WORST ? 'the worst region' : escapeHtml(options.find((o) => o.id === chosen)?.label ?? '')}</small></h4>
+      <div class="levels regions" role="group" aria-label="Region shown on the building">${options.map((o) => `<button data-region="${escapeHtml(o.id)}" class="${o.id === chosen ? 'on' : ''}">${escapeHtml(o.label)}</button>`).join('')}</div>
+      ${rows}${note}`
   }
 
   /** Links that open the system's resources in a portal or console, from the environment's link rules. Nothing without them. */
