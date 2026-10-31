@@ -1,0 +1,39 @@
+{
+  "tables": [
+    {
+      "name": "PrimaryResult",
+      "columns": [
+        {
+          "name": "role",
+          "type": "string"
+        },
+        {
+          "name": "calls",
+          "type": "real"
+        },
+        {
+          "name": "errors",
+          "type": "real"
+        },
+        {
+          "name": "latencyMs",
+          "type": "real"
+        }
+      ],
+      "rows": [
+        [
+          "orders-edge",
+          3000,
+          0,
+          100
+        ],
+        [
+          "scheduler-fn",
+          1440,
+          0,
+          50
+        ]
+      ]
+    }
+  ]
+}

@@ -39,7 +39,7 @@ public sealed class ResourceGraphInventory(HttpClient http, ICredentialSource? c
         var subscriptions = (await Query(rules.Queries.Subscriptions ?? DefaultSubscriptionsQuery, Scope, ct)).Select(ToSubscription).ToList();
         var found = ScopeResolver.Resolve(registry, new Inventory(subscriptions, []));
         var wanted = found.Pillars.Select(p => p.SubscriptionId).OfType<string>().Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-        var types = rules.Resources.SelectMany(r => r.Types).Select(t => t.ToLowerInvariant()).Distinct().ToList();
+        var types = rules.Resources.SelectMany(r => r.Types).Concat(rules.Assets.SelectMany(a => a.Types)).Select(t => t.ToLowerInvariant()).Distinct().ToList();
         var resources = new List<InventoryResource>();
         if (wanted.Count > 0 && types.Count > 0)
         {

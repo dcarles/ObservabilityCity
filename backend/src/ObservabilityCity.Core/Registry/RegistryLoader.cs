@@ -33,7 +33,7 @@ public static partial class RegistryLoader
         "tenantPattern", "order", "default", "sources", "kind", "connection", "tenants", "exclude", "fake", "undeclaredTenants",
         "signals", "credentials", "credential", "pollSeconds", "timeoutSeconds", "tenantId", "clientId", "clientSecretEnv",
         "scope", "inventory", "workspace", "variables", "subscription", "pillars", "types", "pattern", "roles", "serviceTag", "tenantNameTag",
-        "telemetryRole", "queries", "links", "url", "nameLike", "tag", "key", "value", "code", "serviceCode", "telemetry", "minCalls", "query", "window", "discoverLinks", "regions", "tag", "names", "enabled", "off", "state", "running", "minDays", "keepFor", "firstRead", "interval", "ignoreHosts", "rules", "host", "path", "target", "gateway", "domains", "traffic", "shareWindow",
+        "telemetryRole", "queries", "links", "url", "nameLike", "tag", "key", "value", "code", "serviceCode", "telemetry", "minCalls", "query", "window", "discoverLinks", "regions", "tag", "names", "skew", "state", "running", "minDays", "keepFor", "firstRead", "interval", "ignoreHosts", "rules", "host", "path", "target", "gateway", "domains", "traffic", "shareWindow",
     ];
 
     // Last resort when defaults.yaml is missing or silent about a role.
@@ -281,7 +281,7 @@ public static partial class RegistryLoader
             parsed.Add((new RegistryEnvironment(
                 stem, f.Name ?? stem, f.Default,
                 f.Sources.Select(kv => new RegistrySource(kv.Key, kv.Value.Kind.ToLowerInvariant(), kv.Value.Connection)
-                    { Credential = kv.Value.Credential, PollSeconds = kv.Value.PollSeconds, TimeoutSeconds = kv.Value.TimeoutSeconds, Query = kv.Value.Query, Window = kv.Value.Window, Metrics = ToMetrics(kv.Value.Metrics) }).ToList(),
+                    { Credential = kv.Value.Credential, PollSeconds = kv.Value.PollSeconds, TimeoutSeconds = kv.Value.TimeoutSeconds, Query = kv.Value.Query, RegionQuery = kv.Value.RegionQuery, Window = kv.Value.Window, Metrics = ToMetrics(kv.Value.Metrics) }).ToList(),
                 f.Tenants.Select(t => new RegistryTenant(t.Id, t.Name ?? t.Id, t.Kind.Equals("test", StringComparison.OrdinalIgnoreCase) ? TenantKind.Test : TenantKind.Customer)).ToList(),
                 excluded, f.Fake?.UndeclaredTenants ?? [])
             {
@@ -667,7 +667,6 @@ public static partial class RegistryLoader
         {
             MinCalls = Math.Max(1, (int)Resolve("minCalls", d => d?.MinCalls, s.MinCalls)),
             DiscoverLinks = ResolveFlag("discoverLinks", d => d?.DiscoverLinks, s.DiscoverLinks, true),
-            RegionView = ResolveFlag("regions", d => d?.Regions, s.Regions, true),
             GatewayCalls = s.GatewayCalls,
             ServiceCode = s.ServiceCode,
             TelemetryRole = s.Telemetry?.Role,

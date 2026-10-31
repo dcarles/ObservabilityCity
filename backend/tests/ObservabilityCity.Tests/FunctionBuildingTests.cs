@@ -59,6 +59,17 @@ public class FunctionBuildingTests
     [Theory]
     [InlineData("a")]
     [InlineData("b")]
+    public async Task A_function_gets_its_run_rate_from_the_span_metrics_like_any_serving_system(string town)
+    {
+        var scheduler = Node(await TownSnapshot(Town(town)), "aa.sched-fn");
+
+        Assert.Equal(1440.0 / 300, scheduler.RequestsPerSecond, 6);
+        Assert.DoesNotContain("requests", scheduler.Absent);
+    }
+
+    [Theory]
+    [InlineData("a")]
+    [InlineData("b")]
     public async Task A_job_that_did_not_run_when_its_schedule_said_it_would_is_amber_not_red(string town)
     {
         var report = Node(await TownSnapshot(Town(town)), "aa.report-fn");
@@ -114,29 +125,87 @@ public class FunctionBuildingTests
         Assert.Equal(0.60, api.Memory!.Value, 6);
     }
 
+    // ---- how the requests divide between regions ----
+
     [Theory]
-    [InlineData("environment")]
-    [InlineData("pillar")]
-    [InlineData("system")]
-    public async Task The_region_view_can_be_turned_off_for_an_environment_a_pillar_or_one_system(string level)
+    [InlineData("a")]
+    [InlineData("b")]
+    public async Task Each_region_shows_its_part_of_the_requests_and_the_one_that_takes_too_much_is_flagged(string town)
     {
-        TownRegistry Change(TownRegistry r)
+        var api = Node(await TownSnapshot(Town(town)), "aa.orders-api");
+        // town a: 95% to North (flagged above the default 0.9); town b: 75% to Dublin, flagged above the 0.7 the environment sets
+        var (busy, quiet, share) = town == "a" ? ("North", "West", 0.95) : ("Dublin", "Amsterdam", 0.75);
+
+        var heavy = api.Regions!.Single(r => r.Label == busy);
+        var light = api.Regions!.Single(r => r.Label == quiet);
+        Assert.Equal(share, heavy.Share!.Value, 6);
+        Assert.Equal(1 - share, light.Share!.Value, 6);
+        Assert.True(heavy.Skewed);
+        Assert.False(light.Skewed);
+    }
+
+    [Fact]
+    public async Task A_split_is_not_flagged_when_it_stays_within_what_the_environment_allows()
+    {
+        var api = Node(await TownSnapshot(TownA, r => r with { ActiveEnvironment = r.ActiveEnvironment! with { Scope = r.ActiveEnvironment.Scope with { Regions = r.ActiveEnvironment.Scope.Regions with { Skew = 0.96 } } } }), "aa.orders-api");
+
+        Assert.All(api.Regions!, r => Assert.False(r.Skewed));
+        Assert.Equal(0.95, api.Regions!.Max(r => r.Share!.Value), 6);
+    }
+
+    [Fact]
+    public async Task A_region_with_no_instances_left_is_not_a_reason_to_flag_the_other()
+    {
+        // the other region runs nothing: all the traffic is in the one region that runs, which is nothing to flag
+        var inventory = ResourceGraphInventory.FromRecording(File.ReadAllText(Path.Combine(TownA, "inventory.json")));
+        var registry = Prod(TownA);
+        var resolution = ScopeResolver.Resolve(registry, inventory);
+        var readings = ResourceGraphSource.InstanceReadings(resolution, T0);
+        var asked = resolution.Systems.Where(s => s.SystemId == "aa.orders-api").ToList();
+        var shares = LogAnalyticsSource.Readings(asked, [new SpanRow("OrdersApi", 100, 0, 100)], TimeSpan.FromMinutes(5), T0, [new RegionRow("OrdersApi", "northeurope", 99), new RegionRow("OrdersApi", "westeurope", 1)]);
+        var zero = readings.ToDictionary(kv => kv.Key, kv => kv.Value with { Regions = kv.Value.Regions?.Select(x => x with { Instances = x.Region == "northeurope" ? 0 : x.Instances }).ToList() });
+        var state = new LatestState();
+        state.Update("inventory", zero);
+        state.Update("telemetry", shares);
+        var api = Node(new SnapshotBuilder(registry, state, new FakeTimeProvider(T0)) { Environment = "prod", StaleAfter = TimeSpan.FromDays(1) }.Build(), "aa.orders-api");
+
+        Assert.All(api.Regions!, r => Assert.False(r.Skewed && r.Region == "westeurope"));
+        Assert.False(api.Regions!.Single(r => r.Region == "westeurope").Skewed);
+    }
+
+    [Fact]
+    public async Task Without_a_region_query_nothing_is_measured_and_nothing_is_flagged()
+    {
+        var folder = Directory.CreateTempSubdirectory().FullName;
+        try
         {
-            var env = r.ActiveEnvironment!;
-            switch (level)
+            foreach (var file in Directory.GetFiles(TownA, "*", SearchOption.AllDirectories))
             {
-                case "environment": return r with { ActiveEnvironment = env with { Scope = env.Scope with { Regions = env.Scope.Regions with { Enabled = false } } } };
-                case "pillar": return r with { ActiveEnvironment = env with { Scope = env.Scope with { Regions = env.Scope.Regions with { Off = ["aa"] } } } };
-                default:
-                    return r with { Groups = r.Groups.Select(g => g with { Nodes = g.Nodes.Select(n => n.Id == "aa.orders-api" ? n with { RegionView = false } : n).ToList() }).ToList() };
+                var target = Path.Combine(folder, Path.GetRelativePath(TownA, file));
+                Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+                File.Copy(file, target);
             }
+            var prod = Path.Combine(folder, "environments", "prod.yaml");
+            var lines = File.ReadAllLines(prod).ToList();
+            var at = lines.FindIndex(l => l.Contains("regionQuery:"));
+            lines.RemoveRange(at - 1, 5); // the comment, the key and its three lines
+            File.WriteAllLines(prod, lines);
+
+            var api = Node(await TownSnapshot(folder), "aa.orders-api");
+
+            Assert.All(api.Regions!, r => { Assert.Null(r.Share); Assert.False(r.Skewed); });
         }
+        finally { Directory.Delete(folder, true); }
+    }
 
-        var api = Node(await TownSnapshot(TownA, Change), "aa.orders-api");
+    [Fact]
+    public void The_region_rows_name_the_service_the_region_and_the_calls()
+    {
+        var rows = LogAnalyticsReader.ParseRegions("""{"tables":[{"columns":[{"name":"Region"},{"name":"CALLS"},{"name":"role"}],"rows":[["north",3,"Api"],["",1,"Api"],["west","4","Api"]]}]}""");
 
-        Assert.Null(api.Regions);
-        Assert.Equal(3, api.InstancesTotal); // all the service's instances again, as before the region view
-        Assert.Equal(0.64, api.Cpu!.Value, 6); // the busiest plan, as before
+        Assert.Equal([("Api", "north", 3.0), ("Api", "west", 4.0)], rows.Select(r => (r.Role, r.Region, r.Calls)));
+        var bad = Assert.Throws<InvalidOperationException>(() => LogAnalyticsReader.ParseRegions("""{"tables":[{"columns":[{"name":"role"},{"name":"calls"}],"rows":[]}]}"""));
+        Assert.Contains("role, region, calls", bad.Message);
     }
 
     [Fact]

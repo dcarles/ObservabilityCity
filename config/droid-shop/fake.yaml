@@ -1,8 +1,8 @@
 # Baseline numbers for the fake source only. Anything left out comes from the role.
 hub.kafka:              { rps: 180, p99Ms: 8,   minInstances: 3 }
 hub.accounts-db:        { rps: 150, p99Ms: 18,  minInstances: 2 }
-web.storefront-api:     { rps: 210, p99Ms: 220, minInstances: 3 }
-web.catalog-api:        { rps: 190, p99Ms: 110, minInstances: 3 }
+web.storefront-api:     { rps: 210, p99Ms: 220, minInstances: 3, regions: { Core Sector: 70, Outer Rim: 30 } }
+web.catalog-api:        { rps: 190, p99Ms: 110, minInstances: 3, regions: { Core Sector: 65, Outer Rim: 35 } }
 web.catalog-worker:     { rps: 30,  p99Ms: 3500, minInstances: 1 }
 web.catalog-db:         { rps: 260, p99Ms: 16,  minInstances: 2 }
 web.search-cache:       { rps: 500, p99Ms: 2,   minInstances: 2 }

@@ -204,7 +204,8 @@
           "jobs": null,
           "regions": null
         }
-      ]
+      ],
+      "assets": []
     },
     {
       "id": "aa",
@@ -514,7 +515,8 @@
           "jobs": null,
           "regions": null
         }
-      ]
+      ],
+      "assets": []
     },
     {
       "id": "bb",
@@ -716,7 +718,8 @@
           "jobs": null,
           "regions": null
         }
-      ]
+      ],
+      "assets": []
     }
   ],
   "vendors": [],
@@ -793,5 +796,6 @@
   },
   "incidentFreeSince": "2026-10-25T12:00:00+00:00",
   "incidentsSeen": false,
-  "outsideRequestsPerSecond": null
+  "outsideRequestsPerSecond": null,
+  "cloud": null
 }

@@ -13,6 +13,17 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
     {
     }
 
+    private IReadOnlyList<AssetSnapshot> AssetsOf(string groupId, Registry.Registry registry)
+    {
+        if (FixedAssets is { Count: > 0 })
+            return FixedAssets.Where(a => a.PillarId == groupId).Select(a => new AssetSnapshot(a.Id, a.Name, a.Label, a.Shape, a.Service, a.Region, [])).ToList();
+        if (ScopeSource is null || registry.ActiveEnvironment is not { } env || env.Scope.Assets.Count == 0) return [];
+        return ScopeSource.Resolve(registry).AssetList.Where(a => a.PillarId == groupId)
+            .Select(a => new AssetSnapshot(a.Id, a.Name, a.Label, a.Shape, a.Service, a.Region,
+                ObservabilityCity.Core.Scope.ScopeLinks.For(env.Scope, Environment, new Scope.ResolvedResource(a.ResourceId, a.Name, a.Type, a.Region, null, a.Rule), a.SubscriptionId, null)))
+            .ToList();
+    }
+
     private readonly DateTimeOffset _startedAt = clock.GetUtcNow();
     private readonly object _incidentGate = new();
     private readonly Dictionary<string, DateTimeOffset> _lastIncident = new();
@@ -31,6 +42,12 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
         SourceIntervals.TryGetValue(source, out var interval) && interval * 2 > StaleAfter ? interval * 2 : StaleAfter;
 
     public string Environment { get; init; } = "demo";
+
+    /// <summary>Where the resources that stand as basic buildings come from. Without it (a demo town) there are none.</summary>
+    public Scope.ScopeStore? ScopeSource { get; init; }
+
+    /// <summary>Basic buildings given outright, for a demo town that has no inventory to find them in. They have no portal links.</summary>
+    public IReadOnlyList<Scope.ResolvedAsset>? FixedAssets { get; init; }
 
     /// <summary>Who sends how much to each API. Without it (or until it has read), nothing says where an API's traffic comes from.</summary>
     public Links.LinkTraffic? Traffic { get; init; }
@@ -58,7 +75,7 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
         var allGroups = registry.Groups
             .Select(g => new GroupSnapshot(g.Id, g.DisplayName, g.Color, g.IsHub, g.IsLostFound, g.ConfigError,
                 incidents.GetValueOrDefault(g.Id) ?? [], links[g.Id].HasBridge, links[g.Id].HasRingBridge, MessagingOf(registry, g),
-                g.Nodes.Select(n => ToNode(n, now, registry)).ToList()))
+                g.Nodes.Select(n => ToNode(n, now, registry)).ToList(), AssetsOf(g.Id, registry)))
             .ToList();
         var allVendors = registry.Vendors.Select(v => new VendorSnapshot(ToNode(v.Node, now, registry), v.CalledBy)).ToList();
         var allNodes = allGroups.SelectMany(g => g.Nodes).ToList();
@@ -115,7 +132,7 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
         return new Snapshot(registry.Town.Id, registry.Town.Name, registry.Town.GroupLabel, env?.Id ?? Environment, now, DayFraction(), totals, notices, groups,
             vendors, callers, dependencies, registry.RingCapacity,
             env?.Name ?? Environment, environments, TenantsOf(env, allNodes), registry.Town.Topology, Mode ?? registry.Town.Mode, view, incidentFreeSince, incidentsSeen,
-            OutsideRate(onScreenNodes.Values));
+            OutsideRate(onScreenNodes.Values), env?.Scope.Cloud);
     }
 
     /// <summary>Remembers when each island last had an open incident. Every full build calls this, so the memory does not depend on who is looking.</summary>
@@ -342,7 +359,7 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
             InboundEstimated = split?.Estimated ?? false,
             App = r.App,
             Jobs = jobs,
-            Regions = regions?.Select(x => new RegionSnapshot(x.Region, Label(env, x.Region), x.Instances, x.Cpu, x.Memory)).ToList(),
+            Regions = regions?.Select(x => new RegionSnapshot(x.Region, Label(env, x.Region), x.Instances, x.Cpu, x.Memory, x.Share, Skewed(x, regions, env))).ToList(),
         };
     }
 
@@ -354,15 +371,20 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
     private static string Label(RegistryEnvironment? env, string region) => env?.Scope.Regions.Label(region) ?? region;
 
     /// <summary>
-    /// The regions of a service when the region view applies to it: it runs in two or more, neither its settings nor the environment turn the view off.
-    /// Null otherwise (the numbers then stand for the whole service, as they always did).
+    /// The regions of a service when the region view applies to it: it runs in two or more. Null otherwise (the numbers then stand for the whole service, as they always did).
     /// </summary>
     private static IReadOnlyList<RegionReading>? RegionsOf(RegistryNode n, NodeReading r, RegistryEnvironment? env)
     {
-        var rules = env?.Scope.Regions ?? RegionRules.Default;
-        if (!n.RegionView || !rules.Enabled || rules.Off.Contains(n.GroupId) || r.Regions is not { Count: >= 2 } regions) return null;
+        if (r.Regions is not { } regions || regions.Count(x => x.Instances is not null || x.Cpu is not null || x.Memory is not null) < 2) return null;
         return regions.OrderBy(x => Label(env, x.Region), StringComparer.Ordinal).ToList();
     }
+
+    /// <summary>
+    /// Whether this region takes more of the requests than the environment allows (scope.regions.skew) while another region runs instances: traffic sent
+    /// to one region by a routing change, or left to it by a region that has died. Never without a measured share.
+    /// </summary>
+    private static bool Skewed(RegionReading region, IReadOnlyList<RegionReading> all, RegistryEnvironment? env) =>
+        region.Share is { } share && share > (env?.Scope.Regions ?? RegionRules.Default).Skew && all.Any(o => o != region && o.Instances > 0);
 
     /// <summary>The region under the most pressure: the highest CPU or memory. With no number to go by, the first by name.</summary>
     private static RegionReading WorstRegion(IReadOnlyList<RegionReading> regions) =>

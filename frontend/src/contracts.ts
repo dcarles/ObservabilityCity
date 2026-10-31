@@ -90,6 +90,15 @@ export interface components {
     schemas: {
         /** @enum {string} */
         AppState: "Running" | "Stopped" | "Missing";
+        AssetSnapshot: {
+            id: string;
+            name: string;
+            label: string;
+            shape: string;
+            service?: string | null;
+            region?: string | null;
+            links?: components["schemas"]["ResourceLink"][] | null;
+        };
         ConfigValue: {
             key: string;
             value: string;
@@ -126,6 +135,7 @@ export interface components {
             hasRingBridge: boolean;
             messaging: components["schemas"]["MessagingSnapshot"];
             nodes: components["schemas"]["NodeSnapshot"][];
+            assets?: components["schemas"]["AssetSnapshot"][] | null;
         };
         /** @enum {string} */
         HealthState: "Healthy" | "Degraded" | "Down" | "Stale";
@@ -265,6 +275,9 @@ export interface components {
             cpu?: number | null;
             /** Format: double */
             memory?: number | null;
+            /** Format: double */
+            share?: number | null;
+            skewed: boolean;
         };
         ResourceLink: {
             name: string;
@@ -323,6 +336,7 @@ export interface components {
             incidentsSeen: boolean;
             /** Format: double */
             outsideRequestsPerSecond?: number | null;
+            cloud?: string | null;
         };
         SubscriptionSnapshot: {
             topic: string;

@@ -40,8 +40,6 @@ internal sealed class RoleDefaultsFile
     public int? MinCalls { get; set; }
     /// <summary>Whether link discovery looks for the calls systems of this role make (an api or a worker). Default yes.</summary>
     public bool? DiscoverLinks { get; set; }
-    /// <summary>Whether a service that runs in two or more regions gets the per-region view. Default yes; false for, say, a passive disaster-recovery region.</summary>
-    public bool? Regions { get; set; }
 }
 
 /// <summary>defaults.yaml and the "defaults" block of a pillar file: role name to defaults.</summary>
@@ -65,8 +63,6 @@ internal sealed class SystemFile
     public int? MinCalls { get; set; }
     /// <summary>Whether link discovery looks for the calls this system makes. Without it, the pillar's or the defaults' choice.</summary>
     public bool? DiscoverLinks { get; set; }
-    /// <summary>Whether this system gets the per-region view. Without it, the pillar's or the defaults' choice.</summary>
-    public bool? Regions { get; set; }
     /// <summary>Signal to source name (or none), overriding the pillar's and the environment's choice for this system.</summary>
     public Dictionary<string, string> Signals { get; set; } = new();
     /// <summary>The name this system's resources carry for its service, matched against the service group of the environment's resource patterns. Without it, the service name.</summary>
@@ -254,6 +250,10 @@ internal sealed class ScopeFile
     public SubscriptionRuleFile? Subscription { get; set; }
     public Dictionary<string, string> Pillars { get; set; } = new();
     public List<ResourceRuleFile> Resources { get; set; } = [];
+    /// <summary>Resources that are not systems but stand as basic buildings without health (a key vault, a storage account).</summary>
+    public List<AssetRuleFile> Assets { get; set; } = [];
+    /// <summary>What the cloud is called in the town's words, for a missing app ("not found in Azure").</summary>
+    public string? Cloud { get; set; }
     public string? TelemetryRole { get; set; }
     public ScopeQueriesFile? Queries { get; set; }
     /// <summary>Addresses that open a resource in a portal or console. A template over the resource's words; without any, no link is shown.</summary>
@@ -262,12 +262,21 @@ internal sealed class ScopeFile
     public RegionsFile? Regions { get; set; }
 }
 
+internal sealed class AssetRuleFile
+{
+    public string Name { get; set; } = "";
+    public string Label { get; set; } = "";
+    public string Shape { get; set; } = "box";
+    public List<string> Types { get; set; } = [];
+    public string Pattern { get; set; } = "";
+}
+
 internal sealed class RegionsFile
 {
     public string? Tag { get; set; }
     public Dictionary<string, string> Names { get; set; } = new();
-    public bool? Enabled { get; set; }
-    public List<string> Off { get; set; } = [];
+    /// <summary>The share of a service's requests one region may take, while another region runs instances, before the town flags it. Default 0.9.</summary>
+    public double? Skew { get; set; }
 }
 
 internal sealed class ResourceLinkFile
@@ -326,6 +335,8 @@ internal sealed class SourceFile
     public double? TimeoutSeconds { get; set; }
     /// <summary>Query sources only (loganalytics): the query to send, a template. {window} and {windowSeconds} stand for the window, {roles} for the telemetry names of the systems it is asked about, quoted and separated by commas; scope variables and {environment} work too.</summary>
     public string? Query { get; set; }
+    /// <summary>Request sources only (loganalytics): the query that says how a service's requests divide between regions, a template like query. Returns one row per telemetry name and region with the columns role, region and calls (sampling-corrected counts do: only the proportions are used).</summary>
+    public string? RegionQuery { get; set; }
     /// <summary>Query sources only: how far back one answer looks, for example 5m. Default 5m.</summary>
     public string? Window { get; set; }
     /// <summary>Platform-metric sources only (azuremonitor): which metric of which resources fills which signal. Everything about the metrics is written here; the program knows none.</summary>

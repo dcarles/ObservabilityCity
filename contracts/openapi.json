@@ -183,6 +183,45 @@
         ],
         "type": "string"
       },
+      "AssetSnapshot": {
+        "required": [
+          "id",
+          "label",
+          "name",
+          "shape"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "shape": {
+            "type": "string"
+          },
+          "service": {
+            "type": "string",
+            "nullable": true
+          },
+          "region": {
+            "type": "string",
+            "nullable": true
+          },
+          "links": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ResourceLink"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "ConfigValue": {
         "required": [
           "key",
@@ -330,6 +369,13 @@
             "items": {
               "$ref": "#/components/schemas/NodeSnapshot"
             }
+          },
+          "assets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssetSnapshot"
+            },
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -791,7 +837,8 @@
       "RegionSnapshot": {
         "required": [
           "label",
-          "region"
+          "region",
+          "skewed"
         ],
         "type": "object",
         "properties": {
@@ -815,6 +862,14 @@
             "type": "number",
             "format": "double",
             "nullable": true
+          },
+          "share": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "skewed": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false
@@ -1056,6 +1111,10 @@
           "outsideRequestsPerSecond": {
             "type": "number",
             "format": "double",
+            "nullable": true
+          },
+          "cloud": {
+            "type": "string",
             "nullable": true
           }
         },

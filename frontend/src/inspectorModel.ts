@@ -12,7 +12,8 @@ export const stateTone = (s: HealthState): Tone => (s === 'Healthy' ? 'ok' : s =
 
 const pct = (v: number, digits = 0): string => `${(v * 100).toFixed(digits)}%`
 
-export const NOT_FOUND_TEXT = 'not found in the inventory'
+/** What a missing app says: it names the cloud the environment says it uses (scope.cloud), and the inventory when it does not say. */
+export const notFoundText = (cloud?: string | null): string => `not found in ${cloud ? cloud : 'the inventory'}`
 
 const jobName = (j: { name: string; region?: string | null }): string => (j.region ? `${j.name} (${j.region})` : j.name)
 
@@ -25,9 +26,9 @@ export function jobReasons(n: Pick<NodeSnapshot, 'jobs'>): string[] {
 }
 
 /** In words, why the system is not healthy. Empty for a healthy one. Each line names the number and the line it crossed. */
-export function reasons(n: NodeSnapshot): string[] {
+export function reasons(n: NodeSnapshot, cloud?: string | null): string[] {
   if (isUnmonitored(n)) return []
-  if (n.app === 'Missing') return [`The app is ${NOT_FOUND_TEXT}: the cloud has no resource of this name, so nothing here is shown as healthy.`]
+  if (n.app === 'Missing') return [`The app is ${notFoundText(cloud)}: the cloud has no resource of this name, so nothing here is shown as healthy.`]
   if (n.state === 'Stale') return ['No fresh data: the last reading is too old to trust, so nothing here is shown as healthy.']
   const jobs = jobReasons(n)
   if (n.state === 'Down') return jobs.length > 0 ? jobs : ['Down: the system is not answering.']
@@ -54,9 +55,9 @@ export interface Row {
 }
 
 /** The key numbers of a system, in reading order. Numbers a source does not give are left out, not shown as zero. */
-export function overviewRows(n: NodeSnapshot, nameOf: (id: string) => string = (id) => id): Row[] {
+export function overviewRows(n: NodeSnapshot, nameOf: (id: string) => string = (id) => id, cloud?: string | null): Row[] {
   if (isUnmonitored(n)) return [{ label: 'Data', value: 'no source configured', tone: '' }]
-  if (n.app === 'Missing') return [{ label: 'App', value: NOT_FOUND_TEXT, tone: 'stale' }]
+  if (n.app === 'Missing') return [{ label: 'App', value: notFoundText(cloud), tone: 'stale' }]
   if (n.state === 'Stale') return [{ label: 'Data', value: 'none fresh', tone: 'stale' }]
   const rows: Row[] = []
   if (n.app === 'Running' || n.app === 'Stopped') rows.push({ label: 'App', value: n.app === 'Running' ? 'running' : 'stopped (under construction)', tone: n.app === 'Stopped' ? 'warn' : '' })

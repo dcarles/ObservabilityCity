@@ -24,12 +24,13 @@ import { inboundMix } from '../inbound'
 import { VendorIsland, VENDOR_COLOR } from './vendors'
 import { DependencyOverlay } from './overlay'
 import { ServiceSign, summariseService, type ServiceSummary } from './service'
+import { AssetBuilding, summariseAsset, type AssetSummary } from './assets'
 import type { TenantView } from '../tenants'
 import { DEFAULT_LAYERS, buildingShown, type LayerState } from '../layers'
 import { edgeKey, edgeLinks, edgeMode, signLines, type EdgeMode } from '../edgeTraffic'
 import { Signpost } from './signpost'
 import { portCountsLine, portSignText } from '../portSign'
-import { regionLine, validChoice, withRegion, WORST, type RegionChoice } from '../regions'
+import { regionLine, splitLine, validChoice, withRegion, WORST, type RegionChoice } from '../regions'
 
 const QUAY = 9
 
@@ -72,6 +73,8 @@ interface Island {
   services: Map<string, ServiceSign>
   /** The signpost to hidden islands, for a town whose islands call each other directly. Null where the island has no link to a hidden island. */
   signpost: Signpost | null
+  /** The resources that stand as basic buildings, by id. */
+  assets: Map<string, AssetBuilding>
   /** Ids of the systems standing on the island. */
   nodeIds: Set<string>
 }
@@ -428,7 +431,7 @@ export class Town {
     return this.regionChoices.get(id) ?? WORST
   }
 
-  /** Look at one region of a service (or all of them, or the worst) instead of the default; the building follows at once, with no new data. */
+  /** Look at one region of a service (or the worst) instead of the default; the building follows at once, with no new data. */
   setRegion(id: string, choice: RegionChoice): void {
     if (choice === WORST) this.regionChoices.delete(id)
     else this.regionChoices.set(id, choice)
@@ -441,7 +444,7 @@ export class Town {
     // One building that cannot take its numbers must not stop the others from taking theirs.
     for (const g of s.groups) for (const n of g.nodes) this.guard(`apply ${n.id}`, () => {
       const choice = validChoice(n, this.regionChoice(n.id))
-      this.buildings.get(n.id)?.setNode(withRegion(n, choice), regionLine(n, choice))
+      this.buildings.get(n.id)?.setNode(withRegion(n, choice), regionLine(n, choice), splitLine(n))
     })
     for (const isl of this.islands) {
       const g = s.groups.find((x) => x.id === isl.group.id)
@@ -522,6 +525,22 @@ export class Town {
   /** Boxes over every service's sign and hedge, for picking with the pointer. Each carries `userData.serviceKey`. */
   serviceHits(): THREE.Object3D[] {
     return this.islands.flatMap((i) => [...i.services.values()].flatMap((s) => s.hits))
+  }
+
+  /** Boxes over every resource building, for picking with the pointer. Each carries `userData.assetId`. */
+  assetHits(): THREE.Object3D[] {
+    return this.islands.flatMap((i) => [...i.assets.values()].map((a) => a.hit))
+  }
+
+  /** What one resource building is, from the latest snapshot. Null when the snapshot no longer has it. */
+  assetSummary(id: string, s: Snapshot): AssetSummary | null {
+    return summariseAsset(id, s.groups)
+  }
+
+  /** The resource buildings on an island: id, what they are, how they look, where they stand. For tests. */
+  inspectAssets(groupId: string): { id: string; label: string; shape: string; service: string | null; x: number; z: number; behindPad: boolean }[] {
+    const isl = this.islands.find((i) => i.group.id === groupId)
+    return isl ? [...isl.assets.values()].map((a) => ({ id: a.asset.id, label: a.asset.label, shape: a.asset.shape, service: a.asset.service ?? null, x: a.root.position.x, z: a.root.position.z, behindPad: a.behindPad })) : []
   }
 
   /** What one service is and how it is doing, from the latest snapshot. Null when no island has it. */
@@ -814,6 +833,14 @@ export class Town {
       if (p.node.kind === 'Worker') decor.add(prop('dumpster', p.x + 2.4, p.z - 3.6, 0.2))
       if (p.node.kind === 'Api') decor.add(prop('firehydrant', p.x + 2.9, zf + 0.5, 0, 2.4))
     }
+    // resources that are not systems: small plain buildings behind their service's pad, or in the back yard
+    const assets = new Map<string, AssetBuilding>()
+    for (const a of plan.assets) {
+      const b = new AssetBuilding(a.asset, a.x, GROUND + 0.08, a.z, a.pad !== null)
+      root.add(b.root)
+      assets.set(a.asset.id, b)
+      avoid.push({ x: a.x, z: a.z, w: 4, d: 4 })
+    }
     // the first spare cell of the last row becomes a small park
     const last = plan.pads[plan.pads.length - 1]
     const spare = last ? (last.col === 0 ? { col: 1 as const, ring: last.ring } : { col: 0 as const, ring: last.ring + 1 }) : null
@@ -860,7 +887,7 @@ export class Town {
     root.updateMatrixWorld(true)
     const weather = new Weather(g.id, plan.rx, plan.rz)
     root.add(weather.object)
-    return { group: g, root, outline, buildings, harbour: status, links, consumers: consumersOf(g.messaging), messaging: messagingOf([], g.messaging), weather, backGateZ: backZ, services, signpost: post, nodeIds: new Set(g.nodes.map((n) => n.id)) }
+    return { group: g, root, outline, buildings, harbour: status, links, consumers: consumersOf(g.messaging), messaging: messagingOf([], g.messaging), weather, backGateZ: backZ, services, signpost: post, assets, nodeIds: new Set(g.nodes.map((n) => n.id)) }
   }
 
   /** A quay with a pier house, a pier and crates: where the boats from the hub's Service Bus port land. */
@@ -1237,7 +1264,7 @@ function parkProps(x: number, z: number): THREE.Object3D[] {
 }
 
 function layoutKey(s: Snapshot): string {
-  const groups = s.groups.map((g) => `${g.id}${g.configError ? '!' : ''}:${g.nodes.map((n) => `${n.id}/${n.kind}/${n.tenants != null ? 'T' : ''}/${n.service ?? ''}/${n.calls.join('+')}/${(n.gatewayCalls ?? []).join('+')}`).join(',')}|${g.hasBridge === false ? 'nb' : 'b'}${g.hasRingBridge ? 'r' : ''}|${(g.messaging?.topics ?? []).map((t) => t.name).join('+')}|${(g.messaging?.subscriptions ?? []).map((x) => `${x.topic}>${x.consumer}${x.legacy ? '!' : ''}`).join('+')}`).join(';')
+  const groups = s.groups.map((g) => `${g.id}${g.configError ? '!' : ''}:${g.nodes.map((n) => `${n.id}/${n.kind}/${n.tenants != null ? 'T' : ''}/${n.service ?? ''}/${n.calls.join('+')}/${(n.gatewayCalls ?? []).join('+')}`).join(',')}|${g.hasBridge === false ? 'nb' : 'b'}${g.hasRingBridge ? 'r' : ''}|${(g.assets ?? []).map((a) => `${a.id}/${a.shape}/${a.service ?? ''}`).join('+')}|${(g.messaging?.topics ?? []).map((t) => t.name).join('+')}|${(g.messaging?.subscriptions ?? []).map((x) => `${x.topic}>${x.consumer}${x.legacy ? '!' : ''}`).join('+')}`).join(';')
   const vendors = (s.vendors ?? []).map((v) => `${v.node.id}<${v.calledBy.join('+')}`).join(';')
   return `${s.townId}|${s.environment ?? ''}|${groups}|${vendors}|${edgeKey(s)}`
 }

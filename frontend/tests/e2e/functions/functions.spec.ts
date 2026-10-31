@@ -7,8 +7,10 @@ import { API, type Status } from '../support/city'
 
 const B = process.env.E2E_SUITE === 'functionsb'
 const town = B
-  ? { hot: 'Amsterdam', calm: 'Dublin', regions: ['Amsterdam', 'Dublin'] }
-  : { hot: 'West', calm: 'North', regions: ['North', 'West'] }
+  ? { hot: 'Amsterdam', calm: 'Dublin', regions: ['Amsterdam', 'Dublin'], cloud: 'Cumulus', split: '⚠ Amsterdam 25% · Dublin 75%', flagged: 'Dublin',
+      assets: [['aa.orders-blobs', 'Blob store', 'store', 'orders', true], ['aa.orders-vault', 'Secret store', 'vault', 'orders', true], ['aa.vault-main', 'Shared secret store', 'vault', null, false]] }
+  : { hot: 'West', calm: 'North', regions: ['North', 'West'], cloud: 'Azure', split: '⚠ North 95% · West 5%', flagged: 'North',
+      assets: [['aa.appcfg-acme-al', 'App configuration', 'settings', null, false], ['aa.kv-acme-al-ord', 'Key vault', 'vault', 'orders', true], ['aa.kv-acme-al-shared', 'Key vault', 'vault', null, false], ['aa.stacmealord', 'Storage account', 'store', 'orders', true]] }
 
 async function open(page: Page): Promise<void> {
   await page.goto('/?test=1&quality=low')
@@ -60,8 +62,9 @@ test.describe(`functions and regions (${B ? 'tags, Started, a region tag' : 'nam
     expect(ghost.beacon).toBe('grey')
     expect(ghost.plaque).toBe('not found')
     await page.evaluate(() => (window as any).city.openSystem('aa.ghost-fn'))
-    await expect(page.locator('#inspector .row', { hasText: 'App' })).toContainText('not found in the inventory')
-    await expect(page.locator('#inspector .why')).toContainText('not found in the inventory')
+    // the environment names its cloud, and the words follow it: no cloud is built in
+    await expect(page.locator('#inspector .row', { hasText: 'App' })).toContainText(`not found in ${town.cloud}`)
+    await expect(page.locator('#inspector .why')).toContainText(`not found in ${town.cloud}`)
   })
 
   test('the drawer lists each job in each region, and a failed one makes the building red', async ({ page }) => {
@@ -99,11 +102,9 @@ test.describe(`functions and regions (${B ? 'tags, Started, a region tag' : 'nam
     await expect(page.locator('#inspector .regions button.on')).toHaveText('Worst')
     const before = await page.evaluate(() => (window as any).city.seen.snapshots)
 
-    await page.locator('#inspector .regions button', { hasText: 'All' }).click()
-    let api = await inspect(page, 'aa.orders-api')
-    expect(api.region).toBe('all 2 regions')
-    expect(api.floors).toBe(3) // 2 + 1 instances, floors on a doubling scale
+    await expect(page.locator('#inspector .regions button')).toHaveText(['Worst', ...town.regions]) // no combined view
     expect(await page.evaluate(() => (window as any).city.seen.snapshots)).toBeLessThanOrEqual(before + 2) // nothing was asked of the server
+    let api = await inspect(page, 'aa.orders-api')
 
     await page.locator('#inspector .regions button', { hasText: town.calm }).click()
     api = await inspect(page, 'aa.orders-api')
@@ -119,5 +120,63 @@ test.describe(`functions and regions (${B ? 'tags, Started, a region tag' : 'nam
     expect((await inspect(page, 'aa.sched-fn')).region).toBe('')
     await page.evaluate(() => (window as any).city.openSystem('aa.sched-fn'))
     await expect(page.locator('#inspector .regions')).toHaveCount(0)
+  })
+
+  test('the sign shows how the requests divide between the regions, with a warning when one takes too much', async ({ page }) => {
+    await open(page)
+    expect((await inspect(page, 'aa.orders-api')).split).toBe(town.split)
+    expect((await inspect(page, 'aa.sched-fn')).split).toBe('') // one region: nothing to divide
+    await page.evaluate(() => (window as any).city.openSystem('aa.orders-api'))
+    await expect(page.locator('#inspector .region.skewed')).toHaveCount(1)
+    await expect(page.locator('#inspector .region.skewed')).toContainText(town.flagged)
+    await expect(page.locator('#inspector .region').first()).toContainText('of requests')
+    await expect(page.locator('#inspector .region-skew')).toContainText('takes more of the requests')
+    // the split does not change with the switch: the sign always says how the traffic divides
+    await page.locator('#inspector .regions button', { hasText: town.calm }).click()
+    expect((await inspect(page, 'aa.orders-api')).split).toBe(town.split)
+  })
+
+  test('no region line or drawer text says instances are unknown', async ({ page }) => {
+    await open(page)
+    await page.evaluate(() => (window as any).city.openSystem('aa.orders-api'))
+    await expect(page.locator('#inspector')).not.toContainText('unknown')
+    for (const id of ['aa.orders-api', 'aa.sched-fn', 'aa.report-fn']) expect((await inspect(page, id)).plaque).not.toContain('unknown')
+  })
+
+  test('a function gets its run rate from the span metrics like any serving system', async ({ page }) => {
+    await open(page)
+    const sched = await node(page, 'aa.sched-fn')
+    expect(sched.requestsPerSecond).toBeCloseTo(1440 / 300, 3)
+    expect(sched.absent).not.toContain('requests')
+  })
+
+  test('resources that are not systems stand as small buildings: beside their service, or in the back yard', async ({ page }) => {
+    await open(page)
+    const assets = await page.evaluate(() => (window as any).city.inspectAssets('aa'))
+    expect(assets.map((a: any) => [a.id, a.label, a.shape, a.service, a.behindPad]).sort((x: any, y: any) => (x[0] < y[0] ? -1 : 1))).toEqual(town.assets)
+    const services = await page.evaluate(() => (window as any).city.inspectServices('aa'))
+    expect(services.length).toBeGreaterThan(0)
+    // none is a system: no health, no beacon, nothing among the buildings
+    expect(await page.evaluate(() => (window as any).city.inspectIsland('aa').kinds.length)).toBe(5)
+    expect(await page.evaluate(() => (window as any).city.town.assetHits().length)).toBe(town.assets.length)
+  })
+
+  test('a resource building opens a card with what it is, where it belongs and its address, and no health', async ({ page }) => {
+    await open(page)
+    const [id, label, , service] = town.assets[1] as [string, string, string, string | null]
+    await page.evaluate((i) => (window as any).city.openAsset(i), id)
+    const panel = page.locator('#service-panel')
+    await expect(panel).toBeVisible()
+    await expect(panel).toContainText(label)
+    await expect(panel).toContainText(`Resource of the ${service} service`)
+    await expect(panel).toContainText('Not monitored')
+    await expect(panel.locator('a.out')).toHaveAttribute('href', /^https:\/\/(portal|console)\.example\.test\//)
+    await expect(panel).not.toContainText('Healthy')
+    await page.keyboard.press('Escape')
+    await expect(panel).toBeHidden()
+    // a pillar-wide resource says it belongs to the pillar
+    const [pillarId] = town.assets.find((a) => a[3] === null)!
+    await page.evaluate((i) => (window as any).city.openAsset(i), pillarId as string)
+    await expect(panel).toContainText('Resource of Alpha')
   })
 })

@@ -57,6 +57,7 @@ public static class RegistryValidator
         CheckServices(ctx, registry);
         CheckEnvironments(ctx, registry, adapters);
         CheckFake(ctx, registry);
+        CheckFakeAssets(ctx, registry);
         return ApplyExpectedWarnings(ctx, ctx.Result());
     }
 
@@ -106,7 +107,7 @@ public static class RegistryValidator
         // fake data and stories belong to a demo town: in a live one they would never be used, and someone probably forgot to say it is a demo
         var mode = RawYaml.Get(town.Root, "mode");
         var demo = mode is not null && RawYaml.Str(mode) == TownModes.Demo;
-        if (!demo && (File.Exists(Path.Combine(c.Folder, "fake.yaml")) || Directory.Exists(Path.Combine(c.Folder, "stories"))))
+        if (!demo && (File.Exists(Path.Combine(c.Folder, "fake.yaml")) || File.Exists(Path.Combine(c.Folder, "fake-assets.yaml")) || Directory.Exists(Path.Combine(c.Folder, "stories"))))
             c.Error("town.yaml", mode is null ? 1 : RawYaml.Line(mode), "mode", "This town has demo files (fake.yaml or stories/) but is not set to demo, so it runs live and never uses them. Add 'mode: demo' to town.yaml, or remove the demo files.");
         foreach (var key in new[] { "id", "name" })
             if (string.IsNullOrWhiteSpace(RawYaml.Str(RawYaml.Get(town.Root, key))))
@@ -377,12 +378,38 @@ public static class RegistryValidator
                 c.Error("fake.yaml", RawYaml.Line(per), "fake", $"{id}: perInstanceRps must be above 0, or the autoscaler would divide by zero.");
             if (RawYaml.Get(profile, "errorRate") is { } er && RawYaml.Number(er) is not (>= 0 and <= 1))
                 c.Error("fake.yaml", RawYaml.Line(er), "fake", $"{id}: errorRate must be a share between 0 and 1.");
+            if (RawYaml.Get(profile, "regions") is { } regions)
+            {
+                if (regions is not YamlMappingNode weights || weights.Children.Count < 2)
+                    c.Error("fake.yaml", RawYaml.Line(regions), "fake", $"{id}: regions needs two or more entries of region name and weight, or the region view would not show.");
+                else
+                    foreach (var (name, weight) in weights.Children)
+                        if (RawYaml.Number(weight) is not > 0)
+                            c.Error("fake.yaml", RawYaml.Line(weight), "fake", $"{id}: the weight of region '{RawYaml.Str(name)}' must be a number above 0.");
+            }
             var min = RawYaml.Get(profile, "minInstances");
             var max = RawYaml.Get(profile, "maxInstances");
             if (min is not null && RawYaml.Number(min) is not >= 1)
                 c.Error("fake.yaml", RawYaml.Line(min), "fake", $"{id}: minInstances must be 1 or more.");
             if (min is not null && max is not null && RawYaml.Number(min) > RawYaml.Number(max))
                 c.Error("fake.yaml", RawYaml.Line(min), "fake", $"{id}: minInstances ({RawYaml.Str(min)}) is above maxInstances ({RawYaml.Str(max)}).");
+        }
+    }
+
+    private static void CheckFakeAssets(Context c, Registry registry)
+    {
+        if (!File.Exists(Path.Combine(c.Folder, "fake-assets.yaml"))) return;
+        try
+        {
+            var pillars = registry.Groups.Select(g => g.Id).ToHashSet();
+            foreach (var a in FakeAssets.Load(c.Folder))
+                if (!pillars.Contains(a.PillarId))
+                    c.Error("fake-assets.yaml", 1, "fake", $"fake-assets.yaml puts '{a.Name}' in '{a.PillarId}', which is not a pillar of this town.{DidYouMean.Hint(a.PillarId, pillars)}");
+        }
+        catch (Exception e)
+        {
+            var inner = e.InnerException ?? e;
+            c.Error("fake-assets.yaml", (int)Math.Max(1, (inner as YamlException)?.Start.Line ?? 1), "fake", $"fake-assets.yaml cannot be read: {inner.Message}");
         }
     }
 

@@ -308,7 +308,18 @@ sources:
       | extend next = <when the job should run next>
 ```
 
-- **Regions.** A service that runs in two or more regions shows its worst region (by processor and memory) on the building; the drawer can switch between worst, all and one region. The `scope.regions` block names where a region is read from (`tag`), how it is labelled (`names`), and where the view is off (`enabled: false`, or `off: [pillar ids]`). A system, a pillar or a role default can set `regions: false`.
+- **Regions.** A service that runs in two or more regions shows its worst region (by processor and memory) on the building; the drawer can switch between the worst region and each region in turn. The `scope.regions` block names where a region is read from (`tag`), how it is labelled (`names`), and how lopsided a split of requests may be before it is flagged (`skew`).
+  - **Where each region's share comes from.** Give the `loganalytics` source a `regionQuery` that returns one row per app role and region with the number of `calls`. Counts are enough, even sampled ones, since only their proportions are used. The sign and the drawer show the split ("North 90% · West 10%"), and a region over `skew` (0.9 by default; 1 never flags) gets a warning while another region still runs instances. Without a `regionQuery` there is no split and nothing is shown for it.
+  - **The switch.** The building shows one region at a time: the worst one, or the one picked in the drawer. There is no combined view, since adding up two regions' instances and averaging their processors would hide the one that is in trouble. A region the cloud does not report an instance count for adds nothing and is never shown as "unknown".
+
+### Basic buildings (key vaults, storage, App Configuration) and the cloud's name
+
+`scope.assets` lists rules for resources that have no health of their own but belong in the town. Each rule has a `name`, the `label` shown on its card, a `shape` (`vault`, `store`, `settings` or `box`), the resource `types` it matches and a `pattern` that names the pillar (and the service, when the resource belongs to one) with the same groups as the system rules. A resource tied to a service stands behind that service's pad; the others stand in the pillar's back yard. Clicking one opens a card with its name, type, owner and the portal links from `scope.links`. The inventory query includes the rules' types, so no other change is needed.
+
+`scope.cloud` is the name of your cloud as the town should say it (for example `Azure`, `AWS` or `Cumulus`). It is used in the words "not found in <cloud>" and nowhere else; the core assumes no cloud.
+
+A demo town needs no cloud for any of this: `fake.yaml` takes `regions: { <name>: <weight>, ... }` on a service, and `fake-assets.yaml` lists the buildings by pillar, name, label, shape and service.
+
 
 ### What each adapter's runbook section contains
 

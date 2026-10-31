@@ -4,7 +4,7 @@
 
 import { KNOWN_SIGNALS } from './signals'
 import { DEFAULT_RING_CAPACITY, MAX_RING_CAPACITY, MIN_RING_CAPACITY, maxPillars } from './scene/layout'
-import type { DependencySnapshot, EnvironmentInfo, OffscreenLink, ViewInfo, ExternalCallerSnapshot, GroupSnapshot, IncidentSnapshot, MessagingSnapshot, NodeSnapshot, Snapshot, TenantInfo, TenantUnitSnapshot, VendorSnapshot } from './types'
+import type { AssetSnapshot, DependencySnapshot, EnvironmentInfo, OffscreenLink, ViewInfo, ExternalCallerSnapshot, GroupSnapshot, IncidentSnapshot, MessagingSnapshot, NodeSnapshot, Snapshot, TenantInfo, TenantUnitSnapshot, VendorSnapshot } from './types'
 
 const KINDS = ['Api', 'Worker', 'Database', 'Cache', 'Function', 'Gateway', 'Broker', 'Egress']
 const STATES = ['Healthy', 'Degraded', 'Down', 'Stale']
@@ -78,6 +78,8 @@ export function checkSnapshot(raw: unknown): Checked {
     incidentFreeSince: typeof raw.incidentFreeSince === 'string' && Number.isFinite(Date.parse(raw.incidentFreeSince)) ? raw.incidentFreeSince : null,
     incidentsSeen: raw.incidentsSeen === true,
     outsideRequestsPerSecond: isFiniteNumber(raw.outsideRequestsPerSecond) ? raw.outsideRequestsPerSecond : null,
+    // what the environment calls its cloud, for "not found in ..."; null says "the inventory"
+    cloud: typeof raw.cloud === 'string' && raw.cloud.trim() !== '' ? raw.cloud.trim() : null,
     dayFraction: isFiniteNumber(raw.dayFraction) ? raw.dayFraction : 0.5,
     totals: {
       requestsPerSecond: num(totals.requestsPerSecond),
@@ -156,7 +158,27 @@ function checkGroup(g: unknown, seen: Set<string>, problems: string[]): GroupSna
     hasRingBridge: g.hasRingBridge === true,
     messaging: checkMessaging(g.messaging),
     nodes,
+    assets: checkAssets(g.assets),
   }
+}
+
+const ASSET_SHAPES = ['box', 'vault', 'store', 'settings']
+
+/** The island's resources that stand as basic buildings. One without an id or a name cannot be drawn or opened and is dropped; an unknown shape is a plain box. */
+function checkAssets(list: unknown): AssetSnapshot[] {
+  const ids = new Set<string>()
+  const out: AssetSnapshot[] = []
+  for (const a of Array.isArray(list) ? list : []) {
+    if (!isObject(a) || typeof a.id !== 'string' || a.id === '' || ids.has(a.id) || typeof a.name !== 'string' || a.name === '') continue
+    ids.add(a.id)
+    out.push({
+      id: a.id, name: a.name, label: str(a.label) || 'Resource', shape: ASSET_SHAPES.includes(a.shape as string) ? (a.shape as string) : 'box',
+      service: typeof a.service === 'string' && a.service !== '' ? a.service : null, region: typeof a.region === 'string' && a.region !== '' ? a.region : null,
+      links: (Array.isArray(a.links) ? a.links : []).filter(isObject).filter((l) => typeof l.name === 'string' && typeof l.url === 'string' && /^https?:\/\//i.test(l.url as string))
+        .map((l) => ({ name: l.name as string, url: l.url as string })),
+    })
+  }
+  return out
 }
 
 function checkMessaging(m: unknown): MessagingSnapshot {
@@ -223,7 +245,7 @@ function checkNode(n: unknown, groupId: string, ids: Set<string>, problems: stri
     : null
   out.regions = Array.isArray(n.regions)
     ? n.regions.filter(isObject).filter((r) => typeof r.region === 'string' && r.region !== '')
-      .map((r) => ({ region: r.region as string, label: optionalText(r.label) ?? (r.region as string), instances: optionalNumber(r.instances), cpu: optionalNumber(r.cpu), memory: optionalNumber(r.memory) }))
+      .map((r) => ({ region: r.region as string, label: optionalText(r.label) ?? (r.region as string), instances: optionalNumber(r.instances), cpu: optionalNumber(r.cpu), memory: optionalNumber(r.memory), share: isFiniteNumber(r.share) && r.share >= 0 && r.share <= 1 ? r.share : null, skewed: r.skewed === true }))
     : null
   // null is a store without tenants; a list, even an empty one, is a store with a database for each tenant
   out.tenants = Array.isArray(n.tenants) ? checkUnits(n.tenants, n.id, problems) : null

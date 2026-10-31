@@ -314,6 +314,29 @@ public class RegistryValidatorTests
     }
 
     [Fact]
+    public void Fake_regions_need_two_entries_with_weights_above_zero()
+    {
+        using var f = new RegistryCopy(TestPaths.MiniTown);
+        f.ReplaceLine("fake.yaml", "aa.orders-api:", "aa.orders-api: { regions: { North: 1 } }");
+        Assert.Contains(Check(f).Findings.Where(x => x.Rule == "fake"), x => x.Message.Contains("two or more entries"));
+
+        f.ReplaceLine("fake.yaml", "aa.orders-api:", "aa.orders-api: { regions: { North: 1, West: 0 } }");
+        Assert.Contains(Check(f).Findings.Where(x => x.Rule == "fake"), x => x.Message.Contains("region 'West' must be a number above 0"));
+    }
+
+    [Fact]
+    public void A_fake_asset_in_a_pillar_the_town_does_not_have_is_an_error()
+    {
+        using var f = new RegistryCopy(TestPaths.MiniTown);
+        File.WriteAllText(f.FilePath("fake-assets.yaml"), "- { pillar: zz, name: kv-one, shape: vault }\n");
+
+        var hit = Single(Check(f), "fake");
+
+        Assert.Equal("fake-assets.yaml", hit.File);
+        Assert.Contains("not a pillar", hit.Message);
+    }
+
+    [Fact]
     public void A_misspelt_fake_field_is_reported_with_its_line()
     {
         using var f = new RegistryCopy(TestPaths.MiniTown);

@@ -2,7 +2,7 @@ import type { GroupSnapshot, LogLine, NodeSnapshot, ScopeResource, Snapshot, Sys
 import { escapeHtml } from './picker'
 import { scopeParams, type Scope } from './scope'
 import { tenantListOrder, tenantFigures, yardSummary, type TenantView } from './tenants'
-import { regionOptions, validChoice, WORST, type RegionChoice } from './regions'
+import { regionFigures, regionOptions, validChoice, WORST, type RegionChoice } from './regions'
 import { ago, clockTime, configOrder, filterLogs, incidentSummary, jobRows, LAYER_WORD, linkSections, originLabel, type LinkItem, overviewLinks, overviewRows, reasons, resourceLinks, scopeView, SEVERITY_WORD, stateTone, type LogFilter } from './inspectorModel'
 
 export type InspectorTab = 'overview' | 'links' | 'logs' | 'config'
@@ -198,12 +198,12 @@ export class Inspector {
   }
 
   private overview(n: NodeSnapshot, group: GroupSnapshot | null): string {
-    const why = reasons(n)
+    const why = reasons(n, this.snap?.cloud)
     const tenants = this.tenantBlock(n)
     const incidents = group?.incidents ?? []
     return `
       ${why.length === 0 ? '<p class="fine">Nothing to flag: every number is inside its lines.</p>' : `<ul class="why">${why.map((w) => `<li>${escapeHtml(w)}</li>`).join('')}</ul>`}
-      <div class="rows">${overviewRows(n, (id) => this.find(id)?.node.name ?? id).map((r) => `<div class="row"><span>${r.label}</span><span class="${r.tone}">${escapeHtml(r.value)}</span></div>`).join('')}</div>
+      <div class="rows">${overviewRows(n, (id) => this.find(id)?.node.name ?? id, this.snap?.cloud).map((r) => `<div class="row"><span>${r.label}</span><span class="${r.tone}">${escapeHtml(r.value)}</span></div>`).join('')}</div>
       ${this.jobs(n)}
       ${this.regions(n)}
       ${tenants}
@@ -227,11 +227,12 @@ export class Inspector {
     const options = regionOptions(n)
     if (options.length === 0) return ''
     const chosen = validChoice(n, this.host.regionChoice(n.id))
-    const pct = (v: number | null | undefined) => (v == null ? '–' : `${Math.round(v * 100)}%`)
-    const rows = (n.regions ?? []).map((r) => `<div class="row region" data-region-row="${escapeHtml(r.region)}"><span>${escapeHtml(r.label)}</span><span>${r.instances == null ? 'instances unknown' : `${r.instances} ${r.instances === 1 ? 'instance' : 'instances'}`} · CPU ${pct(r.cpu)} · memory ${pct(r.memory)}</span></div>`).join('')
-    return `<h4>Regions <small>the building shows ${chosen === WORST ? 'the worst region' : chosen === 'all' ? 'all regions together' : escapeHtml(options.find((o) => o.id === chosen)?.label ?? '')}</small></h4>
+    const rows = (n.regions ?? []).map((r) => `<div class="row region${r.skewed ? ' skewed' : ''}" data-region-row="${escapeHtml(r.region)}"><span>${r.skewed ? '⚠ ' : ''}${escapeHtml(r.label)}</span><span class="${r.skewed ? 'warn' : ''}">${escapeHtml(regionFigures(r))}</span></div>`).join('')
+    const skewed = (n.regions ?? []).find((r) => r.skewed)
+    const note = skewed ? `<p class="note region-skew">${escapeHtml(skewed.label)} takes more of the requests than the environment allows while another region is running. Check the routing, or whether the other region is down.</p>` : ''
+    return `<h4>Regions <small>the building shows ${chosen === WORST ? 'the worst region' : escapeHtml(options.find((o) => o.id === chosen)?.label ?? '')}</small></h4>
       <div class="levels regions" role="group" aria-label="Region shown on the building">${options.map((o) => `<button data-region="${escapeHtml(o.id)}" class="${o.id === chosen ? 'on' : ''}">${escapeHtml(o.label)}</button>`).join('')}</div>
-      ${rows}`
+      ${rows}${note}`
   }
 
   /** Links that open the system's resources in a portal or console, from the environment's link rules. Nothing without them. */

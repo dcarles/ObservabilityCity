@@ -206,7 +206,8 @@
           "jobs": null,
           "regions": null
         }
-      ]
+      ],
+      "assets": []
     },
     {
       "id": "ful",
@@ -365,7 +366,8 @@
           "jobs": null,
           "regions": null
         }
-      ]
+      ],
+      "assets": []
     },
     {
       "id": "wrk",
@@ -480,7 +482,8 @@
           "jobs": null,
           "regions": null
         }
-      ]
+      ],
+      "assets": []
     },
     {
       "id": "nom",
@@ -583,7 +586,8 @@
           "jobs": null,
           "regions": null
         }
-      ]
+      ],
+      "assets": []
     },
     {
       "id": "hbk",
@@ -659,7 +663,8 @@
           ],
           "regions": null
         }
-      ]
+      ],
+      "assets": []
     },
     {
       "id": "leg",
@@ -813,7 +818,8 @@
           "jobs": null,
           "regions": null
         }
-      ]
+      ],
+      "assets": []
     },
     {
       "id": "sta",
@@ -887,7 +893,8 @@
           ],
           "regions": null
         }
-      ]
+      ],
+      "assets": []
     }
   ],
   "vendors": [],
@@ -930,5 +937,6 @@
   },
   "incidentFreeSince": "2026-10-25T12:00:00+00:00",
   "incidentsSeen": false,
-  "outsideRequestsPerSecond": null
+  "outsideRequestsPerSecond": null,
+  "cloud": null
 }

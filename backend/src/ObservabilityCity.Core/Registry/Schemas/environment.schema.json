@@ -62,6 +62,7 @@
           "pollSeconds": { "type": "number", "exclusiveMinimum": 0, "description": "How often the source is asked. Default 30." },
           "timeoutSeconds": { "type": "number", "exclusiveMinimum": 0, "description": "How long one ask may take before it is given up. Default 10." },
           "query": { "type": "string", "description": "Sources that send a query (loganalytics): the query, a template. {window} and {windowSeconds} stand for the window, {roles} for the telemetry names of the systems asked about (double-quoted, comma separated); scope variables and {environment} work too. It returns one row per telemetry name with the columns role, calls, errors and latencyMs." },
+          "regionQuery": { "type": "string", "description": "Request sources (loganalytics): the query that says how each service's requests divide between regions, a template like query. It returns one row per telemetry name and region with the columns role, region and calls. Sampled counts are fine: only the proportions are used. Without it the split is not measured." },
           "window": { "type": "string", "pattern": "^[0-9]+(\\.[0-9]+)?[smh]$", "description": "Query sources: how far back one answer looks, a number and a unit (30s, 5m, 1h). Default 5m. A system with fewer calls than its minCalls in this window is quiet. Platform-metric sources (azuremonitor) look back this far too." },
           "metrics": {
             "type": "array",
@@ -210,6 +211,23 @@
             }
           }
         },
+        "cloud": { "type": "string", "minLength": 1, "description": "What the cloud is called in your words, for example Azure. A system whose app the inventory cannot find reads not found in <cloud>; without it, not found in the inventory." },
+        "assets": {
+          "type": "array",
+          "description": "Resources that are not systems but stand in the town as small buildings without health, such as a key vault or a storage account. They are looked for in each pillar's subscription. One that names a service stands beside that service's pad; the rest stand in the pillar's back yard. The drawer shows its name, what it is, the service it belongs to and its portal links.",
+          "items": {
+            "type": "object",
+            "required": ["name", "label", "types", "pattern"],
+            "additionalProperties": false,
+            "properties": {
+              "name": { "$ref": "defs.schema.json#/$defs/kebabName", "description": "Names the rule." },
+              "label": { "type": "string", "minLength": 1, "description": "What the resource is, in the words of the drawer, for example Key vault." },
+              "shape": { "enum": ["box", "vault", "store", "settings"], "description": "How the building looks. Default box." },
+              "types": { "type": "array", "minItems": 1, "items": { "type": "string" }, "description": "The resource types it applies to." },
+              "pattern": { "type": "string", "description": "A regular expression over the resource's name, ignoring case. Optional named groups: service (matched with a system's serviceCode), pillar (another pillar's resource is left out) and region." }
+            }
+          }
+        },
         "telemetryRole": { "type": "string", "description": "What the telemetry calls a system that has no telemetry.role of its own: a template over {system}, {service}, {name}, {role}, {pillar}, {pillarId}, {environment} and variables." },
         "links": {
           "type": "array",
@@ -228,12 +246,11 @@
         "regions": {
           "type": "object",
           "additionalProperties": false,
-          "description": "How a service's region is read and named, and where the per-region view is off. A service shows it only when its resources are in two or more regions.",
+          "description": "How a service's region is read and named, and when a lopsided split of requests is flagged. A service shows it only when its resources are in two or more regions.",
           "properties": {
             "tag": { "type": "string", "description": "The tag of a resource that says its region. Without it, the region group of the rule's pattern, else the location the cloud gives." },
             "names": { "type": "object", "additionalProperties": { "type": "string" }, "description": "Region value to the label shown (for example northeurope: North). A value without a label is shown as it is." },
-            "enabled": { "type": "boolean", "description": "false turns the per-region view off in this whole environment. Default true." },
-            "off": { "type": "array", "items": { "type": "string" }, "description": "Pillar ids the per-region view is off for in this environment." }
+            "skew": { "type": "number", "exclusiveMinimum": 0.5, "maximum": 1, "description": "The share of a service's requests one region may take while another region runs instances, before the town flags it. Default 0.9; 1 never flags." }
           }
         },
         "queries": {

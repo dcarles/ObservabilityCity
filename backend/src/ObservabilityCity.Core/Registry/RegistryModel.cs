@@ -141,9 +141,6 @@ public sealed record RegistryNode(
     /// <summary>Whether link discovery looks for the calls this system makes (<c>discoverLinks</c>, through the defaults cascade). Only an API or a worker makes calls worth finding.</summary>
     public bool DiscoverLinks { get; init; } = true;
 
-    /// <summary>Whether a service that runs in two or more regions gets the per-region view (<c>regions</c>, through the defaults cascade). The environment can turn it off too (<c>scope.regions</c>).</summary>
-    public bool RegionView { get; init; } = true;
-
     /// <summary>The links in <see cref="Calls"/> that link discovery found and no file declares, each with the last day it was seen. Empty for a registry without discovery.</summary>
     public IReadOnlyDictionary<string, DateOnly> FoundCalls { get; init; } = new Dictionary<string, DateOnly>();
 
@@ -194,6 +191,9 @@ public sealed record RegistrySource(string Name, string Kind, string? Connection
     /// <summary>For a source that sends a query: the query template (see <see cref="SourceQuery"/>) and how far back it looks. Null: the adapter's own, or none.</summary>
     public string? Query { get; init; }
     public string? Window { get; init; }
+
+    /// <summary>For a request source: the query that gives how the requests divide between regions (columns role, region, calls). Null: the split is not measured.</summary>
+    public string? RegionQuery { get; init; }
 
     /// <summary>For a platform-metric source: which metric of which resources fills which signal. Empty for every other kind of source.</summary>
     public IReadOnlyList<MetricGroup> Metrics { get; init; } = [];

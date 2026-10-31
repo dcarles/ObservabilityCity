@@ -8,6 +8,9 @@ public sealed record PillarScope(string PillarId, string Code, string? Subscript
 /// <summary>A resource that belongs to a system, and the rule that said so. Tenant is the tenant id without dashes, lowercase; null when the rule has none.</summary>
 public sealed record ResolvedResource(string Id, string Name, string Type, string? Region, string? Tenant, string Rule, int? Instances = null, bool? Running = null);
 
+/// <summary>A resource that stands in the town as a basic building (see <see cref="AssetRule"/>). Id is the pillar and the resource's name in lowercase. Service is the registry's service name it belongs to, null for the pillar as a whole.</summary>
+public sealed record ResolvedAsset(string Id, string PillarId, string Name, string Label, string Shape, string Type, string? Service, string? Region, string ResourceId, string Rule, string? SubscriptionId);
+
 /// <summary>Everything the sources need to know about one system: where it is, what its telemetry calls it and which resources are its.</summary>
 public sealed record SystemScope(
     string SystemId,
@@ -46,8 +49,10 @@ public sealed record Resolution(
     bool InventoryRead,
     string? Workspace,
     string? WorkspaceId = null,
-    string? WorkspaceVia = null)
+    string? WorkspaceVia = null,
+    IReadOnlyList<ResolvedAsset>? Assets = null)
 {
+    public IReadOnlyList<ResolvedAsset> AssetList => Assets ?? [];
     public static Resolution Empty { get; } = new([], [], [], [], false, null);
     public SystemScope? System(string id) => Systems.FirstOrDefault(s => s.SystemId == id);
     public PillarScope? Pillar(string id) => Pillars.FirstOrDefault(p => p.PillarId == id);

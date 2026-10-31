@@ -31,10 +31,10 @@ public sealed record NodeReading(
     IReadOnlyList<RegionReading>? Regions = null);
 
 /// <summary>
-/// What one region of a service reports: how many instances it runs, and how busy its plan is. Region is the label the scope rules gave (see <c>scope.regions</c>).
+/// What one region of a service reports: how many instances it runs, and how busy its plan is, and Share is the part of the service's requests it took (0 to 1, the regions add up to 1; null when nothing measures it). Region is the label the scope rules gave (see <c>scope.regions</c>).
 /// A field the source cannot tell is null.
 /// </summary>
-public sealed record RegionReading(string Region, int? Instances, double? Cpu, double? Memory);
+public sealed record RegionReading(string Region, int? Instances, double? Cpu, double? Memory, double? Share = null);
 
 /// <summary>
 /// One scheduled job as a log source saw it in one region: when it last ran, whether that run succeeded (null: unknown) and when its schedule says it runs

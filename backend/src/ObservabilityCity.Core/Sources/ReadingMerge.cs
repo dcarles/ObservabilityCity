@@ -57,17 +57,18 @@ public static class ReadingMerge
             requests?.Calls,
             instances?.App,
             jobs?.Jobs,
-            Regions(instances, cpu, memory));
+            Regions(instances, cpu, memory, requests));
     }
 
-    /// <summary>The regions of a service: the instances of the source that counts them, the CPU and memory of the sources that measure them, joined by region name.</summary>
-    private static IReadOnlyList<RegionReading>? Regions(NodeReading? instances, NodeReading? cpu, NodeReading? memory)
+    /// <summary>The regions of a service: the instances of the source that counts them, the CPU and memory of the sources that measure them, and the share of the requests of the source that measures them, joined by region name.</summary>
+    private static IReadOnlyList<RegionReading>? Regions(NodeReading? instances, NodeReading? cpu, NodeReading? memory, NodeReading? requests)
     {
-        var names = (instances?.Regions ?? []).Concat(cpu?.Regions ?? []).Concat(memory?.Regions ?? []).Select(r => r.Region).Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.Ordinal).ToList();
+        var names = (instances?.Regions ?? []).Concat(cpu?.Regions ?? []).Concat(memory?.Regions ?? []).Concat(requests?.Regions ?? []).Select(r => r.Region).Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.Ordinal).ToList();
         if (names.Count == 0) return null;
         return names.Select(name => new RegionReading(name,
             instances?.Regions?.FirstOrDefault(r => r.Region.Equals(name, StringComparison.OrdinalIgnoreCase))?.Instances,
             cpu?.Regions?.FirstOrDefault(r => r.Region.Equals(name, StringComparison.OrdinalIgnoreCase))?.Cpu,
-            memory?.Regions?.FirstOrDefault(r => r.Region.Equals(name, StringComparison.OrdinalIgnoreCase))?.Memory)).ToList();
+            memory?.Regions?.FirstOrDefault(r => r.Region.Equals(name, StringComparison.OrdinalIgnoreCase))?.Memory,
+            requests?.Regions?.FirstOrDefault(r => r.Region.Equals(name, StringComparison.OrdinalIgnoreCase))?.Share)).ToList();
     }
 }

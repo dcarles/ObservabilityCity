@@ -1,0 +1,5 @@
+# Basic buildings the demo shows, as if found by the scope.assets rules.
+- { pillar: web, name: kv-web-catalog, label: Key vault, shape: vault, service: catalog }
+- { pillar: web, name: stwebmedia, label: Storage, shape: store, service: catalog }
+- { pillar: web, name: appcfg-web, label: App Configuration, shape: settings }
+- { pillar: chk, name: kv-chk-orders, label: Key vault, shape: vault, service: orders }

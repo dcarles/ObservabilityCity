@@ -42,7 +42,39 @@ public static class ScopeResolver
         foreach (var clash in systems.Where(s => s.TelemetryRole is not null).GroupBy(s => s.TelemetryRole!, StringComparer.OrdinalIgnoreCase).Where(g => g.Count() > 1))
             problems.Add($"Telemetry role '{clash.Key}' is used by {string.Join(" and ", clash.Select(s => $"'{s.SystemId}'"))}; the telemetry of one would be read as the other. Give each its own telemetry.role.");
 
-        return new Resolution(pillars, systems, tenantNames.Select(kv => new TenantName(kv.Key, kv.Value)).OrderBy(t => t.Id, StringComparer.Ordinal).ToList(), problems, inventory is not null, workspace ?? workspaceId, workspaceId, workspaceVia);
+        return new Resolution(pillars, systems, tenantNames.Select(kv => new TenantName(kv.Key, kv.Value)).OrderBy(t => t.Id, StringComparer.Ordinal).ToList(), problems, inventory is not null, workspace ?? workspaceId, workspaceId, workspaceVia,
+            ResolveAssets(view, rules, pillars, inventory));
+    }
+
+    /// <summary>
+    /// The resources that stand as basic buildings: in each pillar's subscription, every resource of a rule's types whose name matches its pattern. A <c>service</c> group that matches a system's serviceCode
+    /// ties the resource to that service; otherwise (or without the group) it belongs to the pillar. A <c>pillar</c> group that names another pillar leaves the resource out.
+    /// </summary>
+    private static List<ResolvedAsset> ResolveAssets(Registry.Registry view, ScopeRules rules, List<PillarScope> pillars, Inventory? inventory)
+    {
+        var found = new List<ResolvedAsset>();
+        if (inventory is null || rules.Assets.Count == 0) return found;
+        foreach (var group in view.Groups.Where(g => !g.IsHub))
+        {
+            var pillar = pillars.First(p => p.PillarId == group.Id);
+            if (pillar.SubscriptionId is not { } subscription) continue;
+            foreach (var rule in rules.Assets)
+            {
+                var regex = new Regex(rule.Pattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, RegexTimeout);
+                foreach (var resource in inventory.Resources.Where(r => r.SubscriptionId.Equals(subscription, StringComparison.OrdinalIgnoreCase) && rule.Types.Contains(r.Type, StringComparer.OrdinalIgnoreCase)))
+                {
+                    var match = regex.Match(resource.Name);
+                    if (!match.Success) continue;
+                    if (Group(match, "pillar") is { Length: > 0 } p && !p.Equals(pillar.Code, StringComparison.OrdinalIgnoreCase) && !p.Equals(group.Id, StringComparison.OrdinalIgnoreCase)) continue;
+                    var said = Group(match, "service");
+                    var owner = said.Length == 0 ? null : group.Nodes.FirstOrDefault(n => (n.ServiceCode ?? n.Service).Equals(said, StringComparison.OrdinalIgnoreCase))?.Service;
+                    var region = Group(match, "region") is { Length: > 0 } g ? g : resource.Region;
+                    if (rules.Regions.Tag is { } regionTag && TagValue(resource, regionTag) is { Length: > 0 } tagged) region = tagged;
+                    found.Add(new ResolvedAsset($"{group.Id}.{resource.Name.ToLowerInvariant()}", group.Id, resource.Name, rule.Label, rule.Shape, resource.Type, owner, region, resource.Id, rule.Name, subscription));
+                }
+            }
+        }
+        return found.OrderBy(a => a.Id, StringComparer.Ordinal).ToList();
     }
 
     /// <summary>A GUID or a resource id (starting with a slash) is a workspace id; anything else is a name.</summary>

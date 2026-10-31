@@ -204,7 +204,8 @@
           "jobs": null,
           "regions": null
         }
-      ]
+      ],
+      "assets": []
     },
     {
       "id": "cl",
@@ -272,11 +273,11 @@
           "service": "ledger",
           "external": true,
           "state": "Healthy",
-          "instancesTotal": 6,
-          "instancesHealthy": 6,
+          "instancesTotal": 3,
+          "instancesHealthy": 3,
           "load": 0.6,
-          "cpu": 0.4,
-          "memory": 0.38,
+          "cpu": 0.5199999999999999,
+          "memory": 0.41800000000000004,
           "utilisation": null,
           "throttled": null,
           "queueDepth": null,
@@ -309,7 +310,26 @@
           "inboundEstimated": false,
           "app": null,
           "jobs": null,
-          "regions": null
+          "regions": [
+            {
+              "region": "North Europe",
+              "label": "North Europe",
+              "instances": 3,
+              "cpu": 0.5199999999999999,
+              "memory": 0.41800000000000004,
+              "share": 0.55,
+              "skewed": false
+            },
+            {
+              "region": "West Europe",
+              "label": "West Europe",
+              "instances": 3,
+              "cpu": 0.4763636363636364,
+              "memory": 0.4041818181818182,
+              "share": 0.45,
+              "skewed": false
+            }
+          ]
         },
         {
           "id": "cl.ledger-worker",
@@ -318,11 +338,11 @@
           "service": "ledger",
           "external": false,
           "state": "Healthy",
-          "instancesTotal": 7,
-          "instancesHealthy": 7,
+          "instancesTotal": 4,
+          "instancesHealthy": 4,
           "load": 0.5714285714285714,
-          "cpu": 0.3857142857142857,
-          "memory": 0.46,
+          "cpu": 0.5014285714285713,
+          "memory": 0.5060000000000001,
           "utilisation": null,
           "throttled": null,
           "queueDepth": 2,
@@ -353,7 +373,26 @@
           "inboundEstimated": false,
           "app": null,
           "jobs": null,
-          "regions": null
+          "regions": [
+            {
+              "region": "North Europe",
+              "label": "North Europe",
+              "instances": 4,
+              "cpu": 0.5014285714285713,
+              "memory": 0.5060000000000001,
+              "share": 0.5,
+              "skewed": false
+            },
+            {
+              "region": "West Europe",
+              "label": "West Europe",
+              "instances": 3,
+              "cpu": 0.5014285714285713,
+              "memory": 0.5060000000000001,
+              "share": 0.5,
+              "skewed": false
+            }
+          ]
         },
         {
           "id": "cl.ledger-db",
@@ -763,7 +802,8 @@
           "jobs": null,
           "regions": null
         }
-      ]
+      ],
+      "assets": []
     },
     {
       "id": "acc",
@@ -1120,7 +1160,8 @@
           "jobs": null,
           "regions": null
         }
-      ]
+      ],
+      "assets": []
     },
     {
       "id": "pay",
@@ -1172,11 +1213,11 @@
           "service": "payments",
           "external": true,
           "state": "Healthy",
-          "instancesTotal": 7,
-          "instancesHealthy": 7,
+          "instancesTotal": 6,
+          "instancesHealthy": 6,
           "load": 0.6,
-          "cpu": 0.4,
-          "memory": 0.38,
+          "cpu": 0.5199999999999999,
+          "memory": 0.41800000000000004,
           "utilisation": null,
           "throttled": null,
           "queueDepth": null,
@@ -1211,7 +1252,26 @@
           "inboundEstimated": false,
           "app": null,
           "jobs": null,
-          "regions": null
+          "regions": [
+            {
+              "region": "North Europe",
+              "label": "North Europe",
+              "instances": 6,
+              "cpu": 0.5199999999999999,
+              "memory": 0.41800000000000004,
+              "share": 0.94,
+              "skewed": true
+            },
+            {
+              "region": "West Europe",
+              "label": "West Europe",
+              "instances": 1,
+              "cpu": 0.2953191489361702,
+              "memory": 0.34685106382978725,
+              "share": 0.06,
+              "skewed": false
+            }
+          ]
         },
         {
           "id": "pay.payments-worker",
@@ -1431,7 +1491,8 @@
           "jobs": null,
           "regions": null
         }
-      ]
+      ],
+      "assets": []
     },
     {
       "id": "frd",
@@ -1722,7 +1783,8 @@
           "jobs": null,
           "regions": null
         }
-      ]
+      ],
+      "assets": []
     },
     {
       "id": "cus",
@@ -2170,7 +2232,8 @@
           ],
           "regions": null
         }
-      ]
+      ],
+      "assets": []
     },
     {
       "id": "acq",
@@ -2558,7 +2621,8 @@
           "jobs": null,
           "regions": null
         }
-      ]
+      ],
+      "assets": []
     },
     {
       "id": "dec",
@@ -2851,7 +2915,8 @@
           "jobs": null,
           "regions": null
         }
-      ]
+      ],
+      "assets": []
     },
     {
       "id": "bil",
@@ -3159,7 +3224,8 @@
           ],
           "regions": null
         }
-      ]
+      ],
+      "assets": []
     },
     {
       "id": "col",
@@ -3706,7 +3772,8 @@
           "jobs": null,
           "regions": null
         }
-      ]
+      ],
+      "assets": []
     },
     {
       "id": "dsp",
@@ -3955,7 +4022,8 @@
           "jobs": null,
           "regions": null
         }
-      ]
+      ],
+      "assets": []
     },
     {
       "id": "rwd",
@@ -4246,7 +4314,8 @@
           "jobs": null,
           "regions": null
         }
-      ]
+      ],
+      "assets": []
     },
     {
       "id": "obk",
@@ -4539,7 +4608,8 @@
           "jobs": null,
           "regions": null
         }
-      ]
+      ],
+      "assets": []
     },
     {
       "id": "ntf",
@@ -4856,7 +4926,8 @@
           ],
           "regions": null
         }
-      ]
+      ],
+      "assets": []
     },
     {
       "id": "dat",
@@ -5268,7 +5339,8 @@
           "jobs": null,
           "regions": null
         }
-      ]
+      ],
+      "assets": []
     },
     {
       "id": "rcn",
@@ -5448,7 +5520,8 @@
           ],
           "regions": null
         }
-      ]
+      ],
+      "assets": []
     },
     {
       "id": "reg",
@@ -5552,7 +5625,8 @@
           "jobs": null,
           "regions": null
         }
-      ]
+      ],
+      "assets": []
     },
     {
       "id": "lost-found",
@@ -5748,7 +5822,8 @@
           "jobs": null,
           "regions": null
         }
-      ]
+      ],
+      "assets": []
     }
   ],
   "vendors": [
@@ -6160,5 +6235,6 @@
   },
   "incidentFreeSince": "2026-10-24T12:00:00+00:00",
   "incidentsSeen": false,
-  "outsideRequestsPerSecond": null
+  "outsideRequestsPerSecond": null,
+  "cloud": null
 }

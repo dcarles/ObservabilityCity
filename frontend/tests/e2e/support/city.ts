@@ -26,6 +26,8 @@ export interface Status {
   underConstruction: boolean
   /** Which region the building's numbers are, for a service in two or more; empty otherwise. */
   region: string
+  /** How the requests divide between the regions ("⚠ North 95% · West 5%", the warning when one takes too much); empty when nothing measures it. */
+  split: string
 }
 
 export interface TenantYard {

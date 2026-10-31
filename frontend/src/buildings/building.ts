@@ -30,6 +30,8 @@ export interface BuildingStatus {
   underConstruction: boolean
   /** The line under the name that says which region the numbers are, for a service in two or more regions; empty otherwise. */
   region: string
+  /** How the requests divide between the regions ("North 95% · West 5%"), with a warning sign in front when one region takes too much; empty when nothing measures it. */
+  split: string
 }
 
 interface FloorState {
@@ -83,6 +85,8 @@ export class Building {
   private extra: { text: string; hot: boolean } | null = null
   /** Which region the numbers are, for a service in two or more; the last line of the billboard when nothing else is there. */
   private regionText = ''
+  /** How a service in several regions divides its requests between them, the line below the region; null when nothing measures it. `hot` when one region takes too much. */
+  private split: { text: string; hot: boolean } | null = null
   /** Eased 0 to 1 while the app is stopped: the scaffolding grows round a half-built shell. */
   private construction = 0
   private readonly scaffold: THREE.Group
@@ -165,10 +169,11 @@ export class Building {
   }
 
   /** `region` is the line that says which region the numbers are (see regionLine); empty for a service in one region. */
-  setNode(n: NodeSnapshot, region = ''): void {
+  setNode(n: NodeSnapshot, region = '', split: { text: string; hot: boolean } | null = null): void {
     const first = this.node === null
     this.node = n
     this.regionText = region
+    this.split = region ? split : null
     this.model.setTenants?.(n.tenants ?? [], n.throttleAmber, this.tenantView)
     // a stopped app is a half-built shell: one low floor, however many instances it would have
     this.floorsWanted = n.app === 'Stopped' ? 1 : this.model.fixedFloors ?? floorsFor(n.instancesTotal || 1)
@@ -263,6 +268,7 @@ export class Building {
       tenants: this.model.tenantStatus?.() ?? null,
       underConstruction: n.app === 'Stopped',
       region: this.regionText,
+      split: this.split ? (this.split.hot ? '⚠ ' : '') + this.split.text : '',
     }
   }
 
@@ -423,6 +429,11 @@ export class Building {
     this.updateLabel()
   }
 
+  /** The request split line as drawn, for tests. */
+  splitLine(): string | null {
+    return this.split?.text ?? null
+  }
+
   /** The extra line as drawn, for tests. */
   extraLine(): string | null {
     return this.extra?.text ?? null
@@ -440,7 +451,7 @@ export class Building {
     const hasHealth = live && (!isAbsent(n, 'errors') || !isAbsent(n, 'latency'))
     const extra = this.extra ?? (n.app === 'Stopped' ? { text: 'UNDER CONSTRUCTION', hot: false } : this.regionText ? { text: this.regionText, hot: false } : null)
     const key = [n.name, text, warn, pct(n.cpu), pct(n.memory), pct(n.utilisation), Math.round((n.throttled ?? 0) * 1000),
-      Math.round(n.errorRate * 1000), Math.round(n.p99Ms / 10), Math.round((n.queueDepth ?? -1) / 5), Math.round((n.oldestMessageSeconds ?? -1) / 2), n.deadLetters ?? -1, extra?.text ?? '', extra?.hot ?? ''].join('|')
+      Math.round(n.errorRate * 1000), Math.round(n.p99Ms / 10), Math.round((n.queueDepth ?? -1) / 5), Math.round((n.oldestMessageSeconds ?? -1) / 2), n.deadLetters ?? -1, extra?.text ?? '', extra?.hot ?? '', this.split?.text ?? '', this.split?.hot ?? ''].join('|')
     const hasMeters = live && (n.cpu != null || n.utilisation != null)
     const hasQueue = live && n.queueDepth != null
     if (!this.label) {
@@ -457,7 +468,7 @@ export class Building {
     const ctx = (tex.image as HTMLCanvasElement).getContext('2d')!
     ctx.clearRect(0, 0, 512, 256)
     const color = { down: '#d63a2f', stale: '#8d949e', warn: '#e8a21a', ok: '#9fb4cc' }[warn]
-    const rows = (hasMeters ? 1 : 0) + (hasHealth ? 1 : 0) + (hasQueue ? 1 : 0) + (extra ? 1 : 0)
+    const rows = (hasMeters ? 1 : 0) + (hasHealth ? 1 : 0) + (hasQueue ? 1 : 0) + (extra ? 1 : 0) + (this.split ? 1 : 0)
     const h = 116 + rows * 38
     const y0 = 256 - h - 6
     ctx.fillStyle = 'rgba(20,28,40,0.9)'; roundRect(ctx, 4, y0, 504, h, 24); ctx.fill()
@@ -506,6 +517,11 @@ export class Building {
     if (extra) {
       ctx.fillStyle = extra.hot ? '#ffb830' : '#b8c7da'; ctx.font = '700 22px system-ui, sans-serif'; ctx.textAlign = 'center'
       ctx.fillText(extra.text, 256, top + 15, 470)
+      top += 38
+    }
+    if (this.split) {
+      ctx.fillStyle = this.split.hot ? '#ffb830' : '#b8c7da'; ctx.font = '700 22px system-ui, sans-serif'; ctx.textAlign = 'center'
+      ctx.fillText(this.split.text, 256, top + 15, 470)
     }
     tex.needsUpdate = true
   }

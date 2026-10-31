@@ -19,9 +19,11 @@ public static partial class RegistryLoader
             PillarSubscriptions = f.Pillars,
             Resources = f.Resources.Select(r => new ResourceRule(r.Name, r.Types, r.Pattern, r.Roles.Select(x => x.ToLowerInvariant() == "cron" ? "function" : x.ToLowerInvariant()).ToList(), r.ServiceTag, r.TenantNameTag, string.IsNullOrWhiteSpace(r.Instances) ? null : r.Instances.Trim(),
                 string.IsNullOrWhiteSpace(r.State) ? null : r.State.Trim(), r.Running.Count == 0 ? null : r.Running)).ToList(),
+            Cloud = string.IsNullOrWhiteSpace(f.Cloud) ? null : f.Cloud.Trim(),
+            Assets = f.Assets.Select(a => new AssetRule(a.Name, a.Label.Trim(), a.Shape.Trim().ToLowerInvariant(), a.Types, a.Pattern)).ToList(),
             TelemetryRole = f.TelemetryRole,
             Links = f.Links.Select(l => new ResourceLinkRule(l.Name, l.Url.Trim(), l.Types)).ToList(),
-            Regions = f.Regions is null ? RegionRules.Default : new RegionRules(string.IsNullOrWhiteSpace(f.Regions.Tag) ? null : f.Regions.Tag.Trim(), f.Regions.Names, f.Regions.Enabled ?? true, f.Regions.Off),
+            Regions = f.Regions is null ? RegionRules.Default : new RegionRules(string.IsNullOrWhiteSpace(f.Regions.Tag) ? null : f.Regions.Tag.Trim(), f.Regions.Names, f.Regions.Skew ?? RegionRules.DefaultSkew),
             Queries = new ScopeQueries(f.Queries?.Subscriptions, f.Queries?.Resources, f.Queries?.Workspaces),
         };
 
@@ -29,6 +31,12 @@ public static partial class RegistryLoader
     {
         if (def.Window is { } window && !SourceQuery.TryParseWindow(window, out _))
             errors.Add($"{name}: source '{source}' has window '{window}'. Write a number and a unit: 30s, 5m or 1h");
+        if (def.RegionQuery is { } regionQuery)
+        {
+            if (regionQuery.Trim().Length == 0) errors.Add($"{name}: source '{source}' has an empty regionQuery; give the query that returns role, region and calls, or leave it out");
+            var knownRegion = f.Scope?.Variables.Keys.Append(ScopeRules.EnvironmentVariable).Concat(SourceQuery.Variables) ?? [ScopeRules.EnvironmentVariable, .. SourceQuery.Variables];
+            foreach (var problem in ScopeTemplate.Check(regionQuery, knownRegion)) errors.Add($"{name}: source '{source}' regionQuery: {problem}");
+        }
         if (def.Query is not { } query) return;
         if (query.Trim().Length == 0) errors.Add($"{name}: source '{source}' has an empty query; give the query to send, or leave it out");
         var known = f.Scope?.Variables.Keys.Append(ScopeRules.EnvironmentVariable).Concat(SourceQuery.Variables) ?? [ScopeRules.EnvironmentVariable, .. SourceQuery.Variables];
@@ -138,8 +146,7 @@ public static partial class RegistryLoader
             if (regions.Tag is { } regionTag && regionTag.Trim().Length == 0) errors.Add($"{at}.regions.tag is empty; name the tag that holds a resource's region, or leave it out");
             foreach (var (value, label) in regions.Names)
                 if (label.Trim().Length == 0) errors.Add($"{at}.regions.names: '{value}' has an empty label");
-            foreach (var pillar in regions.Off)
-                if (!KebabId.IsMatch(pillar)) errors.Add($"{at}.regions.off: '{pillar}' must be a pillar id (lowercase kebab-case)");
+            if (regions.Skew is { } skew && (!double.IsFinite(skew) || skew <= 0.5 || skew > 1)) errors.Add($"{at}.regions.skew is {skew}; give a share above 0.5 and up to 1 (1 never flags)");
         }
         var linkNames = new HashSet<string>();
         foreach (var l in s.Links)
@@ -152,6 +159,23 @@ public static partial class RegistryLoader
                 errors.Add($"{link}: url must start with https:// (or http://) written out, so a variable can never choose the scheme or host");
             foreach (var problem in ScopeTemplate.Check(url, own.Concat(ScopeRules.LinkVariables))) errors.Add($"{link}.url: {problem}");
             if (l.Types.Any(t => t.Trim().Length == 0)) errors.Add($"{link}: types has an empty entry");
+        }
+        var assetNames = new HashSet<string>();
+        foreach (var a in s.Assets)
+        {
+            var rule = $"{at}.assets '{a.Name}'";
+            if (!KebabId.IsMatch(a.Name)) errors.Add($"{at}.assets: name '{a.Name}' must be lowercase kebab-case");
+            else if (!assetNames.Add(a.Name)) errors.Add($"{at}.assets: '{a.Name}' is listed twice");
+            if (a.Label.Trim().Length == 0) errors.Add($"{rule} needs a label, the words the drawer calls it (for example Key vault)");
+            if (!AssetRule.Shapes.Contains(a.Shape.Trim().ToLowerInvariant())) errors.Add($"{rule}: shape '{a.Shape}'. Use {string.Join(", ", AssetRule.Shapes)}.{DidYouMean.Hint(a.Shape, AssetRule.Shapes)}");
+            if (a.Types.Count == 0) errors.Add($"{rule} needs types (the resource types it applies to)");
+            try
+            {
+                var regex = new Regex(a.Pattern, RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
+                foreach (var g in regex.GetGroupNames().Where(g => !int.TryParse(g, out _) && !AssetRule.Groups.Contains(g)))
+                    errors.Add($"{rule}: pattern has the group '{g}'. Use {string.Join(", ", AssetRule.Groups)}.{DidYouMean.Hint(g, AssetRule.Groups)}");
+            }
+            catch (ArgumentException e) { errors.Add($"{rule}: pattern is not a valid regular expression: {e.Message}"); }
         }
         var seen = new HashSet<string>();
         foreach (var r in s.Resources)
