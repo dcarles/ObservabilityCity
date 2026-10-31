@@ -10,6 +10,8 @@ internal sealed class TownFile
     public string Topology { get; set; } = "direct";
     /// <summary>"demo" (a town with a fake source and the Break things panel) or "live". A town that does not say is live.</summary>
     public string Mode { get; set; } = "live";
+    /// <summary>How many cars appear, as a multiple of the usual number. 1 is the usual look.</summary>
+    public double TrafficDensity { get; set; } = 1;
     /// <summary>Warnings the validator should expect in this registry (a test registry that shows a rule on purpose). Read by the validator only.</summary>
     public List<ExpectedWarningFile> ExpectedWarnings { get; set; } = [];
 }

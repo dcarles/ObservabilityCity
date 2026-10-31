@@ -1014,6 +1014,7 @@
           "totals",
           "townId",
           "townName",
+          "trafficDensity",
           "vendors",
           "view"
         ],
@@ -1116,6 +1117,10 @@
           "cloud": {
             "type": "string",
             "nullable": true
+          },
+          "trafficDensity": {
+            "type": "number",
+            "format": "double"
           }
         },
         "additionalProperties": false

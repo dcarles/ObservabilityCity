@@ -132,7 +132,7 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
         return new Snapshot(registry.Town.Id, registry.Town.Name, registry.Town.GroupLabel, env?.Id ?? Environment, now, DayFraction(), totals, notices, groups,
             vendors, callers, dependencies, registry.RingCapacity,
             env?.Name ?? Environment, environments, TenantsOf(env, allNodes), registry.Town.Topology, Mode ?? registry.Town.Mode, view, incidentFreeSince, incidentsSeen,
-            OutsideRate(onScreenNodes.Values), env?.Scope.Cloud);
+            OutsideRate(onScreenNodes.Values), env?.Scope.Cloud, registry.Town.TrafficDensity);
     }
 
     /// <summary>Remembers when each island last had an open incident. Every full build calls this, so the memory does not depend on who is looking.</summary>

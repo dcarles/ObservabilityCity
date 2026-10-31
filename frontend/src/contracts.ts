@@ -337,6 +337,8 @@ export interface components {
             /** Format: double */
             outsideRequestsPerSecond?: number | null;
             cloud?: string | null;
+            /** Format: double */
+            trafficDensity: number;
         };
         SubscriptionSnapshot: {
             topic: string;

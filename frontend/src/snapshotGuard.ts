@@ -79,6 +79,7 @@ export function checkSnapshot(raw: unknown): Checked {
     tenants: checkTenants(raw.tenants, problems),
     topology: str(raw.topology) || 'direct',
     mode: raw.mode === 'demo' ? 'demo' : 'live',
+    trafficDensity: isFiniteNumber(raw.trafficDensity) && raw.trafficDensity > 0 ? raw.trafficDensity : 1,
     view: checkView(raw.view),
     generatedAt: str(raw.generatedAt),
     incidentFreeSince: typeof raw.incidentFreeSince === 'string' && Number.isFinite(Date.parse(raw.incidentFreeSince)) ? raw.incidentFreeSince : null,

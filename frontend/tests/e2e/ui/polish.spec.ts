@@ -98,6 +98,30 @@ test.describe('the quality list', () => {
     expect(low).toBeLessThan(high * 0.7)
   })
 
+  test('sends more cars when the town asks for more traffic, and the quality setting still counts on top', async ({ town, page }) => {
+    await town.reset()
+    const carsSent = async (density: number) => {
+      await page.goto('/?test=1&quality=high')
+      await waitForTown(page)
+      // one synchronous run: a snapshot from the server cannot arrive between feeding the setting and counting the cars
+      return page.evaluate((d) => {
+        const c = (window as any).city
+        c.feed({ ...c.seen.last, trafficDensity: d })
+        const before = c.drawnCars().sent
+        for (let i = 0; i < 160; i++) c.step(0.5)
+        return { sent: c.drawnCars().sent - before, setting: c.town.cars.townDensity, quality: c.town.cars.density }
+      }, density)
+    }
+    // small numbers: the sample town's lanes are full at about a third of its usual traffic, and a full lane takes no more cars
+    const usual = await carsSent(0.06)
+    const dense = await carsSent(0.18)
+
+    expect(dense.setting).toBe(0.18)
+    expect(dense.quality).toBe(1)
+    expect(usual.sent).toBeGreaterThan(2)
+    expect(dense.sent).toBeGreaterThan(usual.sent * 1.5)
+  })
+
   test('is not on offer in the top bar of a wall, which has no bar', async ({ town, page }) => {
     await town.open('&wall=1')
     await expect(page.locator('#quality-button')).toBeHidden()

@@ -30,6 +30,7 @@ Thresholds cascade: `defaults.yaml` (per role) → the pillar's `defaults` → t
 | `groupLabel` | no | `Group` | What one island is called in the interface (for example Pillar, Domain, Team). |
 | `topology` | no | `direct` | `direct`: islands are linked by an outer ring road. `hub-and-spoke`: islands call each other through a gateway on the hub. |
 | `mode` | no | `live` | `demo` gives the town a fake source, the Break things panel and the story bar. `live` never does. |
+| `trafficDensity` | no | `1` | How many cars appear, as a multiple of the usual number: `1` is the usual look, `2` twice as many, `0.5` half. From `0.25` to `10`. A weak PC still lowers it with the quality setting, and the town never shows more than 420 cars at once. |
 | `expectedWarnings` | no | none | Warnings the validator should expect, for a test folder that shows a rule on purpose. |
 
 <!-- file: ExpectedWarningFile -->

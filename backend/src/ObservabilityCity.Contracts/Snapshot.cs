@@ -289,6 +289,7 @@ public sealed record TownTotals(
 /// OutsideRequestsPerSecond is the traffic no town system explains, summed over the APIs on screen: what reaches the airport. It is null while the environment
 /// does not measure it (links.traffic), and the airport then adds up what the outside callers bring.
 /// Cloud is what the environment calls its cloud (scope.cloud), for the words "not found in ..."; null: the renderer says "the inventory".
+/// TrafficDensity is the town's trafficDensity setting: how many cars appear, as a multiple of the usual number (1).
 /// </summary>
 public sealed record Snapshot(
     string TownId,
@@ -313,7 +314,8 @@ public sealed record Snapshot(
     DateTimeOffset? IncidentFreeSince,
     bool IncidentsSeen,
     double? OutsideRequestsPerSecond = null,
-    string? Cloud = null);
+    string? Cloud = null,
+    double TrafficDensity = 1);
 
 /// <summary>An island the island filter left out.</summary>
 public sealed record HiddenIsland(string Id, string DisplayName);

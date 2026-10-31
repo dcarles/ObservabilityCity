@@ -264,6 +264,7 @@ async function start(): Promise<void> {
         servicePanel.close()
       }
       town.apply(s)
+      town.cars.townDensity = s.trafficDensity
       if (s.mode === 'demo') startDemoTools()
       // a followed tenant that left the environment can no longer be followed
       const pruned = pruneTenants(tenantView, s.tenants ?? [])
