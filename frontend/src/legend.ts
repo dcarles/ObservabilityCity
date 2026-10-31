@@ -72,7 +72,7 @@ export const LEGEND: readonly LegendSection[] = [
     entries: [
       { id: 'weather', sees: 'Weather over an island', means: 'An open incident there: clouds for sev 4, overcast sev 3, rain sev 2, storm with lightning sev 1', tone: 'amber' },
       { id: 'airport', sees: 'Airport', means: 'Callers from outside. Planes follow the inbound traffic', tone: 'neutral' },
-      { id: 'vendor', sees: 'Small island out at sea', means: 'A third party we call. Its health comes from our calls to it', tone: 'neutral' },
+      { id: 'vendor', sees: 'Small island out at sea', means: 'A third party we call, or a service of the company outside the monitored platform (labelled internal). Several services of one vendor stand on one island. Health comes from our calls to it', tone: 'neutral' },
       { id: 'sign', sees: 'Sign with a hedge in front of a block', means: 'A service: its API, worker and database, with the worst state of them', tone: 'neutral' },
       { id: 'yard', sees: 'Striped or pale unit in a yard', means: 'A test tenant. A "?" unit is a tenant nobody listed', tone: 'neutral' },
       { id: 'signpost', sees: 'Signpost at a gate', means: 'Traffic to or from an island the island filter has hidden', tone: 'neutral' },

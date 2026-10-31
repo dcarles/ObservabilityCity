@@ -31,8 +31,15 @@ public sealed partial record Registry
             && (t.GroupId == "hub" || groups.First(g => g.Id == t.GroupId).Nodes.Any(n => n.Service == t.Service))).ToList();
         var topicNames = topics.Select(t => t.Name).ToHashSet();
         var subscriptions = Subscriptions.Where(s => present.Contains(s.ConsumerId) && topicNames.Contains(s.Topic)).ToList();
+        // calls link discovery found to a service of a vendor island come from callers that are deployed here and have discovery on
+        var discovering = groups.SelectMany(g => g.Nodes).Where(n => n.DiscoverLinks).Select(n => n.Id).ToHashSet();
         var vendors = Vendors
-            .Select(v => v with { CalledBy = v.CalledBy.Where(present.Contains).ToList() })
+            .Select(v => v with
+            {
+                CalledBy = v.CalledBy.Where(present.Contains)
+                    .Concat(found?.Where(l => l.Target == v.Node.Id && discovering.Contains(l.Caller)).Select(l => l.Caller) ?? [])
+                    .Distinct().ToList(),
+            })
             .Where(v => v.CalledBy.Count > 0 || Vendors.First(o => o.Node.Id == v.Node.Id).CalledBy.Count == 0)
             .ToList();
         var callers = ExternalCallers.Select(c => c with { Calls = c.Calls.Where(present.Contains).ToList() }).ToList();

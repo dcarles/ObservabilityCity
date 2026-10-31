@@ -5333,7 +5333,10 @@
       "calledBy": [
         "dec.decision-api",
         "acq.applications-api"
-      ]
+      ],
+      "islandId": "ext.credit-bureau",
+      "islandName": null,
+      "internal": false
     },
     {
       "node": {
@@ -5377,7 +5380,10 @@
       },
       "calledBy": [
         "pay.payments-api"
-      ]
+      ],
+      "islandId": "ext.card-network",
+      "islandName": null,
+      "internal": false
     },
     {
       "node": {
@@ -5421,7 +5427,10 @@
       },
       "calledBy": [
         "ntf.dispatch-worker"
-      ]
+      ],
+      "islandId": "ext.sms-email",
+      "islandName": null,
+      "internal": false
     },
     {
       "node": {
@@ -5466,7 +5475,10 @@
       "calledBy": [
         "dat.ingest-worker",
         "hub.egress"
-      ]
+      ],
+      "islandId": "ext.snowflake",
+      "islandName": null,
+      "internal": false
     }
   ],
   "externalCallers": [

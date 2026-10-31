@@ -60,7 +60,7 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
                 incidents.GetValueOrDefault(g.Id) ?? [], links[g.Id].HasBridge, links[g.Id].HasRingBridge, MessagingOf(registry, g),
                 g.Nodes.Select(n => ToNode(n, now, registry)).ToList()))
             .ToList();
-        var allVendors = registry.Vendors.Select(v => new VendorSnapshot(ToNode(v.Node, now, registry), v.CalledBy)).ToList();
+        var allVendors = registry.Vendors.Select(v => new VendorSnapshot(ToNode(v.Node, now, registry), v.CalledBy, v.IslandId ?? v.Node.Id, v.IslandName, v.Internal)).ToList();
         var allNodes = allGroups.SelectMany(g => g.Nodes).ToList();
         var everyone = allNodes.Concat(allVendors.Select(v => v.Node)).ToDictionary(n => n.Id);
 

@@ -12,7 +12,7 @@ public enum LinkOutcome
     Ignored,
     /// <summary>A known third party. Recognised, not drawn yet.</summary>
     Vendor,
-    /// <summary>A system of the town.</summary>
+    /// <summary>A system of the town, or a service of a vendor island.</summary>
     Found,
     /// <summary>No rule explains the address.</summary>
     Unresolved,
@@ -28,6 +28,7 @@ public sealed class LinkClassifier
     private readonly IReadOnlyDictionary<string, string> _aliases;
     private readonly IReadOnlyList<string> _vendorDomains;
     private readonly Dictionary<string, string> _systems;
+    private readonly List<(string Id, string Host, Regex? Path)> _services;
 
     public LinkClassifier(LinkDiscovery config, IEnumerable<RegistryVendor> vendors, IEnumerable<string> systemIds)
     {
@@ -36,6 +37,8 @@ public sealed class LinkClassifier
         _rules = config.Rules.Select(r => (new Regex(r.Host, Options, LinkDiscovery.RegexTimeout), r.Path is null ? null : new Regex(r.Path, Options, LinkDiscovery.RegexTimeout), r)).ToList();
         _aliases = new Dictionary<string, string>(config.Aliases, StringComparer.OrdinalIgnoreCase);
         _vendorDomains = vendors.SelectMany(v => v.Domains).Select(d => d.Trim().TrimStart('.').ToLowerInvariant()).Where(d => d.Length > 0).ToList();
+        _services = vendors.SelectMany(v => v.Matches.Select(m => (v.Node.Id, m.Host.Trim().TrimStart('.').ToLowerInvariant(), m.Path is null ? null : new Regex(m.Path, Options, LinkDiscovery.RegexTimeout))))
+            .Where(m => m.Item2.Length > 0).ToList();
         _systems = systemIds.ToDictionary(id => id, id => id, StringComparer.OrdinalIgnoreCase);
     }
 
@@ -57,6 +60,13 @@ public sealed class LinkClassifier
             if (_systems.TryGetValue(target, out var id)) return new Classified(LinkOutcome.Found, id, rule.Gateway);
         }
         var h = row.Host.ToLowerInvariant();
+        // a service of a vendor island: the address says which building the call goes to
+        foreach (var (id, domain, path) in _services)
+        {
+            if (h != domain && !h.EndsWith("." + domain, StringComparison.Ordinal)) continue;
+            if (path is not null && (row.Path is null || !path.IsMatch(row.Path))) continue;
+            return new Classified(LinkOutcome.Found, id);
+        }
         if (_vendorDomains.Any(d => h == d || h.EndsWith("." + d, StringComparison.Ordinal))) return new Classified(LinkOutcome.Vendor);
         return new Classified(LinkOutcome.Unresolved);
     }
