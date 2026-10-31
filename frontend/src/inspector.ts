@@ -1,8 +1,8 @@
-import type { GroupSnapshot, LogLine, NodeSnapshot, ScopeResource, Snapshot, SystemDetail } from './types'
+import type { GroupSnapshot, LogLine, NodeSnapshot, ScopeResource, Snapshot, SystemDetail, VendorSnapshot } from './types'
 import { escapeHtml } from './picker'
 import { scopeParams, type Scope } from './scope'
 import { tenantListOrder, tenantFigures, yardSummary, type TenantView } from './tenants'
-import { ago, clockTime, configOrder, filterLogs, incidentSummary, LAYER_WORD, linkSections, originLabel, type LinkItem, overviewLinks, overviewRows, reasons, resourceLinks, scopeView, SEVERITY_WORD, stateTone, type LogFilter } from './inspectorModel'
+import { ago, clockTime, configOrder, filterLogs, incidentSummary, LAYER_WORD, linkSections, originLabel, type LinkItem, overviewLinks, overviewRows, reasons, resourceLinks, scopeView, SEVERITY_WORD, stateTone, vendorWhere, type LogFilter } from './inspectorModel'
 
 export type InspectorTab = 'overview' | 'links' | 'logs' | 'config'
 const TABS: { id: InspectorTab; label: string }[] = [
@@ -143,7 +143,7 @@ export class Inspector {
     this.render()
   }
 
-  private find(id: string): { node: NodeSnapshot; group: GroupSnapshot | null } | null {
+  private find(id: string): { node: NodeSnapshot; group: GroupSnapshot | null; vendor?: VendorSnapshot } | null {
     const s = this.snap
     if (!s) return null
     for (const g of s.groups) {
@@ -151,7 +151,7 @@ export class Inspector {
       if (node) return { node, group: g }
     }
     const v = s.vendors.find((x) => x.node.id === id)
-    return v ? { node: v.node, group: null } : null
+    return v ? { node: v.node, group: null, vendor: v } : null
   }
 
   private click(t: HTMLElement): void {
@@ -168,12 +168,12 @@ export class Inspector {
     const id = this.id
     const found = id ? this.find(id) : null
     if (!id || !found) return
-    const { node: n, group } = found
+    const { node: n, group, vendor } = found
     const body = { overview: () => this.overview(n, group), links: () => this.links(), logs: () => this.logLines(n), config: () => this.config() }[this.tab]()
     const html = `
       <div class="head">
         <div><b>${escapeHtml(n.name)}</b> <span class="${stateTone(n.state)}">· ${n.state}</span>
-          <div class="where">${escapeHtml(n.kind)} · ${escapeHtml(group?.displayName ?? 'Third party')}${this.detail?.service ? ` · service ${escapeHtml(this.detail.service)}` : ''}</div></div>
+          <div class="where">${escapeHtml(n.kind)} · ${escapeHtml(group?.displayName ?? vendorWhere(vendor))}${this.detail?.service ? ` · service ${escapeHtml(this.detail.service)}` : ''}</div></div>
         <button id="inspector-close" title="Close (Esc)">✕</button>
       </div>
       <div class="tabs" role="tablist">${TABS.map((t) => `<button role="tab" data-tab="${t.id}" class="${t.id === this.tab ? 'on' : ''}">${t.label}</button>`).join('')}</div>

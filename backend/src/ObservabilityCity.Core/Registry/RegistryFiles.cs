@@ -162,6 +162,33 @@ internal sealed class VendorFile
     public ErrorThresholdsFile? Errors { get; set; }
     /// <summary>Host names (and everything under them) that belong to this vendor, so a call to one is recognised as a vendor call by link discovery.</summary>
     public List<string> Domains { get; set; } = [];
+    /// <summary>The vendor is a group of services behind one island (several buildings), each recognised by the address its calls go to. Without services the vendor is one building.</summary>
+    public List<VendorServiceFile> Services { get; set; } = [];
+    /// <summary>Marks a vendor that is the company's own: services that are not part of the monitored platform. Shown with an "internal" label.</summary>
+    public bool Internal { get; set; }
+}
+
+/// <summary>One building on a vendor's island, and the addresses that mean a call to it.</summary>
+internal sealed class VendorServiceFile
+{
+    /// <summary>Short id; the building's id is the vendor id, a dash and this.</summary>
+    public string Id { get; set; } = "";
+    public string? Name { get; set; }
+    /// <summary>Which calls go to this service: a host (and everything under it) with an optional path pattern. A call matching any entry is a call to it; the first service that matches wins.</summary>
+    public List<VendorMatchFile> Match { get; set; } = [];
+    /// <summary>Our systems that call this service, besides the ones link discovery finds.</summary>
+    public List<string> CalledBy { get; set; } = [];
+    /// <summary>Overrides the vendor's own value.</summary>
+    public double? SlaP99Ms { get; set; }
+    public ErrorThresholdsFile? Errors { get; set; }
+}
+
+internal sealed class VendorMatchFile
+{
+    /// <summary>A host name; the host itself and everything under it match.</summary>
+    public string Host { get; set; } = "";
+    /// <summary>A regular expression the call's path must match. Without it every path on the host matches.</summary>
+    public string? Path { get; set; }
 }
 
 /// <summary>environments/{id}.yaml: one environment. The pillar and system files are shared by every environment; this file says what differs.</summary>

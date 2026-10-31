@@ -91,6 +91,33 @@ test.describe('connectors follow real links', () => {
   })
 })
 
+test.describe('a vendor with several services', () => {
+  // links-town has one vendor island, Shared services, with three services called from two islands (credit from ful and nom, identity from nom, reports from ful)
+  test('stands on one island with a building for each service and a bridge for each calling island', async ({ town, page }) => {
+    await town.open()
+    await town.step(5)
+
+    const vendors = await page.evaluate(() => (window as any).city.inspectVendors() as { id: string; island: string; x: number; z: number; bx: number; bz: number; bridges: number }[])
+
+    expect(vendors.map((v) => v.id).sort()).toEqual(['ext.shared-credit', 'ext.shared-identity', 'ext.shared-reports'])
+    expect(new Set(vendors.map((v) => v.island))).toEqual(new Set(['ext.shared']))
+    expect(new Set(vendors.map((v) => `${v.x.toFixed(2)}/${v.z.toFixed(2)}`)).size).toBe(1) // one island
+    expect(new Set(vendors.map((v) => `${v.bx.toFixed(1)}/${v.bz.toFixed(1)}`)).size).toBe(3) // three buildings, each in its own place
+    for (const v of vendors) expect(Math.hypot(v.bx - v.x, v.bz - v.z), v.id).toBeLessThan(30) // all on that island
+    expect(Object.fromEntries(vendors.map((v) => [v.id, v.bridges]))).toEqual({ 'ext.shared-credit': 2, 'ext.shared-identity': 1, 'ext.shared-reports': 1 })
+  })
+
+  test('is labelled internal in the inspector, with the island it shares', async ({ town, page }) => {
+    await town.open()
+    await town.step(5)
+
+    await page.evaluate(() => (window as any).city.openSystem('ext.shared-identity'))
+
+    await expect(page.locator('#inspector .where')).toContainText('Internal service, Shared services')
+    await expect(page.locator('#inspector .head b')).toHaveText('Identity')
+  })
+})
+
 test.describe('backlog and dead letters on a pier', () => {
   test('a backlog piles crates on that pier only, and the pile goes when the consumer catches up', async ({ town }) => {
     await town.open()

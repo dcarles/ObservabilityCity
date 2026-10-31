@@ -184,10 +184,15 @@ public sealed record GroupSnapshot(
 /// <summary>
 /// A third party outside the town (a credit bureau, a data warehouse). Node carries its health, worked out from our own calls to it:
 /// request rate, error rate and p99 of the calls that go out, with the vendor's own thresholds. CalledBy lists the ids of our systems that call it.
+/// A vendor with several services has one VendorSnapshot for each, all with the same IslandId (and IslandName): they stand on one island. Without IslandId the
+/// vendor is its own island. Internal marks the company's own services outside the monitored platform.
 /// </summary>
 public sealed record VendorSnapshot(
     NodeSnapshot Node,
-    IReadOnlyList<string> CalledBy);
+    IReadOnlyList<string> CalledBy,
+    string? IslandId = null,
+    string? IslandName = null,
+    bool Internal = false);
 
 /// <summary>
 /// Someone outside the town (an app, a partner) and the external systems it reaches. RequestsPerSecond is the traffic it brings in, the

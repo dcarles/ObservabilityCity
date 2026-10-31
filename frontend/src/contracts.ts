@@ -374,6 +374,9 @@ export interface components {
         VendorSnapshot: {
             node: components["schemas"]["NodeSnapshot"];
             calledBy: string[];
+            islandId?: string | null;
+            islandName?: string | null;
+            internal: boolean;
         };
         ViewInfo: {
             islands: string[];

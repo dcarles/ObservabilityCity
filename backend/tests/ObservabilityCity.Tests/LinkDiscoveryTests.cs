@@ -204,7 +204,7 @@ public class LinkDiscoveryTests
     private const string QueryText = "AppDependencies | where AppRoleName in ({roles}) | where TimeGenerated between (datetime({from}) .. datetime({to}))";
 
     // Town A: services have their own hosts, <service>-<role>.<pillar code>.a.example.test, and a gateway whose path starts with the pillar code.
-    private const string LinksA = """
+    internal const string LinksA = """
 
         links:
           source: telemetry
@@ -217,7 +217,7 @@ public class LinkDiscoveryTests
         """;
 
     // Town B: no gateway path rule at all; every service is one flat host with the parts in another order, and the pillars are spelt out.
-    private const string LinksB = """
+    internal const string LinksB = """
 
         links:
           source: telemetry

@@ -97,7 +97,7 @@ describe('systems with no data', () => {
   it('are counted, third parties too', () => {
     const quiet = structuredClone(staging)
     quiet.groups[1].nodes[0].state = 'Stale'
-    quiet.vendors = [{ node: { ...quiet.groups[1].nodes[0], id: 'ext.x', state: 'Stale' }, calledBy: [] }]
+    quiet.vendors = [{ node: { ...quiet.groups[1].nodes[0], id: 'ext.x', state: 'Stale' }, calledBy: [], internal: false }]
 
     expect(staleCount(quiet)).toBe(2)
     expect(viewTotals(quiet, ALL_TENANTS).stale).toBe(2)

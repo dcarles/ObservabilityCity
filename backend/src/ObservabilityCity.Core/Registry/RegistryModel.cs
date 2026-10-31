@@ -106,9 +106,24 @@ public sealed record RegistryVendor(RegistryNode Node, IReadOnlyList<string> Cal
     /// <summary>Host names (and everything under them) that belong to this vendor, so link discovery knows a call to one is not an unexplained address.</summary>
     public IReadOnlyList<string> Domains { get; init; } = [];
 
+    /// <summary>The island this vendor's building stands on: the vendor id for a group of services, null for a vendor that is its own island (the building's id is used).</summary>
+    public string? IslandId { get; init; }
+
+    /// <summary>Name of the island when several services share it.</summary>
+    public string? IslandName { get; init; }
+
+    /// <summary>The company's own service outside the monitored platform, not a third party.</summary>
+    public bool Internal { get; init; }
+
+    /// <summary>The addresses that mean a call to this building (a service of a vendor island).</summary>
+    public IReadOnlyList<VendorMatch> Matches { get; init; } = [];
+
     /// <summary>The group id every vendor id starts with (ext.snowflake).</summary>
     public const string GroupId = "ext";
 }
+
+/// <summary>A host (and everything under it) with an optional pattern the path must match.</summary>
+public sealed record VendorMatch(string Host, string? Path);
 
 /// <summary>Someone outside the town (an app, a partner) and the external systems it calls.</summary>
 public sealed record ExternalCaller(string Id, string Name, IReadOnlyList<string> Calls);

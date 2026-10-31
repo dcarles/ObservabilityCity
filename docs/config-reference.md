@@ -161,6 +161,24 @@ One island. The file name is the pillar id.
 | `slaP99Ms` | no | none | Latency target. |
 | `errors` | no | none | Error thresholds. |
 | `domains` | no | none | Host names (and everything under them) that belong to this vendor. Link discovery recognises a call to one as a vendor call instead of reporting it as unresolved. |
+| `internal` | no | false | The company's own services outside the monitored platform, not a third party. The island and its buildings carry an "internal" label. |
+| `services` | no | none | The vendor stands on one island with a building for each service (a vendor with services needs no `calledBy`; put it on each service). Without services the vendor is one building on its own island. A service's building id is the vendor id, a dash and the service id. |
+
+<!-- file: VendorServiceFile -->
+| Key | Required | Default | Meaning |
+|---|---|---|---|
+| `id` | yes | | Short id of the service. |
+| `name` | no | the id | Name shown. |
+| `match` | yes | | The addresses that mean a call to this service: entries with a `host` and an optional `path`. A call matching any entry belongs to it; the first service that matches wins. Link discovery draws the callers it finds from those calls. |
+| `calledBy` | no | none | Ids of our systems that call it, besides the ones link discovery finds. |
+| `slaP99Ms` | no | the vendor's | Latency target. |
+| `errors` | no | the vendor's | Error thresholds. |
+
+<!-- file: VendorMatchFile -->
+| Key | Required | Default | Meaning |
+|---|---|---|---|
+| `host` | yes | | A host name. The host itself and everything under it match. |
+| `path` | no | any | A regular expression the call's path must match. |
 
 ## environments/&lt;id&gt;.yaml
 One file per environment. The pillar and system files are shared; this file says what differs: where the numbers come from, which tenants exist, which systems are not deployed.

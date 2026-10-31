@@ -8,15 +8,100 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["id", "calledBy"],
+        "required": [
+          "id"
+        ],
         "additionalProperties": false,
         "properties": {
-          "id": { "type": "string", "pattern": "^ext\\.[a-z0-9]+(-[a-z0-9]+)*$", "description": "ext.vendor-name" },
-          "name": { "type": "string" },
-          "calledBy": { "type": "array", "description": "Our systems that call this vendor. Its health is read from the errors and latency of those calls.", "items": { "$ref": "system-ids.schema.json#/$defs/systemId" } },
-          "slaP99Ms": { "type": "number", "description": "How slow the vendor may get before it counts as degraded." },
-          "errors": { "$ref": "defs.schema.json#/$defs/thresholds" },
-          "domains": { "type": "array", "description": "Host names (and everything under them) that belong to this vendor, so link discovery recognises a call to one as a vendor call instead of reporting it as unresolved.", "items": { "type": "string" } }
+          "id": {
+            "type": "string",
+            "pattern": "^ext\\.[a-z0-9]+(-[a-z0-9]+)*$",
+            "description": "ext.vendor-name"
+          },
+          "name": {
+            "type": "string"
+          },
+          "calledBy": {
+            "type": "array",
+            "description": "Our systems that call this vendor. Its health is read from the errors and latency of those calls. Required unless the vendor has services.",
+            "items": {
+              "$ref": "system-ids.schema.json#/$defs/systemId"
+            }
+          },
+          "slaP99Ms": {
+            "type": "number",
+            "description": "How slow the vendor may get before it counts as degraded."
+          },
+          "errors": {
+            "$ref": "defs.schema.json#/$defs/thresholds"
+          },
+          "domains": {
+            "type": "array",
+            "description": "Host names (and everything under them) that belong to this vendor, so link discovery recognises a call to one as a vendor call instead of reporting it as unresolved.",
+            "items": {
+              "type": "string"
+            }
+          },
+          "internal": {
+            "type": "boolean",
+            "description": "The company's own services outside the monitored platform, not a third party. Shown with an internal label."
+          },
+          "services": {
+            "type": "array",
+            "description": "The vendor stands on one island with a building for each service. A call is sent to the service whose match fits its address.",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "match"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+                  "description": "Short id; the building is the vendor id, a dash and this."
+                },
+                "name": {
+                  "type": "string"
+                },
+                "match": {
+                  "type": "array",
+                  "description": "Which calls go to this service. A call matching any entry is a call to it; the first service that matches wins.",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "host"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                      "host": {
+                        "type": "string",
+                        "description": "A host name; the host itself and everything under it match."
+                      },
+                      "path": {
+                        "type": "string",
+                        "description": "A regular expression the call's path must match. Without it every path on the host matches."
+                      }
+                    }
+                  }
+                },
+                "calledBy": {
+                  "type": "array",
+                  "description": "Our systems that call this service, besides the ones link discovery finds.",
+                  "items": {
+                    "$ref": "system-ids.schema.json#/$defs/systemId"
+                  }
+                },
+                "slaP99Ms": {
+                  "type": "number"
+                },
+                "errors": {
+                  "$ref": "defs.schema.json#/$defs/thresholds"
+                }
+              }
+            }
+          }
         }
       }
     }

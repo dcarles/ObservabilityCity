@@ -52,7 +52,7 @@ export function attentionOf(s: Snapshot): Attention[] {
     })
   }
   for (const g of groups) for (const n of g.nodes) add(n, g.displayName)
-  for (const v of s.vendors) add(v.node, 'third party')
+  for (const v of s.vendors) add(v.node, v.internal ? 'internal service' : 'third party')
   return items
     .sort((a, b) => RANK[a.kind] - RANK[b.kind] || b.weight - a.weight || a.order - b.order)
     .map(({ weight: _w, order: _o, ...rest }) => rest)

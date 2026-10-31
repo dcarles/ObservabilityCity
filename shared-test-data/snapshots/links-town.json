@@ -205,7 +205,7 @@
       "configError": null,
       "incidents": [],
       "hasBridge": true,
-      "hasRingBridge": false,
+      "hasRingBridge": true,
       "messaging": {
         "topics": [
           {
@@ -464,7 +464,7 @@
       "configError": null,
       "incidents": [],
       "hasBridge": true,
-      "hasRingBridge": false,
+      "hasRingBridge": true,
       "messaging": {
         "topics": [],
         "subscriptions": []
@@ -812,7 +812,150 @@
       ]
     }
   ],
-  "vendors": [],
+  "vendors": [
+    {
+      "node": {
+        "id": "ext.shared-credit",
+        "name": "Credit",
+        "kind": "Api",
+        "service": null,
+        "external": false,
+        "state": "Healthy",
+        "instancesTotal": 1,
+        "instancesHealthy": 1,
+        "load": 0.4,
+        "cpu": null,
+        "memory": null,
+        "utilisation": null,
+        "throttled": null,
+        "queueDepth": null,
+        "oldestMessageSeconds": null,
+        "deadLetters": null,
+        "requestsPerSecond": 96,
+        "errorRate": 0.002,
+        "p99Ms": 176.4,
+        "slaP99Ms": 1000,
+        "errorAmber": 0.01,
+        "errorRed": 0.05,
+        "resourceAmber": 0.8,
+        "resourceRed": 0.95,
+        "throttleAmber": 0.001,
+        "throttleRed": 0.02,
+        "backlogAmber": 60,
+        "backlogRed": 300,
+        "calls": [],
+        "gatewayCalls": [],
+        "lastUpdated": "2026-10-25T12:00:03+00:00",
+        "tenants": null,
+        "absent": [],
+        "quiet": false,
+        "outsideRequestsPerSecond": null,
+        "inbound": null,
+        "inboundEstimated": false
+      },
+      "calledBy": [
+        "ful.orders-api",
+        "nom.catalog-api"
+      ],
+      "islandId": "ext.shared",
+      "islandName": "Shared services",
+      "internal": true
+    },
+    {
+      "node": {
+        "id": "ext.shared-identity",
+        "name": "Identity",
+        "kind": "Api",
+        "service": null,
+        "external": false,
+        "state": "Healthy",
+        "instancesTotal": 1,
+        "instancesHealthy": 1,
+        "load": 0.4,
+        "cpu": null,
+        "memory": null,
+        "utilisation": null,
+        "throttled": null,
+        "queueDepth": null,
+        "oldestMessageSeconds": null,
+        "deadLetters": null,
+        "requestsPerSecond": 96,
+        "errorRate": 0.002,
+        "p99Ms": 176.4,
+        "slaP99Ms": 1000,
+        "errorAmber": 0.01,
+        "errorRed": 0.05,
+        "resourceAmber": 0.8,
+        "resourceRed": 0.95,
+        "throttleAmber": 0.001,
+        "throttleRed": 0.02,
+        "backlogAmber": 60,
+        "backlogRed": 300,
+        "calls": [],
+        "gatewayCalls": [],
+        "lastUpdated": "2026-10-25T12:00:03+00:00",
+        "tenants": null,
+        "absent": [],
+        "quiet": false,
+        "outsideRequestsPerSecond": null,
+        "inbound": null,
+        "inboundEstimated": false
+      },
+      "calledBy": [
+        "nom.catalog-api"
+      ],
+      "islandId": "ext.shared",
+      "islandName": "Shared services",
+      "internal": true
+    },
+    {
+      "node": {
+        "id": "ext.shared-reports",
+        "name": "Reports",
+        "kind": "Api",
+        "service": null,
+        "external": false,
+        "state": "Healthy",
+        "instancesTotal": 1,
+        "instancesHealthy": 1,
+        "load": 0.4,
+        "cpu": null,
+        "memory": null,
+        "utilisation": null,
+        "throttled": null,
+        "queueDepth": null,
+        "oldestMessageSeconds": null,
+        "deadLetters": null,
+        "requestsPerSecond": 96,
+        "errorRate": 0.002,
+        "p99Ms": 176.4,
+        "slaP99Ms": 1000,
+        "errorAmber": 0.01,
+        "errorRed": 0.05,
+        "resourceAmber": 0.8,
+        "resourceRed": 0.95,
+        "throttleAmber": 0.001,
+        "throttleRed": 0.02,
+        "backlogAmber": 60,
+        "backlogRed": 300,
+        "calls": [],
+        "gatewayCalls": [],
+        "lastUpdated": "2026-10-25T12:00:03+00:00",
+        "tenants": null,
+        "absent": [],
+        "quiet": false,
+        "outsideRequestsPerSecond": null,
+        "inbound": null,
+        "inboundEstimated": false
+      },
+      "calledBy": [
+        "ful.orders-worker"
+      ],
+      "islandId": "ext.shared",
+      "islandName": "Shared services",
+      "internal": true
+    }
+  ],
   "externalCallers": [
     {
       "id": "client-app",
@@ -827,9 +970,29 @@
   ],
   "dependencies": [
     {
+      "from": "ful",
+      "to": "ext.shared-reports",
+      "requestsPerSecond": 96
+    },
+    {
+      "from": "nom",
+      "to": "ext.shared-identity",
+      "requestsPerSecond": 96
+    },
+    {
       "from": "hbk",
       "to": "hub",
       "requestsPerSecond": 64
+    },
+    {
+      "from": "ful",
+      "to": "ext.shared-credit",
+      "requestsPerSecond": 48
+    },
+    {
+      "from": "nom",
+      "to": "ext.shared-credit",
+      "requestsPerSecond": 48
     }
   ],
   "ringCapacity": 12,

@@ -29,6 +29,7 @@ import { withView } from './address'
 import { viewTotals } from './viewTotals'
 import type { PickItem } from './picker'
 import type { Snapshot, TenantInfo } from './types'
+import { vendorWhere } from './inspectorModel'
 import { checkSnapshot } from './snapshotGuard'
 import { Building } from './buildings/building'
 import { WINDOW_GLOW } from './buildings/windowMaterial'
@@ -103,7 +104,7 @@ async function start(): Promise<void> {
       if (state === 'Incidents')
         return groups.filter((g) => g.incidents.length > 0).map<PickItem>((g) => ({ kind: 'island', id: g.id, name: g.displayName, where: `sev ${g.incidents[0].severity}, ${g.incidents.length} open` }))
       const inGroups = groups.flatMap((g) => g.nodes.filter((n) => n.state === state && !isUnmonitored(n)).map<PickItem>((n) => ({ kind: 'building', id: n.id, name: n.name, where: g.displayName, state: n.state })))
-      const vendors = (seen.last?.vendors ?? []).filter((v) => v.node.state === state && !isUnmonitored(v.node)).map<PickItem>((v) => ({ kind: 'building', id: v.node.id, name: v.node.name, where: 'Third party', state: v.node.state }))
+      const vendors = (seen.last?.vendors ?? []).filter((v) => v.node.state === state && !isUnmonitored(v.node)).map<PickItem>((v) => ({ kind: 'building', id: v.node.id, name: v.node.name, where: vendorWhere(v), state: v.node.state }))
       return [...inGroups, ...vendors]
     },
     goTo,
@@ -117,7 +118,7 @@ async function start(): Promise<void> {
     for (const isl of town.islands)
       for (const [id, b] of isl.buildings) items.push({ kind: 'building', id, name: b.node?.name ?? id, where: isl.group.displayName })
     for (const [id, b] of town.buildings) if (id.startsWith('hub.')) items.push({ kind: 'building', id, name: b.node?.name ?? id, where: 'Platform hub' })
-    for (const [id, v] of town.vendors) items.push({ kind: 'building', id, name: v.building.node?.name ?? id, where: 'Third party' })
+    for (const [id, v] of town.vendors) items.push({ kind: 'building', id, name: v.buildings.get(id)?.node?.name ?? id, where: vendorWhere(seen.last?.vendors.find((x) => x.node.id === id)) })
     return items
   }
   const islandItems = (): SearchItem[] => town.islands.map((i) => ({ kind: 'island', id: i.group.id, name: i.group.displayName, where: i.group.displayName }))

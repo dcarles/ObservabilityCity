@@ -1,3 +1,4 @@
+import type { VendorSnapshot } from '../types'
 /**
  * Where everything stands, worked out from sizes alone so it can be tested without a renderer.
  *
@@ -308,4 +309,25 @@ export function loopArc(loopR: number, from: number, to: number, y = 0, maxStep 
     const d = direction(from + (delta * i) / steps)
     return { x: d.x * loopR, y, z: d.z * loopR }
   })
+}
+
+/** The vendors that stand on one island: every service of a vendor together, a plain vendor alone. */
+export interface VendorGroup {
+  id: string
+  name: string
+  members: VendorSnapshot[]
+  /** Every system that calls any of its buildings. */
+  calledBy: string[]
+}
+
+export function groupVendors(vendors: readonly VendorSnapshot[]): VendorGroup[] {
+  const groups = new Map<string, VendorGroup>()
+  for (const v of vendors) {
+    const id = v.islandId ?? v.node.id
+    const g = groups.get(id) ?? { id, name: v.islandName ?? v.node.name, members: [], calledBy: [] }
+    g.members.push(v)
+    g.calledBy = [...new Set([...g.calledBy, ...v.calledBy])]
+    groups.set(id, g)
+  }
+  return [...groups.values()]
 }

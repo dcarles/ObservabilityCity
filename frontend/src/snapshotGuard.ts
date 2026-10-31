@@ -57,7 +57,13 @@ export function checkSnapshot(raw: unknown): Checked {
   for (const v of Array.isArray(raw.vendors) ? raw.vendors : []) {
     const node = isObject(v) ? checkNode(v.node, 'third parties', vendorIds, problems) : null
     if (!node) { problems.push('dropped a third party that cannot be drawn'); continue }
-    vendors.push({ node, calledBy: strings((v as Record<string, unknown>).calledBy) })
+    const rawVendor = v as Record<string, unknown>
+    vendors.push({
+      node, calledBy: strings(rawVendor.calledBy),
+      islandId: typeof rawVendor.islandId === 'string' ? rawVendor.islandId : null,
+      islandName: typeof rawVendor.islandName === 'string' ? rawVendor.islandName : null,
+      internal: rawVendor.internal === true,
+    })
   }
   const snapshot: Snapshot = {
     townId: str(raw.townId),
