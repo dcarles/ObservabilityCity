@@ -123,7 +123,7 @@ foreach (var (town, runtimes) in hostedByTown)
             builder.Services.AddSingleton<IHostedService>(sp => new LinkDiscoveryRunner(dependencies, rt.Scope, rt.Registry, rt.Discovered, TimeProvider.System, sp.GetRequiredService<ILogger<LinkDiscoveryRunner>>()));
         if (rt.Discovered is not null && rt.Registry.Current.ActiveEnvironment?.Links?.Traffic is not null
             && rt.Sources.OfType<IDependencySource>().FirstOrDefault(s => s.CanReadDependencies && ((IMetricSource)s).Name == rt.Registry.Current.ActiveEnvironment.Links.Source) is { } trafficSource)
-            builder.Services.AddSingleton<IHostedService>(sp => new LinkTrafficRunner(trafficSource, rt.Scope, rt.Registry, rt.Discovered.Traffic, TimeProvider.System, sp.GetRequiredService<ILogger<LinkTrafficRunner>>()));
+            builder.Services.AddSingleton<IHostedService>(sp => new LinkTrafficRunner(trafficSource, rt.Scope, rt.Registry, rt.Discovered.Traffic, TimeProvider.System, sp.GetRequiredService<ILogger<LinkTrafficRunner>>(), trafficSource as IRateHistory));
         builder.Services.AddSingleton<IHostedService>(sp => new SnapshotPublisher(rt.Builder, rt.Store,
             new SignalRSnapshotNotifier(sp.GetRequiredService<IHubContext<TownHub>>(), town.Environments, sp.GetRequiredService<IslandViews>()),
             snapshotInterval, sp.GetRequiredService<ILogger<SnapshotPublisher>>()));

@@ -33,17 +33,27 @@ public static class SourceQuery
         }
     }
 
+    /// <summary>A span written the way a query template reads it: whole seconds, minutes, hours or days (<c>3600s</c> is written <c>1h</c>).</summary>
+    public static string Text(TimeSpan span)
+    {
+        var s = (long)Math.Round(span.TotalSeconds);
+        if (s % 86400 == 0) return $"{s / 86400}d";
+        if (s % 3600 == 0) return $"{s / 3600}h";
+        if (s % 60 == 0) return $"{s / 60}m";
+        return $"{s}s";
+    }
+
     public static TimeSpan WindowOf(RegistrySource source) =>
         TryParseWindow(source.Window ?? DefaultWindow, out var window) ? window : throw new InvalidOperationException($"the window '{source.Window}' is not a number and a unit like 5m");
 
     /// <summary>The query with every hole filled. <paramref name="roles"/> are written as double-quoted strings separated by commas.</summary>
-    public static string Render(string template, RegistrySource source, string environmentId, ScopeRules rules, IEnumerable<string> roles)
+    public static string Render(string template, RegistrySource source, string environmentId, ScopeRules rules, IEnumerable<string> roles, TimeSpan? over = null)
     {
-        var window = WindowOf(source);
+        var window = over ?? WindowOf(source);
         var quoted = string.Join(", ", roles.Select(r => "\"" + r.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\""));
         return ScopeTemplate.Render(template, name => name switch
         {
-            Window => (source.Window ?? DefaultWindow).Trim(),
+            Window => over is { } o ? Text(o) : (source.Window ?? DefaultWindow).Trim(),
             WindowSeconds => ((long)Math.Round(window.TotalSeconds)).ToString(CultureInfo.InvariantCulture),
             Roles => quoted,
             ScopeRules.EnvironmentVariable => environmentId,

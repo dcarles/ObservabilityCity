@@ -32,6 +32,7 @@ public sealed class LinkTraffic
     private readonly Dictionary<string, Dictionary<string, double>> _calls = []; // target to caller to calls in the window
     private readonly Dictionary<string, Dictionary<string, double>> _lastGood = []; // target to caller to the share of the target's rate
     private readonly Dictionary<string, List<(DateTimeOffset At, double Total)>> _totals = []; // target to its own rate, one sample for each half minute, over the window
+    private readonly Dictionary<string, double> _seeds = []; // target to its rate averaged over the share window, read once at the start
     private static readonly TimeSpan SampleEvery = TimeSpan.FromSeconds(30);
     /// <summary>How much history the mean needs before it is trusted. Until then the current rate stands, as before.</summary>
     private static readonly TimeSpan MinHistory = TimeSpan.FromMinutes(10);
@@ -63,6 +64,20 @@ public sealed class LinkTraffic
             (_window, _minCalls, _read, _error) = (window, minCalls, true, null);
         }
     }
+
+    /// <summary>
+    /// Gives each API the rate it averaged over the share window before the town started watching, so the split is steady from the first minute. It stands
+    /// in for the town's own history until that has ten minutes, then the history takes over.
+    /// </summary>
+    public void Seed(IReadOnlyDictionary<string, double> averages)
+    {
+        lock (_gate)
+            foreach (var (target, rate) in averages)
+                if (rate >= 0 && double.IsFinite(rate)) _seeds[target] = rate;
+    }
+
+    /// <summary>True once <see cref="Seed"/> has been given the averages.</summary>
+    public bool Seeded { get { lock (_gate) return _seeds.Count > 0; } }
 
     public void Fail(string error)
     {
@@ -104,7 +119,7 @@ public sealed class LinkTraffic
     /// <summary>
     /// The rate the callers' share is worked out against: the API's own rate averaged over the same window the callers' calls were counted in. The current
     /// rate alone covers a few minutes and, for a service with few calls, jumps about, which made a steady gateway look like outside traffic whenever a busy
-    /// few minutes came along. Without a clock, or before enough history, it is the current rate.
+    /// few minutes came along. Before enough history it is the average read at the start (see <see cref="Seed"/>), else the current rate; without a clock, the current rate.
     /// </summary>
     private double Smoothed(string target, double total, DateTimeOffset? at)
     {
@@ -113,7 +128,7 @@ public sealed class LinkTraffic
         if (samples.Count == 0 || now - samples[^1].At >= SampleEvery) samples.Add((now, total));
         else samples[^1] = (samples[^1].At, total);
         samples.RemoveAll(x => x.At < now - _window);
-        if (now - samples[0].At < MinHistory) return total;
+        if (now - samples[0].At < MinHistory) return _seeds.TryGetValue(target, out var seed) ? seed : total;
         return samples.Average(x => x.Total);
     }
 
