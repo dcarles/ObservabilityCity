@@ -102,7 +102,7 @@ public class SourcePlumbingTests
     [InlineData("sources:\n  metrics: { kind: prometheus, pollSeconds: 0 }\n", "source 'metrics' has pollSeconds 0; it must be above 0")]
     [InlineData("sources:\n  metrics: { kind: prometheus, timeoutSeconds: -5 }\n", "source 'metrics' has timeoutSeconds -5; it must be above 0")]
     [InlineData("sources:\n  metrics: { kind: loganalytics, credential: reader }\n", "source 'metrics' uses credential 'reader', which this file does not define")]
-    [InlineData("sources:\n  metrics: { kind: prometheus }\nsignals:\n  cpuu: metrics\n", "unknown signal 'cpuu'. Use requests, errors, latency, instances, cpu, memory, utilisation, throttled, backlog, deadLetters. Did you mean 'cpu'?")]
+    [InlineData("sources:\n  metrics: { kind: prometheus }\nsignals:\n  cpuu: metrics\n", "unknown signal 'cpuu'. Use requests, errors, latency, instances, cpu, memory, utilisation, throttled, backlog, deadLetters, jobs. Did you mean 'cpu'?")]
     [InlineData("sources:\n  metrics: { kind: prometheus }\nsignals:\n  cpu: metrcs\n", "signal 'cpu' comes from source 'metrcs', which this file does not define. Did you mean 'metrics'?")]
     public void Mistakes_in_sources_credentials_and_signals_are_named_with_the_file(string environment, string expected)
     {
@@ -124,7 +124,7 @@ public class SourcePlumbingTests
 
         var message = Assert.Throws<RegistryException>(() => RegistryLoader.Load(copy.Path)).Message;
 
-        Assert.Contains("aa.yaml: the pillar has signals.cpuu, which is not a signal. Use requests, errors, latency, instances, cpu, memory, utilisation, throttled, backlog, deadLetters. Did you mean 'cpu'?", message);
+        Assert.Contains("aa.yaml: the pillar has signals.cpuu, which is not a signal. Use requests, errors, latency, instances, cpu, memory, utilisation, throttled, backlog, deadLetters, jobs. Did you mean 'cpu'?", message);
     }
 
     // ---- which source answers for a signal ----
@@ -561,7 +561,7 @@ public class SourcePlumbingTests
     }
 
     [Theory]
-    [InlineData("sources:\n  metrics: { kind: loganalytic }\n", "source 'metrics' has kind 'loganalytic', which is not a kind of source this build knows. Use fake, prometheus, grafana-irm, resourcegraph, loganalytics, azuremonitor, servicebus. Did you mean 'loganalytics'?")]
+    [InlineData("sources:\n  metrics: { kind: loganalytic }\n", "source 'metrics' has kind 'loganalytic', which is not a kind of source this build knows. Use fake, prometheus, grafana-irm, resourcegraph, loganalytics, azuremonitor, servicebus, functionjobs. Did you mean 'loganalytics'?")]
     [InlineData("sources:\n  metrics: { kind: prometheus, credential: reader }\ncredentials:\n  reader: { kind: azure-cli }\n", "source 'metrics' names a credential, but a prometheus source does not sign in")]
     [InlineData("credentials:\n  reader: { kind: azure-clu }\n", "credential 'reader' has kind 'azure-clu'. Use azure-cli, default, managed-identity, service-principal. Did you mean 'azure-cli'?")]
     [InlineData("credentials:\n  reader: { kind: service-principal, tenantId: t }\n", "credential 'reader' is a service-principal, which needs clientId and clientSecretEnv")]

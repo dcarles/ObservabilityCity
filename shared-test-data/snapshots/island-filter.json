@@ -68,7 +68,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "hub.service-bus",
@@ -107,7 +110,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "hub.egress",
@@ -146,7 +152,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "hub.customer-db",
@@ -185,7 +194,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         }
       ]
     },
@@ -255,7 +267,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "aa.orders-worker",
@@ -296,7 +311,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "aa.orders-db",
@@ -335,7 +353,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         }
       ]
     },
@@ -414,7 +435,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "cc.notify-worker",
@@ -455,7 +479,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "cc.notify-db",
@@ -494,7 +521,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         }
       ]
     }
@@ -538,7 +568,10 @@
         "quiet": false,
         "outsideRequestsPerSecond": null,
         "inbound": null,
-        "inboundEstimated": false
+        "inboundEstimated": false,
+        "app": null,
+        "jobs": null,
+        "regions": null
       },
       "calledBy": [
         "aa.orders-api"
@@ -582,7 +615,10 @@
         "quiet": false,
         "outsideRequestsPerSecond": null,
         "inbound": null,
-        "inboundEstimated": false
+        "inboundEstimated": false,
+        "app": null,
+        "jobs": null,
+        "regions": null
       },
       "calledBy": [
         "cc.notify-worker"

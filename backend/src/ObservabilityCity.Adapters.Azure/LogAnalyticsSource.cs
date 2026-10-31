@@ -37,6 +37,10 @@ public sealed class LogAnalyticsReader(HttpClient http, ICredentialSource? crede
     public async Task<IReadOnlyList<DependencyRow>> QueryDependenciesAsync(string workspace, string query, DateTimeOffset from, DateTimeOffset to, CancellationToken ct) =>
         ParseDependencies(await SendAsync(workspace, query, $"{LinkQuery.Iso(from)}/{LinkQuery.Iso(to)}", ct));
 
+    /// <summary>The job rows of the function job query over the last <paramref name="window"/>.</summary>
+    public async Task<IReadOnlyList<JobRow>> QueryJobsAsync(string workspace, string query, TimeSpan window, CancellationToken ct) =>
+        ParseJobs(await SendAsync(workspace, query, System.Xml.XmlConvert.ToString(window), ct));
+
     private async Task<string> SendAsync(string workspace, string query, string timespan, CancellationToken ct)
     {
         var body = JsonSerializer.Serialize(new { query, timespan });
@@ -99,6 +103,41 @@ public sealed class LogAnalyticsReader(HttpClient http, ICredentialSource? crede
         return rows;
     }
 
+    /// <summary>
+    /// The rows of the function job query: <c>resourceId</c> (the function app), <c>job</c>, and optionally <c>lastRun</c> (a time), <c>succeeded</c> (true or false),
+    /// <c>next</c> (a time) and <c>region</c>. A row without a resource or a job says nothing and is skipped.
+    /// </summary>
+    public static IReadOnlyList<JobRow> ParseJobs(string json)
+    {
+        using var doc = JsonDocument.Parse(json);
+        if (!doc.RootElement.TryGetProperty("tables", out var tables) || tables.ValueKind != JsonValueKind.Array || tables.GetArrayLength() == 0)
+            throw new InvalidOperationException("the answer has no table; was the query a query that returns rows?");
+        var table = tables[0];
+        var names = table.GetProperty("columns").EnumerateArray().Select(c => c.GetProperty("name").GetString() ?? "").ToList();
+        int Index(string column) => names.FindIndex(n => n.Equals(column, StringComparison.OrdinalIgnoreCase));
+        var (resource, job, lastRun, succeeded, next, region) = (Index("resourceId"), Index("job"), Index("lastRun"), Index("succeeded"), Index("next"), Index("region"));
+        if (resource < 0 || job < 0)
+            throw new InvalidOperationException($"the job query must return the columns {string.Join(", ", JobColumns)} (lastRun, succeeded, next and region may be left out); it returned {string.Join(", ", names)}");
+        DateTimeOffset? Time(JsonElement row, int index) =>
+            index >= 0 && Text(row[index]) is { Length: > 0 } t && DateTimeOffset.TryParse(t, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var at) ? at : null;
+        bool? Flag(JsonElement row, int index) => index < 0 ? null : row[index].ValueKind switch
+        {
+            JsonValueKind.True => true,
+            JsonValueKind.False => false,
+            JsonValueKind.String when bool.TryParse(row[index].GetString(), out var b) => b,
+            _ => null,
+        };
+        var rows = new List<JobRow>();
+        foreach (var row in table.GetProperty("rows").EnumerateArray())
+        {
+            if (Text(row[resource]) is not { Length: > 0 } id || Text(row[job]) is not { Length: > 0 } name) continue;
+            rows.Add(new JobRow(id, name, Time(row, lastRun), Flag(row, succeeded), Time(row, next), region < 0 ? null : Text(row[region]) is { Length: > 0 } r ? r : null));
+        }
+        return rows;
+    }
+
+    public static readonly string[] JobColumns = ["resourceId", "job", "lastRun", "succeeded", "next", "region"];
+
     private static string? Text(JsonElement v) => v.ValueKind == JsonValueKind.String ? v.GetString() : null;
 
     // make_set gives a JSON array, or the same array as text; a plain day is accepted too
@@ -128,6 +167,9 @@ public sealed class LogAnalyticsReader(HttpClient http, ICredentialSource? crede
         };
     }
 }
+
+/// <summary>One scheduled job of one function app as the log query summarised it: when it last ran, whether that run succeeded and when it runs next.</summary>
+public sealed record JobRow(string ResourceId, string Job, DateTimeOffset? LastRun, bool? Succeeded, DateTimeOffset? Next, string? Region);
 
 /// <summary>One telemetry name's calls in the window, how many of them were errors and their latency in milliseconds (null when the query gave none).</summary>
 public sealed record SpanRow(string Role, double Calls, double Errors, double? LatencyMs);
@@ -159,7 +201,7 @@ public sealed class LogAnalyticsSource(
         // a workspace given by name is looked up in the inventory, which is read at the same moment the first poll starts
         if (recording is null && string.IsNullOrWhiteSpace(definition.Connection) && store.Inventory is null) await store.WaitForReadAsync(Timeout / 2, ct);
         var resolution = store.Resolve(view);
-        var serving = view.AllNodes.Where(n => n.Kind is NodeKind.Api or NodeKind.Worker or NodeKind.Gateway or NodeKind.Cron).Select(n => n.Id).ToHashSet();
+        var serving = view.AllNodes.Where(n => n.Kind is NodeKind.Api or NodeKind.Worker or NodeKind.Gateway or NodeKind.Function).Select(n => n.Id).ToHashSet();
         var asked = resolution.Systems.Where(s => serving.Contains(s.SystemId) && !string.IsNullOrWhiteSpace(s.TelemetryRole)).ToList();
         if (asked.Count == 0) return new Dictionary<string, NodeReading>();
 
@@ -179,7 +221,9 @@ public sealed class LogAnalyticsSource(
     /// The workspace to query: the source's own connection, else the id the environment's scope settles (an explicit <c>workspaceId</c>, or the id of the
     /// workspace found by its name). A name that has not been looked up yet is a wait, not a mistake in the files, and the message says so.
     /// </summary>
-    private string Workspace(Resolution resolution)
+    private string Workspace(Resolution resolution) => Workspace(name, definition, resolution);
+
+    internal static string Workspace(string name, RegistrySource definition, Resolution resolution)
     {
         var connection = definition.Connection;
         var workspace = string.IsNullOrWhiteSpace(connection) ? resolution.WorkspaceId : connection.Trim();

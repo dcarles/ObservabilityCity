@@ -41,6 +41,7 @@
           "external": { "type": "boolean", "description": "Reached by callers outside the town." },
           "slaP99Ms": { "type": "number" },
           "minCalls": { "type": "integer", "minimum": 1 },
+          "regions": { "type": "boolean", "description": "Whether this system gets the per-region view. Without it, the pillar's or the defaults' choice." },
           "discoverLinks": { "type": "boolean", "description": "Whether link discovery looks for the calls this system makes. Without it, the pillar's or the defaults' choice." },
           "errors": { "$ref": "defs.schema.json#/$defs/thresholds" },
           "resources": { "$ref": "defs.schema.json#/$defs/thresholds" },

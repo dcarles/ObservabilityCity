@@ -38,6 +38,7 @@ scope:
   inventory: inventory
   variables: { env: prd, directory: example.test }
   workspace: "ws-{env}-main"
+  regions: { enabled: false }   # these tests count a service's instances over both regions; the region view has its own towns
   subscription: { nameLike: "*-{env}-{pillar}" }
   resources:
     - { name: plans, types: [microsoft.web/serverfarms], roles: [api, worker], pattern: '^plan-cf-[^-]+-(?<pillar>[^-]+)-(?<service>[^-]+)-(?<region>[a-z]+)', instances: "coalesce(toint(properties.numberOfWorkers), toint(sku.capacity))" }

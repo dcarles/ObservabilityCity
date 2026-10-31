@@ -166,16 +166,26 @@ public static class ScopeResolver
                     else if (rule.ServiceTag is not { } tag || TagValue(resource, tag) is not { } said || !Compact(said).Equals(Compact(serviceCode), StringComparison.OrdinalIgnoreCase))
                         continue;
 
-                    resources.Add(new ResolvedResource(resource.Id, resource.Name, resource.Type, region, tenant, rule.Name, rule.Instances is null ? null : resource.Instances));
+                    if (rules.Regions.Tag is { } regionTag && TagValue(resource, regionTag) is { Length: > 0 } tagged) region = tagged;
+                    bool? running = rule.State is null || string.IsNullOrWhiteSpace(resource.State) ? null : rule.Running!.Contains(resource.State, StringComparer.OrdinalIgnoreCase);
+                    resources.Add(new ResolvedResource(resource.Id, resource.Name, resource.Type, region, tenant, rule.Name, rule.Instances is null ? null : resource.Instances, running));
                     if (tenant is not null && rule.TenantNameTag is { } nameTag && TagValue(resource, nameTag) is { Length: > 0 } friendly)
                         tenantNames.TryAdd(tenant, friendly);
                 }
             }
-            if (applicable.Count > 0 && resources.Count == 0 && node.Kind is NodeKind.Api or NodeKind.Worker or NodeKind.Database)
+            if (applicable.Count > 0 && resources.Count == 0 && node.Kind is NodeKind.Api or NodeKind.Worker or NodeKind.Database or NodeKind.Function)
                 problems.Add($"No resource found for '{node.Id}' (service code '{serviceCode}') in {pillar.SubscriptionName ?? pillar.SubscriptionId}. Check serviceCode and the resource patterns under scope.resources.");
         }
 
-        return new SystemScope(node.Id, serviceCode, telemetry, via, pillar.SubscriptionId, workspace, resources.OrderBy(r => r.Name, StringComparer.Ordinal).ToList());
+        // the app's state is known only for a system with a rule that reads one: none of its resources found is a missing app, otherwise it runs while any resource does
+        AppState? app = null;
+        if (inventory is not null && pillar.SubscriptionId is not null && serviceCode is not null && rules.Resources.Any(r => r.State is not null && (r.Roles.Count == 0 || r.Roles.Contains(role, StringComparer.OrdinalIgnoreCase))))
+        {
+            var stated = resources.Where(r => r.Running is not null).ToList();
+            app = stated.Count == 0 ? (resources.Count == 0 ? AppState.Missing : null) : stated.Any(r => r.Running == true) ? AppState.Running : AppState.Stopped;
+        }
+
+        return new SystemScope(node.Id, serviceCode, telemetry, via, pillar.SubscriptionId, workspace, resources.OrderBy(r => r.Name, StringComparer.Ordinal).ToList()) { AppState = app };
     }
 
     private static string Group(Match match, string name) => match.Groups[name].Success ? match.Groups[name].Value : "";

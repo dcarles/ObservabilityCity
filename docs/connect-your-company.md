@@ -288,6 +288,28 @@ An API's total request rate comes from your unsampled metrics. With a `links.tra
 - Below `minCalls` observed calls to an API the share is too noisy: the last good share stands and the inspector marks it "estimated". There is no setting for a share; every number is measured.
 - Without a `traffic` block nothing is measured: each API's rate is shared evenly between the systems that declare a call to it (and the outside, when it is marked `external` or an outside caller reaches it).
 
+### Function apps and regions
+
+A system with role `function` (`cron` still works as an alias) stands as a function building. Three things in the environment file make it say more:
+
+- **App state.** Give the resource rule a `state` expression (a query expression that reads the app's state as text) and `running` (the values that mean it runs). A running app is lit; a stopped one stands under construction; a system the inventory has no such app for is grey, "not found in the inventory". The core knows no state words.
+- **Jobs.** A `functionjobs` source runs a query that summarises the function apps' logs into one row per app and job, with the columns `resourceId`, `job`, `lastRun`, `succeeded` and `next` (and `region` where it matters). Point `signals: { jobs: <source> }` at it. Each job shows as succeeded, failed or overdue (now later than `next` plus the source's freshness), and the building's beacon follows. How your logs word a run is yours to say in the query:
+
+```yaml
+sources:
+  functions:
+    kind: functionjobs
+    connection: "<workspace id>"
+    window: 1d
+    query: |
+      <table>
+      | where TimeGenerated > ago({window}) and <your match on the app and the job>
+      | summarize lastRun = max(TimeGenerated), succeeded = <your success test> by resourceId = <column>, job = <column>
+      | extend next = <when the job should run next>
+```
+
+- **Regions.** A service that runs in two or more regions shows its worst region (by processor and memory) on the building; the drawer can switch between worst, all and one region. The `scope.regions` block names where a region is read from (`tag`), how it is labelled (`names`), and where the view is off (`enabled: false`, or `off: [pillar ids]`). A system, a pillar or a role default can set `regions: false`.
+
 ### What each adapter's runbook section contains
 
 Each real adapter lands with its own section here, with the same four parts: the permission the login needs, the `connection` value, the `pollSeconds` and `timeoutSeconds` that suit it, and what `--sources` reports for it. Until an adapter has its section, its kind is known to the module but nothing reads it yet.

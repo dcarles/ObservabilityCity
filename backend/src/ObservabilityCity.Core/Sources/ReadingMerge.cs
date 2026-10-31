@@ -34,6 +34,7 @@ public static class ReadingMerge
         var throttled = Of(Signals.Throttled);
         var backlog = Of(Signals.Backlog);
         var dead = Of(Signals.DeadLetters);
+        var jobs = Of(Signals.Jobs);
         if (used.Count == 0) return bySource.Values.MaxBy(r => r.At);
 
         return new NodeReading(
@@ -53,6 +54,20 @@ public static class ReadingMerge
             backlog?.OldestMessageSeconds,
             dead?.DeadLetters,
             utilisation?.Tenants,
-            requests?.Calls);
+            requests?.Calls,
+            instances?.App,
+            jobs?.Jobs,
+            Regions(instances, cpu, memory));
+    }
+
+    /// <summary>The regions of a service: the instances of the source that counts them, the CPU and memory of the sources that measure them, joined by region name.</summary>
+    private static IReadOnlyList<RegionReading>? Regions(NodeReading? instances, NodeReading? cpu, NodeReading? memory)
+    {
+        var names = (instances?.Regions ?? []).Concat(cpu?.Regions ?? []).Concat(memory?.Regions ?? []).Select(r => r.Region).Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.Ordinal).ToList();
+        if (names.Count == 0) return null;
+        return names.Select(name => new RegionReading(name,
+            instances?.Regions?.FirstOrDefault(r => r.Region.Equals(name, StringComparison.OrdinalIgnoreCase))?.Instances,
+            cpu?.Regions?.FirstOrDefault(r => r.Region.Equals(name, StringComparison.OrdinalIgnoreCase))?.Cpu,
+            memory?.Regions?.FirstOrDefault(r => r.Region.Equals(name, StringComparison.OrdinalIgnoreCase))?.Memory)).ToList();
     }
 }

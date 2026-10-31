@@ -27,7 +27,7 @@ export const LEGEND: readonly LegendSection[] = [
       { id: 'worker', sees: 'Factory', means: 'A worker: it reads messages', tone: 'neutral' },
       { id: 'database', sees: 'Tanks', means: 'A database. One tank for each tenant where each has its own', tone: 'neutral' },
       { id: 'cache', sees: 'Water tower', means: 'A cache', tone: 'neutral' },
-      { id: 'cron', sees: 'Clock tower', means: 'A scheduled job', tone: 'neutral' },
+      { id: 'function', sees: 'Clock tower', means: 'A scheduled function', tone: 'neutral' },
       { id: 'hub', sees: 'The island in the middle', means: 'The platform hub: API gateway, message broker port (Service Bus, Kafka), central egress, shared database', tone: 'neutral' },
     ],
   },

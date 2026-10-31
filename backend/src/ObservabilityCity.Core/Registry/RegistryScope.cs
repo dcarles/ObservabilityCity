@@ -38,6 +38,9 @@ public sealed record ScopeRules
     /// <summary>Addresses that open a resource somewhere else (a portal, a console). None: no link is shown.</summary>
     public IReadOnlyList<ResourceLinkRule> Links { get; init; } = [];
 
+    /// <summary>How a service's region is read and named, and where the per-region view is off. None: the resource's location, shown as it is, on wherever a service has two regions.</summary>
+    public RegionRules Regions { get; init; } = RegionRules.Default;
+
     /// <summary>Overrides for the queries the inventory source sends. Null: the adapter's own.</summary>
     public ScopeQueries Queries { get; init; } = new(null, null);
 
@@ -50,6 +53,19 @@ public sealed record ScopeRules
     public static readonly string[] SystemVariables = ["system", "service", "name", "role", "pillar", "pillarId"];
 }
 
+/// <summary>
+/// How regions are read. <see cref="Tag"/> is the tag of a resource that says its region (without it, the location the cloud gives, or the <c>region</c> group of the resource pattern);
+/// <see cref="Names"/> gives the label to show for a region value (an unmapped value is shown as it is). <see cref="Enabled"/> false turns the region view off in the whole environment,
+/// and <see cref="Off"/> lists the pillars it is off for there.
+/// </summary>
+public sealed record RegionRules(string? Tag, IReadOnlyDictionary<string, string> Names, bool Enabled, IReadOnlyList<string> Off)
+{
+    public static RegionRules Default { get; } = new(null, new Dictionary<string, string>(), true, []);
+
+    /// <summary>The label for a region value.</summary>
+    public string Label(string region) => Names.FirstOrDefault(kv => kv.Key.Equals(region, StringComparison.OrdinalIgnoreCase)).Value is { Length: > 0 } label ? label : region;
+}
+
 /// <summary>Finds a pillar's subscription by its display name (a wildcard pattern) or by a tag on the subscription. Both are templates over {pillar}, {pillarId} and the variables.</summary>
 public sealed record SubscriptionRule(string? NameLike, string? TagKey, string? TagValue);
 
@@ -58,9 +74,9 @@ public sealed record SubscriptionRule(string? NameLike, string? TagKey, string? 
 /// <c>service</c> (required), and optionally <c>role</c>, <c>pillar</c>, <c>region</c> and <c>tenant</c>. <see cref="Roles"/> limits it to systems of
 /// those roles (api, worker, db...). <see cref="ServiceTag"/> is a fallback: a resource whose name does not match but whose tag says the service.
 /// <see cref="TenantNameTag"/> is the tag that holds the tenant's friendly name. <see cref="Instances"/> is the expression the inventory query uses to count
-/// the instances one resource of this rule runs (a plan's workers, an app's replicas); the instances of a system are the sum over its resources of such rules.
+/// the instances one resource of this rule runs (a plan's workers, an app's replicas); the instances of a system are the sum over its resources of such rules. <see cref="State"/> is the expression that reads one resource's app state as text, and <see cref="Running"/> the values of it that mean the app runs (any other value means stopped); the core knows no state words.
 /// </summary>
-public sealed record ResourceRule(string Name, IReadOnlyList<string> Types, string Pattern, IReadOnlyList<string> Roles, string? ServiceTag, string? TenantNameTag, string? Instances = null);
+public sealed record ResourceRule(string Name, IReadOnlyList<string> Types, string Pattern, IReadOnlyList<string> Roles, string? ServiceTag, string? TenantNameTag, string? Instances = null, string? State = null, IReadOnlyList<string>? Running = null);
 
 /// <summary>
 /// One address to make for a resource. <see cref="Url"/> is a template over <see cref="ScopeRules.LinkVariables"/>, {environment} and the environment's variables; it starts with

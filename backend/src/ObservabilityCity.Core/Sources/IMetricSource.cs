@@ -1,3 +1,4 @@
+using ObservabilityCity.Contracts;
 using ObservabilityCity.Core.Registry;
 
 namespace ObservabilityCity.Core.Sources;
@@ -24,7 +25,22 @@ public sealed record NodeReading(
     double? OldestMessageSeconds = null,
     double? DeadLetters = null,
     IReadOnlyList<TenantReading>? Tenants = null,
-    double? Calls = null);
+    double? Calls = null,
+    AppState? App = null,
+    IReadOnlyList<JobReading>? Jobs = null,
+    IReadOnlyList<RegionReading>? Regions = null);
+
+/// <summary>
+/// What one region of a service reports: how many instances it runs, and how busy its plan is. Region is the label the scope rules gave (see <c>scope.regions</c>).
+/// A field the source cannot tell is null.
+/// </summary>
+public sealed record RegionReading(string Region, int? Instances, double? Cpu, double? Memory);
+
+/// <summary>
+/// One scheduled job as a log source saw it in one region: when it last ran, whether that run succeeded (null: unknown) and when its schedule says it runs
+/// next (null: the logs did not say). The town works out from these whether the job is overdue.
+/// </summary>
+public sealed record JobReading(string Name, string? Region, DateTimeOffset? LastRun, bool? Succeeded, DateTimeOffset? Next);
 
 /// <summary>
 /// One tenant's database of a data store that keeps one per tenant: how much of its provisioned capacity it uses, how much it turns away and the

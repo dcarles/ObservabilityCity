@@ -256,11 +256,18 @@ public sealed class FakeSource(
                 deadLetters = Math.Round(dead);
             }
 
-            result[node.Id] = new NodeReading(now, !down, current, healthy, load, rps, errors, p99, cpu, memory, utilisation, throttled, queueDepth, oldest, deadLetters, tenantReadings);
+            // A function runs two jobs. With errors on, its first job fails its last run; with the app down, its jobs are overdue.
+            var jobs = node.Kind != NodeKind.Function ? null : FakeJobs(node, now, fx.Any(e => e.Kind == FakeEffectKind.Errors), down);
+            result[node.Id] = new NodeReading(now, !down, current, healthy, load, rps, errors, p99, cpu, memory, utilisation, throttled, queueDepth, oldest, deadLetters, tenantReadings,
+                App: node.Kind == NodeKind.Function ? AppState.Running : null, Jobs: jobs);
         }
 
         return Task.FromResult<IReadOnlyDictionary<string, NodeReading>>(result);
     }
+
+    private static List<JobReading> FakeJobs(RegistryNode node, DateTimeOffset now, bool failing, bool down) =>
+        new[] { "daily", "hourly" }.Select((name, i) => new JobReading(name, null,
+            now.AddMinutes(down ? -90 : -(10 + 7 * i)), !(failing && i == 0), now.AddMinutes(down ? -30 : 50 - 7 * i))).ToList();
 
     /// <summary>How badly a vendor is failing, 0 to 1: all of it when down, else the error effects' rate.</summary>
     private static double VendorTrouble(List<FakeEffect> fx) =>

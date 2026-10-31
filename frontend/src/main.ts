@@ -179,6 +179,8 @@ async function start(): Promise<void> {
     onScreen: (id) => town.buildings.has(id),
     go: (id) => goTo({ kind: 'building', id, name: id, where: '' }),
     view: () => tenantView,
+    regionChoice: (id) => town.regionChoice(id),
+    setRegion: (id, choice) => town.setRegion(id, choice),
     closed: () => town.select(null),
   })
   const legend = new LegendCard((open) => {

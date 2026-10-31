@@ -51,6 +51,7 @@ A map from a role name (`api`, `worker`, `db`, `cache`, `cron`, `gateway`, `brok
 | `backlog` | no | none | `amber` and `red` for the age of the oldest waiting message, in seconds. |
 | `minCalls` | no | none | The fewest calls in a window that make the error share and latency worth judging. With fewer the system is quiet, not red. |
 | `discoverLinks` | no | `true` | Whether link discovery looks for the calls systems of this role make. Only an `api` or a `worker` makes calls worth finding; it does nothing in an environment without a `links` block. |
+| `regions` | no | `true` | Whether a service that runs in two or more regions gets the per-region view (worst region on the building, every region in the drawer). Set `false` for, say, a passive disaster-recovery region. |
 
 <!-- file: ErrorThresholdsFile -->
 | Key | Required | Default | Meaning |
@@ -96,6 +97,7 @@ One island. The file name is the pillar id.
 | `backlog` | no | role default | Backlog thresholds. |
 | `minCalls` | no | role default | See above. |
 | `discoverLinks` | no | pillar or role default | See above. Set `false` on a system whose calls should only be the declared ones. |
+| `regions` | no | pillar or role default | See above. Set `false` to keep one system out of the per-region view. |
 | `signals` | no | none | Signal → source name (or `none`) for this system alone. |
 | `serviceCode` | no | the service | The name its cloud resources carry for the service. |
 | `telemetry` | no | none | What the telemetry calls it. |
@@ -196,12 +198,12 @@ One file per environment. The pillar and system files are shared; this file says
 <!-- file: SourceFile -->
 | Key | Required | Default | Meaning |
 |---|---|---|---|
-| `kind` | yes | | `fake`, `resourcegraph`, `loganalytics`, `azuremonitor`, `servicebus`, `prometheus` or `grafana-irm`. |
+| `kind` | yes | | `fake`, `resourcegraph`, `loganalytics`, `azuremonitor`, `functionjobs`, `servicebus`, `prometheus` or `grafana-irm`. |
 | `connection` | no | from `scope` | How to reach it (a workspace id, an endpoint). Not used by `fake`. |
 | `credential` | no | Azure CLI login | A name from `credentials`. Azure sources only. |
 | `pollSeconds` | no | 30 | How often the source is asked. Above 0. |
 | `timeoutSeconds` | no | 10 | How long one ask may take. Above 0. |
-| `query` | no | none | `loganalytics`: the query to send, a template. `{window}`, `{windowSeconds}`, `{roles}`, scope variables and `{environment}` work. |
+| `query` | no | none | `loganalytics`: the query to send, a template; `functionjobs`: the query that summarises the function apps' logs into one row per app and job (columns `resourceId`, `job`, `lastRun`, `succeeded`, `next`, `region`). `{window}`, `{windowSeconds}`, `{roles}`, scope variables and `{environment}` work. |
 | `window` | no | `5m` | `loganalytics` and `azuremonitor`: how far back one answer looks. |
 | `metrics` | no | none | `azuremonitor`: which metric of which resources fills which signal. |
 
@@ -332,6 +334,7 @@ links:
 | `resources` | no | none | Rules that find a system's cloud resources. |
 | `telemetryRole` | no | none | Template for a system's telemetry name when it gives none. |
 | `links` | no | none | Addresses that open a resource in a portal or console, shown beside each resource in the Config tab. |
+| `regions` | no | location, as is | How a service's region is read and named, and where the per-region view is off. |
 | `queries` | no | built-in | Replace the inventory queries. |
 
 <!-- file: SubscriptionRuleFile -->
@@ -356,6 +359,16 @@ links:
 | `serviceTag` | no | none | Tag that carries the service. |
 | `tenantNameTag` | no | none | Tag that carries a tenant's friendly name. |
 | `instances` | no | none | Query expression for how many instances a resource runs. |
+| `state` | no | none | Query expression that reads a resource's app state as text. A system whose rule has it shows Running, Stopped (a building under construction) or, when the inventory has no such app, Missing (grey, "not found in Azure"). |
+| `running` | with `state` | | The values of `state` that mean the app runs; any other value is shown as stopped. The core knows no state words. |
+
+<!-- file: RegionsFile -->
+| Key | Required | Default | Meaning |
+|---|---|---|---|
+| `tag` | no | none | Tag of a resource that says its region. Without it, the `region` group of the rule's pattern, else the location the cloud gives. |
+| `names` | no | none | Region value → the label to show (for example `northeurope: North`). A value without a label is shown as it is. |
+| `enabled` | no | `true` | `false` turns the per-region view off in this whole environment. |
+| `off` | no | none | Pillar ids the per-region view is off for in this environment. |
 
 <!-- file: ResourceLinkFile -->
 | Key | Required | Default | Meaning |

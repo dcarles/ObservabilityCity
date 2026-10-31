@@ -17,8 +17,17 @@ public static class Signals
     public const string Backlog = "backlog";
     public const string DeadLetters = "deadLetters";
 
+    /// <summary>The scheduled jobs of a function building: when each last ran and whether it succeeded. Only a function has this signal.</summary>
+    public const string Jobs = "jobs";
+
     public static readonly string[] All =
         [Requests, Errors, Latency, Instances, Cpu, Memory, Utilisation, Throttled, Backlog, DeadLetters];
+
+    /// <summary>The signals every kind of system has, plus <see cref="Jobs"/> for a function.</summary>
+    public static IReadOnlyList<string> For(Contracts.NodeKind kind) => kind == Contracts.NodeKind.Function ? [.. All, Jobs] : All;
+
+    /// <summary>Every name a registry file may use for a signal.</summary>
+    public static readonly string[] Known = [.. All, Jobs];
 
     /// <summary>Written in an environment's <c>signals</c> or a pillar's or system's to say that a signal has no source there, whatever the environment's default.</summary>
     public const string None = "none";
@@ -27,5 +36,5 @@ public static class Signals
     /// The environment source a signal comes from when nothing names one: the source called "messaging" for the queue signals, the one called
     /// "metrics" for the rest. These are the names environment files have always used, so they keep working.
     /// </summary>
-    public static string DefaultSourceName(string signal) => signal is Backlog or DeadLetters ? "messaging" : "metrics";
+    public static string DefaultSourceName(string signal) => signal is Backlog or DeadLetters ? "messaging" : signal == Jobs ? "jobs" : "metrics";
 }

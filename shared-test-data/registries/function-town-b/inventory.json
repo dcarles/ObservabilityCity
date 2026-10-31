@@ -1,0 +1,85 @@
+{
+  "subscriptions": [
+    {
+      "id": "00000000-0000-0000-0000-0000000000f2",
+      "name": "payments",
+      "tags": {
+        "unit": "aa"
+      }
+    }
+  ],
+  "resources": [
+    {
+      "id": "/subscriptions/00000000-0000-0000-0000-0000000000f2/resourceGroups/rg/providers/microsoft.app/containerapps/orders-api-ams",
+      "name": "orders-api-ams",
+      "type": "microsoft.app/containerapps",
+      "subscriptionId": "00000000-0000-0000-0000-0000000000f2",
+      "location": "westeurope",
+      "tags": {
+        "dc": "ams",
+        "svc": "ord"
+      },
+      "instances": 1
+    },
+    {
+      "id": "/subscriptions/00000000-0000-0000-0000-0000000000f2/resourceGroups/rg/providers/microsoft.app/containerapps/orders-api-dub",
+      "name": "orders-api-dub",
+      "type": "microsoft.app/containerapps",
+      "subscriptionId": "00000000-0000-0000-0000-0000000000f2",
+      "location": "northeurope",
+      "tags": {
+        "dc": "dub",
+        "svc": "ord"
+      },
+      "instances": 2
+    },
+    {
+      "id": "/subscriptions/00000000-0000-0000-0000-0000000000f2/resourceGroups/rg/providers/microsoft.app/containerapps/sched-function-ams",
+      "name": "sched-function-ams",
+      "type": "microsoft.app/containerapps",
+      "subscriptionId": "00000000-0000-0000-0000-0000000000f2",
+      "location": "westeurope",
+      "tags": {
+        "dc": "ams",
+        "svc": "sch"
+      },
+      "state": "Started"
+    },
+    {
+      "id": "/subscriptions/00000000-0000-0000-0000-0000000000f2/resourceGroups/rg/providers/microsoft.app/containerapps/sched-function-dub",
+      "name": "sched-function-dub",
+      "type": "microsoft.app/containerapps",
+      "subscriptionId": "00000000-0000-0000-0000-0000000000f2",
+      "location": "northeurope",
+      "tags": {
+        "dc": "dub",
+        "svc": "sch"
+      },
+      "state": "Started"
+    },
+    {
+      "id": "/subscriptions/00000000-0000-0000-0000-0000000000f2/resourceGroups/rg/providers/microsoft.app/containerapps/report-function-dub",
+      "name": "report-function-dub",
+      "type": "microsoft.app/containerapps",
+      "subscriptionId": "00000000-0000-0000-0000-0000000000f2",
+      "location": "northeurope",
+      "tags": {
+        "dc": "dub",
+        "svc": "rpt"
+      },
+      "state": "Started"
+    },
+    {
+      "id": "/subscriptions/00000000-0000-0000-0000-0000000000f2/resourceGroups/rg/providers/microsoft.app/containerapps/idle-function-dub",
+      "name": "idle-function-dub",
+      "type": "microsoft.app/containerapps",
+      "subscriptionId": "00000000-0000-0000-0000-0000000000f2",
+      "location": "northeurope",
+      "tags": {
+        "dc": "dub",
+        "svc": "idl"
+      },
+      "state": "Deactivated"
+    }
+  ]
+}

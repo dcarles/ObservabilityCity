@@ -151,7 +151,7 @@ describe.each(ids)('the %s theme', (id) => {
   })
 
   it('smokes, spins or swings: the animated buildings keep moving', () => {
-    for (const kind of ['Worker', 'Cron', 'Broker', 'Egress'] as const) expect(typeof build(kit, kind).animate).toBe('function')
+    for (const kind of ['Worker', 'Function', 'Broker', 'Egress'] as const) expect(typeof build(kit, kind).animate).toBe('function')
     expect(typeof build(kit, 'Worker').setActivity).toBe('function')
   })
 
@@ -268,7 +268,7 @@ describe('the legend in each theme', () => {
     const entryIds = LEGEND.flatMap((s) => s.entries.map((e) => e.id))
     for (const id of ids.filter((i) => i !== 'harbour-town')) {
       expect(Object.keys(THEME_WORDS[id]).filter((k) => !entryIds.includes(k))).toEqual([])
-      for (const k of ['api', 'worker', 'database', 'cache', 'cron', 'car', 'taxi', 'bridge', 'boat', 'crates']) expect(THEME_WORDS[id][k]?.sees, `${id} ${k}`).toBeTruthy()
+      for (const k of ['api', 'worker', 'database', 'cache', 'function', 'car', 'taxi', 'bridge', 'boat', 'crates']) expect(THEME_WORDS[id][k]?.sees, `${id} ${k}`).toBeTruthy()
     }
   })
 

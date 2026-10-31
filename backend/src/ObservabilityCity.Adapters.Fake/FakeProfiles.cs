@@ -34,7 +34,7 @@ public static class FakeProfiles
             NodeKind.Worker => (30.0, 6000.0, 12.0, 1, 12),
             NodeKind.Database => (200.0, 25.0, 120.0, 2, 6),
             NodeKind.Cache => (400.0, 3.0, 300.0, 2, 6),
-            NodeKind.Cron => (0.2, 20000.0, 1.0, 1, 1),
+            NodeKind.Function => (0.2, 20000.0, 1.0, 1, 1),
             NodeKind.Gateway => (500.0, 90.0, 120.0, 3, 40),
             NodeKind.Broker => (260.0, 12.0, 120.0, 2, 8),
             _ => (60.0, 400.0, 30.0, 2, 10),

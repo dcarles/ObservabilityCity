@@ -1,0 +1,32 @@
+# Convention B: a subscription is found by its tag, resources are container apps called <service>-<role>-<datacentre> (the datacentre is a tag), and a function app
+# reports a run status in its own words. The query text and the state words are the environment's; the program knows none of them.
+name: Production
+default: true
+sources:
+  inventory: { kind: resourcegraph, connection: "file:inventory.json" }
+  platform:
+    kind: azuremonitor
+    connection: "file:platform.json"
+    window: 300s
+    metrics:
+      - resources: apps
+        namespace: microsoft.app/containerapps
+        cpu: { metric: UsageNanoCores, aggregation: average, over: { metric: CpuLimitNanoCores, aggregation: average } }
+        memory: { metric: WorkingSetBytes, aggregation: maximum, over: { metric: MemoryLimitBytes, aggregation: maximum } }
+  jobs:
+    kind: functionjobs
+    connection: "file:jobs.json"
+    window: 1d
+    query: >-
+      ContainerLog_CL | where TimeGenerated > ago({window}) and Line_s startswith "job finished"
+      | summarize lastRun = max(TimeGenerated), succeeded = countif(Line_s has "ok") > 0 by resourceId = ResourceId, job = JobName_s
+scope:
+  workspaceId: "00000000-0000-0000-0000-00000000c0de"
+  subscription: { tag: { key: unit, value: "{pillarId}" } }
+  regions: { tag: dc, names: { ams: Amsterdam, dub: Dublin } }
+  resources:
+    - { name: apps, types: [microsoft.app/containerapps], roles: [api], pattern: '^(?<service>[a-z]+)-api-', instances: "toint(properties.template.scale.minReplicas)" }
+    - { name: function-apps, types: [microsoft.app/containerapps], roles: [function], pattern: '^(?<service>[a-z]+)-function-', state: "tostring(properties.runningStatus)", running: [Started] }
+  links:
+    - { name: Console, url: "https://console.example.test/apps/{name}?env={environment}", types: [microsoft.app/containerapps] }
+signals: { instances: inventory, cpu: platform, memory: platform, jobs: jobs }

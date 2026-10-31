@@ -6,12 +6,12 @@
     "signals": {
       "type": "object",
       "description": "Per-signal source choice, overriding the environment's: signal name to a source name defined in the environment files, or none. A system's choice wins over its pillar's.",
-      "propertyNames": { "enum": ["requests", "errors", "latency", "instances", "cpu", "memory", "utilisation", "throttled", "backlog", "deadLetters"] },
+      "propertyNames": { "enum": ["requests", "errors", "latency", "instances", "cpu", "memory", "utilisation", "throttled", "backlog", "deadLetters", "jobs"] },
       "additionalProperties": { "type": "string" }
     },
     "role": {
       "description": "What a system is. It decides the building that stands for it.",
-      "enum": ["api", "worker", "db", "cache", "cron", "gateway", "broker", "egress"]
+      "enum": ["api", "worker", "db", "cache", "function", "cron", "gateway", "broker", "egress"]
     },
     "messaging": {
       "description": "Service Bus topics and subscriptions. A pillar with neither has no pier, and no boats sail to it.",
@@ -53,6 +53,7 @@
       "properties": {
         "slaP99Ms": { "type": "number", "description": "p99 latency the system should stay under, in milliseconds." },
         "discoverLinks": { "type": "boolean", "description": "Whether link discovery looks for the calls this system makes (default true). Only an api or a worker makes calls worth finding." },
+        "regions": { "type": "boolean", "description": "Whether a service that runs in two or more regions gets the per-region view (default true). Set false for, say, a passive disaster-recovery region." },
         "minCalls": { "type": "integer", "minimum": 1, "description": "The fewest calls in a source's window that make the error share and latency worth judging. A system below it is shown as quiet: its rate stays, its error share and latency are left out and it is never amber or red because of them. Default 1." },
         "errors": { "$ref": "#/$defs/thresholds", "description": "Share of failed requests (0 to 1)." },
         "resources": { "$ref": "#/$defs/thresholds", "description": "CPU, memory or data store utilisation (0 to 1)." },

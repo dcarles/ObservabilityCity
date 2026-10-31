@@ -1,0 +1,33 @@
+# Convention A: everything is in the names, and a resource's region is part of its name.
+name: Production
+default: true
+sources:
+  inventory: { kind: resourcegraph, connection: "file:inventory.json" }
+  platform:
+    kind: azuremonitor
+    connection: "file:platform.json"
+    window: 5m
+    metrics:
+      - resources: plans
+        cpu: { metric: CpuPercentage, aggregation: average, scale: 0.01 }
+        memory: { metric: MemoryPercentage, aggregation: average, scale: 0.01 }
+  jobs:
+    kind: functionjobs
+    connection: "file:jobs.json"
+    window: 1d
+    query: |
+      FunctionAppLogs
+      | where TimeGenerated > ago({window}) and Message startswith "Executed"
+      | summarize arg_max(TimeGenerated, Message) by resourceId = _ResourceId, job = FunctionName
+      | project resourceId, job, lastRun = TimeGenerated, succeeded = Message has "Succeeded"
+scope:
+  variables: { env: prd }
+  workspaceId: "00000000-0000-0000-0000-00000000c0de"
+  subscription: { nameLike: "*-{env}-{pillar}" }
+  regions: { names: { northeurope: North, westeurope: West } }
+  resources:
+    - { name: plans, types: [microsoft.web/serverfarms], roles: [api], pattern: '^plan-cf-[^-]+-(?<pillar>[^-]+)-(?<service>[^-]+)-(?<region>[a-z]+)', instances: "coalesce(toint(properties.numberOfWorkers), toint(sku.capacity))" }
+    - { name: function-apps, types: [microsoft.web/sites], roles: [function], pattern: '^app-[^-]+-(?<pillar>[^-]+)-(?<service>[^-]+)-(?<region>[a-z]+)', state: "tostring(properties.state)", running: [Running] }
+  links:
+    - { name: Cloud portal, url: "https://portal.example.test/#resource{resourceId}" }
+signals: { instances: inventory, cpu: platform, memory: platform, jobs: jobs }

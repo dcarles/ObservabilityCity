@@ -6,7 +6,7 @@ namespace ObservabilityCity.Core.Registry;
 public static partial class RegistryLoader
 {
     private static readonly string[] ResourceGroups = ["service", "role", "pillar", "region", "tenant"];
-    private static readonly string[] SystemRoles = ["api", "worker", "db", "cache", "cron", "gateway", "broker", "egress"];
+    private static readonly string[] SystemRoles = ["api", "worker", "db", "cache", "function", "cron", "gateway", "broker", "egress"];
 
     private static ScopeRules ToScope(ScopeFile? f) =>
         f is null ? ScopeRules.None : new ScopeRules
@@ -17,9 +17,11 @@ public static partial class RegistryLoader
             Variables = f.Variables,
             Subscription = f.Subscription is null ? null : new SubscriptionRule(f.Subscription.NameLike, f.Subscription.Tag?.Key, f.Subscription.Tag?.Value),
             PillarSubscriptions = f.Pillars,
-            Resources = f.Resources.Select(r => new ResourceRule(r.Name, r.Types, r.Pattern, r.Roles.Select(x => x.ToLowerInvariant()).ToList(), r.ServiceTag, r.TenantNameTag, string.IsNullOrWhiteSpace(r.Instances) ? null : r.Instances.Trim())).ToList(),
+            Resources = f.Resources.Select(r => new ResourceRule(r.Name, r.Types, r.Pattern, r.Roles.Select(x => x.ToLowerInvariant() == "cron" ? "function" : x.ToLowerInvariant()).ToList(), r.ServiceTag, r.TenantNameTag, string.IsNullOrWhiteSpace(r.Instances) ? null : r.Instances.Trim(),
+                string.IsNullOrWhiteSpace(r.State) ? null : r.State.Trim(), r.Running.Count == 0 ? null : r.Running)).ToList(),
             TelemetryRole = f.TelemetryRole,
             Links = f.Links.Select(l => new ResourceLinkRule(l.Name, l.Url.Trim(), l.Types)).ToList(),
+            Regions = f.Regions is null ? RegionRules.Default : new RegionRules(string.IsNullOrWhiteSpace(f.Regions.Tag) ? null : f.Regions.Tag.Trim(), f.Regions.Names, f.Regions.Enabled ?? true, f.Regions.Off),
             Queries = new ScopeQueries(f.Queries?.Subscriptions, f.Queries?.Resources, f.Queries?.Workspaces),
         };
 
@@ -131,6 +133,14 @@ public static partial class RegistryLoader
             if (!KebabId.IsMatch(pillar)) errors.Add($"{at}.pillars: '{pillar}' must be a pillar id (lowercase kebab-case)");
             if (subscription.Trim().Length == 0) errors.Add($"{at}.pillars.{pillar} is empty; name a subscription id or leave the pillar out");
         }
+        if (s.Regions is { } regions)
+        {
+            if (regions.Tag is { } regionTag && regionTag.Trim().Length == 0) errors.Add($"{at}.regions.tag is empty; name the tag that holds a resource's region, or leave it out");
+            foreach (var (value, label) in regions.Names)
+                if (label.Trim().Length == 0) errors.Add($"{at}.regions.names: '{value}' has an empty label");
+            foreach (var pillar in regions.Off)
+                if (!KebabId.IsMatch(pillar)) errors.Add($"{at}.regions.off: '{pillar}' must be a pillar id (lowercase kebab-case)");
+        }
         var linkNames = new HashSet<string>();
         foreach (var l in s.Links)
         {
@@ -151,6 +161,9 @@ public static partial class RegistryLoader
             else if (!seen.Add(r.Name)) errors.Add($"{at}.resources: '{r.Name}' is listed twice");
             if (r.Types.Count == 0) errors.Add($"{rule} needs types (the resource types it applies to, for example a plan or an account type)");
             if (r.Instances is { } counting && counting.Trim().Length == 0) errors.Add($"{rule}: instances is empty; give the expression that counts a resource's instances, or leave it out");
+            if (r.State is { } reading && reading.Trim().Length == 0) errors.Add($"{rule}: state is empty; give the expression that reads a resource's app state, or leave it out");
+            if (r.State is not null && r.Running.Count == 0) errors.Add($"{rule}: state needs running, the values of it that mean the app runs (any other value is shown as stopped)");
+            if (r.State is null && r.Running.Count > 0) errors.Add($"{rule}: running is only used with state");
             foreach (var role in r.Roles)
                 if (!SystemRoles.Contains(role, StringComparer.OrdinalIgnoreCase))
                     errors.Add($"{rule}: roles has '{role}'. Use {string.Join(", ", SystemRoles)}.{DidYouMean.Hint(role, SystemRoles)}");

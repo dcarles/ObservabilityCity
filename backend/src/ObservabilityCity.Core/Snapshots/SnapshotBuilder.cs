@@ -284,13 +284,33 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
         var r = ReadingMerge.Merge(bySource, signal => registry.SourceFor(n, signal));
         var env = registry.ActiveEnvironment;
         if (r is not null) r = WithoutAbsent(r, absent);
-        if (r is null || absent.Count == Signals.All.Length || IsStale(n, registry, bySource, r, now))
+        // The inventory has been read and the app is not there: grey, and it says so. Nothing else about a missing app can be known.
+        if (r?.App == AppState.Missing)
+            return Stale(n, r, absent, env) with { App = AppState.Missing };
+        if (r is null || absent.Count == Signals.For(n.Kind).Count || IsStale(n, registry, bySource, r, now))
+            return Stale(n, r, absent, env); // No fresh data: keep the last numbers out of it. Grey, never green.
+
+        // A count of 0 instances is no count: the source did not say (a plan the cloud gives no worker count for), so the signal is absent rather than 0 of 0.
+        if (r.InstancesTotal == 0 && r.InstancesHealthy == 0 && !absent.Contains(Signals.Instances)) absent = [.. absent, Signals.Instances];
+
+        // A service in two or more regions is shown as its worst region; the others are listed beside it.
+        var regions = RegionsOf(n, r, env);
+        if (regions is not null)
         {
-            // No fresh data: keep the last numbers out of it. Grey, never green.
-            return new NodeSnapshot(n.Id, n.Name, n.Kind, n.Service, n.External, HealthState.Stale, 0, 0, 0, null, null, null, null, null, null, null, 0, 0, 0,
-                n.SlaP99Ms, n.ErrorAmber, n.ErrorRed, n.ResourceAmber, n.ResourceRed, n.ThrottleAmber, n.ThrottleRed, n.BacklogAmber, n.BacklogRed, n.Calls, n.GatewayCalls, r?.At,
-                n.TenantPattern is null ? null : StaleUnits(n, env), absent);
+            var worst = WorstRegion(regions);
+            var pressure = regions.Any(x => x.Cpu is not null || x.Memory is not null);
+            r = r with
+            {
+                InstancesTotal = worst.Instances ?? r.InstancesTotal,
+                InstancesHealthy = worst.Instances ?? r.InstancesHealthy,
+                Cpu = pressure ? worst.Cpu : r.Cpu,
+                Memory = pressure ? worst.Memory : r.Memory,
+            };
         }
+
+        // A function: its jobs, each in its region. A failed job is red, a job that did not run when its schedule said it would is amber. A stopped app runs nothing.
+        var jobs = r.App == AppState.Stopped || r.Jobs is null ? null : Jobs(n, r.Jobs, registry, env, now);
+        var jobHealth = jobs?.Any(j => j.Status == JobStatus.Failed) == true ? HealthState.Down : jobs?.Any(j => j.Status == JobStatus.Overdue) == true ? HealthState.Degraded : HealthState.Healthy;
 
         // Quiet: too few calls in the source's window for its error share and latency to mean anything. The numbers are left out (0 is no trouble to
         // any threshold), the rate stays, and nothing else about the building changes.
@@ -307,8 +327,8 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
 
         // Degraded: errors, slow, unhealthy instances, a resource running hot, a data store turning requests away, or a consumer running late.
         var hot = Math.Max(Math.Max(r.Cpu ?? 0, r.Memory ?? 0), utilisation ?? 0) >= n.ResourceAmber;
-        var health = !r.Up ? HealthState.Down
-            : r.ErrorRate >= n.ErrorAmber || r.P99Ms > n.SlaP99Ms || r.InstancesHealthy < r.InstancesTotal || hot || (throttled ?? 0) >= n.ThrottleAmber || (r.OldestMessageSeconds ?? 0) >= n.BacklogAmber
+        var health = !r.Up || jobHealth == HealthState.Down ? HealthState.Down
+            : jobHealth == HealthState.Degraded || r.ErrorRate >= n.ErrorAmber || r.P99Ms > n.SlaP99Ms || r.InstancesHealthy < r.InstancesTotal || hot || (throttled ?? 0) >= n.ThrottleAmber || (r.OldestMessageSeconds ?? 0) >= n.BacklogAmber
                 ? HealthState.Degraded
                 : HealthState.Healthy;
 
@@ -320,7 +340,48 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
             OutsideRequestsPerSecond = split?.Outside,
             Inbound = split?.Callers,
             InboundEstimated = split?.Estimated ?? false,
+            App = r.App,
+            Jobs = jobs,
+            Regions = regions?.Select(x => new RegionSnapshot(x.Region, Label(env, x.Region), x.Instances, x.Cpu, x.Memory)).ToList(),
         };
+    }
+
+    private static NodeSnapshot Stale(RegistryNode n, NodeReading? r, IReadOnlyList<string> absent, RegistryEnvironment? env) =>
+        new(n.Id, n.Name, n.Kind, n.Service, n.External, HealthState.Stale, 0, 0, 0, null, null, null, null, null, null, null, 0, 0, 0,
+            n.SlaP99Ms, n.ErrorAmber, n.ErrorRed, n.ResourceAmber, n.ResourceRed, n.ThrottleAmber, n.ThrottleRed, n.BacklogAmber, n.BacklogRed, n.Calls, n.GatewayCalls, r?.At,
+            n.TenantPattern is null ? null : StaleUnits(n, env), absent);
+
+    private static string Label(RegistryEnvironment? env, string region) => env?.Scope.Regions.Label(region) ?? region;
+
+    /// <summary>
+    /// The regions of a service when the region view applies to it: it runs in two or more, neither its settings nor the environment turn the view off.
+    /// Null otherwise (the numbers then stand for the whole service, as they always did).
+    /// </summary>
+    private static IReadOnlyList<RegionReading>? RegionsOf(RegistryNode n, NodeReading r, RegistryEnvironment? env)
+    {
+        var rules = env?.Scope.Regions ?? RegionRules.Default;
+        if (!n.RegionView || !rules.Enabled || rules.Off.Contains(n.GroupId) || r.Regions is not { Count: >= 2 } regions) return null;
+        return regions.OrderBy(x => Label(env, x.Region), StringComparer.Ordinal).ToList();
+    }
+
+    /// <summary>The region under the most pressure: the highest CPU or memory. With no number to go by, the first by name.</summary>
+    private static RegionReading WorstRegion(IReadOnlyList<RegionReading> regions) =>
+        regions.Select((x, i) => (Region: x, Index: i)).OrderByDescending(x => Math.Max(x.Region.Cpu ?? 0, x.Region.Memory ?? 0)).ThenBy(x => x.Index).First().Region;
+
+    /// <summary>
+    /// The state of each job. Failed: the last run failed. Overdue: the schedule said it runs next at a time that has passed, by more than the reading is
+    /// allowed to lag (the jobs source's freshness), without a newer run to show for it. Anything else is Ok.
+    /// </summary>
+    private List<JobSnapshot> Jobs(RegistryNode n, IReadOnlyList<JobReading> jobs, Registry.Registry registry, RegistryEnvironment? env, DateTimeOffset now)
+    {
+        var grace = registry.SourceFor(n, Signals.Jobs) is { } source ? FreshFor(source) : StaleAfter;
+        return jobs.Select(j =>
+        {
+            var status = j.Succeeded == false ? JobStatus.Failed
+                : j.Next is { } next && now > next + grace && (j.LastRun is null || j.LastRun < next) ? JobStatus.Overdue
+                : JobStatus.Ok;
+            return new JobSnapshot(j.Name, j.Region is null ? null : Label(env, j.Region), status, j.LastRun, j.Next);
+        }).ToList();
     }
 
     /// <summary>
@@ -330,7 +391,7 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
     private bool IsStale(RegistryNode n, Registry.Registry registry, IReadOnlyDictionary<string, NodeReading> bySource, NodeReading merged, DateTimeOffset now)
     {
         var used = bySource.Count == 1 ? bySource.Keys.ToList()
-            : Signals.All.Select(s => registry.SourceFor(n, s)).OfType<string>().Where(bySource.ContainsKey).Distinct().ToList();
+            : Signals.For(n.Kind).Select(s => registry.SourceFor(n, s)).OfType<string>().Where(bySource.ContainsKey).Distinct().ToList();
         return used.Count == 0 ? now - merged.At > StaleAfter : used.Any(s => now - bySource[s].At > FreshFor(s));
     }
 

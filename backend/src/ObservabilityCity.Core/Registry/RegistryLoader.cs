@@ -22,7 +22,7 @@ public static partial class RegistryLoader
         .WithNamingConvention(CamelCaseNamingConvention.Instance)
         .Build();
 
-    private static readonly string[] Roles = ["api", "worker", "db", "cache", "cron", "gateway", "broker", "egress"];
+    private static readonly string[] Roles = ["api", "worker", "db", "cache", "function", "cron", "gateway", "broker", "egress"];
 
     // Every key a registry file may use, for suggesting the right one when a key is misspelt.
     private static readonly string[] KnownKeys =
@@ -33,7 +33,7 @@ public static partial class RegistryLoader
         "tenantPattern", "order", "default", "sources", "kind", "connection", "tenants", "exclude", "fake", "undeclaredTenants",
         "signals", "credentials", "credential", "pollSeconds", "timeoutSeconds", "tenantId", "clientId", "clientSecretEnv",
         "scope", "inventory", "workspace", "variables", "subscription", "pillars", "types", "pattern", "roles", "serviceTag", "tenantNameTag",
-        "telemetryRole", "queries", "links", "url", "nameLike", "tag", "key", "value", "code", "serviceCode", "telemetry", "minCalls", "query", "window", "discoverLinks", "minDays", "keepFor", "firstRead", "interval", "ignoreHosts", "rules", "host", "path", "target", "gateway", "domains", "traffic", "shareWindow",
+        "telemetryRole", "queries", "links", "url", "nameLike", "tag", "key", "value", "code", "serviceCode", "telemetry", "minCalls", "query", "window", "discoverLinks", "regions", "tag", "names", "enabled", "off", "state", "running", "minDays", "keepFor", "firstRead", "interval", "ignoreHosts", "rules", "host", "path", "target", "gateway", "domains", "traffic", "shareWindow",
     ];
 
     // Last resort when defaults.yaml is missing or silent about a role.
@@ -397,8 +397,8 @@ public static partial class RegistryLoader
         }
         foreach (var (signal, source) in f.Signals)
         {
-            if (!Signals.All.Contains(signal))
-                errors.Add($"{name}: unknown signal '{signal}'. Use {string.Join(", ", Signals.All)}.{DidYouMean.Hint(signal, Signals.All)}");
+            if (!Signals.Known.Contains(signal))
+                errors.Add($"{name}: unknown signal '{signal}'. Use {string.Join(", ", Signals.Known)}.{DidYouMean.Hint(signal, Signals.Known)}");
             if (source != Signals.None && !f.Sources.ContainsKey(source))
                 errors.Add($"{name}: signal '{signal}' comes from source '{source}', which this file does not define.{DidYouMean.Hint(source, f.Sources.Keys)}");
         }
@@ -579,7 +579,7 @@ public static partial class RegistryLoader
                 errors.Add($"{fileName}: defaults for unknown role '{role}'. Use {RoleList}.{DidYouMean.Hint(role, Roles)}");
     }
 
-    private static string RoleList => "api, worker, db, cache, cron, gateway, broker or egress";
+    private static string RoleList => "api, worker, db, cache, function (or cron), gateway, broker or egress";
 
     private static RegistryNode? ToNode(
         SystemFile s, string groupId, string fileName, string prefix,
@@ -616,8 +616,12 @@ public static partial class RegistryLoader
                 errors.Add($"{fileName}: tenantPattern '{s.TenantPattern}' of '{s.Id}' must contain {RegistryEnvironment.TenantToken} exactly once, where the tenant id goes (for example merchant-{{tenant}}-db)");
         }
         var role = kind == NodeKind.Database ? "db" : kind.ToString().ToLowerInvariant(); // the YAML spelling
-        appDefaults.TryGetValue(role, out var app);
-        pillarDefaults.TryGetValue(role, out var pillar);
+        RoleDefaultsFile? app = null, pillar = null;
+        foreach (var spelling in kind == NodeKind.Function ? new[] { role, "cron" } : [role]) // a function's defaults may still be written under its old name, cron
+        {
+            if (app is null) appDefaults.TryGetValue(spelling, out app);
+            if (pillar is null) pillarDefaults.TryGetValue(spelling, out pillar);
+        }
 
         var origins = new Dictionary<string, SettingOrigin>();
         double Resolve(string key, Func<RoleDefaultsFile?, double?> pick, double? own)
@@ -663,6 +667,7 @@ public static partial class RegistryLoader
         {
             MinCalls = Math.Max(1, (int)Resolve("minCalls", d => d?.MinCalls, s.MinCalls)),
             DiscoverLinks = ResolveFlag("discoverLinks", d => d?.DiscoverLinks, s.DiscoverLinks, true),
+            RegionView = ResolveFlag("regions", d => d?.Regions, s.Regions, true),
             GatewayCalls = s.GatewayCalls,
             ServiceCode = s.ServiceCode,
             TelemetryRole = s.Telemetry?.Role,
@@ -681,8 +686,8 @@ public static partial class RegistryLoader
     {
         foreach (var (signal, source) in signals)
         {
-            if (!Signals.All.Contains(signal))
-                errors.Add($"{fileName}: {owner} has signals.{signal}, which is not a signal. Use {string.Join(", ", Signals.All)}.{DidYouMean.Hint(signal, Signals.All)}");
+            if (!Signals.Known.Contains(signal))
+                errors.Add($"{fileName}: {owner} has signals.{signal}, which is not a signal. Use {string.Join(", ", Signals.Known)}.{DidYouMean.Hint(signal, Signals.Known)}");
             if (source != Signals.None && !KebabId.IsMatch(source))
                 errors.Add($"{fileName}: {owner} points signals.{signal} at '{source}'; use a source name from the environment files (lowercase kebab-case) or {Signals.None}");
         }
@@ -702,7 +707,7 @@ public static partial class RegistryLoader
             "worker" => NodeKind.Worker,
             "db" or "database" => NodeKind.Database,
             "cache" => NodeKind.Cache,
-            "cron" => NodeKind.Cron,
+            "function" or "cron" => NodeKind.Function, // cron is the old spelling and stays accepted
             "gateway" => NodeKind.Gateway,
             "broker" => NodeKind.Broker,
             "egress" => NodeKind.Egress,

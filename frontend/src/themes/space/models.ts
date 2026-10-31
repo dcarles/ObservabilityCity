@@ -22,7 +22,7 @@ export function spaceModel(kind: NodeKind, accent: string, opts: { tenanted?: bo
     case 'Worker': return fabricator(accent)
     case 'Database': return vault(accent)
     case 'Cache': return fusionSphere()
-    case 'Cron': return chronoSpire()
+    case 'Function': return chronoSpire()
     case 'Gateway': return dockingGate(accent)
     case 'Broker': return spaceport(opts.name)
     case 'Egress': return relayStation(accent)
@@ -218,13 +218,13 @@ function chronoSpire(): BuildingModel {
   const base = group(
     pad(1.9),
     box(W + 0.4, 0.6, W + 0.4, flat(PLATE), { y: 0.26 }),
-    box(W, 2.0, W, flat(P.cronStone, { metalness: 0.2 }), { y: 0.86 }),
+    box(W, 2.0, W, flat(P.functionStone, { metalness: 0.2 }), { y: 0.86 }),
     airlock(0.8, 1.1, W / 2 + 0.12),
     box(2.2, 0.06, 1.4, flat(PLATE), { y: 0.26, z: W / 2 + 0.9 }),
   )
   const roof = group(
-    box(2.0, 1.6, 2.0, flat(P.cronStone, { metalness: 0.2 })),
-    cone(1.5, 2.2, flat(P.cronRoof, { metalness: 0.3 }), { y: 1.6, ry: Math.PI / 4 }, 4),
+    box(2.0, 1.6, 2.0, flat(P.functionStone, { metalness: 0.2 })),
+    cone(1.5, 2.2, flat(P.functionRoof, { metalness: 0.3 }), { y: 1.6, ry: Math.PI / 4 }, 4),
     ringGroup,
     at(mast(1.0), 0, 3.8, 0),
   )
@@ -233,7 +233,7 @@ function chronoSpire(): BuildingModel {
     baseHeight: 3.1,
     floorHeight: FH,
     makeFloor: () => {
-      const { material, uniforms } = makeWindowMaterial({ color: P.cronStone, trim: '#f1f3ff', floorHeight: FH, width: W, depth: W, cell: CELL, win: [0.5, 0.8] })
+      const { material, uniforms } = makeWindowMaterial({ color: P.functionStone, trim: '#f1f3ff', floorHeight: FH, width: W, depth: W, cell: CELL, win: [0.5, 0.8] })
       return { object: box(W - 0.2, FH, W - 0.2, material), uniforms }
     },
     roof,

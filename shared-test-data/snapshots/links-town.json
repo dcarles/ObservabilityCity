@@ -75,7 +75,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "hub.service-bus",
@@ -114,7 +117,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "hub.egress",
@@ -153,7 +159,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "hub.customer-db",
@@ -192,7 +201,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         }
       ]
     },
@@ -262,7 +274,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "ful.orders-worker",
@@ -303,7 +318,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "ful.orders-db",
@@ -342,7 +360,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         }
       ]
     },
@@ -412,7 +433,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "wrk.batch-db",
@@ -451,7 +475,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         }
       ]
     },
@@ -509,7 +536,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "nom.catalog-cache",
@@ -548,7 +578,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         }
       ]
     },
@@ -570,7 +603,7 @@
         {
           "id": "hbk.sync-cron",
           "name": "Customer sync",
-          "kind": "Cron",
+          "kind": "Function",
           "service": null,
           "external": false,
           "state": "Healthy",
@@ -606,7 +639,25 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": "Running",
+          "jobs": [
+            {
+              "name": "daily",
+              "region": null,
+              "status": "Ok",
+              "lastRun": "2026-10-25T11:50:03+00:00",
+              "next": "2026-10-25T12:50:03+00:00"
+            },
+            {
+              "name": "hourly",
+              "region": null,
+              "status": "Ok",
+              "lastRun": "2026-10-25T11:43:03+00:00",
+              "next": "2026-10-25T12:43:03+00:00"
+            }
+          ],
+          "regions": null
         }
       ]
     },
@@ -671,7 +722,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "leg.feed-worker",
@@ -712,7 +766,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         },
         {
           "id": "leg.feed-db",
@@ -751,7 +808,10 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": null,
+          "jobs": null,
+          "regions": null
         }
       ]
     },
@@ -773,7 +833,7 @@
         {
           "id": "sta.idle-cron",
           "name": "Idle job",
-          "kind": "Cron",
+          "kind": "Function",
           "service": null,
           "external": false,
           "state": "Healthy",
@@ -807,7 +867,25 @@
           "quiet": false,
           "outsideRequestsPerSecond": null,
           "inbound": null,
-          "inboundEstimated": false
+          "inboundEstimated": false,
+          "app": "Running",
+          "jobs": [
+            {
+              "name": "daily",
+              "region": null,
+              "status": "Ok",
+              "lastRun": "2026-10-25T11:50:03+00:00",
+              "next": "2026-10-25T12:50:03+00:00"
+            },
+            {
+              "name": "hourly",
+              "region": null,
+              "status": "Ok",
+              "lastRun": "2026-10-25T11:43:03+00:00",
+              "next": "2026-10-25T12:43:03+00:00"
+            }
+          ],
+          "regions": null
         }
       ]
     }

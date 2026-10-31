@@ -1,6 +1,6 @@
 // What the inspector drawer says, as pure functions: a system's numbers in, rows and sentences out.
 
-import type { ConfigValue, HealthState, IncidentSnapshot, LinkRef, LogLine, NodeSnapshot, ResourceLink, ScopeInfo, ScopeResource, SettingLayer, SystemDetail } from './types'
+import type { ConfigValue, HealthState, IncidentSnapshot, JobSnapshot, LinkRef, LogLine, NodeSnapshot, ResourceLink, ScopeInfo, ScopeResource, SettingLayer, SystemDetail } from './types'
 import { inboundSplitText } from './inbound'
 import { limitRange, throttleWho } from './tenants'
 import { isAbsent, isUnmonitored, QUIET_TEXT } from './signals'
@@ -12,12 +12,27 @@ export const stateTone = (s: HealthState): Tone => (s === 'Healthy' ? 'ok' : s =
 
 const pct = (v: number, digits = 0): string => `${(v * 100).toFixed(digits)}%`
 
+export const NOT_FOUND_TEXT = 'not found in the inventory'
+
+const jobName = (j: { name: string; region?: string | null }): string => (j.region ? `${j.name} (${j.region})` : j.name)
+
+/** The jobs of a function that are failing or late, in words. */
+export function jobReasons(n: Pick<NodeSnapshot, 'jobs'>): string[] {
+  return (n.jobs ?? []).flatMap((j) =>
+    j.status === 'Failed' ? [`Job ${jobName(j)} failed its last run${j.lastRun ? ` at ${clockTime(j.lastRun)}` : ''}.`]
+      : j.status === 'Overdue' ? [`Job ${jobName(j)} should have run${j.next ? ` at ${clockTime(j.next)}` : ''} and has not.`]
+        : [])
+}
+
 /** In words, why the system is not healthy. Empty for a healthy one. Each line names the number and the line it crossed. */
 export function reasons(n: NodeSnapshot): string[] {
   if (isUnmonitored(n)) return []
+  if (n.app === 'Missing') return [`The app is ${NOT_FOUND_TEXT}: the cloud has no resource of this name, so nothing here is shown as healthy.`]
   if (n.state === 'Stale') return ['No fresh data: the last reading is too old to trust, so nothing here is shown as healthy.']
-  if (n.state === 'Down') return ['Down: the system is not answering.']
-  const out: string[] = []
+  const jobs = jobReasons(n)
+  if (n.state === 'Down') return jobs.length > 0 ? jobs : ['Down: the system is not answering.']
+  const out: string[] = [...jobs]
+  if (n.app === 'Stopped') out.push('The app is stopped, so this building is under construction and its jobs are not judged.')
   if (isAbsent(n, 'errors')) { /* nothing measures errors here, so there is nothing to say about them */ }
   else if (n.errorRate >= n.errorRed) out.push(`Errors are at ${pct(n.errorRate, 1)}, past the red line of ${pct(n.errorRed, 1)}.`)
   else if (n.errorRate >= n.errorAmber) out.push(`Errors are at ${pct(n.errorRate, 1)}, past the amber line of ${pct(n.errorAmber, 1)}.`)
@@ -41,8 +56,10 @@ export interface Row {
 /** The key numbers of a system, in reading order. Numbers a source does not give are left out, not shown as zero. */
 export function overviewRows(n: NodeSnapshot, nameOf: (id: string) => string = (id) => id): Row[] {
   if (isUnmonitored(n)) return [{ label: 'Data', value: 'no source configured', tone: '' }]
+  if (n.app === 'Missing') return [{ label: 'App', value: NOT_FOUND_TEXT, tone: 'stale' }]
   if (n.state === 'Stale') return [{ label: 'Data', value: 'none fresh', tone: 'stale' }]
   const rows: Row[] = []
+  if (n.app === 'Running' || n.app === 'Stopped') rows.push({ label: 'App', value: n.app === 'Running' ? 'running' : 'stopped (under construction)', tone: n.app === 'Stopped' ? 'warn' : '' })
   if (!isAbsent(n, 'instances')) rows.push({ label: 'Instances', value: plaqueText(n), tone: n.instancesHealthy < n.instancesTotal ? 'warn' : '' })
   if (!isAbsent(n, 'requests')) rows.push({ label: 'Requests', value: `${formatRate(n.requestsPerSecond)}/s`, tone: '' })
   const split = isAbsent(n, 'requests') ? null : inboundSplitText(n, nameOf)
@@ -61,6 +78,17 @@ export function overviewRows(n: NodeSnapshot, nameOf: (id: string) => string = (
   if (n.oldestMessageSeconds != null && !isAbsent(n, 'backlog')) rows.push({ label: 'Oldest message', value: formatAge(n.oldestMessageSeconds), tone: n.oldestMessageSeconds >= n.backlogRed ? 'bad' : n.oldestMessageSeconds >= n.backlogAmber ? 'warn' : '' })
   if (n.deadLetters != null && !isAbsent(n, 'deadLetters')) rows.push({ label: 'Dead letters', value: formatRate(n.deadLetters), tone: n.deadLetters > 0 ? 'bad' : '' })
   return rows
+}
+
+const JOB_TONE: Record<JobSnapshot['status'], Tone> = { Ok: '', Failed: 'bad', Overdue: 'warn' }
+
+/** One row for each scheduled job of a function, in each region: how it stands, when it last ran and when it runs next. Nothing for a building without jobs. */
+export function jobRows(n: Pick<NodeSnapshot, 'jobs'>): Row[] {
+  return (n.jobs ?? []).map((j) => ({
+    label: jobName(j),
+    value: [j.status === 'Ok' ? 'ok' : j.status === 'Failed' ? 'failed' : 'overdue', j.lastRun ? `ran ${clockTime(j.lastRun)}` : null, j.next ? `next ${clockTime(j.next)}` : null].filter(Boolean).join(' · '),
+    tone: JOB_TONE[j.status],
+  }))
 }
 
 /** "sev 2, 3 open": the worst open incident of an island and how many there are. */

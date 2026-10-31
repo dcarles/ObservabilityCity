@@ -40,6 +40,8 @@ internal sealed class RoleDefaultsFile
     public int? MinCalls { get; set; }
     /// <summary>Whether link discovery looks for the calls systems of this role make (an api or a worker). Default yes.</summary>
     public bool? DiscoverLinks { get; set; }
+    /// <summary>Whether a service that runs in two or more regions gets the per-region view. Default yes; false for, say, a passive disaster-recovery region.</summary>
+    public bool? Regions { get; set; }
 }
 
 /// <summary>defaults.yaml and the "defaults" block of a pillar file: role name to defaults.</summary>
@@ -63,6 +65,8 @@ internal sealed class SystemFile
     public int? MinCalls { get; set; }
     /// <summary>Whether link discovery looks for the calls this system makes. Without it, the pillar's or the defaults' choice.</summary>
     public bool? DiscoverLinks { get; set; }
+    /// <summary>Whether this system gets the per-region view. Without it, the pillar's or the defaults' choice.</summary>
+    public bool? Regions { get; set; }
     /// <summary>Signal to source name (or none), overriding the pillar's and the environment's choice for this system.</summary>
     public Dictionary<string, string> Signals { get; set; } = new();
     /// <summary>The name this system's resources carry for its service, matched against the service group of the environment's resource patterns. Without it, the service name.</summary>
@@ -254,6 +258,16 @@ internal sealed class ScopeFile
     public ScopeQueriesFile? Queries { get; set; }
     /// <summary>Addresses that open a resource in a portal or console. A template over the resource's words; without any, no link is shown.</summary>
     public List<ResourceLinkFile> Links { get; set; } = [];
+    /// <summary>How a service's region is read and labelled, and where the per-region view is off.</summary>
+    public RegionsFile? Regions { get; set; }
+}
+
+internal sealed class RegionsFile
+{
+    public string? Tag { get; set; }
+    public Dictionary<string, string> Names { get; set; } = new();
+    public bool? Enabled { get; set; }
+    public List<string> Off { get; set; } = [];
 }
 
 internal sealed class ResourceLinkFile
@@ -285,6 +299,10 @@ internal sealed class ResourceRuleFile
     public string? TenantNameTag { get; set; }
     /// <summary>A query expression that gives, for one resource of this rule, how many instances it runs. Resources of a rule without it carry no count.</summary>
     public string? Instances { get; set; }
+    /// <summary>A query expression that reads, for one resource of this rule, its app state as text (for example a web app's state). Resources of a rule without it carry no state.</summary>
+    public string? State { get; set; }
+    /// <summary>The values of state that mean the app runs. Required with state; any other value means stopped.</summary>
+    public List<string> Running { get; set; } = [];
 }
 
 internal sealed class ScopeQueriesFile

@@ -1,0 +1,10 @@
+pillar: aa
+displayName: Alpha
+color: "#5aa9ff"
+systems:
+  - { id: aa.orders-api, service: orders, serviceCode: orders, name: Orders API, role: api, external: true }
+  - { id: aa.sched-fn, service: scheduler, serviceCode: sched, name: Scheduler, role: function }
+  - { id: aa.report-fn, service: reports, serviceCode: report, name: Reports, role: function }
+  - { id: aa.idle-fn, service: idle, serviceCode: idle, name: Idle jobs, role: function }
+  # the old spelling of the role still works
+  - { id: aa.ghost-fn, service: ghost, serviceCode: ghost, name: Ghost jobs, role: cron }

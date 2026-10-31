@@ -13,10 +13,31 @@ public enum NodeKind
     Worker,
     Database,
     Cache,
-    Cron,
+    Function,
     Gateway,
     Broker,
     Egress,
+}
+
+/// <summary>
+/// Whether the cloud runs a system's app: Running, Stopped (switched off on purpose, drawn as a building under construction) or Missing (the inventory was
+/// read and has no such app, drawn grey as "not found in Azure"). A system whose environment does not read an app state has none (null).
+/// </summary>
+[JsonConverter(typeof(JsonStringEnumConverter))]
+public enum AppState
+{
+    Running,
+    Stopped,
+    Missing,
+}
+
+/// <summary>How one scheduled job of a function building stands: Ok (ran and succeeded, or not due yet), Failed (its last run failed) or Overdue (it should have run by now and has not).</summary>
+[JsonConverter(typeof(JsonStringEnumConverter))]
+public enum JobStatus
+{
+    Ok,
+    Failed,
+    Overdue,
 }
 
 /// <summary>Who a tenant is: a paying customer, a test tenant (smoke tests, QA, sandboxes), or one the data shows that the environment does not list.</summary>
@@ -56,6 +77,9 @@ public enum HealthState
 /// OutsideRequestsPerSecond and Inbound say where an API's traffic comes from, once the environment measures it (links.traffic): the part no town system explains,
 /// which arrives at the airport, and the part each town system sends. Both are null while nothing measures it; the renderer then shares the rate evenly between the
 /// declared callers. InboundEstimated says the share stands on too few calls and is the last good one.
+/// App says whether the cloud runs the app (see <see cref="AppState"/>); Jobs lists the scheduled jobs of a function building; Regions lists a service's regions
+/// when it runs in two or more, and the instances, Cpu and Memory above are then those of its worst region. A count of instances of 0 is never sent: it is not known, so
+/// "instances" is in Absent.
 /// Absent lists the signals no source is configured for (requests, errors, latency, instances, cpu, memory, utilisation, throttled, backlog, deadLetters). They are not
 /// zero and not grey: the number in the matching field means nothing, health ignores it and the renderer shows nothing for it. A system whose signals are all absent has no
 /// source at all; it is Stale in State, but it is not grey and it is not counted as missing data.
@@ -97,7 +121,22 @@ public sealed record NodeSnapshot(
     bool Quiet = false,
     double? OutsideRequestsPerSecond = null,
     IReadOnlyList<InboundLinkSnapshot>? Inbound = null,
-    bool InboundEstimated = false);
+    bool InboundEstimated = false,
+    AppState? App = null,
+    IReadOnlyList<JobSnapshot>? Jobs = null,
+    IReadOnlyList<RegionSnapshot>? Regions = null);
+
+/// <summary>
+/// One scheduled job of a function building in one region: Status, when it last ran (LastRun) and when its schedule says it runs next (Next); both null
+/// when the logs gave none. Region is the region label of the app that runs it, null when the system runs in one region only.
+/// </summary>
+public sealed record JobSnapshot(string Name, string? Region, JobStatus Status, DateTimeOffset? LastRun, DateTimeOffset? Next);
+
+/// <summary>
+/// One region of a service that runs in two or more (see the region view). Label is the region as the town names it. Instances, Cpu and Memory are that region's
+/// own, each null when nothing reports it. The building's own numbers are those of its worst region, the one with the highest CPU or memory.
+/// </summary>
+public sealed record RegionSnapshot(string Region, string Label, int? Instances, double? Cpu, double? Memory);
 
 /// <summary>What one town system sends to an API, in requests per second.</summary>
 public sealed record InboundLinkSnapshot(string From, double RequestsPerSecond);

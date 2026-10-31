@@ -106,7 +106,7 @@
     "signals": {
       "type": "object",
       "description": "Which source each signal comes from in this environment: a source name from sources, or none. A signal not listed here uses the source called metrics (messaging for backlog and deadLetters). A signal with no source is absent: not shown, not grey.",
-      "propertyNames": { "enum": ["requests", "errors", "latency", "instances", "cpu", "memory", "utilisation", "throttled", "backlog", "deadLetters"] },
+      "propertyNames": { "enum": ["requests", "errors", "latency", "instances", "cpu", "memory", "utilisation", "throttled", "backlog", "deadLetters", "jobs"] },
       "additionalProperties": { "type": "string" }
     },
     "tenants": {
@@ -201,10 +201,12 @@
               "name": { "$ref": "defs.schema.json#/$defs/kebabName", "description": "Names the rule in what the inspector shows." },
               "types": { "type": "array", "minItems": 1, "items": { "type": "string" }, "description": "The resource types it applies to, for example microsoft.web/serverfarms." },
               "pattern": { "type": "string", "description": "A regular expression over the resource's name, ignoring case. Named groups: service (required) is matched with a system's serviceCode; role (api, worker...), pillar, region and tenant are optional." },
-              "roles": { "type": "array", "items": { "enum": ["api", "worker", "db", "cache", "cron", "gateway", "broker", "egress"] }, "description": "Only systems of these roles. Without it, all." },
+              "roles": { "type": "array", "items": { "enum": ["api", "worker", "db", "cache", "function", "cron", "gateway", "broker", "egress"] }, "description": "Only systems of these roles. Without it, all." },
               "serviceTag": { "type": "string", "description": "A tag that names the service, for a resource whose name does not match the pattern." },
               "tenantNameTag": { "type": "string", "description": "The tag that holds a tenant's friendly name, on resources whose pattern has a tenant group." },
-              "instances": { "type": "string", "description": "A query expression that counts the instances one resource runs (for example a plan's workers). A system's instances are the sum over its resources of rules that have one." }
+              "instances": { "type": "string", "description": "A query expression that counts the instances one resource runs (for example a plan's workers). A system's instances are the sum over its resources of rules that have one." },
+              "state": { "type": "string", "description": "A query expression that reads one resource's app state as text. A system whose rule has it shows Running, Stopped (a building under construction) or, when the inventory has no such app, Missing (grey, not found)." },
+              "running": { "type": "array", "items": { "type": "string" }, "description": "The values of state that mean the app runs; any other value is shown as stopped. Required with state." }
             }
           }
         },
@@ -221,6 +223,17 @@
               "url": { "type": "string", "pattern": "^https?://", "description": "A template that starts with https:// (or http://) written out. Holes: {resourceId}, {name}, {type}, {region}, {subscriptionId}, {tenantId}, {tenantName}, {environment} and your variables. Values are percent-encoded; a resource id keeps its slashes." },
               "types": { "type": "array", "items": { "type": "string" }, "description": "Only resources of these types. Without it, every resource." }
             }
+          }
+        },
+        "regions": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "How a service's region is read and named, and where the per-region view is off. A service shows it only when its resources are in two or more regions.",
+          "properties": {
+            "tag": { "type": "string", "description": "The tag of a resource that says its region. Without it, the region group of the rule's pattern, else the location the cloud gives." },
+            "names": { "type": "object", "additionalProperties": { "type": "string" }, "description": "Region value to the label shown (for example northeurope: North). A value without a label is shown as it is." },
+            "enabled": { "type": "boolean", "description": "false turns the per-region view off in this whole environment. Default true." },
+            "off": { "type": "array", "items": { "type": "string" }, "description": "Pillar ids the per-region view is off for in this environment." }
           }
         },
         "queries": {

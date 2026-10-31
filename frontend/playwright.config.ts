@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url'
 //   npm run e2e:live     a live town (no mode in town.yaml): no Break things panel, no story bar, no /api/fake, "Live" in the top bar
 //   npm run e2e:sources  a live town whose environment configures some signals and not others: absent signals are not shown, silent ones are grey
 //   npm run e2e:scope    two live towns with opposite scope conventions (names; tags): the inspector says where each system lives, from a recorded inventory
+//   npm run e2e:functions two live towns with opposite conventions (names; tags) whose functions have an app state and scheduled jobs, and whose services run in two regions
 //   npm run e2e:discovery a live town whose environment finds links from dependency data: found links are drawn and tagged "Seen in calls", unresolved calls are notices
 //   npm run e2e:tenants  environments, tenant yards, tenant traffic and service groups, on a town with two pillars and three environments
 //   npm run e2e:towns    the town switcher and the second sample town (Droid Shop, on Kafka), on the server's own config folder with both sample towns
@@ -31,6 +32,8 @@ const registries: Record<string, string> = {
   sources: 'shared-test-data/registries/live-sources-town',
   tenants: 'shared-test-data/registries/tenants-town',
   discovery: 'shared-test-data/registries/discovery-town',
+  functions: 'shared-test-data/registries/function-town-a',
+  functionsb: 'shared-test-data/registries/function-town-b',
   scope: 'shared-test-data/registries/scope-town-a',
   scopeb: 'shared-test-data/registries/scope-town-b',
   // no single folder: the server finds the towns in config/ itself
@@ -44,7 +47,7 @@ const fixture = registries[suite] ? resolve(repo, registries[suite]) : ''
 
 // The scenario tests edit registry files to check reloading, so they run against a copy. The main process makes the copy and
 // passes its path down in the environment, which the workers inherit, so there is only ever one.
-if (['scenarios', 'links', 'tenants', 'ui', 'direct', 'live', 'sources', 'discovery', 'scope', 'scopeb'].includes(suite) && !process.env.E2E_REGISTRY_COPY) {
+if (['scenarios', 'links', 'tenants', 'ui', 'direct', 'live', 'sources', 'discovery', 'scope', 'scopeb', 'functions', 'functionsb'].includes(suite) && !process.env.E2E_REGISTRY_COPY) {
   const copy = mkdtempSync(join(tmpdir(), 'oc-e2e-registry-'))
   cpSync(fixture, copy, { recursive: true })
   process.env.E2E_REGISTRY_COPY = copy
@@ -58,12 +61,12 @@ const api = `http://127.0.0.1:${API_PORT}`
 
 export default defineConfig({
   testDir: './tests/e2e',
-  testMatch: suite === 'scenarios' ? 'scenarios/**/*.spec.ts' : `${suite.replace('stress35', 'stress').replace('scopeb', 'scope')}/**/*.spec.ts`,
+  testMatch: suite === 'scenarios' ? 'scenarios/**/*.spec.ts' : `${suite.replace('stress35', 'stress').replace('scopeb', 'scope').replace('functionsb', 'functions')}/**/*.spec.ts`,
   // one backend, one fake source: tests steer shared state, so they take turns
   workers: 1,
   fullyParallel: false,
   retries: process.env.CI ? 1 : 0,
-  timeout: ['scenarios', 'links', 'tenants', 'ui', 'direct', 'live', 'sources', 'scope', 'scopeb', 'towns', 'wide'].includes(suite) ? 60_000 : 240_000,
+  timeout: ['scenarios', 'links', 'tenants', 'ui', 'direct', 'live', 'sources', 'scope', 'scopeb', 'functions', 'functionsb', 'towns', 'wide'].includes(suite) ? 60_000 : 240_000,
   expect: { timeout: 10_000 },
   reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
   outputDir: 'test-results',

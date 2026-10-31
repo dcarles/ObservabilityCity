@@ -141,6 +141,9 @@ public sealed record RegistryNode(
     /// <summary>Whether link discovery looks for the calls this system makes (<c>discoverLinks</c>, through the defaults cascade). Only an API or a worker makes calls worth finding.</summary>
     public bool DiscoverLinks { get; init; } = true;
 
+    /// <summary>Whether a service that runs in two or more regions gets the per-region view (<c>regions</c>, through the defaults cascade). The environment can turn it off too (<c>scope.regions</c>).</summary>
+    public bool RegionView { get; init; } = true;
+
     /// <summary>The links in <see cref="Calls"/> that link discovery found and no file declares, each with the last day it was seen. Empty for a registry without discovery.</summary>
     public IReadOnlyDictionary<string, DateOnly> FoundCalls { get; init; } = new Dictionary<string, DateOnly>();
 
@@ -159,7 +162,7 @@ public sealed record RegistryNode(
     /// <summary>What the telemetry calls this system (<c>telemetry.role</c>). Null: derived from the environment's template, if it has one.</summary>
     public string? TelemetryRole { get; init; }
 
-    /// <summary>The role as the files spell it: api, worker, db, cache, cron, gateway, broker or egress.</summary>
+    /// <summary>The role as the files spell it: api, worker, db, cache, function, gateway, broker or egress.</summary>
     public string RoleName => Kind == NodeKind.Database ? "db" : Kind.ToString().ToLowerInvariant();
 
     /// <summary>The registry file the system is declared in (cl.yaml, hub.yaml, third-parties.yaml).</summary>
