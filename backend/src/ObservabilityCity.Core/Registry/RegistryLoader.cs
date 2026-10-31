@@ -76,6 +76,8 @@ public static partial class RegistryLoader
         var town = Read<TownFile>(Path.Combine(folder, "town.yaml"));
         if (!TownModes.All.Contains(town.Mode))
             throw new RegistryException($"town.yaml: mode '{town.Mode}' is not known. Use {string.Join(" or ", TownModes.All)}.{DidYouMean.Hint(town.Mode, TownModes.All)}");
+        if (double.IsNaN(town.TrafficDensity) || town.TrafficDensity < TownTraffic.Min || town.TrafficDensity > TownTraffic.Max)
+            throw new RegistryException($"town.yaml: trafficDensity {town.TrafficDensity.ToString(System.Globalization.CultureInfo.InvariantCulture)} is out of range. Use a number from {TownTraffic.Min.ToString(System.Globalization.CultureInfo.InvariantCulture)} to {TownTraffic.Max.ToString(System.Globalization.CultureInfo.InvariantCulture)} (1 is the usual number of cars).");
         var defaults = File.Exists(Path.Combine(folder, "defaults.yaml"))
             ? Read<DefaultsFile>(Path.Combine(folder, "defaults.yaml"))
             : new DefaultsFile();
@@ -270,7 +272,7 @@ public static partial class RegistryLoader
             throw new RegistryException($"The registry has {errors.Count} problems:\n" + string.Join("\n", errors.Select(e => "  - " + e)));
 
         var final = groups.Select(g => g with { Nodes = g.Nodes.Select(n => n with { Calls = resolved[n.Id], GatewayCalls = resolvedGateway[n.Id] }).ToList() }).ToList();
-        var registry = new Registry(new TownInfo(town.Id, town.Name, town.GroupLabel, town.Topology, town.Mode), final, callers)
+        var registry = new Registry(new TownInfo(town.Id, town.Name, town.GroupLabel, town.Topology, town.Mode, town.TrafficDensity), final, callers)
         {
             Notices = notices, Problems = problems, Vendors = vendors, RingCapacity = ringCapacity, Topics = topics, Subscriptions = subscriptions, Environments = environments,
         };

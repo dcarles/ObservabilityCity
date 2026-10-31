@@ -9,6 +9,7 @@
     "name": { "type": "string" },
     "groupLabel": { "type": "string", "description": "What an island is called in this town (Pillar, Team, ...)." },
     "mode": { "enum": ["demo", "live"], "default": "live", "description": "demo: the town runs on fake data and has the Break things panel and the story bar. live (the default when this is left out): real sources only, nothing to break. Read when the server starts." },
+    "trafficDensity": { "type": "number", "minimum": 0.25, "maximum": 10, "default": 1, "description": "How many cars appear, as a multiple of the usual number: 1 is the usual look, 2 twice as many, 0.5 half. A weak PC still lowers it with the quality setting, and the town never shows more than 420 cars at once." },
     "topology": { "enum": ["hub-and-spoke", "direct"], "description": "Whether calls between islands go through the hub." },
     "expectedWarnings": {
       "type": "array",
