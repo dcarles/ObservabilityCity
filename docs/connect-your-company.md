@@ -291,7 +291,7 @@ vendors:
       - { id: identity, name: Identity, match: [{ host: shared.example.test, path: '^/identity' }, { host: id.example.test }] }
 ```
 
-The vendor stands on one island out at sea with a building for each service (two to a row). Link discovery sends each call it finds to the first service whose match fits it, and the island gets a road and cars from every system that calls it. A service's health is not read yet: its building shows no health until a source reports it. A vendor without `services` is still one building on its own island.
+The vendor stands on one island out at sea with a building for each service, in rows of 2, 4, 6 or 8 plots (whichever makes the smallest island, as on a pillar's island). Link discovery sends each call it finds to the first service whose match fits it, and the island gets a road and cars from every system that calls it. A service's health is not read yet: its building shows "not monitored", and is not counted as no data, until a source you name on that service reports it. A vendor without `services` is still one building on its own island.
 
 #### Where an API's traffic comes from
 
