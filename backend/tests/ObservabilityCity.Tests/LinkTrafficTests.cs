@@ -34,6 +34,49 @@ public class LinkTrafficTests
     }
 
     [Fact]
+    public void A_jumpy_rate_does_not_make_a_steady_caller_look_like_outside_traffic()
+    {
+        // one caller sends 2 calls a second all hour; the API's own rate swings between 1 and 4 a second from one few minutes to the next
+        var traffic = Traffic(20, ("a.x", "t.api", 7200));
+        var fractions = new List<double>();
+        for (var minute = 0; minute <= 40; minute++)
+        {
+            var total = minute % 2 == 0 ? 1.0 : 4.0;
+            var split = traffic.Split("t.api", total, Now.AddMinutes(minute))!;
+            if (minute >= 20) fractions.Add(split.Outside / total);
+        }
+
+        // once there is history the share of outside stays near 1 - 2 / 2.5 whatever the few minutes just now did (the current rate alone gave 0 and 50%)
+        Assert.All(fractions, f => Assert.InRange(f, 0.15, 0.25));
+    }
+
+    [Fact]
+    public void Without_enough_history_the_current_rate_is_used_as_before()
+    {
+        var traffic = Traffic(20, ("a.x", "t.api", 7200));
+
+        var first = traffic.Split("t.api", 4.0, Now)!;
+        var soon = traffic.Split("t.api", 4.0, Now.AddMinutes(5))!;
+
+        Assert.Equal(2.0, first.Outside, 6); // 4 received, 2 explained
+        Assert.Equal(2.0, soon.Outside, 6);
+    }
+
+    [Fact]
+    public void The_history_is_per_api_and_forgets_what_is_older_than_the_window()
+    {
+        var traffic = Traffic(20, ("a.x", "t.api", 7200), ("a.x", "u.api", 7200));
+        for (var minute = 0; minute <= 30; minute++) traffic.Split("t.api", 8.0, Now.AddMinutes(minute));
+
+        var other = traffic.Split("u.api", 4.0, Now.AddMinutes(30))!; // no history of its own yet
+        for (var minute = 31; minute <= 100; minute++) traffic.Split("t.api", 2.0, Now.AddMinutes(minute));
+        var later = traffic.Split("t.api", 2.0, Now.AddMinutes(101))!;
+
+        Assert.Equal(2.0, other.Outside, 6);
+        Assert.Equal(0.0, later.Outside, 6); // the eight-a-second half hour is more than an hour old: the API now gets what its caller sends
+    }
+
+    [Fact]
     public void Nothing_is_known_until_a_read_has_succeeded()
     {
         var traffic = new LinkTraffic();

@@ -299,6 +299,8 @@ An API's total request rate comes from your unsampled metrics. With a `links.tra
 
 > outside = the API's measured total, less what the town systems that call it send (never below zero)
 
+The callers' calls are counted over the whole `shareWindow`, so the town compares them with the API's own rate averaged over that same window (it keeps a rolling mean of it, which needs about ten minutes of history after a start). The outside share is worked out from that mean and applied to the current rate. Otherwise an API with few calls, whose last few minutes jump about, would show a steady caller as outside traffic whenever a busy few minutes came along.
+
 - Every API gets its own outside part, not only the ones marked `external`: whatever the town does not explain arrives at the airport. A caller is only known when it is a town system whose own calls the query sees, so a system with `discoverLinks: false` looks like an outside caller.
 - If the callers would add up to more than the API receives (the two are measured differently), they are scaled down together.
 - Below `minCalls` observed calls to an API the share is too noisy: the last good share stands and the inspector marks it "estimated". There is no setting for a share; every number is measured.
