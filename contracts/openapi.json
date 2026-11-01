@@ -1507,6 +1507,13 @@
           },
           "internal": {
             "type": "boolean"
+          },
+          "calls": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
           }
         },
         "additionalProperties": false

@@ -136,3 +136,20 @@ describe('arrivals', () => {
     expect(parked).toBeGreaterThan(0)
   })
 })
+
+describe('the airport\'s back gate', () => {
+  it('is there only when asked for, and the side road from it stays on the island and ends on the front road', () => {
+    activateTheme(kitById('harbour-town'))
+    expect(new Airport().backGate()).toBeNull()
+    expect(new Airport().backPath()).toEqual([])
+
+    const a = new Airport(true)
+    const path = a.backPath()
+    expect(a.backGateZ).toBeLessThan(0) // on the side away from the hub
+    expect(path.length).toBeGreaterThanOrEqual(4)
+    expect(path[0].z).toBeCloseTo(a.backGateZ!, 6)
+    expect(path[path.length - 1].x).toBeCloseTo(0, 6) // it joins the front road, which leads on to the hub bridge
+    // every corner of the road lies inside the island's coast
+    for (const p of path) expect([p.x, p.z, a.outline.contains(p.x, p.z, 0.5)]).toEqual([p.x, p.z, true])
+  })
+})

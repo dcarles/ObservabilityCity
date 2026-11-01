@@ -5,6 +5,7 @@ import type { AirportKit } from '../themes/types'
 import type { ExternalCallerSnapshot } from '../types'
 import { clamp, formatRate } from '../visuals'
 import { buildIslandBody, GROUND, makeOutline, scatterNature, type Outline, type Rect } from './island'
+import { junction, lamp, street, streetX, ROAD_W } from './props'
 import { coastScan } from './plan'
 import { hashString, rng } from './random'
 import { mergeStatic } from './merge'
@@ -13,6 +14,9 @@ const RUNWAY_Z = -9 // island-local: the runway runs along x
 const RUNWAY_HALF = 31
 const TERMINAL_Z = 0.5 // centre of the terminal building
 const APRON_Z = 8 // the road meets the terminal's front here
+const SIDE_ROAD_X = 38 // the side road runs round the east end of the runway
+const SIDE_ROAD_Z = 17 // where it leaves the front road
+const BACK_ROAD_Z = -17 // and where it turns back toward the back gate
 const MAX_PLANES = 4
 /** Seconds a plane takes to land, roll out, taxi to the terminal and park. */
 const APPROACH = 7, ROLLOUT = 4.5, TAXI = 3.5, PARK = 2.5, FADE = 1.2
@@ -53,9 +57,11 @@ interface Plane {
 export class Airport {
   readonly root = new THREE.Group()
   readonly outline: Outline
-  readonly rx = 40
-  readonly rz = 22
+  readonly rx = 52
+  readonly rz = 30
   readonly gateZ: number
+  /** Island-local z of the back gate, on the side away from the hub, where the bridge to the ring road starts; null for an airport without one. */
+  readonly backGateZ: number | null
   private readonly planes: Plane[] = []
   private readonly pool: THREE.Group[] = []
   private acc = 0.8
@@ -68,9 +74,14 @@ export class Airport {
   private readonly kit: AirportKit
   private readonly tick?: (time: number) => void
 
-  constructor() {
+  /**
+   * `backRoad`: the airport has a back gate and a side road inside the island that leads to it, round the end of the runway, so cars from the ring road can
+   * come in through the airport to the hub (a hub-and-spoke town: everything that reaches the gateway crosses the airport).
+   */
+  constructor(backRoad = false) {
     this.outline = makeOutline(hashString('airport'), this.rx, this.rz, 0.045)
     this.gateZ = coastScan(this.outline, 'z') - 0.6
+    this.backGateZ = backRoad ? -(coastScan(this.outline, '-z') - 0.7) : null
     this.root.add(buildIslandBody(this.outline))
     const decor = new THREE.Group()
     this.root.add(decor)
@@ -78,6 +89,17 @@ export class Airport {
     const look = this.kit.dress(decor, { runwayZ: RUNWAY_Z, runwayHalf: RUNWAY_HALF, terminalZ: TERMINAL_Z, apronZ: APRON_Z, gateZ: this.gateZ })
     this.tick = look.tick
     const avoid: Rect[] = look.avoid
+    if (this.backGateZ !== null) {
+      const pts = this.sideRoad()
+      for (let i = 1; i < pts.length; i++) {
+        const [a, b] = [pts[i - 1], pts[i]]
+        if (a.x === b.x) decor.add(street(a.x, a.z, b.z))
+        else decor.add(streetX(a.z, a.x, b.x))
+        avoid.push({ x: (a.x + b.x) / 2, z: (a.z + b.z) / 2, w: Math.abs(a.x - b.x) + 7, d: Math.abs(a.z - b.z) + 7 })
+      }
+      for (const p of pts.slice(1, -1)) decor.add(junction(p.x, p.z, false))
+      for (let z = BACK_ROAD_Z + 6; z < SIDE_ROAD_Z - 4; z += 14) decor.add(lamp(SIDE_ROAD_X - (ROAD_W / 2 + 1.6), z, 0))
+    }
     mergeStatic(decor)
     this.root.add(scatterNature(this.outline, avoid, hashString('airport-nature'), { trees: 40, rocks: 10 }))
 
@@ -94,6 +116,26 @@ export class Airport {
   doorWorld(): THREE.Vector3 {
     this.root.updateWorldMatrix(true, false)
     return this.root.localToWorld(new THREE.Vector3(0, GROUND, APRON_Z - 0.5))
+  }
+
+  /** The side road's corners, island-local, from the front road to the back gate: out to the east, round the end of the runway, back along the far side. */
+  private sideRoad(): { x: number; z: number }[] {
+    return [{ x: 0, z: SIDE_ROAD_Z }, { x: SIDE_ROAD_X, z: SIDE_ROAD_Z }, { x: SIDE_ROAD_X, z: BACK_ROAD_Z }, { x: 0, z: BACK_ROAD_Z }, { x: 0, z: this.backGateZ! }]
+  }
+
+  /** The back gate in world coordinates: where the bridge from the ring road ends. Null without one. */
+  backGate(): THREE.Vector3 | null {
+    if (this.backGateZ === null) return null
+    this.root.updateWorldMatrix(true, false)
+    return this.root.localToWorld(new THREE.Vector3(0, GROUND, this.backGateZ))
+  }
+
+  /** The road from the back gate round to the front road, in world coordinates, for cars that come in from the ring road and go on to the hub without stopping. */
+  backPath(): THREE.Vector3[] {
+    if (this.backGateZ === null) return []
+    this.root.updateWorldMatrix(true, false)
+    const w = (x: number, z: number) => this.root.localToWorld(new THREE.Vector3(x, GROUND, z))
+    return this.sideRoad().reverse().map((p) => w(p.x, p.z))
   }
 
   /** The gate in world coordinates: where the bridge from the hub ends. */

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { groupVendors } from '../../src/scene/layout'
-import { vendorShare } from '../../src/scene/town'
+import { vendorCallersOf, vendorShare } from '../../src/scene/town'
 import { planVendorIsland, vendorSlot } from '../../src/scene/vendors'
 import { checkSnapshot } from '../../src/snapshotGuard'
 import { vendorWhere } from '../../src/inspectorModel'
@@ -128,5 +128,12 @@ describe('the part of a third party\'s traffic one island sends', () => {
     expect(vendorShare(withCalls(0, null), ['a.api'], 4)).toBe(0.25)
     expect(vendorShare(withCalls(5, null), ['a.api'], 2)).toBe(0.5)
     expect(vendorShare(null, ['a.api'], 3)).toBeCloseTo(1 / 3)
+  })
+})
+
+describe('the town systems third party buildings call', () => {
+  it('are listed with the buildings that call them', () => {
+    const s = { vendors: [{ ...vendor('ext.a', []), calls: ['x.api', 'y.api'] }, { ...vendor('ext.b', []), calls: ['x.api'] }, vendor('ext.c', [])] } as unknown as Snapshot
+    expect([...vendorCallersOf(s)]).toEqual([['x.api', ['ext.a', 'ext.b']], ['y.api', ['ext.a']]])
   })
 })

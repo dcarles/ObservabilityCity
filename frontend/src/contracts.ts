@@ -441,6 +441,7 @@ export interface components {
             islandId?: string | null;
             islandName?: string | null;
             internal: boolean;
+            calls?: string[] | null;
         };
         ViewInfo: {
             islands: string[];
