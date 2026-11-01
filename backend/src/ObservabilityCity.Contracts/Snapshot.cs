@@ -336,6 +336,12 @@ public sealed record HiddenIsland(string Id, string DisplayName);
 /// </summary>
 public sealed record UnknownHostSnapshot(string Host, double Calls, IReadOnlyList<string> Callers, int Days, bool Gateway = false, IReadOnlyList<UnknownPathSnapshot>? Paths = null, bool VendorsOnly = false);
 
+/// <summary>A host added from the Unknown hosts panel: Kind is vendor (a third party), internal (the company's own service) or ignore. CalledBy is who called it when it was added.</summary>
+public sealed record AddedHostSnapshot(string Host, string Kind, IReadOnlyList<string> CalledBy);
+
+/// <summary>What the panel sends to add a host. The server works out who called it from what link discovery saw.</summary>
+public sealed record AddHostRequest(string Host, string Kind);
+
 /// <summary>
 /// One path on a gateway host that no rule explains, with its calls. VendorsOnly is true when only vendor buildings (such as Digital Services) made them.
 /// A gateway host is one a links rule reads the path of; it is not a service, so it is listed by these paths.

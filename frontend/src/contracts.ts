@@ -84,6 +84,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/added-hosts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetAddedHosts"];
+        put?: never;
+        post: operations["AddHost"];
+        delete: operations["RemoveAddedHost"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/systems/{id}/logs": {
         parameters: {
             query?: never;
@@ -104,6 +120,15 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AddHostRequest: {
+            host: string;
+            kind: string;
+        };
+        AddedHostSnapshot: {
+            host: string;
+            kind: string;
+            calledBy: string[];
+        };
         /** @enum {string} */
         AppState: "Running" | "Stopped" | "Missing";
         AssetSnapshot: {
@@ -596,6 +621,74 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UnknownHostSnapshot"][];
+                };
+            };
+        };
+    };
+    GetAddedHosts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AddedHostSnapshot"][];
+                };
+            };
+        };
+    };
+    AddHost: {
+        parameters: {
+            query?: {
+                env?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddHostRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AddedHostSnapshot"][];
+                };
+            };
+        };
+    };
+    RemoveAddedHost: {
+        parameters: {
+            query: {
+                host: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AddedHostSnapshot"][];
                 };
             };
         };

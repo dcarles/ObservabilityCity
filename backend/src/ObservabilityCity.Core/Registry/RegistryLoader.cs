@@ -89,6 +89,12 @@ public static partial class RegistryLoader
         var thirdPartiesPath = Path.Combine(folder, "third-parties.yaml");
         var thirdParties = File.Exists(thirdPartiesPath) ? Read<ThirdPartiesFile>(thirdPartiesPath) : new ThirdPartiesFile();
 
+        // hosts added from the Unknown hosts panel become vendors of their own, unless third-parties.yaml already has that id (the file wins)
+        var added = AddedHosts.Read(folder);
+        var fileIds = thirdParties.Vendors.Select(v => v.Id).ToHashSet(StringComparer.Ordinal);
+        foreach (var a in added.Where(a => a.Kind != AddedHosts.IgnoreKind && !fileIds.Contains(AddedHosts.VendorId(a.Host))))
+            thirdParties.Vendors.Add(new VendorFile { Id = AddedHosts.VendorId(a.Host), Name = a.Host, CalledBy = a.CalledBy.ToList(), Domains = [a.Host], Internal = a.Kind == AddedHosts.InternalKind });
+
         var ids = new HashSet<string>();
         var aliases = new Dictionary<string, string>(); // old id to current id
 
@@ -266,6 +272,10 @@ public static partial class RegistryLoader
 
         var (topics, subscriptions) = ResolveMessaging(groups, brokenPillars, resilient, Problem);
         var environments = LoadEnvironments(folder, ids, aliases, resilient, Problem);
+        // hosts ignored from the panel are platform noise in every environment that finds links
+        var ignored = added.Where(a => a.Kind == AddedHosts.IgnoreKind).Select(a => AddedHosts.IgnorePattern(a.Host)).ToList();
+        if (ignored.Count > 0)
+            environments = environments.Select(e => e.Links is { } links ? e with { Links = links with { IgnoreHosts = [.. links.IgnoreHosts, .. ignored.Except(links.IgnoreHosts)] } } : e).ToList();
 
         if (errors.Count == 1) throw new RegistryException(errors[0]);
         if (errors.Count > 1)

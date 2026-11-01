@@ -35,6 +35,23 @@ public sealed class RegistryHolder(Registry initial) : IRegistryProvider
         _reloadFailure = null;
     }
 
+    /// <summary>Loads the folder again now; a load that fails leaves the last good registry in place. True when the new one is in use.</summary>
+    public bool ReloadFrom(string folder, ILogger? log = null)
+    {
+        try
+        {
+            Replace(RegistryLoader.LoadResilient(folder));
+            log?.LogInformation("Registry reloaded from {Folder}", folder);
+            return true;
+        }
+        catch (Exception e)
+        {
+            Fail(e.Message.ReplaceLineEndings(" "));
+            log?.LogWarning("Registry reload failed, keeping the last good one: {Message}", e.Message);
+            return false;
+        }
+    }
+
     public void Fail(string message) => _reloadFailure = $"Reload failed, still showing the last good registry: {message}";
 }
 
@@ -116,21 +133,7 @@ public sealed class RegistryReloader(RegistryHolder holder, string folder, TimeS
     }
 
     /// <summary>Loads the folder again now. Returns true when the new registry is in use.</summary>
-    public bool Reload()
-    {
-        try
-        {
-            holder.Replace(RegistryLoader.LoadResilient(folder));
-            log.LogInformation("Registry reloaded from {Folder}", folder);
-            return true;
-        }
-        catch (Exception e)
-        {
-            holder.Fail(e.Message.ReplaceLineEndings(" "));
-            log.LogWarning("Registry reload failed, keeping the last good one: {Message}", e.Message);
-            return false;
-        }
-    }
+    public bool Reload() => holder.ReloadFrom(folder, log);
 
     /// <summary>Where link discovery saves what it found, under the registry folder (see <see cref="Links.DiscoveredLinks"/>).</summary>
     public const string DiscoveredFolder = "_discovered";

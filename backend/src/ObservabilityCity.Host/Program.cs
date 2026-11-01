@@ -182,6 +182,51 @@ app.MapGet("/api/unknown-hosts", (EnvironmentSet envs, string? env) =>
    .Produces<IReadOnlyList<UnknownHostSnapshot>>()
    .WithName("GetUnknownHosts");
 
+// The hosts added from the Unknown hosts panel (kept in _discovered/third-parties.yaml of the town), and adding and removing them. A change saves the file and
+// loads the town again at once, so the building (or the missing host) shows without a restart.
+static IReadOnlyList<AddedHostSnapshot> AddedList(string folder) => AddedHosts.Read(folder).Select(a => new AddedHostSnapshot(a.Host, a.Kind, a.CalledBy)).ToList();
+
+app.MapGet("/api/added-hosts", (EnvironmentSet envs, TownSet towns) =>
+        !envs.Exists || towns.Find(envs.TownId) is not { } town ? Results.NotFound(new { error = "No such town." }) : Results.Ok(AddedList(town.Folder)))
+   .Produces<IReadOnlyList<AddedHostSnapshot>>()
+   .WithName("GetAddedHosts");
+
+app.MapPost("/api/added-hosts", (AddHostRequest request, EnvironmentSet envs, TownSet towns, string? env) =>
+    {
+        if (envs.Find(env) is not { } rt || towns.Find(envs.TownId) is not { } town) return EnvironmentNotFound(envs, env);
+        var host = (request.Host ?? "").Trim();
+        if (!AddedHosts.IsHostName(host)) return Results.BadRequest(new { error = $"'{host}' is not a plain host name." });
+        if (!AddedHosts.Kinds.Contains(request.Kind)) return Results.BadRequest(new { error = $"Kind must be {string.Join(", ", AddedHosts.Kinds)}." });
+        var callers = new List<string>();
+        if (request.Kind != AddedHosts.IgnoreKind)
+        {
+            var registry = rt.Registry.Current;
+            var townSystems = registry.AllNodes.Select(n => n.Id).ToHashSet(StringComparer.Ordinal);
+            var seen = rt.Discovered?.UnknownHosts(0).FirstOrDefault(h => string.Equals(h.Host, host, StringComparison.OrdinalIgnoreCase));
+            callers = (seen?.Callers ?? []).Where(townSystems.Contains).ToList();
+            if (callers.Count == 0) return Results.BadRequest(new { error = $"No system of the town was seen calling {host}, so there is nobody for it to be a third party of." });
+            var id = AddedHosts.VendorId(host);
+            if (registry.Vendors.Any(v => v.Node.Id == id) && !AddedHosts.Read(town.Folder).Any(a => string.Equals(a.Host, host, StringComparison.OrdinalIgnoreCase)))
+                return Results.Conflict(new { error = $"third-parties.yaml already has '{id}'." });
+        }
+        AddedHosts.Add(town.Folder, new AddedHost(host, request.Kind, callers));
+        town.Registry.ReloadFrom(town.Folder);
+        foreach (var e in town.Environments.All) e.Discovered?.Forget(host);
+        return Results.Ok(AddedList(town.Folder));
+    })
+   .Produces<IReadOnlyList<AddedHostSnapshot>>()
+   .WithName("AddHost");
+
+app.MapDelete("/api/added-hosts", (string host, EnvironmentSet envs, TownSet towns) =>
+    {
+        if (!envs.Exists || towns.Find(envs.TownId) is not { } town) return Results.NotFound(new { error = "No such town." });
+        if (!AddedHosts.Remove(town.Folder, host)) return Results.NotFound(new { error = $"'{host}' was not added from the panel." });
+        town.Registry.ReloadFrom(town.Folder);
+        return Results.Ok(AddedList(town.Folder));
+    })
+   .Produces<IReadOnlyList<AddedHostSnapshot>>()
+   .WithName("RemoveAddedHost");
+
 // What the Logs tab of one system shows: 5xx requests, slow requests, warnings and errors, exceptions. Read on demand when the tab opens, never polled,
 // never part of health. A source that cannot be reached is a 502 with the reason.
 app.MapGet("/api/systems/{id}/logs", async (string id, EnvironmentSet envs, string? env, CancellationToken ct) =>
