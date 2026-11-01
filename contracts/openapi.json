@@ -225,7 +225,7 @@
         "operationId": "RemoveAddedHost",
         "parameters": [
           {
-            "name": "host",
+            "name": "id",
             "in": "query",
             "required": true,
             "schema": {
@@ -233,6 +233,48 @@
             }
           }
         ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AddedHostSnapshot"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/added-rules": {
+      "post": {
+        "tags": [
+          "ObservabilityCity.Host, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+        ],
+        "operationId": "AddRule",
+        "parameters": [
+          {
+            "name": "env",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddRuleRequest"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "description": "OK",
@@ -306,14 +348,42 @@
         },
         "additionalProperties": false
       },
+      "AddRuleRequest": {
+        "required": [
+          "host",
+          "path",
+          "target"
+        ],
+        "type": "object",
+        "properties": {
+          "host": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "target": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
       "AddedHostSnapshot": {
         "required": [
           "calledBy",
           "host",
-          "kind"
+          "id",
+          "kind",
+          "name"
         ],
         "type": "object",
         "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
           "host": {
             "type": "string"
           },

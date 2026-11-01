@@ -184,7 +184,7 @@ app.MapGet("/api/unknown-hosts", (EnvironmentSet envs, string? env) =>
 
 // The hosts added from the Unknown hosts panel (kept in _discovered/third-parties.yaml of the town), and adding and removing them. A change saves the file and
 // loads the town again at once, so the building (or the missing host) shows without a restart.
-static IReadOnlyList<AddedHostSnapshot> AddedList(string folder) => AddedHosts.Read(folder).Select(a => new AddedHostSnapshot(a.Host, a.Kind, a.CalledBy)).ToList();
+static IReadOnlyList<AddedHostSnapshot> AddedList(string folder) => AddedHosts.Read(folder).Select(a => new AddedHostSnapshot(a.Id, a.Name, a.Host, a.Kind, a.CalledBy)).ToList();
 
 app.MapGet("/api/added-hosts", (EnvironmentSet envs, TownSet towns) =>
         !envs.Exists || towns.Find(envs.TownId) is not { } town ? Results.NotFound(new { error = "No such town." }) : Results.Ok(AddedList(town.Folder)))
@@ -206,21 +206,37 @@ app.MapPost("/api/added-hosts", (AddHostRequest request, EnvironmentSet envs, To
             callers = (seen?.Callers ?? []).Where(townSystems.Contains).ToList();
             if (callers.Count == 0) return Results.BadRequest(new { error = $"No system of the town was seen calling {host}, so there is nobody for it to be a third party of." });
             var id = AddedHosts.VendorId(host);
-            if (registry.Vendors.Any(v => v.Node.Id == id) && !AddedHosts.Read(town.Folder).Any(a => string.Equals(a.Host, host, StringComparison.OrdinalIgnoreCase)))
+            if (registry.Vendors.Any(v => v.Node.Id == id) && !AddedHosts.Read(town.Folder).Any(a => a.Id == id))
                 return Results.Conflict(new { error = $"third-parties.yaml already has '{id}'." });
         }
-        AddedHosts.Add(town.Folder, new AddedHost(host, request.Kind, callers));
+        AddedHosts.Add(town.Folder, new AddHost(host, request.Kind, callers));
         town.Registry.ReloadFrom(town.Folder);
-        foreach (var e in town.Environments.All) e.Discovered?.Forget(host);
+        foreach (var e in town.Environments.All) if (e.Discovered is { } found) LinkDiscoveryRunner.Reclassify(found, e.Registry.Current);
         return Results.Ok(AddedList(town.Folder));
     })
    .Produces<IReadOnlyList<AddedHostSnapshot>>()
    .WithName("AddHost");
 
-app.MapDelete("/api/added-hosts", (string host, EnvironmentSet envs, TownSet towns) =>
+// A rule for the paths of a gateway host that no rule explains: the system they belong to. The rule matches the first two parts of the path.
+app.MapPost("/api/added-rules", (AddRuleRequest request, EnvironmentSet envs, TownSet towns, string? env) =>
+    {
+        if (envs.Find(env) is not { } rt || towns.Find(envs.TownId) is not { } town) return EnvironmentNotFound(envs, env);
+        var seen = rt.Discovered?.UnknownHosts(0).FirstOrDefault(h => h.Gateway && string.Equals(h.Host, request.Host, StringComparison.OrdinalIgnoreCase));
+        if (seen is null || !(seen.Paths ?? []).Any(p => p.Path == request.Path))
+            return Results.BadRequest(new { error = $"{request.Path} on {request.Host} is not one of the paths no rule explains." });
+        if (!rt.Registry.Current.AllNodes.Any(n => n.Id == request.Target)) return Results.BadRequest(new { error = $"'{request.Target}' is not a system of the town." });
+        AddedHosts.AddRule(town.Folder, new AddRule(seen.Host, request.Path, request.Target));
+        town.Registry.ReloadFrom(town.Folder);
+        foreach (var e in town.Environments.All) if (e.Discovered is { } found) LinkDiscoveryRunner.Reclassify(found, e.Registry.Current);
+        return Results.Ok(AddedList(town.Folder));
+    })
+   .Produces<IReadOnlyList<AddedHostSnapshot>>()
+   .WithName("AddRule");
+
+app.MapDelete("/api/added-hosts", (string id, EnvironmentSet envs, TownSet towns) =>
     {
         if (!envs.Exists || towns.Find(envs.TownId) is not { } town) return Results.NotFound(new { error = "No such town." });
-        if (!AddedHosts.Remove(town.Folder, host)) return Results.NotFound(new { error = $"'{host}' was not added from the panel." });
+        if (!AddedHosts.Remove(town.Folder, id)) return Results.NotFound(new { error = $"'{id}' is not in the discovered third parties." });
         town.Registry.ReloadFrom(town.Folder);
         return Results.Ok(AddedList(town.Folder));
     })

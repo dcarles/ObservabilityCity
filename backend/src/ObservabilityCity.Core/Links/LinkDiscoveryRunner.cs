@@ -43,6 +43,22 @@ public sealed class LinkDiscoveryRunner(
         return registries.Current.ActiveEnvironment?.Links?.Interval ?? LinkDiscovery.DefaultInterval;
     }
 
+    /// <summary>Asks again what each remembered address is, by the rules the registry has now: a host, vendor or rule added since takes its addresses off the list at once.</summary>
+    public static void Reclassify(DiscoveredLinks store, LinkClassifier classifier, ObservabilityCity.Core.Registry.Registry view)
+    {
+        var groupOf = view.AllNodes.ToDictionary(n => n.Id, n => n.GroupId);
+        foreach (var v in view.Vendors) groupOf.TryAdd(v.Node.Id, v.Node.GroupId);
+        store.Revisit((callerId, host, path) => classifier.Classify(new DependencyRow(callerId, host, path, [], 0), groupOf.GetValueOrDefault(callerId, "")));
+    }
+
+    /// <summary>The same, with a classifier made from the registry view itself. False when the environment finds no links.</summary>
+    public static bool Reclassify(DiscoveredLinks store, ObservabilityCity.Core.Registry.Registry view)
+    {
+        if (view.ActiveEnvironment?.Links is not { } config) return false;
+        Reclassify(store, new LinkClassifier(config, view.Vendors, view.AllNodes.Select(n => n.Id), LinkClassifier.ServicesOf(view.AllNodes)), view);
+        return true;
+    }
+
     /// <summary>One read: asks for the gap since the last one, classifies what comes back and saves it. Public so tests can drive it.</summary>
     public async Task RunOnceAsync(CancellationToken ct)
     {
@@ -87,9 +103,7 @@ public sealed class LinkDiscoveryRunner(
             }
         }
         // a rule added since an address was remembered takes it off the lists now, not when its days age out
-        var groupOf = view.AllNodes.ToDictionary(n => n.Id, n => n.GroupId);
-        foreach (var v in view.Vendors) groupOf.TryAdd(v.Node.Id, v.Node.GroupId);
-        store.Revisit((callerId, host, path) => classifier.Classify(new DependencyRow(callerId, host, path, [], 0), groupOf.GetValueOrDefault(callerId, "")));
+        Reclassify(store, classifier, view);
         store.Prune(now, config.KeepFor);
         store.RoleAsked(byRole.Keys);
         store.Finish(now);

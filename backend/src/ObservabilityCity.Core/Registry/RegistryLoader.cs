@@ -89,11 +89,10 @@ public static partial class RegistryLoader
         var thirdPartiesPath = Path.Combine(folder, "third-parties.yaml");
         var thirdParties = File.Exists(thirdPartiesPath) ? Read<ThirdPartiesFile>(thirdPartiesPath) : new ThirdPartiesFile();
 
-        // hosts added from the Unknown hosts panel become vendors of their own, unless third-parties.yaml already has that id (the file wins)
-        var added = AddedHosts.Read(folder);
+        // vendors in _discovered/third-parties.yaml (added from the Unknown hosts panel, or by hand) join the file's, unless third-parties.yaml already has that id (the file wins)
         var fileIds = thirdParties.Vendors.Select(v => v.Id).ToHashSet(StringComparer.Ordinal);
-        foreach (var a in added.Where(a => a.Kind != AddedHosts.IgnoreKind && !fileIds.Contains(AddedHosts.VendorId(a.Host))))
-            thirdParties.Vendors.Add(new VendorFile { Id = AddedHosts.VendorId(a.Host), Name = a.Host, CalledBy = a.CalledBy.ToList(), Domains = [a.Host], Internal = a.Kind == AddedHosts.InternalKind });
+        foreach (var v in AddedHosts.ReadFile(folder).Vendors.Where(v => !fileIds.Contains(v.Id)))
+            thirdParties.Vendors.Add(v);
 
         var ids = new HashSet<string>();
         var aliases = new Dictionary<string, string>(); // old id to current id
@@ -273,9 +272,27 @@ public static partial class RegistryLoader
         var (topics, subscriptions) = ResolveMessaging(groups, brokenPillars, resilient, Problem);
         var environments = LoadEnvironments(folder, ids, aliases, resilient, Problem);
         // hosts ignored from the panel are platform noise in every environment that finds links
-        var ignored = added.Where(a => a.Kind == AddedHosts.IgnoreKind).Select(a => AddedHosts.IgnorePattern(a.Host)).ToList();
-        if (ignored.Count > 0)
-            environments = environments.Select(e => e.Links is { } links ? e with { Links = links with { IgnoreHosts = [.. links.IgnoreHosts, .. ignored.Except(links.IgnoreHosts)] } } : e).ToList();
+        var ignored = new List<string>();
+        foreach (var pattern in AddedHosts.IgnorePatterns(folder))
+        {
+            try { _ = new System.Text.RegularExpressions.Regex(pattern); ignored.Add(pattern); }
+            catch (ArgumentException e) { Problem($"_discovered/third-parties.yaml: ignoreHosts '{pattern}' is not a valid pattern ({e.Message})"); }
+        }
+        // and the rules added from the panel are tried after the environment's own
+        var addedRules = new List<ObservabilityCity.Core.Links.LinkRule>();
+        foreach (var r in AddedHosts.RulesIn(folder))
+        {
+            try
+            {
+                _ = new System.Text.RegularExpressions.Regex(r.Host);
+                if (r.Path is not null) _ = new System.Text.RegularExpressions.Regex(r.Path);
+                addedRules.Add(new ObservabilityCity.Core.Links.LinkRule(r.Host, r.Path, r.Target, r.Gateway));
+            }
+            catch (ArgumentException e) { Problem($"_discovered/third-parties.yaml: a rule for '{r.Target}' has a pattern that is not valid ({e.Message})"); }
+        }
+        if (ignored.Count > 0 || addedRules.Count > 0)
+            environments = environments.Select(e => e.Links is { } links
+                ? e with { Links = links with { IgnoreHosts = [.. links.IgnoreHosts, .. ignored.Except(links.IgnoreHosts)], Rules = [.. links.Rules, .. addedRules] } } : e).ToList();
 
         if (errors.Count == 1) throw new RegistryException(errors[0]);
         if (errors.Count > 1)

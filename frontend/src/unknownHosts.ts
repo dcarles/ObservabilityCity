@@ -2,29 +2,19 @@ import { escapeHtml } from './picker'
 import { scopeParams, type Scope } from './scope'
 import type { AddedHostSnapshot, UnknownHostSnapshot } from './types'
 
-type UnknownPath = NonNullable<UnknownHostSnapshot['paths']>[number]
-
-/**
- * A links rule line for one path on a gateway host, to complete: the host and the path are filled in, the target is left for you. A gateway is not a
- * service, so the host gets no vendor entry and no ignore line.
- */
-export function pathRule(h: UnknownHostSnapshot, p: UnknownPath): string {
-  const esc = (t: string) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  return `- { host: '^${esc(h.host)}$', path: '^${esc(p.path)}', target: <system id>, gateway: true }`
-}
-
 const callsText = (n: number) => Math.round(n).toLocaleString('en-GB')
 
 /** One row of the panel: the host, how many calls, who made them and on how many days, with the buttons that add it as a vendor, as one of our own or ignore it. A gateway host lists its unexplained paths instead. */
-export function unknownHostRow(h: UnknownHostSnapshot, index: number, showVendors = true): string {
+export function unknownHostRow(h: UnknownHostSnapshot, index: number, showVendors = true, targets: readonly string[] = [], chosen: ReadonlyMap<string, string> = new Map()): string {
   const head = `<div><b>${escapeHtml(h.host)}</b> <span class="dim">· about ${callsText(h.calls)} calls · ${h.days} day${h.days === 1 ? '' : 's'}</span></div>
     <div class="dim">called by ${escapeHtml(h.callers.join(', '))}</div>`
   if (h.gateway) {
     const paths = (h.paths ?? []).filter((p) => showVendors || !p.vendorsOnly)
     return `<li data-host="${escapeHtml(h.host)}" data-gateway="true">${head}
-    <div class="dim">A gateway: no rule explains these paths</div>
+    <div class="dim">A gateway: no rule explains these paths. Pick the system a path belongs to and add a rule.</div>
     <ul class="paths">${paths.map((p, j) => `<li data-path="${escapeHtml(p.path)}"><span>${escapeHtml(p.path || '(no path)')}</span> <span class="dim">· about ${callsText(p.calls)} calls</span>
-      <button data-copy="path" data-i="${index}" data-j="${j}">Copy path rule</button></li>`).join('')}</ul></li>`
+      <select data-target data-i="${index}" data-j="${j}"><option value="">system…</option>${targets.map((t) => `<option value="${escapeHtml(t)}"${chosen.get(`${h.host}|${p.path}`) === t ? ' selected' : ''}>${escapeHtml(t)}</option>`).join('')}</select>
+      <button data-rule data-i="${index}" data-j="${j}">Add rule</button></li>`).join('')}</ul></li>`
   }
   return `<li data-host="${escapeHtml(h.host)}">${head}
     <div class="actions">${h.vendorsOnly ? '' : `<button data-add="vendor" data-i="${index}">Add vendor</button><button data-add="internal" data-i="${index}">Add internal</button>`}<button data-add="ignore" data-i="${index}">Ignore</button></div></li>`
@@ -36,10 +26,11 @@ export function panelLabel(unknown: number, added: number, open: boolean): strin
   return `${added > 0 ? `${hosts} · ${added} added` : hosts} ${open ? '▴' : '▾'}`
 }
 
-/** One entry of the "Added from this panel" list, with its Remove button. */
+/** One entry of the "Added from this panel" list: its name (and host, when they differ), what it is, and a Remove button that asks for its id. */
 export function addedRow(a: AddedHostSnapshot, index: number): string {
-  const kind = a.kind === 'internal' ? 'internal' : a.kind === 'ignore' ? 'ignored' : 'vendor'
-  return `<li data-added="${escapeHtml(a.host)}"><b>${escapeHtml(a.host)}</b> <span class="dim">· ${kind}</span> <button data-remove="${index}">Remove</button></li>`
+  const kind = a.kind === 'internal' ? 'internal' : a.kind === 'ignore' ? 'ignored' : a.kind === 'rule' ? 'rule' : 'vendor'
+  const host = a.host !== a.name ? ` <span class="dim">(${escapeHtml(a.host)})</span>` : ''
+  return `<li data-added="${escapeHtml(a.id)}"><b>${escapeHtml(a.name)}</b>${host} <span class="dim">· ${kind}</span> <button data-remove="${index}">Remove</button></li>`
 }
 
 /**
@@ -56,7 +47,10 @@ export class UnknownHostsPanel {
   private error = ''
   private timer: number | undefined
 
-  constructor(private readonly scope: Scope, private readonly copy: (text: string) => Promise<void> = (t) => navigator.clipboard.writeText(t)) {}
+  private readonly chosen = new Map<string, string>()
+
+  /** `targets` gives the ids of the systems a gateway path can be sent to, from the town on screen. */
+  constructor(private readonly scope: Scope, private readonly targets: () => string[] = () => []) {}
 
   /** Reads now and then every half minute. */
   start(): void {
@@ -121,8 +115,8 @@ export class UnknownHostsPanel {
       <div class="panel" ${this.open ? '' : 'hidden'}>
         <label class="dim"><input type="checkbox" id="unknown-hosts-vendors" ${this.showVendors ? 'checked' : ''}> Include calls made by Digital Services and vendors${vendorHosts > 0 ? ` (${vendorHosts} more)` : ''}</label>
         ${this.error ? `<div class="error" id="unknown-hosts-error">${escapeHtml(this.error)}</div>` : ''}
-        <ul id="unknown-hosts-list">${shown.map((h, i) => unknownHostRow(h, i, this.showVendors)).join('')}</ul>
-        ${this.added.length > 0 ? `<div class="dim">Added from this panel</div><ul id="added-hosts-list">${this.added.map(addedRow).join('')}</ul>` : ''}</div>`
+        <ul id="unknown-hosts-list">${shown.map((h, i) => unknownHostRow(h, i, this.showVendors, this.targets(), this.chosen)).join('')}</ul>
+        ${this.added.length > 0 ? `<div class="dim">Added from this panel (saved in _discovered/third-parties.yaml, which you can edit)</div><ul id="added-hosts-list">${this.added.map(addedRow).join('')}</ul>` : ''}</div>`
     this.el.querySelector('#unknown-hosts-toggle')!.addEventListener('click', () => { this.open = !this.open; this.render() })
     this.el.querySelector('#unknown-hosts-vendors')!.addEventListener('change', (e) => { this.showVendors = (e.target as HTMLInputElement).checked; this.render() })
     this.el.querySelectorAll<HTMLButtonElement>('button[data-add]').forEach((b) =>
@@ -135,16 +129,29 @@ export class UnknownHostsPanel {
       b.addEventListener('click', () => {
         const a = this.added[Number(b.dataset.remove)]
         if (!a) return
-        void this.change(() => fetch(this.url('/api/added-hosts', `host=${encodeURIComponent(a.host)}`), { method: 'DELETE' }))
+        void this.change(() => fetch(this.url('/api/added-hosts', `id=${encodeURIComponent(a.id)}`), { method: 'DELETE' }))
       }))
-    this.el.querySelectorAll<HTMLButtonElement>('button[data-copy="path"]').forEach((b) =>
-      b.addEventListener('click', async () => {
-        const h = shown[Number(b.dataset.i)]
-        const path = (h?.paths ?? []).filter((p) => this.showVendors || !p.vendorsOnly)[Number(b.dataset.j)]
-        if (!h || !path) return
-        await this.copy(pathRule(h, path))
-        b.textContent = 'Copied'
-        window.setTimeout(() => { b.textContent = 'Copy path rule' }, 1500)
+    const pathOf = (el: HTMLElement) => {
+      const h = shown[Number(el.dataset.i)]
+      const path = (h?.paths ?? []).filter((p) => this.showVendors || !p.vendorsOnly)[Number(el.dataset.j)]
+      return h && path ? { h, path } : null
+    }
+    this.el.querySelectorAll<HTMLSelectElement>('select[data-target]').forEach((sel) =>
+      sel.addEventListener('change', () => {
+        const hit = pathOf(sel)
+        if (hit) this.chosen.set(`${hit.h.host}|${hit.path.path}`, sel.value)
+      }))
+    this.el.querySelectorAll<HTMLButtonElement>('button[data-rule]').forEach((b) =>
+      b.addEventListener('click', () => {
+        const hit = pathOf(b)
+        const target = hit ? this.chosen.get(`${hit.h.host}|${hit.path.path}`) : undefined
+        if (!hit) return
+        if (!target) {
+          this.error = 'Pick the system this path belongs to first.'
+          this.render()
+          return
+        }
+        void this.change(() => fetch(this.url('/api/added-rules'), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ host: hit.h.host, path: hit.path.path, target }) }))
       }))
   }
 }

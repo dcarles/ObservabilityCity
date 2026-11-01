@@ -100,6 +100,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/added-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AddRule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/systems/{id}/logs": {
         parameters: {
             query?: never;
@@ -124,7 +140,14 @@ export interface components {
             host: string;
             kind: string;
         };
+        AddRuleRequest: {
+            host: string;
+            path: string;
+            target: string;
+        };
         AddedHostSnapshot: {
+            id: string;
+            name: string;
             host: string;
             kind: string;
             calledBy: string[];
@@ -674,13 +697,39 @@ export interface operations {
     RemoveAddedHost: {
         parameters: {
             query: {
-                host: string;
+                id: string;
             };
             header?: never;
             path?: never;
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AddedHostSnapshot"][];
+                };
+            };
+        };
+    };
+    AddRule: {
+        parameters: {
+            query?: {
+                env?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddRuleRequest"];
+            };
+        };
         responses: {
             /** @description OK */
             200: {
