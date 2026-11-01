@@ -271,22 +271,24 @@ test.describe('the inspector drawer', () => {
     await town.open()
     await openByName(page, 'Orders API')
     await page.locator('#inspector [data-tab="logs"]').click()
-    await expect(page.locator('#inspector h4[data-section]')).toHaveText(['5xx requests', /^Slow requests \(over/, 'Warnings and errors', 'Exceptions'])
-    await expect(page.locator('#inspector h4[data-section="failed"] + .none, #inspector h4[data-section="failed"] + .logs').first()).toBeVisible()
+    await expect(page.locator('#inspector [data-log-tab]')).toHaveText([/^5xx \d+$/, /^Slow \d+$/, /^Warnings and errors \d+$/, /^Exceptions \d+$/])
+    await expect(page.locator('#inspector [data-section] .none, #inspector [data-section] .logs').first()).toBeVisible()
     await town.effect('aa.orders-api', 'Errors', 1)
     await town.until('aa.orders-api', (n) => n.errorRate > 0.05)
     // nothing is polled: the new errors show when the tab is read again
     await page.locator('#inspector [data-refresh-logs]').click()
-    await expect(page.locator('#inspector h4[data-section="failed"] + .logs .log.error').first()).toBeVisible({ timeout: 15_000 })
-    await expect(page.locator('#inspector h4[data-section="exceptions"] + .logs .log').first()).toBeVisible()
+    await page.locator('#inspector [data-log-tab="failed"]').click()
+    await expect(page.locator('#inspector [data-section="failed"] .logs .log.error').first()).toBeVisible({ timeout: 15_000 })
     await expect(page.locator('#inspector .log.error .count').first()).toContainText('×')
+    await page.locator('#inspector [data-log-tab="exceptions"]').click()
+    await expect(page.locator('#inspector [data-section="exceptions"] .logs .log').first()).toBeVisible()
   })
 
   test('a worker\'s Logs tab has only the warnings, errors and exceptions sections', async ({ town, page }) => {
     await town.open()
     await openByName(page, 'Orders worker')
     await page.locator('#inspector [data-tab="logs"]').click()
-    await expect(page.locator('#inspector h4[data-section]')).toHaveText(['Warnings and errors', 'Exceptions'])
+    await expect(page.locator('#inspector [data-log-tab]')).toHaveText([/^Warnings and errors \d+$/, /^Exceptions \d+$/])
   })
 
   test('Config lists each value with the file layer it comes from, and the file', async ({ town, page }) => {
