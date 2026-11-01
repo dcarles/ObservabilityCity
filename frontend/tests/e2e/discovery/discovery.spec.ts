@@ -85,29 +85,35 @@ test.describe('the Logs tab of a live town', () => {
     await page.locator('#inspector [data-tab="logs"]').click()
   }
 
-  test('an API has four separate sections, repeats grouped with a count and each request linking to its trace', async ({ page }) => {
+  test('an API has four separate sections, repeats grouped with a count, and the 5xx and exceptions headers link to each App Insights search', async ({ page }) => {
     await openLogs(page, 'Orders API')
     const sections = page.locator('#inspector h4[data-section]')
-    await expect(sections).toHaveText(['5xx requests', /^Slow requests \(over/, 'Warnings and errors', 'Exceptions'])
-    // the two 500 groups of the same request are one line with the count added up, the newest operation behind its link
+    await expect(sections).toHaveText([/^5xx requests/, /^Slow requests \(over/, /^Warnings and errors/, /^Exceptions/])
+    // the two 500 groups of the same request are one line with the count added up
     const merged = page.locator('#inspector .log', { hasText: 'GET /api/orders' })
     await expect(merged).toHaveCount(1)
     await expect(merged).toContainText('×7')
     await expect(merged).toContainText('500')
-    await expect(merged.locator('a.out')).toHaveAttribute('href', 'https://tracing.example.test/prod/trace/op-new')
     await expect(page.locator('#inspector .log', { hasText: 'POST /api/orders' })).toContainText('503')
     await expect(page.locator('#inspector .log', { hasText: 'GET /api/statements' })).toContainText('×7')
-    // an entry with no operation has no link, and warnings and errors keep their colours
     const warn = page.locator('#inspector .log.warn', { hasText: 'Cache is cold' })
     await expect(warn).toContainText('×2')
-    await expect(warn.locator('a.out')).toHaveCount(0)
-    await expect(page.locator('#inspector .log.error', { hasText: 'Connection to the store was reset' }).locator('a.out')).toHaveCount(1)
     await expect(page.locator('#inspector .log', { hasText: 'TimeoutException' })).toContainText('×9')
+    // no link on any row; both App Insights get a link in the 5xx header and in the exceptions header, filtered by service name
+    await expect(page.locator('#inspector .log a.out')).toHaveCount(0)
+    const failed = page.locator('#inspector h4[data-section="failed"] a.out')
+    await expect(failed).toHaveText(['5xx in App Insights (appi-acme-eu-1) ↗', '5xx in App Insights (appi-acme-eu-2) ↗'])
+    const href = (await failed.first().getAttribute('href')) ?? ''
+    expect(href).toContain('searchV1')
+    expect(href).toContain('appi-acme-eu-1')
+    expect(decodeURIComponent(href)).toContain('request/resultCode')
+    await expect(page.locator('#inspector h4[data-section="exceptions"] a.out')).toHaveText(['Exceptions in App Insights (appi-acme-eu-1) ↗', 'Exceptions in App Insights (appi-acme-eu-2) ↗'])
+    await expect(page.locator('#inspector h4[data-section="slow"] a.out')).toHaveCount(0)
   })
 
   test('a worker keeps only the warnings, errors and exceptions', async ({ page }) => {
     await openLogs(page, 'Orders worker')
-    await expect(page.locator('#inspector h4[data-section]')).toHaveText(['Warnings and errors', 'Exceptions'])
+    await expect(page.locator('#inspector h4[data-section]')).toHaveText(['Warnings and errors', /^Exceptions/])
     await expect(page.locator('#inspector .log', { hasText: 'GET /api/orders' })).toHaveCount(0)
   })
 

@@ -12,7 +12,7 @@ namespace ObservabilityCity.Tests;
 /// <summary>
 /// Phase 3 slice 4: the Logs tab of a live town. Opening it sends one query for the system's telemetry name over the environment's window and nothing
 /// runs otherwise. The answer has four separate sections (5xx requests, slow requests, warnings and errors, exceptions), repeats are grouped with a count,
-/// newest first, each entry can link to its trace, and a worker keeps only the logs and exceptions. Every convention is a template in the environment
+/// newest first, the 5xx and exceptions headers link to the telemetry store's own search (one link for each store), and a worker keeps only the logs and exceptions. Every convention is a template in the environment
 /// file, so two towns that read opposite shapes run through the same code.
 /// </summary>
 public class LogsTabTests
@@ -21,7 +21,7 @@ public class LogsTabTests
     private static string TownB => Path.Combine(TestPaths.RepoRoot, "shared-test-data", "registries", "scope-town-b");
     private static readonly DateTimeOffset Now = new(2026, 11, 1, 12, 0, 0, TimeSpan.Zero);
 
-    // Town A: the usual tables, a four hour window by default and an address that opens a trace by its operation id.
+    // Town A: the usual tables, a four hour window by default, and a link in two headers to the search of each telemetry store the assets rule finds.
     private const string LogsA = """
 
         logs:
@@ -30,11 +30,14 @@ public class LogsTabTests
             union AppRequests, AppTraces, AppExceptions
             | where TimeGenerated between (datetime({from}) .. datetime({to})) and AppRoleName in ({roles})
             | where duration > {slaMs} or kind == "{kind}" or "{window}" == "4h"
-          traceLinks:
-            - { name: Trace, url: "https://tracing.a.example.test/{environment}/operation/{operationId}?role={role}&at={time}" }
+          links:
+            - { name: 5xx, section: failed, resources: stores, url: "https://search.a.example.test/{environment}/{resourceIdTwice}?name={resourceName}&service={role}&code=500&from={from}&to={to}&ms={windowMs}" }
+            - { name: Exceptions, section: exceptions, resources: stores, url: "https://search.a.example.test/{environment}/{resourceId}/exceptions?service={role}" }
         """;
 
-    // Town B: another table, a window in minutes, no link at all, and a second address that only needs the operation.
+    private const string StoresRule = "  assets:\n    - { name: stores, island: hub, group: Monitoring, label: Store, shape: observatory, types: [microsoft.insights/components], pattern: '^appi-', subscription: { nameLike: 'hub-*' } }\n";
+
+    // Town B: another table, a window in minutes, and no link at all.
     private const string LogsB = """
 
         logs:
@@ -70,6 +73,7 @@ public class LogsTabTests
         public Rig(string town, string logsBlock, Func<string, IReadOnlyList<LogRow>>? answer = null, string sourceName = "telemetry")
         {
             _copy = new RegistryCopy(town);
+            _copy.Replace("environments/prod.yaml", "\nscope:\n", "\nscope:\n" + StoresRule);
             _copy.Write("environments/prod.yaml", _copy.Read("environments/prod.yaml") + logsBlock);
             View = new EnvironmentRegistry(new RegistryHolder(RegistryLoader.Load(_copy.Path)), "prod");
             Source = new Stub(sourceName, answer ?? (_ => []));
@@ -81,8 +85,8 @@ public class LogsTabTests
         public void Dispose() => _copy.Dispose();
     }
 
-    private static LogRow Row(string section, int minutesAgo, string text, int count = 1, string? op = null, double? ms = null, string? result = null, LogLevel? level = null) =>
-        new(section, Now.AddMinutes(-minutesAgo), text, count, level, op, ms, result);
+    private static LogRow Row(string section, int minutesAgo, string text, int count = 1, double? ms = null, string? result = null, LogLevel? level = null) =>
+        new(section, Now.AddMinutes(-minutesAgo), text, count, level, ms, result);
 
     // ---- when it runs ----
 
@@ -129,7 +133,7 @@ public class LogsTabTests
         Assert.Equal("30m", logs.Window);
         Assert.Equal(TimeSpan.FromMinutes(30), asked.To - asked.From);
         Assert.Equal("Disk is nearly full", logs.Sections.Single(s => s.Id == "logs").Groups.Single().Text);
-        Assert.All(logs.Sections, s => Assert.All(s.Groups, g => Assert.Null(g.Links)));
+        Assert.All(logs.Sections, s => Assert.Null(s.Links));
     }
 
     // ---- the four sections ----
@@ -169,10 +173,10 @@ public class LogsTabTests
     {
         using var rig = new Rig(TownA, LogsA, _ =>
         [
-            Row("failed", 50, "GET /api/orders", count: 3, op: "old", result: "500"),
-            Row("failed", 10, "GET /api/orders", count: 4, op: "new", ms: 812, result: "500"),
-            Row("failed", 5, "GET /api/orders", count: 2, op: "other-status", result: "503"),
-            Row("failed", 20, "POST /api/orders", op: "post", result: "500"),
+            Row("failed", 50, "GET /api/orders", count: 3, result: "500"),
+            Row("failed", 10, "GET /api/orders", count: 4, ms: 812, result: "500"),
+            Row("failed", 5, "GET /api/orders", count: 2, result: "503"),
+            Row("failed", 20, "POST /api/orders", result: "500"),
         ]);
 
         var failed = (await rig.Logs.RecentAsync(rig.Node(NodeKind.Api), default)).Sections[0].Groups;
@@ -181,7 +185,6 @@ public class LogsTabTests
         Assert.Equal(["503", "500", "500"], failed.Select(g => g.Result));
         Assert.Equal([2, 7, 1], failed.Select(g => g.Count));
         var merged = failed[1];
-        Assert.Equal("new", merged.OperationId);
         Assert.Equal(812, merged.DurationMs);
         Assert.Equal(Now.AddMinutes(-10), merged.At);
         Assert.Equal(failed.OrderByDescending(g => g.At).Select(g => g.At), failed.Select(g => g.At));
@@ -197,22 +200,74 @@ public class LogsTabTests
         Assert.Equal(1, logs.Sections.Sum(s => s.Groups.Count));
     }
 
-    // ---- links to the full trace ----
+    // ---- links in the section headers ----
+
+    private static ResolvedAsset Store(string name) =>
+        new($"hub.{name}", "hub", name, "Store", "observatory", "microsoft.insights/components", null, "northeurope", $"/subscriptions/0000/resourceGroups/rg one/providers/microsoft.insights/components/{name}", "stores", "0000", "Monitoring");
+
+    private static EnvironmentRegistry Env(string town, string logs, out RegistryCopy copy)
+    {
+        copy = new RegistryCopy(town);
+        copy.Replace("environments/prod.yaml", "\nscope:\n", "\nscope:\n" + StoresRule);
+        copy.Write("environments/prod.yaml", copy.Read("environments/prod.yaml") + logs);
+        return new EnvironmentRegistry(new RegistryHolder(RegistryLoader.Load(copy.Path)), "prod");
+    }
+
+    private static IReadOnlyList<LogSection> Headers(string town, string logs, params ResolvedAsset[] assets)
+    {
+        var view = Env(town, logs, out var copy);
+        using (copy)
+        {
+            var environment = view.Current.ActiveEnvironment!;
+            return QueryLogSource.Sections([], LogSections.All, environment.Logs!, environment, "Orders Api", assets, TimeSpan.FromHours(4), Now.AddHours(-4), Now);
+        }
+    }
 
     [Fact]
-    public async Task Each_entry_links_to_its_trace_from_the_environments_templates_with_every_value_encoded()
+    public void The_5xx_and_exceptions_headers_have_one_link_for_each_store_the_rule_finds_and_the_other_sections_have_none()
     {
-        using var rig = new Rig(TownA, LogsA, _ => [Row("failed", 3, "GET /a", op: "op 1/2&x", result: "500"), Row("logs", 3, "no operation", level: LogLevel.Warn)]);
-        var api = rig.Node(NodeKind.Api);
+        var sections = Headers(TownA, LogsA, Store("appi-b"), Store("appi-a"));
 
-        var logs = await rig.Logs.RecentAsync(api, default);
+        Assert.Null(sections.Single(s => s.Id == "slow").Links);
+        Assert.Null(sections.Single(s => s.Id == "logs").Links);
+        // the store's name is added to the words so the two can be told apart, and they come in name order
+        Assert.Equal(["5xx (appi-a)", "5xx (appi-b)"], sections.Single(s => s.Id == "failed").Links!.Select(l => l.Name));
+        Assert.Equal(["Exceptions (appi-a)", "Exceptions (appi-b)"], sections.Single(s => s.Id == "exceptions").Links!.Select(l => l.Name));
+    }
 
-        var link = Assert.Single(logs.Sections[0].Groups.Single().Links!);
-        Assert.Equal("Trace", link.Name);
-        Assert.StartsWith("https://tracing.a.example.test/prod/operation/op%201%2F2%26x?role=", link.Url);
-        Assert.Contains(Uri.EscapeDataString(rig.Role(api)), link.Url);
-        Assert.EndsWith("&at=2026-11-01T11%3A57%3A00Z", link.Url);
-        Assert.Null(logs.Sections[2].Groups.Single().Links); // an entry without an operation has no trace to open
+    [Fact]
+    public void A_link_is_filled_in_with_the_store_the_service_and_the_window_every_value_encoded()
+    {
+        var failed = Headers(TownA, LogsA, Store("appi-a")).Single(s => s.Id == "failed").Links!;
+
+        var link = Assert.Single(failed);
+        Assert.Equal("5xx", link.Name); // one store: the words stay as written
+        Assert.Equal(
+            "https://search.a.example.test/prod/%252Fsubscriptions%252F0000%252FresourceGroups%252Frg%2520one%252Fproviders%252Fmicrosoft.insights%252Fcomponents%252Fappi-a" +
+            "?name=appi-a&service=Orders%20Api&code=500&from=2026-11-01T08%3A00%3A00Z&to=2026-11-01T12%3A00%3A00Z&ms=14400000", link.Url);
+        // the other template keeps the slashes of the id
+        Assert.Equal("https://search.a.example.test/prod//subscriptions/0000/resourceGroups/rg%20one/providers/microsoft.insights/components/appi-a/exceptions?service=Orders%20Api",
+            Headers(TownA, LogsA, Store("appi-a")).Single(s => s.Id == "exceptions").Links!.Single().Url);
+    }
+
+    [Fact]
+    public void A_rule_that_finds_nothing_or_names_another_rule_makes_no_link()
+    {
+        Assert.All(Headers(TownA, LogsA), s => Assert.Null(s.Links));
+        Assert.All(Headers(TownA, LogsA, Store("appi-a") with { Rule = "other" }), s => Assert.Null(s.Links));
+    }
+
+    [Fact]
+    public async Task Opening_the_tab_puts_the_links_in_the_answer_and_a_town_with_no_links_has_none()
+    {
+        using var rig = new Rig(TownA, LogsA, _ => []);
+        rig.Scope.Update(new Inventory([new InventorySubscription("0000", "hub-monitor", new Dictionary<string, string>())], [new InventoryResource("/subscriptions/0000/resourceGroups/rg/providers/microsoft.insights/components/appi-z", "appi-z", "microsoft.insights/components", "0000", "northeurope", new Dictionary<string, string>(), null)]), Now);
+
+        var logs = await rig.Logs.RecentAsync(rig.Node(NodeKind.Api), default);
+
+        Assert.Contains("appi-z", Assert.Single(logs.Sections[0].Links!).Url);
+        Assert.Contains("appi-z", Assert.Single(logs.Sections[3].Links!).Url);
+        Assert.Null(logs.Sections[1].Links);
     }
 
     // ---- not set up, not running, nothing to read ----
@@ -265,6 +320,7 @@ public class LogsTabTests
     private static string LoadProblem(string logsBlock)
     {
         using var copy = new RegistryCopy(TownA);
+        copy.Replace("environments/prod.yaml", "\nscope:\n", "\nscope:\n" + StoresRule);
         copy.Write("environments/prod.yaml", copy.Read("environments/prod.yaml") + logsBlock);
         return Assert.Throws<RegistryException>(() => RegistryLoader.Load(copy.Path)).Message;
     }
@@ -289,31 +345,33 @@ public class LogsTabTests
     public void An_empty_query_and_a_window_without_a_unit_are_errors()
     {
         Assert.Contains("logs.query is empty", LoadProblem("\nlogs:\n  source: telemetry\n  query: ''\n"));
-        Assert.Contains("logs.window 'soon'", LoadProblem(LogsA.Replace("traceLinks:", "window: soon\n  traceLinks:")));
+        Assert.Contains("logs.window 'soon'", LoadProblem(LogsA.Replace("  links:", "  window: soon\n  links:")));
     }
 
     [Fact]
-    public void A_trace_link_must_write_out_its_scheme_and_may_only_use_its_own_variables()
+    public void A_header_link_must_write_out_its_scheme_name_a_real_section_and_assets_rule_and_use_only_its_own_variables()
     {
-        Assert.Contains("url must start with https://", LoadProblem(LogsA.Replace("\"https://tracing.a.example.test", "\"{environment}.example.test")));
-        Assert.Contains("{resourceId}", LoadProblem(LogsA.Replace("{operationId}", "{resourceId}")));
-        Assert.Contains("listed twice", LoadProblem(LogsA + "\n    - { name: Trace, url: \"https://other.example.test/{operationId}\" }"));
+        Assert.Contains("url must start with https://", LoadProblem(LogsA.Replace("\"https://search.a.example.test/{environment}/{resourceIdTwice}", "\"{environment}.example.test/{resourceIdTwice}")));
+        Assert.Contains("{operationId}", LoadProblem(LogsA.Replace("service={role}&code", "service={operationId}&code")));
+        Assert.Contains("section 'errors' is not one of failed, slow, logs, exceptions", LoadProblem(LogsA.Replace("section: failed", "section: errors")));
+        Assert.Contains("resources 'nope' is not a scope.assets rule of this file", LoadProblem(LogsA.Replace("resources: stores, url: \"https://search.a.example.test/{environment}/{resourceIdTwice}", "resources: nope, url: \"https://search.a.example.test/{environment}/{resourceIdTwice}")));
+        Assert.Contains("listed twice", LoadProblem(LogsA + "\n    - { name: 5xx, section: failed, resources: stores, url: \"https://other.example.test/{resourceName}\" }"));
     }
 
     [Fact]
-    public void An_environment_may_have_no_trace_links_and_the_default_window_is_four_hours()
+    public void An_environment_may_have_no_header_links_and_the_default_window_is_four_hours()
     {
         using var rig = new Rig(TownB, LogsB.Replace("  window: 30m\n", ""));
 
         var config = rig.View.Current.ActiveEnvironment!.Logs!;
 
         Assert.Equal(TimeSpan.FromHours(4), config.Window);
-        Assert.Empty(config.TraceLinks);
+        Assert.Empty(config.Links);
     }
 
     // ---- the Azure side ----
 
-    private const string Columns = """{"name":"section","type":"string"},{"name":"at","type":"datetime"},{"name":"text","type":"string"},{"name":"count","type":"long"},{"name":"level","type":"dynamic"},{"name":"operationId","type":"string"},{"name":"durationMs","type":"real"},{"name":"result","type":"string"}""";
+    private const string Columns = """{"name":"section","type":"string"},{"name":"at","type":"datetime"},{"name":"text","type":"string"},{"name":"count","type":"long"},{"name":"level","type":"dynamic"},{"name":"durationMs","type":"real"},{"name":"result","type":"string"}""";
 
     private static string Answer(params string[] rows) => """{"tables":[{"name":"PrimaryResult","columns":[""" + Columns + """],"rows":[""" + string.Join(",", rows) + "]}]}";
 
@@ -321,12 +379,12 @@ public class LogsTabTests
     public void The_answer_is_read_by_column_name_with_the_optional_columns_left_out_or_empty()
     {
         var rows = LogAnalyticsReader.ParseLogs(Answer(
-            """["failed","2026-11-01T11:58:00Z","GET /a",4,null,"op1",812.5,"500"]""",
-            """["logs","2026-11-01T11:57:00Z","Cache is cold",1,"Warning",null,null,null]""",
-            """["logs","2026-11-01T11:56:00Z","Disk full",2,3,null,null,null]"""));
+            """["failed","2026-11-01T11:58:00Z","GET /a",4,null,812.5,"500"]""",
+            """["logs","2026-11-01T11:57:00Z","Cache is cold",1,"Warning",null,null]""",
+            """["logs","2026-11-01T11:56:00Z","Disk full",2,3,null,null]"""));
 
         Assert.Equal(3, rows.Count);
-        Assert.Equal(new LogRow("failed", new DateTimeOffset(2026, 11, 1, 11, 58, 0, TimeSpan.Zero), "GET /a", 4, null, "op1", 812.5, "500"), rows[0]);
+        Assert.Equal(new LogRow("failed", new DateTimeOffset(2026, 11, 1, 11, 58, 0, TimeSpan.Zero), "GET /a", 4, null, 812.5, "500"), rows[0]);
         Assert.Equal(LogLevel.Warn, rows[1].Level);
         Assert.Equal(LogLevel.Error, rows[2].Level); // a number: 3 and above is an error
         Assert.Equal(2, rows[2].Count);
@@ -355,7 +413,7 @@ public class LogsTabTests
     [Fact]
     public async Task The_adapter_sends_the_query_over_the_window_to_the_workspace_and_reads_the_answer()
     {
-        var http = ObservabilityCity.AdapterKit.CannedHttp.Always(Answer("""["logs","2026-11-01T11:57:00Z","Cache is cold",1,"warn",null,null,null]"""));
+        var http = ObservabilityCity.AdapterKit.CannedHttp.Always(Answer("""["logs","2026-11-01T11:57:00Z","Cache is cold",1,"warn",null,null]"""));
         var reader = new LogAnalyticsReader(new HttpClient(http), null);
 
         var rows = await reader.QueryLogsAsync("00000000-0000-0000-0000-00000000c0de", "Q", Now.AddHours(-4), Now, default);

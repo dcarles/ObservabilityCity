@@ -3,7 +3,7 @@ import { escapeHtml } from './picker'
 import { scopeParams, type Scope } from './scope'
 import { tenantListOrder, tenantFigures, yardSummary, type TenantView } from './tenants'
 import { regionFigures, regionOptions, validChoice, WORST, type RegionChoice } from './regions'
-import { ago, clockTime, configOrder, groupDetail, incidentSummary, jobRows, LAYER_WORD, linkSections, logSectionEmpty, logSectionTitle, originLabel, type LinkItem, overviewLinks, overviewRows, reasons, repeatLabel, resourceLinks, scopeView, SEVERITY_WORD, stateTone, traceLinks, vendorWhere } from './inspectorModel'
+import { ago, clockTime, configOrder, groupDetail, incidentSummary, jobRows, LAYER_WORD, linkSections, logSectionEmpty, logSectionTitle, originLabel, type LinkItem, overviewLinks, overviewRows, reasons, repeatLabel, resourceLinks, scopeView, SEVERITY_WORD, sectionLinks, stateTone, vendorWhere } from './inspectorModel'
 
 export type InspectorTab = 'overview' | 'links' | 'logs' | 'config'
 const TABS: { id: InspectorTab; label: string }[] = [
@@ -281,9 +281,9 @@ export class Inspector {
     const logs = this.logs
     if (!logs.configured) return `<p class="none" data-logs="unconfigured">Logs are not set up for this environment, so there is nothing to show here.</p>`
     if (logs.sections.length === 0) return `${refresh}<p class="none">This system has no telemetry name, so it has no logs.</p>`
-    return `${refresh}${logs.sections.map((s) => `<h4 data-section="${escapeHtml(s.id)}">${escapeHtml(logSectionTitle(s, logs.slowOverMs))}</h4>${s.groups.length === 0
+    return `${refresh}${logs.sections.map((s) => `<h4 data-section="${escapeHtml(s.id)}">${escapeHtml(logSectionTitle(s, logs.slowOverMs))}${sectionLinks(s).map((l) => ` ${this.anchor(l.name, l.url)}`).join('')}</h4>${s.groups.length === 0
       ? `<p class="none">${escapeHtml(logSectionEmpty(s, logs.window))}</p>`
-      : `<div class="logs">${s.groups.map((g) => `<div class="log ${(g.level ?? 'Info').toLowerCase()}"><time>${escapeHtml(clockTime(g.at))}</time><span>${escapeHtml(g.text)}${groupDetail(g) ? ` <i class="detail">${escapeHtml(groupDetail(g))}</i>` : ''}${repeatLabel(g) ? ` <b class="count">${escapeHtml(repeatLabel(g))}</b>` : ''}${traceLinks(g).map((l) => ` ${this.anchor(l.name, l.url)}`).join('')}</span></div>`).join('')}</div>`}`).join('')}
+      : `<div class="logs">${s.groups.map((g) => `<div class="log ${(g.level ?? 'Info').toLowerCase()}"><time>${escapeHtml(clockTime(g.at))}</time><span>${escapeHtml(g.text)}${groupDetail(g) ? ` <i class="detail">${escapeHtml(groupDetail(g))}</i>` : ''}${repeatLabel(g) ? ` <b class="count">${escapeHtml(repeatLabel(g))}</b>` : ''}</span></div>`).join('')}</div>`}`).join('')}
       <p class="note">Read ${ago(logs.at, Date.now())} over the last ${escapeHtml(logs.window)}, newest first. Logs are read on demand and do not decide the colours.</p>`
   }
 

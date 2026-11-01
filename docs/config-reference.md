@@ -338,9 +338,19 @@ What a system's Logs tab shows in a live town. Nothing is polled: when someone o
 | Key | Required | Default | Meaning |
 |---|---|---|---|
 | `source` | yes | | Name of a `loganalytics` source of this file. Its workspace and login are used. |
-| `query` | yes | | The query to send, a template. Holes: `{roles}` (the system's telemetry name, double-quoted), `{from}` and `{to}` (UTC, ISO 8601), `{window}` (for example `4h`), `{windowSeconds}`, `{slaMs}` (the system's own p99 SLA), `{kind}` (`api`, `worker` and so on), `{environment}` and your `scope.variables`. It returns one row for each kind of entry with the columns `section` (`failed`, `slow`, `logs` or `exceptions`), `at` (the newest time) and `text`; `count` (default 1), `level` (`info`, `warn` or `error`, or a number where 2 is a warning and 3 and up an error), `operationId`, `durationMs` and `result` (a status code, say) may be left out. Azure does the grouping; no raw rows come back, and none are cut off. |
+| `query` | yes | | The query to send, a template. Holes: `{roles}` (the system's telemetry name, double-quoted), `{from}` and `{to}` (UTC, ISO 8601), `{window}` (for example `4h`), `{windowSeconds}`, `{slaMs}` (the system's own p99 SLA), `{kind}` (`api`, `worker` and so on), `{environment}` and your `scope.variables`. It returns one row for each kind of entry with the columns `section` (`failed`, `slow`, `logs` or `exceptions`), `at` (the newest time) and `text`; `count` (default 1), `level` (`info`, `warn` or `error`, or a number where 2 is a warning and 3 and up an error), `durationMs` and `result` (a status code, say) may be left out. Azure does the grouping; no raw rows come back, and none are cut off. |
 | `window` | no | `4h` | How far back it looks, for example `30m`. |
-| `traceLinks` | no | none | Addresses that open one request's full trace somewhere else, 0 to n, each `{ name, url }`. The url starts with `https://` (or `http://`) written out and may use `{operationId}`, `{role}`, `{time}`, `{environment}` and your `scope.variables`; every value is percent-encoded. An entry with no operation id has no link. |
+| `links` | no | none | Links in the header of a section that open the telemetry store's own search already filtered to the system, 0 to n, each `{ name, section, resources, url }`. `section` is `failed`, `slow`, `logs` or `exceptions`; `resources` names a `scope.assets` rule, and each resource it finds gets its own link (its name is added to the link's name when there is more than one). The url starts with `https://` (or `http://`) written out and may use `{resourceId}`, `{resourceIdTwice}` (the id percent-encoded twice, as the Azure portal's blade addresses want it), `{resourceName}`, `{role}`, `{from}`, `{to}`, `{windowMs}`, `{environment}` and your `scope.variables`; every value is percent-encoded. |
+
+Each entry of `logs.links`:
+
+<!-- file: LogLinkFile -->
+| Key | Required | Default | Meaning |
+|---|---|---|---|
+| `name` | yes | | The words on the link. |
+| `section` | yes | | The section whose header carries it: `failed`, `slow`, `logs` or `exceptions`. |
+| `resources` | yes | | The name of a `scope.assets` rule; each resource it finds gets its own link. |
+| `url` | yes | | The address template, starting with `https://` or `http://` written out. |
 
 ```yaml
 logs:
@@ -350,13 +360,13 @@ logs:
     union
       (AppRequests | where TimeGenerated between (datetime({from}) .. datetime({to})) and AppRoleName in~ ({roles})
         | where toint(resultCode) >= 500
-        | summarize count = count(), at = max(TimeGenerated), operationId = take_any(OperationId), durationMs = max(DurationMs)
+        | summarize count = count(), at = max(TimeGenerated), durationMs = max(DurationMs)
             by section = "failed", text = strcat(name), result = resultCode),
       (AppTraces | where TimeGenerated between (datetime({from}) .. datetime({to})) and AppRoleName in~ ({roles}) and SeverityLevel >= 2
-        | summarize count = count(), at = max(TimeGenerated), operationId = take_any(OperationId), level = max(SeverityLevel)
+        | summarize count = count(), at = max(TimeGenerated), level = max(SeverityLevel)
             by section = "logs", text = Message)
-  traceLinks:
-    - { name: Trace, url: "https://tracing.example.test/trace/{operationId}" }
+  links:
+    - { name: 5xx in search, section: failed, resources: app-insights, url: "https://search.example.test/{resourceIdTwice}?service={role}&from={from}&to={to}" }
 ```
 
 ### credentials

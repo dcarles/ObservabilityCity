@@ -24,10 +24,6 @@
           "type": "string"
         },
         {
-          "name": "operationId",
-          "type": "string"
-        },
-        {
           "name": "durationMs",
           "type": "string"
         },
@@ -43,7 +39,6 @@
           "GET /api/orders",
           4,
           null,
-          "op-new",
           812.5,
           "500"
         ],
@@ -53,7 +48,6 @@
           "GET /api/orders",
           3,
           null,
-          "op-old",
           640,
           "500"
         ],
@@ -63,7 +57,6 @@
           "POST /api/orders",
           1,
           null,
-          "op-post",
           95,
           "503"
         ],
@@ -73,7 +66,6 @@
           "GET /api/statements",
           7,
           null,
-          "op-slow",
           2400,
           "200"
         ],
@@ -84,7 +76,6 @@
           2,
           "Warning",
           null,
-          null,
           null
         ],
         [
@@ -93,7 +84,6 @@
           "Connection to the store was reset",
           5,
           "Error",
-          "op-log",
           null,
           null
         ],
@@ -103,7 +93,6 @@
           "TimeoutException: the upstream call timed out",
           9,
           null,
-          "op-exc",
           null,
           null
         ]

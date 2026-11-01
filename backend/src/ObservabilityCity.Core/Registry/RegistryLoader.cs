@@ -33,7 +33,7 @@ public static partial class RegistryLoader
         "tenantPattern", "order", "default", "sources", "kind", "connection", "tenants", "exclude", "fake", "undeclaredTenants",
         "signals", "credentials", "credential", "pollSeconds", "timeoutSeconds", "tenantId", "clientId", "clientSecretEnv",
         "scope", "inventory", "workspace", "variables", "subscription", "pillars", "types", "pattern", "roles", "serviceTag", "tenantNameTag",
-        "telemetryRole", "queries", "links", "url", "nameLike", "tag", "key", "value", "code", "serviceCode", "telemetry", "minCalls", "query", "window", "discoverLinks", "regions", "tag", "names", "skew", "state", "running", "minDays", "keepFor", "firstRead", "interval", "ignoreHosts", "rules", "host", "path", "target", "gateway", "domains", "services", "internal", "match", "traffic", "shareWindow", "logs", "traceLinks",
+        "telemetryRole", "queries", "links", "url", "nameLike", "tag", "key", "value", "code", "serviceCode", "telemetry", "minCalls", "query", "window", "discoverLinks", "regions", "tag", "names", "skew", "state", "running", "minDays", "keepFor", "firstRead", "interval", "ignoreHosts", "rules", "host", "path", "target", "gateway", "domains", "services", "internal", "match", "traffic", "shareWindow", "logs", "section", "resources",
     ];
 
     // Last resort when defaults.yaml is missing or silent about a role.
@@ -343,7 +343,7 @@ public static partial class RegistryLoader
 
     private static ObservabilityCity.Core.Logs.LogsConfig? ToLogs(LogsFile? f) => f is null ? null : new ObservabilityCity.Core.Logs.LogsConfig(
         f.Source, f.Query, Duration(f.Window, ObservabilityCity.Core.Logs.LogsConfig.DefaultWindow),
-        f.TraceLinks.Select(l => new ResourceLinkRule(l.Name, l.Url.Trim(), [])).ToList());
+        f.Links.Select(l => new ObservabilityCity.Core.Logs.LogLinkRule(l.Name, l.Section.Trim().ToLowerInvariant(), l.Resources, l.Url.Trim())).ToList());
 
     private static void CheckLogs(EnvironmentFile f, string name, List<string> errors)
     {
@@ -357,12 +357,17 @@ public static partial class RegistryLoader
         if (string.IsNullOrWhiteSpace(logs.Query)) errors.Add($"{owner}.query is empty. Write the query that returns one row for each kind of entry with the columns {string.Join(", ", ObservabilityCity.Core.Logs.LogQuery.Columns)}");
         else foreach (var problem in ScopeTemplate.Check(logs.Query, ObservabilityCity.Core.Logs.LogQuery.Variables.Append(ScopeRules.EnvironmentVariable).Concat(own))) errors.Add($"{owner}.query: {problem}");
         if (logs.Window is { } window && !SourceQuery.TryParseWindow(window, out _)) errors.Add($"{owner}.window '{window}' is not a number and a unit like 4h or 30m");
-        var names = new HashSet<string>();
-        foreach (var l in logs.TraceLinks)
+        var assetRules = (f.Scope?.Assets.Select(r => r.Name) ?? []).ToList();
+        var seen = new HashSet<(string, string)>();
+        foreach (var l in logs.Links)
         {
-            var link = $"{owner}.traceLinks '{l.Name}'";
-            if (l.Name.Trim().Length == 0) errors.Add($"{owner}.traceLinks: a link needs a name, the words on the link");
-            else if (!names.Add(l.Name)) errors.Add($"{owner}.traceLinks: '{l.Name}' is listed twice");
+            var link = $"{owner}.links '{l.Name}'";
+            if (l.Name.Trim().Length == 0) errors.Add($"{owner}.links: a link needs a name, the words on the link");
+            if (!ObservabilityCity.Core.Logs.LogSections.All.Contains(l.Section.Trim(), StringComparer.OrdinalIgnoreCase))
+                errors.Add($"{link}: section '{l.Section}' is not one of {string.Join(", ", ObservabilityCity.Core.Logs.LogSections.All)}.{DidYouMean.Hint(l.Section, ObservabilityCity.Core.Logs.LogSections.All)}");
+            else if (!seen.Add((l.Section.Trim().ToLowerInvariant(), l.Name))) errors.Add($"{owner}.links: '{l.Name}' is listed twice for the section {l.Section}");
+            if (!assetRules.Contains(l.Resources, StringComparer.OrdinalIgnoreCase))
+                errors.Add($"{link}: resources '{l.Resources}' is not a scope.assets rule of this file.{DidYouMean.Hint(l.Resources, assetRules)}");
             var url = l.Url.Trim();
             if (!url.StartsWith("https://", StringComparison.OrdinalIgnoreCase) && !url.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
                 errors.Add($"{link}: url must start with https:// (or http://) written out, so a variable can never choose the scheme or host");

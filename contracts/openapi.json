@@ -544,10 +544,6 @@
             "type": "integer",
             "format": "int32"
           },
-          "operationId": {
-            "type": "string",
-            "nullable": true
-          },
           "durationMs": {
             "type": "number",
             "format": "double",
@@ -555,13 +551,6 @@
           },
           "result": {
             "type": "string",
-            "nullable": true
-          },
-          "links": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ResourceLink"
-            },
             "nullable": true
           }
         },
@@ -590,6 +579,13 @@
             "items": {
               "$ref": "#/components/schemas/LogGroup"
             }
+          },
+          "links": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ResourceLink"
+            },
+            "nullable": true
           }
         },
         "additionalProperties": false

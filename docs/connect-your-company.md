@@ -319,7 +319,7 @@ The query is yours (which table, which columns, which status counts as a failure
 - `logs`: warnings and errors, including start-up.
 - `exceptions`: exceptions.
 
-Repeats come back as one row with a `count`, and the tab shows them newest first. A worker (or anything that does not answer requests) is shown only `logs` and `exceptions`. `traceLinks` are named address templates (`{operationId}`, `{role}`, `{time}`); each entry that has an `operationId` gets the links, so one click opens the full trace in whatever tool you use. If you later move to another tracing or logging store, only the adapter behind the source changes.
+Repeats come back as one row with a `count`, and the tab shows them newest first. A worker (or anything that does not answer requests) is shown only `logs` and `exceptions`. `links` put a link in the header of a section (say `failed` or `exceptions`) that opens your telemetry store's own search, already filtered to the system and the window. Each link names a `scope.assets` rule (for example the rule that finds your Application Insights resources); every resource the rule finds gets its own link, so a primary and a standby store both show. The address is a template that you write out in full (`{resourceId}`, `{resourceIdTwice}`, `{resourceName}`, `{role}`, `{from}`, `{to}`, `{windowMs}`). If you later move to another logging store, only the adapter behind the source changes.
 
 ### Function apps and regions
 

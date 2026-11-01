@@ -32,20 +32,24 @@ public sealed class QueryLogSource(IReadOnlyList<IMetricSource> sources, IRegist
         var from = now - config.Window;
         var query = LogQuery.Render(config.Query, environment.Id, environment.Scope, role, node.Kind, node.SlaP99Ms, config.Window, from, now);
         var rows = await source.ReadLogsAsync(view, query, from, now, ct);
-        return new SystemLogs(now, true, window, node.SlaP99Ms, Sections(rows, LogSections.For(node.Kind), config, environment, role));
+        return new SystemLogs(now, true, window, node.SlaP99Ms, Sections(rows, LogSections.For(node.Kind), config, environment, role, scope.Resolve(view).AssetList, config.Window, from, now));
     }
 
-    /// <summary>The sections asked for, in order, each with its rows grouped (same text and result: one group, counted, the newest on top) and newest first.</summary>
-    public static IReadOnlyList<LogSection> Sections(IReadOnlyList<LogRow> rows, IEnumerable<string> wanted, LogsConfig config, RegistryEnvironment environment, string role) =>
+    /// <summary>
+    /// The sections asked for, in order, each with its rows grouped (same text and result: one group, counted, the newest on top) and newest first, and the
+    /// header links of the environment for it.
+    /// </summary>
+    public static IReadOnlyList<LogSection> Sections(IReadOnlyList<LogRow> rows, IEnumerable<string> wanted, LogsConfig config, RegistryEnvironment environment, string role,
+        IReadOnlyList<ResolvedAsset> assets, TimeSpan window, DateTimeOffset from, DateTimeOffset to) =>
         wanted.Select(id => new LogSection(id, rows
             .Where(r => r.Section.Equals(id, StringComparison.OrdinalIgnoreCase))
             .GroupBy(r => (r.Text, r.Result))
             .Select(g =>
             {
                 var newest = g.OrderByDescending(r => r.At).First();
-                return new LogGroup(newest.At, newest.Level, newest.Text, g.Sum(r => r.Count), newest.OperationId, newest.DurationMs, newest.Result,
-                    LogQuery.Links(config.TraceLinks, environment.Scope, environment.Id, role, newest.OperationId, newest.At));
+                return new LogGroup(newest.At, newest.Level, newest.Text, g.Sum(r => r.Count), newest.DurationMs, newest.Result);
             })
             .OrderByDescending(g => g.At)
-            .ToList())).ToList();
+            .ToList(),
+            LogQuery.Links(config.Links, id, assets, environment.Scope, environment.Id, role, window, from, to))).ToList();
 }
