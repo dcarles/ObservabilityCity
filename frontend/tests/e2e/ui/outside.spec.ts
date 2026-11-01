@@ -176,7 +176,20 @@ test.describe('cars from a third party island to the town through the airport', 
     expect(out.sane).toBe(true)
   })
 
-  test('the airport has no back gate when no building of a third party island calls the town', async ({ town, page }) => {
+  test('the airport has a back gate as soon as a vendor island is the company\'s own, before any call is seen', async ({ town, page }) => {
+    await town.open()
+    const out = await page.evaluate(() => {
+      const c = (window as any).city
+      const s = structuredClone(c.seen.last)
+      s.vendors.find((x: any) => x.node.id === 'ext.mailer').internal = true
+      c.feed(s)
+      const a = c.town.airport
+      return { back: a.backGateZ !== null, roads: c.town.inspectRoads() }
+    })
+    expect(out.back).toBe(true)
+  })
+
+  test('the airport has no back gate when no vendor island is the company\'s own and none calls the town', async ({ town, page }) => {
     await town.open()
     expect(await page.evaluate(() => (window as any).city.town.airport.backGateZ)).toBeNull()
   })

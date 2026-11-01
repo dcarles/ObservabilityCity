@@ -198,9 +198,10 @@ export class Town {
     // in the second ring's northernmost place. The hub grows with their number, so every spoke road has room where it leaves the plaza.
     this.direct = s.topology !== 'hub-and-spoke'
     const direct = this.direct
-    // services of a third party's island that call town systems come in by the airport, so it gets a back gate to the ring road and a side road to it
+    // the company's own services on a vendor island may call town systems, and those calls come in by the airport: it gets a back gate to the ring road and a side road to it
+    // whenever such an island is there, not only once a call has been seen
     this.vendorCallers = vendorCallersOf(s)
-    const airport = new Airport(!direct && this.vendorCallers.size > 0)
+    const airport = new Airport(!direct && (this.vendorCallers.size > 0 || s.vendors.some((v) => v.internal)))
     const plans = pillars.map((g) => planIsland(g))
     // the hub grows until the clusters of resource buildings it holds have a place of their own
     const layout = layoutWithHubRoom(plans.map((p) => ({ rx: p.rx, rz: p.rz })), s.ringCapacity, { rx: airport.rx, rz: airport.rz }, hub?.assets ?? [], (hub?.nodes ?? []).map((n) => n.kind))
@@ -1381,7 +1382,7 @@ function parkProps(x: number, z: number): THREE.Object3D[] {
 
 function layoutKey(s: Snapshot): string {
   const groups = s.groups.map((g) => `${g.id}${g.configError ? '!' : ''}:${g.nodes.map((n) => `${n.id}/${n.kind}/${n.tenants != null ? 'T' : ''}/${n.service ?? ''}/${n.calls.join('+')}/${(n.gatewayCalls ?? []).join('+')}`).join(',')}|${g.hasBridge === false ? 'nb' : 'b'}${g.hasRingBridge ? 'r' : ''}|${(g.assets ?? []).map((a) => `${a.id}/${a.shape}/${a.service ?? ''}/${a.group ?? ''}`).join('+')}|${(g.messaging?.topics ?? []).map((t) => t.name).join('+')}|${(g.messaging?.subscriptions ?? []).map((x) => `${x.topic}>${x.consumer}${x.legacy ? '!' : ''}`).join('+')}`).join(';')
-  const vendors = (s.vendors ?? []).map((v) => `${v.node.id}@${v.islandId ?? ''}<${v.calledBy.join('+')}>${(v.calls ?? []).join("+")}`).join(';')
+  const vendors = (s.vendors ?? []).map((v) => `${v.node.id}@${v.islandId ?? ''}${v.internal ? '!' : ''}<${v.calledBy.join('+')}>${(v.calls ?? []).join("+")}`).join(';')
   return `${s.townId}|${s.environment ?? ''}|${groups}|${vendors}|${edgeKey(s)}`
 }
 
