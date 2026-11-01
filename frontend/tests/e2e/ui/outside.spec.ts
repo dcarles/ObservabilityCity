@@ -209,4 +209,29 @@ test.describe('the Unknown hosts button', () => {
     await page.evaluate(() => (window as any).city.unknownHosts.refresh())
     await expect(page.locator('#unknown-hosts')).toBeHidden()
   })
+
+  test('lists a gateway by its unexplained paths with a path rule button, and shows calls made only by vendors behind the tick box', async ({ town, page, context }) => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write'])
+    await town.open()
+    const list = [
+      { host: 'gw.example.test', calls: 440, callers: ['aa.orders-api', 'ext.partner-svc'], days: 3, gateway: true, vendorsOnly: false,
+        paths: [{ path: '/internal/x', calls: 400, vendorsOnly: false }, { path: '/odd/y', calls: 40, vendorsOnly: true }] },
+      { host: 'theirs.example.test', calls: 500, callers: ['ext.partner-svc'], days: 2, vendorsOnly: true },
+    ]
+    await page.route('**/api/unknown-hosts*', (r) => r.fulfill({ json: list }))
+    await page.evaluate(() => (window as any).city.unknownHosts.refresh())
+    await expect(page.locator('#unknown-hosts-toggle')).toHaveText(/1 unknown host /)
+    await page.locator('#unknown-hosts-toggle').click()
+    const gw = page.locator('#unknown-hosts li[data-host="gw.example.test"]')
+    await expect(gw.getByRole('button', { name: 'Copy vendor entry' })).toHaveCount(0)
+    await expect(gw.getByRole('button', { name: 'Copy ignore line' })).toHaveCount(0)
+    await expect(gw.locator('li')).toHaveCount(1)
+    await gw.getByRole('button', { name: 'Copy path rule' }).click()
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("- { host: '^gw\\.example\\.test$', path: '^/internal/x', target: <system id>, gateway: true }")
+
+    await page.locator('#unknown-hosts-vendors').check()
+    await expect(page.locator('#unknown-hosts-toggle')).toHaveText(/2 unknown hosts/)
+    await expect(gw.locator('li')).toHaveCount(2)
+    await expect(page.locator('#unknown-hosts li[data-host="theirs.example.test"]')).toBeVisible()
+  })
 })

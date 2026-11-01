@@ -280,7 +280,7 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
 
         foreach (var callee in callers.Keys.Concat(vendorCallers.Keys).Distinct())
         {
-            if (!byId.TryGetValue(callee, out var snap) || snap.State == HealthState.Stale) continue;
+            if (!byId.TryGetValue(callee, out var snap) || (snap.State == HealthState.Stale && groupOf.ContainsKey(callee))) continue; // a third party has no health to be stale about: its calls are still a link
             var to = groupOf.GetValueOrDefault(callee, callee); // a vendor stands on its own
             var from = callers.GetValueOrDefault(callee) ?? [];
             var vendorsHere = vendorCallers.GetValueOrDefault(callee) ?? [];

@@ -334,7 +334,13 @@ public sealed record HiddenIsland(string Id, string DisplayName);
 /// One host that calls from the town go to and no rule explains: how many calls over the days link discovery remembers, which town systems made them,
 /// and on how many different days it was seen. Hosts that are a third party's or on the ignore list are never listed. Calls are sampling-corrected estimates.
 /// </summary>
-public sealed record UnknownHostSnapshot(string Host, double Calls, IReadOnlyList<string> Callers, int Days);
+public sealed record UnknownHostSnapshot(string Host, double Calls, IReadOnlyList<string> Callers, int Days, bool Gateway = false, IReadOnlyList<UnknownPathSnapshot>? Paths = null, bool VendorsOnly = false);
+
+/// <summary>
+/// One path on a gateway host that no rule explains, with its calls. VendorsOnly is true when only vendor buildings (such as Digital Services) made them.
+/// A gateway host is one a links rule reads the path of; it is not a service, so it is listed by these paths.
+/// </summary>
+public sealed record UnknownPathSnapshot(string Path, double Calls, bool VendorsOnly);
 
 public sealed record OffscreenLink(string NodeId, string IslandId, string IslandName, bool Incoming, double RequestsPerSecond);
 

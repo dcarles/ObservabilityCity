@@ -94,6 +94,9 @@ public sealed class LinkClassifier
         return outside ?? new Classified(LinkOutcome.Unresolved);
     }
 
+    /// <summary>True when a rule that reads the path matches the host: a shared gateway, not one service.</summary>
+    public bool IsGatewayHost(string host) => _rules.Any(r => r.Path is not null && r.Host.IsMatch(host));
+
     /// <summary>The pillar a system id belongs to: what comes before the first dot.</summary>
     public static string Pillar(string systemId) => systemId.Split('.')[0];
 

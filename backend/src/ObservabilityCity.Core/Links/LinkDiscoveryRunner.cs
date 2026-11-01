@@ -54,9 +54,21 @@ public sealed class LinkDiscoveryRunner(
 
         var now = time.GetUtcNow();
         var from = store.ReadUpTo is { } last && last > now - config.FirstRead ? last : now - config.FirstRead;
-        var rows = await source.ReadDependenciesAsync(view, config.Query, byRole.Keys.ToList(), from, now, ct);
+        // a name that has never been read is read over the whole first-read window, not just the gap since the last read: its links need their days
+        var fullFrom = now - config.FirstRead;
+        var fresh = byRole.Keys.Where(r => !store.AskedRoles.Contains(r, StringComparer.OrdinalIgnoreCase)).ToList();
+        var rows = new List<DependencyRow>();
+        if (fresh.Count == 0 || from <= fullFrom || fresh.Count == byRole.Count)
+            rows.AddRange(await source.ReadDependenciesAsync(view, config.Query, byRole.Keys.ToList(), fresh.Count > 0 ? fullFrom : from, now, ct));
+        else
+        {
+            rows.AddRange(await source.ReadDependenciesAsync(view, config.Query, byRole.Keys.Except(fresh).ToList(), from, now, ct));
+            rows.AddRange(await source.ReadDependenciesAsync(view, config.Query, fresh, fullFrom, now, ct));
+        }
 
         var classifier = new LinkClassifier(config, view.Vendors, view.AllNodes.Select(n => n.Id), LinkClassifier.ServicesOf(view.AllNodes));
+        var vendorIds = view.Vendors.Select(v => v.Node.Id).ToHashSet(StringComparer.Ordinal);
+        store.Judge(vendorIds.Contains, classifier.IsGatewayHost);
         foreach (var row in rows)
         {
             if (!byRole.TryGetValue(row.Caller, out var caller)) continue;
@@ -79,6 +91,7 @@ public sealed class LinkDiscoveryRunner(
         foreach (var v in view.Vendors) groupOf.TryAdd(v.Node.Id, v.Node.GroupId);
         store.Revisit((callerId, host, path) => classifier.Classify(new DependencyRow(callerId, host, path, [], 0), groupOf.GetValueOrDefault(callerId, "")));
         store.Prune(now, config.KeepFor);
+        store.RoleAsked(byRole.Keys);
         store.Finish(now);
         store.Save();
     }
