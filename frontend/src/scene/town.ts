@@ -1021,6 +1021,16 @@ export class Town {
    * callers come from the airport, which is on the ring road. Systems on the same island that declare a call to it drive over from their
    * own doors. No car starts anywhere else.
    */
+  /** Whether a system calls another, directly or through the API gateway. */
+  private callsIt(p: Placed, dest: Placed): boolean {
+    return p.node.calls.includes(dest.node.id) || (p.node.gatewayCalls ?? []).includes(dest.node.id)
+  }
+
+  /** Every car route as the scene built it: who drives to whom, and whether the cars are inside or outside callers. For tests. */
+  inspectRoutes(): { source: string | null; dest: string | null; origin: string }[] {
+    return this.cars.routeList.map((r) => ({ source: (r.source as Building).node?.id ?? null, dest: r.dest.node?.id ?? null, origin: r.origin }))
+  }
+
   private islandRoutes(index: number, gates: Gate[], gateway: Building | undefined): Route[] {
     const here = gates[index]
     const { island, plan } = here
@@ -1045,12 +1055,13 @@ export class Town {
       // telemetry shows; not measured, the rate is shared evenly between everything that can be seen to call it (see inboundMix).
       const outsideReach = dest.node.external || this.outsideReach.has(dest.node.id)
       const mayBeCalledFromOutside = dest.node.kind === 'Api' || outsideReach
-      const callers = plan.placed.filter((s) => s !== dest && s.node.calls.includes(dest.node.id))
+      const callers = plan.placed.filter((s) => s !== dest && s.node.calls.includes(dest.node.id)) // same island: plain calls only (the gateway is for other islands)
       // Callers on other islands: the ones that declare a call to it, else one other island picked from its name.
       const declared: { gate: number; from: Placed }[] = []
       gates.forEach((g, i) => {
         if (i === index || !linked(g)) return
-        for (const p of g.plan.placed) if (p.node.calls.includes(dest.node.id) && !declared.some((d) => d.gate === i)) declared.push({ gate: i, from: p })
+        // a call through the API gateway is a call from that island too: it drives over the bridge like any other
+        for (const p of g.plan.placed) if (this.callsIt(p, dest) && !declared.some((d) => d.gate === i)) declared.push({ gate: i, from: p })
       })
       const callerIds = new Set([...declared.map((d) => d.from.node.id), ...callers.map((c) => c.node.id)])
       const mix = () => inboundMix(b.node, callerIds, outsideReach)

@@ -405,6 +405,7 @@ async function start(): Promise<void> {
     feed: (raw: unknown) => onSnapshot(raw),
     inspect: (id: string) => town.inspect(id),
     inspectIsland: (id: string) => town.inspectIsland(id),
+    inspectRoutes: () => town.inspectRoutes(),
     inspectAirport: () => town.inspectAirport(),
     inspectRoads: () => town.inspectRoads(),
     inspectServices: (id: string) => town.inspectServices(id),
