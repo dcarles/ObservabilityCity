@@ -56,7 +56,7 @@ public static class FakeProfiles
 
 /// <summary>
 /// Reads fake-assets.yaml from a registry folder: the basic buildings (key vault, storage, App Configuration) a demo town shows, with no inventory behind them.
-/// The file is optional. Each entry names its pillar, and may name the service it belongs to (the registry's service name).
+/// The file is optional. Each entry names its pillar (or <c>hub</c>, with a <c>group</c>: the cluster it stands in), and may name the service it belongs to (the registry's service name).
 /// </summary>
 public static class FakeAssets
 {
@@ -68,6 +68,7 @@ public static class FakeAssets
         public string Shape { get; set; } = "box";
         public string? Service { get; set; }
         public string? Region { get; set; }
+        public string? Group { get; set; }
     }
 
     public static IReadOnlyList<Core.Scope.ResolvedAsset> Load(string registryFolder)
@@ -76,7 +77,7 @@ public static class FakeAssets
         if (!File.Exists(path)) return [];
         var yaml = new DeserializerBuilder().WithNamingConvention(CamelCaseNamingConvention.Instance).Build();
         return (yaml.Deserialize<List<Entry>>(File.ReadAllText(path)) ?? [])
-            .Select(e => new Core.Scope.ResolvedAsset($"{e.Pillar}.{e.Name.ToLowerInvariant()}", e.Pillar, e.Name, e.Label ?? e.Shape, e.Shape, "demo", e.Service, e.Region, "", "demo", null))
+            .Select(e => new Core.Scope.ResolvedAsset($"{e.Pillar}.{e.Name.ToLowerInvariant()}", e.Pillar, e.Name, e.Label ?? e.Shape, e.Shape, "demo", e.Service, e.Region, "", "demo", null, e.Group))
             .ToList();
     }
 }

@@ -20,7 +20,12 @@ public static partial class RegistryLoader
             Resources = f.Resources.Select(r => new ResourceRule(r.Name, r.Types, r.Pattern, r.Roles.Select(x => x.ToLowerInvariant() == "cron" ? "function" : x.ToLowerInvariant()).ToList(), r.ServiceTag, r.TenantNameTag, string.IsNullOrWhiteSpace(r.Instances) ? null : r.Instances.Trim(),
                 string.IsNullOrWhiteSpace(r.State) ? null : r.State.Trim(), r.Running.Count == 0 ? null : r.Running)).ToList(),
             Cloud = string.IsNullOrWhiteSpace(f.Cloud) ? null : f.Cloud.Trim(),
-            Assets = f.Assets.Select(a => new AssetRule(a.Name, a.Label.Trim(), a.Shape.Trim().ToLowerInvariant(), a.Types, a.Pattern)).ToList(),
+            Assets = f.Assets.Select(a => new AssetRule(a.Name, a.Label.Trim(), a.Shape.Trim().ToLowerInvariant(), a.Types, a.Pattern)
+            {
+                Island = string.IsNullOrWhiteSpace(a.Island) ? null : a.Island.Trim().ToLowerInvariant(),
+                Group = string.IsNullOrWhiteSpace(a.Group) ? null : a.Group.Trim(),
+                Subscription = a.Subscription is null ? null : new SubscriptionRule(a.Subscription.NameLike, a.Subscription.Tag?.Key, a.Subscription.Tag?.Value),
+            }).ToList(),
             TelemetryRole = f.TelemetryRole,
             Links = f.Links.Select(l => new ResourceLinkRule(l.Name, l.Url.Trim(), l.Types)).ToList(),
             Regions = f.Regions is null ? RegionRules.Default : new RegionRules(string.IsNullOrWhiteSpace(f.Regions.Tag) ? null : f.Regions.Tag.Trim(), f.Regions.Names, f.Regions.Skew ?? RegionRules.DefaultSkew),
@@ -169,11 +174,27 @@ public static partial class RegistryLoader
             if (a.Label.Trim().Length == 0) errors.Add($"{rule} needs a label, the words the drawer calls it (for example Key vault)");
             if (!AssetRule.Shapes.Contains(a.Shape.Trim().ToLowerInvariant())) errors.Add($"{rule}: shape '{a.Shape}'. Use {string.Join(", ", AssetRule.Shapes)}.{DidYouMean.Hint(a.Shape, AssetRule.Shapes)}");
             if (a.Types.Count == 0) errors.Add($"{rule} needs types (the resource types it applies to)");
+            var onHub = string.Equals(a.Island?.Trim(), AssetRule.HubIsland, StringComparison.OrdinalIgnoreCase);
+            if (!string.IsNullOrWhiteSpace(a.Island) && !onHub) errors.Add($"{rule}: island '{a.Island}'. The only island other than a pillar's own is '{AssetRule.HubIsland}'; leave island out for a pillar's resource");
+            if (onHub && string.IsNullOrWhiteSpace(a.Group)) errors.Add($"{rule} stands on the hub, so it needs a group: the name of the cluster of buildings it stands in (for example Monitoring)");
+            if (!onHub && !string.IsNullOrWhiteSpace(a.Group)) errors.Add($"{rule}: group only applies to a building on the hub (island: hub)");
+            if (!onHub && a.Subscription is not null) errors.Add($"{rule}: subscription only applies to a building on the hub (island: hub); a pillar's resources are looked for in the pillar's subscription");
+            if (a.Subscription is { } assetSub)
+            {
+                if ((assetSub.NameLike is not null) == (assetSub.Tag is not null)) errors.Add($"{rule}.subscription needs exactly one of nameLike or tag");
+                Template(assetSub.NameLike, $"assets '{a.Name}'.subscription.nameLike", own);
+                if (assetSub.Tag is { } assetTag)
+                {
+                    if (assetTag.Key.Length == 0) errors.Add($"{rule}.subscription.tag needs a key");
+                    Template(assetTag.Value, $"assets '{a.Name}'.subscription.tag.value", own);
+                }
+            }
             try
             {
                 var regex = new Regex(a.Pattern, RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
-                foreach (var g in regex.GetGroupNames().Where(g => !int.TryParse(g, out _) && !AssetRule.Groups.Contains(g)))
-                    errors.Add($"{rule}: pattern has the group '{g}'. Use {string.Join(", ", AssetRule.Groups)}.{DidYouMean.Hint(g, AssetRule.Groups)}");
+                var allowed = onHub ? AssetRule.HubGroups : AssetRule.Groups;
+                foreach (var g in regex.GetGroupNames().Where(g => !int.TryParse(g, out _) && !allowed.Contains(g)))
+                    errors.Add($"{rule}: pattern has the group '{g}'. Use {string.Join(", ", allowed)}.{DidYouMean.Hint(g, allowed)}");
             }
             catch (ArgumentException e) { errors.Add($"{rule}: pattern is not a valid regular expression: {e.Message}"); }
         }

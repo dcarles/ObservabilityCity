@@ -109,4 +109,118 @@ public class AssetBuildingTests
         }
         finally { Directory.Delete(folder, true); }
     }
+
+    private static IReadOnlyList<AssetSnapshot> HubAssets(Snapshot s) => s.Groups.Single(g => g.IsHub).Assets ?? [];
+
+    [Fact]
+    public async Task Town_a_stands_its_monitoring_resources_on_the_hub_in_one_cluster_found_in_the_platform_subscription_only()
+    {
+        var assets = HubAssets(await TownSnapshot(Town("a")));
+
+        Assert.Equal(
+            [("hub.appi-acme-prd-edge", "Application Insights", "observatory", "Monitoring"), ("hub.law-acme-prd", "Log workspace", "observatory", "Monitoring")],
+            assets.Select(a => (a.Id, a.Label, a.Shape, a.Group)).OrderBy(a => a.Id, StringComparer.Ordinal));
+        Assert.All(assets, a => Assert.Null(a.Service));
+        Assert.DoesNotContain(assets, a => a.Name == "appi-acme-al-decoy");
+    }
+
+    [Fact]
+    public async Task Town_b_has_other_names_words_and_a_tag_to_find_its_subscription_and_gets_the_same_kind_of_cluster()
+    {
+        var assets = HubAssets(await TownSnapshot(Town("b")));
+
+        Assert.Equal(
+            [("hub.central-app-monitor", "App monitor", "box", "Telemetry"), ("hub.central-logs", "Central log store", "box", "Telemetry")],
+            assets.Select(a => (a.Id, a.Label, a.Shape, a.Group)).OrderBy(a => a.Id, StringComparer.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("a", "https://portal.example.test/#resource/subscriptions/00000000-0000-0000-0000-0000000000a9/resourceGroups/rg-ops/providers/microsoft.operationalinsights/workspaces/law-acme-prd", "law-acme-prd")]
+    [InlineData("b", "https://console.example.test/apps/central-logs?env=prod", "central-logs")]
+    public async Task A_hub_building_carries_only_the_addresses_the_environment_makes_for_its_resource(string town, string expected, string name)
+    {
+        var building = HubAssets(await TownSnapshot(Town(town))).Single(a => a.Name == name);
+
+        Assert.Equal(expected, Assert.Single(building.Links!).Url);
+    }
+
+    [Fact]
+    public async Task Hub_buildings_are_not_systems_and_leave_the_pillar_islands_alone()
+    {
+        var snapshot = await TownSnapshot(Town("a"));
+
+        Assert.DoesNotContain(snapshot.Groups.SelectMany(g => g.Nodes), n => n.Id.Contains("law-acme"));
+        Assert.DoesNotContain(Assets(snapshot), a => a.Id.StartsWith("hub."));
+        Assert.DoesNotContain(HubAssets(snapshot), a => a.Name.StartsWith("kv-"));
+    }
+
+    [Fact]
+    public void The_subscriptions_the_hub_rules_look_in_are_the_ones_they_name_so_the_inventory_source_reads_them()
+    {
+        var folder = Town("a");
+        var registry = RegistryLoader.Load(folder).ForEnvironment("prod");
+        var inventory = ObservabilityCity.Adapters.Azure.ResourceGraphInventory.FromRecording(File.ReadAllText(Path.Combine(folder, "inventory.json")));
+
+        var ids = ObservabilityCity.Core.Scope.ScopeResolver.HubAssetSubscriptions(registry, ObservabilityCity.Core.Scope.ScopeResolver.Resolve(registry, new ObservabilityCity.Core.Scope.Inventory(inventory.Subscriptions, [])).Pillars, inventory.Subscriptions);
+
+        Assert.Equal(["00000000-0000-0000-0000-0000000000a9"], ids);
+    }
+
+    private static string CopyTownWith(string replaceThis, string with)
+    {
+        var folder = Directory.CreateTempSubdirectory().FullName;
+        foreach (var file in Directory.GetFiles(Town("a"), "*", SearchOption.AllDirectories))
+        {
+            var target = Path.Combine(folder, Path.GetRelativePath(Town("a"), file));
+            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+            File.Copy(file, target);
+        }
+        var prod = Path.Combine(folder, "environments", "prod.yaml");
+        File.WriteAllText(prod, File.ReadAllText(prod).Replace(replaceThis, with));
+        return folder;
+    }
+
+    [Fact]
+    public void A_hub_rule_needs_a_group_and_a_known_island_and_only_uses_the_region_group_in_its_pattern()
+    {
+        var folder = CopyTownWith("  assets:\n", "  assets:\n    - { name: bad-hub, island: hub, label: X, types: [t], pattern: '(?<service>x)' }\n    - { name: bad-island, island: moon, group: G, label: X, types: [t], pattern: x }\n");
+        try
+        {
+            var problems = Assert.Throws<RegistryException>(() => RegistryLoader.Load(folder)).Message;
+
+            Assert.Contains("needs a group", problems);
+            Assert.Contains("island 'moon'", problems);
+            Assert.Contains("the group 'service'", problems);
+        }
+        finally { Directory.Delete(folder, true); }
+    }
+
+    [Fact]
+    public void A_group_or_a_subscription_on_a_pillar_resource_is_refused_because_they_only_apply_to_the_hub()
+    {
+        var folder = CopyTownWith("  assets:\n", "  assets:\n    - { name: odd, group: Monitoring, subscription: { nameLike: x }, label: X, types: [t], pattern: x }\n");
+        try
+        {
+            var problems = Assert.Throws<RegistryException>(() => RegistryLoader.Load(folder)).Message;
+
+            Assert.Contains("group only applies to a building on the hub", problems);
+            Assert.Contains("subscription only applies to a building on the hub", problems);
+        }
+        finally { Directory.Delete(folder, true); }
+    }
+
+    [Fact]
+    public void A_hub_system_such_as_the_gateway_finds_its_resource_in_the_subscription_named_for_the_hub_and_gets_the_portal_address()
+    {
+        var folder = Town("a");
+        var view = RegistryLoader.Load(folder).ForEnvironment("prod");
+        var store = new ObservabilityCity.Core.Scope.ScopeStore();
+        store.Update(ObservabilityCity.Adapters.Azure.ResourceGraphInventory.FromRecording(File.ReadAllText(Path.Combine(folder, "inventory.json"))), DateTimeOffset.UtcNow);
+
+        var info = ObservabilityCity.Core.Scope.ScopeInfos.Of(view, store, "hub.apim")!;
+
+        var gateway = Assert.Single(info.Resources);
+        Assert.Equal("apim-gateway", gateway.Name);
+        Assert.Equal("https://portal.example.test/#resource/subscriptions/00000000-0000-0000-0000-0000000000a9/resourceGroups/rg-ops/providers/microsoft.apimanagement/service/apim-gateway", Assert.Single(gateway.Links!).Url);
+    }
 }

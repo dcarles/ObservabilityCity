@@ -218,6 +218,10 @@
               "$ref": "#/components/schemas/ResourceLink"
             },
             "nullable": true
+          },
+          "group": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false

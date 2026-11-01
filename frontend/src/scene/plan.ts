@@ -178,6 +178,70 @@ export function placeAssets(assets: readonly AssetSnapshot[], pads: Pad[], rowRo
   return out
 }
 
+export const CLUSTER_PER_ROW = 4 // buildings side by side in one hub cluster
+const CLUSTER_SIGN = 4 // room for the cluster's sign in front of its buildings
+
+/** A group of resource buildings on the hub island, with the sign that names it. Coordinates are hub-local. */
+export interface HubCluster {
+  name: string
+  /** The footprint's centre and size. */
+  x: number
+  z: number
+  w: number
+  d: number
+  /** Where the sign stands, in front of the buildings (toward the hub's centre). */
+  signX: number
+  signZ: number
+  assets: { asset: AssetSnapshot; x: number; z: number }[]
+}
+
+/** Footprint of a cluster of `n` buildings. */
+export function clusterSize(n: number): { w: number; d: number } {
+  const rows = Math.ceil(n / CLUSTER_PER_ROW)
+  return { w: Math.min(n, CLUSTER_PER_ROW) * ASSET_PITCH + 1.6, d: rows * ASSET_PITCH + CLUSTER_SIGN }
+}
+
+/** Whether two centred rectangles overlap, with `gap` of room between them. */
+export function rectsTouch(a: { x: number; z: number; w: number; d: number }, b: { x: number; z: number; w: number; d: number }, gap = 0): boolean {
+  return Math.abs(a.x - b.x) < (a.w + b.w) / 2 + gap && Math.abs(a.z - b.z) < (a.d + b.d) / 2 + gap
+}
+
+/**
+ * Where the hub island's resource buildings stand. Those of one group stand together in a cluster (in rows of `CLUSTER_PER_ROW`, ordered by id) with a sign naming the group.
+ * Each cluster is put on the first free place found by sweeping the hub: rings at 55%, 68% and 80% of its half sizes, a step of 15 degrees at a time, starting from a place
+ * that differs for each cluster. A place is free when `free` says so (on land, clear of the plaza, roads and main buildings) and no earlier cluster is there.
+ * Pure and ordered by group then id, so the same snapshot gives the same hub. A cluster that fits nowhere is left out and named in `left`.
+ */
+export function placeHubClusters(
+  assets: readonly AssetSnapshot[], hubRx: number, hubRz: number, centreZ: number, free: (rect: { x: number; z: number; w: number; d: number }) => boolean,
+): { clusters: HubCluster[]; left: string[] } {
+  const byGroup = new Map<string, AssetSnapshot[]>()
+  for (const a of assets) byGroup.set(a.group ?? '', [...(byGroup.get(a.group ?? '') ?? []), a])
+  const names = [...byGroup.keys()].sort()
+  const clusters: HubCluster[] = []
+  const left: string[] = []
+  names.forEach((name, index) => {
+    const list = byGroup.get(name)!.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+    const { w, d } = clusterSize(list.length)
+    for (const k of [0.55, 0.68, 0.8]) {
+      for (let step = 0; step < 24; step++) {
+        const angle = ((index * 7 + step) % 24) * (Math.PI / 12) + Math.PI / 24
+        const x = Math.sin(angle) * hubRx * k, z = centreZ - Math.cos(angle) * hubRz * k
+        const rect = { x, z, w, d }
+        if (!free(rect) || clusters.some((c) => rectsTouch(rect, c, 1))) continue
+        const placed = list.map((asset, i) => {
+          const row = Math.floor(i / CLUSTER_PER_ROW), inRow = Math.min(CLUSTER_PER_ROW, list.length - row * CLUSTER_PER_ROW)
+          return { asset, x: x + ((i % CLUSTER_PER_ROW) - (inRow - 1) / 2) * ASSET_PITCH, z: z - d / 2 + CLUSTER_SIGN + (row + 0.5) * ASSET_PITCH }
+        })
+        clusters.push({ name, x, z, w, d, signX: x, signZ: z - d / 2 + 1.2, assets: placed })
+        return
+      }
+    }
+    left.push(name)
+  })
+  return { clusters, left }
+}
+
 /** Distance from the spine to the outer edge of the outermost pad, which is as far as the row roads reach. */
 export function rowEdge(pads: { ring: number }[]): number {
   return COL_X + Math.max(0, ...pads.map((p) => p.ring)) * PAD_PITCH + PAD_W / 2 + 0.4

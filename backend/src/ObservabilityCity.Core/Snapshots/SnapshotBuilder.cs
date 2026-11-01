@@ -16,11 +16,11 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
     private IReadOnlyList<AssetSnapshot> AssetsOf(string groupId, Registry.Registry registry)
     {
         if (FixedAssets is { Count: > 0 })
-            return FixedAssets.Where(a => a.PillarId == groupId).Select(a => new AssetSnapshot(a.Id, a.Name, a.Label, a.Shape, a.Service, a.Region, [])).ToList();
+            return FixedAssets.Where(a => a.PillarId == groupId).Select(a => new AssetSnapshot(a.Id, a.Name, a.Label, a.Shape, a.Service, a.Region, [], a.Group)).ToList();
         if (ScopeSource is null || registry.ActiveEnvironment is not { } env || env.Scope.Assets.Count == 0) return [];
         return ScopeSource.Resolve(registry).AssetList.Where(a => a.PillarId == groupId)
             .Select(a => new AssetSnapshot(a.Id, a.Name, a.Label, a.Shape, a.Service, a.Region,
-                ObservabilityCity.Core.Scope.ScopeLinks.For(env.Scope, Environment, new Scope.ResolvedResource(a.ResourceId, a.Name, a.Type, a.Region, null, a.Rule), a.SubscriptionId, null)))
+                ObservabilityCity.Core.Scope.ScopeLinks.For(env.Scope, Environment, new Scope.ResolvedResource(a.ResourceId, a.Name, a.Type, a.Region, null, a.Rule), a.SubscriptionId, null), a.Group))
             .ToList();
     }
 

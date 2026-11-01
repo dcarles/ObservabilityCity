@@ -93,8 +93,24 @@ public sealed record ResourceRule(string Name, IReadOnlyList<string> Types, stri
 /// </summary>
 public sealed record AssetRule(string Name, string Label, string Shape, IReadOnlyList<string> Types, string Pattern)
 {
-    public static readonly string[] Shapes = ["box", "vault", "store", "settings"];
+    public static readonly string[] Shapes = ["box", "vault", "store", "settings", "observatory"];
     public static readonly string[] Groups = ["service", "pillar", "region"];
+    /// <summary>The groups a pattern may use for a building on the hub island, which belongs to no pillar and no service.</summary>
+    public static readonly string[] HubGroups = ["region"];
+
+    /// <summary>The island id of the hub, the only island other than a pillar's that a building can stand on.</summary>
+    public const string HubIsland = "hub";
+
+    /// <summary><see cref="HubIsland"/> when the building stands on the hub island, in a cluster named <see cref="Group"/>; null when it stands on the island of the pillar it is found in.</summary>
+    public string? Island { get; init; }
+
+    /// <summary>For a hub building: the cluster it stands in, shown on a sign. Null for a pillar's building.</summary>
+    public string? Group { get; init; }
+
+    /// <summary>For a hub building: which subscriptions it is looked for in (a template over the environment's variables and {environment}). Null: the pillars' subscriptions.</summary>
+    public SubscriptionRule? Subscription { get; init; }
+
+    public bool OnHub => Island == HubIsland;
 }
 
 /// <summary>

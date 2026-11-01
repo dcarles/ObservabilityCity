@@ -410,6 +410,7 @@ async function start(): Promise<void> {
     inspectRoads: () => town.inspectRoads(),
     inspectServices: (id: string) => town.inspectServices(id),
     inspectAssets: (id: string) => town.inspectAssets(id),
+    inspectHubClusters: () => town.inspectHubClusters(),
     /** Open a service's panel as a click on its sign would. */
     openService: (key: string) => { const sv = seen.last ? town.serviceSummary(key, seen.last) : null; if (sv) { inspector.close(); servicePanel.show(sv) } return sv },
     /** Open a resource building's card as a click on it would. */

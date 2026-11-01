@@ -39,13 +39,19 @@ scope:
   workspaceId: "00000000-0000-0000-0000-00000000c0de"
   subscription: { nameLike: "*-{env}-{pillar}" }
   regions: { names: { northeurope: North, westeurope: West } }
+  # the hub is not a pillar, so its subscription is named outright
+  pillars: { hub: "00000000-0000-0000-0000-0000000000a9" }
   resources:
+    - { name: gateways, types: [microsoft.apimanagement/service], roles: [gateway], pattern: '^apim-(?<service>[a-z]+)$' }
     - { name: plans, types: [microsoft.web/serverfarms], roles: [api], pattern: '^plan-cf-[^-]+-(?<pillar>[^-]+)-(?<service>[^-]+)-(?<region>[a-z]+)', instances: "coalesce(toint(properties.numberOfWorkers), toint(sku.capacity))" }
     - { name: function-apps, types: [microsoft.web/sites], roles: [function], pattern: '^app-[^-]+-(?<pillar>[^-]+)-(?<service>[^-]+)-(?<region>[a-z]+)', state: "tostring(properties.state)", running: [Running] }
   assets:
     - { name: key-vaults, label: Key vault, shape: vault, types: [microsoft.keyvault/vaults], pattern: '^kv-[^-]+-(?<pillar>[^-]+)-(?<service>[^-]+)$' }
     - { name: storage, label: Storage account, shape: store, types: [microsoft.storage/storageaccounts], pattern: '^st[a-z]{4}(?<pillar>[a-z]{2})(?<service>[a-z]{3})$' }
     - { name: app-config, label: App configuration, shape: settings, types: [microsoft.appconfiguration/configurationstores], pattern: '^appcfg-' }
+    # shared monitoring resources stand on the hub in one cluster; they are looked for in the platform subscription, not the pillars'
+    - { name: log-workspaces, island: hub, group: Monitoring, subscription: { nameLike: "*-{env}-platform" }, label: Log workspace, shape: observatory, types: [microsoft.operationalinsights/workspaces], pattern: '^law-' }
+    - { name: app-insights, island: hub, group: Monitoring, subscription: { nameLike: "*-{env}-platform" }, label: Application Insights, shape: observatory, types: [microsoft.insights/components], pattern: '^appi-' }
   links:
     - { name: Cloud portal, url: "https://portal.example.test/#resource{resourceId}" }
 signals: { requests: telemetry, instances: inventory, cpu: platform, memory: platform, jobs: jobs }
