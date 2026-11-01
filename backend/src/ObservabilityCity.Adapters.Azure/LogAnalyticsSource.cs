@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using ObservabilityCity.Contracts;
 using ObservabilityCity.Core.Links;
+using ObservabilityCity.Core.Logs;
 using ObservabilityCity.Core.Registry;
 using ObservabilityCity.Core.Scope;
 using ObservabilityCity.Core.Sources;
@@ -40,6 +41,57 @@ public sealed class LogAnalyticsReader(HttpClient http, ICredentialSource? crede
     /// <summary>The job rows of the function job query over the last <paramref name="window"/>.</summary>
     public async Task<IReadOnlyList<RegionRow>> QueryRegionsAsync(string workspace, string query, TimeSpan window, CancellationToken ct) =>
         ParseRegions(await SendAsync(workspace, query, System.Xml.XmlConvert.ToString(window), ct));
+
+    /// <summary>The rows of the logs query over [from, to).</summary>
+    public async Task<IReadOnlyList<LogRow>> QueryLogsAsync(string workspace, string query, DateTimeOffset from, DateTimeOffset to, CancellationToken ct) =>
+        ParseLogs(await SendAsync(workspace, query, $"{LinkQuery.Iso(from)}/{LinkQuery.Iso(to)}", ct));
+
+    /// <summary>
+    /// The rows of the logs query: <c>section</c>, <c>at</c> and <c>text</c>; <c>count</c> (default 1), <c>level</c> (a word like warn or error, or a number where
+    /// 2 is a warning and 3 and above an error), <c>operationId</c>, <c>durationMs</c> and <c>result</c> may be left out. A row without a section, a time or text
+    /// says nothing and is skipped.
+    /// </summary>
+    public static IReadOnlyList<LogRow> ParseLogs(string json)
+    {
+        using var doc = JsonDocument.Parse(json);
+        if (!doc.RootElement.TryGetProperty("tables", out var tables) || tables.ValueKind != JsonValueKind.Array || tables.GetArrayLength() == 0)
+            throw new InvalidOperationException("the answer has no table; was the query a query that returns rows?");
+        var table = tables[0];
+        var names = table.GetProperty("columns").EnumerateArray().Select(c => c.GetProperty("name").GetString() ?? "").ToList();
+        int Index(string column) => names.FindIndex(n => n.Equals(column, StringComparison.OrdinalIgnoreCase));
+        var (section, at, text, count, level, operation, duration, result) =
+            (Index("section"), Index("at"), Index("text"), Index("count"), Index("level"), Index("operationId"), Index("durationMs"), Index("result"));
+        if (section < 0 || at < 0 || text < 0)
+            throw new InvalidOperationException($"the logs query must return the columns section, at and text (count, level, operationId, durationMs and result may be left out); it returned {string.Join(", ", names)}");
+        string? Plain(JsonElement row, int index) => index < 0 ? null : row[index].ValueKind switch
+        {
+            JsonValueKind.String when row[index].GetString() is { Length: > 0 } t => t,
+            JsonValueKind.Number => row[index].GetRawText(),
+            _ => null,
+        };
+        var rows = new List<LogRow>();
+        foreach (var row in table.GetProperty("rows").EnumerateArray())
+        {
+            if (Text(row[section]) is not { Length: > 0 } kind || Text(row[text]) is not { Length: > 0 } what) continue;
+            if (Text(row[at]) is not { Length: > 0 } when || !DateTimeOffset.TryParse(when, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var time)) continue;
+            var n = count < 0 ? 1 : Number(row, count) is { } c ? (int)Math.Clamp(Math.Round(c), 1, int.MaxValue) : 1;
+            rows.Add(new LogRow(kind.Trim().ToLowerInvariant(), time, what, n, Level(Plain(row, level)), Plain(row, operation), duration < 0 ? null : Number(row, duration), Plain(row, result)));
+        }
+        return rows;
+    }
+
+    private static LogLevel? Level(string? text)
+    {
+        if (text is null) return null;
+        if (int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var n)) return n >= 3 ? LogLevel.Error : n == 2 ? LogLevel.Warn : LogLevel.Info;
+        return text.Trim().ToLowerInvariant() switch
+        {
+            "error" or "err" or "critical" or "fatal" => LogLevel.Error,
+            "warn" or "warning" => LogLevel.Warn,
+            "info" or "information" or "verbose" or "debug" or "trace" => LogLevel.Info,
+            _ => null,
+        };
+    }
 
     public static readonly string[] RegionColumns = ["role", "region", "calls"];
 
@@ -205,9 +257,20 @@ public sealed record SpanRow(string Role, double Calls, double Errors, double? L
 /// <c>file:name.json</c> replays a recorded answer kept beside the town's files, for trying a query's shape offline and for tests.
 /// </summary>
 public sealed class LogAnalyticsSource(
-    string name, string environmentId, RegistrySource definition, LogAnalyticsReader reader, ScopeStore store, ScopeRules rules, string? recording, TimeProvider time) : IMetricSource, IDependencySource, IRateHistory
+    string name, string environmentId, RegistrySource definition, LogAnalyticsReader reader, ScopeStore store, ScopeRules rules, string? recording, TimeProvider time) : IMetricSource, IDependencySource, IRateHistory, ILogRowSource
 {
     public bool CanReadDependencies => recording is null;
+
+    /// <summary>A recorded answer for the logs query is kept beside the recording, as <c>name.logs.json</c>; without it a recording has no logs to read.</summary>
+    public bool CanReadLogs => recording is null || File.Exists(Path.ChangeExtension(recording, ".logs.json"));
+
+    public async Task<IReadOnlyList<LogRow>> ReadLogsAsync(TownRegistry registry, string query, DateTimeOffset from, DateTimeOffset to, CancellationToken ct)
+    {
+        if (recording is not null)
+            return LogAnalyticsReader.ParseLogs(await File.ReadAllTextAsync(Path.ChangeExtension(recording, ".logs.json"), ct));
+        var workspace = Workspace(store.Resolve(registry.ForEnvironment(environmentId)));
+        return await reader.QueryLogsAsync(workspace, query, from, to, ct);
+    }
 
     public async Task<IReadOnlyList<DependencyRow>> ReadDependenciesAsync(TownRegistry registry, string query, IReadOnlyCollection<string> roles, DateTimeOffset from, DateTimeOffset to, CancellationToken ct)
     {

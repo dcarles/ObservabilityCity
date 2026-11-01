@@ -170,10 +170,12 @@ public class TownModeTests
         Assert.Empty(s.Groups.SelectMany(g => g.Incidents));
         var expected = DateTimeOffset.Now.TimeOfDay.TotalDays;
         Assert.InRange(Math.Abs(s.DayFraction - expected), 0, 0.01);
-        // the inspector's logs answer with no lines instead of failing
+        // the inspector's logs say the environment has none set up, instead of failing or showing empty sections
         var node = s.Groups.SelectMany(g => g.Nodes).First();
         var logs = await client.GetAsync($"/api/systems/{node.Id}/logs");
         Assert.Equal(HttpStatusCode.OK, logs.StatusCode);
-        Assert.Empty((await logs.Content.ReadFromJsonAsync<LogLine[]>(Json))!);
+        var answer = (await logs.Content.ReadFromJsonAsync<SystemLogs>(Json))!;
+        Assert.False(answer.Configured);
+        Assert.Empty(answer.Sections);
     }
 }

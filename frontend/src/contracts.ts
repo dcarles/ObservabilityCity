@@ -179,13 +179,24 @@ export interface components {
             found: boolean;
             lastSeen?: string | null;
         };
-        /** @enum {string} */
-        LogLevel: "Info" | "Warn" | "Error";
-        LogLine: {
+        LogGroup: {
             /** Format: date-time */
             at: string;
-            level: components["schemas"]["LogLevel"];
-            message: string;
+            level?: components["schemas"]["LogLevel"];
+            text: string;
+            /** Format: int32 */
+            count: number;
+            operationId?: string | null;
+            /** Format: double */
+            durationMs?: number | null;
+            result?: string | null;
+            links?: components["schemas"]["ResourceLink"][] | null;
+        };
+        /** @enum {string} */
+        LogLevel: "Info" | "Warn" | "Error";
+        LogSection: {
+            id: string;
+            groups: components["schemas"]["LogGroup"][];
         };
         MessagingSnapshot: {
             topics: components["schemas"]["TopicSnapshot"][];
@@ -366,6 +377,15 @@ export interface components {
             subscriptions: components["schemas"]["SubscriptionSnapshot"][];
             scope?: components["schemas"]["ScopeInfo"];
         };
+        SystemLogs: {
+            /** Format: date-time */
+            at: string;
+            configured: boolean;
+            window: string;
+            /** Format: double */
+            slowOverMs: number;
+            sections: components["schemas"]["LogSection"][];
+        };
         TenantInfo: {
             id: string;
             name: string;
@@ -528,7 +548,6 @@ export interface operations {
         parameters: {
             query?: {
                 env?: string;
-                limit?: number;
             };
             header?: never;
             path: {
@@ -544,7 +563,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["LogLine"][];
+                    "application/json": components["schemas"]["SystemLogs"];
                 };
             };
         };

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { ago, clockTime, configOrder, filterLogs, incidentSummary, linkSections, originLabel, isWebAddress, overviewLinks, overviewRows, reasons, resourceLinks, scopeView, stateTone } from '../../src/inspectorModel'
-import type { ConfigValue, LogLine, ScopeInfo, ScopeResource, SystemDetail, NodeSnapshot, Snapshot } from '../../src/types'
+import { ago, clockTime, configOrder, groupDetail, incidentSummary, linkSections, logSectionEmpty, logSectionTitle, originLabel, isWebAddress, overviewLinks, overviewRows, reasons, repeatLabel, resourceLinks, scopeView, stateTone, traceLinks } from '../../src/inspectorModel'
+import type { ConfigValue, LogGroup, LogSection, ScopeInfo, ScopeResource, SystemDetail, NodeSnapshot, Snapshot } from '../../src/types'
 
 const bad = JSON.parse(readFileSync(resolve(__dirname, '../../../shared-test-data/snapshots/bad-day.json'), 'utf8')) as Snapshot
 const all = bad.groups.flatMap((g) => g.nodes)
@@ -111,16 +111,41 @@ describe('words for states and incidents', () => {
   })
 })
 
-describe('log lines', () => {
-  const at = '2026-10-26T12:00:00Z'
-  const lines: LogLine[] = [
-    { at, level: 'Info', message: 'a' }, { at, level: 'Warn', message: 'b' }, { at, level: 'Error', message: 'c' }, { at, level: 'Info', message: 'd' },
-  ]
+describe('the Logs tab', () => {
+  const group = (over: Partial<LogGroup> = {}): LogGroup => ({ at: '2026-11-01T12:00:00Z', text: 'GET /a', count: 1, ...over })
+  const section = (id: string, groups: LogGroup[] = []): LogSection => ({ id, groups })
 
-  it('can be narrowed to warnings and errors, or errors only', () => {
-    expect(filterLogs(lines, 'all').map((l) => l.message)).toEqual(['a', 'b', 'c', 'd'])
-    expect(filterLogs(lines, 'warn').map((l) => l.message)).toEqual(['b', 'c'])
-    expect(filterLogs(lines, 'error').map((l) => l.message)).toEqual(['c'])
+  it('names its four sections, and the slow one names the line it is measured against', () => {
+    expect(logSectionTitle(section('failed'), 800)).toBe('5xx requests')
+    expect(logSectionTitle(section('logs'), 800)).toBe('Warnings and errors')
+    expect(logSectionTitle(section('exceptions'), 800)).toBe('Exceptions')
+    expect(logSectionTitle(section('slow'), 800)).toBe('Slow requests (over 800 ms)')
+    expect(logSectionTitle(section('other'), 800)).toBe('other')
+  })
+
+  it('says what an empty section is empty of, over the window the server used', () => {
+    expect(logSectionEmpty(section('failed'), '4h')).toBe('No 5xx requests in the last 4h.')
+    expect(logSectionEmpty(section('slow'), '30m')).toBe('No slow requests in the last 30m.')
+    expect(logSectionEmpty(section('logs'), '4h')).toBe('No warnings or errors in the last 4h.')
+    expect(logSectionEmpty(section('exceptions'), '4h')).toBe('No exceptions in the last 4h.')
+  })
+
+  it('shows a repeat as a count and nothing for a single entry', () => {
+    expect(repeatLabel(group({ count: 1 }))).toBe('')
+    expect(repeatLabel(group({ count: 12 }))).toBe('×12')
+  })
+
+  it('adds the status and the time the newest request took, when it has them', () => {
+    expect(groupDetail(group())).toBe('')
+    expect(groupDetail(group({ result: '500' }))).toBe('500')
+    expect(groupDetail(group({ result: '500', durationMs: 812 }))).toContain('500 · ')
+    expect(groupDetail(group({ durationMs: 812 }))).not.toContain('·')
+  })
+
+  it('draws a trace link only when it is a web address, whatever the server sent', () => {
+    const links = [{ name: 'Trace', url: 'https://tracing.example.test/trace/1' }, { name: 'Bad', url: 'javascript:alert(1)' }, { name: '', url: 'https://x.example.test' }]
+    expect(traceLinks(group({ links })).map((l) => l.name)).toEqual(['Trace'])
+    expect(traceLinks(group())).toEqual([])
   })
 })
 

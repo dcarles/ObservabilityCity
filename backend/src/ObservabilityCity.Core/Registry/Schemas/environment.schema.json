@@ -124,6 +124,30 @@
         }
       }
     },
+    "logs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "query"],
+      "description": "What a system's Logs tab shows in a live town: 5xx requests, slow requests, warnings and errors, and exceptions, as four separate sections. Nothing is polled; the query runs only when the tab is opened and its answer is not kept. Without this block the tab says logs are not set up.",
+      "properties": {
+        "source": { "type": "string", "description": "The loganalytics source (from sources) whose workspace and login are used." },
+        "query": { "type": "string", "description": "The query, a template. {roles} stands for the system's telemetry name (double-quoted), {from} and {to} for the UTC bounds (ISO 8601), {window}, {windowSeconds}, {slaMs} (the system's p99 SLA) and {kind} (api, worker and so on); scope variables and {environment} work too. It returns one row for each kind of entry with the columns section (failed, slow, logs or exceptions), at and text; count, level, operationId, durationMs and result may be left out." },
+        "window": { "type": "string", "pattern": "^[0-9]+(\\.[0-9]+)?[smhd]$", "description": "How far back it looks. Default 4h." },
+        "traceLinks": {
+          "type": "array",
+          "description": "Addresses that open one request's full trace somewhere else, 0 to n.",
+          "items": {
+            "type": "object",
+            "required": ["name", "url"],
+            "additionalProperties": false,
+            "properties": {
+              "name": { "type": "string", "description": "The words on the link, for example Trace." },
+              "url": { "type": "string", "pattern": "^https?://", "description": "A template that starts with https:// (or http://) written out. Holes: {operationId}, {role}, {time}, {environment} and your variables. Values are percent-encoded." }
+            }
+          }
+        }
+      }
+    },
     "links": {
       "type": "object",
       "additionalProperties": false,

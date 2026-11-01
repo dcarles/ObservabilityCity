@@ -164,6 +164,9 @@ button.chip.clickable:focus-visible { outline: 2px solid var(--accent); }
 #inspector .log { display: flex; gap: 8px; padding: 2px 0; border-bottom: 1px solid rgba(29, 42, 58, 0.06); }
 #inspector .log time { opacity: 0.55; flex: none; }
 #inspector .log.warn span { color: #b3541e; } #inspector .log.error span { color: #c0392b; }
+#inspector .log span { min-width: 0; overflow-wrap: anywhere; }
+#inspector .log i.detail { font-style: normal; opacity: 0.6; }
+#inspector .log b.count { font-weight: 600; opacity: 0.8; }
 #inspector .cfg-row { display: grid; grid-template-columns: 1.2fr 1fr auto; gap: 8px; padding: 3px 0; border-bottom: 1px solid rgba(29, 42, 58, 0.06); align-items: baseline; }
 /* A resource row has a long unbreakable name and a long type: the name takes a line of its own and may break anywhere, the tenant, region and type share the next, so nothing is squeezed to a letter wide. */
 #inspector .cfg-row.res { grid-template-columns: minmax(0, 1fr) auto; }

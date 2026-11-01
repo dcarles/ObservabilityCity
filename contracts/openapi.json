@@ -145,14 +145,6 @@
             "schema": {
               "type": "string"
             }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
           }
         ],
         "responses": {
@@ -161,10 +153,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/LogLine"
-                  }
+                  "$ref": "#/components/schemas/SystemLogs"
                 }
               }
             }
@@ -533,19 +522,11 @@
         },
         "additionalProperties": false
       },
-      "LogLevel": {
-        "enum": [
-          "Info",
-          "Warn",
-          "Error"
-        ],
-        "type": "string"
-      },
-      "LogLine": {
+      "LogGroup": {
         "required": [
           "at",
-          "level",
-          "message"
+          "count",
+          "text"
         ],
         "type": "object",
         "properties": {
@@ -556,8 +537,59 @@
           "level": {
             "$ref": "#/components/schemas/LogLevel"
           },
-          "message": {
+          "text": {
             "type": "string"
+          },
+          "count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "operationId": {
+            "type": "string",
+            "nullable": true
+          },
+          "durationMs": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "result": {
+            "type": "string",
+            "nullable": true
+          },
+          "links": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ResourceLink"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "LogLevel": {
+        "enum": [
+          "Info",
+          "Warn",
+          "Error"
+        ],
+        "type": "string"
+      },
+      "LogSection": {
+        "required": [
+          "groups",
+          "id"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LogGroup"
+            }
           }
         },
         "additionalProperties": false
@@ -1251,6 +1283,39 @@
           },
           "scope": {
             "$ref": "#/components/schemas/ScopeInfo"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SystemLogs": {
+        "required": [
+          "at",
+          "configured",
+          "sections",
+          "slowOverMs",
+          "window"
+        ],
+        "type": "object",
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "configured": {
+            "type": "boolean"
+          },
+          "window": {
+            "type": "string"
+          },
+          "slowOverMs": {
+            "type": "number",
+            "format": "double"
+          },
+          "sections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LogSection"
+            }
           }
         },
         "additionalProperties": false

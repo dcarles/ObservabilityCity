@@ -62,6 +62,19 @@ test.describe('a live town', () => {
     await expect(page.locator('#topbar [data-list="Stale"] b')).toHaveText('0')
   })
 
+  test('the Logs tab says logs are not set up, instead of showing four empty sections', async ({ page, request }) => {
+    const first = (await (await request.get(`${API}/api/snapshot/latest`)).json()).groups[0].nodes[0]
+    const logs = await (await request.get(`${API}/api/systems/${first.id}/logs`)).json()
+    expect(logs.configured).toBe(false)
+    expect(logs.sections).toEqual([])
+    await open(page)
+    await page.locator('#search-input').fill(first.name)
+    await page.locator('#search-results .hit').first().click()
+    await page.locator('#inspector [data-tab="logs"]').click()
+    await expect(page.locator('#inspector [data-logs="unconfigured"]')).toContainText('not set up')
+    await expect(page.locator('#inspector h4[data-section]')).toHaveCount(0)
+  })
+
   test('the inspector says there is no source instead of listing numbers', async ({ page }) => {
     await open(page)
     await page.evaluate(() => (window as any).city.inspect('aa.orders-api'))

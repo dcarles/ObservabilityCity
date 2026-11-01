@@ -308,6 +308,19 @@ The callers' calls are counted over the whole `shareWindow`, so the town compare
 - Below `minCalls` observed calls to an API the share is too noisy: the last good share stands and the inspector marks it "estimated". There is no setting for a share; every number is measured.
 - Without a `traffic` block nothing is measured: each API's rate is shared evenly between the systems that declare a call to it (and the outside, when it is marked `external` or an outside caller reaches it).
 
+### Logs tab: failed and slow requests, warnings, exceptions
+
+A system's inspector has a Logs tab. In a live town it is empty of everything until you write a `logs:` block in the environment file (see `logs` in [config-reference.md](config-reference.md)); without it the tab says logs are not set up. With it, opening the tab sends one query for that system's telemetry name over the last `window` (4 hours by default) to the `loganalytics` source you name. Nothing is polled, nothing is stored, and the tab never changes a building's colour: health comes from your unsampled metrics.
+
+The query is yours (which table, which columns, which status counts as a failure). It returns one row for each kind of entry, already grouped by Azure, with a `section` column saying which of four lists it belongs to:
+
+- `failed`: requests that answered with a 5xx.
+- `slow`: requests over the system's own latency line, passed to the query as `{slaMs}` (the `slaP99Ms` of the defaults cascade).
+- `logs`: warnings and errors, including start-up.
+- `exceptions`: exceptions.
+
+Repeats come back as one row with a `count`, and the tab shows them newest first. A worker (or anything that does not answer requests) is shown only `logs` and `exceptions`. `traceLinks` are named address templates (`{operationId}`, `{role}`, `{time}`); each entry that has an `operationId` gets the links, so one click opens the full trace in whatever tool you use. If you later move to another tracing or logging store, only the adapter behind the source changes.
+
 ### Function apps and regions
 
 A system with role `function` (`cron` still works as an alias) stands as a function building. Three things in the environment file make it say more:

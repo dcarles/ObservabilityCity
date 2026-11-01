@@ -60,3 +60,13 @@ links:
     - { host: '^(?<service>[a-z]+)-(?<role>api|worker)\.(?<pillar>[a-z]+)\.a\.example\.test$', target: '{pillar}.{service}-{role}' }
     - { host: '^gw\.a\.example\.test$', path: '^/(?<pillar>[a-z]+)/(?<service>[a-z]+)/(?<role>api|worker)', target: '{pillar}.{service}-{role}', gateway: true }
   aliases: { al: aa, be: bb }
+# what the Logs tab reads when it is opened; the recording beside the telemetry recording (telemetry.logs.json) stands in for the answer
+logs:
+  source: telemetry
+  window: 4h
+  query: |
+    AppRequests
+    | where TimeGenerated between (datetime({from}) .. datetime({to})) and AppRoleName in ({roles})
+    | where duration > {slaMs}
+  traceLinks:
+    - { name: Trace, url: "https://tracing.example.test/{environment}/trace/{operationId}" }

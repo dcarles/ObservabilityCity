@@ -73,3 +73,67 @@ test.describe('a live town that finds links in its dependency data', () => {
     expect(snapshot.notices.some((n: string) => n.includes('/zz/'))).toBe(false)
   })
 })
+
+// The Logs tab of a live town. The recording beside the telemetry recording (telemetry.logs.json) stands in for the answer to the logs query, which is only
+// asked when the tab is opened. Its rows are grouped by the query already; the town groups repeats of the same text and result, and keeps four sections.
+test.describe('the Logs tab of a live town', () => {
+  async function openLogs(page: Page, name: string): Promise<void> {
+    await page.goto('/?test=1&quality=low')
+    await page.waitForFunction(() => (window as any).city?.seen.snapshots > 0)
+    await page.locator('#search-input').fill(name)
+    await page.locator('#search-results .hit').first().click()
+    await page.locator('#inspector [data-tab="logs"]').click()
+  }
+
+  test('an API has four separate sections, repeats grouped with a count and each request linking to its trace', async ({ page }) => {
+    await openLogs(page, 'Orders API')
+    const sections = page.locator('#inspector h4[data-section]')
+    await expect(sections).toHaveText(['5xx requests', /^Slow requests \(over/, 'Warnings and errors', 'Exceptions'])
+    // the two 500 groups of the same request are one line with the count added up, the newest operation behind its link
+    const merged = page.locator('#inspector .log', { hasText: 'GET /api/orders' })
+    await expect(merged).toHaveCount(1)
+    await expect(merged).toContainText('×7')
+    await expect(merged).toContainText('500')
+    await expect(merged.locator('a.out')).toHaveAttribute('href', 'https://tracing.example.test/prod/trace/op-new')
+    await expect(page.locator('#inspector .log', { hasText: 'POST /api/orders' })).toContainText('503')
+    await expect(page.locator('#inspector .log', { hasText: 'GET /api/statements' })).toContainText('×7')
+    // an entry with no operation has no link, and warnings and errors keep their colours
+    const warn = page.locator('#inspector .log.warn', { hasText: 'Cache is cold' })
+    await expect(warn).toContainText('×2')
+    await expect(warn.locator('a.out')).toHaveCount(0)
+    await expect(page.locator('#inspector .log.error', { hasText: 'Connection to the store was reset' }).locator('a.out')).toHaveCount(1)
+    await expect(page.locator('#inspector .log', { hasText: 'TimeoutException' })).toContainText('×9')
+  })
+
+  test('a worker keeps only the warnings, errors and exceptions', async ({ page }) => {
+    await openLogs(page, 'Orders worker')
+    await expect(page.locator('#inspector h4[data-section]')).toHaveText(['Warnings and errors', 'Exceptions'])
+    await expect(page.locator('#inspector .log', { hasText: 'GET /api/orders' })).toHaveCount(0)
+  })
+
+  test('a system with no telemetry name has no logs, and Refresh asks again', async ({ page }) => {
+    await openLogs(page, 'Orders DB')
+    await expect(page.locator('#inspector')).toContainText('no telemetry name')
+    await expect(page.locator('#inspector h4[data-section]')).toHaveCount(0)
+    const asked: string[] = []
+    page.on('request', (r) => { if (r.url().includes('/logs')) asked.push(r.url()) })
+    await page.locator('#inspector [data-refresh-logs]').click()
+    await expect.poll(() => asked.length).toBe(1)
+  })
+
+  test('the tab asks once when it opens and is not polled', async ({ page }) => {
+    const asked: string[] = []
+    page.on('request', (r) => { if (r.url().includes('/logs')) asked.push(r.url()) })
+    await openLogs(page, 'Orders API')
+    await expect(page.locator('#inspector h4[data-section]').first()).toBeVisible()
+    await page.waitForTimeout(3500)
+    expect(asked).toHaveLength(1)
+  })
+
+  test('the endpoint answers the same sections', async ({ request }) => {
+    const logs = await (await request.get(`${API}/api/systems/aa.orders-api/logs`)).json()
+    expect(logs.configured).toBe(true)
+    expect(logs.window).toBe('4h')
+    expect(logs.sections.map((s: any) => s.id)).toEqual(['failed', 'slow', 'logs', 'exceptions'])
+  })
+})

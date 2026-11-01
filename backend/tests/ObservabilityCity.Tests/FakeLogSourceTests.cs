@@ -7,9 +7,10 @@ using ObservabilityCity.Core.Sources;
 namespace ObservabilityCity.Tests;
 
 /// <summary>
-/// Slice 5: the inspector's Logs tab. The fake source makes up lines that fit what it is doing to the system: errors in proportion to the error rate,
-/// slow-request warnings over the SLA, throttling on a store that turns requests away, dead letters on a consumer. Lines are newest first, steady from
-/// one read to the next, and a system with no fresh data has none.
+/// The inspector's Logs tab in a demo town. The fake source makes up entries that fit what it is doing to the system: 5xx requests in proportion to the
+/// error rate, slow requests over the SLA, throttling on a store that turns requests away, dead letters on a consumer, and the exceptions behind the
+/// errors. They come in the same four sections as a live town's, grouped with a count and newest first, steady from one read to the next, and a system
+/// with no fresh data has none.
 /// </summary>
 public class FakeLogSourceTests
 {
@@ -38,85 +39,64 @@ public class FakeLogSourceTests
             }
         }
 
-        public IReadOnlyList<LogLine> Lines(string id, int limit = 60) =>
-            Logs.Recent(Registry.AllNodes.Concat(Registry.Vendors.Select(v => v.Node)).Single(n => n.Id == id), limit);
+        public SystemLogs Logs_(string id) =>
+            Logs.Recent(Registry.AllNodes.Concat(Registry.Vendors.Select(v => v.Node)).Single(n => n.Id == id));
+
+        public IReadOnlyList<LogGroup> Section(string id, string section) => Logs_(id).Sections.Single(s => s.Id == section).Groups;
     }
 
     [Fact]
-    public async Task A_healthy_system_logs_ordinary_lines_newest_first()
+    public async Task A_healthy_system_has_the_sections_and_next_to_nothing_in_them()
     {
         var rig = new Rig();
         await rig.Run();
 
-        var lines = rig.Lines("aa.orders-api");
+        var logs = rig.Logs_("aa.orders-api");
 
-        Assert.Equal(60, lines.Count);
-        Assert.True(lines.Count(l => l.Level == LogLevel.Info) >= 50, "a healthy system's log is nearly all ordinary lines");
-        Assert.Equal(lines.OrderByDescending(l => l.At).Select(l => l.At), lines.Select(l => l.At));
-        Assert.Contains(lines, l => l.Message.Contains("/api/orders/"));
-        Assert.All(lines, l => Assert.True(l.At <= rig.Clock.GetUtcNow()));
+        Assert.True(logs.Configured);
+        Assert.Equal(["failed", "slow", "logs", "exceptions"], logs.Sections.Select(s => s.Id));
+        Assert.All(logs.Sections, s => Assert.InRange(s.Groups.Sum(g => g.Count), 0, FakeLogSource.Steps / 10));
     }
 
     [Fact]
-    public async Task The_same_moment_gives_the_same_lines()
-    {
-        var rig = new Rig();
-        await rig.Run();
-
-        Assert.Equal(rig.Lines("aa.orders-api"), rig.Lines("aa.orders-api"));
-        Assert.NotEqual(rig.Lines("aa.orders-api").Select(l => l.Message), rig.Lines("bb.ledger-api").Select(l => l.Message));
-    }
-
-    [Fact]
-    public async Task A_line_keeps_its_text_and_time_while_newer_lines_arrive_above_it()
-    {
-        var rig = new Rig();
-        await rig.Run();
-        var before = rig.Lines("aa.orders-api", 20);
-
-        rig.Clock.Advance(TimeSpan.FromSeconds(3));
-        rig.State.Update(await rig.Fake.PollAsync(rig.Registry, default));
-        var after = rig.Lines("aa.orders-api", 20);
-
-        Assert.Equal(before.Take(19), after.Skip(1).Take(19));
-    }
-
-    [Fact]
-    public async Task The_limit_is_respected_and_capped()
-    {
-        var rig = new Rig();
-        await rig.Run();
-
-        Assert.Equal(5, rig.Lines("aa.orders-api", 5).Count);
-        Assert.Empty(rig.Lines("aa.orders-api", 0));
-        Assert.Equal(FakeLogSource.MaxLines, rig.Lines("aa.orders-api", 5000).Count);
-    }
-
-    [Fact]
-    public async Task Errors_show_up_as_error_lines()
+    public async Task The_same_moment_gives_the_same_entries()
     {
         var rig = new Rig();
         rig.Fake.Add("aa.orders-api", FakeEffectKind.Errors, 0.6);
         await rig.Run();
 
-        var lines = rig.Lines("aa.orders-api");
-
-        Assert.True(lines.Count(l => l.Level == LogLevel.Error) >= 10, "most of the lines should be errors");
-        Assert.Contains(lines, l => l.Level == LogLevel.Error && l.Message.Contains(" 500 "));
+        Assert.Equal(rig.Logs_("aa.orders-api").Sections.Select(s => s.Groups), rig.Logs_("aa.orders-api").Sections.Select(s => s.Groups));
     }
 
     [Fact]
-    public async Task A_slow_system_logs_slow_request_warnings_with_its_sla()
+    public async Task Errors_show_up_as_500_requests_grouped_with_a_count_and_their_exceptions()
+    {
+        var rig = new Rig();
+        rig.Fake.Add("aa.orders-api", FakeEffectKind.Errors, 0.6);
+        await rig.Run();
+
+        var failed = rig.Section("aa.orders-api", "failed");
+
+        Assert.NotEmpty(failed);
+        Assert.All(failed, g => Assert.Equal("500", g.Result));
+        Assert.True(failed.Sum(g => g.Count) >= 10, "most moments should leave a failed request");
+        Assert.True(failed.Count < failed.Sum(g => g.Count), "repeats are one group with a count");
+        Assert.Equal(failed.OrderByDescending(g => g.At).Select(g => g.At), failed.Select(g => g.At));
+        Assert.NotEmpty(rig.Section("aa.orders-api", "exceptions"));
+        Assert.All(failed, g => Assert.NotNull(g.OperationId));
+    }
+
+    [Fact]
+    public async Task A_slow_system_has_slow_requests_and_the_sla_they_are_measured_against()
     {
         var rig = new Rig();
         rig.Fake.Add("aa.orders-api", FakeEffectKind.Latency, 1);
         await rig.Run();
 
-        var lines = rig.Lines("aa.orders-api", 100);
+        var logs = rig.Logs_("aa.orders-api");
 
-        var warn = lines.Where(l => l.Level == LogLevel.Warn).ToList();
-        Assert.NotEmpty(warn);
-        Assert.All(warn, l => Assert.Contains("SLA", l.Message));
+        Assert.NotEmpty(logs.Sections.Single(s => s.Id == "slow").Groups);
+        Assert.Equal(rig.Registry.AllNodes.Single(n => n.Id == "aa.orders-api").SlaP99Ms, logs.SlowOverMs);
     }
 
     [Fact]
@@ -126,10 +106,19 @@ public class FakeLogSourceTests
         rig.Fake.Add("aa.orders-api", FakeEffectKind.Down, 1);
         await rig.Run();
 
-        var lines = rig.Lines("aa.orders-api");
+        var logs = rig.Section("aa.orders-api", "logs");
 
-        Assert.NotEmpty(lines);
-        Assert.All(lines, l => Assert.Equal(LogLevel.Error, l.Level));
+        Assert.NotEmpty(logs);
+        Assert.All(logs, g => Assert.Equal(LogLevel.Error, g.Level));
+    }
+
+    [Fact]
+    public async Task A_worker_has_only_the_logs_and_exceptions_sections()
+    {
+        var rig = new Rig();
+        await rig.Run();
+
+        Assert.Equal(["logs", "exceptions"], rig.Logs_("aa.orders-worker").Sections.Select(s => s.Id));
     }
 
     [Fact]
@@ -139,9 +128,7 @@ public class FakeLogSourceTests
         rig.Fake.Add("aa.orders-worker", FakeEffectKind.Poison, 1);
         await rig.Run(8);
 
-        var lines = rig.Lines("aa.orders-worker", 100);
-
-        Assert.Contains(lines, l => l.Level == LogLevel.Warn && l.Message.Contains("dead-letter"));
+        Assert.Contains(rig.Section("aa.orders-worker", "logs"), g => g.Level == LogLevel.Warn && g.Text.Contains("dead-letter"));
     }
 
     [Fact]
@@ -151,42 +138,43 @@ public class FakeLogSourceTests
         rig.Fake.Add("aa.orders-db#acme", FakeEffectKind.Saturate, 1);
         await rig.Run();
 
-        var lines = rig.Lines("aa.orders-db", 100);
+        var throttled = rig.Section("aa.orders-db", "logs").Where(g => g.Text.Contains("429")).ToList();
 
-        var throttled = lines.Where(l => l.Message.Contains("429")).ToList();
         Assert.NotEmpty(throttled);
-        Assert.Contains(throttled, l => l.Message.StartsWith("merchant-acme-db: "));
+        Assert.Contains(throttled, g => g.Text.StartsWith("merchant-acme-db: "));
     }
 
     [Fact]
-    public async Task A_system_with_no_fresh_data_has_no_logs()
+    public async Task A_system_with_no_fresh_data_has_empty_sections()
     {
         var rig = new Rig();
+        rig.Fake.Add("aa.orders-api", FakeEffectKind.Errors, 0.6);
         await rig.Run();
-        Assert.NotEmpty(rig.Lines("aa.orders-api"));
+        Assert.NotEmpty(rig.Section("aa.orders-api", "failed"));
 
         rig.Clock.Advance(TimeSpan.FromSeconds(10)); // nothing polls: the reading is older than the stale limit
 
-        Assert.Empty(rig.Lines("aa.orders-api"));
+        Assert.All(rig.Logs_("aa.orders-api").Sections, s => Assert.Empty(s.Groups));
     }
 
     [Fact]
-    public void A_system_never_heard_from_has_no_logs()
+    public void A_system_never_heard_from_has_empty_sections()
     {
         var rig = new Rig();
 
-        Assert.Empty(rig.Lines("aa.orders-api"));
+        Assert.All(rig.Logs_("aa.orders-api").Sections, s => Assert.Empty(s.Groups));
     }
 
     [Fact]
-    public async Task The_async_call_reads_the_same_lines()
+    public async Task The_async_call_reads_the_same_entries()
     {
         var rig = new Rig();
+        rig.Fake.Add("aa.orders-api", FakeEffectKind.Errors, 0.6);
         await rig.Run();
         var node = rig.Registry.AllNodes.Single(n => n.Id == "aa.orders-api");
 
-        var viaInterface = await ((ILogSource)rig.Logs).RecentAsync(node, 10, default);
+        var viaInterface = await ((ILogSource)rig.Logs).RecentAsync(node, default);
 
-        Assert.Equal(rig.Lines("aa.orders-api", 10), viaInterface);
+        Assert.Equal(rig.Logs_("aa.orders-api").Sections.Select(s => s.Groups), viaInterface.Sections.Select(s => s.Groups));
     }
 }
