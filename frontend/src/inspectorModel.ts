@@ -147,6 +147,24 @@ export function logSectionTitle(section: LogSection, slowOverMs: number): string
   return section.id === 'slow' ? `${title} (over ${formatMs(slowOverMs)})` : title
 }
 
+/** The text of a section's tab: its short title and how many entries it holds. The slow section's SLA line goes in the tab's tooltip, see logSectionTitle. */
+export function logTabLabel(section: LogSection): string {
+  return `${LOG_TAB_TITLE[section.id] ?? section.id} ${section.groups.length}`
+}
+
+const LOG_TAB_TITLE: Record<string, string> = { failed: '5xx', slow: 'Slow', logs: 'Warnings and errors', exceptions: 'Exceptions' }
+
+/** The tab that shows: the chosen one when this system has it, otherwise the first with entries, otherwise the first. */
+export function pickLogSection(sections: readonly LogSection[], chosen: string): LogSection | undefined {
+  return sections.find((s) => s.id === chosen) ?? sections.find((s) => s.groups.length > 0) ?? sections[0]
+}
+
+/** A header link as a button: the store's own name when the link names one in brackets ("5xx in search (appi-1)"), the whole name when it does not. */
+export function logLinkLabel(name: string): { text: string; title: string } {
+  const m = /^(.*?)\s*\(([^()]+)\)$/.exec(name)
+  return m ? { text: m[2], title: m[1] } : { text: name, title: name }
+}
+
 /** What an empty section says, so an empty list is never mistaken for a list that failed to load. */
 export function logSectionEmpty(section: LogSection, window: string): string {
   const what = { failed: 'No 5xx requests', slow: 'No slow requests', logs: 'No warnings or errors', exceptions: 'No exceptions' }[section.id] ?? 'Nothing'

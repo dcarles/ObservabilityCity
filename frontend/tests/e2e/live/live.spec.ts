@@ -72,7 +72,7 @@ test.describe('a live town', () => {
     await page.locator('#search-results .hit').first().click()
     await page.locator('#inspector [data-tab="logs"]').click()
     await expect(page.locator('#inspector [data-logs="unconfigured"]')).toContainText('not set up')
-    await expect(page.locator('#inspector h4[data-section]')).toHaveCount(0)
+    await expect(page.locator('#inspector [data-log-tab]')).toHaveCount(0)
   })
 
   test('the inspector says there is no source instead of listing numbers', async ({ page }) => {

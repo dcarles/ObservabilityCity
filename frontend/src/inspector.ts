@@ -3,7 +3,7 @@ import { escapeHtml } from './picker'
 import { scopeParams, type Scope } from './scope'
 import { tenantListOrder, tenantFigures, yardSummary, type TenantView } from './tenants'
 import { regionFigures, regionOptions, validChoice, WORST, type RegionChoice } from './regions'
-import { ago, clockTime, configOrder, groupDetail, incidentSummary, jobRows, LAYER_WORD, linkSections, logSectionEmpty, logSectionTitle, originLabel, type LinkItem, overviewLinks, overviewRows, reasons, repeatLabel, resourceLinks, scopeView, SEVERITY_WORD, sectionLinks, stateTone, vendorWhere } from './inspectorModel'
+import { ago, clockTime, configOrder, groupDetail, incidentSummary, jobRows, LAYER_WORD, linkSections, logLinkLabel, logSectionEmpty, logSectionTitle, logTabLabel, pickLogSection, originLabel, type LinkItem, overviewLinks, overviewRows, reasons, repeatLabel, resourceLinks, scopeView, SEVERITY_WORD, sectionLinks, stateTone, vendorWhere } from './inspectorModel'
 
 export type InspectorTab = 'overview' | 'links' | 'logs' | 'config'
 const TABS: { id: InspectorTab; label: string }[] = [
@@ -44,6 +44,7 @@ export class Inspector {
   private logs: SystemLogs | null = null
   private logsState: 'loading' | 'ready' | 'failed' = 'loading'
   private logsError = ''
+  private logSection = ''
   private key = ''
   private seq = 0
   private logSeq = 0
@@ -69,6 +70,7 @@ export class Inspector {
       this.detailState = 'loading'
       this.logs = null
       this.logsState = 'loading'
+      this.logSection = ''
       void this.loadDetail(id)
     }
     this.setTab(tab)
@@ -161,6 +163,8 @@ export class Inspector {
     const tab = t.closest<HTMLElement>('[data-tab]')
     if (tab) { this.setTab(tab.dataset.tab as InspectorTab); return }
     if (t.closest('[data-refresh-logs]')) { void this.loadLogs(); return }
+    const logTab = t.closest<HTMLElement>('[data-log-tab]')
+    if (logTab) { this.logSection = logTab.dataset.logTab!; this.render(); return }
     const region = t.closest<HTMLElement>('[data-region]')
     if (region && this.id) { this.host.setRegion(this.id, region.dataset.region as RegionChoice); this.render(); return }
     const link = t.closest<HTMLElement>('[data-go]')
@@ -242,8 +246,8 @@ export class Inspector {
     return `<h4>Open in</h4>${rows}${more}${tenants}`
   }
 
-  private anchor(name: string, url: string): string {
-    return `<a class="out" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(name)} ↗</a>`
+  private anchor(name: string, url: string, title?: string): string {
+    return `<a class="out" href="${escapeHtml(url)}"${title ? ` title="${escapeHtml(title)}"` : ''} target="_blank" rel="noopener noreferrer">${escapeHtml(name)} ↗</a>`
   }
 
   private tenantBlock(n: NodeSnapshot): string {
@@ -281,9 +285,14 @@ export class Inspector {
     const logs = this.logs
     if (!logs.configured) return `<p class="none" data-logs="unconfigured">Logs are not set up for this environment, so there is nothing to show here.</p>`
     if (logs.sections.length === 0) return `${refresh}<p class="none">This system has no telemetry name, so it has no logs.</p>`
-    return `${refresh}${logs.sections.map((s) => `<h4 data-section="${escapeHtml(s.id)}">${escapeHtml(logSectionTitle(s, logs.slowOverMs))}${sectionLinks(s).map((l) => ` ${this.anchor(l.name, l.url)}`).join('')}</h4>${s.groups.length === 0
-      ? `<p class="none">${escapeHtml(logSectionEmpty(s, logs.window))}</p>`
-      : `<div class="logs">${s.groups.map((g) => `<div class="log ${(g.level ?? 'Info').toLowerCase()}"><time>${escapeHtml(clockTime(g.at))}</time><span>${escapeHtml(g.text)}${groupDetail(g) ? ` <i class="detail">${escapeHtml(groupDetail(g))}</i>` : ''}${repeatLabel(g) ? ` <b class="count">${escapeHtml(repeatLabel(g))}</b>` : ''}</span></div>`).join('')}</div>`}`).join('')}
+    const shown = pickLogSection(logs.sections, this.logSection)
+    const tabs = `<div class="logtabs" role="tablist">${logs.sections.map((s) => `<button role="tab" data-log-tab="${escapeHtml(s.id)}" class="${s === shown ? 'on' : ''}${s.groups.length === 0 ? ' empty' : ''}" aria-selected="${s === shown}" title="${escapeHtml(logSectionTitle(s, logs.slowOverMs))}">${escapeHtml(logTabLabel(s))}</button>`).join('')}</div>`
+    const links = shown ? sectionLinks(shown) : []
+    const linkRow = links.length === 0 ? '' : `<div class="logbuttons">${links.map((l) => { const b = logLinkLabel(l.name); return this.anchor(b.text, l.url, b.title) }).join('')}</div>`
+    const body = !shown ? '' : shown.groups.length === 0
+      ? `<p class="none">${escapeHtml(logSectionEmpty(shown, logs.window))}</p>`
+      : `<div class="logs">${shown.groups.map((g) => `<div class="log ${(g.level ?? 'Info').toLowerCase()}"><time>${escapeHtml(clockTime(g.at))}</time><span>${escapeHtml(g.text)}${groupDetail(g) ? ` <i class="detail">${escapeHtml(groupDetail(g))}</i>` : ''}${repeatLabel(g) ? ` <b class="count">${escapeHtml(repeatLabel(g))}</b>` : ''}</span></div>`).join('')}</div>`
+    return `${refresh}${tabs}${linkRow}<div data-section="${escapeHtml(shown?.id ?? '')}">${body}</div>
       <p class="note">Read ${ago(logs.at, Date.now())} over the last ${escapeHtml(logs.window)}, newest first. Logs are read on demand and do not decide the colours.</p>`
   }
 

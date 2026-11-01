@@ -160,8 +160,14 @@ button.chip.clickable:focus-visible { outline: 2px solid var(--accent); }
 #inspector .link.off { opacity: 0.5; cursor: not-allowed; }
 #inspector .levels { display: flex; gap: 4px; margin-bottom: 8px; }
 #inspector .levels button { padding: 3px 10px; font-size: 12px; }
+#inspector .logtabs { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+#inspector .logtabs button { padding: 3px 10px; font-size: 12px; }
+#inspector .logtabs button.on { background: var(--accent); color: #fff; }
+#inspector .logtabs button.empty:not(.on) { opacity: 0.55; }
+#inspector .logbuttons { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; font-size: 12px; }
+#inspector .logbuttons a.out { border: 1px solid var(--line); border-radius: 6px; padding: 2px 8px; text-decoration: none; }
 #inspector .logs { font-family: ui-monospace, monospace; font-size: 11.5px; }
-#inspector .log { display: flex; gap: 8px; padding: 2px 0; border-bottom: 1px solid rgba(29, 42, 58, 0.06); }
+#inspector .log { display: flex; gap: 8px; padding: 4px 0; border-bottom: 1px solid rgba(29, 42, 58, 0.06); }
 #inspector .log time { opacity: 0.55; flex: none; }
 #inspector .log.warn span { color: #b3541e; } #inspector .log.error span { color: #c0392b; }
 #inspector .log span { min-width: 0; overflow-wrap: anywhere; }

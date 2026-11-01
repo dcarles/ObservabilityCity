@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { ago, clockTime, configOrder, groupDetail, incidentSummary, linkSections, logSectionEmpty, logSectionTitle, originLabel, isWebAddress, overviewLinks, overviewRows, reasons, repeatLabel, resourceLinks, scopeView, sectionLinks, stateTone } from '../../src/inspectorModel'
+import { ago, clockTime, configOrder, groupDetail, incidentSummary, linkSections, logSectionEmpty, logSectionTitle, originLabel, isWebAddress, overviewLinks, overviewRows, reasons, repeatLabel, resourceLinks, scopeView, logLinkLabel, logTabLabel, pickLogSection, sectionLinks, stateTone } from '../../src/inspectorModel'
 import type { ConfigValue, LogGroup, LogSection, ScopeInfo, ScopeResource, SystemDetail, NodeSnapshot, Snapshot } from '../../src/types'
 
 const bad = JSON.parse(readFileSync(resolve(__dirname, '../../../shared-test-data/snapshots/bad-day.json'), 'utf8')) as Snapshot
@@ -315,5 +315,26 @@ describe('the links to a system\'s resources', () => {
     const v = overviewLinks(scope(many))!
     expect(v.items).toHaveLength(6)
     expect(v.more).toBe(3)
+  })
+})
+
+describe('the Logs sub-tabs', () => {
+  const sec = (id: string, n: number) => ({ id, groups: Array.from({ length: n }, () => ({ at: '2026-11-01T10:00:00Z', text: 't', count: 1 })) }) as never
+  it('writes the short title and the count', () => {
+    expect(logTabLabel(sec('failed', 0))).toBe('5xx 0')
+    expect(logTabLabel(sec('slow', 9))).toBe('Slow 9')
+    expect(logTabLabel(sec('logs', 2))).toBe('Warnings and errors 2')
+  })
+  it('opens the chosen tab, else the first with entries, else the first', () => {
+    const all = [sec('failed', 0), sec('slow', 3), sec('exceptions', 1)]
+    expect(pickLogSection(all, 'exceptions')?.id).toBe('exceptions')
+    expect(pickLogSection(all, '')?.id).toBe('slow')
+    expect(pickLogSection(all, 'logs')?.id).toBe('slow')
+    expect(pickLogSection([sec('failed', 0), sec('slow', 0)], '')?.id).toBe('failed')
+    expect(pickLogSection([], '')).toBeUndefined()
+  })
+  it('names a link button after the store in its brackets, and keeps a whole name that has none', () => {
+    expect(logLinkLabel('5xx in App Insights (appi-1)')).toEqual({ text: 'appi-1', title: '5xx in App Insights' })
+    expect(logLinkLabel('5xx in App Insights')).toEqual({ text: '5xx in App Insights', title: '5xx in App Insights' })
   })
 })
