@@ -422,3 +422,18 @@ test.describe('a quiet tenant database', () => {
     await expect(rows.filter({ hasText: quiet.name }).first()).toContainText('no activity reported')
   })
 })
+
+test.describe('a tenant no database reports', () => {
+  test('is marked "not found" in the tenant dropdown, and the others are not', async ({ town, page }) => {
+    await town.open()
+    await page.evaluate(() => {
+      const c = (window as any).city
+      const s = JSON.parse(JSON.stringify(c.seen.last))
+      s.tenants = s.tenants.map((t: any, i: number) => ({ ...t, notFound: i === 0 }))
+      c.feed(s)
+    })
+    await page.locator('#tenant-button').click()
+    await expect(page.locator('#tenant-list .vb-note')).toHaveCount(1)
+    await expect(page.locator('#tenant-list .vb-note')).toHaveText('not found')
+  })
+})

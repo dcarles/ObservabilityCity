@@ -769,31 +769,36 @@
       "id": "acme",
       "name": "Acme",
       "kind": "Customer",
-      "share": 0.31400370141887723
+      "share": 0.31400370141887723,
+      "notFound": false
     },
     {
       "id": "borealis",
       "name": "Borealis",
       "kind": "Customer",
-      "share": 0.48241826033312774
+      "share": 0.48241826033312774,
+      "notFound": false
     },
     {
       "id": "qa",
       "name": "QA",
       "kind": "Test",
-      "share": 0.024676125848241828
+      "share": 0.024676125848241828,
+      "notFound": false
     },
     {
       "id": "smoke",
       "name": "Smoke",
       "kind": "Test",
-      "share": 0.024676125848241828
+      "share": 0.024676125848241828,
+      "notFound": false
     },
     {
       "id": "ghost-co",
       "name": "ghost-co",
       "kind": "Unknown",
-      "share": 0.15422578655151142
+      "share": 0.15422578655151142,
+      "notFound": false
     }
   ],
   "topology": "hub-and-spoke",

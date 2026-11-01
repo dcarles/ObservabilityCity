@@ -127,7 +127,9 @@ async function start(): Promise<void> {
     for (const [id, v] of town.vendors) items.push({ kind: 'building', id, name: v.buildings.get(id)?.node?.name ?? id, where: vendorWhere(seen.last?.vendors.find((x) => x.node.id === id)) })
     return items
   }
-  const islandItems = (): SearchItem[] => town.islands.map((i) => ({ kind: 'island', id: i.group.id, name: i.group.displayName, where: i.group.displayName }))
+  // a third party with several services stands them on one island, which has a name of its own; a single building is found as a building already
+  const vendorIslandItems = (): SearchItem[] => [...new Set(town.vendors.values())].filter((v) => v.buildings.size > 1).map((v) => ({ kind: 'island', id: v.id, name: v.name, where: 'Third party' }))
+  const islandItems = (): SearchItem[] => [...town.islands.map<SearchItem>((i) => ({ kind: 'island', id: i.group.id, name: i.group.displayName, where: i.group.displayName })), ...vendorIslandItems()]
   const airportItem = (): SearchItem[] => (town.airport ? [{ kind: 'island', id: 'airport', name: 'Airport', where: 'Outside callers' }] : [])
   const scope = requestedScope()
   let towns: TownChoice[] = []

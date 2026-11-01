@@ -456,6 +456,7 @@ export interface components {
             kind: components["schemas"]["TenantKind"];
             /** Format: double */
             share: number;
+            notFound: boolean;
         };
         /** @enum {string} */
         TenantKind: "Customer" | "Test" | "Unknown";

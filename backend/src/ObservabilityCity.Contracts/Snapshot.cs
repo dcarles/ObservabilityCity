@@ -178,9 +178,10 @@ public sealed record EnvironmentInfo(string Id, string Name, bool IsDefault);
 
 /// <summary>
 /// A tenant of this environment. Share is the part of the environment's tenant traffic it brings (0 to 1, all tenants add up to 1),
-/// which decides how many of the cars carry its name.
+/// which decides how many of the cars carry its name. NotFound is true for a tenant the environment lists that no tenant database reports, while the
+/// tenant stores are reporting: a mistyped id, or a tenant that has gone.
 /// </summary>
-public sealed record TenantInfo(string Id, string Name, TenantKind Kind, double Share);
+public sealed record TenantInfo(string Id, string Name, TenantKind Kind, double Share, bool NotFound = false);
 
 /// <summary>
 /// An open incident assigned to a group. Severity runs from 1 (worst) to 4 (minor), as in the incident tool. The renderer turns the worst

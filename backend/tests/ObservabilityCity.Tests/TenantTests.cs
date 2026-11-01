@@ -122,6 +122,51 @@ public class TenantTests
     }
 
     [Fact]
+    public async Task A_listed_tenant_no_database_reports_is_marked_not_found_and_the_others_are_not()
+    {
+        var rig = new Rig("prod");
+        await rig.Run();
+        // cygnus is in no tenant database of either store
+        var without = new[] { Store, "bb.billing-db" }.ToDictionary(id => id, id => { var r = rig.State.Get(id)!; return r with { At = rig.Clock.GetUtcNow(), Tenants = r.Tenants!.Where(t => t.TenantId != "cygnus").ToList() }; });
+        rig.State.Update(without);
+
+        var s = rig.Builder.Build();
+
+        Assert.True(s.Tenants.Single(t => t.Id == "cygnus").NotFound);
+        Assert.DoesNotContain(s.Tenants.Where(t => t.Id != "cygnus"), t => t.NotFound);
+    }
+
+    [Fact]
+    public async Task A_tenant_missing_from_one_store_but_reported_by_another_is_not_marked_not_found()
+    {
+        var rig = new Rig("prod");
+        await rig.Run();
+        var reading = rig.State.Get(Store)!;
+        rig.State.Update(new Dictionary<string, NodeReading> { [Store] = reading with { At = rig.Clock.GetUtcNow(), Tenants = reading.Tenants!.Where(t => t.TenantId != "cygnus").ToList() } });
+
+        var s = rig.Builder.Build();
+
+        Assert.Equal(HealthState.Stale, Unit(s, "cygnus").State); // that store did not find it, so its unit is grey
+        Assert.DoesNotContain(s.Tenants, t => t.NotFound);       // the other store did
+    }
+
+    [Fact]
+    public async Task Nothing_is_marked_not_found_while_a_tenant_store_has_no_fresh_data()
+    {
+        var rig = new Rig("prod");
+        await rig.Run();
+        rig.Fake.Add(Store, FakeEffectKind.Stale, 1);
+        rig.Clock.Advance(TimeSpan.FromSeconds(1));
+        rig.State.Update(await rig.Fake.PollAsync(rig.Registry, TestContext.Current.CancellationToken));
+        rig.Clock.Advance(TimeSpan.FromSeconds(40));
+
+        var s = rig.Builder.Build();
+
+        Assert.NotEmpty(s.Tenants);
+        Assert.DoesNotContain(s.Tenants, t => t.NotFound); // the data is not in, so nobody can say a tenant is missing
+    }
+
+    [Fact]
     public async Task A_store_with_no_fresh_data_shows_every_tenant_grey()
     {
         var rig = new Rig("prod");

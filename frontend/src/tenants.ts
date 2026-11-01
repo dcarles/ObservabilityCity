@@ -16,6 +16,11 @@ export interface TenantView {
 
 export const ALL_TENANTS: TenantView = { hideTest: false, tenants: [] }
 
+/** The words next to a tenant in the dropdown when the environment lists it and no tenant database reports it, or null. */
+export function tenantNote(t: Pick<TenantInfo, 'notFound'>): { text: string; title: string } | null {
+  return t.notFound ? { text: 'not found', title: 'The environment lists this tenant, but no tenant database for it was found. Check the id, or whether the tenant has gone.' } : null
+}
+
 /** True when the viewer follows some tenants (and not simply all of them). */
 export const isFollowing = (view: TenantView): boolean => view.tenants.length > 0
 

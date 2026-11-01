@@ -301,6 +301,7 @@ function checkTenants(list: unknown, problems: string[]): TenantInfo[] {
       name: str(t.name) || t.id,
       kind: TENANT_KINDS.includes(t.kind as string) ? (t.kind as TenantInfo['kind']) : 'Unknown',
       share: isFiniteNumber(t.share) && t.share >= 0 ? t.share : 0,
+      notFound: t.notFound === true,
     })
   }
   return out

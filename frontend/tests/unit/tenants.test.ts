@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { ALL_TENANTS, carShown, fillOf, groupTenants, pickTenant, pruneTenants, shownUnits, tenantLabel, tenantLevel, tenantListOrder, tenantTrouble, limitRange, limitText, tenantFigures, throttleWho, throttledText, throttledUnits, toggleTenant, yardLayout, yardSummary, type TenantView } from '../../src/tenants'
+import { ALL_TENANTS, carShown, fillOf, groupTenants, pickTenant, pruneTenants, shownUnits, tenantLabel, tenantLevel, tenantListOrder, tenantNote, tenantTrouble, limitRange, limitText, tenantFigures, throttleWho, throttledText, throttledUnits, toggleTenant, yardLayout, yardSummary, type TenantView } from '../../src/tenants'
 import { planPads, planIsland } from '../../src/scene/plan'
 import { summariseService } from '../../src/scene/service'
 import { worstState } from '../../src/visuals'
@@ -200,10 +200,10 @@ describe('the tenants the backend sends (tenants-town)', () => {
 
 describe('the tenant dropdown', () => {
   const list: TenantInfo[] = [
-    { id: '7f3a-guid', name: 'Zed Bank', kind: 'Customer', share: 0.4 },
-    { id: 'acme', name: 'Acme', kind: 'Customer', share: 0.4 },
-    { id: 'qa', name: 'QA run', kind: 'Test', share: 0.05 },
-    { id: 'ghost', name: 'ghost', kind: 'Unknown', share: 0.15 },
+    { id: '7f3a-guid', name: 'Zed Bank', kind: 'Customer', share: 0.4, notFound: false },
+    { id: 'acme', name: 'Acme', kind: 'Customer', share: 0.4, notFound: false },
+    { id: 'qa', name: 'QA run', kind: 'Test', share: 0.05, notFound: false },
+    { id: 'ghost', name: 'ghost', kind: 'Unknown', share: 0.15, notFound: true },
   ]
   it('groups customers, then test tenants, then unknown ones, each by name', () => {
     const g = groupTenants(list)
@@ -310,5 +310,14 @@ describe('showing what a tenant database is provisioned at', () => {
     // a quiet database read as no use says so, instead of a bare 0%
     expect(tenantFigures({ limit: 4000, utilisation: 0, throttled: 0, idle: true })).toBe('4,000 RU/s · no activity reported · 0% throttled')
     expect(tenantFigures({ limit: 4000, utilisation: 0, throttled: 0, idle: null })).toBe('4,000 RU/s · 0% · 0% throttled')
+  })
+})
+
+describe('the note on a tenant no database reports', () => {
+  it('is there for a tenant marked not found, with words that say what to check, and absent otherwise', () => {
+    expect(tenantNote({ notFound: false })).toBeNull()
+    const note = tenantNote({ notFound: true })!
+    expect(note.text).toBe('not found')
+    expect(note.title).toContain('no tenant database')
   })
 })

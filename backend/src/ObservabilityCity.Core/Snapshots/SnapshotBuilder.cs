@@ -200,11 +200,13 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
         var declared = env?.Tenants ?? [];
         var declaredKeys = declared.Select(t => Scope.ScopeResolver.TenantKey(t.Id)).ToHashSet();
         var seen = new Dictionary<string, double>(); // tenant key to the request rate its databases see
+        var reported = new HashSet<string>(); // tenants some database really reported (a unit that was not found is grey and does not count)
         var found = new SortedDictionary<string, (string Id, string Name, TenantKind Kind)>(StringComparer.Ordinal); // tenants the list lacks
         foreach (var unit in nodes.Where(n => n.State != HealthState.Stale).SelectMany(n => n.Tenants ?? []))
         {
             var key = Scope.ScopeResolver.TenantKey(unit.Id);
             seen[key] = seen.GetValueOrDefault(key) + unit.RequestsPerSecond;
+            if (unit.State != HealthState.Stale) reported.Add(key);
             if (!declaredKeys.Contains(key)) found.TryAdd(key, (unit.Id, unit.Name, unit.Kind));
         }
         var all = declared.Select(t => (Key: Scope.ScopeResolver.TenantKey(t.Id), Id: t.Id, Name: t.Name, Kind: t.Kind))
@@ -213,7 +215,10 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
         var total = all.Sum(t => seen.GetValueOrDefault(t.Key));
         double Weight(string key, TenantKind kind) => total > 0 ? seen.GetValueOrDefault(key) : kind == TenantKind.Test ? 0.1 : 1.0;
         var sum = all.Sum(t => Weight(t.Key, t.Kind));
-        return all.Select(t => new TenantInfo(t.Id, t.Name, t.Kind, sum > 0 ? Weight(t.Key, t.Kind) / sum : 0)).ToList();
+        // a listed tenant nobody reports is "not found", but only when every tenant store is reporting and some tenant is: otherwise the data is not in yet
+        var stores = nodes.Where(n => n.Tenants is { Count: > 0 }).ToList();
+        var judge = stores.Count > 0 && stores.All(n => n.State != HealthState.Stale) && reported.Count > 0;
+        return all.Select(t => new TenantInfo(t.Id, t.Name, t.Kind, sum > 0 ? Weight(t.Key, t.Kind) / sum : 0, judge && declaredKeys.Contains(t.Key) && !reported.Contains(t.Key))).ToList();
     }
 
     private static MessagingSnapshot MessagingOf(Registry.Registry registry, RegistryGroup g) => new(
