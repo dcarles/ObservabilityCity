@@ -1,0 +1,113 @@
+{
+  "tables": [
+    {
+      "name": "PrimaryResult",
+      "columns": [
+        {
+          "name": "section",
+          "type": "string"
+        },
+        {
+          "name": "at",
+          "type": "string"
+        },
+        {
+          "name": "text",
+          "type": "string"
+        },
+        {
+          "name": "count",
+          "type": "string"
+        },
+        {
+          "name": "level",
+          "type": "string"
+        },
+        {
+          "name": "operationId",
+          "type": "string"
+        },
+        {
+          "name": "durationMs",
+          "type": "string"
+        },
+        {
+          "name": "result",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "failed",
+          "2026-11-01T11:58:00Z",
+          "GET /api/orders",
+          4,
+          null,
+          "op-new",
+          812.5,
+          "500"
+        ],
+        [
+          "failed",
+          "2026-11-01T11:40:00Z",
+          "GET /api/orders",
+          3,
+          null,
+          "op-old",
+          640,
+          "500"
+        ],
+        [
+          "failed",
+          "2026-11-01T11:50:00Z",
+          "POST /api/orders",
+          1,
+          null,
+          "op-post",
+          95,
+          "503"
+        ],
+        [
+          "slow",
+          "2026-11-01T11:55:00Z",
+          "GET /api/statements",
+          7,
+          null,
+          "op-slow",
+          2400,
+          "200"
+        ],
+        [
+          "logs",
+          "2026-11-01T11:57:00Z",
+          "Cache is cold after start-up",
+          2,
+          "Warning",
+          null,
+          null,
+          null
+        ],
+        [
+          "logs",
+          "2026-11-01T11:30:00Z",
+          "Connection to the store was reset",
+          5,
+          "Error",
+          "op-log",
+          null,
+          null
+        ],
+        [
+          "exceptions",
+          "2026-11-01T11:56:00Z",
+          "TimeoutException: the upstream call timed out",
+          9,
+          null,
+          "op-exc",
+          null,
+          null
+        ]
+      ]
+    }
+  ]
+}

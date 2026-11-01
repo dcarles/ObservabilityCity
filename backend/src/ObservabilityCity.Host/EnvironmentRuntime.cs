@@ -83,10 +83,3 @@ public sealed class TownSet(IReadOnlyList<TownRuntime> all, string defaultId)
 
     public IReadOnlyList<TownSummary> Infos => All.Select(t => new TownSummary(t.Id, t.Registry.Current.Town.Name, t.Id == defaultId)).ToList();
 }
-
-/// <summary>The log source of a live town until a real one is wired in: no lines for any system.</summary>
-public sealed class NoLogSource : ILogSource
-{
-    public string Name => "none";
-    public Task<IReadOnlyList<LogLine>> RecentAsync(RegistryNode node, int limit, CancellationToken ct) => Task.FromResult<IReadOnlyList<LogLine>>([]);
-}

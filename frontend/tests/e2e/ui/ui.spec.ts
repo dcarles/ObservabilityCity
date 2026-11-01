@@ -267,19 +267,26 @@ test.describe('the inspector drawer', () => {
     expect(await page.evaluate(() => (window as any).city.inspector().id)).toBe('aa.orders-api')
   })
 
-  test('Logs shows the latest lines, narrows to errors, and follows new ones', async ({ town, page }) => {
+  test('Logs has its four sections, fills the 5xx section when errors start, and reads again only on Refresh', async ({ town, page }) => {
     await town.open()
     await openByName(page, 'Orders API')
     await page.locator('#inspector [data-tab="logs"]').click()
-    await expect(page.locator('#inspector .log').first()).toBeVisible()
-    const calm = await page.locator('#inspector .log.error').count()
+    await expect(page.locator('#inspector h4[data-section]')).toHaveText(['5xx requests', /^Slow requests \(over/, 'Warnings and errors', 'Exceptions'])
+    await expect(page.locator('#inspector h4[data-section="failed"] + .none, #inspector h4[data-section="failed"] + .logs').first()).toBeVisible()
     await town.effect('aa.orders-api', 'Errors', 1)
     await town.until('aa.orders-api', (n) => n.errorRate > 0.05)
-    await expect.poll(() => page.locator('#inspector .log.error').count(), { timeout: 15_000 }).toBeGreaterThan(calm)
-    await page.locator('#inspector [data-level="error"]').click()
-    expect(await page.locator('#inspector .log:not(.error)').count()).toBe(0)
-    await page.locator('#inspector [data-level="warn"]').click()
-    expect(await page.locator('#inspector .log.info').count()).toBe(0)
+    // nothing is polled: the new errors show when the tab is read again
+    await page.locator('#inspector [data-refresh-logs]').click()
+    await expect(page.locator('#inspector h4[data-section="failed"] + .logs .log.error').first()).toBeVisible({ timeout: 15_000 })
+    await expect(page.locator('#inspector h4[data-section="exceptions"] + .logs .log').first()).toBeVisible()
+    await expect(page.locator('#inspector .log.error .count').first()).toContainText('×')
+  })
+
+  test('a worker\'s Logs tab has only the warnings, errors and exceptions sections', async ({ town, page }) => {
+    await town.open()
+    await openByName(page, 'Orders worker')
+    await page.locator('#inspector [data-tab="logs"]').click()
+    await expect(page.locator('#inspector h4[data-section]')).toHaveText(['Warnings and errors', 'Exceptions'])
   })
 
   test('Config lists each value with the file layer it comes from, and the file', async ({ town, page }) => {

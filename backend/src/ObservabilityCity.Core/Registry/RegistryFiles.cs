@@ -216,6 +216,21 @@ internal sealed class EnvironmentFile
     public ScopeFile? Scope { get; set; }
     /// <summary>How the calls the systems make are found in the telemetry. Without it the environment has only the declared links.</summary>
     public LinksFile? Links { get; set; }
+    /// <summary>Where the Logs tab of a system reads from: a query run only when the tab is opened. Without it the tab says logs are not set up.</summary>
+    public LogsFile? Logs { get; set; }
+}
+
+/// <summary>The <c>logs:</c> block of an environment file.</summary>
+internal sealed class LogsFile
+{
+    /// <summary>The name of a loganalytics source of this file. Its connection and login are used.</summary>
+    public string Source { get; set; } = "";
+    /// <summary>The query to send, a template ({roles}, {from}, {to}, {window}, {windowSeconds}, {slaMs}, {kind}, scope variables, {environment}). One row for each kind of entry: section, at, text; count, level, operationId, durationMs and result optional.</summary>
+    public string Query { get; set; } = "";
+    /// <summary>How far back it looks. Default 4h.</summary>
+    public string? Window { get; set; }
+    /// <summary>Addresses that open one request's full trace somewhere else, 0 to n. Variables {operationId}, {role}, {time}, scope variables and {environment}.</summary>
+    public List<ResourceLinkFile> TraceLinks { get; set; } = [];
 }
 
 /// <summary>The <c>links:</c> block of an environment file.</summary>

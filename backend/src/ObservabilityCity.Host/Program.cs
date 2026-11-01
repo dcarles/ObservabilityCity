@@ -1,6 +1,7 @@
 using ObservabilityCity.Adapters.Fake;
 using ObservabilityCity.Contracts;
 using ObservabilityCity.Core.Links;
+using ObservabilityCity.Core.Logs;
 using ObservabilityCity.Core.Registry;
 using ObservabilityCity.Core.Scope;
 using ObservabilityCity.Core.Snapshots;
@@ -101,7 +102,7 @@ foreach (var (folder, registry) in loaded)
             // a demo town has its own sped-up day; a live one shows the real time of day
             DayFraction = fake is null ? () => TimeProvider.System.GetLocalNow().TimeOfDay.TotalDays : () => fake.DayFraction,
         };
-        ILogSource logs = fake is null ? new NoLogSource() : new FakeLogSource(state, TimeProvider.System, staleAfter);
+        ILogSource logs = fake is null ? new QueryLogSource(set.Sources, view, set.Scope, TimeProvider.System) : new FakeLogSource(state, TimeProvider.System, staleAfter);
         runtimes.Add(new EnvironmentRuntime(registry.Town.Id, environmentId, view, fake, state, snapshots, store, logs, set.Sources, set.Problems, set.Scope, discovered, readings));
     }
     var town = new TownRuntime(registry.Town.Id, registry.Town.Name, folder, registries, new EnvironmentSet(runtimes, registry.DefaultEnvironmentId, registry.Town.Id));
@@ -174,15 +175,21 @@ app.MapGet("/api/systems/{id}", (string id, EnvironmentSet envs, string? env) =>
    .Produces<SystemDetail>()
    .WithName("GetSystem");
 
-// Recent log lines of one system, newest first. Read on demand while its inspector is open.
-app.MapGet("/api/systems/{id}/logs", async (string id, EnvironmentSet envs, string? env, int? limit, CancellationToken ct) =>
+// What the Logs tab of one system shows: 5xx requests, slow requests, warnings and errors, exceptions. Read on demand when the tab opens, never polled,
+// never part of health. A source that cannot be reached is a 502 with the reason.
+app.MapGet("/api/systems/{id}/logs", async (string id, EnvironmentSet envs, string? env, CancellationToken ct) =>
     {
         if (envs.Find(env) is not { } rt) return EnvironmentNotFound(envs, env);
         var registry = rt.Registry.Current;
         var node = registry.AllNodes.FirstOrDefault(n => n.Id == id) ?? registry.Vendors.FirstOrDefault(v => v.Node.Id == id)?.Node;
-        return node is null ? Results.NotFound(new { error = $"No system '{id}'." }) : Results.Ok(await rt.Logs.RecentAsync(node, limit ?? 60, ct));
+        if (node is null) return Results.NotFound(new { error = $"No system '{id}'." });
+        try { return Results.Ok(await rt.Logs.RecentAsync(node, ct)); }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            return Results.Json(new { error = e.Message.ReplaceLineEndings(" ") }, statusCode: StatusCodes.Status502BadGateway);
+        }
     })
-   .Produces<LogLine[]>()
+   .Produces<SystemLogs>()
    .WithName("GetSystemLogs");
 
 // Demo steering for the fake generator: the Break things panel and the story bar are built on this.

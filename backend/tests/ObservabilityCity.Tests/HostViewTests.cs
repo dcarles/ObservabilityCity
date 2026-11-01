@@ -98,14 +98,15 @@ public class HostViewTests : IDisposable
     }
 
     [Fact]
-    public async Task A_systems_logs_come_newest_first_and_respect_the_limit()
+    public async Task A_systems_logs_come_in_sections_newest_first()
     {
         await Get<Snapshot>("/api/snapshot/latest"); // the source has produced readings
 
-        var logs = await Get<LogLine[]>("/api/systems/aa.orders-api/logs?limit=7");
+        var logs = await Get<SystemLogs>("/api/systems/aa.orders-api/logs");
 
-        Assert.Equal(7, logs.Length);
-        Assert.Equal(logs.OrderByDescending(l => l.At).Select(l => l.At), logs.Select(l => l.At));
+        Assert.True(logs.Configured);
+        Assert.Equal(["failed", "slow", "logs", "exceptions"], logs.Sections.Select(s => s.Id));
+        Assert.All(logs.Sections, s => Assert.Equal(s.Groups.OrderByDescending(g => g.At).Select(g => g.At), s.Groups.Select(g => g.At)));
     }
 
     // ── the live stream ───────────────────────────────────────────────────────

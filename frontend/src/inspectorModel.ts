@@ -1,6 +1,6 @@
 // What the inspector drawer says, as pure functions: a system's numbers in, rows and sentences out.
 
-import type { ConfigValue, HealthState, IncidentSnapshot, JobSnapshot, LinkRef, LogLine, NodeSnapshot, ResourceLink, ScopeInfo, ScopeResource, SettingLayer, SystemDetail } from './types'
+import type { ConfigValue, HealthState, IncidentSnapshot, JobSnapshot, LinkRef, LogGroup, LogSection, NodeSnapshot, ResourceLink, ScopeInfo, ScopeResource, SettingLayer, SystemDetail } from './types'
 import { inboundSplitText } from './inbound'
 import { limitRange, throttleWho } from './tenants'
 import { isAbsent, isUnmonitored, QUIET_TEXT } from './signals'
@@ -133,12 +133,39 @@ export function ago(iso: string | null | undefined, now: number): string {
   return s < 90 ? `${s} s ago` : `${Math.round(s / 60)} min ago`
 }
 
-export type LogFilter = 'all' | 'warn' | 'error'
+/** The four sections of the Logs tab, in the order they are shown, with the heading each has. */
+export const LOG_SECTION_TITLE: Record<string, string> = {
+  failed: '5xx requests',
+  slow: 'Slow requests',
+  logs: 'Warnings and errors',
+  exceptions: 'Exceptions',
+}
 
-/** Lines at or above a level: all, warnings and errors, errors only. */
-export function filterLogs(lines: readonly LogLine[], filter: LogFilter): LogLine[] {
-  if (filter === 'all') return [...lines]
-  return lines.filter((l) => (filter === 'error' ? l.level === 'Error' : l.level !== 'Info'))
+/** The heading of a section; the slow one says the line it is measured against. */
+export function logSectionTitle(section: LogSection, slowOverMs: number): string {
+  const title = LOG_SECTION_TITLE[section.id] ?? section.id
+  return section.id === 'slow' ? `${title} (over ${formatMs(slowOverMs)})` : title
+}
+
+/** What an empty section says, so an empty list is never mistaken for a list that failed to load. */
+export function logSectionEmpty(section: LogSection, window: string): string {
+  const what = { failed: 'No 5xx requests', slow: 'No slow requests', logs: 'No warnings or errors', exceptions: 'No exceptions' }[section.id] ?? 'Nothing'
+  return `${what} in the last ${window}.`
+}
+
+/** How many times an entry repeated, written as "×4"; nothing for one. */
+export function repeatLabel(group: LogGroup): string {
+  return group.count > 1 ? `×${group.count}` : ''
+}
+
+/** What a request group adds to its text: its status and how long the newest one took. */
+export function groupDetail(group: LogGroup): string {
+  return [group.result, group.durationMs != null ? formatMs(group.durationMs) : null].filter((x): x is string => !!x).join(' · ')
+}
+
+/** The links of an entry to its full trace that are safe to draw (only http and https). */
+export function traceLinks(group: LogGroup): ResourceLink[] {
+  return (group.links ?? []).filter((l) => l.name.length > 0 && isWebAddress(l.url))
 }
 
 export const LAYER_WORD: Record<SettingLayer, string> = {

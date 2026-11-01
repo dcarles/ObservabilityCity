@@ -197,6 +197,7 @@ One file per environment. The pillar and system files are shared; this file says
 | `exclude` | no | none | Ids of systems not deployed in this environment. |
 | `fake` | no | none | Settings for the fake source only. |
 | `links` | no | none | How the calls the systems make are found in the telemetry (see `links` below). |
+| `logs` | no | none | Where a system's Logs tab reads from (see `logs` below). Without it the tab says logs are not set up. |
 | `scope` | no | none | How pillars and systems map onto the cloud. |
 
 <!-- file: TenantFile -->
@@ -328,6 +329,34 @@ links:
       | extend u = parse_url(Data)
       | summarize calls = sum(ItemCount)
           by caller = AppRoleName, host = tostring(u.Host), path = tostring(u.Path)
+```
+
+### logs
+What a system's Logs tab shows in a live town. Nothing is polled: when someone opens the tab, one query for that system's telemetry name goes to the named source, over the last `window`, and the answer is not kept. It never affects health. The tab has four separate sections so a flood in one never hides another: 5xx requests, slow requests (over the system's own `slaP99Ms`), warnings and errors, and exceptions. Repeats are one line with a count, newest first, and each entry that has an operation id links to its full trace. A worker, a function or anything else that does not answer requests gets only the logs and exceptions sections. A demo town makes its own entries and needs none of this.
+
+<!-- file: LogsFile -->
+| Key | Required | Default | Meaning |
+|---|---|---|---|
+| `source` | yes | | Name of a `loganalytics` source of this file. Its workspace and login are used. |
+| `query` | yes | | The query to send, a template. Holes: `{roles}` (the system's telemetry name, double-quoted), `{from}` and `{to}` (UTC, ISO 8601), `{window}` (for example `4h`), `{windowSeconds}`, `{slaMs}` (the system's own p99 SLA), `{kind}` (`api`, `worker` and so on), `{environment}` and your `scope.variables`. It returns one row for each kind of entry with the columns `section` (`failed`, `slow`, `logs` or `exceptions`), `at` (the newest time) and `text`; `count` (default 1), `level` (`info`, `warn` or `error`, or a number where 2 is a warning and 3 and up an error), `operationId`, `durationMs` and `result` (a status code, say) may be left out. Azure does the grouping; no raw rows come back, and none are cut off. |
+| `window` | no | `4h` | How far back it looks, for example `30m`. |
+| `traceLinks` | no | none | Addresses that open one request's full trace somewhere else, 0 to n, each `{ name, url }`. The url starts with `https://` (or `http://`) written out and may use `{operationId}`, `{role}`, `{time}`, `{environment}` and your `scope.variables`; every value is percent-encoded. An entry with no operation id has no link. |
+
+```yaml
+logs:
+  source: logs
+  window: 4h
+  query: |
+    union
+      (AppRequests | where TimeGenerated between (datetime({from}) .. datetime({to})) and AppRoleName in~ ({roles})
+        | where toint(resultCode) >= 500
+        | summarize count = count(), at = max(TimeGenerated), operationId = take_any(OperationId), durationMs = max(DurationMs)
+            by section = "failed", text = strcat(name), result = resultCode),
+      (AppTraces | where TimeGenerated between (datetime({from}) .. datetime({to})) and AppRoleName in~ ({roles}) and SeverityLevel >= 2
+        | summarize count = count(), at = max(TimeGenerated), operationId = take_any(OperationId), level = max(SeverityLevel)
+            by section = "logs", text = Message)
+  traceLinks:
+    - { name: Trace, url: "https://tracing.example.test/trace/{operationId}" }
 ```
 
 ### credentials

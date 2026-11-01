@@ -33,7 +33,7 @@ public static partial class RegistryLoader
         "tenantPattern", "order", "default", "sources", "kind", "connection", "tenants", "exclude", "fake", "undeclaredTenants",
         "signals", "credentials", "credential", "pollSeconds", "timeoutSeconds", "tenantId", "clientId", "clientSecretEnv",
         "scope", "inventory", "workspace", "variables", "subscription", "pillars", "types", "pattern", "roles", "serviceTag", "tenantNameTag",
-        "telemetryRole", "queries", "links", "url", "nameLike", "tag", "key", "value", "code", "serviceCode", "telemetry", "minCalls", "query", "window", "discoverLinks", "regions", "tag", "names", "skew", "state", "running", "minDays", "keepFor", "firstRead", "interval", "ignoreHosts", "rules", "host", "path", "target", "gateway", "domains", "services", "internal", "match", "traffic", "shareWindow",
+        "telemetryRole", "queries", "links", "url", "nameLike", "tag", "key", "value", "code", "serviceCode", "telemetry", "minCalls", "query", "window", "discoverLinks", "regions", "tag", "names", "skew", "state", "running", "minDays", "keepFor", "firstRead", "interval", "ignoreHosts", "rules", "host", "path", "target", "gateway", "domains", "services", "internal", "match", "traffic", "shareWindow", "logs", "traceLinks",
     ];
 
     // Last resort when defaults.yaml is missing or silent about a role.
@@ -315,6 +315,7 @@ public static partial class RegistryLoader
                 Signals = f.Signals,
                 Scope = ToScope(f.Scope),
                 Links = ToLinks(f.Links),
+                Logs = ToLogs(f.Logs),
             }, f.Order ?? 100));
         }
         var ordered = parsed.OrderBy(p => p.Order).ThenBy(p => p.Env.Id, StringComparer.Ordinal).Select(p => p.Env).ToList();
@@ -339,6 +340,35 @@ public static partial class RegistryLoader
             f.Traffic.MinCalls ?? ObservabilityCity.Core.Links.LinkTrafficConfig.DefaultMinCalls,
             Duration(f.Traffic.Interval, ObservabilityCity.Core.Links.LinkTrafficConfig.DefaultInterval)),
     };
+
+    private static ObservabilityCity.Core.Logs.LogsConfig? ToLogs(LogsFile? f) => f is null ? null : new ObservabilityCity.Core.Logs.LogsConfig(
+        f.Source, f.Query, Duration(f.Window, ObservabilityCity.Core.Logs.LogsConfig.DefaultWindow),
+        f.TraceLinks.Select(l => new ResourceLinkRule(l.Name, l.Url.Trim(), [])).ToList());
+
+    private static void CheckLogs(EnvironmentFile f, string name, List<string> errors)
+    {
+        if (f.Logs is not { } logs) return;
+        var owner = $"{name}: logs";
+        if (!f.Sources.TryGetValue(logs.Source, out var source))
+            errors.Add($"{owner}.source '{logs.Source}' is not a source of this file.{DidYouMean.Hint(logs.Source, f.Sources.Keys)}");
+        else if (!source.Kind.Equals("loganalytics", StringComparison.OrdinalIgnoreCase))
+            errors.Add($"{owner}.source '{logs.Source}' is a {source.Kind} source; the logs are read from a loganalytics source");
+        var own = (IEnumerable<string>?)f.Scope?.Variables.Keys ?? [];
+        if (string.IsNullOrWhiteSpace(logs.Query)) errors.Add($"{owner}.query is empty. Write the query that returns one row for each kind of entry with the columns {string.Join(", ", ObservabilityCity.Core.Logs.LogQuery.Columns)}");
+        else foreach (var problem in ScopeTemplate.Check(logs.Query, ObservabilityCity.Core.Logs.LogQuery.Variables.Append(ScopeRules.EnvironmentVariable).Concat(own))) errors.Add($"{owner}.query: {problem}");
+        if (logs.Window is { } window && !SourceQuery.TryParseWindow(window, out _)) errors.Add($"{owner}.window '{window}' is not a number and a unit like 4h or 30m");
+        var names = new HashSet<string>();
+        foreach (var l in logs.TraceLinks)
+        {
+            var link = $"{owner}.traceLinks '{l.Name}'";
+            if (l.Name.Trim().Length == 0) errors.Add($"{owner}.traceLinks: a link needs a name, the words on the link");
+            else if (!names.Add(l.Name)) errors.Add($"{owner}.traceLinks: '{l.Name}' is listed twice");
+            var url = l.Url.Trim();
+            if (!url.StartsWith("https://", StringComparison.OrdinalIgnoreCase) && !url.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
+                errors.Add($"{link}: url must start with https:// (or http://) written out, so a variable can never choose the scheme or host");
+            foreach (var problem in ScopeTemplate.Check(url, ObservabilityCity.Core.Logs.LogQuery.LinkVariables.Append(ScopeRules.EnvironmentVariable).Concat(own))) errors.Add($"{link}.url: {problem}");
+        }
+    }
 
     private static TimeSpan Duration(string? text, TimeSpan fallback) =>
         text is not null && SourceQuery.TryParseWindow(text, out var d) ? d : fallback;
@@ -430,6 +460,7 @@ public static partial class RegistryLoader
         }
         CheckScope(f, name, errors);
         CheckLinks(f, name, errors);
+        CheckLogs(f, name, errors);
         var seen = new HashSet<string>();
         foreach (var t in f.Tenants)
         {

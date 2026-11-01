@@ -276,4 +276,7 @@ public sealed record RegistryEnvironment(
 
     /// <summary>How this environment finds the calls its systems make (<c>links:</c>). Null: it does not, and the links are the declared ones.</summary>
     public ObservabilityCity.Core.Links.LinkDiscovery? Links { get; init; }
+
+    /// <summary>Where the Logs tab of a system reads from (<c>logs:</c>). Null: the environment has no logs to show, and the tab says so.</summary>
+    public ObservabilityCity.Core.Logs.LogsConfig? Logs { get; init; }
 }

@@ -1,9 +1,9 @@
-import type { GroupSnapshot, LogLine, NodeSnapshot, ScopeResource, Snapshot, SystemDetail, VendorSnapshot } from './types'
+import type { GroupSnapshot, NodeSnapshot, ScopeResource, Snapshot, SystemDetail, SystemLogs, VendorSnapshot } from './types'
 import { escapeHtml } from './picker'
 import { scopeParams, type Scope } from './scope'
 import { tenantListOrder, tenantFigures, yardSummary, type TenantView } from './tenants'
 import { regionFigures, regionOptions, validChoice, WORST, type RegionChoice } from './regions'
-import { ago, clockTime, configOrder, filterLogs, incidentSummary, jobRows, LAYER_WORD, linkSections, originLabel, type LinkItem, overviewLinks, overviewRows, reasons, resourceLinks, scopeView, SEVERITY_WORD, stateTone, vendorWhere, type LogFilter } from './inspectorModel'
+import { ago, clockTime, configOrder, groupDetail, incidentSummary, jobRows, LAYER_WORD, linkSections, logSectionEmpty, logSectionTitle, originLabel, type LinkItem, overviewLinks, overviewRows, reasons, repeatLabel, resourceLinks, scopeView, SEVERITY_WORD, stateTone, traceLinks, vendorWhere } from './inspectorModel'
 
 export type InspectorTab = 'overview' | 'links' | 'logs' | 'config'
 const TABS: { id: InspectorTab; label: string }[] = [
@@ -29,13 +29,10 @@ export interface InspectorHost {
   closed(): void
 }
 
-const LOG_POLL_MS = 2000
-const LOG_LINES = 120
-
 /**
  * The drawer on the right: one system, with its numbers (Overview), who it talks to (Links), what it says (Logs) and what it is set to (Config, with
- * where each value comes from). The numbers follow the snapshots; the links and the settings are fetched once when it opens; the log lines are fetched
- * again every couple of seconds while that tab is up.
+ * where each value comes from). The numbers follow the snapshots; the links and the settings are fetched once when it opens; the Logs tab is fetched once
+ * each time it is opened, and again only when Refresh is pressed: it asks the telemetry store a question each time, so it is never polled.
  */
 export class Inspector {
   private readonly el = document.getElementById('inspector') as HTMLElement
@@ -44,12 +41,12 @@ export class Inspector {
   private snap: Snapshot | null = null
   private detail: SystemDetail | null = null
   private detailState: 'loading' | 'ready' | 'missing' = 'loading'
-  private logs: LogLine[] = []
+  private logs: SystemLogs | null = null
   private logsState: 'loading' | 'ready' | 'failed' = 'loading'
-  private filter: LogFilter = 'all'
-  private timer: number | undefined
+  private logsError = ''
   private key = ''
   private seq = 0
+  private logSeq = 0
 
   constructor(private readonly host: InspectorHost) {
     this.el.addEventListener('click', (e) => this.click(e.target as HTMLElement))
@@ -70,7 +67,7 @@ export class Inspector {
       this.id = id
       this.detail = null
       this.detailState = 'loading'
-      this.logs = []
+      this.logs = null
       this.logsState = 'loading'
       void this.loadDetail(id)
     }
@@ -80,7 +77,7 @@ export class Inspector {
   close(): void {
     if (!this.id) return
     this.id = null
-    this.stopLogs()
+    this.logSeq++
     this.seq++
     this.el.hidden = true
     this.key = ''
@@ -99,17 +96,9 @@ export class Inspector {
     this.tab = tab
     const body = this.el.querySelector('.body')
     if (body) body.scrollTop = 0
-    this.stopLogs()
-    if (tab === 'logs' && this.id) {
-      void this.loadLogs()
-      this.timer = window.setInterval(() => void this.loadLogs(), LOG_POLL_MS)
-    }
+    // opening the tab asks the store once, whether or not the tab was open before
+    if (tab === 'logs' && this.id) void this.loadLogs()
     this.render()
-  }
-
-  private stopLogs(): void {
-    if (this.timer !== undefined) window.clearInterval(this.timer)
-    this.timer = undefined
   }
 
   private get query(): string {
@@ -134,14 +123,23 @@ export class Inspector {
   private async loadLogs(): Promise<void> {
     const id = this.id
     if (!id) return
+    const seq = ++this.logSeq
+    this.logsState = 'loading'
+    this.logsError = ''
+    this.render()
     try {
-      const r = await fetch(`/api/systems/${encodeURIComponent(id)}/logs?limit=${LOG_LINES}${this.query ? `&${this.query}` : ''}`)
-      if (this.id !== id) return
-      if (!r.ok) { this.logsState = 'failed'; this.render(); return }
-      this.logs = (await r.json()) as LogLine[]
+      const r = await fetch(`/api/systems/${encodeURIComponent(id)}/logs${this.query ? `?${this.query}` : ''}`)
+      if (seq !== this.logSeq || this.id !== id) return
+      if (!r.ok) {
+        this.logsError = ((await r.json().catch(() => null)) as { error?: string } | null)?.error ?? ''
+        this.logsState = 'failed'
+        this.render()
+        return
+      }
+      this.logs = (await r.json()) as SystemLogs
       this.logsState = 'ready'
     } catch {
-      if (this.id !== id) return
+      if (seq !== this.logSeq || this.id !== id) return
       this.logsState = 'failed'
     }
     this.render()
@@ -162,8 +160,7 @@ export class Inspector {
     if (t.closest('#inspector-close')) { this.close(); return }
     const tab = t.closest<HTMLElement>('[data-tab]')
     if (tab) { this.setTab(tab.dataset.tab as InspectorTab); return }
-    const level = t.closest<HTMLElement>('[data-level]')
-    if (level) { this.filter = level.dataset.level as LogFilter; this.render(); return }
+    if (t.closest('[data-refresh-logs]')) { void this.loadLogs(); return }
     const region = t.closest<HTMLElement>('[data-region]')
     if (region && this.id) { this.host.setRegion(this.id, region.dataset.region as RegionChoice); this.render(); return }
     const link = t.closest<HTMLElement>('[data-go]')
@@ -175,7 +172,7 @@ export class Inspector {
     const found = id ? this.find(id) : null
     if (!id || !found) return
     const { node: n, group, vendor } = found
-    const body = { overview: () => this.overview(n, group), links: () => this.links(), logs: () => this.logLines(n), config: () => this.config() }[this.tab]()
+    const body = { overview: () => this.overview(n, group), links: () => this.links(), logs: () => this.logLines(), config: () => this.config() }[this.tab]()
     const html = `
       <div class="head">
         <div><b>${escapeHtml(n.name)}</b> <span class="${stateTone(n.state)}">· ${n.state}</span>
@@ -277,16 +274,17 @@ export class Inspector {
     return `<i class="origin ${origin.found ? 'found' : 'declared'}" title="${escapeHtml(title)}">${escapeHtml(text)}</i> `
   }
 
-  private logLines(n: NodeSnapshot): string {
-    const levels: { id: LogFilter; label: string }[] = [{ id: 'all', label: 'All' }, { id: 'warn', label: 'Warnings' }, { id: 'error', label: 'Errors' }]
-    const bar = `<div class="levels">${levels.map((l) => `<button data-level="${l.id}" class="${l.id === this.filter ? 'on' : ''}">${l.label}</button>`).join('')}</div>`
-    if (this.logsState === 'loading') return `${bar}<p class="none">Loading…</p>`
-    if (this.logsState === 'failed') return `${bar}<p class="none">The log lines could not be fetched.</p>`
-    const lines = filterLogs(this.logs, this.filter)
-    if (this.logs.length === 0) return `${bar}<p class="none">${n.state === 'Stale' ? 'No fresh data, so no log lines.' : 'No log lines yet.'}</p>`
-    if (lines.length === 0) return `${bar}<p class="none">No ${this.filter === 'error' ? 'errors' : 'warnings or errors'} in the last ${this.logs.length} lines.</p>`
-    return `${bar}<div class="logs">${lines.map((l) => `<div class="log ${l.level.toLowerCase()}"><time>${escapeHtml(clockTime(l.at))}</time><span>${escapeHtml(l.message)}</span></div>`).join('')}</div>
-      <p class="note">Latest first, ${ago(this.logs[0]?.at, Date.now())}. Logs are read on demand and do not decide the colours.</p>`
+  private logLines(): string {
+    const refresh = `<div class="levels"><button data-refresh-logs>Refresh</button></div>`
+    if (this.logsState === 'loading') return `${refresh}<p class="none">Loading…</p>`
+    if (this.logsState === 'failed' || !this.logs) return `${refresh}<p class="none">The logs could not be fetched.${this.logsError ? ` ${escapeHtml(this.logsError)}` : ''}</p>`
+    const logs = this.logs
+    if (!logs.configured) return `<p class="none" data-logs="unconfigured">Logs are not set up for this environment, so there is nothing to show here.</p>`
+    if (logs.sections.length === 0) return `${refresh}<p class="none">This system has no telemetry name, so it has no logs.</p>`
+    return `${refresh}${logs.sections.map((s) => `<h4 data-section="${escapeHtml(s.id)}">${escapeHtml(logSectionTitle(s, logs.slowOverMs))}</h4>${s.groups.length === 0
+      ? `<p class="none">${escapeHtml(logSectionEmpty(s, logs.window))}</p>`
+      : `<div class="logs">${s.groups.map((g) => `<div class="log ${(g.level ?? 'Info').toLowerCase()}"><time>${escapeHtml(clockTime(g.at))}</time><span>${escapeHtml(g.text)}${groupDetail(g) ? ` <i class="detail">${escapeHtml(groupDetail(g))}</i>` : ''}${repeatLabel(g) ? ` <b class="count">${escapeHtml(repeatLabel(g))}</b>` : ''}${traceLinks(g).map((l) => ` ${this.anchor(l.name, l.url)}`).join('')}</span></div>`).join('')}</div>`}`).join('')}
+      <p class="note">Read ${ago(logs.at, Date.now())} over the last ${escapeHtml(logs.window)}, newest first. Logs are read on demand and do not decide the colours.</p>`
   }
 
   private config(): string {
