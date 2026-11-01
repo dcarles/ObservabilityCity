@@ -517,6 +517,53 @@ public class LinkDiscoveryTests
     }
 
     [Fact]
+    public async Task A_changed_rule_or_vendor_reads_the_whole_window_again_for_every_name_and_an_unchanged_one_reads_only_the_gap()
+    {
+        var clock = new FakeTimeProvider(Now);
+        var (town, copy) = Make(TownA, true, clock, DeskVendors);
+        using var _ = copy;
+        var folder = Path.Combine(copy.Path, "_state");
+        var store = new DiscoveredLinks(folder);
+        var source = new FakeDependencies(_ => []);
+        var first = new LinkDiscoveryRunner(source, town.Scope, new EnvironmentRegistry(town.Holder, "prod", store, clock), store, clock, NullLogger<LinkDiscoveryRunner>.Instance);
+        await first.RunOnceAsync(CancellationToken.None);
+        clock.Advance(TimeSpan.FromHours(2));
+        await first.RunOnceAsync(CancellationToken.None);
+        Assert.Equal(Now, source.Asked[1].From); // nothing changed: the gap only
+
+        // a rule is added to the environment file
+        copy.Write("environments/prod.yaml", copy.Read("environments/prod.yaml").Replace("ignoreHosts: ['^169\\.254\\.']", "ignoreHosts: ['^169\\.254\\.', '^mystery\\.']"));
+        var changedStore = new DiscoveredLinks(folder);
+        var changed = new Town(copy.Path, true, clock);
+        var runner = new LinkDiscoveryRunner(source, changed.Scope, new EnvironmentRegistry(changed.Holder, "prod", changedStore, clock), changedStore, clock, NullLogger<LinkDiscoveryRunner>.Instance);
+        clock.Advance(TimeSpan.FromHours(1));
+        await runner.RunOnceAsync(CancellationToken.None);
+
+        Assert.Equal(clock.GetUtcNow().AddDays(-7), source.Asked[^1].From);   // the whole window, for every name
+        Assert.True(source.Asked[^1].Roles.Count > 0);
+        clock.Advance(TimeSpan.FromHours(1));
+        await runner.RunOnceAsync(CancellationToken.None);
+        Assert.Equal(clock.GetUtcNow().AddHours(-1), source.Asked[^1].From);  // and once read with the new rules, only the gap again
+
+        // the fingerprint is remembered across a restart
+        var restartedStore = new DiscoveredLinks(folder);
+        Assert.Equal(changedStore.Fingerprint, restartedStore.Fingerprint);
+    }
+
+    [Fact]
+    public async Task Asking_for_a_read_wakes_the_wait_between_reads_once()
+    {
+        var store = new DiscoveredLinks();
+        var waiting = store.TakeReadRequest();
+        Assert.False(waiting.IsCompleted);
+        store.RequestRead();
+        Assert.True(waiting.IsCompleted);
+        Assert.True(store.TakeReadRequest().IsCompleted); // hands out the finished ask and starts a new one
+        Assert.False(store.TakeReadRequest().IsCompleted);
+        await Task.CompletedTask;
+    }
+
+    [Fact]
     public async Task The_names_already_read_are_remembered_across_a_restart_so_nothing_is_read_twice()
     {
         var clock = new FakeTimeProvider(Now);

@@ -82,6 +82,29 @@ public sealed class DiscoveredLinks
         }
     }
 
+    private string? _fingerprint;
+    private volatile TaskCompletionSource _readWanted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    /// <summary>What the rules, ignore list, vendors and town systems were when the links so far were read (see <see cref="LinkClassifier.Fingerprint"/>). Null when unknown.</summary>
+    public string? Fingerprint { get { lock (_gate) return _fingerprint; } }
+
+    /// <summary>Remembers the fingerprint of the inputs a successful read used. When they change later, the whole first-read window is read again.</summary>
+    public void SetFingerprint(string fingerprint)
+    {
+        lock (_gate) _fingerprint = fingerprint;
+    }
+
+    /// <summary>Asks the background read to run now instead of at its next turn (the rules changed, so the history should be read again).</summary>
+    public void RequestRead() => _readWanted.TrySetResult();
+
+    /// <summary>Completes when a read was asked for since the last call; hands out a fresh one for the next ask.</summary>
+    public Task TakeReadRequest()
+    {
+        var current = _readWanted;
+        if (current.Task.IsCompleted) _readWanted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        return current.Task;
+    }
+
     /// <summary>Why the last read failed, or null.</summary>
     public string? Error { get { lock (_gate) return _error; } }
 
@@ -277,6 +300,7 @@ public sealed class DiscoveredLinks
             WriteIfChanged(Path.Combine(_folder, StateFile), Writer.Serialize(new StateData
             {
                 ReadUpTo = _readUpTo?.UtcDateTime.ToString("yyyy-MM-ddTHH:mm:ssZ"),
+                Fingerprint = _fingerprint,
                 Roles = _askedRoles.Order(StringComparer.Ordinal).ToList(),
                 Unresolved = _unresolved.OrderBy(kv => kv.Key.Caller, StringComparer.Ordinal).ThenBy(kv => kv.Key.Host, StringComparer.Ordinal)
                     .Select(kv => new UnresolvedEntry { Caller = kv.Key.Caller, Host = kv.Key.Host, Path = kv.Key.Path.Length == 0 ? null : kv.Key.Path, Calls = kv.Value.Calls, Days = kv.Value.Days.Select(d => d.ToString("yyyy-MM-dd")).ToList() }).ToList(),
@@ -303,6 +327,7 @@ public sealed class DiscoveredLinks
                 {
                     var state = Reader.Deserialize<StateData>(text);
                     if (state is null) continue;
+                    _fingerprint = state.Fingerprint;
                     foreach (var role in state.Roles) _askedRoles.Add(role);
                     if (DateTimeOffset.TryParse(state.ReadUpTo, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.AssumeUniversal, out var at)) _readUpTo = at;
                     foreach (var u in state.Unresolved)
@@ -337,6 +362,7 @@ public sealed class DiscoveredLinks
     private sealed class StateData
     {
         public string? ReadUpTo { get; set; }
+        public string? Fingerprint { get; set; }
         public List<string> Roles { get; set; } = [];
         public List<UnresolvedEntry> Unresolved { get; set; } = [];
         public List<UnresolvedEntry> Outside { get; set; } = [];

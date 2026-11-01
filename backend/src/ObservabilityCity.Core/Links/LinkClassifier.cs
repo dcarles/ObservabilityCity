@@ -57,6 +57,25 @@ public sealed class LinkClassifier
         _pillars = _systems.Keys.Select(Pillar).ToHashSet(StringComparer.OrdinalIgnoreCase);
     }
 
+    /// <summary>
+    /// A short code for everything that decides what an address is: the ignore list, rules, aliases, each vendor's domains and matches, and the town's systems.
+    /// When it differs from the one the stored links were read with, those links may have been judged differently, so the history is read again.
+    /// </summary>
+    public static string Fingerprint(LinkDiscovery config, IEnumerable<RegistryVendor> vendors, IEnumerable<string> systemIds)
+    {
+        var text = new System.Text.StringBuilder();
+        foreach (var p in config.IgnoreHosts) text.Append("i|").Append(p).Append('\n');
+        foreach (var r in config.Rules) text.Append("r|").Append(r.Host).Append('|').Append(r.Path).Append('|').Append(r.Target).Append('|').Append(r.Gateway).Append('\n');
+        foreach (var a in config.Aliases.OrderBy(a => a.Key, StringComparer.Ordinal)) text.Append("a|").Append(a.Key).Append('|').Append(a.Value).Append('\n');
+        foreach (var v in vendors.OrderBy(v => v.Node.Id, StringComparer.Ordinal))
+        {
+            text.Append("v|").Append(v.Node.Id).Append('|').Append(string.Join(',', v.Domains.Order(StringComparer.Ordinal))).Append('|')
+                .Append(string.Join(',', v.Matches.Select(m => m.Host + "/" + m.Path).Order(StringComparer.Ordinal))).Append('\n');
+        }
+        foreach (var id in systemIds.Order(StringComparer.Ordinal)) text.Append("s|").Append(id).Append('\n');
+        return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(text.ToString())))[..16];
+    }
+
     /// <summary>The services of the registry's systems, for matching an address that carries a service code.</summary>
     public static IEnumerable<ServiceCodeEntry> ServicesOf(IEnumerable<RegistryNode> nodes) =>
         nodes.Where(n => n.Service is { Length: > 0 }).Select(n => new ServiceCodeEntry(n.GroupId, n.Service!, n.ServiceCode is { Length: > 0 } c ? c : n.Service!));
