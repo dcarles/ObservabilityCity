@@ -31,6 +31,8 @@ export interface Route {
   /** Share of the destination's traffic that takes this route. A function when the share follows the latest snapshot (measured traffic). */
   share: number | (() => number)
   bay?: Bay
+  /** A road to a third party: its traffic is the calls the town sends it, so its cars drive whatever its health says (it has none). */
+  vendor?: boolean
   /** Set for cars that leave the picture: they end at the hub plaza because their destination is on an island the filter hides. */
   edge?: boolean
 }
@@ -255,7 +257,7 @@ export class CarSystem {
     for (const plan of this.plans) {
       if (this.hidden.has(plan.route.dest) || this.hidden.has(plan.route.source as Building)) continue
       const n = plan.route.dest.node
-      if (!n || (n.state !== 'Healthy' && n.state !== 'Degraded')) continue
+      if (!n || (!plan.route.vendor && n.state !== 'Healthy' && n.state !== 'Degraded')) continue
       const a = (this.acc.get(plan) ?? this.random()) + this.rateOf(plan.route) * dt
       // a car that cannot leave yet (the road is not clear) waits its turn, up to a few
       let owed = a

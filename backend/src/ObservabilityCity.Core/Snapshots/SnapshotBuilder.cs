@@ -77,7 +77,7 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
                 incidents.GetValueOrDefault(g.Id) ?? [], links[g.Id].HasBridge, links[g.Id].HasRingBridge, MessagingOf(registry, g),
                 g.Nodes.Select(n => ToNode(n, now, registry)).ToList(), AssetsOf(g.Id, registry)))
             .ToList();
-        var allVendors = registry.Vendors.Select(v => new VendorSnapshot(ToNode(v.Node, now, registry), v.CalledBy, v.IslandId ?? v.Node.Id, v.IslandName, v.Internal)).ToList();
+        var allVendors = registry.Vendors.Select(v => new VendorSnapshot(WithCallRate(ToNode(v.Node, now, registry)), v.CalledBy, v.IslandId ?? v.Node.Id, v.IslandName, v.Internal)).ToList();
         var allNodes = allGroups.SelectMany(g => g.Nodes).ToList();
         var everyone = allNodes.Concat(allVendors.Select(v => v.Node)).ToDictionary(n => n.Id);
 
@@ -285,6 +285,10 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
         return links.OrderByDescending(kv => kv.Value).ThenBy(kv => kv.Key.From, StringComparer.Ordinal).ThenBy(kv => kv.Key.To, StringComparer.Ordinal)
             .Select(kv => new DependencySnapshot(kv.Key.From, kv.Key.To, kv.Value)).ToList();
     }
+
+    /// <summary>A third party has no rate of its own: what the town systems are seen sending it is its traffic, with each caller's part, when the traffic is measured.</summary>
+    private NodeSnapshot WithCallRate(NodeSnapshot vendor) =>
+        Traffic?.CallRates(vendor.Id) is { } calls ? vendor with { RequestsPerSecond = calls.Total, Inbound = calls.Callers } : vendor;
 
     /// <summary>Headline latency: p99 averaged over request-serving nodes, weighted by traffic. Workers and crons are left out.</summary>
     private static double RequestWeightedP99(List<NodeSnapshot> live)

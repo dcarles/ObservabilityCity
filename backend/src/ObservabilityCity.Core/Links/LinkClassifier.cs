@@ -10,7 +10,7 @@ public enum LinkOutcome
 {
     /// <summary>Platform noise the ignore list names.</summary>
     Ignored,
-    /// <summary>A known third party. Recognised, not drawn yet.</summary>
+    /// <summary>A known third party. <see cref="Classified.Target"/> is the vendor's id: its calls are counted for the traffic to it, nothing is drawn from the link itself.</summary>
     Vendor,
     /// <summary>A system of the town, or a service of a vendor island.</summary>
     Found,
@@ -31,7 +31,7 @@ public sealed class LinkClassifier
     private readonly List<Regex> _ignore;
     private readonly List<(Regex Host, Regex? Path, LinkRule Rule)> _rules;
     private readonly IReadOnlyDictionary<string, string> _aliases;
-    private readonly IReadOnlyList<string> _vendorDomains;
+    private readonly List<(string Id, string Domain)> _vendorDomains;
     private readonly Dictionary<string, string> _systems;
     private readonly HashSet<string> _pillars;
     private readonly List<(string Id, string Host, Regex? Path)> _services;
@@ -50,7 +50,7 @@ public sealed class LinkClassifier
         _ignore = config.IgnoreHosts.Select(p => new Regex(p, Options, LinkDiscovery.RegexTimeout)).ToList();
         _rules = config.Rules.Select(r => (new Regex(r.Host, Options, LinkDiscovery.RegexTimeout), r.Path is null ? null : new Regex(r.Path, Options, LinkDiscovery.RegexTimeout), r)).ToList();
         _aliases = new Dictionary<string, string>(config.Aliases, StringComparer.OrdinalIgnoreCase);
-        _vendorDomains = vendors.SelectMany(v => v.Domains).Select(d => d.Trim().TrimStart('.').ToLowerInvariant()).Where(d => d.Length > 0).ToList();
+        _vendorDomains = vendors.SelectMany(v => v.Domains.Select(d => (v.Node.Id, Domain: d.Trim().TrimStart('.').ToLowerInvariant()))).Where(d => d.Domain.Length > 0).ToList();
         _services = vendors.SelectMany(v => v.Matches.Select(m => (v.Node.Id, m.Host.Trim().TrimStart('.').ToLowerInvariant(), m.Path is null ? null : new Regex(m.Path, Options, LinkDiscovery.RegexTimeout))))
             .Where(m => m.Item2.Length > 0).ToList();
         _systems = systemIds.ToDictionary(id => id, id => id, StringComparer.OrdinalIgnoreCase);
@@ -89,7 +89,8 @@ public sealed class LinkClassifier
             if (path is not null && (row.Path is null || !path.IsMatch(row.Path))) continue;
             return new Classified(LinkOutcome.Found, id);
         }
-        if (_vendorDomains.Any(d => h == d || h.EndsWith("." + d, StringComparison.Ordinal))) return new Classified(LinkOutcome.Vendor);
+        foreach (var (id, domain) in _vendorDomains)
+            if (h == domain || h.EndsWith("." + domain, StringComparison.Ordinal)) return new Classified(LinkOutcome.Vendor, id);
         return outside ?? new Classified(LinkOutcome.Unresolved);
     }
 

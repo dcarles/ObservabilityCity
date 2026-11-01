@@ -80,6 +80,16 @@ interface Island {
   nodeIds: Set<string>
 }
 
+/**
+ * The part of a third party's traffic that one island sends: what the town systems on it are measured sending, over the whole. Before the traffic is
+ * measured the calls are shared evenly between the islands that call it.
+ */
+export function vendorShare(node: NodeSnapshot | null, callers: readonly string[], islands: number): number {
+  const total = node?.requestsPerSecond ?? 0
+  if (!node?.inbound || !(total > 0)) return 1 / Math.max(1, islands)
+  return Math.min(1, node.inbound.filter((i) => callers.includes(i.from)).reduce((a, i) => a + i.requestsPerSecond, 0) / total)
+}
+
 /** An island's road to one third party: out of its back gate, over its bridge to the ring road, round the loop and down the vendor's spur. */
 interface VendorLink {
   group: number
@@ -720,7 +730,8 @@ export class Town {
     for (const p of loopArc(loopR, link.islandAngle, link.vendorAngle, GROUND)) head.push(new THREE.Vector3(p.x, p.y, p.z))
     head.push(link.vendor.gate().setY(GROUND))
     const lane = link.vendor.into(head, link.to)
-    return [{ dest: link.vendor.buildings.get(link.to)!, source: island.buildings.get(from.node.id)!, origin: 'internal', share: 1 / link.of, ...lane }]
+    const dest = link.vendor.buildings.get(link.to)!
+    return [{ dest, source: island.buildings.get(from.node.id)!, origin: 'internal', vendor: true, share: () => vendorShare(dest.node, link.callers, link.of), ...lane }]
   }
 
   private ringPoint(a: number): THREE.Vector3 {

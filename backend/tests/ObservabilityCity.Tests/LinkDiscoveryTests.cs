@@ -165,6 +165,7 @@ public class LinkDiscoveryTests
 
         Assert.Equal(LinkOutcome.Vendor, Classify(Rules(), "bureau.example.test", vendors: vendors).Outcome);
         Assert.Equal(LinkOutcome.Vendor, Classify(Rules(), "api.bureau.example.test", vendors: vendors).Outcome);
+        Assert.Equal(vendors[0].Node.Id, Classify(Rules(), "api.bureau.example.test", vendors: vendors).Target); // its id, so the calls to it can be counted
         Assert.Equal(LinkOutcome.Unresolved, Classify(Rules(), "notbureau.example.test", vendors: vendors).Outcome);
     }
 

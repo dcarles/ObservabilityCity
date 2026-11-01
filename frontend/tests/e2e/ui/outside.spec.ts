@@ -104,3 +104,39 @@ test.describe('where an API\'s traffic comes from', () => {
     expect(rates.none).toBe(0)
   })
 })
+
+test.describe('cars to a third party', () => {
+  test('are driven at the measured call rate, whatever the third party\'s own state, each road taking its callers\' part', async ({ town, page }) => {
+    await town.open()
+
+    const out = await page.evaluate(() => {
+      const c = (window as any).city
+      const s = structuredClone(c.seen.last)
+      const v = s.vendors.find((x: any) => x.node.id === 'ext.mailer')
+      v.node.state = 'Stale'
+      v.node.requestsPerSecond = 8
+      v.node.inbound = [{ from: 'cc.notify-worker', requestsPerSecond: 6 }, { from: 'bb.ledger-worker', requestsPerSecond: 2 }]
+      c.feed(s)
+      const routes = c.town.cars.routeList.filter((r: any) => r.vendor && r.dest.id === 'ext.mailer')
+      return routes.map((r: any) => ({ from: r.source.node?.id ?? r.source.id, share: typeof r.share === 'function' ? r.share() : r.share, rate: c.town.cars.rateOf(r) }))
+    })
+
+    expect(out.length).toBeGreaterThan(0)
+    expect(out.every((r: any) => r.rate > 0)).toBe(true)
+    expect(out.reduce((a: number, r: any) => a + r.share, 0)).toBeCloseTo(1, 6)
+  })
+
+  test('are not driven when nothing is called', async ({ town, page }) => {
+    await town.open()
+    const rates = await page.evaluate(() => {
+      const c = (window as any).city
+      const s = structuredClone(c.seen.last)
+      const v = s.vendors.find((x: any) => x.node.id === 'ext.mailer')
+      v.node.requestsPerSecond = 0
+      v.node.inbound = null
+      c.feed(s)
+      return c.town.cars.routeList.filter((r: any) => r.vendor && r.dest.id === 'ext.mailer').map((r: any) => c.town.cars.rateOf(r))
+    })
+    expect(rates.every((r: number) => r === 0)).toBe(true)
+  })
+})

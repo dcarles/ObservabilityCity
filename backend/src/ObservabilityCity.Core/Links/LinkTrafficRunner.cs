@@ -60,7 +60,7 @@ public sealed class LinkTrafficRunner(
         {
             if (!byRole.TryGetValue(row.Caller, out var caller)) continue;
             var result = classifier.Classify(row, caller.GroupId);
-            if (result.Outcome == LinkOutcome.Found && result.Target != caller.Id) calls.Add((caller.Id, result.Target!, row.Calls));
+            if (result.Outcome is LinkOutcome.Found or LinkOutcome.Vendor && result.Target is { } target && target != caller.Id) calls.Add((caller.Id, target, row.Calls));
         }
         traffic.Update(calls, config.ShareWindow, config.MinCalls);
     }

@@ -131,6 +131,26 @@ public class LinkTrafficTests
     }
 
     [Fact]
+    public void A_third_partys_traffic_is_what_the_town_systems_are_seen_sending_it_with_each_callers_part()
+    {
+        // 1800 and 900 calls an hour are 0.5 and 0.25 a second
+        var traffic = Traffic(20, ("aa.orders-worker", "ext.bureau", 1800), ("bb.ledger-worker", "ext.bureau", 900));
+
+        var rates = traffic.CallRates("ext.bureau")!.Value;
+
+        Assert.Equal(0.75, rates.Total, 6);
+        Assert.Equal(0.5, rates.Callers.Single(c => c.From == "aa.orders-worker").RequestsPerSecond, 6);
+        Assert.Equal(0.25, rates.Callers.Single(c => c.From == "bb.ledger-worker").RequestsPerSecond, 6);
+    }
+
+    [Fact]
+    public void A_third_party_nobody_was_seen_calling_has_no_rate_and_an_unmeasured_town_has_none_at_all()
+    {
+        Assert.Null(Traffic(20, ("aa.orders-worker", "ext.bureau", 1800)).CallRates("ext.other"));
+        Assert.Null(new LinkTraffic().CallRates("ext.bureau"));
+    }
+
+    [Fact]
     public void A_building_no_town_system_calls_gets_all_its_traffic_from_outside()
     {
         var traffic = Traffic(20, ("aa.orders-worker", "bb.ledger-api", 1800));
