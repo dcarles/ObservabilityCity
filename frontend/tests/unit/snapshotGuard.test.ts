@@ -82,8 +82,15 @@ describe('a snapshot with something wrong in it is repaired where that is safe',
     delete (group.nodes as Record<string, unknown>[])[0].calls
     const out = checkSnapshot(raw).snapshot!
     expect(out.notices).toEqual([])
+    expect(out.notes).toBeNull()
     expect(out.groups[1].configError).toBeNull()
     expect(out.groups[1].nodes[0].calls).toEqual([])
+  })
+
+  it('keeps the notes, which are not problems, and drops anything that is not text', () => {
+    const raw = calm() as unknown as Record<string, unknown>
+    raw.notes = ["Pillar 'zz' is not in the town yet", 7, null]
+    expect(checkSnapshot(raw).snapshot!.notes).toEqual(["Pillar 'zz' is not in the town yet"])
   })
 
   it('keeps a config error island, which has no systems, and its message', () => {
