@@ -229,8 +229,21 @@ internal sealed class LogsFile
     public string Query { get; set; } = "";
     /// <summary>How far back it looks. Default 4h.</summary>
     public string? Window { get; set; }
-    /// <summary>Addresses that open one request's full trace somewhere else, 0 to n. Variables {operationId}, {role}, {time}, scope variables and {environment}.</summary>
-    public List<ResourceLinkFile> TraceLinks { get; set; } = [];
+    /// <summary>Links in the header of a section that open the telemetry store's own search, already filtered to the system, 0 to n.</summary>
+    public List<LogLinkFile> Links { get; set; } = [];
+}
+
+/// <summary>One entry of <c>logs.links</c>.</summary>
+internal sealed class LogLinkFile
+{
+    /// <summary>The words on the link. When the rule finds more than one resource, the resource's name is added to it.</summary>
+    public string Name { get; set; } = "";
+    /// <summary>The section whose header carries it: failed, slow, logs or exceptions.</summary>
+    public string Section { get; set; } = "";
+    /// <summary>The name of a scope.assets rule. Each resource it finds gets its own link.</summary>
+    public string Resources { get; set; } = "";
+    /// <summary>A template that starts with https:// (or http://) written out. Variables {resourceId}, {resourceIdTwice}, {resourceName}, {role}, {from}, {to}, {windowMs}, scope variables and {environment}.</summary>
+    public string Url { get; set; } = "";
 }
 
 /// <summary>The <c>links:</c> block of an environment file.</summary>

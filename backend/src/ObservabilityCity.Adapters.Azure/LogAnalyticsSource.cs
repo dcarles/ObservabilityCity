@@ -48,7 +48,7 @@ public sealed class LogAnalyticsReader(HttpClient http, ICredentialSource? crede
 
     /// <summary>
     /// The rows of the logs query: <c>section</c>, <c>at</c> and <c>text</c>; <c>count</c> (default 1), <c>level</c> (a word like warn or error, or a number where
-    /// 2 is a warning and 3 and above an error), <c>operationId</c>, <c>durationMs</c> and <c>result</c> may be left out. A row without a section, a time or text
+    /// 2 is a warning and 3 and above an error), <c>durationMs</c> and <c>result</c> may be left out. A row without a section, a time or text
     /// says nothing and is skipped.
     /// </summary>
     public static IReadOnlyList<LogRow> ParseLogs(string json)
@@ -59,10 +59,10 @@ public sealed class LogAnalyticsReader(HttpClient http, ICredentialSource? crede
         var table = tables[0];
         var names = table.GetProperty("columns").EnumerateArray().Select(c => c.GetProperty("name").GetString() ?? "").ToList();
         int Index(string column) => names.FindIndex(n => n.Equals(column, StringComparison.OrdinalIgnoreCase));
-        var (section, at, text, count, level, operation, duration, result) =
-            (Index("section"), Index("at"), Index("text"), Index("count"), Index("level"), Index("operationId"), Index("durationMs"), Index("result"));
+        var (section, at, text, count, level, duration, result) =
+            (Index("section"), Index("at"), Index("text"), Index("count"), Index("level"), Index("durationMs"), Index("result"));
         if (section < 0 || at < 0 || text < 0)
-            throw new InvalidOperationException($"the logs query must return the columns section, at and text (count, level, operationId, durationMs and result may be left out); it returned {string.Join(", ", names)}");
+            throw new InvalidOperationException($"the logs query must return the columns section, at and text (count, level, durationMs and result may be left out); it returned {string.Join(", ", names)}");
         string? Plain(JsonElement row, int index) => index < 0 ? null : row[index].ValueKind switch
         {
             JsonValueKind.String when row[index].GetString() is { Length: > 0 } t => t,
@@ -75,7 +75,7 @@ public sealed class LogAnalyticsReader(HttpClient http, ICredentialSource? crede
             if (Text(row[section]) is not { Length: > 0 } kind || Text(row[text]) is not { Length: > 0 } what) continue;
             if (Text(row[at]) is not { Length: > 0 } when || !DateTimeOffset.TryParse(when, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var time)) continue;
             var n = count < 0 ? 1 : Number(row, count) is { } c ? (int)Math.Clamp(Math.Round(c), 1, int.MaxValue) : 1;
-            rows.Add(new LogRow(kind.Trim().ToLowerInvariant(), time, what, n, Level(Plain(row, level)), Plain(row, operation), duration < 0 ? null : Number(row, duration), Plain(row, result)));
+            rows.Add(new LogRow(kind.Trim().ToLowerInvariant(), time, what, n, Level(Plain(row, level)), duration < 0 ? null : Number(row, duration), Plain(row, result)));
         }
         return rows;
     }

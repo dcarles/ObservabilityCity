@@ -436,12 +436,10 @@ public sealed record SystemLogs(DateTimeOffset At, bool Configured, string Windo
 
 /// <summary>
 /// One section of the Logs tab. Id is "failed" (5xx requests), "slow" (requests over the SLA), "logs" (warnings and errors) or "exceptions", so that a flood
-/// in one never hides another. Groups are newest first; a repeat is one group with a count.
+/// in one never hides another. Groups are newest first; a repeat is one group with a count. Links open the telemetry store's own search for this section,
+/// already filtered to the system, from the environment's <c>logs.links</c> (one for each store); null when the environment has none for the section.
 /// </summary>
-public sealed record LogSection(string Id, IReadOnlyList<LogGroup> Groups);
+public sealed record LogSection(string Id, IReadOnlyList<LogGroup> Groups, IReadOnlyList<ResourceLink>? Links = null);
 
-/// <summary>
-/// Entries that say the same thing, grouped: Count of them, the newest at At. OperationId, DurationMs and Result (a status code, say) are those of the newest
-/// entry, when the source has them. Links open the full trace of that entry somewhere else, from the environment's <c>logs.traceLinks</c>.
-/// </summary>
-public sealed record LogGroup(DateTimeOffset At, LogLevel? Level, string Text, int Count, string? OperationId, double? DurationMs, string? Result, IReadOnlyList<ResourceLink>? Links);
+/// <summary>Entries that say the same thing, grouped: Count of them, the newest at At. DurationMs and Result (a status code, say) are those of the newest entry, when the source has them.</summary>
+public sealed record LogGroup(DateTimeOffset At, LogLevel? Level, string Text, int Count, double? DurationMs, string? Result);

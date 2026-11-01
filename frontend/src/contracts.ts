@@ -186,17 +186,16 @@ export interface components {
             text: string;
             /** Format: int32 */
             count: number;
-            operationId?: string | null;
             /** Format: double */
             durationMs?: number | null;
             result?: string | null;
-            links?: components["schemas"]["ResourceLink"][] | null;
         };
         /** @enum {string} */
         LogLevel: "Info" | "Warn" | "Error";
         LogSection: {
             id: string;
             groups: components["schemas"]["LogGroup"][];
+            links?: components["schemas"]["ResourceLink"][] | null;
         };
         MessagingSnapshot: {
             topics: components["schemas"]["TopicSnapshot"][];

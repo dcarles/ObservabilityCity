@@ -10,7 +10,7 @@ namespace ObservabilityCity.Adapters.Fake;
 /// slow requests when p99 is over its SLA, warnings and errors (throttling on a store that turns requests away, dead letters on a consumer that parks
 /// them) and the exceptions behind the errors. The entries are a pure function of the system, the reading and the clock (an entry keeps its text and its
 /// time from one read to the next), and repeats are grouped with a count, newest first, as the live Logs tab does. A worker has only the logs and exceptions
-/// sections. The demo has no tracing tool, so its entries carry an operation id and no trace links.
+/// sections. The demo has no telemetry store to link to, so its sections have no header links.
 /// </summary>
 public sealed class FakeLogSource(LatestState state, TimeProvider clock, TimeSpan staleAfter) : ILogSource
 {
@@ -40,11 +40,11 @@ public sealed class FakeLogSource(LatestState state, TimeProvider clock, TimeSpa
             var at = DateTimeOffset.FromUnixTimeSeconds(b * Step + (long)(h % Step));
             if (at > now) at = now;
             foreach (var (section, level, text, result, ms) in Entries(node, r, h))
-                rows.Add(new LogRow(section, at, text, 1, level, (h >> 20).ToString("x8")[..8], ms, result));
+                rows.Add(new LogRow(section, at, text, 1, level, ms, result));
         }
         var config = new LogsConfig("fake", "", TimeSpan.FromSeconds(Steps * Step), []);
         var environment = new RegistryEnvironment("demo", "demo", true, [], [], new HashSet<string>(), []);
-        return new SystemLogs(now, true, window, node.SlaP99Ms, QueryLogSource.Sections(rows, wanted, config, environment, node.Id));
+        return new SystemLogs(now, true, window, node.SlaP99Ms, QueryLogSource.Sections(rows, wanted, config, environment, node.Id, [], TimeSpan.FromSeconds(Steps * Step), now - TimeSpan.FromSeconds(Steps * Step), now));
     }
 
     /// <summary>

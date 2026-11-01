@@ -163,9 +163,9 @@ export function groupDetail(group: LogGroup): string {
   return [group.result, group.durationMs != null ? formatMs(group.durationMs) : null].filter((x): x is string => !!x).join(' · ')
 }
 
-/** The links of an entry to its full trace that are safe to draw (only http and https). */
-export function traceLinks(group: LogGroup): ResourceLink[] {
-  return (group.links ?? []).filter((l) => l.name.length > 0 && isWebAddress(l.url))
+/** The links in a section's header that are safe to draw (only http and https). */
+export function sectionLinks(section: { links?: ResourceLink[] | null }): ResourceLink[] {
+  return (section.links ?? []).filter((l) => l.name.length > 0 && isWebAddress(l.url))
 }
 
 export const LAYER_WORD: Record<SettingLayer, string> = {

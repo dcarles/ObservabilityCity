@@ -1,12 +1,13 @@
 using System.Globalization;
 using ObservabilityCity.Contracts;
 using ObservabilityCity.Core.Registry;
+using ObservabilityCity.Core.Scope;
 using ObservabilityCity.Core.Sources;
 
 namespace ObservabilityCity.Core.Logs;
 
 /// <summary>One row of the logs query: one kind of entry (a section), seen <see cref="Count"/> times, the newest at <see cref="At"/>.</summary>
-public sealed record LogRow(string Section, DateTimeOffset At, string Text, int Count, LogLevel? Level, string? OperationId, double? DurationMs, string? Result);
+public sealed record LogRow(string Section, DateTimeOffset At, string Text, int Count, LogLevel? Level, double? DurationMs, string? Result);
 
 /// <summary>A source that can answer the logs query (the Log Analytics adapter does). The Logs tab never learns which cloud is behind it.</summary>
 public interface ILogRowSource
@@ -38,7 +39,7 @@ public static class LogSections
 /// The variables the logs query template may use, besides the scope variables and {environment}: {roles} (the system's telemetry name, double-quoted),
 /// {from} and {to} (UTC, ISO 8601), {window} (for example 4h), {windowSeconds}, {slaMs} (the system's own p99 SLA, the line slow requests are measured
 /// against) and {kind} (api, worker and so on). The query returns one row for each kind of entry with the columns <c>section</c> (failed, slow, logs or
-/// exceptions), <c>at</c> (the newest time) and <c>text</c>; <c>count</c>, <c>level</c>, <c>operationId</c>, <c>durationMs</c> and <c>result</c> may be left out.
+/// exceptions), <c>at</c> (the newest time) and <c>text</c>; <c>count</c>, <c>level</c>, <c>durationMs</c> and <c>result</c> may be left out.
 /// </summary>
 public static class LogQuery
 {
@@ -47,10 +48,10 @@ public static class LogQuery
     public const string SlaMs = "slaMs";
     public const string Kind = "kind";
     public static readonly string[] Variables = [SourceQuery.Roles, SourceQuery.Window, SourceQuery.WindowSeconds, From, To, SlaMs, Kind];
-    public static readonly string[] Columns = ["section", "at", "text", "count", "level", "operationId", "durationMs", "result"];
+    public static readonly string[] Columns = ["section", "at", "text", "count", "level", "durationMs", "result"];
 
-    /// <summary>The variables a trace link template may use besides the scope variables and {environment}.</summary>
-    public static readonly string[] LinkVariables = ["operationId", "role", "time"];
+    /// <summary>The variables a section link template may use besides the scope variables and {environment}.</summary>
+    public static readonly string[] LinkVariables = ["resourceId", "resourceIdTwice", "resourceName", "role", From, To, "windowMs"];
 
     public static string Render(string template, string environmentId, ScopeRules rules, string role, NodeKind kind, double slaMs, TimeSpan window, DateTimeOffset from, DateTimeOffset to) =>
         ScopeTemplate.Render(template, name => name switch
@@ -69,26 +70,35 @@ public static class LogQuery
     public static string Iso(DateTimeOffset at) => at.UtcDateTime.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", CultureInfo.InvariantCulture);
 
     /// <summary>
-    /// The addresses of one entry's full trace, from the environment's <c>logs.traceLinks</c>. Every value is percent-encoded, the scheme and host come only
-    /// from the template, and an address that does not come out as an http or https address is dropped. Null when there is no operation to open or no link.
+    /// The links of one section's header: for each link rule of that section, one address for each resource its asset rule found, with the resource's name added
+    /// to the link's words when there is more than one. Every value is percent-encoded (<c>resourceIdTwice</c> twice, for a portal that nests the id in
+    /// its own address), the scheme and host come only from the template, and an address that does not come out as an http or https address is dropped.
+    /// Null when there is none.
     /// </summary>
-    public static IReadOnlyList<ResourceLink>? Links(IReadOnlyList<ResourceLinkRule> rules, ScopeRules scope, string environmentId, string role, string? operationId, DateTimeOffset at)
+    public static IReadOnlyList<ResourceLink>? Links(IReadOnlyList<LogLinkRule> rules, string section, IReadOnlyList<ResolvedAsset> assets, ScopeRules scope, string environmentId, string role, TimeSpan window, DateTimeOffset from, DateTimeOffset to)
     {
-        if (rules.Count == 0 || string.IsNullOrWhiteSpace(operationId)) return null;
-        string? Value(string name) => name switch
-        {
-            "operationId" => Uri.EscapeDataString(operationId),
-            "role" => Uri.EscapeDataString(role),
-            "time" => Uri.EscapeDataString(Iso(at)),
-            ScopeRules.EnvironmentVariable => Uri.EscapeDataString(environmentId),
-            _ => scope.Variables.TryGetValue(name, out var own) ? Uri.EscapeDataString(own) : null,
-        };
         var links = new List<ResourceLink>();
-        foreach (var rule in rules)
+        foreach (var rule in rules.Where(r => r.Section.Equals(section, StringComparison.OrdinalIgnoreCase)))
         {
-            var url = ScopeTemplate.Render(rule.Url, Value);
-            if (Uri.TryCreate(url, UriKind.Absolute, out var parsed) && (parsed.Scheme == Uri.UriSchemeHttps || parsed.Scheme == Uri.UriSchemeHttp))
-                links.Add(new ResourceLink(rule.Name, url));
+            var found = assets.Where(a => a.Rule.Equals(rule.Resources, StringComparison.OrdinalIgnoreCase)).OrderBy(a => a.Name, StringComparer.Ordinal).ToList();
+            foreach (var asset in found)
+            {
+                string? Value(string name) => name switch
+                {
+                    "resourceId" => string.Join("/", asset.ResourceId.Split('/').Select(Uri.EscapeDataString)),
+                    "resourceIdTwice" => Uri.EscapeDataString(Uri.EscapeDataString(asset.ResourceId)),
+                    "resourceName" => Uri.EscapeDataString(asset.Name),
+                    "role" => Uri.EscapeDataString(role),
+                    From => Uri.EscapeDataString(Iso(from)),
+                    To => Uri.EscapeDataString(Iso(to)),
+                    "windowMs" => ((long)window.TotalMilliseconds).ToString(CultureInfo.InvariantCulture),
+                    ScopeRules.EnvironmentVariable => Uri.EscapeDataString(environmentId),
+                    _ => scope.Variables.TryGetValue(name, out var own) ? Uri.EscapeDataString(own) : null,
+                };
+                var url = ScopeTemplate.Render(rule.Url, Value);
+                if (Uri.TryCreate(url, UriKind.Absolute, out var parsed) && (parsed.Scheme == Uri.UriSchemeHttps || parsed.Scheme == Uri.UriSchemeHttp))
+                    links.Add(new ResourceLink(found.Count > 1 ? $"{rule.Name} ({asset.Name})" : rule.Name, url));
+            }
         }
         return links.Count == 0 ? null : links;
     }

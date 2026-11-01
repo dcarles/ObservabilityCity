@@ -83,7 +83,6 @@ public class FakeLogSourceTests
         Assert.True(failed.Count < failed.Sum(g => g.Count), "repeats are one group with a count");
         Assert.Equal(failed.OrderByDescending(g => g.At).Select(g => g.At), failed.Select(g => g.At));
         Assert.NotEmpty(rig.Section("aa.orders-api", "exceptions"));
-        Assert.All(failed, g => Assert.NotNull(g.OperationId));
     }
 
     [Fact]

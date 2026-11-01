@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { ago, clockTime, configOrder, groupDetail, incidentSummary, linkSections, logSectionEmpty, logSectionTitle, originLabel, isWebAddress, overviewLinks, overviewRows, reasons, repeatLabel, resourceLinks, scopeView, stateTone, traceLinks } from '../../src/inspectorModel'
+import { ago, clockTime, configOrder, groupDetail, incidentSummary, linkSections, logSectionEmpty, logSectionTitle, originLabel, isWebAddress, overviewLinks, overviewRows, reasons, repeatLabel, resourceLinks, scopeView, sectionLinks, stateTone } from '../../src/inspectorModel'
 import type { ConfigValue, LogGroup, LogSection, ScopeInfo, ScopeResource, SystemDetail, NodeSnapshot, Snapshot } from '../../src/types'
 
 const bad = JSON.parse(readFileSync(resolve(__dirname, '../../../shared-test-data/snapshots/bad-day.json'), 'utf8')) as Snapshot
@@ -142,10 +142,10 @@ describe('the Logs tab', () => {
     expect(groupDetail(group({ durationMs: 812 }))).not.toContain('·')
   })
 
-  it('draws a trace link only when it is a web address, whatever the server sent', () => {
+  it('draws a header link only when it is a web address, whatever the server sent', () => {
     const links = [{ name: 'Trace', url: 'https://tracing.example.test/trace/1' }, { name: 'Bad', url: 'javascript:alert(1)' }, { name: '', url: 'https://x.example.test' }]
-    expect(traceLinks(group({ links })).map((l) => l.name)).toEqual(['Trace'])
-    expect(traceLinks(group())).toEqual([])
+    expect(sectionLinks({ links }).map((l) => l.name)).toEqual(['Trace'])
+    expect(sectionLinks({})).toEqual([])
   })
 })
 

@@ -143,6 +143,22 @@
       "location": "northeurope",
       "tags": {},
       "instances": 9
+    },
+    {
+      "id": "/subscriptions/00000000-0000-0000-0000-0000000000a1/resourceGroups/rg-monitor/providers/microsoft.insights/components/appi-acme-eu-1",
+      "name": "appi-acme-eu-1",
+      "type": "microsoft.insights/components",
+      "subscriptionId": "00000000-0000-0000-0000-0000000000a1",
+      "location": "northeurope",
+      "tags": {}
+    },
+    {
+      "id": "/subscriptions/00000000-0000-0000-0000-0000000000a1/resourceGroups/rg-monitor/providers/microsoft.insights/components/appi-acme-eu-2",
+      "name": "appi-acme-eu-2",
+      "type": "microsoft.insights/components",
+      "subscriptionId": "00000000-0000-0000-0000-0000000000a1",
+      "location": "northeurope",
+      "tags": {}
     }
   ],
   "workspaces": [
