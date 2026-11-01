@@ -51,9 +51,10 @@ public class HostEnvironmentTests : IDisposable
     [Fact]
     public async Task The_server_lists_its_environments_in_order_with_the_default_marked()
     {
-        var list = await Client.GetFromJsonAsync<EnvironmentInfo[]>("/api/environments", Json);
+        var list = await Client.GetFromJsonAsync<EnvironmentInfo[]>("/api/environments", Json, TestContext.Current.CancellationToken);
 
-        Assert.Equal(["dev", "staging", "prod"], list!.Select(e => e.Id));
+        Assert.NotNull(list);
+        Assert.Equal(["dev", "staging", "prod"], list.Select(e => e.Id));
         Assert.Equal(["Development", "Staging", "Production"], list.Select(e => e.Name));
         Assert.Equal(["prod"], list.Where(e => e.IsDefault).Select(e => e.Id));
     }
@@ -76,42 +77,42 @@ public class HostEnvironmentTests : IDisposable
     [Fact]
     public async Task An_unknown_environment_is_not_found_and_the_answer_lists_the_real_ones()
     {
-        var r = await Client.GetAsync("/api/snapshot/latest?env=prd");
+        var r = await Client.GetAsync("/api/snapshot/latest?env=prd", TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, r.StatusCode);
-        var body = await r.Content.ReadAsStringAsync();
+        var body = await r.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
         Assert.Contains("No environment 'prd'", body);
         Assert.Contains("\"prod\"", body);
-        Assert.Equal(HttpStatusCode.NotFound, (await Client.GetAsync("/api/fake?env=prd")).StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, (await Client.PostAsync("/api/fake/reset?env=prd", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await Client.GetAsync("/api/fake?env=prd", TestContext.Current.CancellationToken)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await Client.PostAsync("/api/fake/reset?env=prd", null, TestContext.Current.CancellationToken)).StatusCode);
     }
 
     [Fact]
     public async Task Steering_one_environment_leaves_the_others_alone()
     {
         var client = Client;
-        await client.PostAsJsonAsync("/api/fake/calm?env=staging", new { on = true });
-        await client.PostAsJsonAsync("/api/fake/calm?env=prod", new { on = true });
-        var r = await client.PostAsJsonAsync("/api/fake/effects?env=staging", new { target = "aa.orders-db#acme", kind = "Saturate", intensity = 1.0 });
-        Assert.True(r.IsSuccessStatusCode, await r.Content.ReadAsStringAsync());
+        await client.PostAsJsonAsync("/api/fake/calm?env=staging", new { on = true }, TestContext.Current.CancellationToken);
+        await client.PostAsJsonAsync("/api/fake/calm?env=prod", new { on = true }, TestContext.Current.CancellationToken);
+        var r = await client.PostAsJsonAsync("/api/fake/effects?env=staging", new { target = "aa.orders-db#acme", kind = "Saturate", intensity = 1.0 }, TestContext.Current.CancellationToken);
+        Assert.True(r.IsSuccessStatusCode, await r.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
 
         var staging = await WaitFor("staging", s => Unit(s, "acme").Throttled > 0);
         var prod = await Latest("prod");
 
         Assert.True(Unit(staging, "acme").Throttled > 0);
         Assert.Equal(0, Unit(prod, "acme").Throttled);
-        Assert.Single((await client.GetFromJsonAsync<JsonElement>("/api/fake?env=staging", Json)).GetProperty("effects").EnumerateArray());
-        Assert.Empty((await client.GetFromJsonAsync<JsonElement>("/api/fake?env=prod", Json)).GetProperty("effects").EnumerateArray());
-        Assert.Empty((await client.GetFromJsonAsync<JsonElement>("/api/fake", Json)).GetProperty("effects").EnumerateArray()); // none given: the default, prod
+        Assert.Single((await client.GetFromJsonAsync<JsonElement>("/api/fake?env=staging", Json, TestContext.Current.CancellationToken)).GetProperty("effects").EnumerateArray());
+        Assert.Empty((await client.GetFromJsonAsync<JsonElement>("/api/fake?env=prod", Json, TestContext.Current.CancellationToken)).GetProperty("effects").EnumerateArray());
+        Assert.Empty((await client.GetFromJsonAsync<JsonElement>("/api/fake", Json, TestContext.Current.CancellationToken)).GetProperty("effects").EnumerateArray()); // none given: the default, prod
     }
 
     [Fact]
     public async Task A_tenant_effect_on_anything_but_saturation_is_refused()
     {
-        var r = await Client.PostAsJsonAsync("/api/fake/effects", new { target = "aa.orders-db#acme", kind = "Errors", intensity = 1.0 });
+        var r = await Client.PostAsJsonAsync("/api/fake/effects", new { target = "aa.orders-db#acme", kind = "Errors", intensity = 1.0 }, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, r.StatusCode);
-        Assert.Contains("only DB saturated can be aimed at one tenant", await r.Content.ReadAsStringAsync());
+        Assert.Contains("only DB saturated can be aimed at one tenant", await r.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
     }
 
     private static TenantUnitSnapshot Unit(Snapshot s, string tenant) =>
@@ -149,9 +150,9 @@ public class HostEnvironmentTests : IDisposable
         staging.On<Snapshot>(TownHub.SnapshotMethod, s => seen.Add(("staging", s.Environment)));
         fallback.On<Snapshot>(TownHub.SnapshotMethod, s => seen.Add(("default", s.Environment)));
 
-        await staging.StartAsync();
-        await fallback.StartAsync();
-        await Task.Delay(1500);
+        await staging.StartAsync(TestContext.Current.CancellationToken);
+        await fallback.StartAsync(TestContext.Current.CancellationToken);
+        await Task.Delay(1500, TestContext.Current.CancellationToken);
 
         Assert.Contains(seen, x => x.Viewer == "staging");
         Assert.Contains(seen, x => x.Viewer == "default");
@@ -168,9 +169,9 @@ public class HostEnvironmentTests : IDisposable
         viewer.On<Snapshot>(TownHub.SnapshotMethod, _ => Interlocked.Increment(ref snapshots));
         viewer.On<JsonElement>(TownHub.UnknownMethod, e => told.TrySetResult(e));
 
-        await viewer.StartAsync();
-        var message = await told.Task.WaitAsync(TimeSpan.FromSeconds(10));
-        await Task.Delay(800);
+        await viewer.StartAsync(TestContext.Current.CancellationToken);
+        var message = await told.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        await Task.Delay(800, TestContext.Current.CancellationToken);
 
         Assert.Equal("prd", message.GetProperty("requested").GetString());
         Assert.Contains("prod", message.GetProperty("environments").EnumerateArray().Select(e => e.GetString()));

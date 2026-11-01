@@ -128,7 +128,7 @@ public class TenantTests
         await rig.Run();
         rig.Fake.Add(Store, FakeEffectKind.Stale, 1);
         rig.Clock.Advance(TimeSpan.FromSeconds(1));
-        rig.State.Update(await rig.Fake.PollAsync(rig.Registry, default));
+        rig.State.Update(await rig.Fake.PollAsync(rig.Registry, TestContext.Current.CancellationToken));
         rig.Clock.Advance(TimeSpan.FromSeconds(40));
 
         var node = Node(rig.Builder.Build(), Store);
@@ -282,7 +282,7 @@ public class TenantTests
         var state = new LatestState();
         var fake = new FakeSource(FakeProfiles.Load(TestPaths.MiniTown), new FakeOptions(), clock);
         clock.Advance(TimeSpan.FromSeconds(1));
-        state.Update(await fake.PollAsync(registry, default));
+        state.Update(await fake.PollAsync(registry, TestContext.Current.CancellationToken));
 
         var s = new SnapshotBuilder(registry, state, clock).Build();
 

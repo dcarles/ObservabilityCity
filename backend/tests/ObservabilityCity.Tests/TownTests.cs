@@ -60,7 +60,7 @@ public class TownTests : IDisposable
         var factory = Host(b => b.UseSetting("Registry:Path", TestPaths.MiniTown));
         _owned.Add(factory);
 
-        var towns = await factory.CreateClient().GetFromJsonAsync<TownSummary[]>("/api/towns", Json);
+        var towns = await factory.CreateClient().GetFromJsonAsync<TownSummary[]>("/api/towns", Json, TestContext.Current.CancellationToken);
 
         var only = Assert.Single(towns!);
         Assert.Equal(new TownSummary("mini-town", "Mini Town", true), only);
@@ -71,7 +71,7 @@ public class TownTests : IDisposable
     {
         var client = TwoSmallTowns();
 
-        var towns = await client.GetFromJsonAsync<TownSummary[]>("/api/towns", Json);
+        var towns = await client.GetFromJsonAsync<TownSummary[]>("/api/towns", Json, TestContext.Current.CancellationToken);
 
         Assert.Equal(["mini-town", "direct-town"], towns!.Select(t => t.Id));
         Assert.Equal(["mini-town"], towns!.Where(t => t.IsDefault).Select(t => t.Id));
@@ -83,7 +83,7 @@ public class TownTests : IDisposable
         var factory = Host(_ => { });
         _owned.Add(factory);
 
-        var towns = await factory.CreateClient().GetFromJsonAsync<TownSummary[]>("/api/towns", Json);
+        var towns = await factory.CreateClient().GetFromJsonAsync<TownSummary[]>("/api/towns", Json, TestContext.Current.CancellationToken);
 
         Assert.Equal("galactic-credit", towns![0].Id);
         Assert.True(towns[0].IsDefault);
@@ -111,9 +111,9 @@ public class TownTests : IDisposable
 
         foreach (var url in new[] { "/api/snapshot/latest?town=nope", "/api/environments?town=nope", "/api/fake?town=nope", "/api/systems/aa.orders-api?town=nope" })
         {
-            var r = await client.GetAsync(url);
+            var r = await client.GetAsync(url, TestContext.Current.CancellationToken);
             Assert.Equal(HttpStatusCode.NotFound, r.StatusCode);
-            Assert.Contains("No town 'nope'", await r.Content.ReadAsStringAsync());
+            Assert.Contains("No town 'nope'", await r.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
         }
     }
 
@@ -125,15 +125,15 @@ public class TownTests : IDisposable
         await Latest(client, "?town=direct-town");
 
         // both towns have a system with this id in this pillar; only the one steered may change
-        var post = await client.PostAsJsonAsync("/api/fake/effects?town=direct-town", new { target = "aa.orders-api", kind = "Down", intensity = 1 });
+        var post = await client.PostAsJsonAsync("/api/fake/effects?town=direct-town", new { target = "aa.orders-api", kind = "Down", intensity = 1 }, TestContext.Current.CancellationToken);
         post.EnsureSuccessStatusCode();
-        await Task.Delay(1500);
+        await Task.Delay(1500, TestContext.Current.CancellationToken);
         var steered = await Latest(client, "?town=direct-town");
         var other = await Latest(client, "");
 
         Assert.Equal(HealthState.Down, steered.Groups.SelectMany(g => g.Nodes).Single(n => n.Id == "aa.orders-api").State);
         Assert.NotEqual(HealthState.Down, other.Groups.SelectMany(g => g.Nodes).Single(n => n.Id == "aa.orders-api").State);
-        Assert.Empty((await client.GetFromJsonAsync<System.Text.Json.Nodes.JsonNode>("/api/fake", Json))!["effects"]!.AsArray());
+        Assert.Empty((await client.GetFromJsonAsync<System.Text.Json.Nodes.JsonNode>("/api/fake", Json, TestContext.Current.CancellationToken))!["effects"]!.AsArray());
     }
 
     [Fact]
@@ -159,12 +159,12 @@ public class TownTests : IDisposable
         await using var nowhere = Connect("?town=nope");
         nowhere.On<Snapshot>(TownHub.SnapshotMethod, _ => strayed = true);
         nowhere.On<JsonElement>(TownHub.UnknownMethod, e => bad.TrySetResult(e));
-        await direct.StartAsync();
-        await nowhere.StartAsync();
+        await direct.StartAsync(TestContext.Current.CancellationToken);
+        await nowhere.StartAsync(TestContext.Current.CancellationToken);
 
-        var snapshot = await good.Task.WaitAsync(TimeSpan.FromSeconds(10));
-        var unknown = await bad.Task.WaitAsync(TimeSpan.FromSeconds(10));
-        await Task.Delay(700);
+        var snapshot = await good.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        var unknown = await bad.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        await Task.Delay(700, TestContext.Current.CancellationToken);
 
         Assert.Equal("direct-town", snapshot.TownId);
         Assert.Equal("nope", unknown.GetProperty("requestedTown").GetString());

@@ -91,10 +91,10 @@ public class HostViewTests : IDisposable
     {
         var client = Client;
 
-        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/api/systems/aa.nothing")).StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/api/systems/aa.nothing/logs")).StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/api/systems/aa.orders-api?env=prd")).StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/api/systems/aa.orders-api/logs?env=prd")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/api/systems/aa.nothing", TestContext.Current.CancellationToken)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/api/systems/aa.nothing/logs", TestContext.Current.CancellationToken)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/api/systems/aa.orders-api?env=prd", TestContext.Current.CancellationToken)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/api/systems/aa.orders-api/logs?env=prd", TestContext.Current.CancellationToken)).StatusCode);
     }
 
     [Fact]
@@ -138,9 +138,9 @@ public class HostViewTests : IDisposable
         await using var viewer = Connect("?islands=bb");
         viewer.On<Snapshot>(TownHub.SnapshotMethod, seen.Enqueue);
 
-        await viewer.StartAsync();
+        await viewer.StartAsync(TestContext.Current.CancellationToken);
         var first = await Next(seen, _ => true);
-        await Task.Delay(700); // and it keeps getting them on every tick
+        await Task.Delay(700, TestContext.Current.CancellationToken); // and it keeps getting them on every tick
 
         Assert.Equal(["hub", "bb"], first.Groups.Select(g => g.Id));
         Assert.Equal(["bb"], first.View.Islands);
@@ -162,10 +162,10 @@ public class HostViewTests : IDisposable
         two.On<Snapshot>(TownHub.SnapshotMethod, b.Enqueue);
         three.On<Snapshot>(TownHub.SnapshotMethod, all.Enqueue);
 
-        await one.StartAsync();
-        await two.StartAsync();
-        await three.StartAsync();
-        await Task.Delay(1000);
+        await one.StartAsync(TestContext.Current.CancellationToken);
+        await two.StartAsync(TestContext.Current.CancellationToken);
+        await three.StartAsync(TestContext.Current.CancellationToken);
+        await Task.Delay(1000, TestContext.Current.CancellationToken);
 
         Assert.NotEmpty(a); Assert.NotEmpty(b); Assert.NotEmpty(all);
         Assert.All(a, s => Assert.Equal(["hub", "aa"], s.Groups.Select(g => g.Id)));
@@ -180,21 +180,21 @@ public class HostViewTests : IDisposable
         var seen = new System.Collections.Concurrent.ConcurrentQueue<Snapshot>();
         await using var viewer = Connect();
         viewer.On<Snapshot>(TownHub.SnapshotMethod, seen.Enqueue);
-        await viewer.StartAsync();
+        await viewer.StartAsync(TestContext.Current.CancellationToken);
         Assert.Equal(4, (await Next(seen, _ => true)).Groups.Count);
 
-        await viewer.InvokeAsync("SetIslands", new[] { "cc" });
+        await viewer.InvokeAsync("SetIslands", new[] { "cc" }, TestContext.Current.CancellationToken);
         var filtered = await Next(seen, s => s.Groups.Count == 2);
         Assert.Equal(["hub", "cc"], filtered.Groups.Select(g => g.Id));
         seen.Clear();
-        await Task.Delay(700);
+        await Task.Delay(700, TestContext.Current.CancellationToken);
         Assert.NotEmpty(seen);
         Assert.All(seen, s => Assert.Equal(["hub", "cc"], s.Groups.Select(g => g.Id))); // and no more of the whole town
 
-        await viewer.InvokeAsync("SetIslands", new[] { "aa", "bb" });
+        await viewer.InvokeAsync("SetIslands", new[] { "aa", "bb" }, TestContext.Current.CancellationToken);
         Assert.Equal(["hub", "aa", "bb"], (await Next(seen, s => s.Groups.Count == 3)).Groups.Select(g => g.Id));
 
-        await viewer.InvokeAsync("SetIslands", Array.Empty<string>());
+        await viewer.InvokeAsync("SetIslands", Array.Empty<string>(), TestContext.Current.CancellationToken);
         Assert.Equal(4, (await Next(seen, s => s.Groups.Count == 4)).Groups.Count);
     }
 
@@ -205,13 +205,13 @@ public class HostViewTests : IDisposable
         var views = (IslandViews)_factory.Services.GetService(typeof(IslandViews))!;
         await using (var viewer = Connect("?islands=aa"))
         {
-            await viewer.StartAsync();
+            await viewer.StartAsync(TestContext.Current.CancellationToken);
             // the server registers the view a moment after the socket opens
-            for (var i = 0; i < 50 && views.InUse("mini-town/demo").Count == 0; i++) await Task.Delay(100);
+            for (var i = 0; i < 50 && views.InUse("mini-town/demo").Count == 0; i++) await Task.Delay(100, TestContext.Current.CancellationToken);
             Assert.Single(views.InUse("mini-town/demo"));
         }
 
-        for (var i = 0; i < 50 && views.InUse("mini-town/demo").Count > 0; i++) await Task.Delay(100);
+        for (var i = 0; i < 50 && views.InUse("mini-town/demo").Count > 0; i++) await Task.Delay(100, TestContext.Current.CancellationToken);
         Assert.Empty(views.InUse("mini-town/demo"));
     }
 }

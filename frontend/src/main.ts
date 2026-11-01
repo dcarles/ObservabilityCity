@@ -327,7 +327,7 @@ async function start(): Promise<void> {
   void fetchTowns().then((list) => { towns = list; viewBar.refresh() })
 
   // Wall mode: a tour, a status strip and change cues, over the same town.
-  const nowSeconds = (): number => (testMode ? simTime : clock.elapsedTime)
+  const nowSeconds = (): number => (testMode ? simTime : clock.getElapsed())
   const wall = wallParams.on
     ? new WallMode(wallParams.hold, {
         focusOf: (f) => (f.kind === 'building' ? town.focusOf(f.id) : town.islandFocusOf(f.id)),
@@ -494,13 +494,15 @@ async function start(): Promise<void> {
     },
   }
 
-  const clock = new THREE.Clock()
+  const clock = new THREE.Timer()
+  clock.connect(document) // time stands still while the tab is hidden, so coming back does not jump
   const failed = new Set<string>()
   function frame(): void {
     // schedule the next frame first, so an error below can never stop the loop
     requestAnimationFrame(frame)
+    clock.update()
     const dt = Math.min(clock.getDelta(), 0.1)
-    const time = clock.elapsedTime
+    const time = clock.getElapsed()
     try {
       stage.tick(dt, time)
       town.update(dt, time, stage.camera)

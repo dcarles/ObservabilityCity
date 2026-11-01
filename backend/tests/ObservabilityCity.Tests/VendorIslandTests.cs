@@ -176,7 +176,7 @@ public class VendorIslandTests
         var vendors = town.View.Current.Vendors.ToDictionary(v => v.Node.Id);
         Assert.Equal(["aa.orders-api", "aa.orders-worker"], vendors["ext.shared-credit"].CalledBy.Order(StringComparer.Ordinal));
         Assert.Equal(["bb.ledger-api"], vendors["ext.shared-identity"].CalledBy);
-        Assert.Empty(town.Store.Notices(5).Where(n => n.StartsWith("Unresolved call")));
+        Assert.DoesNotContain(town.Store.Notices(5), n => n.StartsWith("Unresolved call"));
         // the snapshot carries the island, so the browser stands both buildings on one island
         var snapshot = new SnapshotBuilder(town.View, new ObservabilityCity.Core.Sources.LatestState(), town.Clock).Build();
         var onIsland = snapshot.Vendors.Where(v => v.IslandId == "ext.shared").ToList();

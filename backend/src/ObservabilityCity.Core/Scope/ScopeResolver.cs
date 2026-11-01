@@ -68,7 +68,7 @@ public static class ScopeResolver
                     if (!match.Success) continue;
                     if (Group(match, "pillar") is { Length: > 0 } p && !p.Equals(pillar.Code, StringComparison.OrdinalIgnoreCase) && !p.Equals(group.Id, StringComparison.OrdinalIgnoreCase)) continue;
                     var said = Group(match, "service");
-                    var owner = said.Length == 0 ? null : group.Nodes.FirstOrDefault(n => (n.ServiceCode ?? n.Service).Equals(said, StringComparison.OrdinalIgnoreCase))?.Service;
+                    var owner = said.Length == 0 ? null : group.Nodes.FirstOrDefault(n => (n.ServiceCode ?? n.Service)?.Equals(said, StringComparison.OrdinalIgnoreCase) == true)?.Service;
                     var region = Group(match, "region") is { Length: > 0 } g ? g : resource.Region;
                     if (rules.Regions.Tag is { } regionTag && TagValue(resource, regionTag) is { Length: > 0 } tagged) region = tagged;
                     found.Add(new ResolvedAsset($"{group.Id}.{resource.Name.ToLowerInvariant()}", group.Id, resource.Name, rule.Label, rule.Shape, resource.Type, owner, region, resource.Id, rule.Name, subscription));

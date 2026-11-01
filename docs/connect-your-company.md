@@ -24,7 +24,7 @@ git remote add upstream https://github.com/dcarles/ObservabilityCity.git   # if 
 dotnet run --project backend/src/ObservabilityCity.AppHost
 ```
 
-Check that the sample town opens on http://localhost:5173 before you change anything. You need .NET SDK 10 and Node 24 (see the README).
+Check that the sample town opens on http://localhost:5173 before you change anything. You need .NET SDK 10 and Node 26 (see the README).
 
 ## 2. Sign in to Azure
 
