@@ -1,31 +1,49 @@
 import { describe, expect, it } from 'vitest'
-import { ignoreLine, pathRule, unknownHostRow, vendorEntry } from '../../src/unknownHosts'
+import { addedRow, panelLabel, pathRule, unknownHostRow } from '../../src/unknownHosts'
 import type { UnknownHostSnapshot } from '../../src/types'
 
 const host = (over: Partial<UnknownHostSnapshot> = {}): UnknownHostSnapshot => ({ host: 'api.partner.example', calls: 12345.6, callers: ['aa.orders-api', 'bb.ledger-worker'], days: 3, gateway: false, vendorsOnly: false, ...over })
 
-describe('the lines the Unknown hosts panel copies', () => {
-  it('a vendor entry names the host as its domain and the systems seen calling it', () => {
-    expect(vendorEntry(host())).toBe('- { id: ext.api-partner-example, name: api.partner.example, domains: [api.partner.example], calledBy: [aa.orders-api, bb.ledger-worker] }')
-  })
-
-  it('an ignore line matches exactly that host, with its dots escaped', () => {
-    expect(ignoreLine(host())).toBe("- '^api\\.partner\\.example$'")
-    const re = new RegExp(ignoreLine(host()).slice(3, -1), 'i')
-    expect(re.test('api.partner.example')).toBe(true)
-    expect(re.test('apixpartner.example')).toBe(false)
-    expect(re.test('api.partner.example.evil.test')).toBe(false)
-  })
-
-  it('a row says how many calls, how many days and who called, and escapes the host', () => {
+describe('a row of the Unknown hosts panel', () => {
+  it('says how many calls, how many days and who called, and escapes the host', () => {
     const html = unknownHostRow(host({ host: '<b>x</b>.test', days: 1 }), 0)
     expect(html).toContain('about 12,346 calls')
     expect(html).toContain('1 day')
     expect(html).not.toContain('1 days')
     expect(html).toContain('aa.orders-api, bb.ledger-worker')
     expect(html).not.toContain('<b>x</b>')
-    expect(html).toContain('Copy vendor entry')
-    expect(html).toContain('Copy ignore line')
+  })
+
+  it('has the three buttons Add vendor, Add internal and Ignore, and no copy buttons', () => {
+    const html = unknownHostRow(host(), 2)
+    expect(html).toContain('data-add="vendor" data-i="2">Add vendor<')
+    expect(html).toContain('data-add="internal" data-i="2">Add internal<')
+    expect(html).toContain('data-add="ignore" data-i="2">Ignore<')
+    expect(html).not.toContain('data-copy')
+  })
+
+  it('offers only Ignore for a host nothing of the town called (only vendor buildings did)', () => {
+    const html = unknownHostRow(host({ vendorsOnly: true }), 0)
+    expect(html).toContain('>Ignore<')
+    expect(html).not.toContain('Add vendor')
+    expect(html).not.toContain('Add internal')
+  })
+})
+
+describe('the button and the added list', () => {
+  it('counts the unknown hosts and, when there are any, the hosts added from the panel', () => {
+    expect(panelLabel(2, 0, false)).toBe('2 unknown hosts ▾')
+    expect(panelLabel(1, 0, true)).toBe('1 unknown host ▴')
+    expect(panelLabel(0, 3, false)).toBe('0 unknown hosts · 3 added ▾')
+  })
+
+  it('lists an added host with its kind and a Remove button, escaped', () => {
+    const html = addedRow({ host: '<i>x</i>.test', kind: 'ignore', calledBy: [] }, 1)
+    expect(html).toContain('ignored')
+    expect(html).toContain('data-remove="1"')
+    expect(html).not.toContain('<i>x</i>')
+    expect(addedRow({ host: 'a.test', kind: 'internal', calledBy: ['x'] }, 0)).toContain('internal')
+    expect(addedRow({ host: 'a.test', kind: 'vendor', calledBy: ['x'] }, 0)).toContain('vendor')
   })
 })
 

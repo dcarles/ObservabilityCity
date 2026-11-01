@@ -120,6 +120,17 @@ public sealed class DiscoveredLinks
         }
     }
 
+    /// <summary>Takes every remembered unresolved call to this host off the list now, because somebody added or ignored the host.</summary>
+    public void Forget(string host)
+    {
+        lock (_gate)
+        {
+            var gone = _unresolved.Keys.Where(k => string.Equals(k.Host, host, StringComparison.OrdinalIgnoreCase)).ToList();
+            foreach (var key in gone) _unresolved.Remove(key);
+            if (gone.Count > 0) _version++;
+        }
+    }
+
     /// <summary>
     /// Asks again what each remembered address is, so a rule added since it was seen takes it off the list at once: an address now ignored, found or
     /// recognised as a vendor goes, one that now names a pillar outside the town moves to those, and the reverse.
