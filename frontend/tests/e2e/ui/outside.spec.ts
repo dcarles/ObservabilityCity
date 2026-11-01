@@ -76,4 +76,31 @@ test.describe('where an API\'s traffic comes from', () => {
     expect(routes.filter((r: any) => r.origin === 'external').map((r: any) => r.share)).toEqual([0.5])
     expect(routes.some((r: any) => r.origin === 'internal' && r.source === 'cc.notify-api' && Math.abs(r.share - 0.5) < 1e-9)).toBe(true)
   })
+
+  test('a small measured caller still sends a car now and then, one with nothing measured sends none', async ({ town, page }) => {
+    await town.open()
+
+    const rates = await page.evaluate(() => {
+      const c = (window as any).city
+      const s = structuredClone(c.seen.last)
+      const nodes = s.groups.flatMap((g: any) => g.nodes)
+      const set = (id: string, rps: number, outside: number, from: [string, number][]) => {
+        const n = nodes.find((x: any) => x.id === id)
+        n.requestsPerSecond = rps; n.outsideRequestsPerSecond = outside
+        n.inbound = from.map(([f, r]) => ({ from: f, requestsPerSecond: r })); n.inboundEstimated = false
+      }
+      set('aa.orders-api', 1000, 999.9, [['cc.notify-api', 0.1]]) // 0.01% from the caller
+      set('bb.ledger-api', 1000, 1000, []) // the caller is known but sends nothing measured
+      c.feed(s)
+      const rateTo = (dest: string, source: string) => {
+        const r = c.town.cars.routeList.find((x: any) => x.dest.id === dest && x.source.id === source)
+        return r ? c.town.cars.rateOf(r) : null
+      }
+      const quiet = c.town.cars.density * c.town.cars.townDensity
+      return { quiet, small: rateTo('aa.orders-api', 'cc.notify-api'), none: rateTo('bb.ledger-api', 'cc.notify-api') }
+    })
+
+    expect(rates.small).toBeCloseTo(rates.quiet / 20, 6) // the floor: one every 20 s (at full density)
+    expect(rates.none).toBe(0)
+  })
 })

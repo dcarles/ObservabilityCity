@@ -69,6 +69,19 @@ export function spawnRate(rps: number): number {
   return rps <= 0 ? 0 : 0.1 * Math.pow(rps, 0.6)
 }
 
+/** The fewest cars a confirmed link sends: one every 20 seconds, so a small link still shows life on its road. */
+export const MIN_CAR_RATE = 1 / 20
+
+/**
+ * Cars leaving per second on one route: the destination's request rate, gently scaled, times the route's share and the town's own settings.
+ * A route with a real share (something is measured or declared on it) never sends fewer than MIN_CAR_RATE cars a second, however small the share;
+ * above that the rate follows the traffic as before. With no traffic at all, or the cars turned off (scale 0), it sends none.
+ */
+export function carRate(rps: number, share: number, scale: number, traffic: number): number {
+  if (!(rps > 0) || !(share > 0) || !(scale > 0)) return 0
+  return Math.max(spawnRate(rps) * traffic * scale * share, MIN_CAR_RATE * scale)
+}
+
 export function plaqueText(n: Pick<NodeSnapshot, 'state' | 'instancesTotal' | 'instancesHealthy'> & Partial<Pick<NodeSnapshot, 'absent' | 'app'>>): string {
   if (n.app === 'Missing') return 'not found'
   if (n.app === 'Stopped') return 'stopped'
