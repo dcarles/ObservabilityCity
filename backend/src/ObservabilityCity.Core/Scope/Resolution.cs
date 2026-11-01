@@ -6,7 +6,7 @@ namespace ObservabilityCity.Core.Scope;
 public sealed record PillarScope(string PillarId, string Code, string? SubscriptionId, string? SubscriptionName, string Via);
 
 /// <summary>A resource that belongs to a system, and the rule that said so. Tenant is the tenant id without dashes, lowercase; null when the rule has none.</summary>
-public sealed record ResolvedResource(string Id, string Name, string Type, string? Region, string? Tenant, string Rule, int? Instances = null, bool? Running = null);
+public sealed record ResolvedResource(string Id, string Name, string Type, string? Region, string? Tenant, string Rule, int? Instances = null, bool? Running = null, string? SubscriptionId = null);
 
 /// <summary>A resource that stands in the town as a basic building (see <see cref="AssetRule"/>). Id is the pillar and the resource's name in lowercase. Service is the registry's service name it belongs to, null for the pillar as a whole.</summary>
 public sealed record ResolvedAsset(string Id, string PillarId, string Name, string Label, string Shape, string Type, string? Service, string? Region, string ResourceId, string Rule, string? SubscriptionId, string? Group = null);

@@ -381,6 +381,7 @@ links:
 | `instances` | no | none | Query expression for how many instances a resource runs. |
 | `state` | no | none | Query expression that reads a resource's app state as text. A system whose rule has it shows Running, Stopped (a building under construction) or, when the inventory has no such app, Missing (grey, "not found in" the `cloud` you name). |
 | `running` | with `state` | | The values of `state` that mean the app runs; any other value is shown as stopped. The core knows no state words. |
+| `subscription` | no | the system's pillar's | Which subscriptions this rule looks in, by `nameLike` (a template over your `variables` and `{environment}`) or by `tag` (`key`, `value`). For resources that live apart from their pillar, such as the hub's gateway or Service Bus. |
 
 <!-- file: AssetRuleFile -->
 | Key | Required | Default | Meaning |

@@ -70,8 +70,8 @@ function keepClear(buildingR: number): number {
 }
 
 /** The smallest hub that gives `n` spoke roads room: they share the arc the four hub buildings leave free. */
-export function hubGeometry(n: number): HubGeometry {
-  let scale = 1.25 // always room for the extra shared resources a town can have
+export function hubGeometry(n: number, minScale = 0): HubGeometry {
+  let scale = Math.max(1.25, minScale) // always room for the extra shared resources a town can have, and for the clusters of resource buildings the hub may hold
   for (; scale < 3.5; scale += 0.05) {
     const free = 2 * Math.PI - 8 * keepClear(BASE_BUILDING_R * scale)
     if ((free * BASE_HUB_RX * scale * 0.9) / Math.max(1, n) >= MIN_COAST_SPACING) break
@@ -140,12 +140,12 @@ function secondRingGap(k: number, first: number, second: number): number {
   return Math.floor(((k + 0.5) * (first - 1)) / second)
 }
 
-export function layoutTown(sizes: IslandSize[], capacity = DEFAULT_RING_CAPACITY, airportSize: IslandSize | null = null): TownLayout {
+export function layoutTown(sizes: IslandSize[], capacity = DEFAULT_RING_CAPACITY, airportSize: IslandSize | null = null, minHubScale = 0): TownLayout {
   const pillars = sizes.length
   const hasAirport = airportSize !== null
   if (capacity < MIN_RING_CAPACITY || capacity > MAX_RING_CAPACITY) throw new Error(`ring capacity ${capacity} is outside ${MIN_RING_CAPACITY} to ${MAX_RING_CAPACITY}`)
   if (pillars > maxPillars(capacity)) throw new Error(`${pillars} pillars do not fit on two rings of ${capacity} (at most ${maxPillars(capacity)})`)
-  const hub = hubGeometry(pillars + (hasAirport ? 1 : 0))
+  const hub = hubGeometry(pillars + (hasAirport ? 1 : 0), minHubScale)
   if (pillars === 0) {
     // nothing but the hub (the island filter can leave only that): the airport, when there is one, stands alone on the first ring
     if (!hasAirport) return { hub, islands: [], airport: null }

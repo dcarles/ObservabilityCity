@@ -6,7 +6,8 @@ import type { GroupSnapshot, NodeSnapshot, Snapshot } from '../types'
 import { palette } from '../themes/active'
 import { blockPad, bench, bridge, crates, fountain, junction, lamp, pier, prop, ring, roadBetween, ROAD_W, serviceLane, street, streetX } from './props'
 import { buildIslandBody, GROUND, makeOutline, scatterNature, type Outline, type Rect } from './island'
-import { CURB, LANE_Z, PAD_D, PAD_W, coastScan, laneStart, padX, placeHubClusters, planIsland, rectsTouch, rowEdge, type HubCluster, type Placed, type Plan } from './plan'
+import { layoutWithHubRoom } from './hubRoom'
+import { CURB, LANE_Z, PAD_D, PAD_W, coastScan, hubFree, laneStart, padX, placeHubClusters, planIsland, rowEdge, type HubCluster, type Placed, type Plan } from './plan'
 import { hashString } from './random'
 import { clamp, speedFactor } from '../visuals'
 import { CarSystem, type Route } from './cars'
@@ -17,7 +18,7 @@ import { findLane, type SeaMap } from './sea'
 import { mergeStatic } from './merge'
 import { bayTo } from './bay'
 import { islandSign } from './sign'
-import { backBridgeClear, groupVendors, hubGeometry, layoutTown, loopArc, placeVendorsOnRing, ringRoadRadius, wrapAngle, type Disc, type HubGeometry, type VendorSpec } from './layout'
+import { backBridgeClear, groupVendors, hubGeometry, loopArc, placeVendorsOnRing, ringRoadRadius, wrapAngle, type Disc, type HubGeometry, type VendorSpec } from './layout'
 import { Weather, type SkyStatus } from './weather'
 import { Airport, type AirportStatus } from './airport'
 import { inboundMix } from '../inbound'
@@ -176,7 +177,8 @@ export class Town {
     this.direct = s.topology !== 'hub-and-spoke'
     const direct = this.direct
     const plans = pillars.map((g) => planIsland(g))
-    const layout = layoutTown(plans.map((p) => ({ rx: p.rx, rz: p.rz })), s.ringCapacity, { rx: airport.rx, rz: airport.rz })
+    // the hub grows until the clusters of resource buildings it holds have a place of their own
+    const layout = layoutWithHubRoom(plans.map((p) => ({ rx: p.rx, rz: p.rz })), s.ringCapacity, { rx: airport.rx, rz: airport.rz }, hub?.assets ?? [], (hub?.nodes ?? []).map((n) => n.kind))
     this.hubGeo = layout.hub
     const airportPlace = layout.airport!
     // pillars first, then the airport: one entry for everything that has a spoke to the hub
@@ -655,10 +657,7 @@ export class Town {
     }
     // shared resources that are not systems (a log workspace, application insights...) stand in clusters, each with a sign, wherever the hub has room
     this.hubAssets = new Map()
-    const roomRects = [...avoid]
-    for (const port of ports) for (let r = 9 * f; r < 30 * f; r += 3) roomRects.push({ x: Math.sin(port.angle) * r, z: CZ - Math.cos(port.angle) * r, w: 8, d: 8 })
-    const layout = placeHubClusters(hub?.assets ?? [], this.hubGeo.rx, this.hubGeo.rz, CZ, (rect) =>
-      !roomRects.some((a) => rectsTouch(rect, a, 0.5)) && [[-1, -1], [1, -1], [-1, 1], [1, 1]].every(([sx, sz]) => this.hubOutline.contains(rect.x + (sx * rect.w) / 2, rect.z + (sz * rect.d) / 2, 3)))
+    const layout = placeHubClusters(hub?.assets ?? [], this.hubGeo.rx, this.hubGeo.rz, CZ, hubFree(this.hubGeo, (hub?.nodes ?? []).map((n) => n.kind), ports.map((p) => p.angle)))
     this.hubClusters = layout.clusters
     for (const name of layout.left) console.warn(`Hub cluster ${name} has no free place and is not drawn`)
     for (const c of layout.clusters) {
