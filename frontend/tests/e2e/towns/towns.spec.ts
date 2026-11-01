@@ -55,8 +55,10 @@ test.describe('Droid Shop', () => {
 
   test('has six teams round the platform', async ({ town, page }) => {
     await town.open()
-    const islands = await page.evaluate(() => (window as any).city.islandChoices().map((i: any) => `${i.id}:${i.name}`))
-    expect([...islands].sort()).toEqual(['chk:Checkout', 'inv:Inventory', 'mob:Mobile', 'ntf:Notifications', 'shp:Shipping', 'web:Web'])
+    const choices = await page.evaluate(() => (window as any).city.islandChoices() as { id: string; name: string; vendor?: boolean }[])
+    expect(choices.filter((i) => !i.vendor).map((i) => `${i.id}:${i.name}`).sort()).toEqual(['chk:Checkout', 'inv:Inventory', 'mob:Mobile', 'ntf:Notifications', 'shp:Shipping', 'web:Web'])
+    // the three third parties can be chosen too, apart from the teams
+    expect(choices.filter((i) => i.vendor).map((i) => i.name).sort()).toEqual(['Courier', 'Payment gateway', 'Push service'])
     await expect(page.locator('#town-name')).toHaveText('Droid Shop')
     expect(await page.evaluate(() => (window as any).city.seen.last.topology)).toBe('direct')
     expect(await page.evaluate(() => (window as any).city.seen.last.groupLabel)).toBe('Team')
