@@ -216,6 +216,23 @@ test.describe('changing the links changes the connectors', () => {
     }
     await page.waitForFunction(() => (window as any).city.town.inspectIsland('wrk')?.bridge === false, null, { timeout: 30_000 })
   })
+
+  test('a call through the gateway sends cars from the calling island, and removing the call takes them away', async ({ town, page }) => {
+    const file = join(registryCopy(), 'pillars', 'wrk.yaml')
+    const original = readFileSync(join(fixtureDir(), 'pillars', 'wrk.yaml'), 'utf8')
+    const routes = () => page.evaluate(() => (window as any).city.inspectRoutes() as { source: string | null; dest: string | null; origin: string }[])
+    await town.open()
+    expect((await routes()).filter((r) => r.source === 'wrk.batch-worker' && r.dest === 'ful.orders-api')).toHaveLength(0)
+    try {
+      writeFileSync(file, original.replace('calls: [wrk.batch-db] }', 'calls: [wrk.batch-db], gatewayCalls: [ful.orders-api] }'))
+      await page.waitForFunction(() => (window as any).city.inspectRoutes().some((r: any) => r.source === 'wrk.batch-worker' && r.dest === 'ful.orders-api'), null, { timeout: 30_000 })
+      // the cars are the caller's own (blue), not outside traffic
+      expect((await routes()).find((r) => r.source === 'wrk.batch-worker' && r.dest === 'ful.orders-api')?.origin).toBe('internal')
+    } finally {
+      writeFileSync(file, original)
+    }
+    await page.waitForFunction(() => !(window as any).city.inspectRoutes().some((r: any) => r.source === 'wrk.batch-worker' && r.dest === 'ful.orders-api'), null, { timeout: 30_000 })
+  })
 })
 
 function registryCopy(): string {
