@@ -172,7 +172,7 @@ public class FakeLogSourceTests
         await rig.Run();
         var node = rig.Registry.AllNodes.Single(n => n.Id == "aa.orders-api");
 
-        var viaInterface = await ((ILogSource)rig.Logs).RecentAsync(node, default);
+        var viaInterface = await ((ILogSource)rig.Logs).RecentAsync(node, TestContext.Current.CancellationToken);
 
         Assert.Equal(rig.Logs_("aa.orders-api").Sections.Select(s => s.Groups), viaInterface.Sections.Select(s => s.Groups));
     }

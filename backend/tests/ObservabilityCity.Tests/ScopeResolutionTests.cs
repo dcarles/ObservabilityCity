@@ -318,7 +318,7 @@ public class ScopeResolutionTests
         // The defaults of the adapter's queries name Resource Graph tables and columns only; no tag key, name part or resource type of any company
         Assert.DoesNotContain("tag", ResourceGraphInventory.DefaultSubscriptionsQuery.Replace("tags", ""));
         Assert.Contains("{types}", ResourceGraphInventory.DefaultResourcesQuery);
-        Assert.Equal(0, ScopeRules.None.Resources.Count);
+        Assert.Empty(ScopeRules.None.Resources);
     }
 
     // ---- the adapter ----

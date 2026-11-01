@@ -250,23 +250,23 @@ public class AddedHostsTests : IDisposable
         Discovered(server).RecordUnresolved("ext.bureau", "files.example.test", "/v2", Days, 5); // a vendor building called it too: not a system of the town
         var towns = server.Services.GetRequiredService<TownSet>();
 
-        var add = await client.PostAsJsonAsync("/api/added-hosts", new AddHostRequest("files.example.test", "vendor"));
+        var add = await client.PostAsJsonAsync("/api/added-hosts", new AddHostRequest("files.example.test", "vendor"), TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, add.StatusCode);
-        var list = (await add.Content.ReadFromJsonAsync<List<AddedHostSnapshot>>(Json))!;
+        var list = (await add.Content.ReadFromJsonAsync<List<AddedHostSnapshot>>(Json, TestContext.Current.CancellationToken))!;
         Assert.Equal("files.example.test", Assert.Single(list).Host);
         Assert.Equal("ext.files-example-test", list[0].Id);
         Assert.Equal(["aa.orders-api"], list[0].CalledBy);
         Assert.Contains(towns.Default.Registry.Current.Vendors, v => v.Node.Id == "ext.files-example-test"); // loaded again at once
         Assert.DoesNotContain(Discovered(server).UnknownHosts(2), h => h.Host == "files.example.test");
-        Assert.Single(await client.GetFromJsonAsync<List<AddedHostSnapshot>>("/api/added-hosts", Json) ?? []);
+        Assert.Single(await client.GetFromJsonAsync<List<AddedHostSnapshot>>("/api/added-hosts", Json, TestContext.Current.CancellationToken) ?? []);
 
-        var remove = await client.DeleteAsync("/api/added-hosts?id=ext.files-example-test");
+        var remove = await client.DeleteAsync("/api/added-hosts?id=ext.files-example-test", TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, remove.StatusCode);
-        Assert.Empty((await remove.Content.ReadFromJsonAsync<List<AddedHostSnapshot>>(Json))!);
+        Assert.Empty((await remove.Content.ReadFromJsonAsync<List<AddedHostSnapshot>>(Json, TestContext.Current.CancellationToken))!);
         Assert.DoesNotContain(towns.Default.Registry.Current.Vendors, v => v.Node.Id == "ext.files-example-test");
-        Assert.Equal(HttpStatusCode.NotFound, (await client.DeleteAsync("/api/added-hosts?id=ext.files-example-test")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.DeleteAsync("/api/added-hosts?id=ext.files-example-test", TestContext.Current.CancellationToken)).StatusCode);
     }
 
     [Fact]
@@ -277,10 +277,10 @@ public class AddedHostsTests : IDisposable
         Discovered(server).RecordUnresolved("ext.bureau", "vendors-only.example.test", null, Days, 10);
         Discovered(server).RecordUnresolved("aa.orders-api", "ext-bureau.example.test", null, Days, 10);
 
-        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync("/api/added-hosts", new AddHostRequest("https://x.example.test/a", "vendor"))).StatusCode);
-        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync("/api/added-hosts", new AddHostRequest("x.example.test", "partner"))).StatusCode);
-        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync("/api/added-hosts", new AddHostRequest("vendors-only.example.test", "vendor"))).StatusCode);
-        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync("/api/added-hosts", new AddHostRequest("never-seen.example.test", "internal"))).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync("/api/added-hosts", new AddHostRequest("https://x.example.test/a", "vendor"), TestContext.Current.CancellationToken)).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync("/api/added-hosts", new AddHostRequest("x.example.test", "partner"), TestContext.Current.CancellationToken)).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync("/api/added-hosts", new AddHostRequest("vendors-only.example.test", "vendor"), TestContext.Current.CancellationToken)).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync("/api/added-hosts", new AddHostRequest("never-seen.example.test", "internal"), TestContext.Current.CancellationToken)).StatusCode);
         Assert.Empty(AddedHosts.Read(_folder));
     }
 
@@ -291,7 +291,7 @@ public class AddedHostsTests : IDisposable
         var client = server.CreateClient();
         Discovered(server).RecordUnresolved("ext.bureau", "noise.example.test", null, Days, 10);
 
-        var response = await client.PostAsJsonAsync("/api/added-hosts", new AddHostRequest("noise.example.test", "ignore"));
+        var response = await client.PostAsJsonAsync("/api/added-hosts", new AddHostRequest("noise.example.test", "ignore"), TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var towns = server.Services.GetRequiredService<TownSet>();

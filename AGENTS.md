@@ -38,7 +38,7 @@ source (fake now, Prometheus / Log Analytics / Service Bus / Grafana IRM later)
 
 ## Run and test
 
-Needs .NET SDK 10 and Node 24. No Docker.
+Needs .NET SDK 10 and Node 26. No Docker.
 
 ```
 dotnet run --project backend/src/ObservabilityCity.AppHost          # town on http://localhost:5173

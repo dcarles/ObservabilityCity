@@ -61,9 +61,9 @@ public class DemoRegionsAndAssetsTests
     {
         var group = (await Run(Path.Combine(TestPaths.RepoRoot, "config", town))).Groups.Single(g => g.Id == pillar);
 
-        Assert.Contains(group.Assets, a => a.Service == service && a.Shape == "vault");
-        Assert.Contains(group.Assets, a => a.Service is null);
-        Assert.All(group.Assets, a => Assert.Contains(a.Shape, RegionAssetShapes));
+        Assert.Contains(group.Assets!, a => a.Service == service && a.Shape == "vault");
+        Assert.Contains(group.Assets!, a => a.Service is null);
+        Assert.All(group.Assets!, a => Assert.Contains(a.Shape, RegionAssetShapes));
     }
 
     private static readonly string[] RegionAssetShapes = ["box", "vault", "store", "settings"];

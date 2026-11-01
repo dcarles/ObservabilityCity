@@ -138,8 +138,8 @@ public class TownModeTests
         var client = factory.CreateClient();
 
         Assert.Equal("demo", (await Latest(client)).Mode);
-        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/fake")).StatusCode);
-        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/fake/stories")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/fake", TestContext.Current.CancellationToken)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/fake/stories", TestContext.Current.CancellationToken)).StatusCode);
     }
 
     [Fact]
@@ -150,11 +150,11 @@ public class TownModeTests
 
         Assert.Equal("live", (await Latest(client)).Mode);
         foreach (var path in new[] { "/api/fake", "/api/fake/stories", "/api/fake/story" })
-            Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync(path)).StatusCode);
-        var effect = await client.PostAsJsonAsync("/api/fake/effects", new { target = "*", kind = "Down", intensity = 1 });
+            Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync(path, TestContext.Current.CancellationToken)).StatusCode);
+        var effect = await client.PostAsJsonAsync("/api/fake/effects", new { target = "*", kind = "Down", intensity = 1 }, TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.NotFound, effect.StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, (await client.PostAsync("/api/fake/reset", null)).StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, (await client.PostAsync("/api/fake/story/stop", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.PostAsync("/api/fake/reset", null, TestContext.Current.CancellationToken)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.PostAsync("/api/fake/story/stop", null, TestContext.Current.CancellationToken)).StatusCode);
     }
 
     [Fact]
@@ -162,7 +162,7 @@ public class TownModeTests
     {
         using var factory = Host(TestPaths.LiveTown);
         var client = factory.CreateClient();
-        await Task.Delay(800);
+        await Task.Delay(800, TestContext.Current.CancellationToken);
 
         var s = await Latest(client);
 
@@ -172,9 +172,9 @@ public class TownModeTests
         Assert.InRange(Math.Abs(s.DayFraction - expected), 0, 0.01);
         // the inspector's logs say the environment has none set up, instead of failing or showing empty sections
         var node = s.Groups.SelectMany(g => g.Nodes).First();
-        var logs = await client.GetAsync($"/api/systems/{node.Id}/logs");
+        var logs = await client.GetAsync($"/api/systems/{node.Id}/logs", TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.OK, logs.StatusCode);
-        var answer = (await logs.Content.ReadFromJsonAsync<SystemLogs>(Json))!;
+        var answer = (await logs.Content.ReadFromJsonAsync<SystemLogs>(Json, TestContext.Current.CancellationToken))!;
         Assert.False(answer.Configured);
         Assert.Empty(answer.Sections);
     }

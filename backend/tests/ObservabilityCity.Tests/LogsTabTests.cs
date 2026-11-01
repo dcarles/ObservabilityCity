@@ -104,7 +104,7 @@ public class LogsTabTests
         using var rig = new Rig(TownA, LogsA);
         var api = rig.Node(NodeKind.Api);
 
-        var logs = await rig.Logs.RecentAsync(api, default);
+        var logs = await rig.Logs.RecentAsync(api, TestContext.Current.CancellationToken);
 
         var asked = Assert.Single(rig.Source.Asked);
         Assert.Contains($"\"{rig.Role(api)}\"", asked.Query);
@@ -124,7 +124,7 @@ public class LogsTabTests
         using var rig = new Rig(TownB, LogsB, _ => [Row("logs", 5, "Disk is nearly full", level: LogLevel.Warn)]);
         var api = rig.Node(NodeKind.Api);
 
-        var logs = await rig.Logs.RecentAsync(api, default);
+        var logs = await rig.Logs.RecentAsync(api, TestContext.Current.CancellationToken);
 
         var asked = Assert.Single(rig.Source.Asked);
         Assert.Contains("Events_CL", asked.Query);
@@ -144,7 +144,7 @@ public class LogsTabTests
         var flood = Enumerable.Range(0, 300).Select(i => Row("failed", i % 200, $"GET /api/orders/{i}", result: "500")).ToList();
         using var rig = new Rig(TownA, LogsA, _ => [.. flood, Row("exceptions", 90, "TimeoutException: the call timed out"), Row("logs", 80, "Cache is cold", level: LogLevel.Warn)]);
 
-        var logs = await rig.Logs.RecentAsync(rig.Node(NodeKind.Api), default);
+        var logs = await rig.Logs.RecentAsync(rig.Node(NodeKind.Api), TestContext.Current.CancellationToken);
 
         Assert.Equal(["failed", "slow", "logs", "exceptions"], logs.Sections.Select(s => s.Id));
         Assert.Equal(300, logs.Sections[0].Groups.Count); // no row cap: every distinct entry is kept
@@ -162,7 +162,7 @@ public class LogsTabTests
             Row("logs", 2, "Handling a message failed", level: LogLevel.Error), Row("exceptions", 2, "InvalidOperationException: bad shape"),
         ]);
 
-        var logs = await rig.Logs.RecentAsync(rig.Node(NodeKind.Worker), default);
+        var logs = await rig.Logs.RecentAsync(rig.Node(NodeKind.Worker), TestContext.Current.CancellationToken);
 
         Assert.Equal(["logs", "exceptions"], logs.Sections.Select(s => s.Id));
         Assert.All(logs.Sections, s => Assert.Single(s.Groups));
@@ -179,7 +179,7 @@ public class LogsTabTests
             Row("failed", 20, "POST /api/orders", result: "500"),
         ]);
 
-        var failed = (await rig.Logs.RecentAsync(rig.Node(NodeKind.Api), default)).Sections[0].Groups;
+        var failed = (await rig.Logs.RecentAsync(rig.Node(NodeKind.Api), TestContext.Current.CancellationToken)).Sections[0].Groups;
 
         Assert.Equal(["GET /api/orders", "GET /api/orders", "POST /api/orders"], failed.Select(g => g.Text));
         Assert.Equal(["503", "500", "500"], failed.Select(g => g.Result));
@@ -195,7 +195,7 @@ public class LogsTabTests
     {
         using var rig = new Rig(TownA, LogsA, _ => [Row("audit", 1, "something else"), Row("logs", 1, "kept", level: LogLevel.Warn)]);
 
-        var logs = await rig.Logs.RecentAsync(rig.Node(NodeKind.Api), default);
+        var logs = await rig.Logs.RecentAsync(rig.Node(NodeKind.Api), TestContext.Current.CancellationToken);
 
         Assert.Equal(1, logs.Sections.Sum(s => s.Groups.Count));
     }
@@ -263,7 +263,7 @@ public class LogsTabTests
         using var rig = new Rig(TownA, LogsA, _ => []);
         rig.Scope.Update(new Inventory([new InventorySubscription("0000", "hub-monitor", new Dictionary<string, string>())], [new InventoryResource("/subscriptions/0000/resourceGroups/rg/providers/microsoft.insights/components/appi-z", "appi-z", "microsoft.insights/components", "0000", "northeurope", new Dictionary<string, string>(), null)]), Now);
 
-        var logs = await rig.Logs.RecentAsync(rig.Node(NodeKind.Api), default);
+        var logs = await rig.Logs.RecentAsync(rig.Node(NodeKind.Api), TestContext.Current.CancellationToken);
 
         Assert.Contains("appi-z", Assert.Single(logs.Sections[0].Links!).Url);
         Assert.Contains("appi-z", Assert.Single(logs.Sections[3].Links!).Url);
@@ -277,7 +277,7 @@ public class LogsTabTests
     {
         using var rig = new Rig(TownA, "");
 
-        var logs = await rig.Logs.RecentAsync(rig.Node(NodeKind.Api), default);
+        var logs = await rig.Logs.RecentAsync(rig.Node(NodeKind.Api), TestContext.Current.CancellationToken);
 
         Assert.False(logs.Configured);
         Assert.Empty(logs.Sections);
@@ -289,7 +289,7 @@ public class LogsTabTests
     {
         using var rig = new Rig(TownA, LogsA);
 
-        var logs = await rig.Logs.RecentAsync(rig.Node(NodeKind.Database), default);
+        var logs = await rig.Logs.RecentAsync(rig.Node(NodeKind.Database), TestContext.Current.CancellationToken);
 
         Assert.True(logs.Configured);
         Assert.Empty(logs.Sections);
@@ -301,7 +301,7 @@ public class LogsTabTests
     {
         using var rig = new Rig(TownA, LogsA, sourceName: "another");
 
-        var e = await Assert.ThrowsAsync<InvalidOperationException>(() => rig.Logs.RecentAsync(rig.Node(NodeKind.Api), default));
+        var e = await Assert.ThrowsAsync<InvalidOperationException>(() => rig.Logs.RecentAsync(rig.Node(NodeKind.Api), TestContext.Current.CancellationToken));
 
         Assert.Contains("'telemetry'", e.Message);
     }
@@ -312,7 +312,7 @@ public class LogsTabTests
         using var rig = new Rig(TownA, LogsA);
         rig.Source.CanReadLogs = false;
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => rig.Logs.RecentAsync(rig.Node(NodeKind.Api), default));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => rig.Logs.RecentAsync(rig.Node(NodeKind.Api), TestContext.Current.CancellationToken));
     }
 
     // ---- the files ----
@@ -416,7 +416,7 @@ public class LogsTabTests
         var http = ObservabilityCity.AdapterKit.CannedHttp.Always(Answer("""["logs","2026-11-01T11:57:00Z","Cache is cold",1,"warn",null,null]"""));
         var reader = new LogAnalyticsReader(new HttpClient(http), null);
 
-        var rows = await reader.QueryLogsAsync("00000000-0000-0000-0000-00000000c0de", "Q", Now.AddHours(-4), Now, default);
+        var rows = await reader.QueryLogsAsync("00000000-0000-0000-0000-00000000c0de", "Q", Now.AddHours(-4), Now, TestContext.Current.CancellationToken);
 
         Assert.Single(rows);
         var sent = Assert.Single(http.Sent);

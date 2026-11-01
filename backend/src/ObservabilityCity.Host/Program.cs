@@ -102,8 +102,9 @@ foreach (var (folder, registry) in loaded)
             // a demo town has its own sped-up day; a live one shows the real time of day
             DayFraction = fake is null ? () => TimeProvider.System.GetLocalNow().TimeOfDay.TotalDays : () => fake.DayFraction,
         };
-        ILogSource logs = fake is null ? new QueryLogSource(set.Sources, view, set.Scope, TimeProvider.System) : new FakeLogSource(state, TimeProvider.System, staleAfter);
-        runtimes.Add(new EnvironmentRuntime(registry.Town.Id, environmentId, view, fake, state, snapshots, store, logs, set.Sources, set.Problems, set.Scope, discovered, readings));
+        var scopeStore = set.Scope ?? new ScopeStore();
+        ILogSource logs = fake is null ? new QueryLogSource(set.Sources, view, scopeStore, TimeProvider.System) : new FakeLogSource(state, TimeProvider.System, staleAfter);
+        runtimes.Add(new EnvironmentRuntime(registry.Town.Id, environmentId, view, fake, state, snapshots, store, logs, set.Sources, set.Problems, scopeStore, discovered, readings));
     }
     var town = new TownRuntime(registry.Town.Id, registry.Town.Name, folder, registries, new EnvironmentSet(runtimes, registry.DefaultEnvironmentId, registry.Town.Id));
     townRuntimes.Add(town);

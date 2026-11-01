@@ -35,7 +35,7 @@ public class HostStoryTests : IDisposable
     [Fact]
     public async Task The_stories_of_the_town_are_listed_with_their_steps()
     {
-        var list = await Client.GetFromJsonAsync<Story[]>("/api/fake/stories", Json);
+        var list = await Client.GetFromJsonAsync<Story[]>("/api/fake/stories", Json, TestContext.Current.CancellationToken);
 
         var story = Assert.Single(list!);
         Assert.Equal("orders-trouble", story.Id);
@@ -52,32 +52,32 @@ public class HostStoryTests : IDisposable
         var client = Client;
         Assert.Null((await StoryState()).StoryId);
 
-        var played = await client.PostAsJsonAsync("/api/fake/story/play", new { id = "orders-trouble", speed = 2 });
+        var played = await client.PostAsJsonAsync("/api/fake/story/play", new { id = "orders-trouble", speed = 2 }, TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.OK, played.StatusCode);
         var s = await StoryState();
         Assert.Equal("orders-trouble", s.StoryId);
         Assert.True(s.Playing);
         Assert.Equal(2, s.Speed);
 
-        await client.PostAsync("/api/fake/story/pause", null);
+        await client.PostAsync("/api/fake/story/pause", null, TestContext.Current.CancellationToken);
         var paused = await StoryState();
         Assert.False(paused.Playing);
-        await Task.Delay(300);
+        await Task.Delay(300, TestContext.Current.CancellationToken);
         Assert.Equal(paused.Position, (await StoryState()).Position);
 
-        await client.PostAsJsonAsync("/api/fake/story/seek", new { seconds = 25 });
+        await client.PostAsJsonAsync("/api/fake/story/seek", new { seconds = 25 }, TestContext.Current.CancellationToken);
         var sought = await StoryState();
         Assert.Equal(25, sought.Position, 3);
         Assert.Equal(2, sought.Step);
         Assert.Equal("The orders worker goes down.", sought.Caption);
 
-        await client.PostAsJsonAsync("/api/fake/story/speed", new { speed = 4 });
+        await client.PostAsJsonAsync("/api/fake/story/speed", new { speed = 4 }, TestContext.Current.CancellationToken);
         Assert.Equal(4, (await StoryState()).Speed);
 
-        await client.PostAsync("/api/fake/story/resume", null);
+        await client.PostAsync("/api/fake/story/resume", null, TestContext.Current.CancellationToken);
         Assert.True((await StoryState()).Playing);
 
-        await client.PostAsync("/api/fake/story/stop", null);
+        await client.PostAsync("/api/fake/story/stop", null, TestContext.Current.CancellationToken);
         var stopped = await StoryState();
         Assert.Null(stopped.StoryId);
         Assert.False(stopped.Playing);
@@ -88,23 +88,23 @@ public class HostStoryTests : IDisposable
     {
         var client = Client;
 
-        Assert.Equal(HttpStatusCode.NotFound, (await client.PostAsJsonAsync("/api/fake/story/play", new { id = "nope" })).StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/api/fake/stories?env=nowhere")).StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, (await client.PostAsync("/api/fake/story/pause?env=nowhere", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.PostAsJsonAsync("/api/fake/story/play", new { id = "nope" }, TestContext.Current.CancellationToken)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/api/fake/stories?env=nowhere", TestContext.Current.CancellationToken)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.PostAsync("/api/fake/story/pause?env=nowhere", null, TestContext.Current.CancellationToken)).StatusCode);
     }
 
     [Fact]
     public async Task A_story_that_is_scrubbed_breaks_the_town_and_reset_puts_it_right()
     {
         var client = Client;
-        await client.PostAsJsonAsync("/api/fake/calm", new { on = true });
-        await client.PostAsJsonAsync("/api/fake/story/play", new { id = "orders-trouble" });
-        await client.PostAsync("/api/fake/story/pause", null);
-        await client.PostAsJsonAsync("/api/fake/story/seek", new { seconds = 25 });
+        await client.PostAsJsonAsync("/api/fake/calm", new { on = true }, TestContext.Current.CancellationToken);
+        await client.PostAsJsonAsync("/api/fake/story/play", new { id = "orders-trouble" }, TestContext.Current.CancellationToken);
+        await client.PostAsync("/api/fake/story/pause", null, TestContext.Current.CancellationToken);
+        await client.PostAsJsonAsync("/api/fake/story/seek", new { seconds = 25 }, TestContext.Current.CancellationToken);
 
         await Eventually(async () => (await Node("aa.orders-worker")).State == HealthState.Down);
 
-        await client.PostAsync("/api/fake/reset", null);
+        await client.PostAsync("/api/fake/reset", null, TestContext.Current.CancellationToken);
         Assert.Null((await StoryState()).StoryId);
         await Eventually(async () => (await Node("aa.orders-worker")).State == HealthState.Healthy);
     }
@@ -113,18 +113,18 @@ public class HostStoryTests : IDisposable
     public async Task Effects_set_by_hand_can_change_intensity_and_the_state_lists_hand_effects_the_story_and_the_day()
     {
         var client = Client;
-        await client.PostAsync("/api/fake/reset", null);
-        var created = await (await client.PostAsJsonAsync("/api/fake/effects", new { target = "aa.orders-api", kind = "Errors", intensity = 0.2 })).Content.ReadFromJsonAsync<JsonElement>(Json);
+        await client.PostAsync("/api/fake/reset", null, TestContext.Current.CancellationToken);
+        var created = await (await client.PostAsJsonAsync("/api/fake/effects", new { target = "aa.orders-api", kind = "Errors", intensity = 0.2 }, TestContext.Current.CancellationToken)).Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
         var id = created.GetProperty("id").GetString();
 
-        Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync($"/api/fake/effects/{id}", new { intensity = 0.9 })).StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, (await client.PutAsJsonAsync("/api/fake/effects/fx9999", new { intensity = 0.9 })).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync($"/api/fake/effects/{id}", new { intensity = 0.9 }, TestContext.Current.CancellationToken)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.PutAsJsonAsync("/api/fake/effects/fx9999", new { intensity = 0.9 }, TestContext.Current.CancellationToken)).StatusCode);
 
-        var state = await client.GetFromJsonAsync<JsonElement>("/api/fake", Json);
+        var state = await client.GetFromJsonAsync<JsonElement>("/api/fake", Json, TestContext.Current.CancellationToken);
         Assert.Equal(0.9, state.GetProperty("effects")[0].GetProperty("intensity").GetDouble(), 3);
         Assert.Equal(120, state.GetProperty("dayLengthSeconds").GetDouble());
         Assert.Equal(JsonValueKind.Null, state.GetProperty("story").GetProperty("storyId").ValueKind);
-        await client.PostAsync("/api/fake/reset", null);
+        await client.PostAsync("/api/fake/reset", null, TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -132,12 +132,12 @@ public class HostStoryTests : IDisposable
     {
         var client = Client;
 
-        var ok = await client.PostAsJsonAsync("/api/fake/day", new { seconds = 30 });
+        var ok = await client.PostAsJsonAsync("/api/fake/day", new { seconds = 30 }, TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.OK, ok.StatusCode);
-        Assert.Equal(30, (await client.GetFromJsonAsync<JsonElement>("/api/fake", Json)).GetProperty("dayLengthSeconds").GetDouble());
+        Assert.Equal(30, (await client.GetFromJsonAsync<JsonElement>("/api/fake", Json, TestContext.Current.CancellationToken)).GetProperty("dayLengthSeconds").GetDouble());
 
-        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync("/api/fake/day", new { seconds = 1 })).StatusCode);
-        await client.PostAsJsonAsync("/api/fake/day", new { seconds = 120 });
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync("/api/fake/day", new { seconds = 1 }, TestContext.Current.CancellationToken)).StatusCode);
+        await client.PostAsJsonAsync("/api/fake/day", new { seconds = 120 }, TestContext.Current.CancellationToken);
     }
 
     private async Task<NodeSnapshot> Node(string id)
