@@ -1,3 +1,4 @@
+using ObservabilityCity.Contracts;
 using Microsoft.Extensions.Logging;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
@@ -183,6 +184,22 @@ public sealed class DiscoveredLinks
             if (open.Count > limit) lines.Add($"Link discovery: {open.Count - limit} more unresolved calls not shown.");
             return lines;
         }
+    }
+
+    /// <summary>
+    /// The addresses no rule explains, grouped by host: the calls added up over every caller and path, who made them, and the days it was seen on (together).
+    /// Only hosts seen on at least <paramref name="minDays"/> days; the busiest first.
+    /// </summary>
+    public IReadOnlyList<UnknownHostSnapshot> UnknownHosts(int minDays)
+    {
+        lock (_gate)
+            return _unresolved.GroupBy(kv => kv.Key.Host, StringComparer.OrdinalIgnoreCase)
+                .Select(g => (Host: g.First().Key.Host, Calls: g.Sum(kv => kv.Value.Calls), Callers: g.Select(kv => kv.Key.Caller).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToList(),
+                    Days: g.SelectMany(kv => kv.Value.Days).Distinct().Count()))
+                .Where(x => x.Days >= minDays)
+                .OrderByDescending(x => x.Calls).ThenBy(x => x.Host, StringComparer.Ordinal)
+                .Select(x => new UnknownHostSnapshot(x.Host, x.Calls, x.Callers, x.Days))
+                .ToList();
     }
 
     /// <summary>

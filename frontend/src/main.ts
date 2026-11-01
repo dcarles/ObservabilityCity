@@ -10,6 +10,7 @@ import { addressForTown, fetchTowns, requestedScope, type TownChoice } from './s
 import { saveQuality, startQuality, type Quality } from './quality'
 import { parseWall } from './wall/params'
 import { WallMode } from './wall/wall'
+import { UnknownHostsPanel } from './unknownHosts'
 import { NoticesPanel, Search, ServicePanel, showTooltip, StateList, TopBar, type SearchItem } from './ui'
 import { ALL_TENANTS, pruneTenants, type TenantView } from './tenants'
 import { ViewBar } from './viewbar'
@@ -23,7 +24,7 @@ import { browserStore, otherLighting, saveLighting, startLighting } from './ligh
 import { saveTheme, startTheme, themeById } from './themes'
 import { kitById } from './themes/kits'
 import { activateTheme, palette as livePalette } from './themes/active'
-import { parseLayers, toggleLayer, type Layer } from './layers'
+import { parseFocus, parseLayers, toggleLayer, type Layer } from './layers'
 import { islandChoices, parseIslands, pruneIslands } from './islands'
 import { withView } from './address'
 import { viewTotals } from './viewTotals'
@@ -56,10 +57,12 @@ async function start(): Promise<void> {
   const wallParams = parseWall(query)
   let islands: readonly string[] = parseIslands(query)
   let layers = parseLayers(query)
+  let focus = parseFocus(query)
   // a wall opens on Dusk whatever this browser last chose, unless the address says otherwise
   let lighting = wallParams.on ? startLighting(query, null, 'dusk') : startLighting(query, store)
   const theme = themeAsked.theme
   town.setLayers(layers)
+  town.setDependencyFocus(focus)
   stage.setLighting(lighting, true)
   document.documentElement.dataset.theme = theme.id
 
@@ -82,7 +85,7 @@ async function start(): Promise<void> {
 
   /** Keeps the islands and layers in the address, so the view can be bookmarked and shared. */
   function syncAddress(): void {
-    const next = withView(window.location.search, { islands, layers })
+    const next = withView(window.location.search, { islands, layers, focus })
     if (next !== window.location.search) window.history.replaceState(null, '', `${window.location.pathname}${next}${window.location.hash}`)
   }
 
@@ -113,6 +116,8 @@ async function start(): Promise<void> {
   const topbar = new TopBar((state, anchor) => stateList.toggle(state, anchor), () => tenantView)
   document.getElementById('home')!.addEventListener('click', () => stage.home())
   const notices = new NoticesPanel()
+  const unknownHosts = new UnknownHostsPanel(requestedScope())
+  unknownHosts.start()
   const buildingItems = (): SearchItem[] => {
     const items: SearchItem[] = []
     for (const isl of town.islands)
@@ -161,6 +166,13 @@ async function start(): Promise<void> {
     toggleLayer: (layer: Layer) => {
       layers = toggleLayer(layers, layer)
       town.setLayers(layers)
+      syncAddress()
+      viewBar.refresh()
+    },
+    focus: () => focus,
+    setFocus: (id: string) => {
+      focus = id
+      town.setDependencyFocus(focus)
       syncAddress()
       viewBar.refresh()
     },
@@ -403,6 +415,7 @@ async function start(): Promise<void> {
     stage, town, THREE, seen, step,
     /** Hand the page a snapshot as if the server had sent it. */
     feed: (raw: unknown) => onSnapshot(raw),
+    unknownHosts,
     inspect: (id: string) => town.inspect(id),
     inspectIsland: (id: string) => town.inspectIsland(id),
     inspectRoutes: () => town.inspectRoutes(),

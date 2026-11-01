@@ -235,14 +235,16 @@ public sealed record GroupSnapshot(
 /// A third party outside the town (a credit bureau, a data warehouse). Node carries its health, worked out from our own calls to it:
 /// request rate, error rate and p99 of the calls that go out, with the vendor's own thresholds. CalledBy lists the ids of our systems that call it.
 /// A vendor with several services has one VendorSnapshot for each, all with the same IslandId (and IslandName): they stand on one island. Without IslandId the
-/// vendor is its own island. Internal marks the company's own services outside the monitored platform.
+/// vendor is its own island. Internal marks the company's own services outside the monitored platform. Calls lists the ids of the town systems the building was
+/// seen calling through the API gateway (null when none).
 /// </summary>
 public sealed record VendorSnapshot(
     NodeSnapshot Node,
     IReadOnlyList<string> CalledBy,
     string? IslandId = null,
     string? IslandName = null,
-    bool Internal = false);
+    bool Internal = false,
+    IReadOnlyList<string>? Calls = null);
 
 /// <summary>
 /// Someone outside the town (an app, a partner) and the external systems it reaches. RequestsPerSecond is the traffic it brings in, the
@@ -328,6 +330,12 @@ public sealed record HiddenIsland(string Id, string DisplayName);
 /// Traffic between a system on screen and an island the filter left out. NodeId is the system on screen. Incoming is false when it calls a system on
 /// the hidden island and true when a system there calls it. RequestsPerSecond is the traffic on the link (the callee's rate, shared evenly between its callers).
 /// </summary>
+/// <summary>
+/// One host that calls from the town go to and no rule explains: how many calls over the days link discovery remembers, which town systems made them,
+/// and on how many different days it was seen. Hosts that are a third party's or on the ignore list are never listed. Calls are sampling-corrected estimates.
+/// </summary>
+public sealed record UnknownHostSnapshot(string Host, double Calls, IReadOnlyList<string> Callers, int Days);
+
 public sealed record OffscreenLink(string NodeId, string IslandId, string IslandName, bool Incoming, double RequestsPerSecond);
 
 /// <summary>

@@ -175,6 +175,13 @@ app.MapGet("/api/systems/{id}", (string id, EnvironmentSet envs, string? env) =>
    .Produces<SystemDetail>()
    .WithName("GetSystem");
 
+// The hosts the town's calls go to that no rule explains, grouped by host, for the Unknown hosts panel. Empty when link discovery is off.
+app.MapGet("/api/unknown-hosts", (EnvironmentSet envs, string? env) =>
+        envs.Find(env) is not { } rt ? EnvironmentNotFound(envs, env)
+        : Results.Ok(rt.Discovered is { } found ? found.UnknownHosts(rt.Registry.Current.ActiveEnvironment?.Links?.MinDays ?? LinkDiscovery.DefaultMinDays) : []))
+   .Produces<IReadOnlyList<UnknownHostSnapshot>>()
+   .WithName("GetUnknownHosts");
+
 // What the Logs tab of one system shows: 5xx requests, slow requests, warnings and errors, exceptions. Read on demand when the tab opens, never polled,
 // never part of health. A source that cannot be reached is a 502 with the reason.
 app.MapGet("/api/systems/{id}/logs", async (string id, EnvironmentSet envs, string? env, CancellationToken ct) =>

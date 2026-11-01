@@ -46,9 +46,7 @@ public sealed class LinkTrafficRunner(
         var view = registries.Current;
         if (view.ActiveEnvironment?.Links is not { Traffic: { } config } links) return;
         var resolution = scope.Resolve(view);
-        var byRole = new Dictionary<string, RegistryNode>(StringComparer.OrdinalIgnoreCase);
-        foreach (var node in view.AllNodes.Where(n => n.Kind is NodeKind.Api or NodeKind.Worker && n.DiscoverLinks))
-            if (resolution.System(node.Id)?.TelemetryRole is { Length: > 0 } role) byRole.TryAdd(role, node);
+        var byRole = LinkCallers.ByRole(view, id => resolution.System(id)?.TelemetryRole);
         if (byRole.Count == 0) return;
 
         await SeedAsync(view, config, ct);
@@ -60,7 +58,7 @@ public sealed class LinkTrafficRunner(
         {
             if (!byRole.TryGetValue(row.Caller, out var caller)) continue;
             var result = classifier.Classify(row, caller.GroupId);
-            if (result.Outcome == LinkOutcome.Found && result.Target != caller.Id) calls.Add((caller.Id, result.Target!, row.Calls));
+            if (result.Outcome is LinkOutcome.Found or LinkOutcome.Vendor && result.Target is { } target && target != caller.Id) calls.Add((caller.Id, target, row.Calls));
         }
         traffic.Update(calls, config.ShareWindow, config.MinCalls);
     }

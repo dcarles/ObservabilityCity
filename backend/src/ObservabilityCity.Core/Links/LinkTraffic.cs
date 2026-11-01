@@ -85,6 +85,20 @@ public sealed class LinkTraffic
     }
 
     /// <summary>
+    /// The traffic to a target that has no rate of its own to split, a third party: what each town system sends it, in requests per second, and the sum.
+    /// Null until a read has succeeded, and when no town system was seen calling it.
+    /// </summary>
+    public (double Total, IReadOnlyList<InboundLinkSnapshot> Callers)? CallRates(string target)
+    {
+        lock (_gate)
+        {
+            if (!_read || !_calls.TryGetValue(target, out var seen) || seen.Count == 0) return null;
+            var rates = seen.OrderBy(kv => kv.Key, StringComparer.Ordinal).Select(kv => new InboundLinkSnapshot(kv.Key, kv.Value / _window.TotalSeconds)).ToList();
+            return (rates.Sum(r => r.RequestsPerSecond), rates);
+        }
+    }
+
+    /// <summary>
     /// Splits <paramref name="total"/> (the API's measured requests per second) between the town systems that call it and the outside. Null until a read has
     /// succeeded: unmeasured is not the same as nobody calls.
     /// </summary>

@@ -202,6 +202,21 @@ public class IslandFilterTests
     }
 
     [Fact]
+    public async Task Every_link_between_two_islands_has_an_arc_whatever_its_traffic()
+    {
+        var rig = new Rig();
+        await rig.Run();
+
+        var arcs = rig.Builder.Build().Dependencies;
+        var groupOf = rig.Registry.AllNodes.ToDictionary(n => n.Id, n => n.GroupId);
+        var crossing = rig.Registry.AllNodes
+            .SelectMany(n => n.Calls.Concat(n.GatewayCalls).Where(groupOf.ContainsKey).Select(callee => (From: n.GroupId, To: groupOf[callee])))
+            .Where(l => l.From != l.To).Distinct().ToList();
+        Assert.NotEmpty(crossing);
+        Assert.All(crossing, l => Assert.Contains(arcs, d => d.From == l.From && d.To == l.To));
+    }
+
+    [Fact]
     public async Task The_airports_rate_counts_only_the_systems_on_screen()
     {
         var rig = new Rig();

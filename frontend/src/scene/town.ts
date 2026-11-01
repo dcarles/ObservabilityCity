@@ -80,6 +80,23 @@ interface Island {
   nodeIds: Set<string>
 }
 
+/**
+ * The part of a third party's traffic that one island sends: what the town systems on it are measured sending, over the whole. Before the traffic is
+ * measured the calls are shared evenly between the islands that call it.
+ */
+export function vendorShare(node: NodeSnapshot | null, callers: readonly string[], islands: number): number {
+  const total = node?.requestsPerSecond ?? 0
+  if (!node?.inbound || !(total > 0)) return 1 / Math.max(1, islands)
+  return Math.min(1, node.inbound.filter((i) => callers.includes(i.from)).reduce((a, i) => a + i.requestsPerSecond, 0) / total)
+}
+
+/** The town systems the services of third parties' islands were seen calling, by system id, with the ids of the calling buildings. */
+export function vendorCallersOf(s: Snapshot): Map<string, string[]> {
+  const out = new Map<string, string[]>()
+  for (const v of s.vendors) for (const target of v.calls ?? []) out.set(target, [...(out.get(target) ?? []), v.node.id])
+  return out
+}
+
 /** An island's road to one third party: out of its back gate, over its bridge to the ring road, round the loop and down the vendor's spur. */
 interface VendorLink {
   group: number
@@ -132,6 +149,12 @@ export class Town {
   private airportPath: THREE.Vector3[] | null = null
   /** The angle on the plaza's ring road where that road joins it. */
   private airportJoin = 0
+  /** Cars from the ring road through the airport: the ring road's landing, then the side road inside the island. Null where the airport has no back gate. */
+  private airportBack: { landing: THREE.Vector3; angle: number; path: THREE.Vector3[] } | null = null
+  /** Town systems that services of third parties' islands were seen calling through the gateway, by system id: the ids of the calling buildings. */
+  private vendorCallers = new Map<string, string[]>()
+  /** The direction of each vendor island from the hub, where its spur meets the ring road, by vendor island id. */
+  private readonly vendorAngles = new Map<string, number>()
   /** True for a town whose islands call each other directly: they reach each other, the airport and the third parties over the outer ring road. */
   private direct = false
   /** Radius of the outer ring road; 0 when there is none. */
@@ -173,9 +196,11 @@ export class Town {
 
     // Islands stand round the hub in registry order, `ringCapacity` to a ring and the rest in a staggered second ring, with the airport
     // in the second ring's northernmost place. The hub grows with their number, so every spoke road has room where it leaves the plaza.
-    const airport = new Airport()
     this.direct = s.topology !== 'hub-and-spoke'
     const direct = this.direct
+    // services of a third party's island that call town systems come in by the airport, so it gets a back gate to the ring road and a side road to it
+    this.vendorCallers = vendorCallersOf(s)
+    const airport = new Airport(!direct && this.vendorCallers.size > 0)
     const plans = pillars.map((g) => planIsland(g))
     // the hub grows until the clusters of resource buildings it holds have a place of their own
     const layout = layoutWithHubRoom(plans.map((p) => ({ rx: p.rx, rz: p.rz })), s.ringCapacity, { rx: airport.rx, rz: airport.rz }, hub?.assets ?? [], (hub?.nodes ?? []).map((n) => n.kind))
@@ -198,6 +223,8 @@ export class Town {
     this.edge = { mode: edgeMode(s), out: new Set(links.filter((l) => !l.incoming).map((l) => l.nodeId)), in: new Set(links.filter((l) => l.incoming).map((l) => l.nodeId)) }
     this.airport = null
     this.airportPath = null
+    this.airportBack = null
+    this.vendorAngles.clear()
     const centres = places.map((l) => dirOf(l.angle).multiplyScalar(l.radius))
     const discs: Disc[] = pillars.map((g, i) => ({ id: g.id, x: centres[i].x, z: centres[i].z, r: Math.max(plans[i].rx, plans[i].rz) * 0.95 + 3 }))
     const airportDisc: Disc = { id: 'airport', x: centres[pillars.length].x, z: centres[pillars.length].z, r: Math.max(airport.rx, airport.rz) * 0.95 + 3 }
@@ -283,6 +310,7 @@ export class Town {
     spots.forEach((spot, i) => {
       const vi = vendorIslands[i]
       const group = vendorGroups[i]
+      this.vendorAngles.set(group.id, spot.angle)
       vi.root.position.set(spot.x, 0, spot.z)
       vi.root.rotation.y = Math.atan2(spot.loopX - spot.x, spot.loopZ - spot.z) // local +z faces the ring road
       this.root.add(vi.root)
@@ -357,6 +385,13 @@ export class Town {
       this.airportPath = [airport.doorWorld(), gate.setY(GROUND), coast.clone().setY(GROUND)]
       this.airportJoin = ports[pillars.length]
       this.airportAngle = angles[pillars.length]
+      const back = airport.backGate()
+      if (back && loopR > 0) {
+        const land = loopPoint(angles[pillars.length])
+        bridgeDecor.add(bridge({ from: back.clone().setY(0), to: land.clone().setY(0) }))
+        bridges.push([new THREE.Vector2(back.x, back.z), new THREE.Vector2(land.x, land.z)])
+        this.airportBack = { landing: land.clone().setY(GROUND), angle: angles[pillars.length], path: [back.clone().setY(GROUND), ...airport.backPath().slice(1)] }
+      }
     }
 
     // ── Sea lanes: boats sail from a hub quay in the gap beside each bridge to the island's harbour ──
@@ -720,7 +755,8 @@ export class Town {
     for (const p of loopArc(loopR, link.islandAngle, link.vendorAngle, GROUND)) head.push(new THREE.Vector3(p.x, p.y, p.z))
     head.push(link.vendor.gate().setY(GROUND))
     const lane = link.vendor.into(head, link.to)
-    return [{ dest: link.vendor.buildings.get(link.to)!, source: island.buildings.get(from.node.id)!, origin: 'internal', share: 1 / link.of, ...lane }]
+    const dest = link.vendor.buildings.get(link.to)!
+    return [{ dest, source: island.buildings.get(from.node.id)!, origin: 'internal', vendor: true, share: () => vendorShare(dest.node, link.callers, link.of), ...lane }]
   }
 
   private ringPoint(a: number): THREE.Vector3 {
@@ -1091,7 +1127,9 @@ export class Town {
         // a call through the API gateway is a call from that island too: it drives over the bridge like any other
         for (const p of g.plan.placed) if (this.callsIt(p, dest) && !declared.some((d) => d.gate === i)) declared.push({ gate: i, from: p })
       })
-      const callerIds = new Set([...declared.map((d) => d.from.node.id), ...callers.map((c) => c.node.id)])
+      // services of a third party's island that were seen calling it through the gateway
+      const vendorCallerIds = this.vendorCallers.get(dest.node.id) ?? []
+      const callerIds = new Set([...declared.map((d) => d.from.node.id), ...callers.map((c) => c.node.id), ...vendorCallerIds])
       const mix = () => inboundMix(b.node, callerIds, outsideReach)
       // An island with no bridge is reached by no car from outside; only its own systems drive to each other.
       if (linked(here)) {
@@ -1116,6 +1154,26 @@ export class Town {
           const head = this.airportPath ? this.airportPath.map((p) => p.clone()) : [gateway.doorWorld().setY(GROUND), this.ringPoint(exit)]
           this.cross(island.group.id)
           routes.push({ dest: b, source: this.airportPath && this.airport ? this.airport : gateway, origin: 'external', share: () => mix().outside, ...toDest(dest, intoIsland(head, exit, dest), null)! })
+        }
+        // such a caller drives out of its island, round the ring road to the airport, through it and over its bridge to the hub, and from there like an outside caller
+        // (a direct town has no hub: it drives round the ring road to this island)
+        for (const vendorId of vendorCallerIds) {
+          const vi = this.vendors.get(vendorId)
+          const angle = vi && this.vendorAngles.get(vi.id)
+          const source = vi?.buildings.get(vendorId)
+          if (!vi || angle === undefined || !source) continue
+          const out = vi.outOf(vendorId)
+          const share = () => mix().caller(vendorId)
+          if (direct) {
+            if (!here.ringed) continue
+            this.cross(island.group.id)
+            routes.push({ dest: b, source, origin: 'internal', share, ...toDest(dest, intoIsland([...out, this.loopPoint(angle)], angle, dest), null)! })
+          } else if (this.airportBack && this.airportPath && gateway) {
+            this.cross(island.group.id)
+            const head = [...out, this.loopPoint(angle), ...this.loopArc(angle, this.airportBack.angle), this.airportBack.landing,
+              ...this.airportBack.path, ...this.airportPath.slice(1).map((p) => p.clone())]
+            routes.push({ dest: b, source, origin: 'internal', share, ...toDest(dest, intoIsland(head, this.airportJoin, dest), null)! })
+          }
         }
         remote.forEach(({ gate, from }) => {
           const g = gates[gate]
@@ -1192,6 +1250,11 @@ export class Town {
     for (const isl of this.islands) if (isl.harbour) isl.harbour.group.visible = state.messaging
     this.applyPortLine()
     this.overlay.visible = state.dependencies
+  }
+
+  /** Focuses the dependency arcs on one island or vendor (empty for none). */
+  setDependencyFocus(id: string): void {
+    this.overlay.setFocus(id)
   }
 
   /** The hit boxes of the buildings that are drawn: a building hidden by a layer cannot be hovered or clicked. */
@@ -1318,7 +1381,7 @@ function parkProps(x: number, z: number): THREE.Object3D[] {
 
 function layoutKey(s: Snapshot): string {
   const groups = s.groups.map((g) => `${g.id}${g.configError ? '!' : ''}:${g.nodes.map((n) => `${n.id}/${n.kind}/${n.tenants != null ? 'T' : ''}/${n.service ?? ''}/${n.calls.join('+')}/${(n.gatewayCalls ?? []).join('+')}`).join(',')}|${g.hasBridge === false ? 'nb' : 'b'}${g.hasRingBridge ? 'r' : ''}|${(g.assets ?? []).map((a) => `${a.id}/${a.shape}/${a.service ?? ''}/${a.group ?? ''}`).join('+')}|${(g.messaging?.topics ?? []).map((t) => t.name).join('+')}|${(g.messaging?.subscriptions ?? []).map((x) => `${x.topic}>${x.consumer}${x.legacy ? '!' : ''}`).join('+')}`).join(';')
-  const vendors = (s.vendors ?? []).map((v) => `${v.node.id}@${v.islandId ?? ''}<${v.calledBy.join('+')}`).join(';')
+  const vendors = (s.vendors ?? []).map((v) => `${v.node.id}@${v.islandId ?? ''}<${v.calledBy.join('+')}>${(v.calls ?? []).join("+")}`).join(';')
   return `${s.townId}|${s.environment ?? ''}|${groups}|${vendors}|${edgeKey(s)}`
 }
 

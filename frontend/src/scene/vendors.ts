@@ -137,6 +137,12 @@ export class VendorIsland {
     return this.world(0, this.gateZ)
   }
 
+  /** The way out of one building's service lane to the island's gate, as world points: out to the spine, then up it. */
+  outOf(nodeId: string): THREE.Vector3[] {
+    const target = this.targets.get(nodeId)!
+    return [this.world(target.x, target.roadZ), this.world(0, target.roadZ), this.gate()]
+  }
+
   /** A route into one building's service lane from a head that ends on the island's spine. Cars come out of the caller's door, cross the bridge and queue here. */
   into(head: THREE.Vector3[], nodeId: string): Pick<Route, 'path' | 'bay'> {
     const target = this.targets.get(nodeId)!

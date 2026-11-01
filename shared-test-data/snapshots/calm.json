@@ -5876,7 +5876,8 @@
       ],
       "islandId": "ext.credit-bureau",
       "islandName": null,
-      "internal": false
+      "internal": false,
+      "calls": null
     },
     {
       "node": {
@@ -5926,7 +5927,8 @@
       ],
       "islandId": "ext.card-network",
       "islandName": null,
-      "internal": false
+      "internal": false,
+      "calls": null
     },
     {
       "node": {
@@ -5976,7 +5978,8 @@
       ],
       "islandId": "ext.sms-email",
       "islandName": null,
-      "internal": false
+      "internal": false,
+      "calls": null
     },
     {
       "node": {
@@ -6027,7 +6030,8 @@
       ],
       "islandId": "ext.snowflake",
       "islandName": null,
-      "internal": false
+      "internal": false,
+      "calls": null
     }
   ],
   "externalCallers": [

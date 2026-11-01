@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { groupVendors } from '../../src/scene/layout'
+import { vendorCallersOf, vendorShare } from '../../src/scene/town'
 import { planVendorIsland, vendorSlot } from '../../src/scene/vendors'
 import { checkSnapshot } from '../../src/snapshotGuard'
 import { vendorWhere } from '../../src/inspectorModel'
@@ -110,5 +111,29 @@ describe('the buildings of a vendor island', () => {
     expect(size(1)).toBeLessThanOrEqual(size(2))
     expect(size(4)).toBeGreaterThan(size(2))
     expect(size(6)).toBeGreaterThan(size(4))
+  })
+})
+
+describe('the part of a third party\'s traffic one island sends', () => {
+  const withCalls = (rps: number, inbound: { from: string; requestsPerSecond: number }[] | null): NodeSnapshot =>
+    ({ ...node('ext.x'), requestsPerSecond: rps, inbound } as unknown as NodeSnapshot)
+
+  it('is the measured part of the callers on that island', () => {
+    const n = withCalls(10, [{ from: 'a.api', requestsPerSecond: 3 }, { from: 'a.worker', requestsPerSecond: 1 }, { from: 'b.api', requestsPerSecond: 6 }])
+    expect(vendorShare(n, ['a.api', 'a.worker'], 2)).toBeCloseTo(0.4)
+    expect(vendorShare(n, ['b.api'], 2)).toBeCloseTo(0.6)
+  })
+
+  it('is an even split before the traffic is measured, or when nothing was seen', () => {
+    expect(vendorShare(withCalls(0, null), ['a.api'], 4)).toBe(0.25)
+    expect(vendorShare(withCalls(5, null), ['a.api'], 2)).toBe(0.5)
+    expect(vendorShare(null, ['a.api'], 3)).toBeCloseTo(1 / 3)
+  })
+})
+
+describe('the town systems third party buildings call', () => {
+  it('are listed with the buildings that call them', () => {
+    const s = { vendors: [{ ...vendor('ext.a', []), calls: ['x.api', 'y.api'] }, { ...vendor('ext.b', []), calls: ['x.api'] }, vendor('ext.c', [])] } as unknown as Snapshot
+    expect([...vendorCallersOf(s)]).toEqual([['x.api', ['ext.a', 'ext.b']], ['y.api', ['ext.a']]])
   })
 })

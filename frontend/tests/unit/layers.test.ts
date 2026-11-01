@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildingShown, DEFAULT_LAYERS, layerOfKind, layerParams, LAYERS, layersLabel, parseLayers, toggleLayer } from '../../src/layers'
+import { buildingShown, DEFAULT_LAYERS, layerOfKind, layerParams, LAYERS, layersLabel, parseFocus, parseLayers, toggleLayer } from '../../src/layers'
 import type { NodeKind } from '../../src/types'
 
 describe('layers from the address', () => {
@@ -66,5 +66,13 @@ describe('what a layer covers', () => {
     expect(layersLabel(toggleLayer(DEFAULT_LAYERS, 'traffic'))).toBe('Layers · 1 off')
     expect(layersLabel(toggleLayer(toggleLayer(DEFAULT_LAYERS, 'traffic'), 'workers'))).toBe('Layers · 2 off')
     expect(layersLabel(toggleLayer(DEFAULT_LAYERS, 'dependencies'))).toBe('Layers')
+  })
+})
+
+describe('parseFocus', () => {
+  it('reads the island or vendor from the address, and is empty without one', () => {
+    expect(parseFocus('?focus=cl')).toBe('cl')
+    expect(parseFocus('?env=prod&focus=ext.fiserv')).toBe('ext.fiserv')
+    expect(parseFocus('')).toBe('')
   })
 })

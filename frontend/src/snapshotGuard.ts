@@ -65,6 +65,7 @@ export function checkSnapshot(raw: unknown): Checked {
       islandId: typeof rawVendor.islandId === 'string' ? rawVendor.islandId : null,
       islandName: typeof rawVendor.islandName === 'string' ? rawVendor.islandName : null,
       internal: rawVendor.internal === true,
+      calls: Array.isArray(rawVendor.calls) ? strings(rawVendor.calls) : null,
     })
   }
   const snapshot: Snapshot = {

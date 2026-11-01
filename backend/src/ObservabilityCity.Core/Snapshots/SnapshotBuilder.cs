@@ -77,7 +77,7 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
                 incidents.GetValueOrDefault(g.Id) ?? [], links[g.Id].HasBridge, links[g.Id].HasRingBridge, MessagingOf(registry, g),
                 g.Nodes.Select(n => ToNode(n, now, registry)).ToList(), AssetsOf(g.Id, registry)))
             .ToList();
-        var allVendors = registry.Vendors.Select(v => new VendorSnapshot(ToNode(v.Node, now, registry), v.CalledBy, v.IslandId ?? v.Node.Id, v.IslandName, v.Internal)).ToList();
+        var allVendors = registry.Vendors.Select(v => new VendorSnapshot(WithCallRate(ToNode(v.Node, now, registry)), v.CalledBy, v.IslandId ?? v.Node.Id, v.IslandName, v.Internal, v.Calls is { Count: > 0 } calls ? calls : null)).ToList();
         var allNodes = allGroups.SelectMany(g => g.Nodes).ToList();
         var everyone = allNodes.Concat(allVendors.Select(v => v.Node)).ToDictionary(n => n.Id);
 
@@ -85,7 +85,8 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
         var shown = filter is null ? allGroups : allGroups.Where(g => g.IsHub || filter.Contains(g.Id)).ToList();
         var shownIds = shown.SelectMany(g => g.Nodes).Select(n => n.Id).ToHashSet();
         var vendors = filter is null ? allVendors
-            : allVendors.Where(v => v.CalledBy.Any(shownIds.Contains)).Select(v => v with { CalledBy = v.CalledBy.Where(shownIds.Contains).ToList() }).ToList();
+            : allVendors.Where(v => v.CalledBy.Any(shownIds.Contains) || (v.Calls ?? []).Any(shownIds.Contains))
+                .Select(v => v with { CalledBy = v.CalledBy.Where(shownIds.Contains).ToList(), Calls = (v.Calls ?? []).Where(shownIds.Contains).ToList() }).ToList();
         var visible = shownIds.Concat(vendors.Select(v => v.Node.Id)).ToHashSet();
         var groups = shown;
 
@@ -271,20 +272,35 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
                 if (groupOf.ContainsKey(caller))
                     (callers.TryGetValue(v.Node.Id, out var l) ? l : callers[v.Node.Id] = []).Add(registry.AllNodes.First(n => n.Id == caller));
 
-        foreach (var (callee, from) in callers)
+        // a service of a vendor island that was seen calling town systems through the gateway counts as one of their callers
+        var vendorCallers = new Dictionary<string, List<string>>(); // callee id to the vendor buildings that call it
+        foreach (var v in registry.Vendors)
+            foreach (var callee in v.Calls)
+                if (groupOf.ContainsKey(callee)) (vendorCallers.TryGetValue(callee, out var l) ? l : vendorCallers[callee] = []).Add(v.Node.Id);
+
+        foreach (var callee in callers.Keys.Concat(vendorCallers.Keys).Distinct())
         {
             if (!byId.TryGetValue(callee, out var snap) || snap.State == HealthState.Stale) continue;
             var to = groupOf.GetValueOrDefault(callee, callee); // a vendor stands on its own
+            var from = callers.GetValueOrDefault(callee) ?? [];
+            var vendorsHere = vendorCallers.GetValueOrDefault(callee) ?? [];
+            var count = from.Count + vendorsHere.Count;
             foreach (var caller in from)
             {
                 if (caller.GroupId == to) continue;
-                var share = LinkRate(snap, caller.Id, from.Count);
+                var share = LinkRate(snap, caller.Id, count);
                 links[(caller.GroupId, to)] = links.GetValueOrDefault((caller.GroupId, to)) + share;
             }
+            foreach (var vendorId in vendorsHere)
+                links[(vendorId, to)] = links.GetValueOrDefault((vendorId, to)) + LinkRate(snap, vendorId, count);
         }
         return links.OrderByDescending(kv => kv.Value).ThenBy(kv => kv.Key.From, StringComparer.Ordinal).ThenBy(kv => kv.Key.To, StringComparer.Ordinal)
             .Select(kv => new DependencySnapshot(kv.Key.From, kv.Key.To, kv.Value)).ToList();
     }
+
+    /// <summary>A third party has no rate of its own: what the town systems are seen sending it is its traffic, with each caller's part, when the traffic is measured.</summary>
+    private NodeSnapshot WithCallRate(NodeSnapshot vendor) =>
+        Traffic?.CallRates(vendor.Id) is { } calls ? vendor with { RequestsPerSecond = calls.Total, Inbound = calls.Callers } : vendor;
 
     /// <summary>Headline latency: p99 averaged over request-serving nodes, weighted by traffic. Workers and crons are left out.</summary>
     private static double RequestWeightedP99(List<NodeSnapshot> live)

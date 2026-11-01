@@ -104,3 +104,109 @@ test.describe('where an API\'s traffic comes from', () => {
     expect(rates.none).toBe(0)
   })
 })
+
+test.describe('cars to a third party', () => {
+  test('are driven at the measured call rate, whatever the third party\'s own state, each road taking its callers\' part', async ({ town, page }) => {
+    await town.open()
+
+    const out = await page.evaluate(() => {
+      const c = (window as any).city
+      const s = structuredClone(c.seen.last)
+      const v = s.vendors.find((x: any) => x.node.id === 'ext.mailer')
+      v.node.state = 'Stale'
+      v.node.requestsPerSecond = 8
+      v.node.inbound = [{ from: 'cc.notify-worker', requestsPerSecond: 6 }, { from: 'bb.ledger-worker', requestsPerSecond: 2 }]
+      c.feed(s)
+      const routes = c.town.cars.routeList.filter((r: any) => r.vendor && r.dest.id === 'ext.mailer')
+      return routes.map((r: any) => ({ from: r.source.node?.id ?? r.source.id, share: typeof r.share === 'function' ? r.share() : r.share, rate: c.town.cars.rateOf(r) }))
+    })
+
+    expect(out.length).toBeGreaterThan(0)
+    expect(out.every((r: any) => r.rate > 0)).toBe(true)
+    expect(out.reduce((a: number, r: any) => a + r.share, 0)).toBeCloseTo(1, 6)
+  })
+
+  test('are not driven when nothing is called', async ({ town, page }) => {
+    await town.open()
+    const rates = await page.evaluate(() => {
+      const c = (window as any).city
+      const s = structuredClone(c.seen.last)
+      const v = s.vendors.find((x: any) => x.node.id === 'ext.mailer')
+      v.node.requestsPerSecond = 0
+      v.node.inbound = null
+      c.feed(s)
+      return c.town.cars.routeList.filter((r: any) => r.vendor && r.dest.id === 'ext.mailer').map((r: any) => c.town.cars.rateOf(r))
+    })
+    expect(rates.every((r: number) => r === 0)).toBe(true)
+  })
+})
+
+test.describe('cars from a third party island to the town through the airport', () => {
+  const callsTheApi = (page: import('@playwright/test').Page) => page.evaluate(() => {
+    const c = (window as any).city
+    const s = structuredClone(c.seen.last)
+    s.vendors.find((x: any) => x.node.id === 'ext.mailer').calls = ['aa.orders-api']
+    const api = s.groups.flatMap((g: any) => g.nodes).find((x: any) => x.id === 'aa.orders-api')
+    api.requestsPerSecond = 10
+    api.outsideRequestsPerSecond = 2
+    api.inbound = [{ from: 'ext.mailer', requestsPerSecond: 8 }]
+    api.inboundEstimated = false
+    c.feed(s)
+    const routes = c.town.cars.routeList.filter((r: any) => r.source.node?.id === 'ext.mailer' && r.dest.node?.id === 'aa.orders-api')
+    const airport = c.town.airport
+    const xs = routes.flatMap((r: any) => r.path.map((p: any) => p.x))
+    return {
+      routes: routes.length,
+      rate: routes.map((r: any) => c.town.cars.rateOf(r)),
+      backGate: airport.backGateZ !== null,
+      // the road passes the airport's back gate: some point of the path is within a few metres of it
+      throughAirport: routes.every((r: any) => r.path.some((p: any) => p.distanceTo(airport.backGate()) < 3) && r.path.some((p: any) => p.distanceTo(airport.gate()) < 3)),
+      roads: c.town.inspectRoads(),
+      sane: xs.every((x: number) => Number.isFinite(x)),
+    }
+  })
+
+  test('start on the island, pass the airport\'s back gate and its front gate, and are driven at the measured rate', async ({ town, page }) => {
+    await town.open()
+    const out = await callsTheApi(page)
+    expect(out.backGate).toBe(true)
+    expect(out.routes).toBe(1)
+    expect(out.rate[0]).toBeGreaterThan(0)
+    expect(out.throughAirport).toBe(true)
+    expect(out.sane).toBe(true)
+  })
+
+  test('the airport has no back gate when no building of a third party island calls the town', async ({ town, page }) => {
+    await town.open()
+    expect(await page.evaluate(() => (window as any).city.town.airport.backGateZ)).toBeNull()
+  })
+})
+
+test.describe('the Unknown hosts button', () => {
+  const hosts = [
+    { host: 'api.partner.example', calls: 1200, callers: ['aa.orders-api'], days: 3 },
+    { host: 'files.example.test', calls: 40, callers: ['bb.ledger-worker', 'aa.orders-worker'], days: 2 },
+  ]
+
+  test('is hidden when there are none, lists each host with its copy buttons when there are, and copies a line', async ({ town, page, context }) => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write'])
+    await town.open()
+    await expect(page.locator('#unknown-hosts')).toBeHidden()
+
+    await page.route('**/api/unknown-hosts*', (r) => r.fulfill({ json: hosts }))
+    await page.evaluate(() => (window as any).city.unknownHosts.refresh())
+    await expect(page.locator('#unknown-hosts-toggle')).toHaveText(/2 unknown hosts/)
+    await page.locator('#unknown-hosts-toggle').click()
+    await expect(page.locator('#unknown-hosts li')).toHaveCount(2)
+    await expect(page.locator('#unknown-hosts li').first()).toContainText('api.partner.example')
+
+    await page.locator('#unknown-hosts li').first().getByRole('button', { name: 'Copy vendor entry' }).click()
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('- { id: ext.api-partner-example, name: api.partner.example, domains: [api.partner.example], calledBy: [aa.orders-api] }')
+    await page.locator('#unknown-hosts li').nth(1).getByRole('button', { name: 'Copy ignore line' }).click()
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("- '^files\\.example\\.test$'")
+
+    await page.route('**/api/unknown-hosts*', (r) => r.fulfill({ json: [] }))
+    await page.evaluate(() => (window as any).city.unknownHosts.refresh())
+    await expect(page.locator('#unknown-hosts')).toBeHidden()
+  })
+})

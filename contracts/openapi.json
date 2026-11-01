@@ -124,6 +124,38 @@
         }
       }
     },
+    "/api/unknown-hosts": {
+      "get": {
+        "tags": [
+          "ObservabilityCity.Host, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+        ],
+        "operationId": "GetUnknownHosts",
+        "parameters": [
+          {
+            "name": "env",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UnknownHostSnapshot"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/systems/{id}/logs": {
       "get": {
         "tags": [
@@ -1480,6 +1512,35 @@
         },
         "additionalProperties": false
       },
+      "UnknownHostSnapshot": {
+        "required": [
+          "callers",
+          "calls",
+          "days",
+          "host"
+        ],
+        "type": "object",
+        "properties": {
+          "host": {
+            "type": "string"
+          },
+          "calls": {
+            "type": "number",
+            "format": "double"
+          },
+          "callers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "days": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
       "VendorSnapshot": {
         "required": [
           "calledBy",
@@ -1507,6 +1568,13 @@
           },
           "internal": {
             "type": "boolean"
+          },
+          "calls": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
           }
         },
         "additionalProperties": false
