@@ -1340,7 +1340,8 @@ export class Town {
   islandFocusOf(groupId: string): { target: THREE.Vector3; distance: number } | null {
     if (groupId === 'hub') return { target: new THREE.Vector3(0, 0, 0), distance: Math.max(this.hubGeo.rx, this.hubGeo.rz) * 2.6 }
     if (groupId === 'airport' && this.airport) return { target: this.airport.root.getWorldPosition(new THREE.Vector3()).setY(0), distance: this.airport.rx * 2.2 }
-    const isl = this.islands.find((i) => i.group.id === groupId)
+    // a pillar's island, or a third party's (the id of the vendor, or the shared island of its services)
+    const isl = this.islands.find((i) => i.group.id === groupId) ?? [...new Set(this.vendors.values())].find((v) => v.id === groupId)
     if (!isl) return null
     let reach = 0
     for (const p of isl.outline.points) reach = Math.max(reach, Math.hypot(p.x, p.y))

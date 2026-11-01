@@ -299,3 +299,4 @@ body.wall #inspector, body.wall #legend, body.wall #notices, body.wall #unknown-
   color: #fff; background: rgba(14, 22, 34, 0.78); border: 2px solid #fff; border-radius: 999px; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5); will-change: transform; }
 .island-label.vendor { font-weight: 600; font-style: italic; }
 body.wall .island-label { font-size: 16px; }
+.vb-note { font-style: normal; font-size: 10px; margin-left: 6px; padding: 0 6px; border-radius: 999px; background: rgba(255, 190, 90, 0.18); color: #ffd27a; }

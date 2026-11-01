@@ -1,6 +1,6 @@
 import type { EnvironmentInfo, Snapshot, TenantInfo } from './types'
 import { escapeHtml } from './picker'
-import { groupTenants, tenantLabel, tenantTrouble, toggleTenant, type TenantView } from './tenants'
+import { groupTenants, tenantLabel, tenantNote, tenantTrouble, toggleTenant, type TenantView } from './tenants'
 import { islandChoices, islandsLabel, searchIslands, type IslandChoice } from './islands'
 import { LAYERS, layersLabel, type Layer, type LayerState } from './layers'
 import { THEMES, type ThemeInfo } from './themes'
@@ -214,7 +214,8 @@ export class ViewBar {
       const on = view.tenants.includes(t.id)
       const trouble = this.trouble.get(t.id)
       const same = t.name === t.id
-      return `<div class="vb-row ${on ? 'sel' : ''}" data-act="tenant" data-id="${escapeHtml(t.id)}"><input type="checkbox" ${on ? 'checked' : ''} tabindex="-1" /><span>${escapeHtml(t.name)}${trouble ? ` <b class="dot ${trouble}" title="${trouble === 'red' ? 'Throttled right now' : 'Under pressure right now'}"></b>` : ''}</span>${same ? '' : `<small>${escapeHtml(t.id)}</small>`}</div>`
+      const note = tenantNote(t)
+      return `<div class="vb-row ${on ? 'sel' : ''}" data-act="tenant" data-id="${escapeHtml(t.id)}"><input type="checkbox" ${on ? 'checked' : ''} tabindex="-1" /><span>${escapeHtml(t.name)}${trouble ? ` <b class="dot ${trouble}" title="${trouble === 'red' ? 'Throttled right now' : 'Under pressure right now'}"></b>` : ''}${note ? ` <em class="vb-note" title="${escapeHtml(note.title)}">${note.text}</em>` : ''}</span>${same ? '' : `<small>${escapeHtml(t.id)}</small>`}</div>`
     }
     return `<div class="vb-list wide" id="tenant-list">
       <input id="tenant-query" type="search" placeholder="Find a tenant by name or id" value="${escapeHtml(this.query)}" autocomplete="off" spellcheck="false" />

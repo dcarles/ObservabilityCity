@@ -107,6 +107,17 @@ test.describe('a vendor with several services', () => {
     expect(Object.fromEntries(vendors.map((v) => [v.id, v.bridges]))).toEqual({ 'ext.shared-credit': 2, 'ext.shared-identity': 1, 'ext.shared-reports': 1 })
   })
 
+  test('is found by the island name in the search, which flies to the island, and can be chosen in the island filter', async ({ town, page }) => {
+    await town.open()
+    await page.locator('#search-input').fill('Shared services')
+    const hit = page.locator('#search-results .hit').first()
+    await expect(hit).toContainText('Shared services')
+    await expect(hit).toContainText('island')
+    expect(await page.evaluate(() => (window as any).city.town.islandFocusOf('ext.shared'))).not.toBeNull()
+    await page.locator('#islands-button').click()
+    await expect(page.locator('#islands-list [data-id="ext.shared"]')).toContainText('Shared services')
+  })
+
   test('is labelled internal in the inspector, with the island it shares', async ({ town, page }) => {
     await town.open()
     await town.step(5)

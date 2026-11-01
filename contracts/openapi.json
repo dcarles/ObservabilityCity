@@ -1560,6 +1560,7 @@
           "id",
           "kind",
           "name",
+          "notFound",
           "share"
         ],
         "type": "object",
@@ -1576,6 +1577,9 @@
           "share": {
             "type": "number",
             "format": "double"
+          },
+          "notFound": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false
