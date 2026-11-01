@@ -22,8 +22,19 @@ public sealed class LinkDiscoveryRunner(
         if (scope.Inventory is null) await scope.WaitForReadAsync(InventoryWait, ct);
         while (!ct.IsCancellationRequested)
         {
+            _ = store.TakeReadRequest(); // an ask made before this read is answered by it
             var interval = await CycleAsync(ct);
-            try { await Task.Delay(interval, time, ct); }
+            var asked = store.TakeReadRequest();
+            using var wait = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            try
+            {
+                // the next read comes at its turn, or at once when the rules changed while this one ran
+                var turn = Task.Delay(interval, time, wait.Token);
+                await Task.WhenAny(turn, asked);
+                wait.Cancel();
+                await turn.ContinueWith(_ => { }, TaskScheduler.Default);
+                ct.ThrowIfCancellationRequested();
+            }
             catch (OperationCanceledException) { return; }
         }
     }
@@ -56,6 +67,8 @@ public sealed class LinkDiscoveryRunner(
     {
         if (view.ActiveEnvironment?.Links is not { } config) return false;
         Reclassify(store, new LinkClassifier(config, view.Vendors, view.AllNodes.Select(n => n.Id), LinkClassifier.ServicesOf(view.AllNodes)), view);
+        // the history was read with the old rules: ask for a read now, which sees the new fingerprint and reads the whole window again
+        store.RequestRead();
         return true;
     }
 
@@ -72,7 +85,10 @@ public sealed class LinkDiscoveryRunner(
         var from = store.ReadUpTo is { } last && last > now - config.FirstRead ? last : now - config.FirstRead;
         // a name that has never been read is read over the whole first-read window, not just the gap since the last read: its links need their days
         var fullFrom = now - config.FirstRead;
-        var fresh = byRole.Keys.Where(r => !store.AskedRoles.Contains(r, StringComparer.OrdinalIgnoreCase)).ToList();
+        // the rules, ignore list, vendors or town systems changed since the links were read: every name's history is read again, so a new rule shows its links at once
+        var fingerprint = LinkClassifier.Fingerprint(config, view.Vendors, view.AllNodes.Select(n => n.Id));
+        var rescan = store.Fingerprint != fingerprint;
+        var fresh = rescan ? byRole.Keys.ToList() : byRole.Keys.Where(r => !store.AskedRoles.Contains(r, StringComparer.OrdinalIgnoreCase)).ToList();
         var rows = new List<DependencyRow>();
         if (fresh.Count == 0 || from <= fullFrom || fresh.Count == byRole.Count)
             rows.AddRange(await source.ReadDependenciesAsync(view, config.Query, byRole.Keys.ToList(), fresh.Count > 0 ? fullFrom : from, now, ct));
@@ -106,6 +122,7 @@ public sealed class LinkDiscoveryRunner(
         Reclassify(store, classifier, view);
         store.Prune(now, config.KeepFor);
         store.RoleAsked(byRole.Keys);
+        store.SetFingerprint(fingerprint);
         store.Finish(now);
         store.Save();
     }

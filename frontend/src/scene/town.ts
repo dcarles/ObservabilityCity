@@ -116,6 +116,9 @@ interface VendorLink {
  * Builds the town from the first snapshot (the hub in the middle, one island per group on a ring) and then
  * only updates it. Layout is deterministic: the same registry gives the same town every time.
  */
+/** An island by name, for the signs seen from the air and the label under the pointer. */
+export interface IslandLabel { id: string; name: string; color: string; vendor: boolean; x: number; z: number }
+
 export class Town {
   readonly root = new THREE.Group()
   readonly cars = new CarSystem()
@@ -1255,6 +1258,23 @@ export class Town {
   /** Focuses the dependency arcs on one island or vendor (empty for none). */
   setDependencyFocus(id: string): void {
     this.overlay.setFocus(id)
+  }
+
+  /** Every island of the town (pillars and third parties, not the hub) by name, with the colour of its sign and where its middle is. */
+  islandLabels(): IslandLabel[] {
+    const pillars = this.islands.map((i) => ({ id: i.group.id, name: i.group.displayName, color: i.group.color, vendor: false, x: i.root.position.x, z: i.root.position.z }))
+    const vendors = [...new Set(this.vendors.values())].map((v) => ({ id: v.id, name: v.name, color: VENDOR_COLOR, vendor: true, x: v.root.position.x, z: v.root.position.z }))
+    return [...pillars, ...vendors]
+  }
+
+  /** The island whose ground is under the point (x, z) of the world, or null for the sea, the hub and the airport. */
+  islandAt(x: number, z: number): IslandLabel | null {
+    const probe = new THREE.Vector3(x, 0, z)
+    const hit = (root: THREE.Object3D, outline: Outline) => { const p = root.worldToLocal(probe.clone()); return outline.contains(p.x, p.z) }
+    const label = (id: string) => this.islandLabels().find((l) => l.id === id) ?? null
+    for (const i of this.islands) if (hit(i.root, i.outline)) return label(i.group.id)
+    for (const v of new Set(this.vendors.values())) if (hit(v.root, v.outline)) return label(v.id)
+    return null
   }
 
   /** The hit boxes of the buildings that are drawn: a building hidden by a layer cannot be hovered or clicked. */

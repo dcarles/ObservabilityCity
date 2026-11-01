@@ -620,7 +620,8 @@
       "HiddenIsland": {
         "required": [
           "displayName",
-          "id"
+          "id",
+          "vendor"
         ],
         "type": "object",
         "properties": {
@@ -629,6 +630,9 @@
           },
           "displayName": {
             "type": "string"
+          },
+          "vendor": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false

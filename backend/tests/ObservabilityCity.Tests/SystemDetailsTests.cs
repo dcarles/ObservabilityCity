@@ -156,6 +156,23 @@ public class SystemDetailsTests
     }
 
     [Fact]
+    public void A_third_partys_building_lists_what_it_calls_through_the_gateway_and_the_systems_list_it_as_a_caller()
+    {
+        var seen = Mini with { Vendors = [.. Mini.Vendors.Select(v => v.Node.Id == "ext.bureau" ? v with { Calls = ["aa.orders-api"] } : v)] };
+
+        var vendor = SystemDetails.Of(seen, "ext.bureau")!;
+        var callee = SystemDetails.Of(seen, "aa.orders-api")!;
+
+        var call = Assert.Single(vendor.GatewayCalls);
+        Assert.Equal("aa.orders-api", call.Id);
+        Assert.True(call.Found);                       // read from the telemetry, not written in a file
+        var caller = Assert.Single(callee.GatewayCalledBy, l => l.Id == "ext.bureau");
+        Assert.Equal(LinkKind.Vendor, caller.Kind);
+        Assert.True(caller.Found);
+        Assert.Empty(SystemDetails.Of(Mini, "ext.bureau")!.GatewayCalls); // nothing seen, nothing listed
+    }
+
+    [Fact]
     public void Outside_callers_are_named()
     {
         Assert.Equal(["Mobile app"], SystemDetails.Of(Mini, "aa.orders-api")!.OutsideCallers);

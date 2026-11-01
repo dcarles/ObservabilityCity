@@ -15,14 +15,14 @@ public static class SystemDetails
 
         var names = registry.AllNodes.Concat(registry.Vendors.Select(v => v.Node)).ToDictionary(n => n.Id);
         var groups = registry.Groups.ToDictionary(g => g.Id);
-        LinkRef Ref(string target, DateOnly? seen = null)
+        LinkRef Ref(string target, DateOnly? seen = null, bool found = false)
         {
             var n = names.GetValueOrDefault(target);
             var vendor = target.StartsWith(RegistryVendor.GroupId + ".", StringComparison.Ordinal);
             var gid = n?.GroupId ?? target.Split('.')[0];
             var island = vendor ? "Third party" : groups.TryGetValue(gid, out var g) ? g.DisplayName : gid;
             return new LinkRef(target, n?.Name ?? target, vendor ? LinkKind.Vendor : LinkKind.System, vendor ? RegistryVendor.GroupId : gid, island,
-                seen is not null, seen?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+                seen is not null || found, seen?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
         }
 
         var vendorCalls = registry.Vendors.Where(v => v.CalledBy.Contains(id)).Select(v => v.Node.Id);
@@ -31,7 +31,11 @@ public static class SystemDetails
         var vendorEntry = registry.Vendors.FirstOrDefault(v => v.Node.Id == id);
         var calledBy = registry.AllNodes.Where(n => n.Calls.Contains(id)).Select(n => n.Id)
             .Concat(vendorEntry?.CalledBy ?? []).Distinct().Select(c => Ref(c, names.TryGetValue(c, out var caller) ? Seen(caller.FoundCalls, id) : null)).ToList();
-        var gatewayCalledBy = registry.AllNodes.Where(n => n.GatewayCalls.Contains(id)).Select(n => Ref(n.Id, Seen(n.FoundGatewayCalls, id))).ToList();
+        // a third party's building calls town systems through the gateway too (the calls link discovery saw it make), and is listed among their callers
+        var gatewayCalledBy = registry.AllNodes.Where(n => n.GatewayCalls.Contains(id)).Select(n => Ref(n.Id, Seen(n.FoundGatewayCalls, id)))
+            .Concat(registry.Vendors.Where(v => v.Calls.Contains(id)).Select(v => Ref(v.Node.Id, found: true))).ToList();
+        var gatewayCalls = node.GatewayCalls.Select(c => Ref(c, Seen(node.FoundGatewayCalls, c)))
+            .Concat((vendorEntry?.Calls ?? []).Where(c => !node.GatewayCalls.Contains(c)).Select(c => Ref(c, found: true))).ToList();
         var outside = registry.ExternalCallers.Where(c => c.Calls.Contains(id)).Select(c => c.Name).ToList();
         var topics = node.Service is null ? []
             : registry.Topics.Where(t => t.GroupId == node.GroupId && t.Service == node.Service).Select(t => t.Name).ToList();
@@ -40,7 +44,7 @@ public static class SystemDetails
 
         var island2 = node.GroupId == RegistryVendor.GroupId ? "Third party" : groups.TryGetValue(node.GroupId, out var own) ? own.DisplayName : node.GroupId;
         return new SystemDetail(node.Id, node.Name, node.Kind, node.Service, node.GroupId, island2, FileOf(node),
-            Config(node), calls, calledBy, node.GatewayCalls.Select(c => Ref(c, Seen(node.FoundGatewayCalls, c))).ToList(), gatewayCalledBy, outside, topics, subscriptions);
+            Config(node), calls, calledBy, gatewayCalls, gatewayCalledBy, outside, topics, subscriptions);
     }
 
     /// <summary>The path of the registry file a system is declared in, relative to the registry folder.</summary>

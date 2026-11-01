@@ -83,7 +83,7 @@ export class VendorIsland {
   /** Where each building stands for the service lane: its x, the road in front, and the side of the spine. */
   readonly targets = new Map<string, BayTarget>()
 
-  constructor(readonly id: string, name: string, nodes: NodeSnapshot[]) {
+  constructor(readonly id: string, readonly name: string, nodes: NodeSnapshot[]) {
     const { slots, rows, outline, rx, rz, gateZ, edge, perRow } = planVendorIsland(id, nodes.length)
     this.outline = outline
     this.rx = rx

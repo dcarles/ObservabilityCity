@@ -323,8 +323,8 @@ public sealed record Snapshot(
     double TrafficDensity = 1,
     IReadOnlyList<string>? Notes = null);
 
-/// <summary>An island the island filter left out.</summary>
-public sealed record HiddenIsland(string Id, string DisplayName);
+/// <summary>An island the island filter left out. Vendor is true for a third party's island (the vendor id, or the shared island id of a group of its services).</summary>
+public sealed record HiddenIsland(string Id, string DisplayName, bool Vendor = false);
 
 /// <summary>
 /// Traffic between a system on screen and an island the filter left out. NodeId is the system on screen. Incoming is false when it calls a system on

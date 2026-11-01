@@ -120,7 +120,7 @@ function checkView(v: unknown): ViewInfo {
     islands: strings(raw.islands),
     unknown: strings(raw.unknown),
     hidden: (Array.isArray(raw.hidden) ? raw.hidden : []).filter(isObject).filter((h) => typeof h.id === 'string' && h.id !== '')
-      .map((h) => ({ id: h.id as string, displayName: str(h.displayName) || (h.id as string) })),
+      .map((h) => ({ id: h.id as string, displayName: str(h.displayName) || (h.id as string), vendor: h.vendor === true })),
     links: (Array.isArray(raw.links) ? raw.links : []).filter(isObject)
       .filter((l) => typeof l.nodeId === 'string' && l.nodeId !== '' && typeof l.islandId === 'string' && l.islandId !== '')
       .map<OffscreenLink>((l) => ({

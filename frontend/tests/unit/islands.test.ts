@@ -33,7 +33,7 @@ describe('the list of islands to choose from', () => {
   it('lists the islands on screen and the ones the filter left out, by name, and never the hub', () => {
     const choices = islandChoices(golden)
 
-    expect(choices).toEqual([
+    expect(choices.filter((c) => !c.vendor)).toEqual([
       { id: 'aa', name: 'Alpha', shown: true },
       { id: 'bb', name: 'Beta', shown: false },
       { id: 'cc', name: 'Gamma', shown: true },
@@ -43,9 +43,10 @@ describe('the list of islands to choose from', () => {
   it('lists every island of an unfiltered town as shown', () => {
     const choices = islandChoices(calm)
 
-    expect(choices.length).toBe(calm.groups.filter((g) => !g.isHub).length)
+    expect(choices.filter((c) => !c.vendor).length).toBe(calm.groups.filter((g) => !g.isHub).length)
     expect(choices.every((c) => c.shown)).toBe(true)
-    expect(choices.map((c) => c.name)).toEqual([...choices.map((c) => c.name)].sort((a, b) => a.localeCompare(b)))
+    const pillars = choices.filter((c) => !c.vendor).map((c) => c.name)
+    expect(pillars).toEqual([...pillars].sort((a, b) => a.localeCompare(b)))
   })
 
   it('still works for a snapshot from before the view existed', () => {
@@ -74,7 +75,7 @@ describe('choosing islands', () => {
     const choices = islandChoices(golden)
     expect(islandsLabel([], choices)).toBe('All islands')
     expect(islandsLabel(['bb'], choices)).toBe('Beta')
-    expect(islandsLabel(['aa', 'cc'], choices)).toBe('2 of 3 islands')
+    expect(islandsLabel(['aa', 'cc'], choices)).toBe('2 of 5 islands')
     expect(islandsLabel(['zz'], choices)).toBe('zz')
   })
 
@@ -82,7 +83,37 @@ describe('choosing islands', () => {
     const choices = islandChoices(golden)
     expect(searchIslands(choices, 'gam').map((c) => c.id)).toEqual(['cc'])
     expect(searchIslands(choices, 'BB').map((c) => c.id)).toEqual(['bb'])
-    expect(searchIslands(choices, '').length).toBe(3)
+    expect(searchIslands(choices, '').length).toBe(choices.length)
     expect(searchIslands(choices, 'nothing')).toEqual([])
+  })
+})
+
+describe('third parties among the islands', () => {
+  const vendorNode = (id: string, name: string) => ({ ...golden.vendors[0].node, id, name })
+
+  it('lists a third party after the pillars, by its island name, once for all its services', () => {
+    const s = {
+      ...golden,
+      vendors: [
+        { ...golden.vendors[0], node: vendorNode('dsa', 'Search'), islandId: 'ext.ds', islandName: 'Digital Services' },
+        { ...golden.vendors[0], node: vendorNode('dsb', 'Credit'), islandId: 'ext.ds', islandName: 'Digital Services' },
+        { ...golden.vendors[0], node: vendorNode('ext.solo', 'Solo'), islandId: undefined, islandName: undefined },
+      ],
+    } as Snapshot
+    const vendors = islandChoices(s).filter((c) => c.vendor)
+    expect(vendors).toEqual([
+      { id: 'ext.ds', name: 'Digital Services', shown: true, vendor: true },
+      { id: 'ext.solo', name: 'Solo', shown: true, vendor: true },
+    ])
+    expect(islandChoices(s).findIndex((c) => c.vendor)).toBe(3)
+  })
+
+  it('lists a third party the filter left out as hidden, and can search and label it', () => {
+    const s = { ...golden, vendors: [], view: { ...golden.view, hidden: [...golden.view.hidden, { id: 'ext.fiserv', displayName: 'Fiserv', vendor: true }] } } as Snapshot
+    const choices = islandChoices(s)
+    expect(choices.find((c) => c.id === 'ext.fiserv')).toEqual({ id: 'ext.fiserv', name: 'Fiserv', shown: false, vendor: true })
+    expect(searchIslands(choices, 'fis').map((c) => c.id)).toEqual(['ext.fiserv'])
+    expect(islandsLabel(['ext.fiserv'], choices)).toBe('Fiserv')
+    expect(pruneIslands(['ext.fiserv', 'zz'], choices)).toEqual(['ext.fiserv'])
   })
 })
