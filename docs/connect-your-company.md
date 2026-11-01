@@ -335,6 +335,10 @@ sources:
 
 `scope.assets` lists rules for resources that have no health of their own but belong in the town. Each rule has a `name`, the `label` shown on its card, a `shape` (`vault`, `store`, `settings` or `box`), the resource `types` it matches and a `pattern` that names the pillar (and the service, when the resource belongs to one) with the same groups as the system rules. A resource tied to a service stands behind that service's pad; the others stand in the pillar's back yard. Clicking one opens a card with its name, type, owner and the portal links from `scope.links`. The inventory query includes the rules' types, so no other change is needed.
 
+Shared resources that belong to no pillar (a log workspace, application insights) stand on the hub island: give the rule `island: hub` and a `group`, the name of the cluster they stand in, shown on a sign (rules with the same group share a cluster). If they live in a subscription of their own, add `subscription: { nameLike: "..." }` (or `tag`), a template over your `variables` and `{environment}`. The card has no health, only the portal links.
+
+The hub's own systems (the gateway, the message broker) get their portal links the same way as any system: name the hub's subscription under `scope.pillars` (`hub: <subscription id>`), give the system a `serviceCode` in `hub.yaml`, and add a `scope.resources` rule for its resource type with `roles: [gateway]` or `roles: [broker]` and a `pattern` whose `service` group matches that code.
+
 `scope.cloud` is the name of your cloud as the town should say it (for example `Azure`, `AWS` or `Cumulus`). It is used in the words "not found in <cloud>" and nowhere else; the core assumes no cloud.
 
 A demo town needs no cloud for any of this: `fake.yaml` takes `regions: { <name>: <weight>, ... }` on a service, and `fake-assets.yaml` lists the buildings by pillar, name, label, shape and service.

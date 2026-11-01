@@ -130,8 +130,9 @@ public sealed record NodeSnapshot(
 /// A resource that is not a system but stands in the town as a small building without health (a key vault, a storage account). Label is what it is
 /// ("Key vault"), Shape how it is drawn, Service the service whose pad it stands beside (null: it belongs to the pillar and stands in its back yard),
 /// Region where it lives when the cloud says. Links are the addresses that open it somewhere else.
+/// On the hub island Group names the cluster of buildings it stands in (for example "Monitoring"); it is null on a pillar's island.
 /// </summary>
-public sealed record AssetSnapshot(string Id, string Name, string Label, string Shape, string? Service, string? Region, IReadOnlyList<ResourceLink>? Links);
+public sealed record AssetSnapshot(string Id, string Name, string Label, string Shape, string? Service, string? Region, IReadOnlyList<ResourceLink>? Links, string? Group = null);
 
 /// <summary>
 /// One scheduled job of a function building in one region: Status, when it last ran (LastRun) and when its schedule says it runs next (Next); both null

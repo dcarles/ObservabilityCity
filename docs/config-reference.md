@@ -348,7 +348,7 @@ links:
 | `workspaceId` | no | none | The workspace's id (GUID or resource id), a template. Wins over `workspace`. |
 | `variables` | no | none | Your own names for use in templates. |
 | `subscription` | no | none | Which subscriptions belong to the environment. |
-| `pillars` | no | none | Pillar id → the id of the subscription that holds its resources. |
+| `pillars` | no | none | Pillar id → the id of the subscription that holds its resources. `hub` is accepted too, so the hub's gateway and broker find their resources and portal links. |
 | `resources` | no | none | Rules that find a system's cloud resources. |
 | `telemetryRole` | no | none | Template for a system's telemetry name when it gives none. |
 | `links` | no | none | Addresses that open a resource in a portal or console, shown beside each resource in the Config tab. |
@@ -387,9 +387,12 @@ links:
 |---|---|---|---|
 | `name` | yes | | Names the rule (lowercase kebab-case). |
 | `label` | yes | | What the resource is, in the drawer's words (for example `Key vault`). |
-| `shape` | no | `box` | How the building looks: `box`, `vault`, `store` or `settings`. |
-| `types` | yes | | The resource types it applies to. They are looked for in each pillar's subscription. |
-| `pattern` | yes | | Regular expression over the resource's name. Optional named groups: `service` (matched with a system's `serviceCode`; a match stands the building beside that service's pad, otherwise it stands in the pillar's back yard), `pillar` (another pillar's resource is left out) and `region`. |
+| `shape` | no | `box` | How the building looks: `box`, `vault`, `store`, `settings` or `observatory`. |
+| `types` | yes | | The resource types it applies to. They are looked for in each pillar's subscription (or, with `island: hub`, in the subscriptions `subscription` names). |
+| `pattern` | yes | | Regular expression over the resource's name. Optional named groups: `service` (matched with a system's `serviceCode`; a match stands the building beside that service's pad, otherwise it stands in the pillar's back yard), `pillar` (another pillar's resource is left out) and `region`. On the hub only `region` is allowed. |
+| `island` | no | the pillar it is found in | `hub` stands the building on the hub island, in the cluster `group` names. It belongs to no pillar and no service. |
+| `group` | with `island: hub` | | The cluster of buildings it stands in on the hub, named on a sign (for example `Monitoring`). Rules with the same group share a cluster. |
+| `subscription` | no | the pillars' subscriptions | With `island: hub`: which subscriptions to look in, by `nameLike` (a template over your `variables` and `{environment}`) or by `tag` (`key`, `value`). Use it when the shared resources live in a subscription of their own. |
 
 <!-- file: RegionsFile -->
 | Key | Required | Default | Meaning |
