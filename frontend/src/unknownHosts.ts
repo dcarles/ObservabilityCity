@@ -1,19 +1,8 @@
 import { escapeHtml } from './picker'
 import { scopeParams, type Scope } from './scope'
-import type { UnknownHostSnapshot } from './types'
+import type { AddedHostSnapshot, UnknownHostSnapshot } from './types'
 
 type UnknownPath = NonNullable<UnknownHostSnapshot['paths']>[number]
-
-/** A third_parties.yaml line for a host: a vendor that owns the host and is called by the systems seen calling it. Nothing is created by itself; this is a copy-paste start. */
-export function vendorEntry(h: UnknownHostSnapshot): string {
-  const slug = h.host.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
-  return `- { id: ext.${slug}, name: ${h.host}, domains: [${h.host}], calledBy: [${h.callers.join(', ')}] }`
-}
-
-/** An ignoreHosts line that matches exactly this host, for platform noise that should not be listed or drawn. */
-export function ignoreLine(h: UnknownHostSnapshot): string {
-  return `- '^${h.host.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$'`
-}
 
 /**
  * A links rule line for one path on a gateway host, to complete: the host and the path are filled in, the target is left for you. A gateway is not a
@@ -26,7 +15,7 @@ export function pathRule(h: UnknownHostSnapshot, p: UnknownPath): string {
 
 const callsText = (n: number) => Math.round(n).toLocaleString('en-GB')
 
-/** One row of the panel: the host, how many calls, who made them and on how many days, with the two copy buttons. A gateway host lists its unexplained paths instead. */
+/** One row of the panel: the host, how many calls, who made them and on how many days, with the buttons that add it as a vendor, as one of our own or ignore it. A gateway host lists its unexplained paths instead. */
 export function unknownHostRow(h: UnknownHostSnapshot, index: number, showVendors = true): string {
   const head = `<div><b>${escapeHtml(h.host)}</b> <span class="dim">· about ${callsText(h.calls)} calls · ${h.days} day${h.days === 1 ? '' : 's'}</span></div>
     <div class="dim">called by ${escapeHtml(h.callers.join(', '))}</div>`
@@ -38,18 +27,33 @@ export function unknownHostRow(h: UnknownHostSnapshot, index: number, showVendor
       <button data-copy="path" data-i="${index}" data-j="${j}">Copy path rule</button></li>`).join('')}</ul></li>`
   }
   return `<li data-host="${escapeHtml(h.host)}">${head}
-    <div class="actions"><button data-copy="vendor" data-i="${index}">Copy vendor entry</button><button data-copy="ignore" data-i="${index}">Copy ignore line</button></div></li>`
+    <div class="actions">${h.vendorsOnly ? '' : `<button data-add="vendor" data-i="${index}">Add vendor</button><button data-add="internal" data-i="${index}">Add internal</button>`}<button data-add="ignore" data-i="${index}">Ignore</button></div></li>`
+}
+
+/** The words on the panel's button: the unknown hosts on show, and how many were added from the panel. */
+export function panelLabel(unknown: number, added: number, open: boolean): string {
+  const hosts = `${unknown} unknown host${unknown === 1 ? '' : 's'}`
+  return `${added > 0 ? `${hosts} · ${added} added` : hosts} ${open ? '▴' : '▾'}`
+}
+
+/** One entry of the "Added from this panel" list, with its Remove button. */
+export function addedRow(a: AddedHostSnapshot, index: number): string {
+  const kind = a.kind === 'internal' ? 'internal' : a.kind === 'ignore' ? 'ignored' : 'vendor'
+  return `<li data-added="${escapeHtml(a.host)}"><b>${escapeHtml(a.host)}</b> <span class="dim">· ${kind}</span> <button data-remove="${index}">Remove</button></li>`
 }
 
 /**
  * The Unknown hosts button and its panel: the hosts the town's calls go to that no rule explains, grouped by host. It is read from the server on a slow
- * poll, shown only when there is something to see, and next to the Notices button. Nothing here changes the config: the two buttons only copy a line.
+ * poll and sits next to the Notices button. A plain host can be added as a vendor, as one of our own or ignored: the server saves that, loads the town
+ * again, and the host leaves the list. What was added is listed below with a Remove button, and the button stays while there is anything in either list.
  */
 export class UnknownHostsPanel {
   private readonly el = document.getElementById('unknown-hosts')!
   private open = false
   private hosts: UnknownHostSnapshot[] = []
+  private added: AddedHostSnapshot[] = []
   private showVendors = false
+  private error = ''
   private timer: number | undefined
 
   constructor(private readonly scope: Scope, private readonly copy: (text: string) => Promise<void> = (t) => navigator.clipboard.writeText(t)) {}
@@ -64,48 +68,83 @@ export class UnknownHostsPanel {
     if (this.timer !== undefined) window.clearInterval(this.timer)
   }
 
+  private url(path: string, extra = ''): string {
+    const q = scopeParams(this.scope)
+    return `${path}?${[q, extra].filter(Boolean).join('&')}`
+  }
+
   async refresh(): Promise<void> {
     try {
-      const q = scopeParams(this.scope)
-      const r = await fetch(`/api/unknown-hosts${q ? `?${q}` : ''}`)
-      if (r.ok) this.set((await r.json()) as UnknownHostSnapshot[])
+      const [hosts, added] = await Promise.all([fetch(this.url('/api/unknown-hosts')), fetch(this.url('/api/added-hosts'))])
+      if (hosts.ok) this.hosts = (await hosts.json()) as UnknownHostSnapshot[]
+      if (added.ok) this.added = (await added.json()) as AddedHostSnapshot[]
+      this.render()
     } catch {
-      /* the list stays as it was; the next read tries again */
+      /* the lists stay as they were; the next read tries again */
     }
   }
 
-  set(hosts: UnknownHostSnapshot[]): void {
+  set(hosts: UnknownHostSnapshot[], added: AddedHostSnapshot[] = this.added): void {
     this.hosts = hosts
+    this.added = added
     this.render()
   }
 
-  /** The hosts on screen: those only vendor buildings (such as Digital Services) called are left out until the box is ticked. */
+  /** Asks the server to add (or remove) a host; it saves, loads the town again and answers with the list of what was added. */
+  private async change(request: () => Promise<Response>): Promise<void> {
+    try {
+      const r = await request()
+      if (!r.ok) {
+        const body = (await r.json().catch(() => ({}))) as { error?: string }
+        this.error = body.error ?? `The server refused (${r.status}).`
+        this.render()
+        return
+      }
+      this.error = ''
+      this.added = (await r.json()) as AddedHostSnapshot[]
+      await this.refresh()
+    } catch {
+      this.error = 'The server could not be reached.'
+      this.render()
+    }
+  }
+
   private visible(): UnknownHostSnapshot[] {
     return this.hosts.filter((h) => this.showVendors || !h.vendorsOnly)
   }
 
   private render(): void {
     const shown = this.visible()
-    const vendorHosts = this.hosts.length - this.hosts.filter((h) => !h.vendorsOnly).length
-    this.el.hidden = this.hosts.length === 0
-    const n = shown.length
-    this.el.innerHTML = `<button id="unknown-hosts-toggle">${n} unknown host${n === 1 ? '' : 's'} ${this.open ? '▴' : '▾'}</button>
+    const vendorHosts = this.hosts.filter((h) => h.vendorsOnly).length
+    this.el.hidden = this.hosts.length === 0 && this.added.length === 0
+    this.el.innerHTML = `<button id="unknown-hosts-toggle">${panelLabel(shown.length, this.added.length, this.open)}</button>
       <div class="panel" ${this.open ? '' : 'hidden'}>
         <label class="dim"><input type="checkbox" id="unknown-hosts-vendors" ${this.showVendors ? 'checked' : ''}> Include calls made by Digital Services and vendors${vendorHosts > 0 ? ` (${vendorHosts} more)` : ''}</label>
-        <ul>${shown.map((h, i) => unknownHostRow(h, i, this.showVendors)).join('')}</ul></div>`
+        ${this.error ? `<div class="error" id="unknown-hosts-error">${escapeHtml(this.error)}</div>` : ''}
+        <ul id="unknown-hosts-list">${shown.map((h, i) => unknownHostRow(h, i, this.showVendors)).join('')}</ul>
+        ${this.added.length > 0 ? `<div class="dim">Added from this panel</div><ul id="added-hosts-list">${this.added.map(addedRow).join('')}</ul>` : ''}</div>`
     this.el.querySelector('#unknown-hosts-toggle')!.addEventListener('click', () => { this.open = !this.open; this.render() })
     this.el.querySelector('#unknown-hosts-vendors')!.addEventListener('change', (e) => { this.showVendors = (e.target as HTMLInputElement).checked; this.render() })
-    const labels: Record<string, string> = { vendor: 'Copy vendor entry', ignore: 'Copy ignore line', path: 'Copy path rule' }
-    this.el.querySelectorAll<HTMLButtonElement>('button[data-copy]').forEach((b) =>
-      b.addEventListener('click', async () => {
+    this.el.querySelectorAll<HTMLButtonElement>('button[data-add]').forEach((b) =>
+      b.addEventListener('click', () => {
         const h = shown[Number(b.dataset.i)]
         if (!h) return
-        const kind = b.dataset.copy!
-        const path = kind === 'path' ? (h.paths ?? []).filter((p) => this.showVendors || !p.vendorsOnly)[Number(b.dataset.j)] : undefined
-        if (kind === 'path' && !path) return
-        await this.copy(kind === 'vendor' ? vendorEntry(h) : kind === 'ignore' ? ignoreLine(h) : pathRule(h, path!))
+        void this.change(() => fetch(this.url('/api/added-hosts'), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ host: h.host, kind: b.dataset.add }) }))
+      }))
+    this.el.querySelectorAll<HTMLButtonElement>('button[data-remove]').forEach((b) =>
+      b.addEventListener('click', () => {
+        const a = this.added[Number(b.dataset.remove)]
+        if (!a) return
+        void this.change(() => fetch(this.url('/api/added-hosts', `host=${encodeURIComponent(a.host)}`), { method: 'DELETE' }))
+      }))
+    this.el.querySelectorAll<HTMLButtonElement>('button[data-copy="path"]').forEach((b) =>
+      b.addEventListener('click', async () => {
+        const h = shown[Number(b.dataset.i)]
+        const path = (h?.paths ?? []).filter((p) => this.showVendors || !p.vendorsOnly)[Number(b.dataset.j)]
+        if (!h || !path) return
+        await this.copy(pathRule(h, path))
         b.textContent = 'Copied'
-        window.setTimeout(() => { b.textContent = labels[kind] }, 1500)
+        window.setTimeout(() => { b.textContent = 'Copy path rule' }, 1500)
       }))
   }
 }

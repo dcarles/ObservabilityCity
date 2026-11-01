@@ -188,26 +188,65 @@ test.describe('the Unknown hosts button', () => {
     { host: 'files.example.test', calls: 40, callers: ['bb.ledger-worker', 'aa.orders-worker'], days: 2 },
   ]
 
-  test('is hidden when there are none, lists each host with its copy buttons when there are, and copies a line', async ({ town, page, context }) => {
-    await context.grantPermissions(['clipboard-read', 'clipboard-write'])
+  test('is hidden when there is nothing, adds a host with one click and takes it off the list, and a Remove undoes it', async ({ town, page }) => {
     await town.open()
     await expect(page.locator('#unknown-hosts')).toBeHidden()
 
-    await page.route('**/api/unknown-hosts*', (r) => r.fulfill({ json: hosts }))
+    // a server that keeps the two lists, as the real one does: adding saves, loads the town again, and the host leaves the unknown list
+    let unknown = [...hosts]
+    let added: { host: string; kind: string; calledBy: string[] }[] = []
+    const posted: any[] = []
+    await page.route('**/api/unknown-hosts*', (r) => r.fulfill({ json: unknown }))
+    await page.route('**/api/added-hosts*', async (r) => {
+      const req = r.request()
+      if (req.method() === 'POST') {
+        const body = req.postDataJSON()
+        posted.push(body)
+        const host = unknown.find((h) => h.host === body.host)!
+        added = [...added, { host: body.host, kind: body.kind, calledBy: host.callers }]
+        unknown = unknown.filter((h) => h.host !== body.host)
+      } else if (req.method() === 'DELETE') {
+        added = added.filter((a) => a.host !== new URL(req.url()).searchParams.get('host'))
+      }
+      await r.fulfill({ json: added })
+    })
     await page.evaluate(() => (window as any).city.unknownHosts.refresh())
     await expect(page.locator('#unknown-hosts-toggle')).toHaveText(/2 unknown hosts/)
     await page.locator('#unknown-hosts-toggle').click()
-    await expect(page.locator('#unknown-hosts li')).toHaveCount(2)
-    await expect(page.locator('#unknown-hosts li').first()).toContainText('api.partner.example')
+    await expect(page.locator('#unknown-hosts-list > li')).toHaveCount(2)
+    await expect(page.locator('#unknown-hosts-list > li').first()).toContainText('api.partner.example')
+    await expect(page.getByRole('button', { name: 'Copy vendor entry' })).toHaveCount(0)
 
-    await page.locator('#unknown-hosts li').first().getByRole('button', { name: 'Copy vendor entry' }).click()
-    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('- { id: ext.api-partner-example, name: api.partner.example, domains: [api.partner.example], calledBy: [aa.orders-api] }')
-    await page.locator('#unknown-hosts li').nth(1).getByRole('button', { name: 'Copy ignore line' }).click()
-    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("- '^files\\.example\\.test$'")
+    await page.locator('#unknown-hosts-list > li').first().getByRole('button', { name: 'Add vendor' }).click()
+    await expect(page.locator('#unknown-hosts-toggle')).toHaveText(/1 unknown host · 1 added/)
+    expect(posted).toEqual([{ host: 'api.partner.example', kind: 'vendor' }])
+    await expect(page.locator('#added-hosts-list > li')).toHaveCount(1)
+    await expect(page.locator('#added-hosts-list > li')).toContainText('api.partner.example')
 
-    await page.route('**/api/unknown-hosts*', (r) => r.fulfill({ json: [] }))
-    await page.evaluate(() => (window as any).city.unknownHosts.refresh())
+    await page.locator('#unknown-hosts-list > li').first().getByRole('button', { name: 'Ignore' }).click()
+    await expect(page.locator('#unknown-hosts-toggle')).toHaveText(/0 unknown hosts · 2 added/)
+    await expect(page.locator('#unknown-hosts')).toBeVisible() // nothing unknown any more, but the added list is still there to undo from
+    await expect(page.locator('#unknown-hosts-list > li')).toHaveCount(0)
+
+    await page.locator('#added-hosts-list > li').first().getByRole('button', { name: 'Remove' }).click()
+    await expect(page.locator('#added-hosts-list > li')).toHaveCount(1)
+    await page.locator('#added-hosts-list > li').first().getByRole('button', { name: 'Remove' }).click()
     await expect(page.locator('#unknown-hosts')).toBeHidden()
+  })
+
+  test('shows why the server refused an add, and leaves the lists as they were', async ({ town, page }) => {
+    await town.open()
+    await page.route('**/api/unknown-hosts*', (r) => r.fulfill({ json: hosts }))
+    await page.route('**/api/added-hosts*', (r) => r.request().method() === 'POST'
+      ? r.fulfill({ status: 400, json: { error: 'No system of the town was seen calling api.partner.example.' } })
+      : r.fulfill({ json: [] }))
+    await page.evaluate(() => (window as any).city.unknownHosts.refresh())
+    await page.locator('#unknown-hosts-toggle').click()
+
+    await page.locator('#unknown-hosts-list > li').first().getByRole('button', { name: 'Add internal' }).click()
+
+    await expect(page.locator('#unknown-hosts-error')).toContainText('No system of the town was seen calling')
+    await expect(page.locator('#unknown-hosts-list > li')).toHaveCount(2)
   })
 
   test('lists a gateway by its unexplained paths with a path rule button, and shows calls made only by vendors behind the tick box', async ({ town, page, context }) => {
