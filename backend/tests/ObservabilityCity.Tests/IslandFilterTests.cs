@@ -217,6 +217,20 @@ public class IslandFilterTests
     }
 
     [Fact]
+    public async Task Every_third_party_a_system_calls_has_an_arc_even_though_it_has_no_health_of_its_own()
+    {
+        var rig = new Rig();
+        await rig.Run();
+
+        var snapshot = rig.Builder.Build();
+        var groupOf = rig.Registry.AllNodes.ToDictionary(n => n.Id, n => n.GroupId);
+        var called = rig.Registry.Vendors.SelectMany(v => v.CalledBy.Select(c => (From: groupOf[c], To: v.Node.Id))).Distinct().ToList();
+
+        Assert.NotEmpty(called);
+        Assert.All(called, l => Assert.Contains(snapshot.Dependencies, d => d.From == l.From && d.To == l.To));
+    }
+
+    [Fact]
     public async Task The_airports_rate_counts_only_the_systems_on_screen()
     {
         var rig = new Rig();
