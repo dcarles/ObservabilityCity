@@ -12,7 +12,7 @@ namespace ObservabilityCity.Host;
 /// Everything one environment runs on its own: its view of the registry, its source and the readings that source produced, and the stream of
 /// snapshots built from them. Every environment of the town has one, so dev, staging and prod each move on their own.
 /// </summary>
-public sealed class EnvironmentRuntime(string townId, string id, EnvironmentRegistry registry, FakeSource? fake, LatestState state, SnapshotBuilder builder, SnapshotStore store, ILogSource logs, IReadOnlyList<IMetricSource> sources, IReadOnlyList<string> sourceProblems, ScopeStore? scope = null, DiscoveredLinks? discovered = null)
+public sealed class EnvironmentRuntime(string townId, string id, EnvironmentRegistry registry, FakeSource? fake, LatestState state, SnapshotBuilder builder, SnapshotStore store, ILogSource logs, IReadOnlyList<IMetricSource> sources, IReadOnlyList<string> sourceProblems, ScopeStore? scope = null, DiscoveredLinks? discovered = null, ReadingCache? readings = null)
 {
     public string TownId { get; } = townId;
     public string Id { get; } = id;
@@ -23,6 +23,7 @@ public sealed class EnvironmentRuntime(string townId, string id, EnvironmentRegi
     /// <summary>The fake source, in a demo town only. A live town has none, and nothing to steer.</summary>
     public FakeSource? Fake { get; } = fake;
     public LatestState State { get; } = state;
+    public ReadingCache? Readings { get; } = readings;
     public SnapshotBuilder Builder { get; } = builder;
     public SnapshotStore Store { get; } = store;
     public ILogSource Logs { get; } = logs;

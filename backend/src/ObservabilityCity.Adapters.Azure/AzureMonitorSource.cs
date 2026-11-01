@@ -111,7 +111,7 @@ public sealed class AzureMonitorReader(HttpClient http, ICredentialSource? crede
 /// <c>file:name.json</c> replays recorded series (<c>{ "&lt;resource name&gt;": [ { "metric", "aggregation", "filter", "points": [...] } ] }</c>) kept beside the town's files.
 /// </summary>
 public sealed class AzureMonitorSource(
-    string name, string environmentId, RegistrySource definition, AzureMonitorReader reader, ScopeStore store, string? recording, TimeProvider time) : IMetricSource
+    string name, string environmentId, RegistrySource definition, AzureMonitorReader reader, ScopeStore store, string? recording, TimeProvider time) : IProgressiveMetricSource
 {
     public const int MaxParallel = 8;
 
@@ -125,55 +125,88 @@ public sealed class AzureMonitorSource(
 
     public async Task<IReadOnlyDictionary<string, NodeReading>> PollAsync(TownRegistry registry, CancellationToken ct)
     {
+        var all = new Dictionary<string, NodeReading>();
+        await PollAsync(registry, found => { lock (all) foreach (var (id, reading) in found) all[id] = reading; }, ct);
+        return all;
+    }
+
+    /// <summary>
+    /// Reads every resource and hands over each system's reading the moment the last of its own resources has been read, so a town with many plans lights
+    /// up as the reads finish and one slow or failing read holds back only the systems that use it. A system is never reported from only some of its
+    /// resources. When any read fails the poll still ends in an error saying how many, after everything that could be reported has been.
+    /// </summary>
+    public async Task PollAsync(TownRegistry registry, Action<IReadOnlyDictionary<string, NodeReading>> publish, CancellationToken ct)
+    {
         var view = registry.ForEnvironment(environmentId);
         if (store.Inventory is null) await store.WaitForReadAsync(Timeout / 2, ct); // the resources to read are in the inventory
         var resolution = store.Resolve(view);
         var targets = resolution.Systems.SelectMany(s => s.Resources.SelectMany(r => definition.Metrics.Where(g => g.Resources == r.Rule).Select(g => new Target(s.SystemId, r, g)))).ToList();
-        if (targets.Count == 0) return new Dictionary<string, NodeReading>();
+        if (targets.Count == 0) return;
 
         var at = time.GetUtcNow();
         var recorded = recording is null ? null : ReadRecording(await File.ReadAllTextAsync(recording, ct));
         var gate = new SemaphoreSlim(MaxParallel);
         var errors = new List<string>();
-        async Task<(Target Target, IReadOnlyList<MetricSeries> Series)> Read(Target target)
+        var names = resolution.TenantNames.ToDictionary(t => t.Id, t => t.Name);
+        var seriesOf = new Dictionary<(string, MetricGroup), IReadOnlyList<MetricSeries>>();
+        // for each system the reads it waits for; a read that fails is never marked done, so the systems that use it are not reported
+        var waiting = targets.GroupBy(t => t.SystemId).ToDictionary(g => g.Key, g => g.Select(t => (t.Resource.Id, t.Group)).ToHashSet());
+        var wanted = targets.GroupBy(t => t.SystemId).ToDictionary(g => g.Key, g => g.ToList());
+        var usedBy = targets.SelectMany(t => new[] { (Key: (t.Resource.Id, t.Group), t.SystemId) }).GroupBy(x => x.Key).ToDictionary(g => g.Key, g => g.Select(x => x.SystemId).Distinct().ToList());
+
+        async Task Read(Target target)
         {
-            if (recorded is not null) return (target, recorded.GetValueOrDefault(target.Resource.Name) ?? []);
-            await gate.WaitAsync(ct);
-            try { return (target, await ReadResource(target, at, ct)); }
-            catch (Exception e) when (e is not OperationCanceledException || !ct.IsCancellationRequested)
+            IReadOnlyList<MetricSeries> series;
+            if (recorded is not null) series = recorded.GetValueOrDefault(target.Resource.Name) ?? [];
+            else
             {
-                lock (errors) errors.Add(e.Message);
-                return (target, []);
+                await gate.WaitAsync(ct);
+                try { series = await ReadResource(target, at, ct); }
+                catch (Exception e) when (e is not OperationCanceledException || !ct.IsCancellationRequested)
+                {
+                    lock (errors) errors.Add(e.Message);
+                    return;
+                }
+                finally { gate.Release(); }
             }
-            finally { gate.Release(); }
+            var ready = new Dictionary<string, NodeReading>();
+            lock (seriesOf)
+            {
+                var key = (target.Resource.Id, target.Group);
+                seriesOf[key] = series;
+                foreach (var systemId in usedBy[key])
+                {
+                    waiting[systemId].Remove(key);
+                    if (waiting[systemId].Count > 0) continue;
+                    var read = wanted[systemId].Select(t => (Target: t, Series: seriesOf[(t.Resource.Id, t.Group)])).ToList();
+                    if (Reading(read, names, at) is { } reading) ready[systemId] = reading;
+                }
+            }
+            if (ready.Count > 0) publish(ready);
         }
         // a plan that several systems share is read once
         var unique = targets.DistinctBy(t => (t.Resource.Id, t.Group)).ToList();
-        var done = await Task.WhenAll(unique.Select(Read));
+        await Task.WhenAll(unique.Select(Read));
         if (errors.Count > 0)
-            throw new HttpRequestException($"{errors.Count} of {unique.Count} resource reads failed, so nothing was reported this time; the first: {errors[0]}");
-        var seriesOf = done.ToDictionary(d => (d.Target.Resource.Id, d.Target.Group), d => d.Series);
-        var read = targets.Select(t => (Target: t, Series: seriesOf[(t.Resource.Id, t.Group)])).ToList();
+            throw new HttpRequestException($"{errors.Count} of {unique.Count} resource reads failed, so the systems that use them were not reported this time; the first: {errors[0]}");
+    }
 
-        var names = resolution.TenantNames.ToDictionary(t => t.Id, t => t.Name);
-        var readings = new Dictionary<string, NodeReading>();
-        foreach (var system in read.GroupBy(r => r.Target.SystemId))
-        {
-            var values = system.Select(r => Values(r.Target, r.Series, r.Target.Group.Window ?? Window)).ToList();
-            double? Worst(string signal) => Max(values, signal);
-            var cpu = Worst("cpu");
-            var memory = Worst("memory");
-            var utilisation = Worst("utilisation");
-            var throttled = Worst("throttled");
-            if (cpu is null && memory is null && utilisation is null && throttled is null) continue;
-            var tenants = values.Where(v => v.Tenant is not null).GroupBy(v => v.Tenant!)
-                .Select(g => new TenantReading(g.Key, Max(g, "utilisation"), Max(g, "throttled"), g.Sum(v => v.Signals.GetValueOrDefault("requests") ?? 0), names.GetValueOrDefault(g.Key), Max(g, "limit"))).ToList();
-            // each region's own CPU and memory, for the resources that report them and say where they are
-            var regions = values.Where(v => v.Region is not null && (v.Signals.ContainsKey("cpu") || v.Signals.ContainsKey("memory"))).GroupBy(v => v.Region!, StringComparer.OrdinalIgnoreCase)
-                .Select(g => new RegionReading(g.Key, null, Max(g, "cpu"), Max(g, "memory"))).OrderBy(r => r.Region, StringComparer.Ordinal).ToList();
-            readings[system.Key] = new NodeReading(at, true, 0, 0, 0, 0, 0, 0, cpu, memory, utilisation, throttled, Tenants: tenants.Count == 0 ? null : tenants, Regions: regions.Count == 0 ? null : regions);
-        }
-        return readings;
+    /// <summary>One system's reading from the series of all its resources, or null when none of its signals has a number.</summary>
+    private NodeReading? Reading(List<(Target Target, IReadOnlyList<MetricSeries> Series)> system, Dictionary<string, string> names, DateTimeOffset at)
+    {
+        var values = system.Select(r => Values(r.Target, r.Series, r.Target.Group.Window ?? Window)).ToList();
+        double? Worst(string signal) => Max(values, signal);
+        var cpu = Worst("cpu");
+        var memory = Worst("memory");
+        var utilisation = Worst("utilisation");
+        var throttled = Worst("throttled");
+        if (cpu is null && memory is null && utilisation is null && throttled is null) return null;
+        var tenants = values.Where(v => v.Tenant is not null).GroupBy(v => v.Tenant!)
+            .Select(g => new TenantReading(g.Key, Max(g, "utilisation"), Max(g, "throttled"), g.Sum(v => v.Signals.GetValueOrDefault("requests") ?? 0), names.GetValueOrDefault(g.Key), Max(g, "limit"))).ToList();
+        // each region's own CPU and memory, for the resources that report them and say where they are
+        var regions = values.Where(v => v.Region is not null && (v.Signals.ContainsKey("cpu") || v.Signals.ContainsKey("memory"))).GroupBy(v => v.Region!, StringComparer.OrdinalIgnoreCase)
+            .Select(g => new RegionReading(g.Key, null, Max(g, "cpu"), Max(g, "memory"))).OrderBy(r => r.Region, StringComparer.Ordinal).ToList();
+        return new NodeReading(at, true, 0, 0, 0, 0, 0, 0, cpu, memory, utilisation, throttled, Tenants: tenants.Count == 0 ? null : tenants, Regions: regions.Count == 0 ? null : regions);
     }
 
     /// <summary>

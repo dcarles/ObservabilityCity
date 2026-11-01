@@ -110,4 +110,17 @@ describe('systems with no data', () => {
     expect(staleCount(quiet)).toBe(2)
     expect(viewTotals(quiet, ALL_TENANTS).stale).toBe(2)
   })
+
+  it('fall one by one as the systems report in during the first reads', () => {
+    const loading = structuredClone(staging)
+    const real = loading.groups.flatMap((g) => g.nodes).filter((n) => n.state !== 'Stale')
+    expect(real.length).toBeGreaterThan(2)
+    real.forEach((n) => { n.state = 'Stale' })
+    const before = staleCount(loading)
+    real.forEach((n, i) => {
+      n.state = 'Healthy'
+      expect(staleCount(loading)).toBe(before - (i + 1))
+      expect(viewTotals(loading, ALL_TENANTS).stale).toBe(before - (i + 1))
+    })
+  })
 })
