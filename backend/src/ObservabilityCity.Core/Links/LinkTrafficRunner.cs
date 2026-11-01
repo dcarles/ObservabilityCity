@@ -54,7 +54,7 @@ public sealed class LinkTrafficRunner(
         await SeedAsync(view, config, ct);
         var now = time.GetUtcNow();
         var rows = await source.ReadDependenciesAsync(view, config.Query, byRole.Keys.ToList(), now - config.ShareWindow, now, ct);
-        var classifier = new LinkClassifier(links, view.Vendors, view.AllNodes.Select(n => n.Id));
+        var classifier = new LinkClassifier(links, view.Vendors, view.AllNodes.Select(n => n.Id), LinkClassifier.ServicesOf(view.AllNodes));
         var calls = new List<(string, string, double)>();
         foreach (var row in rows)
         {
