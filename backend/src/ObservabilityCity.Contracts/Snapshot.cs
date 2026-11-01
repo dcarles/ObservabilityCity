@@ -316,7 +316,8 @@ public sealed record Snapshot(
     bool IncidentsSeen,
     double? OutsideRequestsPerSecond = null,
     string? Cloud = null,
-    double TrafficDensity = 1);
+    double TrafficDensity = 1,
+    IReadOnlyList<string>? Notes = null);
 
 /// <summary>An island the island filter left out.</summary>
 public sealed record HiddenIsland(string Id, string DisplayName);

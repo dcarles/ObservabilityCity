@@ -340,6 +340,7 @@ export interface components {
             cloud?: string | null;
             /** Format: double */
             trafficDensity: number;
+            notes?: string[] | null;
         };
         SubscriptionSnapshot: {
             topic: string;

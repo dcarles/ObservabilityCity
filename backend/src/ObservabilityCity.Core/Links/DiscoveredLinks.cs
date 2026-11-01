@@ -28,6 +28,7 @@ public sealed class DiscoveredLinks
 
     private readonly Dictionary<(string Caller, string Target, bool Gateway), SortedSet<DateOnly>> _links = [];
     private readonly Dictionary<(string Caller, string Host, string Path), (SortedSet<DateOnly> Days, double Calls)> _unresolved = [];
+    private readonly Dictionary<(string Caller, string Host, string Path), (SortedSet<DateOnly> Days, double Calls, string Target)> _outside = [];
     private DateTimeOffset? _readUpTo;
     private string? _error;
     private int _version;
@@ -73,6 +74,42 @@ public sealed class DiscoveredLinks
         }
     }
 
+    /// <summary>A call a rule explains, to a system of a pillar the town does not have yet.</summary>
+    public void RecordOutside(string caller, string host, string? path, string target, IEnumerable<DateOnly> days, double calls)
+    {
+        lock (_gate)
+        {
+            var key = (caller, host, path ?? "");
+            var (seen, total, _) = _outside.TryGetValue(key, out var old) ? old : ([], 0d, target);
+            foreach (var day in days) seen.Add(day);
+            _outside[key] = (seen, Math.Max(total, calls), target);
+            _version++;
+        }
+    }
+
+    /// <summary>
+    /// Asks again what each remembered address is, so a rule added since it was seen takes it off the list at once: an address now ignored, found or
+    /// recognised as a vendor goes, one that now names a pillar outside the town moves to those, and the reverse.
+    /// </summary>
+    public void Revisit(Func<string, string, string?, Classified> classify)
+    {
+        lock (_gate)
+        {
+            var all = _unresolved.Select(kv => (kv.Key, kv.Value.Days, kv.Value.Calls))
+                .Concat(_outside.Select(kv => (kv.Key, kv.Value.Days, kv.Value.Calls))).ToList();
+            var before = (_unresolved.Count, _outside.Count);
+            _unresolved.Clear();
+            _outside.Clear();
+            foreach (var (key, days, calls) in all)
+            {
+                var c = classify(key.Caller, key.Host, key.Path.Length == 0 ? null : key.Path);
+                if (c.Outcome == LinkOutcome.Unresolved) _unresolved[key] = (days, calls);
+                else if (c.Outcome == LinkOutcome.OutsideTown) _outside[key] = (days, calls, c.Target!);
+            }
+            if (before != (_unresolved.Count, _outside.Count)) _version++;
+        }
+    }
+
     public void Finish(DateTimeOffset readUpTo)
     {
         lock (_gate)
@@ -107,6 +144,11 @@ public sealed class DiscoveredLinks
             {
                 _unresolved[key].Days.RemoveWhere(d => d < oldest);
                 if (_unresolved[key].Days.Count == 0) _unresolved.Remove(key);
+            }
+            foreach (var key in _outside.Keys.ToList())
+            {
+                _outside[key].Days.RemoveWhere(d => d < oldest);
+                if (_outside[key].Days.Count == 0) _outside.Remove(key);
             }
             _version++;
         }
@@ -143,6 +185,22 @@ public sealed class DiscoveredLinks
         }
     }
 
+    /// <summary>
+    /// What is worth knowing but is not a mistake: one line for each pillar that calls reach through a rule but the town does not have yet, with how many of
+    /// its services are called and by whom, busiest first. Calls seen on fewer than <paramref name="minDays"/> days are left out.
+    /// </summary>
+    public IReadOnlyList<string> Notes(int minDays)
+    {
+        lock (_gate)
+            return _outside.Where(kv => kv.Value.Days.Count >= minDays)
+                .GroupBy(kv => LinkClassifier.Pillar(kv.Value.Target))
+                .Select(g => (Pillar: g.Key, Calls: g.Sum(kv => kv.Value.Calls), Services: g.Select(kv => kv.Value.Target).Distinct().Count(),
+                    Callers: g.Select(kv => kv.Key.Caller).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToList()))
+                .OrderByDescending(x => x.Calls).ThenBy(x => x.Pillar, StringComparer.Ordinal)
+                .Select(x => $"Pillar '{x.Pillar}' is not in the town yet: {x.Services} of its services are called by {string.Join(", ", x.Callers)}, about {Math.Round(x.Calls):0} calls. They link up when the pillar joins.")
+                .ToList();
+    }
+
     public void Save()
     {
         if (_folder is null) return;
@@ -163,6 +221,8 @@ public sealed class DiscoveredLinks
                 ReadUpTo = _readUpTo?.UtcDateTime.ToString("yyyy-MM-ddTHH:mm:ssZ"),
                 Unresolved = _unresolved.OrderBy(kv => kv.Key.Caller, StringComparer.Ordinal).ThenBy(kv => kv.Key.Host, StringComparer.Ordinal)
                     .Select(kv => new UnresolvedEntry { Caller = kv.Key.Caller, Host = kv.Key.Host, Path = kv.Key.Path.Length == 0 ? null : kv.Key.Path, Calls = kv.Value.Calls, Days = kv.Value.Days.Select(d => d.ToString("yyyy-MM-dd")).ToList() }).ToList(),
+                Outside = _outside.OrderBy(kv => kv.Key.Caller, StringComparer.Ordinal).ThenBy(kv => kv.Key.Host, StringComparer.Ordinal).ThenBy(kv => kv.Key.Path, StringComparer.Ordinal)
+                    .Select(kv => new UnresolvedEntry { Caller = kv.Key.Caller, Host = kv.Key.Host, Path = kv.Key.Path.Length == 0 ? null : kv.Key.Path, Calls = kv.Value.Calls, Target = kv.Value.Target, Days = kv.Value.Days.Select(d => d.ToString("yyyy-MM-dd")).ToList() }).ToList(),
             }));
         }
     }
@@ -187,6 +247,8 @@ public sealed class DiscoveredLinks
                     if (DateTimeOffset.TryParse(state.ReadUpTo, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.AssumeUniversal, out var at)) _readUpTo = at;
                     foreach (var u in state.Unresolved)
                         _unresolved[(u.Caller, u.Host, u.Path ?? "")] = (Days(u.Days), u.Calls);
+                    foreach (var u in state.Outside.Where(o => o.Target is { Length: > 0 }))
+                        _outside[(u.Caller, u.Host, u.Path ?? "")] = (Days(u.Days), u.Calls, u.Target!);
                     continue;
                 }
                 foreach (var l in Reader.Deserialize<LinksFile>(text)?.Links ?? [])
@@ -216,6 +278,7 @@ public sealed class DiscoveredLinks
     {
         public string? ReadUpTo { get; set; }
         public List<UnresolvedEntry> Unresolved { get; set; } = [];
+        public List<UnresolvedEntry> Outside { get; set; } = [];
     }
     private sealed class UnresolvedEntry
     {
@@ -223,6 +286,7 @@ public sealed class DiscoveredLinks
         public string Host { get; set; } = "";
         public string? Path { get; set; }
         public double Calls { get; set; }
+        public string? Target { get; set; }
         public List<string> Days { get; set; } = [];
     }
 }

@@ -276,6 +276,7 @@ Declared `calls` and `gatewayCalls` are always drawn. An environment can also fi
 - Found links are saved under `_discovered/links/<environment>/` in the town's folder, one file for each pillar, with the days seen. Your pillar files are never edited. Keep the folder out of version control (a fork's `.gitignore` should list it).
 - `discoverLinks: false` (in `defaults.yaml`, a pillar's `defaults` or a system) switches discovery off for the systems it covers. Only an API or a worker makes calls worth finding.
 - An address no rule explains, no `ignoreHosts` pattern covers and no third party `domains` entry names appears under Notices, so a missing rule shows up as something to add. A wrong link is fixed by tightening a rule or adding an ignore pattern, not link by link.
+- A call a rule explains but whose pillar is not in the town yet (a gateway path that starts with a pillar you have not added) is not a problem. It is listed as a note, one line for each pillar, apart from the problems and not counted among them, and it links up when that pillar joins the town. Remembered addresses are checked again on every read, so a rule or ignore pattern you add clears the notice at once, without waiting for it to age out. To make the same address one line instead of one for each id, replace the ids in the path in the query itself.
 - The inspector's Links tab tags each link "Seen in calls" (with the last day it was seen) or "Declared".
 
 #### Services outside the monitored platform

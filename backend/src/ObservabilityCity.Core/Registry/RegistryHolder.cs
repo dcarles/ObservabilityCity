@@ -10,6 +10,9 @@ public interface IRegistryProvider
 
     /// <summary>Configuration problems that did not stop the town: skipped files, dropped links, a failed reload, and warnings such as an island nothing connects to.</summary>
     IReadOnlyList<string> Notices { get; }
+
+    /// <summary>Things worth knowing that are not mistakes, such as calls to a pillar the town does not have yet. Shown apart from the problems.</summary>
+    IReadOnlyList<string> Notes => [];
 }
 
 /// <summary>Holds the registry in use. A reload that fails leaves the last good one in place and only adds a notice.</summary>
@@ -73,6 +76,8 @@ public sealed class EnvironmentRegistry(RegistryHolder source, string environmen
             }
         }
     }
+
+    public IReadOnlyList<string> Notes => discovered is not null && Current.ActiveEnvironment?.Links is { } config ? discovered.Notes(config.MinDays) : [];
 
     public IReadOnlyList<string> Notices
     {

@@ -72,8 +72,14 @@ public sealed class LinkDiscoveryRunner(
                 case LinkOutcome.Unresolved:
                     store.RecordUnresolved(caller.Id, row.Host, row.Path, row.Days, row.Calls);
                     break;
+                case LinkOutcome.OutsideTown:
+                    store.RecordOutside(caller.Id, row.Host, row.Path, result.Target!, row.Days, row.Calls);
+                    break;
             }
         }
+        // a rule added since an address was remembered takes it off the lists now, not when its days age out
+        var groupOf = view.AllNodes.ToDictionary(n => n.Id, n => n.GroupId);
+        store.Revisit((callerId, host, path) => classifier.Classify(new DependencyRow(callerId, host, path, [], 0), groupOf.GetValueOrDefault(callerId, "")));
         store.Prune(now, config.KeepFor);
         store.Finish(now);
         store.Save();

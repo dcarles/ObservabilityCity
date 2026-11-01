@@ -8,3 +8,13 @@ unresolved:
   - 2026-10-01
   - 2026-10-02
   - 2026-10-03
+outside:
+- caller: aa.orders-api
+  host: gw.a.example.test
+  path: /zz/ledger/api/v1
+  calls: 400
+  target: zz.ledger-api
+  days:
+  - 2026-10-01
+  - 2026-10-02
+  - 2026-10-03

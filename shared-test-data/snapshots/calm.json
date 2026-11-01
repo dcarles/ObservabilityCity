@@ -6249,5 +6249,6 @@
   "incidentsSeen": false,
   "outsideRequestsPerSecond": null,
   "cloud": null,
-  "trafficDensity": 1
+  "trafficDensity": 1,
+  "notes": null
 }
