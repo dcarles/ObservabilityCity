@@ -191,6 +191,18 @@ describe('the links tab', () => {
     expect(originLabel(calls.items[0].origin!)).toEqual({ text: 'Declared', title: 'Written in a registry file' })
   })
 
+  it('shows a third-party building what it calls through the gateway, as seen in the telemetry', () => {
+    const vendor: SystemDetail = {
+      ...detail, id: 'ext.pyd', name: 'Payment disbursement service', kind: 'Api', calls: [], gatewayCalledBy: [], outsideCallers: [], serviceTopics: [], subscriptions: [],
+      calledBy: [{ id: 'cl.settlement-api', name: 'Settlement API', kind: 'System', islandId: 'cl', islandName: 'Closed Loop', found: false, lastSeen: null }],
+      gatewayCalls: [{ id: 'tms.merchant-api', name: 'Merchant API', kind: 'System', islandId: 'tms', islandName: 'Tenancy', found: true, lastSeen: null }],
+    }
+    const sections = linkSections(vendor)
+    expect(sections.map((s) => s.id)).toEqual(['calledBy', 'gatewayCalls'])
+    expect(sections[1].items.map((i) => [i.id, i.where])).toEqual([['tms.merchant-api', 'Tenancy']])
+    expect(originLabel(sections[1].items[0].origin!)).toEqual({ text: 'Seen in calls', title: 'Found in the telemetry' })
+  })
+
   it('gives words that are not links no origin', () => {
     const outside = linkSections(detail).find((s) => s.id === 'outside')!
     expect(outside.items[0].origin).toBeUndefined()
