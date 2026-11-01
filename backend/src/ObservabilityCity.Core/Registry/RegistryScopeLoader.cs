@@ -52,7 +52,7 @@ public static partial class RegistryLoader
     }
 
     private static MetricSignal? ToSignal(MetricSignalFile? f) =>
-        f is null ? null : new MetricSignal(f.Metric.Trim(), f.Aggregation.Trim().ToLowerInvariant(), string.IsNullOrWhiteSpace(f.Filter) ? null : f.Filter.Trim(), f.Scale, f.PerSecond, ToSignal(f.Over), ToSignal(f.OrElse));
+        f is null ? null : new MetricSignal(f.Metric.Trim(), f.Aggregation.Trim().ToLowerInvariant(), string.IsNullOrWhiteSpace(f.Filter) ? null : f.Filter.Trim(), f.Scale, f.PerSecond, ToSignal(f.Over), ToSignal(f.OrElse), string.Equals(f.WhenEmpty?.Trim(), "idle", StringComparison.OrdinalIgnoreCase));
 
     private static List<MetricGroup> ToMetrics(List<MetricGroupFile> files) =>
         files.Select(g => new MetricGroup(g.Resources, string.IsNullOrWhiteSpace(g.Namespace) ? null : g.Namespace.Trim(),
@@ -94,6 +94,12 @@ public static partial class RegistryLoader
             if (!MetricGroup.Aggregations.Contains(spec.Aggregation.Trim().ToLowerInvariant()))
                 errors.Add($"{at}: aggregation '{spec.Aggregation}'. Use {string.Join(", ", MetricGroup.Aggregations)}.{DidYouMean.Hint(spec.Aggregation, MetricGroup.Aggregations)}");
             if (!double.IsFinite(spec.Scale) || spec.Scale <= 0) errors.Add($"{at}: scale must be above 0 (0.01 turns a percentage into a fraction)");
+            if (spec.WhenEmpty is { } whenEmpty)
+            {
+                if (!MetricGroup.WhenEmptyValues.Contains(whenEmpty.Trim().ToLowerInvariant()))
+                    errors.Add($"{at}.whenEmpty: '{whenEmpty}'. Use {string.Join(", ", MetricGroup.WhenEmptyValues)}.{DidYouMean.Hint(whenEmpty, MetricGroup.WhenEmptyValues)}");
+                else if (isOver) errors.Add($"{at}.whenEmpty: it belongs on the signal itself, not on its over or orElse");
+            }
             if (spec.Filter is { } filter)
                 foreach (var problem in ScopeTemplate.Check(filter, known)) errors.Add($"{at}.filter: {problem}");
             if (spec.OrElse is { } alt)

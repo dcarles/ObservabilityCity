@@ -166,6 +166,90 @@ public class PlatformMetricsTests
         Assert.Contains("limit.orElse: it is only another metric to read in place; it cannot have an over or an orElse of its own", message);
     }
 
+    private const string NormalisedUtilisation = "utilisation: { metric: NormalizedRUConsumption, aggregation: maximum, scale: 0.01 }";
+
+    /// <summary>Town B's accounts report a normalised consumption (a maximum), which Azure sends only when something happened. A quiet account has no points.</summary>
+    private static void QuietAccounts(RegistryCopy copy, bool idle, params string[] accounts)
+    {
+        if (idle) copy.Replace("environments/prod.yaml", NormalisedUtilisation, NormalisedUtilisation.Replace(" scale:", " whenEmpty: idle, scale:"));
+        EditRecording(copy, doc =>
+        {
+            foreach (var account in accounts)
+                doc[account]!.AsArray().First(x => (string?)x!["metric"] == "NormalizedRUConsumption")!["points"] = new JsonArray();
+        });
+    }
+
+    [Fact]
+    public async Task A_quiet_account_that_gave_no_number_makes_the_whole_store_unknown_unless_the_entry_says_idle()
+    {
+        using var copy = new RegistryCopy(TownB);
+        QuietAccounts(copy, idle: false, "cosmos-orders-cygnus");
+        var (source, registry) = await Platform(copy.Path);
+
+        var orders = (await source.PollAsync(registry, CancellationToken.None))["aa.orders-db"];
+
+        Assert.Null(orders.Utilisation);
+        Assert.All(orders.Tenants!, t => Assert.Null(t.Idle));
+    }
+
+    [Fact]
+    public async Task When_empty_idle_counts_a_read_that_gave_no_number_as_no_use_and_marks_that_tenant()
+    {
+        using var copy = new RegistryCopy(TownB);
+        QuietAccounts(copy, idle: true, "cosmos-orders-cygnus");
+        var (source, registry) = await Platform(copy.Path);
+
+        var orders = (await source.PollAsync(registry, CancellationToken.None))["aa.orders-db"];
+
+        var idle = orders.Tenants!.Where(t => t.Idle == true).ToList();
+        Assert.Single(idle);
+        Assert.Equal(0, idle[0].Utilisation);
+        Assert.Equal(2, orders.Tenants!.Count(t => t.Idle is null && t.Utilisation > 0));
+        Assert.Equal(0.95, Math.Round(orders.Utilisation!.Value, 6)); // the busy one still decides the store's light
+    }
+
+    [Fact]
+    public async Task A_store_whose_every_account_is_quiet_reads_zero_not_no_data_when_idle_is_set()
+    {
+        using var copy = new RegistryCopy(TownB);
+        QuietAccounts(copy, idle: true, "cosmos-orders-acmebank", "cosmos-orders-borealis", "cosmos-orders-cygnus");
+        var (source, registry) = await Platform(copy.Path);
+
+        var orders = (await source.PollAsync(registry, CancellationToken.None))["aa.orders-db"];
+
+        Assert.Equal(0, orders.Utilisation);
+        Assert.All(orders.Tenants!, t => Assert.True(t.Idle));
+    }
+
+    [Fact]
+    public async Task A_failed_read_is_never_read_as_idle()
+    {
+        using var copy = new RegistryCopy(TownB);
+        QuietAccounts(copy, idle: true);
+        var http = new CannedHttp().Respond(_ => CannedHttp.Reply("""{"error":{"code":"AuthorizationFailed"}}""", HttpStatusCode.Forbidden));
+        var (source, registry) = await Platform(copy.Path, http);
+        var published = new Dictionary<string, NodeReading>();
+
+        var e = await Assert.ThrowsAsync<HttpRequestException>(() => ((IProgressiveMetricSource)source).PollAsync(registry, b => { foreach (var (id, r) in b) published[id] = r; }, CancellationToken.None));
+
+        Assert.Contains("resource reads failed", e.Message);
+        Assert.False(published.ContainsKey("aa.orders-db")); // not reported at all, so it shows no data and not 0%
+    }
+
+    [Fact]
+    public void When_empty_takes_unknown_or_idle_and_only_on_the_signal_itself()
+    {
+        const string utilisation = "utilisation: { metric: TotalRequestUnits, aggregation: total, perSecond: true, over: { metric: ProvisionedThroughput, aggregation: maximum } }";
+        var wrong = LoadError(_ => [utilisation, utilisation.Replace(" over:", " whenEmpty: zero, over:")]);
+        var onOver = LoadError(_ => [utilisation, utilisation.Replace("aggregation: maximum }", "aggregation: maximum, whenEmpty: idle }")]);
+
+        Assert.Contains("utilisation.whenEmpty: 'zero'. Use unknown, idle.", wrong);
+        Assert.Contains("utilisation.over.whenEmpty: it belongs on the signal itself, not on its over or orElse", onOver);
+        using var copy = new RegistryCopy(TownA);
+        copy.Replace("environments/prod.yaml", utilisation, utilisation.Replace(" over:", " whenEmpty: unknown, over:"));
+        Assert.NotNull(RegistryLoader.Load(copy.Path));
+    }
+
     [Fact]
     public async Task A_tenant_the_list_spells_with_dashes_is_the_tenant_the_source_found_without_them()
     {

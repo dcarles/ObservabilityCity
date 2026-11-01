@@ -39,7 +39,8 @@
             "orElse": { "$ref": "#/$defs/fallbackMetric" }
           }
         },
-        "orElse": { "$ref": "#/$defs/fallbackMetric" }
+        "orElse": { "$ref": "#/$defs/fallbackMetric" },
+        "whenEmpty": { "enum": ["unknown", "idle"], "description": "What a read that worked but returned no number means. unknown (default): the system shows no data. idle: nothing happened, so the signal is 0 and the tenant's row says no activity reported. A failed read is always unknown." }
       }
     }
   },

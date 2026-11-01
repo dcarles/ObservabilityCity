@@ -459,7 +459,8 @@
               "utilisation": 1.08,
               "throttled": 0.3120000000000003,
               "requestsPerSecond": 25.12029611351018,
-              "limit": 4000
+              "limit": 4000,
+              "idle": null
             },
             {
               "id": "borealis",
@@ -470,7 +471,8 @@
               "utilisation": 0.41800000000000004,
               "throttled": 0,
               "requestsPerSecond": 38.593460826650215,
-              "limit": 20000
+              "limit": 20000,
+              "idle": null
             },
             {
               "id": "qa",
@@ -481,7 +483,8 @@
               "utilisation": 1.012,
               "throttled": 0.14880000000000013,
               "requestsPerSecond": 1.9740900678593463,
-              "limit": 4000
+              "limit": 4000,
+              "idle": null
             },
             {
               "id": "smoke",
@@ -492,7 +495,8 @@
               "utilisation": 0.498,
               "throttled": 0,
               "requestsPerSecond": 1.9740900678593463,
-              "limit": 20000
+              "limit": 20000,
+              "idle": null
             },
             {
               "id": "ghost-co",
@@ -503,7 +507,8 @@
               "utilisation": 0.712,
               "throttled": 0,
               "requestsPerSecond": 12.338062924120914,
-              "limit": 20000
+              "limit": 20000,
+              "idle": null
             }
           ],
           "absent": [],
@@ -620,7 +625,8 @@
               "utilisation": 0.504,
               "throttled": 0,
               "requestsPerSecond": 15.072177668106109,
-              "limit": 10000
+              "limit": 10000,
+              "idle": null
             },
             {
               "id": "borealis",
@@ -631,7 +637,8 @@
               "utilisation": 0.486,
               "throttled": 0,
               "requestsPerSecond": 23.15607649599013,
-              "limit": 10000
+              "limit": 10000,
+              "idle": null
             },
             {
               "id": "qa",
@@ -642,7 +649,8 @@
               "utilisation": 0.508,
               "throttled": 0,
               "requestsPerSecond": 1.1844540407156077,
-              "limit": 10000
+              "limit": 10000,
+              "idle": null
             },
             {
               "id": "smoke",
@@ -653,7 +661,8 @@
               "utilisation": 0.55,
               "throttled": 0,
               "requestsPerSecond": 1.1844540407156077,
-              "limit": 10000
+              "limit": 10000,
+              "idle": null
             },
             {
               "id": "ghost-co",
@@ -664,7 +673,8 @@
               "utilisation": 0.41600000000000004,
               "throttled": 0,
               "requestsPerSecond": 7.402837754472547,
-              "limit": 4000
+              "limit": 4000,
+              "idle": null
             }
           ],
           "absent": [],

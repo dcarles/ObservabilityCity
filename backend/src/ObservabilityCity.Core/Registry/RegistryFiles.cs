@@ -445,6 +445,8 @@ internal sealed class MetricSignalFile
     public MetricSignalFile? Over { get; set; }
     /// <summary>Another metric to read in place of this one when it gives no number or 0 (for example the autoscale ceiling, then the fixed throughput of an account that has none). It cannot have an <c>over</c> or an <c>orElse</c> of its own.</summary>
     public MetricSignalFile? OrElse { get; set; }
+    /// <summary>What a read that worked but returned no number means: <c>unknown</c> (the default, the system shows no data) or <c>idle</c> (nothing happened, so the signal is 0). A failed read is always unknown.</summary>
+    public string? WhenEmpty { get; set; }
 }
 
 internal sealed class CredentialFile

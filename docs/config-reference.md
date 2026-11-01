@@ -251,6 +251,7 @@ One file per environment. The pillar and system files are shared; this file says
 | `perSecond` | no | `false` | Divide a total by the window's seconds, to get a rate. |
 | `over` | no | none | Another metric to divide by (capacity, all requests), to give a share. |
 | `orElse` | no | none | Another metric to read when this one gives no number or 0. It cannot have its own `over` or `orElse`. |
+| `whenEmpty` | no | `unknown` | What a read that worked but returned no number means: `unknown` (the system shows no data) or `idle` (nothing happened, so the signal is 0 and the tenant's row says "no activity reported"). A failed read is always unknown. Only on the signal itself, not on its `over` or `orElse`. |
 
 Example (a database account with an autoscale ceiling, falling back to fixed throughput):
 

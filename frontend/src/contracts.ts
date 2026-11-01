@@ -408,6 +408,7 @@ export interface components {
             requestsPerSecond: number;
             /** Format: double */
             limit?: number | null;
+            idle?: boolean | null;
         };
         TopicSnapshot: {
             name: string;

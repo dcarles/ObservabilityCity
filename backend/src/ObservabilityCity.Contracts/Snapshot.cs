@@ -155,6 +155,7 @@ public sealed record InboundLinkSnapshot(string From, double RequestsPerSecond);
 /// Utilisation and Throttled are this database's own share of provisioned capacity in use and share of requests turned away.
 /// Limit is the capacity provisioned for it as a number in the store's own unit (request units per second for Cosmos), when the source reads one;
 /// null for a serverless database or a source that is not asked for it.
+/// Idle is true when the source got no number for its utilisation and the town was told to read that as no use (whenEmpty: idle); the 0 shown is then an assumption.
 /// Kind Unknown is a tenant the data shows that the environment does not list.
 /// </summary>
 public sealed record TenantUnitSnapshot(
@@ -166,7 +167,8 @@ public sealed record TenantUnitSnapshot(
     double? Utilisation,
     double? Throttled,
     double RequestsPerSecond,
-    double? Limit = null);
+    double? Limit = null,
+    bool? Idle = null);
 
 /// <summary>A town the server can show (Galactic Credit, Droid Shop). Each has its own registry, its own environments and its own stream of snapshots.</summary>
 public sealed record TownSummary(string Id, string Name, bool IsDefault);

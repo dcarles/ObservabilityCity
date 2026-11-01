@@ -202,7 +202,7 @@ public sealed class AzureMonitorSource(
         var throttled = Worst("throttled");
         if (cpu is null && memory is null && utilisation is null && throttled is null) return null;
         var tenants = values.Where(v => v.Tenant is not null).GroupBy(v => v.Tenant!)
-            .Select(g => new TenantReading(g.Key, Max(g, "utilisation"), Max(g, "throttled"), g.Sum(v => v.Signals.GetValueOrDefault("requests") ?? 0), names.GetValueOrDefault(g.Key), Max(g, "limit"))).ToList();
+            .Select(g => new TenantReading(g.Key, Max(g, "utilisation"), Max(g, "throttled"), g.Sum(v => v.Signals.GetValueOrDefault("requests") ?? 0), names.GetValueOrDefault(g.Key), Max(g, "limit"), g.Any(v => v.Idle?.Contains("utilisation") == true) ? true : null)).ToList();
         // each region's own CPU and memory, for the resources that report them and say where they are
         var regions = values.Where(v => v.Region is not null && (v.Signals.ContainsKey("cpu") || v.Signals.ContainsKey("memory"))).GroupBy(v => v.Region!, StringComparer.OrdinalIgnoreCase)
             .Select(g => new RegionReading(g.Key, null, Max(g, "cpu"), Max(g, "memory"))).OrderBy(r => r.Region, StringComparer.Ordinal).ToList();
@@ -219,7 +219,8 @@ public sealed class AzureMonitorSource(
         return asked.Count == 0 || asked.Any(x => x is null) ? null : asked.Max(x => x!.Value);
     }
 
-    private sealed record ResourceValues(string? Tenant, IReadOnlyDictionary<string, double?> Signals, string? Region = null);
+    /// <summary>One resource's numbers. Idle names the signals that had no number but are set to count as 0 then (<c>whenEmpty: idle</c>).</summary>
+    private sealed record ResourceValues(string? Tenant, IReadOnlyDictionary<string, double?> Signals, string? Region = null, IReadOnlySet<string>? Idle = null);
 
     /// <summary>The metric specs of an entry with the call each needs. Specs that agree on namespace, aggregation and filter are asked together.</summary>
     private static IEnumerable<(MetricCall Call, IReadOnlyList<string> Metrics)> Calls(MetricGroup group) =>
@@ -247,6 +248,7 @@ public sealed class AzureMonitorSource(
         double? Of(MetricSignal spec) => Own(spec) is { } own && (own > 0 || spec.OrElse is null) ? own : spec.OrElse is { } alt ? Of(alt) ?? Own(spec) : Own(spec);
 
         var signals = new Dictionary<string, double?>();
+        var idle = new HashSet<string>();
         foreach (var (signal, spec) in target.Group.Signals)
         {
             var value = Of(spec);
@@ -257,9 +259,11 @@ public sealed class AzureMonitorSource(
             if (value is not null && spec.PerSecond) value /= window.TotalSeconds;
             if (value is not null) value *= spec.Scale;
             if (value is not null && signal is "cpu" or "memory" or "utilisation" or "throttled") value = Math.Clamp(value.Value, 0, 1);
+            // the read worked and gave no number: for a signal set to whenEmpty idle that means nothing happened, so 0 (a failed read never gets here, it throws)
+            if (value is null && spec.EmptyIsIdle) { value = 0; idle.Add(signal); }
             signals[signal] = value is null ? null : Math.Max(0, value.Value);
         }
-        return new ResourceValues(target.Resource.Tenant, signals, target.Resource.Region);
+        return new ResourceValues(target.Resource.Tenant, signals, target.Resource.Region, idle.Count == 0 ? null : idle);
     }
 
     private static bool Same(MetricSeries s, MetricSignal spec) =>

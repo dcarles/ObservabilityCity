@@ -78,9 +78,11 @@ export function limitRange(units: readonly Pick<TenantUnitSnapshot, 'limit'>[]):
   return low === high ? limitText(high) : `${Math.round(low).toLocaleString('en-US')} to ${limitText(high)}`
 }
 
-/** The figures on a tenant's row, in order: what it is provisioned at, how much of that it uses, and how much it turns away. Each is left out when unknown, apart from the use, which shows a dash. */
-export function tenantFigures(u: Pick<TenantUnitSnapshot, 'limit' | 'utilisation' | 'throttled'>): string {
-  return [u.limit == null ? null : limitText(u.limit), u.utilisation == null ? '–' : `${Math.round(u.utilisation * 100)}%`, u.throttled == null ? null : throttledText(u)].filter(Boolean).join(' · ')
+/** The figures on a tenant's row, in order: what it is provisioned at, how much of that it uses, and how much it turns away. Each is left out when unknown, apart from the use, which shows a dash (or "no activity reported" for an idle one). */
+export function tenantFigures(u: Pick<TenantUnitSnapshot, 'limit' | 'utilisation' | 'throttled' | 'idle'>): string {
+  // a quiet database the source sent no number for, and the town was told to read as no use: say so, so the 0% is not taken for a measurement
+  const use = u.idle ? 'no activity reported' : u.utilisation == null ? '–' : `${Math.round(u.utilisation * 100)}%`
+  return [u.limit == null ? null : limitText(u.limit), use, u.throttled == null ? null : throttledText(u)].filter(Boolean).join(' · ')
 }
 
 /** Most throttled tenants the yard sign names; past this it gives only the count. */

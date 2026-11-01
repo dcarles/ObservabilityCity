@@ -280,6 +280,7 @@ function checkUnits(list: unknown[], nodeId: string, problems: string[]): Tenant
       throttled: isFiniteNumber(u.throttled) ? u.throttled : null,
       requestsPerSecond: isFiniteNumber(u.requestsPerSecond) ? u.requestsPerSecond : 0,
       limit: isFiniteNumber(u.limit) && u.limit > 0 ? u.limit : null,
+      ...(u.idle === true ? { idle: true } : {}),
     })
   }
   return out
