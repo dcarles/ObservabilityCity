@@ -18,6 +18,9 @@ public enum LinkOutcome
     Unresolved,
 }
 
+/// <summary>A service as the registry knows it: which pillar, its name, and the short code its cloud resources carry (the name when it has none).</summary>
+public readonly record struct ServiceCodeEntry(string Pillar, string Service, string Code);
+
 public readonly record struct Classified(LinkOutcome Outcome, string? Target = null, bool Gateway = false);
 
 /// <summary>Decides what a call's address is, by the environment's rules and nothing else. Pure: it reads no clock and no file.</summary>
@@ -29,9 +32,17 @@ public sealed class LinkClassifier
     private readonly IReadOnlyList<string> _vendorDomains;
     private readonly Dictionary<string, string> _systems;
     private readonly List<(string Id, string Host, Regex? Path)> _services;
+    private readonly HashSet<(string Pillar, string Service)> _serviceNames;
+    private readonly Dictionary<(string Pillar, string Code), string> _byCode;
 
-    public LinkClassifier(LinkDiscovery config, IEnumerable<RegistryVendor> vendors, IEnumerable<string> systemIds)
+    public LinkClassifier(LinkDiscovery config, IEnumerable<RegistryVendor> vendors, IEnumerable<string> systemIds, IEnumerable<ServiceCodeEntry>? services = null)
     {
+        var entries = (services ?? []).ToList();
+        _serviceNames = entries.Select(e => (e.Pillar.ToLowerInvariant(), e.Service.ToLowerInvariant())).ToHashSet();
+        // a code that points at two different services of a pillar is ambiguous and never used
+        _byCode = entries.GroupBy(e => (e.Pillar.ToLowerInvariant(), e.Code.ToLowerInvariant()))
+            .Where(g => g.Select(e => e.Service.ToLowerInvariant()).Distinct().Count() == 1)
+            .ToDictionary(g => g.Key, g => g.First().Service);
         const RegexOptions Options = RegexOptions.IgnoreCase | RegexOptions.CultureInvariant;
         _ignore = config.IgnoreHosts.Select(p => new Regex(p, Options, LinkDiscovery.RegexTimeout)).ToList();
         _rules = config.Rules.Select(r => (new Regex(r.Host, Options, LinkDiscovery.RegexTimeout), r.Path is null ? null : new Regex(r.Path, Options, LinkDiscovery.RegexTimeout), r)).ToList();
@@ -41,6 +52,10 @@ public sealed class LinkClassifier
             .Where(m => m.Item2.Length > 0).ToList();
         _systems = systemIds.ToDictionary(id => id, id => id, StringComparer.OrdinalIgnoreCase);
     }
+
+    /// <summary>The services of the registry's systems, for matching an address that carries a service code.</summary>
+    public static IEnumerable<ServiceCodeEntry> ServicesOf(IEnumerable<RegistryNode> nodes) =>
+        nodes.Where(n => n.Service is { Length: > 0 }).Select(n => new ServiceCodeEntry(n.GroupId, n.Service!, n.ServiceCode is { Length: > 0 } c ? c : n.Service!));
 
     public Classified Classify(DependencyRow row, string callerPillar)
     {
@@ -56,7 +71,7 @@ public sealed class LinkClassifier
                 pathMatch = path.Match(row.Path);
                 if (!pathMatch.Success) continue;
             }
-            var target = ScopeTemplate.Render(rule.Target, name => name == LinkRules.CallerPillar ? callerPillar : Captured(name, hostMatch, pathMatch));
+            var target = ScopeTemplate.Render(rule.Target, name => name == LinkRules.CallerPillar ? callerPillar : Captured(name, hostMatch, pathMatch, callerPillar));
             if (_systems.TryGetValue(target, out var id)) return new Classified(LinkOutcome.Found, id, rule.Gateway);
         }
         var h = row.Host.ToLowerInvariant();
@@ -71,11 +86,17 @@ public sealed class LinkClassifier
         return new Classified(LinkOutcome.Unresolved);
     }
 
-    private string? Captured(string name, Match host, Match? path)
+    private string? Captured(string name, Match host, Match? path, string callerPillar)
     {
         var group = host.Groups[name];
         if (!group.Success && path is not null) group = path.Groups[name];
         if (!group.Success) return null;
-        return _aliases.TryGetValue(group.Value, out var alias) ? alias : group.Value;
+        var value = _aliases.TryGetValue(group.Value, out var alias) ? alias : group.Value;
+        if (name != "service") return value;
+        // an address may carry a service's short code instead of its name: the pillar's own serviceCode says which service it is
+        var pillarGroup = host.Groups["pillar"].Success ? host.Groups["pillar"] : path?.Groups["pillar"];
+        var pillar = (pillarGroup is { Success: true } ? pillarGroup.Value : callerPillar).ToLowerInvariant();
+        if (_aliases.ContainsKey(group.Value) || _serviceNames.Contains((pillar, value.ToLowerInvariant()))) return value;
+        return _byCode.TryGetValue((pillar, value.ToLowerInvariant()), out var service) ? service : value;
     }
 }

@@ -291,7 +291,7 @@ Finds the calls the systems really make, from the dependency data in the telemet
 |---|---|---|---|
 | `host` | yes | | A regular expression over the host, with named groups `(?<name>...)`. |
 | `path` | no | none | A regular expression over the path, for a gateway that names the destination in it. |
-| `target` | yes | | The system id, written with `{name}` holes for the named groups and `{callerPillar}` for the pillar of the caller. A rule whose result is not a system of the town is skipped. |
+| `target` | yes | | The system id, written with `{name}` holes for the named groups and `{callerPillar}` for the pillar of the caller. A rule whose result is not a system of the town is skipped. A captured group named `service` may hold the service's name or its `serviceCode` (in the pillar the address names, else the caller's): when it is not a service name, the pillar's `serviceCode` finds the service, so one rule serves addresses written with short codes. An entry in `aliases` wins over that lookup; a code shared by two services of a pillar is never guessed. |
 | `gateway` | no | `false` | The call goes through the API gateway, so it is drawn as one (to a system on another island). |
 
 <!-- file: TrafficFile -->
