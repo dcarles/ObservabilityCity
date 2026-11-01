@@ -947,7 +947,8 @@
       ],
       "islandId": "ext.shared",
       "islandName": "Shared services",
-      "internal": true
+      "internal": true,
+      "calls": null
     },
     {
       "node": {
@@ -997,7 +998,8 @@
       ],
       "islandId": "ext.shared",
       "islandName": "Shared services",
-      "internal": true
+      "internal": true,
+      "calls": null
     },
     {
       "node": {
@@ -1047,7 +1049,8 @@
       ],
       "islandId": "ext.shared",
       "islandName": "Shared services",
-      "internal": true
+      "internal": true,
+      "calls": null
     }
   ],
   "externalCallers": [

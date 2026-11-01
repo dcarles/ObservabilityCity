@@ -334,10 +334,22 @@ public class LinkDiscoveryTests
         public LinkDiscoveryRunner Runner(IDependencySource source, FakeTimeProvider clock) => new(source, Scope, new EnvironmentRegistry(Holder, "prod", Store, clock), Store, clock, NullLogger<LinkDiscoveryRunner>.Instance);
     }
 
-    private static (Town Town, RegistryCopy Copy) Make(string source, bool a, FakeTimeProvider time)
+    /// <summary>A vendor island of the company's own services, one of which runs under two telemetry names (one for each instance).</summary>
+    private const string DeskVendors = """
+        vendors:
+          - id: ext.desk
+            name: Service desk
+            internal: true
+            services:
+              - { id: portal, name: Portal, match: [{ host: portal.example.test }], roles: ["Desk.Portal.One", "Desk.Portal.Two"] }
+              - { id: quiet, name: Quiet, match: [{ host: quiet.example.test }] }
+        """;
+
+    private static (Town Town, RegistryCopy Copy) Make(string source, bool a, FakeTimeProvider time, string? thirdParties = null)
     {
         var copy = new RegistryCopy(source);
         copy.Write("environments/prod.yaml", copy.Read("environments/prod.yaml") + (a ? LinksA : LinksB));
+        if (thirdParties is not null) copy.Write("third-parties.yaml", thirdParties);
         return (new Town(copy.Path, a, time), copy);
     }
 
@@ -367,6 +379,50 @@ public class LinkDiscoveryTests
         Assert.Contains("aa.orders-db", view.AllNodes.Single(n => n.Id == "aa.orders-api").Calls);
         Assert.Equal(D("2026-10-29"), view.AllNodes.Single(n => n.Id == "aa.orders-worker").FoundGatewayCalls["bb.ledger-api"]);
         Assert.Empty(town.Store.Notices(2));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task A_service_of_a_vendor_island_that_lists_its_roles_is_found_calling_town_systems_through_the_gateway_whatever_the_addresses_look_like(bool a)
+    {
+        var clock = new FakeTimeProvider(Now);
+        var (town, copy) = Make(a ? TownA : TownB, a, clock, DeskVendors);
+        using var _ = copy;
+        string? path;
+        var host = Host(a, "bb.ledger-api", true, out path);
+        var source = new FakeDependencies(_ => town.Rows(RealCalls,
+            new DependencyRow("Desk.Portal.One", host, path, Days("2026-10-27", "2026-10-29"), 100),
+            new DependencyRow("Desk.Portal.Two", host, path, Days("2026-10-28"), 100),   // the second instance of the same building, a day the first was quiet
+            new DependencyRow("Not.Listed", host, path, Days("2026-10-27", "2026-10-29"), 100)));
+
+        await town.Runner(source, clock).RunOnceAsync(CancellationToken.None);
+
+        Assert.Contains("Desk.Portal.One", source.Asked.Single().Roles);
+        Assert.Contains("Desk.Portal.Two", source.Asked.Single().Roles);
+        var view = town.View.Current;
+        Assert.Equal(["bb.ledger-api"], view.Vendors.Single(v => v.Node.Id == "ext.desk-portal").Calls);
+        Assert.Empty(view.Vendors.Single(v => v.Node.Id == "ext.desk-quiet").Calls); // no roles, so its own calls are never read
+        // the town's own links are as before: the building is not a town system, so nothing is drawn from it on the island's side
+        Assert.Equal(
+            ["aa.orders-worker>gateway bb.ledger-api", "bb.ledger-api>gateway aa.orders-api", "bb.ledger-worker>calls bb.ledger-api"],
+            Links(view).Keys.Order(StringComparer.Ordinal).ToArray());
+        Assert.Empty(town.Store.Notices(2));
+    }
+
+    [Fact]
+    public async Task A_vendor_buildings_roles_are_not_given_to_a_town_system_that_already_has_them_and_a_repeated_role_is_asked_once()
+    {
+        var clock = new FakeTimeProvider(Now);
+        var (town, copy) = Make(TownA, true, clock, DeskVendors.Replace("\"Desk.Portal.Two\"", "\"Desk.Portal.One\", \"OrdersApi\""));
+        using var _ = copy;
+        var source = new FakeDependencies(_ => []);
+
+        await town.Runner(source, clock).RunOnceAsync(CancellationToken.None);
+
+        var roles = source.Asked.Single().Roles;
+        Assert.Single(roles, r => r == "OrdersApi");
+        Assert.Single(roles, r => r == "Desk.Portal.One");
     }
 
     [Fact]

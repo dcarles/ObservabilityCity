@@ -172,6 +172,7 @@ One island. The file name is the pillar id.
 | `name` | no | the id | Name shown. |
 | `match` | yes | | The addresses that mean a call to this service: entries with a `host` and an optional `path`. A call matching any entry belongs to it; the first service that matches wins. Link discovery draws the callers it finds from those calls. |
 | `calledBy` | no | none | Ids of our systems that call it, besides the ones link discovery finds. |
+| `roles` | no | none | The telemetry names this service's own calls are recorded under (list every instance name). Link discovery reads their calls like those of a town system: calls through the gateway are resolved by the same `links.rules`, drawn from this building to the town system, taken out of that system's outside traffic, and driven by cars from this island through the airport and the hub gateway. |
 | `slaP99Ms` | no | the vendor's | Latency target. |
 | `errors` | no | the vendor's | Error thresholds. |
 

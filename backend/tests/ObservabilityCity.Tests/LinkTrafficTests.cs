@@ -315,10 +315,11 @@ public class LinkTrafficTests
         public void Dispose() => Copy?.Dispose();
     }
 
-    private static Town Make(bool a, FakeTimeProvider time)
+    private static Town Make(bool a, FakeTimeProvider time, string? thirdParties = null)
     {
         var copy = new RegistryCopy(a ? TownA : TownB);
         copy.Write("environments/prod.yaml", copy.Read("environments/prod.yaml") + (a ? TrafficA : TrafficB));
+        if (thirdParties is not null) copy.Write("third-parties.yaml", thirdParties);
         return new Town(copy.Path, a, time) { Copy = copy };
     }
 
@@ -348,6 +349,37 @@ public class LinkTrafficTests
         var orders = town.Store.Traffic.Split("aa.orders-api", 4.0)!;
         Assert.Equal(3.0, orders.Outside, 6);
         Assert.Equal(1.0, Rate(orders, "bb.ledger-api"), 6);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Calls_from_a_vendor_island_building_are_a_known_caller_so_the_airport_is_left_with_the_rest(bool a)
+    {
+        var clock = new FakeTimeProvider(Now);
+        using var town = Make(a, clock, """
+            vendors:
+              - id: ext.desk
+                name: Service desk
+                internal: true
+                services:
+                  - { id: portal, name: Portal, match: [{ host: portal.example.test }], roles: ["Desk.Portal.One", "Desk.Portal.Two"] }
+            """);
+        string? path;
+        var host = Host(a, "bb.ledger-api", true, out path);
+        // the ledger API gets 1 a second: 0.5 from the town's worker, and 0.2 + 0.1 from the two instances of the portal
+        var source = new FakeDependencies(() => town.Rows(("aa.orders-worker", "bb.ledger-api", true, 1800)).Concat(
+        [
+            new DependencyRow("Desk.Portal.One", host, path, [], 720 * town.WindowSeconds / 3600),
+            new DependencyRow("Desk.Portal.Two", host, path, [], 360 * town.WindowSeconds / 3600),
+        ]).ToList());
+
+        await town.Runner(source, clock).RunOnceAsync(TestContext.Current.CancellationToken);
+
+        var ledger = town.Store.Traffic.Split("bb.ledger-api", 1.0)!;
+        Assert.Equal(0.5, Rate(ledger, "aa.orders-worker"), 6);
+        Assert.Equal(0.3, Rate(ledger, "ext.desk-portal"), 6); // both instances are one building
+        Assert.Equal(0.2, ledger.Outside, 6);
     }
 
     [Theory]

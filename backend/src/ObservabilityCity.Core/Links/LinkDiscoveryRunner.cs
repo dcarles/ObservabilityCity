@@ -49,10 +49,7 @@ public sealed class LinkDiscoveryRunner(
         var view = registries.Current;
         if (view.ActiveEnvironment?.Links is not { } config) return;
         var resolution = scope.Resolve(view);
-        var callers = view.AllNodes.Where(n => n.Kind is NodeKind.Api or NodeKind.Worker && n.DiscoverLinks).ToList();
-        var byRole = new Dictionary<string, RegistryNode>(StringComparer.OrdinalIgnoreCase);
-        foreach (var node in callers)
-            if (resolution.System(node.Id)?.TelemetryRole is { Length: > 0 } role) byRole.TryAdd(role, node);
+        var byRole = LinkCallers.ByRole(view, id => resolution.System(id)?.TelemetryRole);
         if (byRole.Count == 0) return;
 
         var now = time.GetUtcNow();
@@ -79,6 +76,7 @@ public sealed class LinkDiscoveryRunner(
         }
         // a rule added since an address was remembered takes it off the lists now, not when its days age out
         var groupOf = view.AllNodes.ToDictionary(n => n.Id, n => n.GroupId);
+        foreach (var v in view.Vendors) groupOf.TryAdd(v.Node.Id, v.Node.GroupId);
         store.Revisit((callerId, host, path) => classifier.Classify(new DependencyRow(callerId, host, path, [], 0), groupOf.GetValueOrDefault(callerId, "")));
         store.Prune(now, config.KeepFor);
         store.Finish(now);

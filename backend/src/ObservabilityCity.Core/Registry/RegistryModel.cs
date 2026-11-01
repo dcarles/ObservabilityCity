@@ -126,6 +126,12 @@ public sealed record RegistryVendor(RegistryNode Node, IReadOnlyList<string> Cal
     /// <summary>The addresses that mean a call to this building (a service of a vendor island).</summary>
     public IReadOnlyList<VendorMatch> Matches { get; init; } = [];
 
+    /// <summary>The telemetry names this building's own calls are recorded under, so link discovery can see which town systems it calls.</summary>
+    public IReadOnlyList<string> Roles { get; init; } = [];
+
+    /// <summary>Ids of the town systems this building was seen calling (through the gateway), filled in per environment from what link discovery found.</summary>
+    public IReadOnlyList<string> Calls { get; init; } = [];
+
     /// <summary>The group id every vendor id starts with (ext.snowflake).</summary>
     public const string GroupId = "ext";
 }

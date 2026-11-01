@@ -39,6 +39,8 @@ public sealed partial record Registry
                 CalledBy = v.CalledBy.Where(present.Contains)
                     .Concat(found?.Where(l => l.Target == v.Node.Id && discovering.Contains(l.Caller)).Select(l => l.Caller) ?? [])
                     .Distinct().ToList(),
+                // the town systems a service of a vendor island was seen calling through the gateway, where they are deployed here
+                Calls = found?.Where(l => l.Caller == v.Node.Id && present.Contains(l.Target)).Select(l => l.Target).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToList() ?? [],
             })
             .Where(v => v.CalledBy.Count > 0 || Vendors.First(o => o.Node.Id == v.Node.Id).CalledBy.Count == 0)
             .ToList();

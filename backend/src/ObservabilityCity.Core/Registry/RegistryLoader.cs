@@ -223,9 +223,9 @@ public static partial class RegistryLoader
         {
             // a vendor with services is one island with a building for each; without them it is one building
             var units = v.Services.Count == 0
-                ? [(Id: v.Id, Name: v.Name, CalledBy: v.CalledBy, Sla: v.SlaP99Ms, Errors: v.Errors, Matches: (IReadOnlyList<VendorMatch>)[], Service: false)]
+                ? [(Id: v.Id, Name: v.Name, CalledBy: v.CalledBy, Sla: v.SlaP99Ms, Errors: v.Errors, Matches: (IReadOnlyList<VendorMatch>)[], Roles: (IReadOnlyList<string>)[], Service: false)]
                 : v.Services.Select(s => (Id: v.Id + "-" + s.Id, Name: s.Name ?? s.Id, CalledBy: s.CalledBy, Sla: s.SlaP99Ms ?? v.SlaP99Ms, Errors: s.Errors ?? v.Errors,
-                    Matches: (IReadOnlyList<VendorMatch>)s.Match.Select(m => new VendorMatch(m.Host, m.Path)).ToList(), Service: true)).ToList();
+                    Matches: (IReadOnlyList<VendorMatch>)s.Match.Select(m => new VendorMatch(m.Host, m.Path)).ToList(), Roles: (IReadOnlyList<string>)s.Roles.Select(r => r.Trim()).Where(r => r.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToList(), Service: true)).ToList();
             if (v.Services.Count > 0 && v.CalledBy.Count > 0) Problem($"third-parties.yaml: '{v.Id}' has services, so calledBy goes on each service, not on the vendor");
             foreach (var s in v.Services)
             {
@@ -258,7 +258,7 @@ public static partial class RegistryLoader
                 if (!u.Service && u.CalledBy.Count == 0) Problem($"third-parties.yaml: '{u.Id}' needs calledBy: the systems whose calls show how it is doing");
                 vendors.Add(new RegistryVendor(node, calledBy.Distinct().ToList())
                 {
-                    Domains = v.Domains, Matches = u.Matches, Internal = v.Internal,
+                    Domains = v.Domains, Matches = u.Matches, Roles = u.Roles, Internal = v.Internal,
                     IslandId = u.Service ? v.Id : null, IslandName = u.Service ? v.Name ?? v.Id : null,
                 });
             }

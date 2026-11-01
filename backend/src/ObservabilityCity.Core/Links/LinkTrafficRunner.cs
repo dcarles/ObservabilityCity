@@ -46,9 +46,7 @@ public sealed class LinkTrafficRunner(
         var view = registries.Current;
         if (view.ActiveEnvironment?.Links is not { Traffic: { } config } links) return;
         var resolution = scope.Resolve(view);
-        var byRole = new Dictionary<string, RegistryNode>(StringComparer.OrdinalIgnoreCase);
-        foreach (var node in view.AllNodes.Where(n => n.Kind is NodeKind.Api or NodeKind.Worker && n.DiscoverLinks))
-            if (resolution.System(node.Id)?.TelemetryRole is { Length: > 0 } role) byRole.TryAdd(role, node);
+        var byRole = LinkCallers.ByRole(view, id => resolution.System(id)?.TelemetryRole);
         if (byRole.Count == 0) return;
 
         await SeedAsync(view, config, ct);

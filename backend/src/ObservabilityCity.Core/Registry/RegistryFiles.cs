@@ -180,6 +180,8 @@ internal sealed class VendorServiceFile
     public List<VendorMatchFile> Match { get; set; } = [];
     /// <summary>Our systems that call this service, besides the ones link discovery finds.</summary>
     public List<string> CalledBy { get; set; } = [];
+    /// <summary>The telemetry names this service's own calls are recorded under (its AppRoleName). Link discovery reads their calls like those of a town system, so a service that calls town systems through the gateway is drawn calling them.</summary>
+    public List<string> Roles { get; set; } = [];
     /// <summary>Overrides the vendor's own value.</summary>
     public double? SlaP99Ms { get; set; }
     public ErrorThresholdsFile? Errors { get; set; }
