@@ -194,7 +194,7 @@ test.describe('the Unknown hosts button', () => {
 
     // a server that keeps the two lists, as the real one does: adding saves, loads the town again, and the host leaves the unknown list
     let unknown = [...hosts]
-    let added: { host: string; kind: string; calledBy: string[] }[] = []
+    let added: { id: string; name: string; host: string; kind: string; calledBy: string[] }[] = []
     const posted: any[] = []
     await page.route('**/api/unknown-hosts*', (r) => r.fulfill({ json: unknown }))
     await page.route('**/api/added-hosts*', async (r) => {
@@ -203,10 +203,10 @@ test.describe('the Unknown hosts button', () => {
         const body = req.postDataJSON()
         posted.push(body)
         const host = unknown.find((h) => h.host === body.host)!
-        added = [...added, { host: body.host, kind: body.kind, calledBy: host.callers }]
+        added = [...added, { id: `ext.${body.host}`, name: body.host === 'api.partner.example' ? 'Partner API' : body.host, host: body.host, kind: body.kind, calledBy: host.callers }]
         unknown = unknown.filter((h) => h.host !== body.host)
       } else if (req.method() === 'DELETE') {
-        added = added.filter((a) => a.host !== new URL(req.url()).searchParams.get('host'))
+        added = added.filter((a) => a.id !== new URL(req.url()).searchParams.get('id'))
       }
       await r.fulfill({ json: added })
     })
@@ -221,7 +221,7 @@ test.describe('the Unknown hosts button', () => {
     await expect(page.locator('#unknown-hosts-toggle')).toHaveText(/1 unknown host · 1 added/)
     expect(posted).toEqual([{ host: 'api.partner.example', kind: 'vendor' }])
     await expect(page.locator('#added-hosts-list > li')).toHaveCount(1)
-    await expect(page.locator('#added-hosts-list > li')).toContainText('api.partner.example')
+    await expect(page.locator('#added-hosts-list > li')).toContainText('Partner API')
 
     await page.locator('#unknown-hosts-list > li').first().getByRole('button', { name: 'Ignore' }).click()
     await expect(page.locator('#unknown-hosts-toggle')).toHaveText(/0 unknown hosts · 2 added/)
@@ -249,24 +249,43 @@ test.describe('the Unknown hosts button', () => {
     await expect(page.locator('#unknown-hosts-list > li')).toHaveCount(2)
   })
 
-  test('lists a gateway by its unexplained paths with a path rule button, and shows calls made only by vendors behind the tick box', async ({ town, page, context }) => {
-    await context.grantPermissions(['clipboard-read', 'clipboard-write'])
+  test('lists a gateway by its unexplained paths, adds a rule for one once a system is picked, and shows calls made only by vendors behind the tick box', async ({ town, page }) => {
     await town.open()
     const list = [
       { host: 'gw.example.test', calls: 440, callers: ['aa.orders-api', 'ext.partner-svc'], days: 3, gateway: true, vendorsOnly: false,
         paths: [{ path: '/internal/x', calls: 400, vendorsOnly: false }, { path: '/odd/y', calls: 40, vendorsOnly: true }] },
       { host: 'theirs.example.test', calls: 500, callers: ['ext.partner-svc'], days: 2, vendorsOnly: true },
     ]
+    const posted: any[] = []
+    let added: any[] = []
     await page.route('**/api/unknown-hosts*', (r) => r.fulfill({ json: list }))
+    await page.route('**/api/added-hosts*', (r) => r.fulfill({ json: added }))
+    await page.route('**/api/added-rules*', (r) => {
+      posted.push(r.request().postDataJSON())
+      added = [{ id: 'rule:x', name: 'aa.orders-api', host: '^/internal/x(/|$)', kind: 'rule', calledBy: [] }]
+      return r.fulfill({ json: added })
+    })
     await page.evaluate(() => (window as any).city.unknownHosts.refresh())
     await expect(page.locator('#unknown-hosts-toggle')).toHaveText(/1 unknown host /)
     await page.locator('#unknown-hosts-toggle').click()
     const gw = page.locator('#unknown-hosts li[data-host="gw.example.test"]')
-    await expect(gw.getByRole('button', { name: 'Copy vendor entry' })).toHaveCount(0)
-    await expect(gw.getByRole('button', { name: 'Copy ignore line' })).toHaveCount(0)
+    await expect(gw.getByRole('button', { name: 'Add vendor' })).toHaveCount(0)
+    await expect(gw.getByRole('button', { name: 'Ignore' })).toHaveCount(0)
     await expect(gw.locator('li')).toHaveCount(1)
-    await gw.getByRole('button', { name: 'Copy path rule' }).click()
-    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("- { host: '^gw\\.example\\.test$', path: '^/internal/x', target: <system id>, gateway: true }")
+
+    // no system picked yet: it says so and sends nothing
+    await gw.getByRole('button', { name: 'Add rule' }).click()
+    await expect(page.locator('#unknown-hosts-error')).toContainText('Pick the system')
+    expect(posted).toEqual([])
+
+    // the systems on offer are the town's APIs; pick one and add
+    const options = await page.locator('#unknown-hosts select[data-target] option').allTextContents()
+    expect(options.length).toBeGreaterThan(1)
+    const target = options[1]
+    await page.locator('#unknown-hosts li[data-host="gw.example.test"] select').selectOption(target)
+    await page.locator('#unknown-hosts li[data-host="gw.example.test"]').getByRole('button', { name: 'Add rule' }).click()
+    await expect(page.locator('#added-hosts-list > li')).toContainText('rule')
+    expect(posted).toEqual([{ host: 'gw.example.test', path: '/internal/x', target }])
 
     await page.locator('#unknown-hosts-vendors').check()
     await expect(page.locator('#unknown-hosts-toggle')).toHaveText(/2 unknown hosts/)

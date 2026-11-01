@@ -336,8 +336,14 @@ public sealed record HiddenIsland(string Id, string DisplayName);
 /// </summary>
 public sealed record UnknownHostSnapshot(string Host, double Calls, IReadOnlyList<string> Callers, int Days, bool Gateway = false, IReadOnlyList<UnknownPathSnapshot>? Paths = null, bool VendorsOnly = false);
 
-/// <summary>A host added from the Unknown hosts panel: Kind is vendor (a third party), internal (the company's own service) or ignore. CalledBy is who called it when it was added.</summary>
-public sealed record AddedHostSnapshot(string Host, string Kind, IReadOnlyList<string> CalledBy);
+/// <summary>
+/// An entry of the town's _discovered/third-parties.yaml: Kind is vendor (a third party), internal (the company's own service) or ignore. Id is what Remove
+/// asks for (the vendor's id, or the ignore pattern); Name is the name shown; Host is the host it stands for. CalledBy is who calls a vendor.
+/// </summary>
+public sealed record AddedHostSnapshot(string Id, string Name, string Host, string Kind, IReadOnlyList<string> CalledBy);
+
+/// <summary>What the panel sends to add a rule for a path on a gateway host: the system that path belongs to.</summary>
+public sealed record AddRuleRequest(string Host, string Path, string Target);
 
 /// <summary>What the panel sends to add a host. The server works out who called it from what link discovery saw.</summary>
 public sealed record AddHostRequest(string Host, string Kind);

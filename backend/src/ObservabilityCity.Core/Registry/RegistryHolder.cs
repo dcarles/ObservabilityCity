@@ -142,9 +142,11 @@ public sealed class RegistryReloader(RegistryHolder holder, string folder, TimeS
     {
         try
         {
-            // _discovered holds what link discovery wrote itself; a reload for that would only repeat the last one
+            // _discovered holds what link discovery wrote itself; a reload for that would only repeat the last one. The one file there that is read as
+            // configuration, the third parties added from the panel (which may be edited by hand), does count.
+            var added = Path.GetFullPath(AddedHosts.PathIn(folder));
             return string.Join('|', Directory.EnumerateFiles(folder, "*.yaml", SearchOption.AllDirectories)
-                .Where(f => !Path.GetRelativePath(folder, f).StartsWith(DiscoveredFolder + Path.DirectorySeparatorChar, StringComparison.Ordinal))
+                .Where(f => Path.GetFullPath(f) == added || !Path.GetRelativePath(folder, f).StartsWith(DiscoveredFolder + Path.DirectorySeparatorChar, StringComparison.Ordinal))
                 .OrderBy(f => f, StringComparer.Ordinal)
                 .Select(f => { var i = new FileInfo(f); return $"{f}:{i.Length}:{i.LastWriteTimeUtc.Ticks}"; }));
         }

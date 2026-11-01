@@ -116,7 +116,7 @@ async function start(): Promise<void> {
   const topbar = new TopBar((state, anchor) => stateList.toggle(state, anchor), () => tenantView)
   document.getElementById('home')!.addEventListener('click', () => stage.home())
   const notices = new NoticesPanel()
-  const unknownHosts = new UnknownHostsPanel(requestedScope())
+  const unknownHosts = new UnknownHostsPanel(requestedScope(), () => (seen.last?.groups ?? []).flatMap((g) => g.nodes).filter((n) => n.kind === 'Api').map((n) => n.id).sort())
   unknownHosts.start()
   const buildingItems = (): SearchItem[] => {
     const items: SearchItem[] = []

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { addedRow, panelLabel, pathRule, unknownHostRow } from '../../src/unknownHosts'
+import { addedRow, panelLabel, unknownHostRow } from '../../src/unknownHosts'
 import type { UnknownHostSnapshot } from '../../src/types'
 
 const host = (over: Partial<UnknownHostSnapshot> = {}): UnknownHostSnapshot => ({ host: 'api.partner.example', calls: 12345.6, callers: ['aa.orders-api', 'bb.ledger-worker'], days: 3, gateway: false, vendorsOnly: false, ...over })
@@ -37,13 +37,16 @@ describe('the button and the added list', () => {
     expect(panelLabel(0, 3, false)).toBe('0 unknown hosts · 3 added ▾')
   })
 
-  it('lists an added host with its kind and a Remove button, escaped', () => {
-    const html = addedRow({ host: '<i>x</i>.test', kind: 'ignore', calledBy: [] }, 1)
+  it('lists an added entry by its name, with its host when that differs, its kind and a Remove button, escaped', () => {
+    const html = addedRow({ id: '^x\\.test$', name: '<i>x</i>.test', host: '<i>x</i>.test', kind: 'ignore', calledBy: [] }, 1)
     expect(html).toContain('ignored')
     expect(html).toContain('data-remove="1"')
     expect(html).not.toContain('<i>x</i>')
-    expect(addedRow({ host: 'a.test', kind: 'internal', calledBy: ['x'] }, 0)).toContain('internal')
-    expect(addedRow({ host: 'a.test', kind: 'vendor', calledBy: ['x'] }, 0)).toContain('vendor')
+    const named = addedRow({ id: 'ext.a-test', name: 'Access Pay', host: 'a.test', kind: 'vendor', calledBy: ['x'] }, 0)
+    expect(named).toContain('Access Pay')
+    expect(named).toContain('(a.test)')
+    expect(named).toContain('vendor')
+    expect(addedRow({ id: 'ext.a-test', name: 'a.test', host: 'a.test', kind: 'internal', calledBy: ['x'] }, 0)).not.toContain('(a.test)')
   })
 })
 
@@ -53,13 +56,14 @@ describe('a gateway host in the Unknown hosts panel', () => {
     paths: [{ path: '/internal/x', calls: 400, vendorsOnly: false }, { path: '/odd/y', calls: 40, vendorsOnly: true }],
   })
 
-  it('is listed by its unexplained paths, each with a path rule button, and has no vendor or ignore button', () => {
-    const html = unknownHostRow(gw, 0)
+  it('is listed by its unexplained paths, each with a system to pick and an Add rule button, and has no vendor or ignore button', () => {
+    const html = unknownHostRow(gw, 0, true, ['aa.orders-api', 'bb.ledger-api'])
     expect(html).toContain('/internal/x')
     expect(html).toContain('/odd/y')
-    expect(html).toContain('Copy path rule')
-    expect(html).not.toContain('Copy vendor entry')
-    expect(html).not.toContain('Copy ignore line')
+    expect(html).toContain('<option value="aa.orders-api">aa.orders-api</option>')
+    expect(html).toContain('Add rule')
+    expect(html).not.toContain('Add vendor')
+    expect(html).not.toContain('Ignore')
   })
 
   it('leaves out the paths only vendor buildings called unless they are asked for', () => {
@@ -68,8 +72,16 @@ describe('a gateway host in the Unknown hosts panel', () => {
     expect(html).not.toContain('/odd/y')
   })
 
-  it('copies a rule line with the host and path filled in and the target left to complete', () => {
-    const line = pathRule(gw, gw.paths![0])
-    expect(line).toBe("- { host: '^gw\\.example\\.test$', path: '^/internal/x', target: <system id>, gateway: true }")
+  it('keeps the system already chosen for a path selected, and escapes what it shows', () => {
+    const html = unknownHostRow(gw, 0, true, ['aa.orders-api', '<b>x</b>'], new Map([['gw.example.test|/internal/x', 'aa.orders-api']]))
+    expect(html).toContain('<option value="aa.orders-api" selected>')
+    expect(html).not.toContain('<b>x</b>')
+  })
+
+  it('lists an added rule by the system it points to and the pattern it matches', () => {
+    const html = addedRow({ id: 'rule:a', name: 'aa.orders-api', host: '^/aa/orders(/|$)', kind: 'rule', calledBy: [] }, 0)
+    expect(html).toContain('aa.orders-api')
+    expect(html).toContain('rule')
+    expect(html).toContain('Remove')
   })
 })
