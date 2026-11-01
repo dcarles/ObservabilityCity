@@ -3,7 +3,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import type { Building } from '../buildings/building'
 import { canvasTexture, roundRect } from '../buildings/mk'
 import { vehicles } from '../themes/active'
-import { clamp, spawnRate } from '../visuals'
+import { carRate, clamp } from '../visuals'
 import type { TenantInfo } from '../types'
 import { carShown, pickTenant, type TenantView } from '../tenants'
 
@@ -244,6 +244,11 @@ export class CarSystem {
     this.lights.count = 0
   }
 
+  /** Cars per second leaving on a route right now (see carRate). Public for tests. */
+  rateOf(route: Route): number {
+    return carRate(route.dest.node?.requestsPerSecond ?? 0, shareOf(route), this.density * this.townDensity, TRAFFIC)
+  }
+
   update(dt: number): void {
     if (!this.enabled) return
     this.time += dt
@@ -251,7 +256,7 @@ export class CarSystem {
       if (this.hidden.has(plan.route.dest) || this.hidden.has(plan.route.source as Building)) continue
       const n = plan.route.dest.node
       if (!n || (n.state !== 'Healthy' && n.state !== 'Degraded')) continue
-      const a = (this.acc.get(plan) ?? this.random()) + spawnRate(n.requestsPerSecond) * TRAFFIC * this.density * this.townDensity * shareOf(plan.route) * dt
+      const a = (this.acc.get(plan) ?? this.random()) + this.rateOf(plan.route) * dt
       // a car that cannot leave yet (the road is not clear) waits its turn, up to a few
       let owed = a
       while (owed >= 1 && this.cars.length < this.max && this.spawn(plan)) owed -= 1

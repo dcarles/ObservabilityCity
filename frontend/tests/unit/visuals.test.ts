@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { beaconLevel, darkFloorsFor, floorsFor, formatAge, litFraction, speedFactor, spawnRate } from '../../src/visuals'
+import { carRate, MIN_CAR_RATE, beaconLevel, darkFloorsFor, floorsFor, formatAge, litFraction, speedFactor, spawnRate } from '../../src/visuals'
 import type { Snapshot } from '../../src/types'
 
 describe('floors', () => {
@@ -80,5 +80,29 @@ describe('golden snapshot from the backend', () => {
       expect(beaconLevel(n)).toBe('green')
       expect(litFraction(n.load)).toBeGreaterThan(0)
     }
+  })
+})
+
+describe('cars leaving on a route', () => {
+  it('never fall below one every 20 seconds for a link with a real share, however small', () => {
+    expect(carRate(300, 0.001, 1, 0.4)).toBe(MIN_CAR_RATE)
+    expect(carRate(2, 0.0001, 1, 0.4)).toBe(MIN_CAR_RATE)
+  })
+
+  it('follow the traffic above that, as before, and are not capped by the floor', () => {
+    const busy = carRate(300, 0.8, 1, 0.4)
+    expect(busy).toBeCloseTo(spawnRate(300) * 0.4 * 0.8, 9)
+    expect(busy).toBeGreaterThan(MIN_CAR_RATE * 10)
+    expect(carRate(300, 0.8, 1, 0.4)).toBeGreaterThan(carRate(300, 0.1, 1, 0.4))
+  })
+
+  it('send none when nothing is measured on the route, nothing arrives, or the cars are turned off', () => {
+    expect(carRate(300, 0, 1, 0.4)).toBe(0)
+    expect(carRate(0, 0.5, 1, 0.4)).toBe(0)
+    expect(carRate(300, 0.5, 0, 0.4)).toBe(0)
+  })
+
+  it('shrink with the quality and town density settings, the floor too', () => {
+    expect(carRate(300, 0.001, 0.5, 0.4)).toBeCloseTo(MIN_CAR_RATE * 0.5, 9)
   })
 })
