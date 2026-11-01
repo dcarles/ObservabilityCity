@@ -296,6 +296,16 @@ vendors:
 
 The vendor stands on one island out at sea with a building for each service, in rows of 2, 4, 6 or 8 plots (whichever makes the smallest island, as on a pillar's island). Link discovery sends each call it finds to the first service whose match fits it, and the island gets a road and cars from every system that calls it. A service's health is not read yet: its building shows "not monitored", and is not counted as no data, until a source you name on that service reports it. A vendor without `services` is still one building on its own island.
 
+Cars drive from the town to such a service at the rate the calls were measured (the `links.traffic` block), whatever the service's own state, so the traffic going out to a third party shows without any health being read for it.
+
+**Services that call the town.** A service that is not a system of the town may itself call town systems, through the gateway. List the telemetry names its calls are recorded under, one for each instance, as `roles` on the service:
+
+```yaml
+      - { id: portal, name: Portal, match: [{ host: shared.example.test, path: '^/portal' }], roles: ["Portal.Instance.One", "Portal.Instance.Two"] }
+```
+
+Link discovery and the traffic read then ask about those names as well as the town systems', and resolve the calls with the same `links.rules`. What follows needs no extra setting: the service is drawn calling the town system, its calls are counted as a known caller (so they leave the airport's outside traffic), the Dependencies layer gets an arc from its island, and cars drive from the island round the ring road, through the airport (which has a back gate and a side road for this), over its bridge to the hub and through the gateway to the system. The names are exact; list every instance. A hub-and-spoke town only: a direct town has no hub, so the cars drive round the ring road to the island. Hosts that calls go to and no rule explains are listed in the **Unknown hosts** panel (a button next to Notices), grouped by host with the calls, the systems that made them and the days seen, and each row copies a ready `third-parties.yaml` line or an `ignoreHosts` pattern to paste. Nothing is added by itself.
+
 #### Where an API's traffic comes from
 
 An API's total request rate comes from your unsampled metrics. With a `links.traffic` block (see `links` in [config-reference.md](config-reference.md)) the town also learns how much each town system sends to it, from the same dependency table: the query returns one row for each caller and address over the last `shareWindow` with `calls` summed from the sampling-corrected count (`sum(ItemCount)` in KQL). The rest is outside traffic:
