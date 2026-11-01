@@ -448,6 +448,53 @@ public class LinkDiscoveryTests
     }
 
     [Fact]
+    public async Task A_role_never_read_before_is_read_over_the_whole_first_read_window_while_the_others_read_only_the_gap()
+    {
+        var clock = new FakeTimeProvider(Now);
+        var (town, copy) = Make(TownA, true, clock, DeskVendors);
+        using var _ = copy;
+        var source = new FakeDependencies(_ => []);
+        await town.Runner(source, clock).RunOnceAsync(CancellationToken.None);
+        clock.Advance(TimeSpan.FromHours(3));
+        // the file now lists one more name; the town starts again with the same remembered state
+        copy.Write("third-parties.yaml", DeskVendors.Replace("\"Desk.Portal.Two\"]", "\"Desk.Portal.Two\", \"Desk.Portal.Three\"]"));
+        var restarted = new LinkDiscoveryRunner(source, town.Scope, new EnvironmentRegistry(new RegistryHolder(RegistryLoader.Load(copy.Path)), "prod", town.Store, clock), town.Store, clock, NullLogger<LinkDiscoveryRunner>.Instance);
+
+        await restarted.RunOnceAsync(CancellationToken.None);
+
+        Assert.Equal(3, source.Asked.Count);
+        Assert.Equal(Now, source.Asked[1].From);                          // the names it already knew: the gap since the last read
+        Assert.DoesNotContain("Desk.Portal.Three", source.Asked[1].Roles);
+        Assert.Equal(["Desk.Portal.Three"], source.Asked[2].Roles);              // the new one: the whole window
+        Assert.Equal(clock.GetUtcNow().AddDays(-7), source.Asked[2].From);
+        // and once read it is known: the next read is one read of the gap again
+        clock.Advance(TimeSpan.FromHours(1));
+        await restarted.RunOnceAsync(CancellationToken.None);
+        Assert.Equal(4, source.Asked.Count);
+        Assert.Contains("Desk.Portal.Three", source.Asked[3].Roles);
+    }
+
+    [Fact]
+    public async Task The_names_already_read_are_remembered_across_a_restart_so_nothing_is_read_twice()
+    {
+        var clock = new FakeTimeProvider(Now);
+        var (town, copy) = Make(TownA, true, clock, DeskVendors);
+        using var _ = copy;
+        var folder = Path.Combine(copy.Path, "_state");
+        var store = new DiscoveredLinks(folder);
+        var source = new FakeDependencies(_ => []);
+        var view = new EnvironmentRegistry(town.Holder, "prod", store, clock);
+        await new LinkDiscoveryRunner(source, town.Scope, view, store, clock, NullLogger<LinkDiscoveryRunner>.Instance).RunOnceAsync(CancellationToken.None);
+        clock.Advance(TimeSpan.FromHours(2));
+
+        var again = new DiscoveredLinks(folder);
+        await new LinkDiscoveryRunner(source, town.Scope, new EnvironmentRegistry(town.Holder, "prod", again, clock), again, clock, NullLogger<LinkDiscoveryRunner>.Instance).RunOnceAsync(CancellationToken.None);
+
+        Assert.Equal(2, source.Asked.Count);
+        Assert.Equal(Now, source.Asked[1].From); // the gap only
+    }
+
+    [Fact]
     public async Task The_query_is_the_environments_own_with_the_roles_and_the_read_bounds_filled_in()
     {
         var clock = new FakeTimeProvider(Now);
