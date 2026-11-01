@@ -10,6 +10,7 @@ import { addressForTown, fetchTowns, requestedScope, type TownChoice } from './s
 import { saveQuality, startQuality, type Quality } from './quality'
 import { parseWall } from './wall/params'
 import { WallMode } from './wall/wall'
+import { UnknownHostsPanel } from './unknownHosts'
 import { NoticesPanel, Search, ServicePanel, showTooltip, StateList, TopBar, type SearchItem } from './ui'
 import { ALL_TENANTS, pruneTenants, type TenantView } from './tenants'
 import { ViewBar } from './viewbar'
@@ -115,6 +116,8 @@ async function start(): Promise<void> {
   const topbar = new TopBar((state, anchor) => stateList.toggle(state, anchor), () => tenantView)
   document.getElementById('home')!.addEventListener('click', () => stage.home())
   const notices = new NoticesPanel()
+  const unknownHosts = new UnknownHostsPanel(requestedScope())
+  unknownHosts.start()
   const buildingItems = (): SearchItem[] => {
     const items: SearchItem[] = []
     for (const isl of town.islands)
@@ -412,6 +415,7 @@ async function start(): Promise<void> {
     stage, town, THREE, seen, step,
     /** Hand the page a snapshot as if the server had sent it. */
     feed: (raw: unknown) => onSnapshot(raw),
+    unknownHosts,
     inspect: (id: string) => town.inspect(id),
     inspectIsland: (id: string) => town.inspectIsland(id),
     inspectRoutes: () => town.inspectRoutes(),

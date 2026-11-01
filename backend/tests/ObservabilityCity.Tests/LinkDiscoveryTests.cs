@@ -426,6 +426,28 @@ public class LinkDiscoveryTests
     }
 
     [Fact]
+    public void Unknown_addresses_are_grouped_by_host_with_their_calls_callers_and_days_and_a_host_that_gets_a_rule_leaves_the_list()
+    {
+        var store = new DiscoveredLinks();
+        store.RecordUnresolved("aa.orders-api", "api.partner.test", "/v1/a", Days("2026-10-28", "2026-10-29"), 300);
+        store.RecordUnresolved("aa.orders-api", "api.partner.test", "/v1/b", Days("2026-10-29"), 100);
+        store.RecordUnresolved("bb.ledger-worker", "API.partner.test", null, Days("2026-10-30"), 50);
+        store.RecordUnresolved("aa.orders-worker", "once.example.test", null, Days("2026-10-30"), 9999); // seen on one day only: not enough
+        store.RecordUnresolved("aa.orders-worker", "other.example.test", null, Days("2026-10-29", "2026-10-30"), 60);
+
+        var hosts = store.UnknownHosts(2);
+
+        Assert.Equal(["api.partner.test", "other.example.test"], hosts.Select(h => h.Host).ToArray());
+        var partner = hosts[0];
+        Assert.Equal(450, partner.Calls);
+        Assert.Equal(["aa.orders-api", "bb.ledger-worker"], partner.Callers);
+        Assert.Equal(3, partner.Days); // the days of every caller and path together
+        // a vendor domain is added: the next read takes the host off the list
+        store.Revisit((_, host, _) => host.EndsWith("partner.test", StringComparison.OrdinalIgnoreCase) ? new Classified(LinkOutcome.Vendor, "ext.partner") : new Classified(LinkOutcome.Unresolved));
+        Assert.Equal(["other.example.test"], store.UnknownHosts(2).Select(h => h.Host).ToArray());
+    }
+
+    [Fact]
     public async Task The_query_is_the_environments_own_with_the_roles_and_the_read_bounds_filled_in()
     {
         var clock = new FakeTimeProvider(Now);

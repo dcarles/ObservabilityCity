@@ -58,6 +58,16 @@ test.describe('a live town that finds links in its dependency data', () => {
     await expect(notice).toContainText('no links rule explains it')
   })
 
+  test('the Unknown hosts button lists the host no rule explains, once, with the system that called it', async ({ page, request }) => {
+    const hosts = await (await request.get(`${API}/api/unknown-hosts`)).json()
+    expect(hosts).toEqual([expect.objectContaining({ host: 'mystery.a.example.test', callers: ['aa.orders-api'] })])
+    await page.goto('/?test=1&quality=low')
+    await page.waitForFunction(() => (window as any).city?.seen.snapshots > 0)
+    await expect(page.locator('#unknown-hosts-toggle')).toHaveText(/^1 unknown host /)
+    await page.click('#unknown-hosts-toggle')
+    await expect(page.locator('#unknown-hosts li')).toContainText('mystery.a.example.test')
+  })
+
   test('calls to a pillar the town does not have are a note, apart from the problems, and are not counted as one', async ({ page, request }) => {
     await page.goto('/?test=1&quality=low')
     await page.waitForFunction(() => (window as any).city?.seen.snapshots > 0)

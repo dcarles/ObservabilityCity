@@ -330,6 +330,12 @@ public sealed record HiddenIsland(string Id, string DisplayName);
 /// Traffic between a system on screen and an island the filter left out. NodeId is the system on screen. Incoming is false when it calls a system on
 /// the hidden island and true when a system there calls it. RequestsPerSecond is the traffic on the link (the callee's rate, shared evenly between its callers).
 /// </summary>
+/// <summary>
+/// One host that calls from the town go to and no rule explains: how many calls over the days link discovery remembers, which town systems made them,
+/// and on how many different days it was seen. Hosts that are a third party's or on the ignore list are never listed. Calls are sampling-corrected estimates.
+/// </summary>
+public sealed record UnknownHostSnapshot(string Host, double Calls, IReadOnlyList<string> Callers, int Days);
+
 public sealed record OffscreenLink(string NodeId, string IslandId, string IslandName, bool Incoming, double RequestsPerSecond);
 
 /// <summary>

@@ -181,3 +181,32 @@ test.describe('cars from a third party island to the town through the airport', 
     expect(await page.evaluate(() => (window as any).city.town.airport.backGateZ)).toBeNull()
   })
 })
+
+test.describe('the Unknown hosts button', () => {
+  const hosts = [
+    { host: 'api.partner.example', calls: 1200, callers: ['aa.orders-api'], days: 3 },
+    { host: 'files.example.test', calls: 40, callers: ['bb.ledger-worker', 'aa.orders-worker'], days: 2 },
+  ]
+
+  test('is hidden when there are none, lists each host with its copy buttons when there are, and copies a line', async ({ town, page, context }) => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write'])
+    await town.open()
+    await expect(page.locator('#unknown-hosts')).toBeHidden()
+
+    await page.route('**/api/unknown-hosts*', (r) => r.fulfill({ json: hosts }))
+    await page.evaluate(() => (window as any).city.unknownHosts.refresh())
+    await expect(page.locator('#unknown-hosts-toggle')).toHaveText(/2 unknown hosts/)
+    await page.locator('#unknown-hosts-toggle').click()
+    await expect(page.locator('#unknown-hosts li')).toHaveCount(2)
+    await expect(page.locator('#unknown-hosts li').first()).toContainText('api.partner.example')
+
+    await page.locator('#unknown-hosts li').first().getByRole('button', { name: 'Copy vendor entry' }).click()
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('- { id: ext.api-partner-example, name: api.partner.example, domains: [api.partner.example], calledBy: [aa.orders-api] }')
+    await page.locator('#unknown-hosts li').nth(1).getByRole('button', { name: 'Copy ignore line' }).click()
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("- '^files\\.example\\.test$'")
+
+    await page.route('**/api/unknown-hosts*', (r) => r.fulfill({ json: [] }))
+    await page.evaluate(() => (window as any).city.unknownHosts.refresh())
+    await expect(page.locator('#unknown-hosts')).toBeHidden()
+  })
+})

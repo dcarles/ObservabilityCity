@@ -68,6 +68,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/unknown-hosts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetUnknownHosts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/systems/{id}/logs": {
         parameters: {
             query?: never;
@@ -435,6 +451,14 @@ export interface components {
             /** Format: double */
             deadLetters: number;
         };
+        UnknownHostSnapshot: {
+            host: string;
+            /** Format: double */
+            calls: number;
+            callers: string[];
+            /** Format: int32 */
+            days: number;
+        };
         VendorSnapshot: {
             node: components["schemas"]["NodeSnapshot"];
             calledBy: string[];
@@ -541,6 +565,28 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SystemDetail"];
+                };
+            };
+        };
+    };
+    GetUnknownHosts: {
+        parameters: {
+            query?: {
+                env?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnknownHostSnapshot"][];
                 };
             };
         };
