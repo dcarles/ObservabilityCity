@@ -403,3 +403,22 @@ test.describe('services', () => {
     expect(new Set(keys)).toEqual(new Set(['aa/orders', 'aa.audit-cache', 'aa.tools-cron', 'bb/billing', 'bb.shared-db']))
   })
 })
+
+// A quiet database that Azure sent no number for, and the town was told to read as no use (whenEmpty: idle), is marked on its row: the 0% is an assumption, not a measurement.
+test.describe('a quiet tenant database', () => {
+  test('says "no activity reported" on its row where a measured one shows its percentage', async ({ page, request }) => {
+    const real = await (await request.get(`${API}/api/snapshot/latest`)).json()
+    const orders = real.groups.flatMap((g: any) => g.nodes).find((n: any) => n.id === DB)
+    const quiet = orders.tenants[0]
+    Object.assign(quiet, { utilisation: 0, throttled: 0, idle: true })
+    await page.route('**/hubs/town**', (r) => r.abort())
+    await page.route('**/api/snapshot/latest**', (r) => r.fulfill({ json: real }))
+    await page.goto('/?test=1&quality=low')
+    await page.waitForFunction(() => (window as any).city?.seen.snapshots > 0)
+    await page.locator('#search-input').fill('Orders DB')
+    await page.locator('#search-results .hit').first().click()
+    const rows = page.locator('#inspector h4', { hasText: 'Tenants' }).locator('~ .row')
+    await expect(rows.filter({ hasText: 'no activity reported' })).toHaveCount(1)
+    await expect(rows.filter({ hasText: quiet.name }).first()).toContainText('no activity reported')
+  })
+})

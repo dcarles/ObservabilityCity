@@ -109,6 +109,29 @@ describe('a snapshot with something wrong in it is repaired where that is safe',
   })
 })
 
+describe('a tenant database read as idle', () => {
+  const withTenants = () => {
+    const raw = structuredClone(fixture('tenants-town.json'))
+    const db = raw.groups.flatMap((g) => g.nodes).find((n) => n.tenants && n.tenants.length > 0)!
+    return { raw, unit: db.tenants![0] }
+  }
+
+  it('keeps the mark the server put on it', () => {
+    const { raw, unit } = withTenants()
+    Object.assign(unit, { utilisation: 0, idle: true })
+    const { snapshot, problems } = checkSnapshot(raw)
+    expect(problems).toEqual([])
+    expect(snapshot!.groups.flatMap((g) => g.nodes).flatMap((n) => n.tenants ?? []).filter((t) => t.idle)).toHaveLength(1)
+  })
+
+  it('drops a mark that is not a plain true, so a stray value never says "no activity"', () => {
+    const { raw, unit } = withTenants()
+    Object.assign(unit, { idle: 'yes' })
+    const { snapshot } = checkSnapshot(raw)
+    expect(snapshot!.groups.flatMap((g) => g.nodes).flatMap((n) => n.tenants ?? []).some((t) => t.idle)).toBe(false)
+  })
+})
+
 describe('wrapText', () => {
   it('breaks at word boundaries', () => {
     expect(wrapText('one two three four five', 10)).toEqual(['one two', 'three four', 'five'])

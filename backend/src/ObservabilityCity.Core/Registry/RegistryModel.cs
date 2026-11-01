@@ -235,6 +235,7 @@ public sealed record MetricGroup(string Resources, string? Namespace, IReadOnlyD
     public static readonly int[] IntervalMinutes = [1, 5, 15, 30, 60, 360, 720, 1440];
 
     public static readonly string[] SignalNames = ["cpu", "memory", "utilisation", "throttled", "requests"];
+    public static readonly string[] WhenEmptyValues = ["unknown", "idle"];
     public static readonly string[] Aggregations = ["average", "total", "count", "maximum", "minimum"];
 }
 
@@ -242,7 +243,7 @@ public sealed record MetricGroup(string Resources, string? Namespace, IReadOnlyD
 /// Where one signal's number comes from: a metric, how its points are added up, an optional dimension filter, and how it becomes the fraction or rate the
 /// town reads (divided by <see cref="Over"/>, per second, times <see cref="Scale"/>). <see cref="OrElse"/> is read in its place when the metric gives no number or 0.
 /// </summary>
-public sealed record MetricSignal(string Metric, string Aggregation, string? Filter, double Scale, bool PerSecond, MetricSignal? Over, MetricSignal? OrElse = null);
+public sealed record MetricSignal(string Metric, string Aggregation, string? Filter, double Scale, bool PerSecond, MetricSignal? Over, MetricSignal? OrElse = null, bool EmptyIsIdle = false);
 
 /// <summary>A way to sign in to Azure, named in the environment file. Secrets are not here: ClientSecretEnv names the variable that holds one.</summary>
 public sealed record RegistryCredential(string Name, string Kind, string? TenantId, string? ClientId, string? ClientSecretEnv);

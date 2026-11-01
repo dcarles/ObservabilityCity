@@ -307,5 +307,8 @@ describe('showing what a tenant database is provisioned at', () => {
     expect(tenantFigures({ limit: 20000, utilisation: 0.4, throttled: 0.032 })).toBe('20,000 RU/s · 40% · 3.2% throttled')
     expect(tenantFigures({ limit: null, utilisation: 0.4, throttled: 0 })).toBe('40% · 0% throttled')
     expect(tenantFigures({ limit: null, utilisation: null, throttled: null })).toBe('–')
+    // a quiet database read as no use says so, instead of a bare 0%
+    expect(tenantFigures({ limit: 4000, utilisation: 0, throttled: 0, idle: true })).toBe('4,000 RU/s · no activity reported · 0% throttled')
+    expect(tenantFigures({ limit: 4000, utilisation: 0, throttled: 0, idle: null })).toBe('4,000 RU/s · 0% · 0% throttled')
   })
 })

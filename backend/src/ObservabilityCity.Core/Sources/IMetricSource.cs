@@ -48,7 +48,7 @@ public sealed record JobReading(string Name, string? Region, DateTimeOffset? Las
 /// knows the tenant as (a tag on the database, say), so a tenant the environment does not list can still be shown by name. Limit is the capacity
 /// provisioned for the database as a plain number in the store's unit (request units per second), when the source is asked to read it.
 /// </summary>
-public sealed record TenantReading(string TenantId, double? Utilisation, double? Throttled, double RequestsPerSecond, string? Name = null, double? Limit = null);
+public sealed record TenantReading(string TenantId, double? Utilisation, double? Throttled, double RequestsPerSecond, string? Name = null, double? Limit = null, bool? Idle = null);
 
 /// <summary>
 /// One data source behind the town. The renderer never knows which one produced a number.
