@@ -483,6 +483,23 @@ public class LinkDiscoveryTests
     }
 
     [Fact]
+    public async Task An_address_written_with_the_service_code_draws_the_link_to_the_service_with_the_longer_name()
+    {
+        var clock = new FakeTimeProvider(Now);
+        var (_, copy) = Make(TownA, true, clock);
+        using var _c = copy;
+        // one more rule of the town: <service code>.c.<pillar>.example.test, while the ids use the service names (ledger has the code "led")
+        copy.Replace("environments/prod.yaml", "  rules:\n", "  rules:\n    - { host: '^(?<service>[a-z]+)\\.c\\.(?<pillar>[a-z]+)\\.example\\.test$', target: '{pillar}.{service}-api' }\n");
+        var coded = new Town(copy.Path, true, clock);
+        var source = new FakeDependencies(_ => [new DependencyRow(coded.Roles["bb.ledger-worker"], "led.c.bb.example.test", null, Days("2026-10-28", "2026-10-30"), 100)]);
+
+        await coded.Runner(source, clock).RunOnceAsync(CancellationToken.None);
+
+        Assert.Equal(["bb.ledger-worker>calls bb.ledger-api"], Links(coded.View.Current).Keys);
+        Assert.DoesNotContain(coded.View.Notices, n => n.StartsWith("Unresolved call"));
+    }
+
+    [Fact]
     public async Task A_declared_link_stays_declared_even_when_the_telemetry_shows_it_too()
     {
         var clock = new FakeTimeProvider(Now);

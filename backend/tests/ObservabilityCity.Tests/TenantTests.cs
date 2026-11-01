@@ -151,6 +151,9 @@ public class TenantTests
         var acme = Unit(s, "acme");
         Assert.True(acme.Throttled > 0);
         Assert.Equal(HealthState.Down, acme.State); // a customer past the red thresholds is red
+        // the store itself is only amber and counts as degraded, never down: the top bar and the lists both go by this
+        Assert.Equal(HealthState.Degraded, s.Groups.SelectMany(g => g.Nodes).Single(n => n.Id == Store).State);
+        Assert.Equal(0, s.Totals.Down);
         Assert.All(new[] { "borealis", "cygnus", "smoke" }, id =>
         {
             Assert.Equal(0, Unit(s, id).Throttled);
