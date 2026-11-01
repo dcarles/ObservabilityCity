@@ -21,6 +21,10 @@ public sealed class LatestState
             _readings.GetOrAdd(id, _ => new(StringComparer.Ordinal))[source] = reading;
     }
 
+    /// <summary>One source's newest reading of every node it has reported.</summary>
+    public IReadOnlyDictionary<string, NodeReading> Of(string source) =>
+        _readings.Where(kv => kv.Value.ContainsKey(source)).ToDictionary(kv => kv.Key, kv => kv.Value[source]);
+
     /// <summary>The newest reading of the node from any source, or null.</summary>
     public NodeReading? Get(string id) =>
         _readings.TryGetValue(id, out var bySource) ? bySource.Values.MaxBy(r => r.At) : null;

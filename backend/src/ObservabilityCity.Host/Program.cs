@@ -83,6 +83,10 @@ foreach (var (folder, registry) in loaded)
             : sourceCatalog.Build(environment, folder);
         foreach (var problem in set.Problems) Console.Error.WriteLine($"Source notice ({registry.Town.Id}): {problem}");
         var state = new LatestState();
+        // a live town carries on from the last readings after a restart (the town's freshness rule still decides whether they count); a demo town has none
+        var readings = fake is null ? new ReadingCache(Path.Combine(folder, RegistryReloader.DiscoveredFolder, "readings", environmentId)) : null;
+        if (readings is not null)
+            foreach (var source in set.Sources) state.Update(source.Name, readings.Load(source.Name));
         var store = new SnapshotStore();
         var snapshots = new SnapshotBuilder(view, state, TimeProvider.System)
         {
@@ -98,7 +102,7 @@ foreach (var (folder, registry) in loaded)
             DayFraction = fake is null ? () => TimeProvider.System.GetLocalNow().TimeOfDay.TotalDays : () => fake.DayFraction,
         };
         ILogSource logs = fake is null ? new NoLogSource() : new FakeLogSource(state, TimeProvider.System, staleAfter);
-        runtimes.Add(new EnvironmentRuntime(registry.Town.Id, environmentId, view, fake, state, snapshots, store, logs, set.Sources, set.Problems, set.Scope, discovered));
+        runtimes.Add(new EnvironmentRuntime(registry.Town.Id, environmentId, view, fake, state, snapshots, store, logs, set.Sources, set.Problems, set.Scope, discovered, readings));
     }
     var town = new TownRuntime(registry.Town.Id, registry.Town.Name, folder, registries, new EnvironmentSet(runtimes, registry.DefaultEnvironmentId, registry.Town.Id));
     townRuntimes.Add(town);
@@ -118,7 +122,7 @@ foreach (var (town, runtimes) in hostedByTown)
     foreach (var rt in runtimes)
     {
         // AddHostedService would keep only the first of each type, so these are added as plain services
-        builder.Services.AddSingleton<IHostedService>(sp => new SourcePoller(rt.Sources, rt.Registry, rt.State, sp.GetRequiredService<ILogger<SourcePoller>>()));
+        builder.Services.AddSingleton<IHostedService>(sp => new SourcePoller(rt.Sources, rt.Registry, rt.State, sp.GetRequiredService<ILogger<SourcePoller>>(), rt.Readings));
         if (rt.Discovered is not null && rt.Sources.OfType<IDependencySource>().FirstOrDefault(s => s.CanReadDependencies && ((IMetricSource)s).Name == rt.Registry.Current.ActiveEnvironment?.Links?.Source) is { } dependencies)
             builder.Services.AddSingleton<IHostedService>(sp => new LinkDiscoveryRunner(dependencies, rt.Scope, rt.Registry, rt.Discovered, TimeProvider.System, sp.GetRequiredService<ILogger<LinkDiscoveryRunner>>()));
         if (rt.Discovered is not null && rt.Registry.Current.ActiveEnvironment?.Links?.Traffic is not null

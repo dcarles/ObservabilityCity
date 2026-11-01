@@ -63,3 +63,13 @@ public interface IMetricSource
     TimeSpan Timeout => TimeSpan.FromSeconds(Registry.RegistrySource.DefaultTimeoutSeconds);
     Task<IReadOnlyDictionary<string, NodeReading>> PollAsync(Registry.Registry registry, CancellationToken ct);
 }
+
+/// <summary>
+/// A source that reads many things one by one can hand over each node's reading as soon as it has it, instead of all of them at the end, so the town fills
+/// in as the reads finish. The poller uses this when a source offers it. <c>PollAsync</c> with a callback may still end in an error after it has published
+/// what it could, and the poller counts that as a failed poll for the log only.
+/// </summary>
+public interface IProgressiveMetricSource : IMetricSource
+{
+    Task PollAsync(Registry.Registry registry, Action<IReadOnlyDictionary<string, NodeReading>> publish, CancellationToken ct);
+}
