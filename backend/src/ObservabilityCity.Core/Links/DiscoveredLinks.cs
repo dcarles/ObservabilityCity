@@ -45,6 +45,23 @@ public sealed class DiscoveredLinks
         if (folder is not null) Load(folder, log);
     }
 
+    private Func<string, bool> _isVendorCaller = _ => false;
+    private Func<string, bool> _isGatewayHost = _ => false;
+
+    /// <summary>
+    /// Tells the store which callers are vendor buildings (their unresolved calls stay out of the notices, they are not the town's to fix) and which hosts are
+    /// gateways (a rule reads the path to pick the service, so the host is listed by its unexplained paths). Called after every read, from the current rules.
+    /// </summary>
+    public void Judge(Func<string, bool> isVendorCaller, Func<string, bool> isGatewayHost)
+    {
+        lock (_gate)
+        {
+            _isVendorCaller = isVendorCaller;
+            _isGatewayHost = isGatewayHost;
+            _version++;
+        }
+    }
+
     /// <summary>Changes whenever what the store would show changes, so the registry view is made again only then.</summary>
     public int Version { get { lock (_gate) return _version; } }
 
@@ -193,7 +210,7 @@ public sealed class DiscoveredLinks
             var lines = new List<string>();
             if (_error is not null) lines.Add($"Link discovery failed, still showing the links found before: {_error}");
             if (Traffic.Error is { } trafficError) lines.Add($"Link traffic could not be read, so the split between outside and town callers keeps its last numbers: {trafficError}");
-            var open = _unresolved.Where(kv => kv.Value.Days.Count >= minDays).OrderByDescending(kv => kv.Value.Calls).ThenBy(kv => kv.Key.Host, StringComparer.Ordinal).ToList();
+            var open = _unresolved.Where(kv => kv.Value.Days.Count >= minDays && !_isVendorCaller(kv.Key.Caller)).OrderByDescending(kv => kv.Value.Calls).ThenBy(kv => kv.Key.Host, StringComparer.Ordinal).ToList();
             foreach (var ((caller, host, path), (days, calls)) in open.Take(limit))
                 lines.Add($"Unresolved call: '{caller}' calls {host}{path}, about {Math.Round(calls):0} calls on {days.Count} days, and no links rule explains it. Add a rule, an ignore pattern or a third party domain.");
             if (open.Count > limit) lines.Add($"Link discovery: {open.Count - limit} more unresolved calls not shown.");
@@ -209,11 +226,20 @@ public sealed class DiscoveredLinks
     {
         lock (_gate)
             return _unresolved.GroupBy(kv => kv.Key.Host, StringComparer.OrdinalIgnoreCase)
-                .Select(g => (Host: g.First().Key.Host, Calls: g.Sum(kv => kv.Value.Calls), Callers: g.Select(kv => kv.Key.Caller).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToList(),
+                .Select(g => (Host: g.First().Key.Host, Rows: g.ToList(), Calls: g.Sum(kv => kv.Value.Calls), Callers: g.Select(kv => kv.Key.Caller).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToList(),
                     Days: g.SelectMany(kv => kv.Value.Days).Distinct().Count()))
                 .Where(x => x.Days >= minDays)
                 .OrderByDescending(x => x.Calls).ThenBy(x => x.Host, StringComparer.Ordinal)
-                .Select(x => new UnknownHostSnapshot(x.Host, x.Calls, x.Callers, x.Days))
+                .Select(x =>
+                {
+                    var gateway = _isGatewayHost(x.Host);
+                    var paths = gateway
+                        ? x.Rows.GroupBy(kv => kv.Key.Path, StringComparer.Ordinal)
+                            .Select(p => new UnknownPathSnapshot(p.Key, p.Sum(kv => kv.Value.Calls), p.All(kv => _isVendorCaller(kv.Key.Caller))))
+                            .OrderByDescending(p => p.Calls).ThenBy(p => p.Path, StringComparer.Ordinal).ToList()
+                        : null;
+                    return new UnknownHostSnapshot(x.Host, x.Calls, x.Callers, x.Days, gateway, paths, x.Callers.All(_isVendorCaller));
+                })
                 .ToList();
     }
 

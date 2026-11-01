@@ -67,6 +67,8 @@ public sealed class LinkDiscoveryRunner(
         }
 
         var classifier = new LinkClassifier(config, view.Vendors, view.AllNodes.Select(n => n.Id), LinkClassifier.ServicesOf(view.AllNodes));
+        var vendorIds = view.Vendors.Select(v => v.Node.Id).ToHashSet(StringComparer.Ordinal);
+        store.Judge(vendorIds.Contains, classifier.IsGatewayHost);
         foreach (var row in rows)
         {
             if (!byRole.TryGetValue(row.Caller, out var caller)) continue;

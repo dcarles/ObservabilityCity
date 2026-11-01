@@ -448,6 +448,48 @@ public class LinkDiscoveryTests
     }
 
     [Fact]
+    public void Unresolved_calls_made_by_vendor_buildings_stay_out_of_the_notices_but_stay_in_the_unknown_hosts()
+    {
+        var store = new DiscoveredLinks();
+        store.RecordUnresolved("aa.orders-api", "mine.example.test", null, Days("2026-10-28", "2026-10-29"), 80);
+        store.RecordUnresolved("ext.partner-svc", "theirs.example.test", null, Days("2026-10-28", "2026-10-29"), 500);
+        store.Judge(id => id.StartsWith("ext.", StringComparison.Ordinal), _ => false);
+
+        var notice = Assert.Single(store.Notices(2));
+        Assert.Contains("mine.example.test", notice);
+        var hosts = store.UnknownHosts(2);
+        Assert.Equal(["theirs.example.test", "mine.example.test"], hosts.Select(h => h.Host).ToArray());
+        Assert.True(hosts[0].VendorsOnly);
+        Assert.False(hosts[1].VendorsOnly);
+    }
+
+    [Fact]
+    public void A_gateway_host_is_listed_by_the_paths_no_rule_explains_and_a_plain_host_is_not()
+    {
+        var store = new DiscoveredLinks();
+        store.RecordUnresolved("aa.orders-api", "gw.example.test", "/internal/x", Days("2026-10-28", "2026-10-29"), 300);
+        store.RecordUnresolved("ext.partner-svc", "gw.example.test", "/internal/x", Days("2026-10-29"), 100);
+        store.RecordUnresolved("ext.partner-svc", "gw.example.test", "/odd/y", Days("2026-10-29"), 40);
+        store.RecordUnresolved("aa.orders-api", "plain.example.test", "/v1/a", Days("2026-10-28", "2026-10-29"), 10);
+        var classifier = new LinkClassifier(Rules([ViaGateway]), [], Systems);
+        Assert.True(classifier.IsGatewayHost("GW.example.test"));
+        Assert.False(classifier.IsGatewayHost("plain.example.test"));
+        store.Judge(id => id.StartsWith("ext.", StringComparison.Ordinal), classifier.IsGatewayHost);
+
+        var hosts = store.UnknownHosts(2);
+        var gw = hosts.Single(h => h.Host == "gw.example.test");
+        Assert.True(gw.Gateway);
+        Assert.Equal(["/internal/x", "/odd/y"], gw.Paths!.Select(p => p.Path).ToArray());
+        Assert.Equal(400, gw.Paths![0].Calls); // the calls of every caller added up
+        Assert.False(gw.Paths[0].VendorsOnly); // the town's own API called it too
+        Assert.Equal(40, gw.Paths[1].Calls);
+        Assert.True(gw.Paths[1].VendorsOnly);
+        var plain = hosts.Single(h => h.Host == "plain.example.test");
+        Assert.False(plain.Gateway);
+        Assert.Null(plain.Paths);
+    }
+
+    [Fact]
     public async Task A_role_never_read_before_is_read_over_the_whole_first_read_window_while_the_others_read_only_the_gap()
     {
         var clock = new FakeTimeProvider(Now);

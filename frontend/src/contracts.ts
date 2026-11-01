@@ -458,6 +458,15 @@ export interface components {
             callers: string[];
             /** Format: int32 */
             days: number;
+            gateway: boolean;
+            paths?: components["schemas"]["UnknownPathSnapshot"][] | null;
+            vendorsOnly: boolean;
+        };
+        UnknownPathSnapshot: {
+            path: string;
+            /** Format: double */
+            calls: number;
+            vendorsOnly: boolean;
         };
         VendorSnapshot: {
             node: components["schemas"]["NodeSnapshot"];
