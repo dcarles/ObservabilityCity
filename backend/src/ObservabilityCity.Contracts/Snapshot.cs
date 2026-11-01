@@ -130,8 +130,9 @@ public sealed record NodeSnapshot(
 /// A resource that is not a system but stands in the town as a small building without health (a key vault, a storage account). Label is what it is
 /// ("Key vault"), Shape how it is drawn, Service the service whose pad it stands beside (null: it belongs to the pillar and stands in its back yard),
 /// Region where it lives when the cloud says. Links are the addresses that open it somewhere else.
+/// On the hub island Group names the cluster of buildings it stands in (for example "Monitoring"); it is null on a pillar's island.
 /// </summary>
-public sealed record AssetSnapshot(string Id, string Name, string Label, string Shape, string? Service, string? Region, IReadOnlyList<ResourceLink>? Links);
+public sealed record AssetSnapshot(string Id, string Name, string Label, string Shape, string? Service, string? Region, IReadOnlyList<ResourceLink>? Links, string? Group = null);
 
 /// <summary>
 /// One scheduled job of a function building in one region: Status, when it last ran (LastRun) and when its schedule says it runs next (Next); both null
@@ -289,6 +290,7 @@ public sealed record TownTotals(
 /// OutsideRequestsPerSecond is the traffic no town system explains, summed over the APIs on screen: what reaches the airport. It is null while the environment
 /// does not measure it (links.traffic), and the airport then adds up what the outside callers bring.
 /// Cloud is what the environment calls its cloud (scope.cloud), for the words "not found in ..."; null: the renderer says "the inventory".
+/// TrafficDensity is the town's trafficDensity setting: how many cars appear, as a multiple of the usual number (1).
 /// </summary>
 public sealed record Snapshot(
     string TownId,
@@ -314,6 +316,7 @@ public sealed record Snapshot(
     bool IncidentsSeen,
     double? OutsideRequestsPerSecond = null,
     string? Cloud = null,
+    double TrafficDensity = 1,
     IReadOnlyList<string>? Notes = null);
 
 /// <summary>An island the island filter left out.</summary>

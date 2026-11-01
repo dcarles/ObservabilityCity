@@ -6,3 +6,6 @@
 - { pillar: pay, name: kv-pay-payments, label: Key vault, shape: vault, service: payments }
 - { pillar: pay, name: stpaystatements, label: Storage, shape: store }
 - { pillar: frd, name: kv-frd-screening, label: Key vault, shape: vault, service: screening }
+# Shared monitoring resources stand on the hub in one cluster (a hub entry names its cluster with group).
+- { pillar: hub, name: law-platform, label: Log workspace, shape: observatory, group: Monitoring }
+- { pillar: hub, name: appi-platform, label: Application Insights, shape: observatory, group: Monitoring }

@@ -8,8 +8,10 @@ import { API, type Status } from '../support/city'
 const B = process.env.E2E_SUITE === 'functionsb'
 const town = B
   ? { hot: 'Amsterdam', calm: 'Dublin', regions: ['Amsterdam', 'Dublin'], cloud: 'Cumulus', split: '⚠ Amsterdam 25% · Dublin 75%', flagged: 'Dublin',
+      hub: { group: 'Telemetry', assets: [['hub.central-app-monitor', 'App monitor', 'box'], ['hub.central-logs', 'Central log store', 'box']] },
       assets: [['aa.orders-blobs', 'Blob store', 'store', 'orders', true], ['aa.orders-vault', 'Secret store', 'vault', 'orders', true], ['aa.vault-main', 'Shared secret store', 'vault', null, false]] }
   : { hot: 'West', calm: 'North', regions: ['North', 'West'], cloud: 'Azure', split: '⚠ North 95% · West 5%', flagged: 'North',
+      hub: { group: 'Monitoring', assets: [['hub.appi-acme-prd-edge', 'Application Insights', 'observatory'], ['hub.law-acme-prd', 'Log workspace', 'observatory']] },
       assets: [['aa.appcfg-acme-al', 'App configuration', 'settings', null, false], ['aa.kv-acme-al-ord', 'Key vault', 'vault', 'orders', true], ['aa.kv-acme-al-shared', 'Key vault', 'vault', null, false], ['aa.stacmealord', 'Storage account', 'store', 'orders', true]] }
 
 async function open(page: Page): Promise<void> {
@@ -77,6 +79,15 @@ test.describe(`functions and regions (${B ? 'tags, Started, a region tag' : 'nam
     await expect(page.locator(`#inspector .job[data-job="hourly (${town.hot})"] .warn`)).toContainText('overdue')
     await expect(page.locator(`#inspector .job[data-job="daily (${town.calm})"]`)).toContainText('ok')
     await expect(page.locator('#inspector .why li')).toHaveCount(2)
+  })
+
+  test('a job time that is not today names its date, and shows no seconds', async ({ page }) => {
+    await open(page)
+    await page.evaluate(() => (window as any).city.openSystem('aa.sched-fn'))
+    const text = await page.locator('#inspector .job').allTextContents()
+
+    expect(text.length).toBe(3)
+    for (const t of text) expect(t).toMatch(/ran \d{1,2} [A-Z][a-z]{2} \d\d:\d\d(?!:)/)
   })
 
   test('a late job alone makes the building amber', async ({ page }) => {
@@ -158,7 +169,7 @@ test.describe(`functions and regions (${B ? 'tags, Started, a region tag' : 'nam
     expect(services.length).toBeGreaterThan(0)
     // none is a system: no health, no beacon, nothing among the buildings
     expect(await page.evaluate(() => (window as any).city.inspectIsland('aa').kinds.length)).toBe(5)
-    expect(await page.evaluate(() => (window as any).city.town.assetHits().length)).toBe(town.assets.length)
+    expect(await page.evaluate(() => (window as any).city.town.assetHits().length)).toBe(town.assets.length + town.hub.assets.length) // the hub's are pickable too
   })
 
   test('a resource building opens a card with what it is, where it belongs and its address, and no health', async ({ page }) => {
@@ -178,5 +189,26 @@ test.describe(`functions and regions (${B ? 'tags, Started, a region tag' : 'nam
     const [pillarId] = town.assets.find((a) => a[3] === null)!
     await page.evaluate((i) => (window as any).city.openAsset(i), pillarId as string)
     await expect(panel).toContainText('Resource of Alpha')
+  })
+
+  test('shared resources stand on the hub in one cluster with a sign, and open a card with only their address', async ({ page }) => {
+    await open(page)
+    const clusters = await page.evaluate(() => (window as any).city.inspectHubClusters())
+    expect(clusters.map((c: any) => [c.name, c.ids])).toEqual([[town.hub.group, town.hub.assets.map((a) => a[0])]])
+    const spots = await page.evaluate(() => (window as any).city.inspectAssets('hub'))
+    expect(spots.map((a: any) => [a.id, a.label, a.shape]).sort((x: any, y: any) => (x[0] < y[0] ? -1 : 1))).toEqual(town.hub.assets)
+    expect(await page.evaluate(() => (window as any).city.town.assetHits().length)).toBe(town.assets.length + town.hub.assets.length)
+    // they are not systems: the hub still has only its gateway
+    expect(await page.evaluate(() => (window as any).city.seen.last.groups.find((g: any) => g.isHub).nodes.map((n: any) => n.id))).toEqual(['hub.apim'])
+
+    const [id, label] = town.hub.assets[1] as [string, string, string]
+    await page.evaluate((i) => (window as any).city.openAsset(i), id)
+    const panel = page.locator('#service-panel')
+    await expect(panel).toBeVisible()
+    await expect(panel).toContainText(label)
+    await expect(panel).toContainText(`${town.hub.group} resource on Platform hub`)
+    await expect(panel).toContainText('Not monitored')
+    await expect(panel.locator('a.out')).toHaveAttribute('href', /^https:\/\/(portal|console)\.example\.test\//)
+    await expect(panel).not.toContainText('Healthy')
   })
 })

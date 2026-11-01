@@ -73,3 +73,8 @@ export interface TenantYardStatus {
   /** The two lines of the yard's sign. */
   sign: { text: string; note: string }
 }
+
+/** How far above a building's roof its name label starts: clear of the beacon, which a tall model (a clock tower) carries high on its roof. */
+export function labelRise(beaconAtY: number): number {
+  return Math.max(3.4, beaconAtY + 0.8)
+}

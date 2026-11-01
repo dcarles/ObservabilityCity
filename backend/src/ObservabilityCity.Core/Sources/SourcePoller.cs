@@ -11,7 +11,8 @@ public sealed class SourcePoller(
     IEnumerable<IMetricSource> sources,
     Registry.IRegistryProvider registries,
     LatestState state,
-    ILogger<SourcePoller> log) : BackgroundService
+    ILogger<SourcePoller> log,
+    ReadingCache? cache = null) : BackgroundService
 {
     protected override Task ExecuteAsync(CancellationToken stoppingToken) =>
         Task.WhenAll(sources.Select(s => Loop(s, stoppingToken)));
@@ -25,12 +26,16 @@ public sealed class SourcePoller(
             {
                 using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
                 timeout.CancelAfter(source.Timeout);
-                state.Update(source.Name, await source.PollAsync(registries.Current, timeout.Token));
+                if (source is IProgressiveMetricSource progressive)
+                    await progressive.PollAsync(registries.Current, found => state.Update(source.Name, found), timeout.Token);
+                else
+                    state.Update(source.Name, await source.PollAsync(registries.Current, timeout.Token));
             }
             catch (Exception e) when (e is not OperationCanceledException || !ct.IsCancellationRequested)
             {
                 log.LogWarning(e, "Source {Source} failed; its values will go stale", source.Name);
             }
+            cache?.Save(source.Name, state.Of(source.Name));
         }
         while (await WaitNext(timer, ct));
     }

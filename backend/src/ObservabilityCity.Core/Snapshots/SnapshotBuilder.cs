@@ -16,11 +16,11 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
     private IReadOnlyList<AssetSnapshot> AssetsOf(string groupId, Registry.Registry registry)
     {
         if (FixedAssets is { Count: > 0 })
-            return FixedAssets.Where(a => a.PillarId == groupId).Select(a => new AssetSnapshot(a.Id, a.Name, a.Label, a.Shape, a.Service, a.Region, [])).ToList();
+            return FixedAssets.Where(a => a.PillarId == groupId).Select(a => new AssetSnapshot(a.Id, a.Name, a.Label, a.Shape, a.Service, a.Region, [], a.Group)).ToList();
         if (ScopeSource is null || registry.ActiveEnvironment is not { } env || env.Scope.Assets.Count == 0) return [];
         return ScopeSource.Resolve(registry).AssetList.Where(a => a.PillarId == groupId)
             .Select(a => new AssetSnapshot(a.Id, a.Name, a.Label, a.Shape, a.Service, a.Region,
-                ObservabilityCity.Core.Scope.ScopeLinks.For(env.Scope, Environment, new Scope.ResolvedResource(a.ResourceId, a.Name, a.Type, a.Region, null, a.Rule), a.SubscriptionId, null)))
+                ObservabilityCity.Core.Scope.ScopeLinks.For(env.Scope, Environment, new Scope.ResolvedResource(a.ResourceId, a.Name, a.Type, a.Region, null, a.Rule), a.SubscriptionId, null), a.Group))
             .ToList();
     }
 
@@ -132,7 +132,7 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
         return new Snapshot(registry.Town.Id, registry.Town.Name, registry.Town.GroupLabel, env?.Id ?? Environment, now, DayFraction(), totals, notices, groups,
             vendors, callers, dependencies, registry.RingCapacity,
             env?.Name ?? Environment, environments, TenantsOf(env, allNodes), registry.Town.Topology, Mode ?? registry.Town.Mode, view, incidentFreeSince, incidentsSeen,
-            OutsideRate(onScreenNodes.Values), env?.Scope.Cloud, registries.Notes is { Count: > 0 } notes ? notes : null);
+            OutsideRate(onScreenNodes.Values), env?.Scope.Cloud, registry.Town.TrafficDensity, registries.Notes is { Count: > 0 } notes ? notes : null);
     }
 
     /// <summary>Remembers when each island last had an open incident. Every full build calls this, so the memory does not depend on who is looking.</summary>
@@ -334,7 +334,7 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
         var quiet = r.Calls is { } calls && calls < n.MinCalls;
         if (quiet) r = r with { ErrorRate = 0, P99Ms = 0 };
 
-        var split = n.Kind == NodeKind.Api && !absent.Contains(Signals.Requests) ? Traffic?.Split(n.Id, r.RequestsPerSecond) : null;
+        var split = n.Kind == NodeKind.Api && !absent.Contains(Signals.Requests) ? Traffic?.Split(n.Id, r.RequestsPerSecond, now) : null;
 
         // A store with a database for each tenant: each unit gets its own state, and the store's numbers are the worst that count.
         var tenants = n.TenantPattern is null ? null : TenantUnits(n, r, env);

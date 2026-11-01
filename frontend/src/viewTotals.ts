@@ -29,7 +29,8 @@ const rank: Record<HealthState, number> = { Healthy: 0, Stale: 1, Degraded: 2, D
 
 /**
  * The state a system counts as for this tenant choice. A data store with a database for each tenant counts as the worst of the chosen tenants'
- * databases (a store that is down stays down); every other system is as the snapshot says.
+ * databases, but never worse than Degraded: a store running hot or throttling is amber, the same rule the snapshot and the lists use, and only a store
+ * the snapshot itself calls Down stays down. Every other system is as the snapshot says.
  */
 export function stateFor(n: Pick<NodeSnapshot, 'state' | 'tenants'>, tenants: readonly TenantInfo[], view: TenantView): HealthState {
   if (!n.tenants || n.state === 'Down' || n.state === 'Stale') return n.state
@@ -39,7 +40,8 @@ export function stateFor(n: Pick<NodeSnapshot, 'state' | 'tenants'>, tenants: re
   if (units.length === 0) return 'Healthy' // none of the chosen tenants has a database here to be in trouble
   const live = units.filter((u) => u.state !== 'Stale')
   if (live.length === 0) return 'Stale' // their databases have no fresh data: grey, never healthy
-  return live.reduce<HealthState>((worst, u) => (rank[u.state] > rank[worst] ? u.state : worst), 'Healthy')
+  const worst = live.reduce<HealthState>((w, u) => (rank[u.state] > rank[w] ? u.state : w), 'Healthy')
+  return worst === 'Down' ? 'Degraded' : worst // a tenant database past the red line is a hot store, not a store that is down
 }
 
 /** Systems and third parties with no fresh data. */

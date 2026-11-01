@@ -39,6 +39,56 @@ public class LinkDiscoveryTests
     private static readonly LinkRule Direct = new(@"^(?<service>[a-z]+)-(?<role>api|worker)\.(?<pillar>[a-z]+)\.example\.test$", null, "{pillar}.{service}-{role}", false);
     private static readonly LinkRule ViaGateway = new(@"^gw\.example\.test$", @"^/(?<pillar>[a-z]+)/(?<service>[a-z]+)/(?<role>api|worker)\b", "{pillar}.{service}-{role}", true);
 
+    // ---- addresses that carry a service code instead of the name ----
+
+    private static readonly string[] CodedSystems = ["aa.orders-api", "aa.orders-worker", "aa.orders-db", "aa.stock-levels-api", "bb.ledger-api", "bb.orders-api"];
+    private static readonly ServiceCodeEntry[] Codes =
+    [
+        new("aa", "orders", "ord"), new("aa", "orders", "ord"), new("aa", "stock-levels", "sl"),
+        new("bb", "ledger", "led"), new("bb", "orders", "led2"),
+    ];
+
+    private static readonly LinkRule ByCode = new(@"^(?<service>[a-z0-9]+)\.(?<pillar>[a-z]+)\.example\.test$", null, "{pillar}.{service}-api", false);
+
+    private static Classified ClassifyCoded(string host, Dictionary<string, string>? aliases = null) =>
+        new LinkClassifier(Rules([ByCode], aliases: aliases), [], CodedSystems, Codes).Classify(new DependencyRow("x", host, null, Days("2026-10-29"), 10), "aa");
+
+    [Fact]
+    public void An_address_that_carries_the_service_code_finds_the_service_whose_name_is_longer()
+    {
+        Assert.Equal(new Classified(LinkOutcome.Found, "aa.stock-levels-api", false), ClassifyCoded("sl.aa.example.test"));
+        Assert.Equal(new Classified(LinkOutcome.Found, "aa.orders-api", false), ClassifyCoded("ord.aa.example.test"));
+    }
+
+    [Fact]
+    public void A_code_is_read_in_the_pillar_the_address_names_so_the_same_code_in_two_pillars_does_not_clash()
+    {
+        Assert.Equal(new Classified(LinkOutcome.Found, "bb.ledger-api", false), ClassifyCoded("led.bb.example.test"));
+        Assert.Equal(new Classified(LinkOutcome.Found, "bb.orders-api", false), ClassifyCoded("led2.bb.example.test"));
+        Assert.Equal(LinkOutcome.Unresolved, ClassifyCoded("led.aa.example.test").Outcome);
+    }
+
+    [Fact]
+    public void A_service_name_in_the_address_still_works_and_wins_over_a_code()
+    {
+        Assert.Equal(new Classified(LinkOutcome.Found, "aa.orders-api", false), ClassifyCoded("orders.aa.example.test"));
+    }
+
+    [Fact]
+    public void An_alias_wins_over_the_code_lookup()
+    {
+        Assert.Equal(new Classified(LinkOutcome.Found, "aa.orders-api", false), ClassifyCoded("sl.aa.example.test", new() { ["sl"] = "orders" }));
+    }
+
+    [Fact]
+    public void A_code_shared_by_two_services_of_one_pillar_is_never_guessed()
+    {
+        ServiceCodeEntry[] clash = [new("aa", "orders", "x"), new("aa", "stock-levels", "x")];
+        var result = new LinkClassifier(Rules([ByCode]), [], CodedSystems, clash).Classify(new DependencyRow("x", "x.aa.example.test", null, Days("2026-10-29"), 10), "aa");
+
+        Assert.Equal(LinkOutcome.Unresolved, result.Outcome);
+    }
+
     [Fact]
     public void A_host_rule_turns_an_address_into_a_system_by_the_groups_it_captures()
     {
@@ -516,6 +566,23 @@ public class LinkDiscoveryTests
         Assert.DoesNotContain("LedgerWorker", source.Asked.Single().Roles);
         Assert.False(off.View.Current.AllNodes.Single(n => n.Id == "bb.ledger-worker").DiscoverLinks);
         Assert.DoesNotContain(Links(off.View.Current).Keys, k => k.StartsWith("bb.ledger-worker"));
+    }
+
+    [Fact]
+    public async Task An_address_written_with_the_service_code_draws_the_link_to_the_service_with_the_longer_name()
+    {
+        var clock = new FakeTimeProvider(Now);
+        var (_, copy) = Make(TownA, true, clock);
+        using var _c = copy;
+        // one more rule of the town: <service code>.c.<pillar>.example.test, while the ids use the service names (ledger has the code "led")
+        copy.Replace("environments/prod.yaml", "  rules:\n", "  rules:\n    - { host: '^(?<service>[a-z]+)\\.c\\.(?<pillar>[a-z]+)\\.example\\.test$', target: '{pillar}.{service}-api' }\n");
+        var coded = new Town(copy.Path, true, clock);
+        var source = new FakeDependencies(_ => [new DependencyRow(coded.Roles["bb.ledger-worker"], "led.c.bb.example.test", null, Days("2026-10-28", "2026-10-30"), 100)]);
+
+        await coded.Runner(source, clock).RunOnceAsync(CancellationToken.None);
+
+        Assert.Equal(["bb.ledger-worker>calls bb.ledger-api"], Links(coded.View.Current).Keys);
+        Assert.DoesNotContain(coded.View.Notices, n => n.StartsWith("Unresolved call"));
     }
 
     [Fact]

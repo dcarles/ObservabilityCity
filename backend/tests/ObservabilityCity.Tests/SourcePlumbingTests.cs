@@ -395,6 +395,42 @@ public class SourcePlumbingTests
         Assert.Same(stuck.Cancelled.Task, gaveUp);
     }
 
+    [Fact]
+    public async Task The_poller_keeps_what_a_progressive_source_published_even_when_the_poll_then_fails_and_saves_it_for_the_next_start()
+    {
+        var folder = Path.Combine(Path.GetTempPath(), "oc-poller-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var state = new LatestState();
+            var source = new PublishThenFail();
+            var poller = new SourcePoller([source], new RegistryHolder(RegistryLoader.Load(TestPaths.LiveTown)), state, NullLogger<SourcePoller>.Instance, new ReadingCache(folder));
+
+            await poller.StartAsync(TestContext.Current.CancellationToken);
+            await Task.WhenAny(source.Done.Task, Task.Delay(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
+            await Task.Delay(200, TestContext.Current.CancellationToken);
+            await poller.StopAsync(TestContext.Current.CancellationToken);
+
+            Assert.Equal(["a.one"], state.Of("progressive").Keys);
+            Assert.Equal(["a.one"], new ReadingCache(folder).Load("progressive").Keys);
+        }
+        finally { if (Directory.Exists(folder)) Directory.Delete(folder, true); }
+    }
+
+    private sealed class PublishThenFail : IProgressiveMetricSource
+    {
+        public TaskCompletionSource Done { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public string Name => "progressive";
+        public TimeSpan PollInterval => TimeSpan.FromMinutes(10);
+        public Task<IReadOnlyDictionary<string, NodeReading>> PollAsync(Registry registry, CancellationToken ct) => throw new InvalidOperationException("the poller must use the progressive call");
+
+        public Task PollAsync(Registry registry, Action<IReadOnlyDictionary<string, NodeReading>> publish, CancellationToken ct)
+        {
+            publish(new Dictionary<string, NodeReading> { ["a.one"] = new(DateTimeOffset.UtcNow, true, 0, 0, 0, 0, 0, 0, Cpu: 0.2) });
+            Done.TrySetResult();
+            throw new HttpRequestException("one of the reads failed");
+        }
+    }
+
     private sealed class Stuck(TimeSpan timeout) : IMetricSource
     {
         public TaskCompletionSource Cancelled { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);

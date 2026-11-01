@@ -4,6 +4,11 @@
    "id": "00000000-0000-0000-0000-0000000000f1",
    "name": "acme-eu-prd-al",
    "tags": {}
+  },
+  {
+   "id": "00000000-0000-0000-0000-0000000000a9",
+   "name": "acme-eu-prd-platform",
+   "tags": {}
   }
  ],
  "resources": [
@@ -98,6 +103,38 @@
    "name": "kv-acme-zz-ord",
    "type": "microsoft.keyvault/vaults",
    "subscriptionId": "00000000-0000-0000-0000-0000000000f1",
+   "location": "northeurope",
+   "tags": {}
+  },
+  {
+   "id": "/subscriptions/00000000-0000-0000-0000-0000000000a9/resourceGroups/rg-ops/providers/microsoft.operationalinsights/workspaces/law-acme-prd",
+   "name": "law-acme-prd",
+   "type": "microsoft.operationalinsights/workspaces",
+   "subscriptionId": "00000000-0000-0000-0000-0000000000a9",
+   "location": "northeurope",
+   "tags": {}
+  },
+  {
+   "id": "/subscriptions/00000000-0000-0000-0000-0000000000a9/resourceGroups/rg-ops/providers/microsoft.insights/components/appi-acme-prd-edge",
+   "name": "appi-acme-prd-edge",
+   "type": "microsoft.insights/components",
+   "subscriptionId": "00000000-0000-0000-0000-0000000000a9",
+   "location": "northeurope",
+   "tags": {}
+  },
+  {
+   "id": "/subscriptions/00000000-0000-0000-0000-0000000000f1/resourceGroups/rg/providers/microsoft.insights/components/appi-acme-al-decoy",
+   "name": "appi-acme-al-decoy",
+   "type": "microsoft.insights/components",
+   "subscriptionId": "00000000-0000-0000-0000-0000000000f1",
+   "location": "northeurope",
+   "tags": {}
+  },
+  {
+   "id": "/subscriptions/00000000-0000-0000-0000-0000000000a9/resourceGroups/rg-ops/providers/microsoft.apimanagement/service/apim-gateway",
+   "name": "apim-gateway",
+   "type": "microsoft.apimanagement/service",
+   "subscriptionId": "00000000-0000-0000-0000-0000000000a9",
    "location": "northeurope",
    "tags": {}
   }

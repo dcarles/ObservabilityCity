@@ -290,6 +290,21 @@ test.describe('the numbers in the top bar', () => {
     expect(borealis.degraded + borealis.down).toBeGreaterThan(acme.degraded + acme.down)
   })
 
+  test('the degraded and down chips agree with their lists, even when a tenant database is past the red line', async ({ town, page }) => {
+    await town.open()
+    await town.effect(`${DB}#acme`, 'Saturate')
+    await town.until(DB, (n) => (n.throttled ?? 0) > 0)
+    await page.evaluate(() => (window as any).city.setTenantView({ hideTest: true, tenants: [] }))
+    const t = await page.evaluate(() => (window as any).city.totals())
+    for (const [state, count] of [['Degraded', t.degraded], ['Down', t.down]] as const) {
+      await page.locator(`#topbar [data-list="${state}"]`).click()
+      await expect(page.locator('#state-list .hit')).toHaveCount(count)
+      await page.locator('#state-list-close').click().catch(() => {})
+    }
+    expect(t.down).toBe(0) // a hot database is amber, as its building says
+    expect(t.degraded).toBeGreaterThan(0)
+  })
+
   test('the chip shows what the totals say', async ({ town, page }) => {
     await town.open()
     await page.evaluate(() => (window as any).city.setTenantView({ hideTest: false, tenants: ['acme'] }))

@@ -6,6 +6,13 @@
    "tags": {
     "unit": "aa"
    }
+  },
+  {
+   "id": "00000000-0000-0000-0000-0000000000b8",
+   "name": "shared-services",
+   "tags": {
+    "unit": "shared"
+   }
   }
  ],
  "resources": [
@@ -103,6 +110,22 @@
    "type": "microsoft.keyvault/vaults",
    "subscriptionId": "00000000-0000-0000-0000-0000000000f2",
    "location": "ams",
+   "tags": {}
+  },
+  {
+   "id": "/subscriptions/00000000-0000-0000-0000-0000000000b8/resourceGroups/rg-ops/providers/microsoft.operationalinsights/workspaces/central-logs",
+   "name": "central-logs",
+   "type": "microsoft.operationalinsights/workspaces",
+   "subscriptionId": "00000000-0000-0000-0000-0000000000b8",
+   "location": "westeurope",
+   "tags": {}
+  },
+  {
+   "id": "/subscriptions/00000000-0000-0000-0000-0000000000b8/resourceGroups/rg-ops/providers/microsoft.insights/components/central-app-monitor",
+   "name": "central-app-monitor",
+   "type": "microsoft.insights/components",
+   "subscriptionId": "00000000-0000-0000-0000-0000000000b8",
+   "location": "westeurope",
    "tags": {}
   }
  ]

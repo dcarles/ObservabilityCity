@@ -154,6 +154,8 @@ export class CarSystem {
   private hidden: ReadonlySet<Building> = new Set()
   /** The share of the usual number of cars that are sent out: 1 for every car, less on a weak PC (see the quality presets). */
   density = 1
+  /** The town's own multiple of the usual number of cars (town.yaml trafficDensity), on top of the quality share above. */
+  townDensity = 1
   /** Where the dice come from: which cars fail, when they leave, which tenant they carry. Tests swap in a seeded one so a run repeats. */
   random: () => number = Math.random
   /** Cars sent out since the town was built. For tests. */
@@ -249,7 +251,7 @@ export class CarSystem {
       if (this.hidden.has(plan.route.dest) || this.hidden.has(plan.route.source as Building)) continue
       const n = plan.route.dest.node
       if (!n || (n.state !== 'Healthy' && n.state !== 'Degraded')) continue
-      const a = (this.acc.get(plan) ?? this.random()) + spawnRate(n.requestsPerSecond) * TRAFFIC * this.density * shareOf(plan.route) * dt
+      const a = (this.acc.get(plan) ?? this.random()) + spawnRate(n.requestsPerSecond) * TRAFFIC * this.density * this.townDensity * shareOf(plan.route) * dt
       // a car that cannot leave yet (the road is not clear) waits its turn, up to a few
       let owed = a
       while (owed >= 1 && this.cars.length < this.max && this.spawn(plan)) owed -= 1

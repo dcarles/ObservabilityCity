@@ -6,7 +6,7 @@ import type { GroupSnapshot, NodeSnapshot, Snapshot } from '../types'
 import { palette } from '../themes/active'
 import { blockPad, bench, bridge, crates, fountain, junction, lamp, pier, prop, ring, roadBetween, ROAD_W, serviceLane, street, streetX } from './props'
 import { buildIslandBody, GROUND, makeOutline, scatterNature, type Outline, type Rect } from './island'
-import { CURB, LANE_Z, PAD_D, PAD_W, coastScan, laneStart, padX, planIsland, rowEdge, type Placed, type Plan } from './plan'
+import { CURB, LANE_Z, PAD_D, PAD_W, coastScan, laneStart, padX, placeHubClusters, planIsland, rectsTouch, rowEdge, type HubCluster, type Placed, type Plan } from './plan'
 import { hashString } from './random'
 import { clamp, speedFactor } from '../visuals'
 import { CarSystem, type Route } from './cars'
@@ -108,6 +108,9 @@ export class Town {
   /** Size of the hub for this town. It grows with the number of islands. */
   private hubGeo: HubGeometry = hubGeometry(0)
   private hubDecor = new THREE.Group()
+  /** The resource buildings on the hub island (shared monitoring and the like), by id, and the clusters they stand in. */
+  private hubAssets = new Map<string, AssetBuilding>()
+  private hubClusters: HubCluster[] = []
   /** Extent used to frame the camera. */
   readonly bounds = new THREE.Box3()
   /** Points along every coast, for working out how far back the camera must stand to show the whole town. */
@@ -540,7 +543,7 @@ export class Town {
 
   /** Boxes over every resource building, for picking with the pointer. Each carries `userData.assetId`. */
   assetHits(): THREE.Object3D[] {
-    return this.islands.flatMap((i) => [...i.assets.values()].map((a) => a.hit))
+    return [...this.islands.flatMap((i) => [...i.assets.values()].map((a) => a.hit)), ...[...this.hubAssets.values()].map((a) => a.hit)]
   }
 
   /** What one resource building is, from the latest snapshot. Null when the snapshot no longer has it. */
@@ -550,8 +553,14 @@ export class Town {
 
   /** The resource buildings on an island: id, what they are, how they look, where they stand. For tests. */
   inspectAssets(groupId: string): { id: string; label: string; shape: string; service: string | null; x: number; z: number; behindPad: boolean }[] {
+    if (groupId === 'hub') return [...this.hubAssets.values()].map((a) => ({ id: a.asset.id, label: a.asset.label, shape: a.asset.shape, service: null, x: a.root.position.x, z: a.root.position.z, behindPad: false }))
     const isl = this.islands.find((i) => i.group.id === groupId)
     return isl ? [...isl.assets.values()].map((a) => ({ id: a.asset.id, label: a.asset.label, shape: a.asset.shape, service: a.asset.service ?? null, x: a.root.position.x, z: a.root.position.z, behindPad: a.behindPad })) : []
+  }
+
+  /** The clusters of resource buildings on the hub: name, where, how many. For tests. */
+  inspectHubClusters(): { name: string; x: number; z: number; w: number; d: number; ids: string[] }[] {
+    return this.hubClusters.map((c) => ({ name: c.name, x: c.x, z: c.z, w: c.w, d: c.d, ids: c.assets.map((a) => a.asset.id) }))
   }
 
   /** What one service is and how it is doing, from the latest snapshot. Null when no island has it. */
@@ -643,6 +652,26 @@ export class Town {
       this.buildings.set(n.id, b)
       out.push(b)
       avoid.push({ x: spot.x, z: spot.z, w: 12, d: 12 })
+    }
+    // shared resources that are not systems (a log workspace, application insights...) stand in clusters, each with a sign, wherever the hub has room
+    this.hubAssets = new Map()
+    const roomRects = [...avoid]
+    for (const port of ports) for (let r = 9 * f; r < 30 * f; r += 3) roomRects.push({ x: Math.sin(port.angle) * r, z: CZ - Math.cos(port.angle) * r, w: 8, d: 8 })
+    const layout = placeHubClusters(hub?.assets ?? [], this.hubGeo.rx, this.hubGeo.rz, CZ, (rect) =>
+      !roomRects.some((a) => rectsTouch(rect, a, 0.5)) && [[-1, -1], [1, -1], [-1, 1], [1, 1]].every(([sx, sz]) => this.hubOutline.contains(rect.x + (sx * rect.w) / 2, rect.z + (sz * rect.d) / 2, 3)))
+    this.hubClusters = layout.clusters
+    for (const name of layout.left) console.warn(`Hub cluster ${name} has no free place and is not drawn`)
+    for (const c of layout.clusters) {
+      const sign = islandSign(c.name, hub?.color ?? palette.flagFallback, c.signX, c.signZ)
+      sign.scale.setScalar(0.85)
+      sign.rotation.y = 0
+      hubRoot.add(sign)
+      for (const p of c.assets) {
+        const b = new AssetBuilding(p.asset, p.x, GROUND + 0.08, p.z, false)
+        hubRoot.add(b.root)
+        this.hubAssets.set(p.asset.id, b)
+      }
+      avoid.push({ x: c.x, z: c.z, w: c.w, d: c.d })
     }
     // plaza: paved centre with a fountain inside a ring road, and the roads out to each building
     const paving = new THREE.Mesh(new THREE.CylinderGeometry(3.7 * f, 3.8 * f, 0.14, 48), new THREE.MeshStandardMaterial({ color: palette.island.pavement, roughness: 0.95, flatShading: true }))
@@ -1021,6 +1050,16 @@ export class Town {
    * callers come from the airport, which is on the ring road. Systems on the same island that declare a call to it drive over from their
    * own doors. No car starts anywhere else.
    */
+  /** Whether a system calls another, directly or through the API gateway. */
+  private callsIt(p: Placed, dest: Placed): boolean {
+    return p.node.calls.includes(dest.node.id) || (p.node.gatewayCalls ?? []).includes(dest.node.id)
+  }
+
+  /** Every car route as the scene built it: who drives to whom, and whether the cars are inside or outside callers. For tests. */
+  inspectRoutes(): { source: string | null; dest: string | null; origin: string }[] {
+    return this.cars.routeList.map((r) => ({ source: (r.source as Building).node?.id ?? null, dest: r.dest.node?.id ?? null, origin: r.origin }))
+  }
+
   private islandRoutes(index: number, gates: Gate[], gateway: Building | undefined): Route[] {
     const here = gates[index]
     const { island, plan } = here
@@ -1045,12 +1084,13 @@ export class Town {
       // telemetry shows; not measured, the rate is shared evenly between everything that can be seen to call it (see inboundMix).
       const outsideReach = dest.node.external || this.outsideReach.has(dest.node.id)
       const mayBeCalledFromOutside = dest.node.kind === 'Api' || outsideReach
-      const callers = plan.placed.filter((s) => s !== dest && s.node.calls.includes(dest.node.id))
+      const callers = plan.placed.filter((s) => s !== dest && s.node.calls.includes(dest.node.id)) // same island: plain calls only (the gateway is for other islands)
       // Callers on other islands: the ones that declare a call to it, else one other island picked from its name.
       const declared: { gate: number; from: Placed }[] = []
       gates.forEach((g, i) => {
         if (i === index || !linked(g)) return
-        for (const p of g.plan.placed) if (p.node.calls.includes(dest.node.id) && !declared.some((d) => d.gate === i)) declared.push({ gate: i, from: p })
+        // a call through the API gateway is a call from that island too: it drives over the bridge like any other
+        for (const p of g.plan.placed) if (this.callsIt(p, dest) && !declared.some((d) => d.gate === i)) declared.push({ gate: i, from: p })
       })
       const callerIds = new Set([...declared.map((d) => d.from.node.id), ...callers.map((c) => c.node.id)])
       const mix = () => inboundMix(b.node, callerIds, outsideReach)
@@ -1278,7 +1318,7 @@ function parkProps(x: number, z: number): THREE.Object3D[] {
 }
 
 function layoutKey(s: Snapshot): string {
-  const groups = s.groups.map((g) => `${g.id}${g.configError ? '!' : ''}:${g.nodes.map((n) => `${n.id}/${n.kind}/${n.tenants != null ? 'T' : ''}/${n.service ?? ''}/${n.calls.join('+')}/${(n.gatewayCalls ?? []).join('+')}`).join(',')}|${g.hasBridge === false ? 'nb' : 'b'}${g.hasRingBridge ? 'r' : ''}|${(g.assets ?? []).map((a) => `${a.id}/${a.shape}/${a.service ?? ''}`).join('+')}|${(g.messaging?.topics ?? []).map((t) => t.name).join('+')}|${(g.messaging?.subscriptions ?? []).map((x) => `${x.topic}>${x.consumer}${x.legacy ? '!' : ''}`).join('+')}`).join(';')
+  const groups = s.groups.map((g) => `${g.id}${g.configError ? '!' : ''}:${g.nodes.map((n) => `${n.id}/${n.kind}/${n.tenants != null ? 'T' : ''}/${n.service ?? ''}/${n.calls.join('+')}/${(n.gatewayCalls ?? []).join('+')}`).join(',')}|${g.hasBridge === false ? 'nb' : 'b'}${g.hasRingBridge ? 'r' : ''}|${(g.assets ?? []).map((a) => `${a.id}/${a.shape}/${a.service ?? ''}/${a.group ?? ''}`).join('+')}|${(g.messaging?.topics ?? []).map((t) => t.name).join('+')}|${(g.messaging?.subscriptions ?? []).map((x) => `${x.topic}>${x.consumer}${x.legacy ? '!' : ''}`).join('+')}`).join(';')
   const vendors = (s.vendors ?? []).map((v) => `${v.node.id}@${v.islandId ?? ''}<${v.calledBy.join('+')}`).join(';')
   return `${s.townId}|${s.environment ?? ''}|${groups}|${vendors}|${edgeKey(s)}`
 }

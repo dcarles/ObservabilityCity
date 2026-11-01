@@ -30,6 +30,7 @@ Thresholds cascade: `defaults.yaml` (per role) → the pillar's `defaults` → t
 | `groupLabel` | no | `Group` | What one island is called in the interface (for example Pillar, Domain, Team). |
 | `topology` | no | `direct` | `direct`: islands are linked by an outer ring road. `hub-and-spoke`: islands call each other through a gateway on the hub. |
 | `mode` | no | `live` | `demo` gives the town a fake source, the Break things panel and the story bar. `live` never does. |
+| `trafficDensity` | no | `1` | How many cars appear, as a multiple of the usual number: `1` is the usual look, `2` twice as many, `0.5` half. From `0.25` to `10`. A weak PC still lowers it with the quality setting, and the town never shows more than 420 cars at once. |
 | `expectedWarnings` | no | none | Warnings the validator should expect, for a test folder that shows a rule on purpose. |
 
 <!-- file: ExpectedWarningFile -->
@@ -290,7 +291,7 @@ Finds the calls the systems really make, from the dependency data in the telemet
 |---|---|---|---|
 | `host` | yes | | A regular expression over the host, with named groups `(?<name>...)`. |
 | `path` | no | none | A regular expression over the path, for a gateway that names the destination in it. |
-| `target` | yes | | The system id, written with `{name}` holes for the named groups and `{callerPillar}` for the pillar of the caller. A rule whose result is not a system of the town is skipped. |
+| `target` | yes | | The system id, written with `{name}` holes for the named groups and `{callerPillar}` for the pillar of the caller. A rule whose result is not a system of the town is skipped. A captured group named `service` may hold the service's name or its `serviceCode` (in the pillar the address names, else the caller's): when it is not a service name, the pillar's `serviceCode` finds the service, so one rule serves addresses written with short codes. An entry in `aliases` wins over that lookup; a code shared by two services of a pillar is never guessed. |
 | `gateway` | no | `false` | The call goes through the API gateway, so it is drawn as one (to a system on another island). |
 
 <!-- file: TrafficFile -->
@@ -347,7 +348,7 @@ links:
 | `workspaceId` | no | none | The workspace's id (GUID or resource id), a template. Wins over `workspace`. |
 | `variables` | no | none | Your own names for use in templates. |
 | `subscription` | no | none | Which subscriptions belong to the environment. |
-| `pillars` | no | none | Pillar id → the id of the subscription that holds its resources. |
+| `pillars` | no | none | Pillar id → the id of the subscription that holds its resources. `hub` is accepted too, so the hub's gateway and broker find their resources and portal links. |
 | `resources` | no | none | Rules that find a system's cloud resources. |
 | `telemetryRole` | no | none | Template for a system's telemetry name when it gives none. |
 | `links` | no | none | Addresses that open a resource in a portal or console, shown beside each resource in the Config tab. |
@@ -386,9 +387,12 @@ links:
 |---|---|---|---|
 | `name` | yes | | Names the rule (lowercase kebab-case). |
 | `label` | yes | | What the resource is, in the drawer's words (for example `Key vault`). |
-| `shape` | no | `box` | How the building looks: `box`, `vault`, `store` or `settings`. |
-| `types` | yes | | The resource types it applies to. They are looked for in each pillar's subscription. |
-| `pattern` | yes | | Regular expression over the resource's name. Optional named groups: `service` (matched with a system's `serviceCode`; a match stands the building beside that service's pad, otherwise it stands in the pillar's back yard), `pillar` (another pillar's resource is left out) and `region`. |
+| `shape` | no | `box` | How the building looks: `box`, `vault`, `store`, `settings` or `observatory`. |
+| `types` | yes | | The resource types it applies to. They are looked for in each pillar's subscription (or, with `island: hub`, in the subscriptions `subscription` names). |
+| `pattern` | yes | | Regular expression over the resource's name. Optional named groups: `service` (matched with a system's `serviceCode`; a match stands the building beside that service's pad, otherwise it stands in the pillar's back yard), `pillar` (another pillar's resource is left out) and `region`. On the hub only `region` is allowed. |
+| `island` | no | the pillar it is found in | `hub` stands the building on the hub island, in the cluster `group` names. It belongs to no pillar and no service. |
+| `group` | with `island: hub` | | The cluster of buildings it stands in on the hub, named on a sign (for example `Monitoring`). Rules with the same group share a cluster. |
+| `subscription` | no | the pillars' subscriptions | With `island: hub`: which subscriptions to look in, by `nameLike` (a template over your `variables` and `{environment}`) or by `tag` (`key`, `value`). Use it when the shared resources live in a subscription of their own. |
 
 <!-- file: RegionsFile -->
 | Key | Required | Default | Meaning |

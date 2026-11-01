@@ -264,6 +264,7 @@ async function start(): Promise<void> {
         servicePanel.close()
       }
       town.apply(s)
+      town.cars.townDensity = s.trafficDensity
       if (s.mode === 'demo') startDemoTools()
       // a followed tenant that left the environment can no longer be followed
       const pruned = pruneTenants(tenantView, s.tenants ?? [])
@@ -404,10 +405,12 @@ async function start(): Promise<void> {
     feed: (raw: unknown) => onSnapshot(raw),
     inspect: (id: string) => town.inspect(id),
     inspectIsland: (id: string) => town.inspectIsland(id),
+    inspectRoutes: () => town.inspectRoutes(),
     inspectAirport: () => town.inspectAirport(),
     inspectRoads: () => town.inspectRoads(),
     inspectServices: (id: string) => town.inspectServices(id),
     inspectAssets: (id: string) => town.inspectAssets(id),
+    inspectHubClusters: () => town.inspectHubClusters(),
     /** Open a service's panel as a click on its sign would. */
     openService: (key: string) => { const sv = seen.last ? town.serviceSummary(key, seen.last) : null; if (sv) { inspector.close(); servicePanel.show(sv) } return sv },
     /** Open a resource building's card as a click on it would. */

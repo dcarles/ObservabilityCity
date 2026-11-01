@@ -59,7 +59,7 @@ public sealed class LinkDiscoveryRunner(
         var from = store.ReadUpTo is { } last && last > now - config.FirstRead ? last : now - config.FirstRead;
         var rows = await source.ReadDependenciesAsync(view, config.Query, byRole.Keys.ToList(), from, now, ct);
 
-        var classifier = new LinkClassifier(config, view.Vendors, view.AllNodes.Select(n => n.Id));
+        var classifier = new LinkClassifier(config, view.Vendors, view.AllNodes.Select(n => n.Id), LinkClassifier.ServicesOf(view.AllNodes));
         foreach (var row in rows)
         {
             if (!byRole.TryGetValue(row.Caller, out var caller)) continue;

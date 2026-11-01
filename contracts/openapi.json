@@ -218,6 +218,10 @@
               "$ref": "#/components/schemas/ResourceLink"
             },
             "nullable": true
+          },
+          "group": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -1014,6 +1018,7 @@
           "totals",
           "townId",
           "townName",
+          "trafficDensity",
           "vendors",
           "view"
         ],
@@ -1116,6 +1121,10 @@
           "cloud": {
             "type": "string",
             "nullable": true
+          },
+          "trafficDensity": {
+            "type": "number",
+            "format": "double"
           },
           "notes": {
             "type": "array",

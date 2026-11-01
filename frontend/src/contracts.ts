@@ -98,6 +98,7 @@ export interface components {
             service?: string | null;
             region?: string | null;
             links?: components["schemas"]["ResourceLink"][] | null;
+            group?: string | null;
         };
         ConfigValue: {
             key: string;
@@ -337,6 +338,8 @@ export interface components {
             /** Format: double */
             outsideRequestsPerSecond?: number | null;
             cloud?: string | null;
+            /** Format: double */
+            trafficDensity: number;
             notes?: string[] | null;
         };
         SubscriptionSnapshot: {

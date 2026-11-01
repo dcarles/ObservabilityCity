@@ -438,6 +438,91 @@ public class PlatformMetricsTests
     }
 
     [Fact]
+    public async Task Each_system_is_reported_as_soon_as_its_own_resources_are_read_not_when_every_read_is_done()
+    {
+        var http = new CannedHttp().Respond(_ => CannedHttp.Reply("""{"value":[{"name":{"value":"CpuPercentage"},"timeseries":[{"data":[{"average":50}]}]}]}"""));
+        var (source, registry) = await Platform(TownA, http);
+        var batches = new List<IReadOnlyDictionary<string, NodeReading>>();
+
+        await ((IProgressiveMetricSource)source).PollAsync(registry, batches.Add, CancellationToken.None);
+
+        Assert.True(batches.Count > 1, "every system came in one batch at the end");
+        Assert.All(batches, b => Assert.NotEmpty(b));
+    }
+
+    [Fact]
+    public async Task A_failing_read_holds_back_only_the_systems_that_use_it_and_the_rest_are_reported_before_the_poll_fails()
+    {
+        var everyone = new HashSet<string>();
+        var ok = new CannedHttp().Respond(_ => CannedHttp.Reply("""{"value":[{"name":{"value":"CpuPercentage"},"timeseries":[{"data":[{"average":50}]}]}]}"""));
+        var (all, town) = await Platform(TownA, ok);
+        await ((IProgressiveMetricSource)all).PollAsync(town, b => { foreach (var id in b.Keys) everyone.Add(id); }, CancellationToken.None);
+
+        var http = new CannedHttp().Respond(r => r.Uri!.AbsolutePath.Contains("westeurope9z")
+            ? CannedHttp.Reply("""{"error":{"code":"AuthorizationFailed"}}""", HttpStatusCode.Forbidden)
+            : CannedHttp.Reply("""{"value":[{"name":{"value":"CpuPercentage"},"timeseries":[{"data":[{"average":50}]}]}]}"""));
+        var (source, registry) = await Platform(TownA, http);
+        var published = new HashSet<string>();
+
+        var e = await Assert.ThrowsAsync<HttpRequestException>(() => ((IProgressiveMetricSource)source).PollAsync(registry, b => { foreach (var id in b.Keys) published.Add(id); }, CancellationToken.None));
+
+        Assert.Contains("resource reads failed", e.Message);
+        Assert.True(published.IsSubsetOf(everyone) && published.Count < everyone.Count, $"published {published.Count} of {everyone.Count}");
+    }
+
+    [Fact]
+    public void Saved_readings_come_back_as_they_were_with_the_time_they_were_taken_and_a_bad_file_is_ignored()
+    {
+        var folder = Path.Combine(Path.GetTempPath(), "oc-readings-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var cache = new ReadingCache(folder);
+            var at = DateTimeOffset.Parse("2026-11-01T01:00:00Z");
+            cache.Save("platform", new Dictionary<string, NodeReading>
+            {
+                ["aa.orders-db"] = new(at, true, 0, 0, 0, 0, 0, 0, Cpu: 0.4, Utilisation: 0.9, Throttled: 0.1,
+                    Tenants: [new TenantReading("t1", 0.9, 0.1, 3, "Acme", 4000)], Regions: [new RegionReading("North", null, 0.4, 0.5)]),
+            });
+
+            var back = new ReadingCache(folder).Load("platform");
+
+            var r = Assert.Single(back).Value;
+            Assert.Equal(at, r.At);
+            Assert.Equal(0.9, r.Utilisation);
+            Assert.Equal("Acme", Assert.Single(r.Tenants!).Name);
+            Assert.Equal("North", Assert.Single(r.Regions!).Region);
+            File.WriteAllText(Path.Combine(folder, "platform.json"), "{ not json");
+            Assert.Empty(new ReadingCache(folder).Load("platform"));
+            Assert.Empty(new ReadingCache(folder).Load("never-saved"));
+        }
+        finally { if (Directory.Exists(folder)) Directory.Delete(folder, true); }
+    }
+
+    [Fact]
+    public async Task A_restart_within_the_freshness_window_starts_from_the_saved_readings_and_an_older_save_comes_back_stale()
+    {
+        var folder = Path.Combine(Path.GetTempPath(), "oc-readings-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var time = new FakeTimeProvider(T0);
+            var (source, registry) = await Platform(TownA);
+            var first = new LatestState();
+            first.Update("platform", await source.PollAsync(registry, CancellationToken.None));
+            new ReadingCache(folder).Save("platform", first.Of("platform"));
+            Assert.NotEmpty(first.Of("platform"));
+
+            var restarted = new LatestState();
+            restarted.Update("platform", new ReadingCache(folder).Load("platform"));
+            var builder = () => new SnapshotBuilder(registry, restarted, time) { Environment = "prod", StaleAfter = TimeSpan.FromMinutes(4) };
+
+            Assert.Equal(first.Of("platform").Count, restarted.Of("platform").Count);
+            time.SetUtcNow(first.Of("platform").Values.Max(r => r.At) + TimeSpan.FromHours(1));
+            Assert.All(builder().Build().Groups.SelectMany(g => g.Nodes).Where(n => restarted.Of("platform").ContainsKey(n.Id)), n => Assert.NotEqual(HealthState.Healthy, n.State));
+        }
+        finally { if (Directory.Exists(folder)) Directory.Delete(folder, true); }
+    }
+
+    [Fact]
     public async Task A_refused_read_fails_the_poll_and_says_how_many_and_what_the_cloud_answered()
     {
         var http = new CannedHttp().Respond(r => r.Uri!.AbsolutePath.Contains("westeurope9z")

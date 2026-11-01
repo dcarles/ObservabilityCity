@@ -10,6 +10,8 @@ internal sealed class TownFile
     public string Topology { get; set; } = "direct";
     /// <summary>"demo" (a town with a fake source and the Break things panel) or "live". A town that does not say is live.</summary>
     public string Mode { get; set; } = "live";
+    /// <summary>How many cars appear, as a multiple of the usual number. 1 is the usual look.</summary>
+    public double TrafficDensity { get; set; } = 1;
     /// <summary>Warnings the validator should expect in this registry (a test registry that shows a rule on purpose). Read by the validator only.</summary>
     public List<ExpectedWarningFile> ExpectedWarnings { get; set; } = [];
 }
@@ -296,6 +298,12 @@ internal sealed class AssetRuleFile
     public string Shape { get; set; } = "box";
     public List<string> Types { get; set; } = [];
     public string Pattern { get; set; } = "";
+    /// <summary>"hub": the building stands on the hub island instead of a pillar's island. Leave out for a pillar's own resource.</summary>
+    public string? Island { get; set; }
+    /// <summary>For a hub building: the cluster it stands in, named on a sign (for example Monitoring).</summary>
+    public string? Group { get; set; }
+    /// <summary>For a hub building: which subscriptions to look in. Without it, the pillars' subscriptions.</summary>
+    public SubscriptionRuleFile? Subscription { get; set; }
 }
 
 internal sealed class RegionsFile

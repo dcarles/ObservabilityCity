@@ -55,8 +55,8 @@ describe('the totals when some tenants are followed', () => {
   })
 
   it('count the degraded and down systems from the followed tenants databases', () => {
-    // acme is past the red line on the orders store, so following acme shows it down
-    expect(viewTotals(staging, view(['acme']))).toMatchObject({ degraded: 0, down: 1 })
+    // acme is past the red line on the orders store, which makes the store degraded (hot), never down: the same as the list shows
+    expect(viewTotals(staging, view(['acme']))).toMatchObject({ degraded: 1, down: 0 })
     // borealis is fine there: nothing is degraded, nothing down
     expect(viewTotals(staging, view(['borealis']))).toMatchObject({ degraded: 0, down: 0 })
     // a test tenant in trouble is amber
@@ -79,8 +79,16 @@ describe('the state a system counts as', () => {
   })
 
   it('is the worst of the chosen tenants databases for a tenant store', () => {
-    expect(stateFor(store(), staging.tenants, view(['acme', 'borealis']))).toBe('Down')
+    expect(stateFor(store(), staging.tenants, view(['acme', 'borealis']))).toBe('Degraded') // acme is past the red line, still only amber for the store
     expect(stateFor(store(), staging.tenants, view(['borealis']))).toBe('Healthy')
+  })
+
+  it('counts every hot store as degraded and none as down when test tenants are only hidden, as the list does', () => {
+    const t = viewTotals(staging, view([], true))
+    const listed = staging.groups.flatMap((g) => g.nodes).filter((n) => n.state === 'Degraded').length
+    expect(t.down).toBe(0)
+    expect(t.degraded).toBeLessThanOrEqual(listed)
+    expect(stateFor({ ...store(), tenants: store().tenants!.map((u) => ({ ...u, state: 'Down' as const })) }, staging.tenants, view([], true))).toBe('Degraded')
   })
 
   it('stays down when the store itself is down, whoever is followed', () => {
@@ -101,5 +109,18 @@ describe('systems with no data', () => {
 
     expect(staleCount(quiet)).toBe(2)
     expect(viewTotals(quiet, ALL_TENANTS).stale).toBe(2)
+  })
+
+  it('fall one by one as the systems report in during the first reads', () => {
+    const loading = structuredClone(staging)
+    const real = loading.groups.flatMap((g) => g.nodes).filter((n) => n.state !== 'Stale')
+    expect(real.length).toBeGreaterThan(2)
+    real.forEach((n) => { n.state = 'Stale' })
+    const before = staleCount(loading)
+    real.forEach((n, i) => {
+      n.state = 'Healthy'
+      expect(staleCount(loading)).toBe(before - (i + 1))
+      expect(viewTotals(loading, ALL_TENANTS).stale).toBe(before - (i + 1))
+    })
   })
 })

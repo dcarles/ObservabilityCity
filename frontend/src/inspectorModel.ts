@@ -18,10 +18,10 @@ export const notFoundText = (cloud?: string | null): string => `not found in ${c
 const jobName = (j: { name: string; region?: string | null }): string => (j.region ? `${j.name} (${j.region})` : j.name)
 
 /** The jobs of a function that are failing or late, in words. */
-export function jobReasons(n: Pick<NodeSnapshot, 'jobs'>): string[] {
+export function jobReasons(n: Pick<NodeSnapshot, 'jobs'>, now: number = Date.now()): string[] {
   return (n.jobs ?? []).flatMap((j) =>
-    j.status === 'Failed' ? [`Job ${jobName(j)} failed its last run${j.lastRun ? ` at ${clockTime(j.lastRun)}` : ''}.`]
-      : j.status === 'Overdue' ? [`Job ${jobName(j)} should have run${j.next ? ` at ${clockTime(j.next)}` : ''} and has not.`]
+    j.status === 'Failed' ? [`Job ${jobName(j)} failed its last run${j.lastRun ? ` at ${dayTime(j.lastRun, now)}` : ''}.`]
+      : j.status === 'Overdue' ? [`Job ${jobName(j)} should have run${j.next ? ` at ${dayTime(j.next, now)}` : ''} and has not.`]
         : [])
 }
 
@@ -84,10 +84,10 @@ export function overviewRows(n: NodeSnapshot, nameOf: (id: string) => string = (
 const JOB_TONE: Record<JobSnapshot['status'], Tone> = { Ok: '', Failed: 'bad', Overdue: 'warn' }
 
 /** One row for each scheduled job of a function, in each region: how it stands, when it last ran and when it runs next. Nothing for a building without jobs. */
-export function jobRows(n: Pick<NodeSnapshot, 'jobs'>): Row[] {
+export function jobRows(n: Pick<NodeSnapshot, 'jobs'>, now: number = Date.now()): Row[] {
   return (n.jobs ?? []).map((j) => ({
     label: jobName(j),
-    value: [j.status === 'Ok' ? 'ok' : j.status === 'Failed' ? 'failed' : 'overdue', j.lastRun ? `ran ${clockTime(j.lastRun)}` : null, j.next ? `next ${clockTime(j.next)}` : null].filter(Boolean).join(' · '),
+    value: [j.status === 'Ok' ? 'ok' : j.status === 'Failed' ? 'failed' : 'overdue', j.lastRun ? `ran ${dayTime(j.lastRun, now)}` : null, j.next ? `next ${dayTime(j.next, now)}` : null].filter(Boolean).join(' · '),
     tone: JOB_TONE[j.status],
   }))
 }
@@ -100,6 +100,23 @@ export function incidentSummary(incidents: readonly IncidentSnapshot[]): string 
 }
 
 export const SEVERITY_WORD: Record<number, string> = { 1: 'storm', 2: 'rain', 3: 'overcast', 4: 'light clouds' }
+
+/**
+ * "19:49" for a time today, "yesterday 00:00" or "tomorrow 00:00" a day either side, and "29 Oct 00:00" any other day, in the viewer's own time zone.
+ * A daily job with only a time of day cannot be told from one that ran a week ago.
+ */
+export function dayTime(iso: string, now: number): string {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  const p = (v: number) => String(v).padStart(2, '0')
+  const time = `${p(d.getHours())}:${p(d.getMinutes())}`
+  const midnight = (t: Date) => new Date(t.getFullYear(), t.getMonth(), t.getDate()).getTime()
+  const days = Math.round((midnight(d) - midnight(new Date(now))) / 86_400_000)
+  if (days === 0) return time
+  if (days === -1) return `yesterday ${time}`
+  if (days === 1) return `tomorrow ${time}`
+  return `${d.getDate()} ${d.toLocaleString('en-GB', { month: 'short' })} ${time}`
+}
 
 /** "12:04:09" in the viewer's own time zone. */
 export function clockTime(iso: string): string {

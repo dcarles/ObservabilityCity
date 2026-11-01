@@ -76,7 +76,7 @@ export const LEGEND: readonly LegendSection[] = [
       { id: 'vendor', sees: 'Small island out at sea', means: 'A third party we call, or a service of the company outside the monitored platform (labelled internal). Several services of one vendor stand on one island. Health comes from our calls to it', tone: 'neutral' },
       { id: 'sign', sees: 'Sign with a hedge in front of a block', means: 'A service: its API, worker and database, with the worst state of them', tone: 'neutral' },
       { id: 'yard', sees: 'Striped or pale unit in a yard', means: 'A test tenant. A "?" unit is a tenant nobody listed', tone: 'neutral' },
-      { id: 'asset', sees: 'Small plain building behind a block or in the back yard', means: 'A resource that is not a system, such as a key vault or a storage account. It is not monitored', tone: 'neutral' },
+      { id: 'asset', sees: 'Small plain building behind a block, in the back yard or in a cluster on the hub', means: 'A resource that is not a system, such as a key vault, a storage account or the log workspace (a cluster on the hub has a sign). It is not monitored', tone: 'neutral' },
       { id: 'signpost', sees: 'Signpost at a gate', means: 'Traffic to or from an island the island filter has hidden', tone: 'neutral' },
     ],
   },

@@ -205,7 +205,7 @@ public sealed record SpanRow(string Role, double Calls, double Errors, double? L
 /// <c>file:name.json</c> replays a recorded answer kept beside the town's files, for trying a query's shape offline and for tests.
 /// </summary>
 public sealed class LogAnalyticsSource(
-    string name, string environmentId, RegistrySource definition, LogAnalyticsReader reader, ScopeStore store, ScopeRules rules, string? recording, TimeProvider time) : IMetricSource, IDependencySource
+    string name, string environmentId, RegistrySource definition, LogAnalyticsReader reader, ScopeStore store, ScopeRules rules, string? recording, TimeProvider time) : IMetricSource, IDependencySource, IRateHistory
 {
     public bool CanReadDependencies => recording is null;
 
@@ -214,6 +214,27 @@ public sealed class LogAnalyticsSource(
         if (recording is not null) throw new InvalidOperationException($"source '{name}' replays a recording, which has no dependencies to read");
         var workspace = Workspace(store.Resolve(registry.ForEnvironment(environmentId)));
         return await reader.QueryDependenciesAsync(workspace, LinkQuery.Render(query, environmentId, rules, roles, from, to), from, to, ct);
+    }
+
+    public bool CanReadRates => recording is null;
+
+    /// <summary>The same query the polls use, asked over a longer window: the rate of each system averaged over it.</summary>
+    public async Task<IReadOnlyDictionary<string, double>> ReadAverageRatesAsync(TownRegistry registry, TimeSpan window, CancellationToken ct)
+    {
+        if (recording is not null) throw new InvalidOperationException($"source '{name}' replays a recording, which has no history to read");
+        var view = registry.ForEnvironment(environmentId);
+        var resolution = store.Resolve(view);
+        var asked = Asked(view, resolution);
+        if (asked.Count == 0) return new Dictionary<string, double>();
+        var query = definition.Query ?? throw new InvalidOperationException($"source '{name}' has no query");
+        var rows = await reader.QueryAsync(Workspace(resolution), SourceQuery.Render(query, definition, environmentId, rules, asked.Select(s => s.TelemetryRole!).Distinct(StringComparer.OrdinalIgnoreCase), window), window, ct);
+        return Readings(asked, rows, window, time.GetUtcNow()).ToDictionary(kv => kv.Key, kv => kv.Value.RequestsPerSecond);
+    }
+
+    private static List<SystemScope> Asked(TownRegistry view, Resolution resolution)
+    {
+        var serving = view.AllNodes.Where(n => n.Kind is NodeKind.Api or NodeKind.Worker or NodeKind.Gateway or NodeKind.Function).Select(n => n.Id).ToHashSet();
+        return resolution.Systems.Where(s => serving.Contains(s.SystemId) && !string.IsNullOrWhiteSpace(s.TelemetryRole)).ToList();
     }
 
     public string Name => name;
@@ -227,8 +248,7 @@ public sealed class LogAnalyticsSource(
         // a workspace given by name is looked up in the inventory, which is read at the same moment the first poll starts
         if (recording is null && string.IsNullOrWhiteSpace(definition.Connection) && store.Inventory is null) await store.WaitForReadAsync(Timeout / 2, ct);
         var resolution = store.Resolve(view);
-        var serving = view.AllNodes.Where(n => n.Kind is NodeKind.Api or NodeKind.Worker or NodeKind.Gateway or NodeKind.Function).Select(n => n.Id).ToHashSet();
-        var asked = resolution.Systems.Where(s => serving.Contains(s.SystemId) && !string.IsNullOrWhiteSpace(s.TelemetryRole)).ToList();
+        var asked = Asked(view, resolution);
         if (asked.Count == 0) return new Dictionary<string, NodeReading>();
 
         IReadOnlyList<SpanRow> rows;

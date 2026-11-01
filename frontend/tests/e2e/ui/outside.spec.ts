@@ -53,12 +53,27 @@ test.describe('where an API\'s traffic comes from', () => {
 
     const shares = await page.evaluate(() => {
       const c = (window as any).city
-      const n = c.seen.last.groups.flatMap((g: any) => g.nodes).find((x: any) => x.id === 'aa.orders-api')
-      return { measured: n.outsideRequestsPerSecond, routes: c.town.cars.routeList.filter((r: any) => r.dest.id === 'aa.orders-api' && r.origin === 'external').map((r: any) => (typeof r.share === 'function' ? r.share() : r.share)) }
+      const n = c.seen.last.groups.flatMap((g: any) => g.nodes).find((x: any) => x.id === 'cc.notify-api')
+      return { measured: n.outsideRequestsPerSecond, routes: c.town.cars.routeList.filter((r: any) => r.dest.id === 'cc.notify-api' && r.origin === 'external').map((r: any) => (typeof r.share === 'function' ? r.share() : r.share)) }
     })
 
     expect(shares.measured).toBeNull()
     expect(shares.routes).toEqual([1])
     expect(shares.routes).not.toContain(0.85)
+  })
+
+  test('not measured, a call through the gateway is a known caller: the outside and that caller share the traffic evenly', async ({ town, page }) => {
+    await town.open()
+
+    const routes = await page.evaluate(() => {
+      const c = (window as any).city
+      return c.town.cars.routeList
+        .filter((r: any) => r.dest.id === 'aa.orders-api')
+        .map((r: any) => ({ origin: r.origin, source: r.source.id ?? r.source.node?.id, share: typeof r.share === 'function' ? r.share() : r.share }))
+    })
+
+    // aa.orders-api is called through the gateway by cc.notify-api and is open to the outside: two slots, half each
+    expect(routes.filter((r: any) => r.origin === 'external').map((r: any) => r.share)).toEqual([0.5])
+    expect(routes.some((r: any) => r.origin === 'internal' && r.source === 'cc.notify-api' && Math.abs(r.share - 0.5) < 1e-9)).toBe(true)
   })
 })

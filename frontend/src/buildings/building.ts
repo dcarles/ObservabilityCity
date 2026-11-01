@@ -3,7 +3,7 @@ import type { NodeSnapshot } from '../types'
 import { isAbsent, isUnmonitored } from '../signals'
 import { beaconLevel, clamp, darkFloorsFor, floorsFor, formatAge, formatMs, formatRate, lerp, MAX_FLOORS, plaqueText, type BeaconLevel } from '../visuals'
 import { buildModel, palette } from '../themes/active'
-import type { BuildingModel, FloorModule, TenantYardStatus } from './model'
+import { labelRise, type BuildingModel, type FloorModule, type TenantYardStatus } from './model'
 import { ALL_TENANTS, type TenantView } from '../tenants'
 import { canvasTexture, roundRect } from './mk'
 
@@ -240,7 +240,7 @@ export class Building {
     this.model.animate?.(time, dt)
     this.hit.scale.y = y + 2
     this.hit.position.y = (y + 2) / 2
-    if (this.label) this.label.position.set(0, y + 3.4, 0)
+    if (this.label) this.label.position.set(0, y + labelRise(this.model.beaconAt.y), 0)
     this.fadeLabel(camera)
     this.closedSign.visible = n.state === 'Down'
   }

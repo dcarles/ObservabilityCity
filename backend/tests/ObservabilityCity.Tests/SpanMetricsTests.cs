@@ -462,4 +462,59 @@ public class SpanMetricsTests
 
         await AdapterContract.AssertPollAsync(set.Sources.Single(s => s.Name == "telemetry"), registry);
     }
+
+    // ---- the rate averaged over a longer stretch (the traffic split asks once at the start) ----
+
+    private const string Pinned = "00000000-0000-0000-0000-00000000beef";
+    private const string HourOfCalls = """{"tables":[{"name":"PrimaryResult","columns":[{"name":"role","type":"string"},{"name":"calls","type":"real"},{"name":"errors","type":"real"},{"name":"latencyMs","type":"real"}],"rows":[["OrdersApi",3600,0,100],["SomeoneElse",9,0,9]]}]}""";
+
+    [Theory]
+    [InlineData("a", "ago(1h)")]
+    [InlineData("b", "ago(3600s)")]
+    public async Task The_average_rate_is_the_towns_own_query_asked_over_the_longer_window(string town, string expected)
+    {
+        var folder = town == "a" ? TownA : TownB;
+        using var copy = new RegistryCopy(folder);
+        copy.Replace("environments/prod.yaml", "connection: \"file:telemetry.json\"", $"connection: \"{Pinned}\"");
+        var registry = Prod(copy.Path);
+        var env = registry.ActiveEnvironment!;
+        var http = CannedHttp.Always(HourOfCalls);
+        var definition = env.Sources.Single(s => s.Name == "telemetry");
+        var inventory = new AdapterCatalog([new AzureAdapters()]).Build(env, copy.Path);
+        await inventory.Sources.Single(s => s.Name == "inventory").PollAsync(registry, CancellationToken.None);
+        var scoped = (LogAnalyticsSource)new LogAnalyticsSourceFactory(new HttpClient(http), new FakeTimeProvider(T0)).Create(new SourceContext("prod", definition, null, env.Scope, inventory.Scope, copy.Path));
+
+        var rates = await scoped.ReadAverageRatesAsync(registry, TimeSpan.FromHours(1), CancellationToken.None);
+
+        Assert.True(scoped.CanReadRates);
+        Assert.Equal(1.0, rates["aa.orders-api"], 6); // 3600 calls in an hour
+        Assert.DoesNotContain("SomeoneElse", rates.Keys);
+        var sent = Assert.Single(http.Sent);
+        Assert.Contains(expected, sent.Json.GetProperty("query").GetString());
+        Assert.Equal("PT1H", sent.Json.GetProperty("timespan").GetString());
+        Assert.Contains(Pinned, sent.Uri!.ToString());
+    }
+
+    [Fact]
+    public void A_source_that_replays_a_recording_has_no_history_to_read()
+    {
+        var registry = Prod(TownA);
+        var set = new AdapterCatalog([new AzureAdapters()]).Build(registry.ActiveEnvironment!, TownA);
+
+        var source = Assert.IsType<LogAnalyticsSource>(set.Sources.Single(s => s.Name == "telemetry"));
+
+        Assert.False(source.CanReadRates);
+    }
+
+    [Theory]
+    [InlineData(3600, "1h")]
+    [InlineData(300, "5m")]
+    [InlineData(90, "90s")]
+    [InlineData(172800, "2d")]
+    public void A_span_is_written_in_the_unit_a_query_reads(int seconds, string text)
+    {
+        Assert.Equal(text, SourceQuery.Text(TimeSpan.FromSeconds(seconds)));
+        Assert.True(SourceQuery.TryParseWindow(text, out var back));
+        Assert.Equal(TimeSpan.FromSeconds(seconds), back);
+    }
 }

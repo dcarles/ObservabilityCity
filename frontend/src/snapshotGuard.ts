@@ -79,6 +79,7 @@ export function checkSnapshot(raw: unknown): Checked {
     tenants: checkTenants(raw.tenants, problems),
     topology: str(raw.topology) || 'direct',
     mode: raw.mode === 'demo' ? 'demo' : 'live',
+    trafficDensity: isFiniteNumber(raw.trafficDensity) && raw.trafficDensity > 0 ? raw.trafficDensity : 1,
     view: checkView(raw.view),
     generatedAt: str(raw.generatedAt),
     incidentFreeSince: typeof raw.incidentFreeSince === 'string' && Number.isFinite(Date.parse(raw.incidentFreeSince)) ? raw.incidentFreeSince : null,
@@ -169,7 +170,7 @@ function checkGroup(g: unknown, seen: Set<string>, problems: string[]): GroupSna
   }
 }
 
-const ASSET_SHAPES = ['box', 'vault', 'store', 'settings']
+const ASSET_SHAPES = ['box', 'vault', 'store', 'settings', 'observatory']
 
 /** The island's resources that stand as basic buildings. One without an id or a name cannot be drawn or opened and is dropped; an unknown shape is a plain box. */
 function checkAssets(list: unknown): AssetSnapshot[] {
@@ -180,7 +181,7 @@ function checkAssets(list: unknown): AssetSnapshot[] {
     ids.add(a.id)
     out.push({
       id: a.id, name: a.name, label: str(a.label) || 'Resource', shape: ASSET_SHAPES.includes(a.shape as string) ? (a.shape as string) : 'box',
-      service: typeof a.service === 'string' && a.service !== '' ? a.service : null, region: typeof a.region === 'string' && a.region !== '' ? a.region : null,
+      service: typeof a.service === 'string' && a.service !== '' ? a.service : null, group: typeof a.group === 'string' && a.group !== '' ? a.group : null, region: typeof a.region === 'string' && a.region !== '' ? a.region : null,
       links: (Array.isArray(a.links) ? a.links : []).filter(isObject).filter((l) => typeof l.name === 'string' && typeof l.url === 'string' && /^https?:\/\//i.test(l.url as string))
         .map((l) => ({ name: l.name as string, url: l.url as string })),
     })

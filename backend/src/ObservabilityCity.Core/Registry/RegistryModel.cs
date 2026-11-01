@@ -63,9 +63,17 @@ public sealed record RegistryTopic(string Name, string GroupId, string Service);
 public sealed record RegistrySubscription(string Topic, string PublisherGroupId, string ConsumerId, string ConsumerGroupId, bool Legacy);
 
 /// <summary>Mode is <see cref="TownModes.Demo"/> or <see cref="TownModes.Live"/>; a town that does not say is live.</summary>
-public sealed record TownInfo(string Id, string Name, string GroupLabel, string Topology, string Mode = TownModes.Live)
+public sealed record TownInfo(string Id, string Name, string GroupLabel, string Topology, string Mode = TownModes.Live, double TrafficDensity = TownTraffic.Usual)
 {
     public bool IsDemo => Mode == TownModes.Demo;
+}
+
+/// <summary>The range of the town.yaml trafficDensity setting: a multiple of the usual number of cars.</summary>
+public static class TownTraffic
+{
+    public const double Usual = 1;
+    public const double Min = 0.25;
+    public const double Max = 10;
 }
 
 /// <summary>Whether a town is a demo (fake data, steered from the Break things panel and the story bar) or live (real sources only, nothing to break).</summary>
