@@ -82,7 +82,7 @@ export class ViewBar {
     this.townName = s.townName
     this.tenants = s.tenants
     this.choices = islandChoices(s)
-    this.focusChoices = [...this.choices, ...s.vendors.map((v) => ({ id: v.node.id, name: v.node.name, shown: true }))]
+    this.focusChoices = [...this.choices.filter((c) => !c.vendor), ...s.vendors.map((v) => ({ id: v.node.id, name: v.node.name, shown: true }))]
     this.trouble = tenantTrouble(s.groups.flatMap((g) => g.nodes))
     this.render()
   }
@@ -198,9 +198,13 @@ export class ViewBar {
       return `<div class="vb-row ${on ? 'sel' : ''}" data-act="island" data-id="${escapeHtml(c.id)}"><input type="checkbox" ${on ? 'checked' : ''} tabindex="-1" /><span>${escapeHtml(c.name)}</span><small>${c.shown ? escapeHtml(c.id) : `${escapeHtml(c.id)} · hidden`}</small></div>`
     }
     return `<div class="vb-list wide" id="islands-list">
-      <input id="island-query" type="search" placeholder="Find an island by name or id" value="${escapeHtml(this.query)}" autocomplete="off" spellcheck="false" />
+      <input id="island-query" type="search" placeholder="Find an island or third party by name or id" value="${escapeHtml(this.query)}" autocomplete="off" spellcheck="false" />
       <div class="vb-row ${selected.length === 0 ? 'sel' : ''}" data-act="all-islands"><span>All islands</span></div>
-      ${rows.map(row).join('') || '<div class="vb-none">No island matches.</div>'}
+      ${rows.length === 0 ? '<div class="vb-none">No island matches.</div>' : ''}
+      ${rows.some((c) => !c.vendor) && rows.some((c) => c.vendor) ? '<div class="vb-group">Islands</div>' : ''}
+      ${rows.filter((c) => !c.vendor).map(row).join('')}
+      ${rows.some((c) => c.vendor) ? '<div class="vb-group">Third parties</div>' : ''}
+      ${rows.filter((c) => c.vendor).map(row).join('')}
     </div>`
   }
 

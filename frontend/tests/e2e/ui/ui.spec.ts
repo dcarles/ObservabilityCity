@@ -35,7 +35,8 @@ test.describe('the island filter', () => {
     await town.open()
     await expect(page.locator('#islands-button')).toContainText('All islands')
     await page.locator('#islands-button').click()
-    await expect(page.locator('#islands-list [data-act="island"]')).toHaveCount(3)
+    await expect(page.locator('#islands-list [data-act="island"]')).toHaveCount(5) // three islands and the two third parties
+    await expect(page.locator('#islands-list')).toContainText('Third parties')
     await expect(page.locator('#islands-list')).toContainText('Alpha')
     await expect(page.locator('#islands-list')).toContainText('Gamma')
   })
@@ -54,10 +55,25 @@ test.describe('the island filter', () => {
     // picking the second adds it; "All islands" clears the choice again
     await page.locator('#islands-list [data-id="cc"]').click()
     await page.waitForFunction(() => (window as any).city.seen.last.view.islands.join() === 'aa,cc')
-    await expect(page.locator('#islands-button')).toContainText('2 of 3 islands')
+    await expect(page.locator('#islands-button')).toContainText('2 of 5 islands')
     await page.locator('#islands-list [data-act="all-islands"]').click()
     await page.waitForFunction(() => (window as any).city.seen.last.view.islands.length === 0)
     expect(page.url()).not.toContain('islands=')
+  })
+
+  test('a third party can be chosen like an island, and shows even when nobody on screen calls it', async ({ town, page }) => {
+    await town.open()
+    await page.locator('#islands-button').click()
+    await page.locator('#islands-list [data-id="bb"]').click()
+    await page.waitForFunction(() => (window as any).city.seen.last.view.islands.join() === 'bb')
+    // bb calls only the mailer, so the bureau is hidden and offered in the list
+    expect(await page.evaluate(() => (window as any).city.seen.last.vendors.map((v: any) => v.node.id))).toEqual(['ext.mailer'])
+    await expect(page.locator('#islands-list [data-id="ext.bureau"]')).toContainText('hidden')
+    await page.locator('#islands-list [data-id="ext.bureau"]').click()
+    await page.waitForFunction(() => (window as any).city.seen.last.view.islands.join() === 'bb,ext.bureau')
+    expect(await page.evaluate(() => (window as any).city.seen.last.vendors.map((v: any) => v.node.id).sort())).toEqual(['ext.bureau', 'ext.mailer'])
+    expect(page.url()).toContain('islands=bb,ext.bureau')
+    await expect(page.locator('#islands-button')).toContainText('2 of 5 islands')
   })
 
   test('?islands= opens the page already filtered', async ({ town, page }) => {
@@ -431,5 +447,34 @@ test.describe('the theme picker', () => {
     await town.open('&theme=nope')
     await expect(page.locator('#banner')).toContainText('no theme "nope"')
     expect(await page.evaluate(() => (window as any).city.themeId())).toBe('harbour-town')
+  })
+})
+
+test.describe('island names', () => {
+  test('from the air every island has its name over it, and close up the signs are gone', async ({ town, page }) => {
+    await town.open()
+    await page.evaluate(() => { const c = (window as any).city; c.stage.focus(c.stage.controls.target.clone(), 400, true) })
+    await town.step(4)
+    const far = await page.evaluate(() => { (window as any).city.step(0.2); return (window as any).city.islandLabels.names() })
+    expect(far.map((n: any) => n.name).sort()).toEqual(expect.arrayContaining(['Alpha', 'Beta', 'Gamma']))
+    await expect(page.locator('#island-labels')).toBeVisible()
+    await page.evaluate(() => { const c = (window as any).city; c.stage.focus(c.stage.controls.target.clone(), 30, true) })
+    await town.step(4)
+    await expect(page.locator('#island-labels')).toBeHidden()
+  })
+
+  test('the ground under an island is told apart from the sea, by name', async ({ town, page }) => {
+    await town.open()
+    const spot = await page.evaluate(() => {
+      const c = (window as any).city
+      const l = c.town.islandLabels().find((x: any) => x.id === 'aa')
+      const v = new c.THREE.Vector3(l.x, 0.55, l.z)
+      c.stage.camera.updateMatrixWorld()
+      v.project(c.stage.camera)
+      return { x: ((v.x + 1) / 2) * window.innerWidth, y: ((1 - v.y) / 2) * window.innerHeight, found: c.town.islandAt(l.x, l.z)?.id }
+    })
+    expect(spot.found).toBe('aa')
+    // the sea is no island
+    expect(await page.evaluate(() => (window as any).city.town.islandAt(5000, 5000))).toBeNull()
   })
 })

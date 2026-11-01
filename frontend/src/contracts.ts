@@ -207,6 +207,7 @@ export interface components {
         HiddenIsland: {
             id: string;
             displayName: string;
+            vendor: boolean;
         };
         InboundLinkSnapshot: {
             from: string;

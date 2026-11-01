@@ -84,8 +84,11 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
         var filter = islands is { Count: > 0 } ? islands.Select(i => i.Trim()).Where(i => i.Length > 0).Distinct().Order(StringComparer.Ordinal).ToList() : null;
         var shown = filter is null ? allGroups : allGroups.Where(g => g.IsHub || filter.Contains(g.Id)).ToList();
         var shownIds = shown.SelectMany(g => g.Nodes).Select(n => n.Id).ToHashSet();
+        // a third party's island can be chosen like a pillar's: it shows even when none of the shown islands calls it
+        var vendorIslands = allVendors.GroupBy(v => v.IslandId ?? v.Node.Id).ToDictionary(g => g.Key, g => g.First().IslandName ?? g.First().Node.Name);
+        var chosenVendors = filter is null ? [] : filter.Where(vendorIslands.ContainsKey).ToHashSet();
         var vendors = filter is null ? allVendors
-            : allVendors.Where(v => v.CalledBy.Any(shownIds.Contains) || (v.Calls ?? []).Any(shownIds.Contains))
+            : allVendors.Where(v => chosenVendors.Contains(v.IslandId ?? v.Node.Id) || v.CalledBy.Any(shownIds.Contains) || (v.Calls ?? []).Any(shownIds.Contains))
                 .Select(v => v with { CalledBy = v.CalledBy.Where(shownIds.Contains).ToList(), Calls = (v.Calls ?? []).Where(shownIds.Contains).ToList() }).ToList();
         var visible = shownIds.Concat(vendors.Select(v => v.Node.Id)).ToHashSet();
         var groups = shown;
@@ -117,13 +120,15 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
         var notices = registries.Notices;
         if (filter is not null)
         {
-            var known = allGroups.Where(g => !g.IsHub).Select(g => g.Id).ToHashSet();
+            var known = allGroups.Where(g => !g.IsHub).Select(g => g.Id).Concat(vendorIslands.Keys).ToHashSet();
             var unknown = filter.Where(i => i != "hub" && !known.Contains(i)).ToList();
             var hidden = allGroups.Where(g => !g.IsHub && !filter.Contains(g.Id)).Select(g => new HiddenIsland(g.Id, g.DisplayName)).ToList();
+            var shownVendorIslands = vendors.Select(v => v.IslandId ?? v.Node.Id).ToHashSet();
+            var hiddenVendors = vendorIslands.Where(kv => !shownVendorIslands.Contains(kv.Key)).OrderBy(kv => kv.Key, StringComparer.Ordinal).Select(kv => new HiddenIsland(kv.Key, kv.Value, true)).ToList();
             var onScreen = groups.Select(g => g.Id).Concat(vendors.Select(v => v.Node.Id)).ToHashSet();
             callers = callers.Select(c => c with { Calls = c.Calls.Where(visible.Contains).ToList() }).ToList();
             dependencies = dependencies.Where(d => onScreen.Contains(d.From) && onScreen.Contains(d.To)).ToList();
-            view = new ViewInfo(filter.Where(known.Contains).ToList(), unknown, hidden, OffscreenLinks(registry, everyone, shownIds, hidden));
+            view = new ViewInfo(filter.Where(known.Contains).ToList(), unknown, [.. hidden, .. hiddenVendors], OffscreenLinks(registry, everyone, shownIds, hidden));
             if (unknown.Count > 0)
                 notices = [.. notices, .. unknown.Select(i => $"Island '{i}' is not in this town, so the island filter ignores it.")];
         }

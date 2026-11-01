@@ -80,8 +80,51 @@ public class IslandFilterTests
 
         Assert.Equal(["hub", "bb"], s.Groups.Select(g => g.Id));
         Assert.Equal(["bb"], s.View.Islands);
-        Assert.Equal(["aa", "cc"], s.View.Hidden.Select(h => h.Id));
-        Assert.Equal(["Alpha", "Gamma"], s.View.Hidden.Select(h => h.DisplayName));
+        Assert.Equal(["aa", "cc"], s.View.Hidden.Where(h => !h.Vendor).Select(h => h.Id));
+        Assert.Equal(["Alpha", "Gamma"], s.View.Hidden.Where(h => !h.Vendor).Select(h => h.DisplayName));
+    }
+
+    [Fact]
+    public async Task A_third_partys_island_the_filter_leaves_out_is_listed_as_hidden_so_it_can_be_chosen()
+    {
+        var rig = new Rig();
+        await rig.Run();
+
+        var s = rig.Builder.Build(["bb"]); // bb calls the mailer, nobody on screen calls the bureau
+
+        Assert.Equal(["ext.mailer"], s.Vendors.Select(v => v.Node.Id));
+        var hidden = Assert.Single(s.View.Hidden, h => h.Vendor);
+        Assert.Equal("ext.bureau", hidden.Id);
+        Assert.Empty(s.View.Unknown);
+    }
+
+    [Fact]
+    public async Task Choosing_a_third_party_shows_it_even_when_no_island_on_screen_calls_it()
+    {
+        var rig = new Rig();
+        await rig.Run();
+
+        var s = rig.Builder.Build(["bb", "ext.bureau"]);
+
+        Assert.Equal(["ext.bureau", "ext.mailer"], s.Vendors.Select(v => v.Node.Id).Order());
+        Assert.Equal(["bb", "ext.bureau"], s.View.Islands);
+        Assert.Empty(s.View.Unknown);
+        Assert.DoesNotContain(s.View.Hidden, h => h.Id == "ext.bureau");
+        Assert.Equal(["hub", "bb"], s.Groups.Select(g => g.Id));
+    }
+
+    [Fact]
+    public async Task Choosing_only_a_third_party_shows_the_hub_and_that_third_party()
+    {
+        var rig = new Rig();
+        await rig.Run();
+
+        var s = rig.Builder.Build(["ext.bureau"]);
+
+        Assert.Equal(["hub"], s.Groups.Select(g => g.Id));
+        Assert.Equal(["ext.bureau"], s.Vendors.Select(v => v.Node.Id));
+        Assert.Equal(["ext.bureau"], s.View.Islands);
+        Assert.Equal(["aa", "bb", "cc"], s.View.Hidden.Where(h => !h.Vendor).Select(h => h.Id).Order());
     }
 
     [Fact]

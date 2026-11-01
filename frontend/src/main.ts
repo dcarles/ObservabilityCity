@@ -11,7 +11,7 @@ import { saveQuality, startQuality, type Quality } from './quality'
 import { parseWall } from './wall/params'
 import { WallMode } from './wall/wall'
 import { UnknownHostsPanel } from './unknownHosts'
-import { NoticesPanel, Search, ServicePanel, showTooltip, StateList, TopBar, type SearchItem } from './ui'
+import { NoticesPanel, Search, ServicePanel, showIslandTooltip, showTooltip, StateList, TopBar, type SearchItem } from './ui'
 import { ALL_TENANTS, pruneTenants, type TenantView } from './tenants'
 import { ViewBar } from './viewbar'
 import { BreakPanel } from './breakPanel'
@@ -25,6 +25,7 @@ import { saveTheme, startTheme, themeById } from './themes'
 import { kitById } from './themes/kits'
 import { activateTheme, palette as livePalette } from './themes/active'
 import { parseFocus, parseLayers, toggleLayer, type Layer } from './layers'
+import { IslandLabels } from './islandLabels'
 import { islandChoices, parseIslands, pruneIslands } from './islands'
 import { withView } from './address'
 import { viewTotals } from './viewTotals'
@@ -387,6 +388,10 @@ async function start(): Promise<void> {
     if (focus) stage.focus(focus.target, focus.distance)
   })
 
+  const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -0.55)
+  const groundHit = new THREE.Vector3()
+  const islandLabels = new IslandLabels()
+  const updateIslandLabels = (): void => islandLabels.update(town.islandLabels(), stage.camera, stage.camera.position.distanceTo(stage.controls.target), window.innerWidth, window.innerHeight)
   function hover(): void {
     if (!dirty) return
     dirty = false
@@ -394,6 +399,12 @@ async function start(): Promise<void> {
     const hits = ray.intersectObjects(town.hitMeshes(), false)
     const b = hits[0]?.object.userData.building as Building | undefined
     showTooltip(b?.node ?? null, pointerPx.x, pointerPx.y, tenantView)
+    // over an island but no building: the island's name
+    if (!b) {
+      const ground = ray.ray.intersectPlane(groundPlane, groundHit)
+      const isl = ground ? town.islandAt(ground.x, ground.z) : null
+      if (isl) showIslandTooltip(isl.name, isl.vendor, pointerPx.x, pointerPx.y)
+    }
     const overService = !b && (ray.intersectObjects(town.serviceHits(), false).length > 0 || ray.intersectObjects(town.assetHits(), false).length > 0)
     canvas.style.cursor = breakPanel?.armed ? 'crosshair' : b || overService ? 'pointer' : 'grab'
   }
@@ -408,11 +419,12 @@ async function start(): Promise<void> {
       town.update(dt, simTime, stage.camera)
       wall?.tick(simTime)
     }
+    updateIslandLabels()
   }
 
   // Debug handle for automated tests, screenshots and poking from the console.
   ;(window as unknown as { city: unknown }).city = {
-    stage, town, THREE, seen, step,
+    stage, town, THREE, seen, step, islandLabels,
     /** Hand the page a snapshot as if the server had sent it. */
     feed: (raw: unknown) => onSnapshot(raw),
     unknownHosts,
@@ -493,6 +505,7 @@ async function start(): Promise<void> {
       stage.tick(dt, time)
       town.update(dt, time, stage.camera)
       wall?.tick(time)
+      updateIslandLabels()
       hover()
       stage.render()
     } catch (e) {

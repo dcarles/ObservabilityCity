@@ -144,6 +144,17 @@ export function showTooltip(n: NodeSnapshot | null, x: number, y: number, view: 
   el.style.top = `${Math.min(y + 16, window.innerHeight - h - 8)}px`
 }
 
+/** The name of the island under the pointer, in the same box as a building's numbers. Null hides it. */
+export function showIslandTooltip(name: string | null, third: boolean, x: number, y: number): void {
+  const el = $('tooltip')
+  if (!name) { el.hidden = true; return }
+  el.innerHTML = `<b>${escapeHtml(name)}</b> <span class="stale">· ${third ? 'third party island' : 'island'}</span>`
+  el.hidden = false
+  const w = el.offsetWidth, h = el.offsetHeight
+  el.style.left = `${Math.min(x + 16, window.innerWidth - w - 8)}px`
+  el.style.top = `${Math.min(y + 16, window.innerHeight - h - 8)}px`
+}
+
 export type SearchItem = PickItem
 
 /**

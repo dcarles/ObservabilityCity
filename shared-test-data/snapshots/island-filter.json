@@ -692,7 +692,8 @@
     "hidden": [
       {
         "id": "bb",
-        "displayName": "Beta"
+        "displayName": "Beta",
+        "vendor": false
       }
     ],
     "links": [

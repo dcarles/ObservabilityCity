@@ -17,16 +17,32 @@ export interface IslandChoice {
   name: string
   /** On screen right now. */
   shown: boolean
+  /** A third party's island, listed apart from the pillars. */
+  vendor?: boolean
 }
 
 /**
  * Every island of the town, on screen or not, by name. A filtered snapshot lists the islands it left out, so the whole list can always be
  * rebuilt from the snapshot alone. The hub is not a choice: it is always shown.
  */
-export function islandChoices(s: Pick<Snapshot, 'groups' | 'view'>): IslandChoice[] {
-  const shown = s.groups.filter((g) => !g.isHub).map((g) => ({ id: g.id, name: g.displayName, shown: true }))
-  const hidden = (s.view?.hidden ?? []).map((h) => ({ id: h.id, name: h.displayName, shown: false }))
-  return [...shown, ...hidden].sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id))
+export function islandChoices(s: Pick<Snapshot, 'groups' | 'view'> & { vendors?: Snapshot['vendors'] }): IslandChoice[] {
+  const byName = (a: IslandChoice, b: IslandChoice) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id)
+  const hidden = s.view?.hidden ?? []
+  const pillars = [
+    ...s.groups.filter((g) => !g.isHub).map((g) => ({ id: g.id, name: g.displayName, shown: true })),
+    ...hidden.filter((h) => !h.vendor).map((h) => ({ id: h.id, name: h.displayName, shown: false })),
+  ].sort(byName)
+  // a third party's services share one island when they have an island id; a vendor without one is its own island
+  const shownVendors = new Map<string, string>()
+  for (const v of s.vendors ?? []) {
+    const id = v.islandId ?? v.node.id
+    if (!shownVendors.has(id)) shownVendors.set(id, v.islandName ?? v.node.name)
+  }
+  const vendors = [
+    ...[...shownVendors].map(([id, name]) => ({ id, name, shown: true, vendor: true })),
+    ...hidden.filter((h) => h.vendor).map((h) => ({ id: h.id, name: h.displayName, shown: false, vendor: true })),
+  ].sort(byName)
+  return [...pillars, ...vendors]
 }
 
 /** Adds the island to the choice, or takes it out. Taking the last one out shows every island again. */
@@ -40,7 +56,7 @@ export function pruneIslands(selected: readonly string[], choices: readonly Isla
   return keep.length === selected.length ? selected : keep
 }
 
-/** The button's label: "All islands", the island's name, or "3 of 14 islands". */
+/** The button's label: "All islands", the island's name, or "3 of 14 islands" (third parties count as islands here). */
 export function islandsLabel(selected: readonly string[], choices: readonly IslandChoice[]): string {
   if (selected.length === 0) return 'All islands'
   if (selected.length === 1) return choices.find((c) => c.id === selected[0])?.name ?? selected[0]
