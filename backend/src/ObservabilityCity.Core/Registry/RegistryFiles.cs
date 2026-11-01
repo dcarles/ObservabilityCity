@@ -298,6 +298,12 @@ internal sealed class AssetRuleFile
     public string Shape { get; set; } = "box";
     public List<string> Types { get; set; } = [];
     public string Pattern { get; set; } = "";
+    /// <summary>"hub": the building stands on the hub island instead of a pillar's island. Leave out for a pillar's own resource.</summary>
+    public string? Island { get; set; }
+    /// <summary>For a hub building: the cluster it stands in, named on a sign (for example Monitoring).</summary>
+    public string? Group { get; set; }
+    /// <summary>For a hub building: which subscriptions to look in. Without it, the pillars' subscriptions.</summary>
+    public SubscriptionRuleFile? Subscription { get; set; }
 }
 
 internal sealed class RegionsFile

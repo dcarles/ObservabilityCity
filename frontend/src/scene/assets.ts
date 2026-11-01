@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { box, cyl, flat } from '../buildings/mk'
+import { box, cyl, dome, flat } from '../buildings/mk'
 import type { AssetSnapshot, GroupSnapshot } from '../types'
 
 // Resources that are not systems (a key vault, a storage account, a configuration store) stand as small plain buildings: no lights, no beacon, no health.
@@ -14,6 +14,8 @@ export interface AssetSummary {
   groupName: string
   /** The service whose pad it stands behind, null when it belongs to the pillar. */
   service: string | null
+  /** The cluster it stands in on the hub island (for example Monitoring), null elsewhere. */
+  cluster: string | null
   region: string | null
   links: { name: string; url: string }[]
 }
@@ -22,13 +24,14 @@ export interface AssetSummary {
 export function summariseAsset(id: string, groups: readonly GroupSnapshot[]): AssetSummary | null {
   for (const g of groups) {
     const a = (g.assets ?? []).find((x) => x.id === id)
-    if (a) return { id: a.id, name: a.name, label: a.label, group: g.id, groupName: g.displayName, service: a.service ?? null, region: a.region ?? null, links: (a.links ?? []).map((l) => ({ name: l.name, url: l.url })) }
+    if (a) return { id: a.id, name: a.name, label: a.label, group: g.id, groupName: g.displayName, service: a.service ?? null, cluster: a.group ?? null, region: a.region ?? null, links: (a.links ?? []).map((l) => ({ name: l.name, url: l.url })) }
   }
   return null
 }
 
 /** The sentence that says where a resource belongs. */
-export function assetWhere(a: Pick<AssetSummary, 'groupName' | 'service'>): string {
+export function assetWhere(a: Pick<AssetSummary, 'groupName' | 'service'> & { cluster?: string | null }): string {
+  if (a.cluster) return `${a.cluster} resource on ${a.groupName}`
   return a.service ? `Resource of the ${a.service} service on ${a.groupName}` : `Resource of ${a.groupName}`
 }
 
@@ -58,6 +61,14 @@ function shape(kind: string): THREE.Group {
         box(2.1, 0.16, 2.1, flat('#42746d'), { y: 1.4 }),
         cyl(0.55, 0.55, 0.22, flat('#e6eef0'), { y: 1.56 }, 8),
         cyl(0.2, 0.2, 0.26, flat('#42746d'), { y: 1.56 }, 8),
+      )
+      break
+    case 'observatory':
+      g.add(
+        box(2.4, 1.3, 2.4, flat('#5d6f8f')),
+        cyl(1.0, 1.1, 0.7, flat('#8696b4'), { y: 1.3 }, 16),
+        dome(0.95, flat('#dfe6f2', { metalness: 0.2 }), { y: 2.0 }),
+        box(0.18, 0.5, 0.9, flat('#2b3750'), { y: 2.45, z: 0.55 }),
       )
       break
     default:

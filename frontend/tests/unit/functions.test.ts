@@ -7,7 +7,7 @@ import { notFoundText } from '../../src/inspectorModel'
 import { beaconLevel, plaqueText } from '../../src/visuals'
 import type { NodeSnapshot, Snapshot } from '../../src/types'
 import { healthyTown } from './wall.testutil'
-import { planIsland, CURB, PAD_D, YARD_OFFSET } from '../../src/scene/plan'
+import { planIsland, placeHubClusters, clusterSize, rectsTouch, CLUSTER_PER_ROW, CURB, PAD_D, YARD_OFFSET } from '../../src/scene/plan'
 import { makeOutline } from '../../src/scene/island'
 import { hashString } from '../../src/scene/random'
 import { assetWhere, summariseAsset } from '../../src/scene/assets'
@@ -227,6 +227,73 @@ describe('resource buildings', () => {
     expect(sum.links).toEqual([{ name: 'Portal', url: 'https://portal.example.test/x' }])
     expect(summariseAsset('gone', s.groups)).toBeNull()
   })
+  describe('on the hub island', () => {
+    const hubAsset = (id: string, group: string | null, patch: Record<string, unknown> = {}) => asset({ id, name: id, label: 'Log workspace', shape: 'observatory', service: null, group, ...patch })
+    const land = () => (r: { x: number; z: number; w: number; d: number }) => Math.abs(r.x) + r.w / 2 < 40 && Math.abs(r.z) + r.d / 2 < 36
+
+    it('keep their group and the new shape through the snapshot check', () => {
+      const raw = withAssets([hubAsset('hub.law', 'Monitoring'), hubAsset('hub.odd', '', { shape: 'castle' })])
+
+      const assets = checkSnapshot(raw).snapshot!.groups[0]!.assets!
+
+      expect(assets.map((a) => [a.id, a.shape, a.group])).toEqual([['hub.law', 'observatory', 'Monitoring'], ['hub.odd', 'box', null]])
+    })
+
+    it('stand together by group, ordered by id, one cluster for each group', () => {
+      const { clusters, left } = placeHubClusters([hubAsset('hub.b', 'Monitoring'), hubAsset('hub.a', 'Monitoring'), hubAsset('hub.z', 'Other')] as never, 30, 28, 2, land())
+
+      expect(left).toEqual([])
+      expect(clusters.map((c) => [c.name, c.assets.map((a) => a.asset.id)])).toEqual([['Monitoring', ['hub.a', 'hub.b']], ['Other', ['hub.z']]])
+    })
+
+    it('never overlap each other or a taken place, and stay inside the land', () => {
+      const taken = { x: 0, z: 2, w: 20, d: 20 }
+      const many = ['A', 'B', 'C'].flatMap((g) => Array.from({ length: 5 }, (_, i) => hubAsset(`hub.${g}${i}`, g)))
+      const { clusters } = placeHubClusters(many as never, 30, 28, 2, (r) => land()(r) && !rectsTouch(r, taken))
+
+      expect(clusters).toHaveLength(3)
+      for (const c of clusters) {
+        expect(rectsTouch(c, taken)).toBe(false)
+        expect(land()(c)).toBe(true)
+      }
+      for (const [i, a] of clusters.entries()) for (const b of clusters.slice(i + 1)) expect(rectsTouch(a, b)).toBe(false)
+    })
+
+    it('wrap into rows and keep every building inside its cluster, spaced apart', () => {
+      const six = Array.from({ length: 6 }, (_, i) => hubAsset(`hub.s${i}`, 'Monitoring'))
+      const { clusters: [c] } = placeHubClusters(six as never, 30, 28, 2, land())
+
+      const size = clusterSize(6)
+      expect(c!.w).toBe(size.w)
+      expect(new Set(c!.assets.map((a) => `${a.x.toFixed(1)}/${a.z.toFixed(1)}`)).size).toBe(6)
+      expect(new Set(c!.assets.map((a) => a.z)).size).toBe(Math.ceil(6 / CLUSTER_PER_ROW))
+      for (const a of c!.assets) expect(Math.abs(a.x - c!.x) <= c!.w / 2 && Math.abs(a.z - c!.z) <= c!.d / 2).toBe(true)
+    })
+
+    it('leave out, and name, a cluster that has nowhere to stand', () => {
+      const { clusters, left } = placeHubClusters([hubAsset('hub.a', 'Monitoring')] as never, 30, 28, 2, () => false)
+
+      expect(clusters).toEqual([])
+      expect(left).toEqual(['Monitoring'])
+    })
+
+    it('give the same hub for the same snapshot, whatever order the resources arrive in', () => {
+      const list = [hubAsset('hub.z', 'M'), hubAsset('hub.a', 'M'), hubAsset('hub.m', 'N')]
+      const one = placeHubClusters(list as never, 30, 28, 2, land()).clusters.map((c) => [c.name, c.x, c.z])
+      const two = placeHubClusters([...list].reverse() as never, 30, 28, 2, land()).clusters.map((c) => [c.name, c.x, c.z])
+
+      expect(two).toEqual(one)
+    })
+
+    it('open a card that names the cluster and has only the addresses', () => {
+      const s = withAssets([hubAsset('hub.law', 'Monitoring', { links: [{ name: 'Portal', url: 'https://portal.example.test/law' }] })])
+      const sum = summariseAsset('hub.law', s.groups)!
+
+      expect(sum.cluster).toBe('Monitoring')
+      expect(assetWhere(sum)).toBe(`Monitoring resource on ${s.groups[0]!.displayName}`)
+      expect(sum.links).toEqual([{ name: 'Portal', url: 'https://portal.example.test/law' }])
+    })
+  })
 })
 
 describe('times of jobs name the day when it is not today', () => {
@@ -258,4 +325,5 @@ describe('times of jobs name the day when it is not today', () => {
     expect(jobRows(n, now)[0]!.value).toBe('overdue · ran yesterday 00:00 · next 00:00')
     expect(jobReasons(n, now)[0]).toBe('Job daily (North) should have run at 00:00 and has not.')
   })
+
 })

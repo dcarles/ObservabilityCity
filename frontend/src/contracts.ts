@@ -98,6 +98,7 @@ export interface components {
             service?: string | null;
             region?: string | null;
             links?: components["schemas"]["ResourceLink"][] | null;
+            group?: string | null;
         };
         ConfigValue: {
             key: string;

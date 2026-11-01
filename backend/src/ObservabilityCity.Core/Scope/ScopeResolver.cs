@@ -43,22 +43,23 @@ public static class ScopeResolver
             problems.Add($"Telemetry role '{clash.Key}' is used by {string.Join(" and ", clash.Select(s => $"'{s.SystemId}'"))}; the telemetry of one would be read as the other. Give each its own telemetry.role.");
 
         return new Resolution(pillars, systems, tenantNames.Select(kv => new TenantName(kv.Key, kv.Value)).OrderBy(t => t.Id, StringComparer.Ordinal).ToList(), problems, inventory is not null, workspace ?? workspaceId, workspaceId, workspaceVia,
-            ResolveAssets(view, rules, pillars, inventory));
+            ResolveAssets(view, rules, pillars, inventory, Custom));
     }
 
     /// <summary>
     /// The resources that stand as basic buildings: in each pillar's subscription, every resource of a rule's types whose name matches its pattern. A <c>service</c> group that matches a system's serviceCode
     /// ties the resource to that service; otherwise (or without the group) it belongs to the pillar. A <c>pillar</c> group that names another pillar leaves the resource out.
     /// </summary>
-    private static List<ResolvedAsset> ResolveAssets(Registry.Registry view, ScopeRules rules, List<PillarScope> pillars, Inventory? inventory)
+    private static List<ResolvedAsset> ResolveAssets(Registry.Registry view, ScopeRules rules, List<PillarScope> pillars, Inventory? inventory, Func<string, string?> custom)
     {
         var found = new List<ResolvedAsset>();
         if (inventory is null || rules.Assets.Count == 0) return found;
+        found.AddRange(ResolveHubAssets(rules, pillars, inventory, custom));
         foreach (var group in view.Groups.Where(g => !g.IsHub))
         {
             var pillar = pillars.First(p => p.PillarId == group.Id);
             if (pillar.SubscriptionId is not { } subscription) continue;
-            foreach (var rule in rules.Assets)
+            foreach (var rule in rules.Assets.Where(r => !r.OnHub))
             {
                 var regex = new Regex(rule.Pattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, RegexTimeout);
                 foreach (var resource in inventory.Resources.Where(r => r.SubscriptionId.Equals(subscription, StringComparison.OrdinalIgnoreCase) && rule.Types.Contains(r.Type, StringComparer.OrdinalIgnoreCase)))
@@ -75,6 +76,61 @@ public static class ScopeResolver
             }
         }
         return found.OrderBy(a => a.Id, StringComparer.Ordinal).ToList();
+    }
+
+    /// <summary>
+    /// The resources that stand on the hub island, in a cluster each rule names: every resource of a rule's types whose name matches its pattern, in the subscriptions the rule names
+    /// (see <see cref="HubAssetSubscriptions"/>). They belong to no pillar and no service. The same resource found by two rules stands once, for the first.
+    /// </summary>
+    private static List<ResolvedAsset> ResolveHubAssets(ScopeRules rules, List<PillarScope> pillars, Inventory inventory, Func<string, string?> custom)
+    {
+        var found = new List<ResolvedAsset>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var rule in rules.Assets.Where(r => r.OnHub))
+        {
+            var subscriptions = HubAssetSubscriptions(rule, pillars, inventory.Subscriptions, custom);
+            var regex = new Regex(rule.Pattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, RegexTimeout);
+            foreach (var resource in inventory.Resources.Where(r => subscriptions.Contains(r.SubscriptionId) && rule.Types.Contains(r.Type, StringComparer.OrdinalIgnoreCase)))
+            {
+                var match = regex.Match(resource.Name);
+                if (!match.Success || !seen.Add(resource.Id)) continue;
+                var region = Group(match, "region") is { Length: > 0 } g ? g : resource.Region;
+                if (rules.Regions.Tag is { } regionTag && TagValue(resource, regionTag) is { Length: > 0 } tagged) region = tagged;
+                found.Add(new ResolvedAsset($"{AssetRule.HubIsland}.{resource.Name.ToLowerInvariant()}", AssetRule.HubIsland, resource.Name, rule.Label, rule.Shape, resource.Type, null, region, resource.Id, rule.Name, resource.SubscriptionId, rule.Group));
+            }
+        }
+        return found;
+    }
+
+    /// <summary>
+    /// The ids of the subscriptions a hub rule looks in: those its <c>subscription</c> names (by name pattern or tag, templates over the environment's variables), else every pillar's.
+    /// The inventory source reads the resources of these, so a subscription that holds only shared resources is read too.
+    /// </summary>
+    public static HashSet<string> HubAssetSubscriptions(AssetRule rule, IEnumerable<PillarScope> pillars, IEnumerable<InventorySubscription> known, Func<string, string?> custom)
+    {
+        var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (rule.Subscription is not { } sub)
+        {
+            foreach (var p in pillars.Where(p => p.SubscriptionId is not null)) ids.Add(p.SubscriptionId!);
+            return ids;
+        }
+        foreach (var s in known)
+        {
+            var matches = sub.NameLike is { } like
+                ? ScopeTemplate.Like(s.Name, ScopeTemplate.Render(like, custom))
+                : s.Tags.FirstOrDefault(t => t.Key.Equals(sub.TagKey, StringComparison.OrdinalIgnoreCase)).Value is { } v && (sub.TagValue is null || v.Equals(ScopeTemplate.Render(sub.TagValue, custom), StringComparison.OrdinalIgnoreCase));
+            if (matches) ids.Add(s.Id);
+        }
+        return ids;
+    }
+
+    /// <summary>The subscriptions the hub rules of an environment look in, for the inventory source to read.</summary>
+    public static IReadOnlyList<string> HubAssetSubscriptions(Registry.Registry view, IEnumerable<PillarScope> pillars, IEnumerable<InventorySubscription> known)
+    {
+        if (view.ActiveEnvironment is not { } env) return [];
+        string? Custom(string name) => name == ScopeRules.EnvironmentVariable ? env.Id : env.Scope.Variables.GetValueOrDefault(name);
+        return env.Scope.Assets.Where(r => r.OnHub && r.Subscription is not null)
+            .SelectMany(r => HubAssetSubscriptions(r, pillars, known, Custom)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
     }
 
     /// <summary>A GUID or a resource id (starting with a slash) is a workspace id; anything else is a name.</summary>
