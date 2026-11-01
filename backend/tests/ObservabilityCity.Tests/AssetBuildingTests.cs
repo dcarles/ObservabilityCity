@@ -163,7 +163,7 @@ public class AssetBuildingTests
 
         var ids = ObservabilityCity.Core.Scope.ScopeResolver.HubAssetSubscriptions(registry, ObservabilityCity.Core.Scope.ScopeResolver.Resolve(registry, new ObservabilityCity.Core.Scope.Inventory(inventory.Subscriptions, [])).Pillars, inventory.Subscriptions);
 
-        Assert.Equal(["00000000-0000-0000-0000-0000000000a9"], ids);
+        Assert.Equal(["00000000-0000-0000-0000-0000000000a9", "00000000-0000-0000-0000-0000000000e9"], ids.Order(StringComparer.Ordinal));
     }
 
     private static string CopyTownWith(string replaceThis, string with)
@@ -210,7 +210,7 @@ public class AssetBuildingTests
     }
 
     [Fact]
-    public void A_hub_system_such_as_the_gateway_finds_its_resource_in_the_subscription_named_for_the_hub_and_gets_the_portal_address()
+    public void A_hub_system_finds_its_resources_in_the_subscriptions_each_rule_names_and_gets_a_portal_address_for_each()
     {
         var folder = Town("a");
         var view = RegistryLoader.Load(folder).ForEnvironment("prod");
@@ -219,8 +219,38 @@ public class AssetBuildingTests
 
         var info = ObservabilityCity.Core.Scope.ScopeInfos.Of(view, store, "hub.apim")!;
 
-        var gateway = Assert.Single(info.Resources);
-        Assert.Equal("apim-gateway", gateway.Name);
-        Assert.Equal("https://portal.example.test/#resource/subscriptions/00000000-0000-0000-0000-0000000000a9/resourceGroups/rg-ops/providers/microsoft.apimanagement/service/apim-gateway", Assert.Single(gateway.Links!).Url);
+        Assert.Equal(["apim-gateway", "apimedge-gateway"], info.Resources.Select(r => r.Name).OrderBy(n => n, StringComparer.Ordinal));
+        Assert.Equal(
+            ["https://portal.example.test/#resource/subscriptions/00000000-0000-0000-0000-0000000000a9/resourceGroups/rg-ops/providers/microsoft.apimanagement/service/apim-gateway",
+             "https://portal.example.test/#resource/subscriptions/00000000-0000-0000-0000-0000000000e9/resourceGroups/rg-edge/providers/microsoft.apimanagement/service/apimedge-gateway"],
+            info.Resources.OrderBy(r => r.Name, StringComparer.Ordinal).Select(r => Assert.Single(r.Links!).Url));
+    }
+
+    [Fact]
+    public void The_inventory_source_reads_the_subscriptions_that_resource_rules_name()
+    {
+        var folder = Town("a");
+        var registry = RegistryLoader.Load(folder).ForEnvironment("prod");
+        var inventory = ObservabilityCity.Adapters.Azure.ResourceGraphInventory.FromRecording(File.ReadAllText(Path.Combine(folder, "inventory.json")));
+        var pillars = ObservabilityCity.Core.Scope.ScopeResolver.Resolve(registry, new ObservabilityCity.Core.Scope.Inventory(inventory.Subscriptions, [])).Pillars;
+
+        var ids = ObservabilityCity.Core.Scope.ScopeResolver.HubAssetSubscriptions(registry, pillars, inventory.Subscriptions);
+
+        Assert.Contains("00000000-0000-0000-0000-0000000000e9", ids);
+        Assert.Contains("00000000-0000-0000-0000-0000000000a9", ids);
+    }
+
+    [Fact]
+    public void A_resource_rule_subscription_needs_exactly_one_of_name_or_tag_and_known_variables()
+    {
+        var folder = CopyTownWith("    - { name: edge-gateways,", "    - { name: bad-sub, types: [t], pattern: x, subscription: { nameLike: \"*-{nope}\", tag: { key: k } } }\n    - { name: edge-gateways,");
+        try
+        {
+            var problems = Assert.Throws<RegistryException>(() => RegistryLoader.Load(folder)).Message;
+
+            Assert.Contains("needs exactly one of nameLike or tag", problems);
+            Assert.Contains("{nope}", problems);
+        }
+        finally { Directory.Delete(folder, true); }
     }
 }

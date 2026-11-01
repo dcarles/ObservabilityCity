@@ -114,6 +114,13 @@ public static class ScopeResolver
             foreach (var p in pillars.Where(p => p.SubscriptionId is not null)) ids.Add(p.SubscriptionId!);
             return ids;
         }
+        return SubscriptionsOf(sub, known, custom);
+    }
+
+    /// <summary>The ids of the subscriptions a rule's <c>subscription</c> names, by name pattern or by tag (templates over the environment's variables).</summary>
+    public static HashSet<string> SubscriptionsOf(SubscriptionRule sub, IEnumerable<InventorySubscription> known, Func<string, string?> custom)
+    {
+        var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var s in known)
         {
             var matches = sub.NameLike is { } like
@@ -130,7 +137,9 @@ public static class ScopeResolver
         if (view.ActiveEnvironment is not { } env) return [];
         string? Custom(string name) => name == ScopeRules.EnvironmentVariable ? env.Id : env.Scope.Variables.GetValueOrDefault(name);
         return env.Scope.Assets.Where(r => r.OnHub && r.Subscription is not null)
-            .SelectMany(r => HubAssetSubscriptions(r, pillars, known, Custom)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            .SelectMany(r => HubAssetSubscriptions(r, pillars, known, Custom))
+            .Concat(env.Scope.Resources.Where(r => r.Subscription is not null).SelectMany(r => SubscriptionsOf(r.Subscription!, known, Custom)))
+            .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
     }
 
     /// <summary>A GUID or a resource id (starting with a slash) is a workspace id; anything else is a name.</summary>
@@ -232,14 +241,17 @@ public static class ScopeResolver
         }
 
         var resources = new List<ResolvedResource>();
-        if (inventory is not null && pillar.SubscriptionId is { } subscription && serviceCode is not null)
+        var subscription = pillar.SubscriptionId;
+        if (inventory is not null && serviceCode is not null && (subscription is not null || rules.Resources.Any(r => r.Subscription is not null)))
         {
             var applicable = rules.Resources.Where(r => r.Roles.Count == 0 || r.Roles.Contains(role, StringComparer.OrdinalIgnoreCase)).ToList();
             foreach (var rule in applicable)
             {
+                // a rule may look in subscriptions of its own; without one it looks in the pillar's
+                var wanted = rule.Subscription is { } ruleSubscription ? SubscriptionsOf(ruleSubscription, inventory.Subscriptions, custom) : subscription is null ? [] : new HashSet<string>([subscription], StringComparer.OrdinalIgnoreCase);
                 var regex = new Regex(rule.Pattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, RegexTimeout);
                 foreach (var resource in inventory.Resources.Where(r =>
-                    r.SubscriptionId.Equals(subscription, StringComparison.OrdinalIgnoreCase) && rule.Types.Contains(r.Type, StringComparer.OrdinalIgnoreCase)))
+                    wanted.Contains(r.SubscriptionId) && rule.Types.Contains(r.Type, StringComparer.OrdinalIgnoreCase)))
                 {
                     var match = regex.Match(resource.Name);
                     string? region = resource.Region, tenant = null;
@@ -256,12 +268,12 @@ public static class ScopeResolver
 
                     if (rules.Regions.Tag is { } regionTag && TagValue(resource, regionTag) is { Length: > 0 } tagged) region = tagged;
                     bool? running = rule.State is null || string.IsNullOrWhiteSpace(resource.State) ? null : rule.Running!.Contains(resource.State, StringComparer.OrdinalIgnoreCase);
-                    resources.Add(new ResolvedResource(resource.Id, resource.Name, resource.Type, region, tenant, rule.Name, rule.Instances is null ? null : resource.Instances, running));
+                    resources.Add(new ResolvedResource(resource.Id, resource.Name, resource.Type, region, tenant, rule.Name, rule.Instances is null ? null : resource.Instances, running, rule.Subscription is null ? null : resource.SubscriptionId));
                     if (tenant is not null && rule.TenantNameTag is { } nameTag && TagValue(resource, nameTag) is { Length: > 0 } friendly)
                         tenantNames.TryAdd(tenant, friendly);
                 }
             }
-            if (applicable.Count > 0 && resources.Count == 0 && node.Kind is NodeKind.Api or NodeKind.Worker or NodeKind.Database or NodeKind.Function)
+            if (subscription is not null && applicable.Count > 0 && resources.Count == 0 && node.Kind is NodeKind.Api or NodeKind.Worker or NodeKind.Database or NodeKind.Function)
                 problems.Add($"No resource found for '{node.Id}' (service code '{serviceCode}') in {pillar.SubscriptionName ?? pillar.SubscriptionId}. Check serviceCode and the resource patterns under scope.resources.");
         }
 

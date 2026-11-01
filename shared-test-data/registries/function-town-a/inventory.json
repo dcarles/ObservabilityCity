@@ -9,6 +9,11 @@
    "id": "00000000-0000-0000-0000-0000000000a9",
    "name": "acme-eu-prd-platform",
    "tags": {}
+  },
+  {
+   "id": "00000000-0000-0000-0000-0000000000e9",
+   "name": "acme-eu-prd-edge",
+   "tags": {}
   }
  ],
  "resources": [
@@ -136,6 +141,14 @@
    "type": "microsoft.apimanagement/service",
    "subscriptionId": "00000000-0000-0000-0000-0000000000a9",
    "location": "northeurope",
+   "tags": {}
+  },
+  {
+   "id": "/subscriptions/00000000-0000-0000-0000-0000000000e9/resourceGroups/rg-edge/providers/microsoft.apimanagement/service/apimedge-gateway",
+   "name": "apimedge-gateway",
+   "type": "microsoft.apimanagement/service",
+   "subscriptionId": "00000000-0000-0000-0000-0000000000e9",
+   "location": "westeurope",
    "tags": {}
   }
  ]

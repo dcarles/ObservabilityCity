@@ -84,7 +84,11 @@ public sealed record SubscriptionRule(string? NameLike, string? TagKey, string? 
 /// <see cref="TenantNameTag"/> is the tag that holds the tenant's friendly name. <see cref="Instances"/> is the expression the inventory query uses to count
 /// the instances one resource of this rule runs (a plan's workers, an app's replicas); the instances of a system are the sum over its resources of such rules. <see cref="State"/> is the expression that reads one resource's app state as text, and <see cref="Running"/> the values of it that mean the app runs (any other value means stopped); the core knows no state words.
 /// </summary>
-public sealed record ResourceRule(string Name, IReadOnlyList<string> Types, string Pattern, IReadOnlyList<string> Roles, string? ServiceTag, string? TenantNameTag, string? Instances = null, string? State = null, IReadOnlyList<string>? Running = null);
+public sealed record ResourceRule(string Name, IReadOnlyList<string> Types, string Pattern, IReadOnlyList<string> Roles, string? ServiceTag, string? TenantNameTag, string? Instances = null, string? State = null, IReadOnlyList<string>? Running = null)
+{
+    /// <summary>The subscriptions this rule looks in instead of the system's pillar's (a template rule over the environment's variables). Null: the pillar's.</summary>
+    public SubscriptionRule? Subscription { get; init; }
+}
 
 /// <summary>
 /// One kind of resource that stands in the town as a basic building without health. <see cref="Label"/> is what the drawer calls it ("Key vault"), <see cref="Shape"/> how it looks

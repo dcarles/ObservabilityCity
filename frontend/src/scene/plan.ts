@@ -242,6 +242,28 @@ export function placeHubClusters(
   return { clusters, left }
 }
 
+export const HUB_CENTRE_Z = 2 // the plaza's centre sits a little south of the hub's
+
+/**
+ * What stands on the hub island and so keeps a cluster of resource buildings away: the plaza, the road to the gateway, the main buildings that exist (one each of
+ * Gateway, Broker, Egress and Database, on the axes) and a strip along each spoke road. Hub-local coordinates; `f` is the hub's scale.
+ */
+export function hubReserved(f: number, kinds: readonly string[], spokeAngles: readonly number[]): { x: number; z: number; w: number; d: number }[] {
+  const CZ = HUB_CENTRE_Z
+  const spots: Record<string, { x: number; z: number }> = { Gateway: { x: 0, z: CZ - 13.5 * f }, Broker: { x: 14.5 * f, z: CZ }, Egress: { x: -14.5 * f, z: CZ }, Database: { x: 0, z: CZ + 14 * f } }
+  const out = [{ x: 0, z: CZ, w: 20 * f, d: 20 * f }, { x: 0, z: CZ - 15 * f, w: 6, d: 14 }]
+  for (const kind of new Set(kinds)) if (spots[kind]) out.push({ ...spots[kind], w: 12, d: 12 })
+  for (const a of spokeAngles) for (let r = 9 * f; r < 30 * f; r += 3) out.push({ x: Math.sin(a) * r, z: CZ - Math.cos(a) * r, w: 8, d: 8 })
+  return out
+}
+
+/** Whether a cluster's footprint is a free place on the hub: clear of everything reserved, and with all four corners on land (3 in from the coast). */
+export function hubFree(geo: { rx: number; rz: number; scale: number }, kinds: readonly string[], spokeAngles: readonly number[]): (rect: { x: number; z: number; w: number; d: number }) => boolean {
+  const reserved = hubReserved(geo.scale, kinds, spokeAngles)
+  const outline = makeOutline(hashString('hub'), geo.rx, geo.rz, 0.05)
+  return (rect) => !reserved.some((a) => rectsTouch(rect, a, 0.5)) && [[-1, -1], [1, -1], [-1, 1], [1, 1]].every(([sx, sz]) => outline.contains(rect.x + (sx! * rect.w) / 2, rect.z + (sz! * rect.d) / 2, 3))
+}
+
 /** Distance from the spine to the outer edge of the outermost pad, which is as far as the row roads reach. */
 export function rowEdge(pads: { ring: number }[]): number {
   return COL_X + Math.max(0, ...pads.map((p) => p.ring)) * PAD_PITCH + PAD_W / 2 + 0.4

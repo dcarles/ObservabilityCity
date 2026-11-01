@@ -338,7 +338,7 @@ sources:
 
 Shared resources that belong to no pillar (a log workspace, application insights) stand on the hub island: give the rule `island: hub` and a `group`, the name of the cluster they stand in, shown on a sign (rules with the same group share a cluster). If they live in a subscription of their own, add `subscription: { nameLike: "..." }` (or `tag`), a template over your `variables` and `{environment}`. The card has no health, only the portal links.
 
-The hub's own systems (the gateway, the message broker) get their portal links the same way as any system: name the hub's subscription under `scope.pillars` (`hub: <subscription id>`), give the system a `serviceCode` in `hub.yaml`, and add a `scope.resources` rule for its resource type with `roles: [gateway]` or `roles: [broker]` and a `pattern` whose `service` group matches that code.
+The hub's own systems (the gateway, the message broker) get their portal links the same way as any system: give the system a `serviceCode` in `hub.yaml`, and add a `scope.resources` rule for its resource type with `roles: [gateway]` or `roles: [broker]` and a `pattern` whose `service` group matches that code. The hub is not a pillar, so say where the rule looks with its own `subscription` (`nameLike` or `tag`); a rule that finds several resources (one for each region) gives the system one link for each. When the hub holds buildings of its own (`island: hub`), the hub island grows just enough to give each group a place.
 
 `scope.cloud` is the name of your cloud as the town should say it (for example `Azure`, `AWS` or `Cumulus`). It is used in the words "not found in <cloud>" and nowhere else; the core assumes no cloud.
 

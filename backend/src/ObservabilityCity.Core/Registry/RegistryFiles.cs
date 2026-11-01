@@ -347,6 +347,8 @@ internal sealed class ResourceRuleFile
     public string? State { get; set; }
     /// <summary>The values of state that mean the app runs. Required with state; any other value means stopped.</summary>
     public List<string> Running { get; set; } = [];
+    /// <summary>Which subscriptions this rule looks in, instead of the system's pillar's: by name pattern or tag (templates over your variables and {environment}). For a resource that lives apart from its pillar, such as a hub system's.</summary>
+    public SubscriptionRuleFile? Subscription { get; set; }
 }
 
 internal sealed class ScopeQueriesFile

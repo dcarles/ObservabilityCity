@@ -18,7 +18,10 @@ public static partial class RegistryLoader
             Subscription = f.Subscription is null ? null : new SubscriptionRule(f.Subscription.NameLike, f.Subscription.Tag?.Key, f.Subscription.Tag?.Value),
             PillarSubscriptions = f.Pillars,
             Resources = f.Resources.Select(r => new ResourceRule(r.Name, r.Types, r.Pattern, r.Roles.Select(x => x.ToLowerInvariant() == "cron" ? "function" : x.ToLowerInvariant()).ToList(), r.ServiceTag, r.TenantNameTag, string.IsNullOrWhiteSpace(r.Instances) ? null : r.Instances.Trim(),
-                string.IsNullOrWhiteSpace(r.State) ? null : r.State.Trim(), r.Running.Count == 0 ? null : r.Running)).ToList(),
+                string.IsNullOrWhiteSpace(r.State) ? null : r.State.Trim(), r.Running.Count == 0 ? null : r.Running)
+            {
+                Subscription = r.Subscription is null ? null : new SubscriptionRule(r.Subscription.NameLike, r.Subscription.Tag?.Key, r.Subscription.Tag?.Value),
+            }).ToList(),
             Cloud = string.IsNullOrWhiteSpace(f.Cloud) ? null : f.Cloud.Trim(),
             Assets = f.Assets.Select(a => new AssetRule(a.Name, a.Label.Trim(), a.Shape.Trim().ToLowerInvariant(), a.Types, a.Pattern)
             {
@@ -205,6 +208,16 @@ public static partial class RegistryLoader
             if (!KebabId.IsMatch(r.Name)) errors.Add($"{at}.resources: name '{r.Name}' must be lowercase kebab-case");
             else if (!seen.Add(r.Name)) errors.Add($"{at}.resources: '{r.Name}' is listed twice");
             if (r.Types.Count == 0) errors.Add($"{rule} needs types (the resource types it applies to, for example a plan or an account type)");
+            if (r.Subscription is { } ruleSub)
+            {
+                if ((ruleSub.NameLike is not null) == (ruleSub.Tag is not null)) errors.Add($"{rule}.subscription needs exactly one of nameLike or tag");
+                Template(ruleSub.NameLike, $"resources '{r.Name}'.subscription.nameLike", own);
+                if (ruleSub.Tag is { } ruleTag)
+                {
+                    if (ruleTag.Key.Length == 0) errors.Add($"{rule}.subscription.tag needs a key");
+                    Template(ruleTag.Value, $"resources '{r.Name}'.subscription.tag.value", own);
+                }
+            }
             if (r.Instances is { } counting && counting.Trim().Length == 0) errors.Add($"{rule}: instances is empty; give the expression that counts a resource's instances, or leave it out");
             if (r.State is { } reading && reading.Trim().Length == 0) errors.Add($"{rule}: state is empty; give the expression that reads a resource's app state, or leave it out");
             if (r.State is not null && r.Running.Count == 0) errors.Add($"{rule}: state needs running, the values of it that mean the app runs (any other value is shown as stopped)");

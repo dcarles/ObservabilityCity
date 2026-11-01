@@ -211,4 +211,15 @@ test.describe(`functions and regions (${B ? 'tags, Started, a region tag' : 'nam
     await expect(panel.locator('a.out')).toHaveAttribute('href', /^https:\/\/(portal|console)\.example\.test\//)
     await expect(panel).not.toContainText('Healthy')
   })
+
+  test('a hub system finds its resources in the subscriptions its rules name, and the Config tab links each one', async ({ page, request }) => {
+    test.skip(B, 'only the names town gives the hub gateway rules')
+    await expect.poll(async () => (await (await request.get(`${API}/api/systems/hub.apim`)).json()).scope?.resources?.length, { timeout: 30_000 }).toBe(2)
+    const scope = (await (await request.get(`${API}/api/systems/hub.apim`)).json()).scope
+    expect(scope.resources.map((r: any) => [r.name, r.links.length]).sort()).toEqual([['apim-gateway', 1], ['apimedge-gateway', 1]])
+    await open(page)
+    await page.evaluate(() => (window as any).city.openSystem('hub.apim'))
+    await page.locator('#inspector [data-tab="config"]').click()
+    for (const name of ['apim-gateway', 'apimedge-gateway']) await expect(page.locator(`#inspector .cfg-row[data-resource="${name}"] a`)).toHaveAttribute('href', /^https:\/\/portal\.example\.test\//)
+  })
 })
