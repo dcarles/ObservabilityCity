@@ -76,3 +76,8 @@ export function layersLabel(state: LayerState): string {
   const off = LAYERS.filter((l) => l.on && !state[l.id]).length
   return off === 0 ? 'Layers' : `Layers · ${off} off`
 }
+
+/** The island or vendor the arcs are focused on, from ?focus= ; empty for none. */
+export function parseFocus(search: string): string {
+  return (new URLSearchParams(search).get('focus') ?? '').trim()
+}

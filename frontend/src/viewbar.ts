@@ -20,6 +20,9 @@ export interface ViewBarHost {
   setIslands(ids: string[]): void
   layers(): LayerState
   toggleLayer(layer: Layer): void
+  /** The island or vendor the dependency arcs are focused on (empty for all). */
+  focus(): string
+  setFocus(id: string): void
   theme(): ThemeInfo
   setTheme(id: string): void
   quality(): Quality
@@ -44,6 +47,8 @@ export class ViewBar {
   private townName = ''
   private tenants: TenantInfo[] = []
   private choices: IslandChoice[] = []
+  /** The islands and the vendors, for the dependency focus. */
+  private focusChoices: IslandChoice[] = []
   private trouble = new Map<string, 'amber' | 'red'>()
 
   constructor(private readonly host: ViewBarHost) {
@@ -77,6 +82,7 @@ export class ViewBar {
     this.townName = s.townName
     this.tenants = s.tenants
     this.choices = islandChoices(s)
+    this.focusChoices = [...this.choices, ...s.vendors.map((v) => ({ id: v.node.id, name: v.node.name, shown: true }))]
     this.trouble = tenantTrouble(s.groups.flatMap((g) => g.nodes))
     this.render()
   }
@@ -131,6 +137,7 @@ export class ViewBar {
       }
       case 'all-islands': this.host.setIslands([]); break
       case 'layer': this.host.toggleLayer(act.dataset.id as Layer); break
+      case 'focus': this.host.setFocus(act.dataset.id ?? ''); break
       case 'theme': this.open = null; this.host.setTheme(act.dataset.id!); this.render(); break
     }
   }
@@ -142,7 +149,7 @@ export class ViewBar {
     const theme = this.host.theme()
     const towns = this.host.towns()
     const quality = this.host.quality()
-    const key = JSON.stringify([this.open, this.query, this.townId, towns, quality, this.current, this.environments, this.tenants.map((t) => t.id + t.kind), view, [...this.trouble], this.choices, islands, layers, theme.id])
+    const key = JSON.stringify([this.open, this.query, this.townId, towns, quality, this.current, this.environments, this.tenants.map((t) => t.id + t.kind), view, [...this.trouble], this.choices, this.focusChoices, this.host.focus(), islands, layers, theme.id])
     if (key === this.key) return
     this.key = key
     const envName = this.environments.find((e) => e.id === this.current)?.name ?? this.current
@@ -165,7 +172,7 @@ export class ViewBar {
           ${this.open === 'islands' ? this.islandRows(islands) : ''}</div>`
       : ''
     const layerBtn = `<div class="vb">${button('open-layers', 'layers-button', layersLabel(layers), 'Layers to draw', this.open === 'layers')}
-          ${this.open === 'layers' ? `<div class="vb-list" id="layers-list">${LAYERS.map((l) => `<div class="vb-row" data-act="layer" data-id="${l.id}" id="layer-${l.id}"><input type="checkbox" ${layers[l.id] ? 'checked' : ''} tabindex="-1" /><span>${l.label}<br /><small class="hint">${escapeHtml(l.hint)}</small></span></div>`).join('')}</div>` : ''}</div>`
+          ${this.open === 'layers' ? `<div class="vb-list" id="layers-list">${LAYERS.map((l) => `<div class="vb-row" data-act="layer" data-id="${l.id}" id="layer-${l.id}"><input type="checkbox" ${layers[l.id] ? 'checked' : ''} tabindex="-1" /><span>${l.label}<br /><small class="hint">${escapeHtml(l.hint)}</small></span></div>`).join('')}${layers.dependencies ? this.focusRows() : ''}</div>` : ''}</div>`
     const themeBtn = `<div class="vb">${button('open-theme', 'theme-button', theme.name, 'Theme', this.open === 'theme')}
           ${this.open === 'theme' ? `<div class="vb-list" id="theme-list">${THEMES.map((th) => `<div class="vb-row ${th.id === theme.id ? 'sel' : ''}" data-act="theme" data-id="${th.id}"><span>${escapeHtml(th.name)}<br /><small class="hint">${escapeHtml(th.blurb)}</small></span></div>`).join('')}</div>` : ''}</div>`
     const qualityBtn = `<div class="vb">${button('open-quality', 'quality-button', qualityName(quality), 'Quality: how much detail the town is drawn with. Lower it on a weak PC', this.open === 'quality')}
@@ -175,6 +182,13 @@ export class ViewBar {
       const input = this.el.querySelector<HTMLInputElement>('.vb-list input[type=search]')
       if (input) { input.focus(); input.setSelectionRange(this.query.length, this.query.length) }
     } else if (this.open === 'tenant' || this.open === 'islands') this.el.querySelector<HTMLInputElement>('.vb-list input[type=search]')?.focus()
+  }
+
+  /** Under the layers: which island or vendor the dependency arcs focus on. Only offered while the arcs are drawn. */
+  private focusRows(): string {
+    const focus = this.host.focus()
+    const row = (id: string, name: string) => `<div class="vb-row ${focus === id ? 'sel' : ''}" data-act="focus" data-id="${escapeHtml(id)}" id="focus-${escapeHtml(id || 'all')}"><span>${escapeHtml(name)}</span></div>`
+    return `<div class="vb-group">Dependencies: focus on</div>${row('', 'All islands')}${this.focusChoices.map((c) => row(c.id, c.name)).join('')}`
   }
 
   private islandRows(selected: readonly string[]): string {

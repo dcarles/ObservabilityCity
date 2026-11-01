@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { backBridgeClear, distanceToSegment, loopArc, meanDirection, placeVendorsOnRing, ringRoadRadius, VENDOR_SPUR, type Disc } from '../../src/scene/layout'
 import { worstSeverity } from '../../src/scene/weather'
-import { arcWidth } from '../../src/scene/overlay'
+import { arcDim, arcLinks, arcWidth } from '../../src/scene/overlay'
 import { planeRate } from '../../src/scene/airport'
 import { staleCount } from '../../src/ui'
 import { checkSnapshot } from '../../src/snapshotGuard'
@@ -22,6 +22,28 @@ describe('worstSeverity', () => {
     expect(worstSeverity([])).toBeNull()
     expect(worstSeverity([{ severity: 3 }, { severity: 2 }, { severity: 4 }])).toBe(2)
     expect(worstSeverity([{ severity: 1 }])).toBe(1)
+  })
+})
+
+describe('arcLinks', () => {
+  const stands = (id: string) => ['a', 'b', 'c'].includes(id)
+  it('keeps every link between two things in the town, however little traffic it carries', () => {
+    const links = [{ from: 'a', to: 'b', requestsPerSecond: 12 }, { from: 'a', to: 'c', requestsPerSecond: 0.0004 }, { from: 'b', to: 'c', requestsPerSecond: 0 }]
+    expect(arcLinks(links, stands)).toEqual(links)
+  })
+  it('drops a link whose end is not in the town', () => {
+    expect(arcLinks([{ from: 'a', to: 'z', requestsPerSecond: 50 }, { from: 'y', to: 'b', requestsPerSecond: 50 }], stands)).toEqual([])
+  })
+})
+
+describe('arcDim', () => {
+  it('fades nothing when there is no focus', () => {
+    expect(arcDim({ from: 'a', to: 'b' }, '')).toBe(false)
+  })
+  it('keeps the arcs into and out of the focus bright and fades the rest', () => {
+    expect(arcDim({ from: 'a', to: 'b' }, 'a')).toBe(false)
+    expect(arcDim({ from: 'c', to: 'a' }, 'a')).toBe(false)
+    expect(arcDim({ from: 'b', to: 'c' }, 'a')).toBe(true)
   })
 })
 

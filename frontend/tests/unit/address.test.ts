@@ -25,4 +25,9 @@ describe('the view in the address', () => {
     expect(parseIslands(next)).toEqual(['a', 'b'])
     expect(parseLayers(next)).toEqual(layers)
   })
+
+  it('keeps the dependency focus in the address and drops it when there is none', () => {
+    expect(withView('?env=prod', { islands: [], layers: DEFAULT_LAYERS, focus: 'cl' })).toBe('?env=prod&focus=cl')
+    expect(withView('?focus=cl', { islands: [], layers: DEFAULT_LAYERS, focus: '' })).toBe('')
+  })
 })

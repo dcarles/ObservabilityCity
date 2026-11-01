@@ -1194,6 +1194,11 @@ export class Town {
     this.overlay.visible = state.dependencies
   }
 
+  /** Focuses the dependency arcs on one island or vendor (empty for none). */
+  setDependencyFocus(id: string): void {
+    this.overlay.setFocus(id)
+  }
+
   /** The hit boxes of the buildings that are drawn: a building hidden by a layer cannot be hovered or clicked. */
   hitMeshes(): THREE.Mesh[] {
     return [...this.buildings.values()].filter((b) => b.root.visible).map((b) => b.hit)

@@ -9,7 +9,16 @@ export interface ArcStatus {
   requestsPerSecond: number
   /** Tube radius: how thick the arc is drawn. */
   width: number
+  /** Faded because another island is the focus and this arc does not touch it. */
+  dim: boolean
 }
+
+/** Whether an arc fades: only when something is the focus and the arc neither starts nor ends there. */
+export function arcDim(link: { from: string; to: string }, focus: string): boolean {
+  return focus !== '' && link.from !== focus && link.to !== focus
+}
+
+const BRIGHT = 0.9, DIM = 0.1 // how opaque an arc is, in focus or faded
 
 const LIFT = 10 // how far above the islands the arcs start
 const DASH = 5 // dash length in metres
@@ -17,6 +26,11 @@ const DASH = 5 // dash length in metres
 /** Thickness of an arc for a traffic volume: a trickle is a pencil line and the busiest links are about three times as thick. */
 export function arcWidth(requestsPerSecond: number): number {
   return 0.45 + 0.75 * clamp(Math.log10(1 + Math.max(0, requestsPerSecond)), 0, 2.6)
+}
+
+/** The links that get an arc: every one whose two ends are standing in the town, however little traffic it carries (a real link is always shown, as thin as a trickle). */
+export function arcLinks(links: readonly DependencySnapshot[], stands: (id: string) => boolean): DependencySnapshot[] {
+  return links.filter((l) => stands(l.from) && stands(l.to))
 }
 
 /**
@@ -31,6 +45,7 @@ export class DependencyOverlay {
   private key = ''
   private readonly dash: THREE.CanvasTexture
   private on = false
+  private focus = ''
 
   constructor() {
     this.object.visible = false
@@ -61,9 +76,19 @@ export class DependencyOverlay {
     this.object.visible = v
   }
 
+  /** Makes one island or vendor the focus: the arcs into and out of it stay bright, the others fade. An empty id clears it. */
+  setFocus(id: string): void {
+    if (id === this.focus) return
+    this.focus = id
+    for (const a of this.arcs) {
+      a.status.dim = arcDim(a.status, id)
+      ;(a.mesh.material as THREE.MeshBasicMaterial).opacity = a.status.dim ? DIM : BRIGHT
+    }
+  }
+
   /** Feeds the links from a snapshot. Cheap when nothing a viewer could see has changed. */
   set(links: readonly DependencySnapshot[]): void {
-    const wanted = links.filter((l) => this.anchors.has(l.from) && this.anchors.has(l.to) && l.requestsPerSecond > 0.05)
+    const wanted = arcLinks(links, (id) => this.anchors.has(id))
     const key = wanted.map((l) => `${l.from}>${l.to}:${arcWidth(l.requestsPerSecond).toFixed(2)}`).join('|')
     if (key === this.key) {
       wanted.forEach((l) => { const a = this.arcs.find((x) => x.status.from === l.from && x.status.to === l.to); if (a) a.status.requestsPerSecond = l.requestsPerSecond })
@@ -97,12 +122,12 @@ export class DependencyOverlay {
     map.needsUpdate = true
     map.repeat.set(Math.max(1, dist / (DASH * 2)), 1)
     map.wrapS = THREE.RepeatWrapping
-    const material = new THREE.MeshBasicMaterial({ color: a.color, alphaMap: map, transparent: true, opacity: 0.9, depthWrite: false, toneMapped: false })
+    const material = new THREE.MeshBasicMaterial({ color: a.color, alphaMap: map, transparent: true, opacity: arcDim(l, this.focus) ? DIM : BRIGHT, depthWrite: false, toneMapped: false })
     const mesh = new THREE.Mesh(geometry, material)
     mesh.renderOrder = 6
     mesh.frustumCulled = false
     this.object.add(mesh)
-    this.arcs.push({ status: { from: l.from, to: l.to, requestsPerSecond: l.requestsPerSecond, width }, mesh, map })
+    this.arcs.push({ status: { from: l.from, to: l.to, requestsPerSecond: l.requestsPerSecond, width, dim: arcDim(l, this.focus) }, mesh, map })
   }
 
   private clear(): void {

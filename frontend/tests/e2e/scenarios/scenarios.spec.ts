@@ -537,6 +537,26 @@ test.describe('the other signals', () => {
     expect(a.board.length).toBeGreaterThan(0)
   })
 
+  test('focusing the arcs on an island keeps its arcs bright and fades the others, and the address remembers it', async ({ town, page }) => {
+    await town.open()
+    await page.locator('#layers-button').click()
+    await page.locator('#layer-dependencies').click()
+    await town.step(1)
+    const all = (await page.evaluate(() => (window as any).city.overlay())).arcs as { from: string; to: string; dim: boolean }[]
+    expect(all.length).toBeGreaterThan(1)
+    expect(all.every((a) => !a.dim)).toBe(true)
+    const island = all[0].from
+    await page.locator(`[id="focus-${island}"]`).click()
+    const focused = (await page.evaluate(() => (window as any).city.overlay())).arcs as { from: string; to: string; dim: boolean }[]
+    expect(focused.filter((a) => !a.dim).every((a) => a.from === island || a.to === island)).toBe(true)
+    expect(focused.filter((a) => !a.dim).length).toBeGreaterThan(0)
+    expect(focused.filter((a) => a.from !== island && a.to !== island).every((a) => a.dim)).toBe(true)
+    expect(page.url()).toContain(`focus=${island}`)
+    await page.locator('#focus-all').click()
+    expect(((await page.evaluate(() => (window as any).city.overlay())).arcs as { dim: boolean }[]).every((a) => !a.dim)).toBe(true)
+    expect(page.url()).not.toContain('focus=')
+  })
+
   test('the dependency switch shows dashed arcs between callers and what they call, and hides them again', async ({ town, page }) => {
     await town.open()
     expect(await page.evaluate(() => (window as any).city.overlay().visible)).toBe(false)
