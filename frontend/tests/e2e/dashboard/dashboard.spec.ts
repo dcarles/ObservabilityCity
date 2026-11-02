@@ -221,6 +221,9 @@ test.describe('the dashboard view', () => {
       await card.locator('tr.row[data-system="aa.orders-api"] td').first().click()
       await expect(page.locator('#inspector')).toBeVisible()
       expect((await brightness(page, '#inspector')) < 128).toBe(dark)
+      await page.locator('#inspector [data-tab="logs"]').click()
+      await expect(page.locator('#inspector [data-refresh-logs]')).toBeVisible()
+      expect((await brightness(page, '#inspector [data-refresh-logs]')) < 128).toBe(dark)
     }
   })
 

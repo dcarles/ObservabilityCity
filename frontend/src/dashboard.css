@@ -67,6 +67,10 @@ body.dash #notices, body.dash #unknown-hosts { position: static; width: auto; ma
 
 /* the drawer and the lists come from the town and are built for a light page: here they follow the dashboard's own colours */
 :where(body.dash) :where(button, input, select, textarea) { background: var(--surface2); color: var(--fg); }
+/* the town's plain button rule paints them white and beats the zero-weight rule above, so the drawer's own buttons are set here */
+body.dash #inspector :is(.levels, .logtabs, .logbuttons) :is(button, a.out):not(.on) { background: var(--surface2); color: var(--fg); border-color: var(--dline); }
+body.dash #inspector :is(.levels, .logtabs) button:not(.on):hover { background: color-mix(in srgb, var(--daccent) 18%, var(--surface2)); }
+body.dash #inspector :is(.levels, .logtabs) button.on { background: var(--daccent); border-color: var(--daccent); color: var(--bg); }
 body.dash #inspector .ok { color: var(--ok); } body.dash #inspector .warn { color: var(--warn); } body.dash #inspector .bad { color: var(--bad); } body.dash #inspector .stale { color: var(--muted); }
 body.dash #inspector a.out, body.dash #inspector .link i.origin.found { color: var(--daccent); }
 body.dash #inspector .cfg .o, body.dash #inspector .link i.origin { background: var(--surface2); border-color: var(--dline); color: var(--fg); }
