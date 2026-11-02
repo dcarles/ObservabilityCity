@@ -46,6 +46,12 @@ export function startDashboard(): void {
     showMode()
   })
 
+  // panels start below the menu, which wraps to more rows on a narrow screen
+  const menuBar = $('dash-menu')
+  const measureMenu = (): void => document.documentElement.style.setProperty('--bar-h', `${menuBar.offsetHeight - 12}px`)
+  measureMenu()
+  new ResizeObserver(measureMenu).observe(menuBar)
+
   $('vs-town').addEventListener('click', () => { window.location.href = viewSwitchAddress(window.location, 'town', store) })
 
   const ui = { openPillars: new Set<string>(), groups: new Map<string, boolean>(), databases: new Map<string, boolean>(), sections: new Set<string>() }

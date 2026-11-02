@@ -19,10 +19,11 @@ describe('the freshness marker', () => {
     expect(marker(true, null, 10).late).toBe(false)
   })
 
-  it('waits three times the usual gap, never under ten seconds', () => {
+  it('waits three times the usual gap, never under thirty seconds', () => {
     expect(feedLateAfter([])).toBe(30)
-    expect(feedLateAfter([0.5, 0.5, 0.6])).toBe(10)
-    expect(feedLateAfter([5, 5, 6, 5])).toBe(15)
+    expect(feedLateAfter([0.5, 0.5, 0.6])).toBe(30)
+    expect(feedLateAfter([5, 5, 6, 5])).toBe(30)
+    expect(feedLateAfter([20, 20, 21])).toBe(60)
   })
 })
 
