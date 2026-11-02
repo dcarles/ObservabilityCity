@@ -3,4 +3,7 @@ pillar: sta
 displayName: Standalone
 color: "#9aa3ad"
 systems:
-  - { id: sta.idle-cron, name: Idle job, role: cron }
+  - { id: sta.idle-cron, service: idle, name: Idle job, role: cron }
+scheduler:
+  - system: sta.idle-cron
+    jobs: { daily: [idle], hourly: [idle] }

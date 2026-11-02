@@ -9,6 +9,8 @@ export interface BoatRoute {
   /** The island whose topic the boats carry out of (null for the hub's own), and the island they sail to. */
   from: string | null
   to: string
+  /** True for the boats of a scheduler's mapped jobs: a short loop out of the island's own harbour. */
+  scheduler?: boolean
   /** Boats leaving per second. Zero while the broker is down or has no data. */
   rate: () => number
   /** Sailing speed multiplier from the broker's latency against its SLA. */

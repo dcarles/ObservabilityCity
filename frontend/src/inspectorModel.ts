@@ -1,6 +1,6 @@
 // What the inspector drawer says, as pure functions: a system's numbers in, rows and sentences out.
 
-import type { ConfigValue, HealthState, IncidentSnapshot, JobSnapshot, LinkRef, LogGroup, LogSection, NodeSnapshot, ResourceLink, ScopeInfo, ScopeResource, SettingLayer, SystemDetail } from './types'
+import type { ConfigValue, HealthState, ScheduleSnapshot, IncidentSnapshot, JobSnapshot, LinkRef, LogGroup, LogSection, NodeSnapshot, ResourceLink, ScopeInfo, ScopeResource, SettingLayer, SystemDetail } from './types'
 import { inboundSplitText } from './inbound'
 import { limitRange, throttleWho } from './tenants'
 import { isAbsent, isUnmonitored, QUIET_TEXT } from './signals'
@@ -84,12 +84,17 @@ export function overviewRows(n: NodeSnapshot, nameOf: (id: string) => string = (
 const JOB_TONE: Record<JobSnapshot['status'], Tone> = { Ok: '', Failed: 'bad', Overdue: 'warn' }
 
 /** One row for each scheduled job of a function, in each region: how it stands, when it last ran and when it runs next. Nothing for a building without jobs. */
-export function jobRows(n: Pick<NodeSnapshot, 'jobs'>, now: number = Date.now()): Row[] {
-  return (n.jobs ?? []).map((j) => ({
-    label: jobName(j),
-    value: [j.status === 'Ok' ? 'ok' : j.status === 'Failed' ? 'failed' : 'overdue', j.lastRun ? `ran ${dayTime(j.lastRun, now)}` : null, j.next ? `next ${dayTime(j.next, now)}` : null].filter(Boolean).join(' · '),
-    tone: JOB_TONE[j.status],
-  }))
+export function jobRows(n: Pick<NodeSnapshot, 'jobs'> & { id?: string }, now: number = Date.now(), schedules?: readonly ScheduleSnapshot[]): Row[] {
+  return (n.jobs ?? []).map((j) => {
+    const mapped = schedules?.find((x) => (n.id === undefined || x.system === n.id) && x.job.toLowerCase() === j.name.toLowerCase())
+    // with the island's schedules at hand, a job says which services it starts work for, or that the file does not say
+    const target = !schedules ? null : mapped && mapped.services.length > 0 ? `starts ${mapped.services.join(', ')}` : 'not mapped'
+    return {
+      label: jobName(j),
+      value: [j.status === 'Ok' ? 'ok' : j.status === 'Failed' ? 'failed' : 'overdue', j.lastRun ? `ran ${dayTime(j.lastRun, now)}` : null, j.next ? `next ${dayTime(j.next, now)}` : null, target].filter(Boolean).join(' · '),
+      tone: JOB_TONE[j.status],
+    }
+  })
 }
 
 /** "sev 2, 3 open": the worst open incident of an island and how many there are. */

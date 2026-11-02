@@ -15,9 +15,7 @@
     "deadLetters": 0
   },
   "notices": [
-    "Island \u0027sta\u0027 stands alone: it has no API, no topics or subscriptions, no calls to or from other islands and no third party, so nothing connects it to the town. Add an API, a messaging block or a calls link.",
-    "Job not mapped: hbk.sync-cron runs daily, hourly, which the scheduler: list of hbk.yaml does not say a service for, so it sends no boats.",
-    "Job not mapped: sta.idle-cron runs daily, hourly, which the scheduler: list of sta.yaml does not say a service for, so it sends no boats."
+    "Island \u0027sta\u0027 stands alone: it has no API, no topics or subscriptions, no calls to or from other islands and no third party, so nothing connects it to the town. Add an API, a messaging block or a calls link."
   ],
   "groups": [
     {
@@ -608,14 +606,29 @@
       "messaging": {
         "topics": [],
         "subscriptions": [],
-        "schedules": []
+        "schedules": [
+          {
+            "system": "hbk.sync-cron",
+            "job": "daily",
+            "services": [
+              "sync"
+            ]
+          },
+          {
+            "system": "hbk.sync-cron",
+            "job": "hourly",
+            "services": [
+              "sync"
+            ]
+          }
+        ]
       },
       "nodes": [
         {
           "id": "hbk.sync-cron",
           "name": "Customer sync",
           "kind": "Function",
-          "service": null,
+          "service": "sync",
           "external": false,
           "state": "Healthy",
           "instancesTotal": 1,
@@ -842,14 +855,29 @@
       "messaging": {
         "topics": [],
         "subscriptions": [],
-        "schedules": []
+        "schedules": [
+          {
+            "system": "sta.idle-cron",
+            "job": "daily",
+            "services": [
+              "idle"
+            ]
+          },
+          {
+            "system": "sta.idle-cron",
+            "job": "hourly",
+            "services": [
+              "idle"
+            ]
+          }
+        ]
       },
       "nodes": [
         {
           "id": "sta.idle-cron",
           "name": "Idle job",
           "kind": "Function",
-          "service": null,
+          "service": "idle",
           "external": false,
           "state": "Healthy",
           "instancesTotal": 1,

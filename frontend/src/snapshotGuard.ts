@@ -198,6 +198,9 @@ function checkMessaging(m: unknown): MessagingSnapshot {
     subscriptions: (Array.isArray(raw.subscriptions) ? raw.subscriptions : []).filter(isObject)
       .filter((x) => typeof x.topic === 'string' && typeof x.consumer === 'string' && x.consumer !== '')
       .map((x) => ({ topic: x.topic as string, publisher: str(x.publisher), consumer: x.consumer as string, legacy: x.legacy === true })),
+    schedules: (Array.isArray(raw.schedules) ? raw.schedules : []).filter(isObject)
+      .filter((x) => typeof x.system === 'string' && x.system !== '' && typeof x.job === 'string' && x.job !== '')
+      .map((x) => ({ system: x.system as string, job: x.job as string, services: (Array.isArray(x.services) ? x.services : []).filter((v): v is string => typeof v === 'string' && v !== '') })),
   }
 }
 

@@ -16,6 +16,7 @@ import { archCount, clearArches } from './arches'
 import { consumersOf, HarbourStatus, messagingOf, type Messaging } from './harbour'
 import { connectorsOf, portSummary, type Connectors, type PortSummary } from './links'
 import { findLane, harbourLoop, type SeaMap } from './sea'
+import { schedulerRate } from './scheduler'
 import { mergeStatic } from './merge'
 import { bayTo } from './bay'
 import { islandSign } from './sign'
@@ -145,7 +146,7 @@ export class Town {
   private readonly boatLanes = new Set<string>()
   private seaMap: SeaMap = { land: [] }
   private harbourPoints = new Map<string, THREE.Vector3>()
-  private boatRouteEnds: { from: string | null; to: string }[] = []
+  private boatRouteEnds: { from: string | null; to: string; scheduler: boolean; rate: () => number }[] = []
   private readonly crossings = new Map<string, number>()
   private hubWeather: Weather | null = null
   /** Third parties on their own small islands, by vendor id. */
@@ -464,6 +465,26 @@ export class Town {
       }
     })
 
+    // the scheduled jobs the pillar's file maps to services: their boats sail a short loop out of the island's own harbour and back (every mapped service is on this island)
+    pillars.forEach((g, index) => {
+      const schedules = g.messaging?.schedules ?? []
+      if (!harbours[index] || !schedules.some((x) => x.services.length > 0)) return
+      const loop = laneBetween(index, index)
+      if (!loop) return
+      const island = this.islands[index]
+      const broker = hubBuildings.find((b) => b.kind === 'Broker')
+      boatRoutes.push({
+        path: loop,
+        from: g.id,
+        to: g.id,
+        scheduler: true,
+        rate: () => (broker?.node && (broker.node.state === 'Healthy' || broker.node.state === 'Degraded') ? schedulerRate(schedules, (id) => island.buildings.get(id)?.node) : 0),
+        speed: () => (broker?.node ? speedFactor(broker.node.p99Ms, broker.node.slaP99Ms) : 1),
+        load: () => 0.2,
+      })
+      this.boatLanes.add(g.id)
+    })
+
     // an island with a pier always has a lane, so the water by its harbour is proven open even while nothing sails (a loop out and back)
     pillars.forEach((g, index) => {
       if (!harbours[index] || this.boatLanes.has(g.id)) return
@@ -474,7 +495,7 @@ export class Town {
     })
     this.seaMap = sea
     this.harbourPoints = new Map(pillars.flatMap((g, i) => (harbours[i] ? [[g.id, harbours[i]!] as [string, THREE.Vector3]] : [])))
-    this.boatRouteEnds = boatRoutes.map((r) => ({ from: r.from, to: r.to }))
+    this.boatRouteEnds = boatRoutes.map((r) => ({ from: r.from, to: r.to, scheduler: r.scheduler === true, rate: r.rate }))
 
     mergeStatic(bridgeDecor)
     mergeStatic(this.hubDecor)
@@ -675,13 +696,13 @@ export class Town {
    * The sea the boats sail: the islands' harbours, every pair of them with no open water between (there must be none, since every bridge is an
    * arch), the boat routes as (publisher island, consumer island) with null for the hub, and how many arched bridges stand. For tests.
    */
-  inspectSea(): { harbours: string[]; unreachable: string[]; routes: { from: string | null; to: string }[]; arches: number } {
+  inspectSea(): { harbours: string[]; unreachable: string[]; routes: { from: string | null; to: string; scheduler: boolean; rate: number }[]; arches: number } {
     const ids = [...this.harbourPoints.keys()]
     const unreachable: string[] = []
     for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) {
       if (!findLane(this.seaMap, this.harbourPoints.get(ids[i])!, this.harbourPoints.get(ids[j])!)) unreachable.push(`${ids[i]}|${ids[j]}`)
     }
-    return { harbours: ids, unreachable, routes: this.boatRouteEnds, arches: archCount() }
+    return { harbours: ids, unreachable, routes: this.boatRouteEnds.map((r) => ({ from: r.from, to: r.to, scheduler: r.scheduler, rate: r.rate() })), arches: archCount() }
   }
 
   inspectVendors(): { id: string; island: string; x: number; z: number; bx: number; bz: number; bridges: number }[] {

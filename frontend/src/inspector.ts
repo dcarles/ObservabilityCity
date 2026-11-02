@@ -205,7 +205,7 @@ export class Inspector {
     return `
       ${why.length === 0 ? '<p class="fine">Nothing to flag: every number is inside its lines.</p>' : `<ul class="why">${why.map((w) => `<li>${escapeHtml(w)}</li>`).join('')}</ul>`}
       <div class="rows">${overviewRows(n, (id) => this.find(id)?.node.name ?? id, this.snap?.cloud).map((r) => `<div class="row"><span>${r.label}</span><span class="${r.tone}">${escapeHtml(r.value)}</span></div>`).join('')}</div>
-      ${this.jobs(n)}
+      ${this.jobs(n, group)}
       ${this.regions(n)}
       ${tenants}
       ${this.openIn()}
@@ -214,8 +214,8 @@ export class Inspector {
   }
 
   /** A function building's scheduled jobs, one row for each job in each region. Nothing for a building without jobs. */
-  private jobs(n: NodeSnapshot): string {
-    const rows = jobRows(n)
+  private jobs(n: NodeSnapshot, group: GroupSnapshot | null): string {
+    const rows = jobRows(n, Date.now(), group?.messaging.schedules ?? [])
     if (rows.length === 0) return ''
     return `<h4>Jobs</h4><div class="jobs">${rows.map((r) => `<div class="row job" data-job="${escapeHtml(r.label)}"><span>${escapeHtml(r.label)}</span><span class="${r.tone}">${escapeHtml(r.value)}</span></div>`).join('')}</div>`
   }
