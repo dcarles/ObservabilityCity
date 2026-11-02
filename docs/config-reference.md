@@ -315,6 +315,12 @@ signals: { backlog: messaging, deadLetters: messaging }
 | `deadLetterLink` | no | none | `{ name, url }`: an address that opens a consumer's dead letters in your support tool, shown in its drawer. The url is a template over `{pillar}`, `{service}` (the codes of the scope rules), `{system}` and `{environment}`. Without it, no link. |
 | `patterns` | yes | | The shapes of entity names, tried in order. |
 
+<!-- file: EntityLinkFile -->
+| Key | Required | Default | Meaning |
+|---|---|---|---|
+| `name` | yes | | The words the link shows (for example `Support tool`). |
+| `url` | yes | | An `http://` or `https://` address, a template over `{pillar}`, `{service}`, `{system}` and `{environment}`. A system with no code for a word it uses gets no link. |
+
 <!-- file: EntityMetricFile -->
 | Key | Required | Default | Meaning |
 |---|---|---|---|
