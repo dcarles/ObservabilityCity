@@ -128,7 +128,14 @@ public sealed record NodeSnapshot(
     IReadOnlyList<JobSnapshot>? Jobs = null,
     IReadOnlyList<RegionSnapshot>? Regions = null,
     IReadOnlyList<QueueSnapshot>? Queues = null,
-    string? Reason = null);
+    string? Reason = null,
+    IReadOnlyList<SourceAgeSnapshot>? Sources = null);
+
+/// <summary>
+/// A source that feeds a system: its name, how many seconds ago it last answered, whether that is fresh enough to show, and the signals it supplies. A source that is
+/// not fresh leaves its signals out of the system (they are listed in Absent) while the others carry on.
+/// </summary>
+public sealed record SourceAgeSnapshot(string Source, int AgeSeconds, bool Fresh, IReadOnlyList<string> Signals);
 
 /// <summary>
 /// One queue a consumer reads: what waits in it and what is dead-lettered (each null when nothing measures it), and Link, the address that opens its dead letters in the

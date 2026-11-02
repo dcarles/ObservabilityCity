@@ -34,6 +34,22 @@ describe('the queues of a consumer', () => {
   })
 })
 
+describe('the snapshot guard and the sources of a system', () => {
+  const nodeOf = (t: any) => t.groups.flatMap((g: any) => g.nodes)[0]
+
+  it('keeps the sources with a name, repairs a bad age, and treats a missing list as none', () => {
+    const t = healthyTown() as any
+    nodeOf(t).sources = [{ source: 'platform', ageSeconds: 240, fresh: false, signals: ['cpu', 5] }, { source: '', ageSeconds: 1, fresh: true, signals: [] }, { source: 'telemetry', ageSeconds: -3, fresh: 'yes', signals: [] }, 'junk']
+    expect(nodeOf(checkSnapshot(t).snapshot!).sources).toEqual([
+      { source: 'platform', ageSeconds: 240, fresh: false, signals: ['cpu'] },
+      { source: 'telemetry', ageSeconds: 0, fresh: false, signals: [] },
+    ])
+
+    delete nodeOf(t).sources
+    expect(nodeOf(checkSnapshot(t).snapshot!).sources).toBeNull()
+  })
+})
+
 describe('the snapshot guard and queues', () => {
   const nodeOf = (t: any) => t.groups.flatMap((g: any) => g.nodes)[0]
 

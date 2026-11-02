@@ -380,6 +380,58 @@ public class InstancesTests
         Assert.Equal(HealthState.Stale, Node(builder.Build(), "aa.orders-api").State);
     }
 
+    private async Task<(SnapshotBuilder Builder, LatestState State, FakeTimeProvider Time)> ThreeSources(DateTimeOffset platformAt)
+    {
+        var registry = Prod(TownA);
+        var time = new FakeTimeProvider(T0);
+        var state = new LatestState();
+        state.Update("inventory", await Source(TownA, time).PollAsync(registry, CancellationToken.None));
+        state.Update("telemetry", new Dictionary<string, NodeReading> { ["aa.orders-api"] = Reading(at: T0, rps: 12) });
+        state.Update("platform", new Dictionary<string, NodeReading> { ["aa.orders-api"] = Reading(at: platformAt, cpu: 0.3) });
+        var builder = new SnapshotBuilder(registry, state, time)
+        {
+            Environment = "prod",
+            StaleAfter = TimeSpan.FromSeconds(30),
+            SourceIntervals = new Dictionary<string, TimeSpan> { ["inventory"] = TimeSpan.FromMinutes(5), ["telemetry"] = TimeSpan.FromSeconds(10), ["platform"] = TimeSpan.FromSeconds(10) },
+        };
+        return (builder, state, time);
+    }
+
+    [Fact]
+    public async Task A_late_source_leaves_out_only_its_own_signals_while_another_source_of_health_signals_is_fresh()
+    {
+        var (builder, _, time) = await ThreeSources(platformAt: T0);
+        time.Advance(TimeSpan.FromSeconds(25));
+        Assert.NotEqual(HealthState.Stale, Node(builder.Build(), "aa.orders-api").State);
+        Assert.Null(Node(builder.Build(), "aa.orders-api").Sources); // everything is fresh: nothing to say about the sources
+
+        // the platform's reading is now 2 minutes old and the others are fresh
+        var (late, state, lateTime) = await ThreeSources(platformAt: T0 - TimeSpan.FromMinutes(2));
+        state.Update("telemetry", new Dictionary<string, NodeReading> { ["aa.orders-api"] = Reading(at: T0, rps: 12) });
+        var node = Node(late.Build(), "aa.orders-api");
+        Assert.NotEqual(HealthState.Stale, node.State);
+        Assert.Contains("cpu", node.Absent);
+        Assert.Contains("memory", node.Absent);
+        Assert.Equal(12, node.RequestsPerSecond); // what the fresh source says is still shown
+        Assert.False(node.Sources!.Single(x => x.Source == "platform").Fresh);
+        Assert.True(node.Sources!.Single(x => x.Source == "telemetry").Fresh);
+        Assert.True(node.Sources!.Single(x => x.Source == "platform").AgeSeconds >= 120);
+        Assert.Contains("cpu", node.Sources!.Single(x => x.Source == "platform").Signals);
+        _ = lateTime;
+    }
+
+    [Fact]
+    public async Task A_building_is_grey_when_no_source_of_health_signals_is_fresh_and_the_sources_say_how_old_they_are()
+    {
+        var (builder, state, time) = await ThreeSources(platformAt: T0);
+        time.Advance(TimeSpan.FromMinutes(2)); // platform and telemetry are 2 minutes old, only the inventory (every 5 minutes) is still fresh
+        state.Update("inventory", await Source(TownA, time).PollAsync(Prod(TownA), CancellationToken.None));
+        var node = Node(builder.Build(), "aa.orders-api");
+        Assert.Equal(HealthState.Stale, node.State); // instance counts alone do not say how a building is doing
+        Assert.Equal(["inventory", "platform", "telemetry"], node.Sources!.Select(x => x.Source).Order().ToArray());
+        Assert.False(node.Sources!.Single(x => x.Source == "telemetry").Fresh);
+    }
+
     private static readonly JsonSerializerOptions Wire = new(JsonSerializerDefaults.Web) { Converters = { new JsonStringEnumConverter() } };
 
     private static async Task<(Snapshot Snapshot, SystemDetail Detail)> Served(string folder)

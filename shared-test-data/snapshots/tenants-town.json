@@ -79,7 +79,8 @@
           "jobs": null,
           "regions": null,
           "queues": null,
-          "reason": null
+          "reason": null,
+          "sources": null
         },
         {
           "id": "hub.service-bus",
@@ -123,7 +124,8 @@
           "jobs": null,
           "regions": null,
           "queues": null,
-          "reason": null
+          "reason": null,
+          "sources": null
         },
         {
           "id": "hub.egress",
@@ -167,7 +169,8 @@
           "jobs": null,
           "regions": null,
           "queues": null,
-          "reason": null
+          "reason": null,
+          "sources": null
         },
         {
           "id": "hub.customer-db",
@@ -211,7 +214,8 @@
           "jobs": null,
           "regions": null,
           "queues": null,
-          "reason": null
+          "reason": null,
+          "sources": null
         }
       ],
       "assets": []
@@ -297,7 +301,8 @@
           "jobs": null,
           "regions": null,
           "queues": null,
-          "reason": null
+          "reason": null,
+          "sources": null
         },
         {
           "id": "aa.audit-cache",
@@ -341,7 +346,8 @@
           "jobs": null,
           "regions": null,
           "queues": null,
-          "reason": null
+          "reason": null,
+          "sources": null
         },
         {
           "id": "aa.orders-worker",
@@ -387,7 +393,8 @@
           "jobs": null,
           "regions": null,
           "queues": null,
-          "reason": null
+          "reason": null,
+          "sources": null
         },
         {
           "id": "aa.tools-cron",
@@ -448,7 +455,8 @@
           ],
           "regions": null,
           "queues": null,
-          "reason": null
+          "reason": null,
+          "sources": null
         },
         {
           "id": "aa.orders-db",
@@ -553,7 +561,8 @@
           "jobs": null,
           "regions": null,
           "queues": null,
-          "reason": "error rate 6.4%, tenant Acme \u00B7 108% RU \u00B7 31.2% throttled"
+          "reason": "error rate 6.4%, tenant Acme \u00B7 108% RU \u00B7 31.2% throttled",
+          "sources": null
         }
       ],
       "assets": []
@@ -619,7 +628,8 @@
           "jobs": null,
           "regions": null,
           "queues": null,
-          "reason": null
+          "reason": null,
+          "sources": null
         },
         {
           "id": "bb.billing-db",
@@ -724,7 +734,8 @@
           "jobs": null,
           "regions": null,
           "queues": null,
-          "reason": null
+          "reason": null,
+          "sources": null
         },
         {
           "id": "bb.shared-db",
@@ -768,7 +779,8 @@
           "jobs": null,
           "regions": null,
           "queues": null,
-          "reason": null
+          "reason": null,
+          "sources": null
         }
       ],
       "assets": []
