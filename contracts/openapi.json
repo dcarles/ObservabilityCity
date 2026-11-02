@@ -1087,6 +1087,10 @@
             },
             "nullable": true
           },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          },
           "sources": {
             "type": "array",
             "items": {

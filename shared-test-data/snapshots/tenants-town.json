@@ -79,6 +79,7 @@
           "jobs": null,
           "regions": null,
           "queues": null,
+          "reason": null,
           "sources": null
         },
         {
@@ -123,6 +124,7 @@
           "jobs": null,
           "regions": null,
           "queues": null,
+          "reason": null,
           "sources": null
         },
         {
@@ -167,6 +169,7 @@
           "jobs": null,
           "regions": null,
           "queues": null,
+          "reason": null,
           "sources": null
         },
         {
@@ -211,6 +214,7 @@
           "jobs": null,
           "regions": null,
           "queues": null,
+          "reason": null,
           "sources": null
         }
       ],
@@ -297,6 +301,7 @@
           "jobs": null,
           "regions": null,
           "queues": null,
+          "reason": null,
           "sources": null
         },
         {
@@ -341,6 +346,7 @@
           "jobs": null,
           "regions": null,
           "queues": null,
+          "reason": null,
           "sources": null
         },
         {
@@ -387,6 +393,7 @@
           "jobs": null,
           "regions": null,
           "queues": null,
+          "reason": null,
           "sources": null
         },
         {
@@ -448,6 +455,7 @@
           ],
           "regions": null,
           "queues": null,
+          "reason": null,
           "sources": null
         },
         {
@@ -553,6 +561,7 @@
           "jobs": null,
           "regions": null,
           "queues": null,
+          "reason": "error rate 6.4%, tenant Acme \u00B7 108% RU \u00B7 31.2% throttled",
           "sources": null
         }
       ],
@@ -619,6 +628,7 @@
           "jobs": null,
           "regions": null,
           "queues": null,
+          "reason": null,
           "sources": null
         },
         {
@@ -724,6 +734,7 @@
           "jobs": null,
           "regions": null,
           "queues": null,
+          "reason": null,
           "sources": null
         },
         {
@@ -768,6 +779,7 @@
           "jobs": null,
           "regions": null,
           "queues": null,
+          "reason": null,
           "sources": null
         }
       ],

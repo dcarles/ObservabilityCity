@@ -424,6 +424,7 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
             App = r.App,
             Jobs = jobs,
             Regions = regions?.Select(x => new RegionSnapshot(x.Region, Label(env, x.Region), x.Instances, x.Cpu, x.Memory, x.Share, Skewed(x, regions, env))).ToList(),
+            Reason = health == HealthState.Healthy ? null : HealthReasons.For(n, r, health, jobs, utilisation, throttled, tenants),
         };
     }
 

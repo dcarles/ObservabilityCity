@@ -36,6 +36,10 @@ source (fake now, Prometheus / Log Analytics / Service Bus / Grafana IRM later)
 | `shared-test-data/` | Registries, golden snapshots and layout golden used by both sides |
 | `contracts/openapi.json` | Generated from the C# records |
 
+## Two views of the same data
+
+The page opens as the 3D town or as a plain dashboard (`?view=dashboard`, remembered per browser, switch in the menu). Both read the same snapshot and live feed. `frontend/src/main.ts` only picks a view and loads it, so the dashboard (`frontend/src/dashboard/`) never loads three.js. The dashboard's rules live in `dashboard/model.ts` as pure functions; its markup in `dashboard/render.ts`. The "why is it amber or red" line comes from the backend (`NodeSnapshot.Reason`, built in `HealthReasons.cs` from the same thresholds that set the state). Pillar choice (`?islands=`), environment and tenant filter are shared by both views.
+
 ## Run and test
 
 Needs .NET SDK 10 and Node 26. No Docker.

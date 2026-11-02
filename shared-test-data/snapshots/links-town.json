@@ -81,6 +81,7 @@
           "jobs": null,
           "regions": null,
           "queues": null,
+          "reason": null,
           "sources": null
         },
         {
@@ -125,6 +126,7 @@
           "jobs": null,
           "regions": null,
           "queues": null,
+          "reason": null,
           "sources": null
         },
         {
@@ -169,6 +171,7 @@
           "jobs": null,
           "regions": null,
           "queues": null,
+          "reason": null,
           "sources": null
         },
         {
@@ -213,6 +216,7 @@
           "jobs": null,
           "regions": null,
           "queues": null,
+          "reason": null,
           "sources": null
         }
       ],
@@ -290,6 +294,7 @@
           "jobs": null,
           "regions": null,
           "queues": null,
+          "reason": null,
           "sources": null
         },
         {
@@ -336,6 +341,7 @@
           "jobs": null,
           "regions": null,
           "queues": null,
+          "reason": null,
           "sources": null
         },
         {
@@ -380,6 +386,7 @@
           "jobs": null,
           "regions": null,
           "queues": null,
+          "reason": null,
           "sources": null
         }
       ],
@@ -457,6 +464,7 @@
           "jobs": null,
           "regions": null,
           "queues": null,
+          "reason": null,
           "sources": null
         },
         {
@@ -501,6 +509,7 @@
           "jobs": null,
           "regions": null,
           "queues": null,
+          "reason": null,
           "sources": null
         }
       ],
@@ -566,6 +575,7 @@
           "jobs": null,
           "regions": null,
           "queues": null,
+          "reason": null,
           "sources": null
         },
         {
@@ -610,6 +620,7 @@
           "jobs": null,
           "regions": null,
           "queues": null,
+          "reason": null,
           "sources": null
         }
       ],
@@ -705,6 +716,7 @@
           ],
           "regions": null,
           "queues": null,
+          "reason": null,
           "sources": null
         }
       ],
@@ -777,6 +789,7 @@
           "jobs": null,
           "regions": null,
           "queues": null,
+          "reason": null,
           "sources": null
         },
         {
@@ -823,6 +836,7 @@
           "jobs": null,
           "regions": null,
           "queues": null,
+          "reason": null,
           "sources": null
         },
         {
@@ -867,6 +881,7 @@
           "jobs": null,
           "regions": null,
           "queues": null,
+          "reason": null,
           "sources": null
         }
       ],
@@ -960,6 +975,7 @@
           ],
           "regions": null,
           "queues": null,
+          "reason": null,
           "sources": null
         }
       ],
@@ -1010,6 +1026,7 @@
         "jobs": null,
         "regions": null,
         "queues": null,
+        "reason": null,
         "sources": null
       },
       "calledBy": [
@@ -1064,6 +1081,7 @@
         "jobs": null,
         "regions": null,
         "queues": null,
+        "reason": null,
         "sources": null
       },
       "calledBy": [
@@ -1117,6 +1135,7 @@
         "jobs": null,
         "regions": null,
         "queues": null,
+        "reason": null,
         "sources": null
       },
       "calledBy": [

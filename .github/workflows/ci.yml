@@ -82,7 +82,7 @@ jobs:
           - { group: scenarios, suites: 'scenarios' }
           - { group: ui, suites: 'ui' }
           - { group: towns, suites: 'towns' }
-          - { group: links and tenants, suites: 'links tenants' }
+          - { group: links and tenants, suites: 'links tenants dashboard' }
           - { group: other towns, suites: 'direct live sources discovery scope functions messaging wide' }
     steps:
       - uses: actions/checkout@v7

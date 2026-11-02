@@ -74,6 +74,7 @@
           "jobs": null,
           "regions": null,
           "queues": null,
+          "reason": null,
           "sources": null
         },
         {
@@ -118,6 +119,7 @@
           "jobs": null,
           "regions": null,
           "queues": null,
+          "reason": null,
           "sources": null
         },
         {
@@ -162,6 +164,7 @@
           "jobs": null,
           "regions": null,
           "queues": null,
+          "reason": null,
           "sources": null
         },
         {
@@ -206,6 +209,7 @@
           "jobs": null,
           "regions": null,
           "queues": null,
+          "reason": null,
           "sources": null
         }
       ],
@@ -283,6 +287,7 @@
           "jobs": null,
           "regions": null,
           "queues": null,
+          "reason": "error rate 18.2%",
           "sources": null
         },
         {
@@ -329,6 +334,7 @@
           "jobs": null,
           "regions": null,
           "queues": null,
+          "reason": null,
           "sources": null
         },
         {
@@ -373,6 +379,7 @@
           "jobs": null,
           "regions": null,
           "queues": null,
+          "reason": null,
           "sources": null
         }
       ],
@@ -459,6 +466,7 @@
           "jobs": null,
           "regions": null,
           "queues": null,
+          "reason": null,
           "sources": null
         },
         {
@@ -505,6 +513,7 @@
           "jobs": null,
           "regions": null,
           "queues": null,
+          "reason": null,
           "sources": null
         },
         {
@@ -549,6 +558,7 @@
           "jobs": null,
           "regions": null,
           "queues": null,
+          "reason": null,
           "sources": null
         }
       ],
@@ -599,6 +609,7 @@
         "jobs": null,
         "regions": null,
         "queues": null,
+        "reason": null,
         "sources": null
       },
       "calledBy": [
@@ -652,6 +663,7 @@
         "jobs": null,
         "regions": null,
         "queues": null,
+        "reason": null,
         "sources": null
       },
       "calledBy": [

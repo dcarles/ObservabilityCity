@@ -81,6 +81,7 @@ public enum HealthState
 /// App says whether the cloud runs the app (see <see cref="AppState"/>); Jobs lists the scheduled jobs of a function building; Regions lists a service's regions
 /// when it runs in two or more, and the instances, Cpu and Memory above are then those of its worst region. A count of instances of 0 is never sent: it is not known, so
 /// "instances" is in Absent.
+/// Reason is a short plain-text line saying why the state is Degraded or Down ("error rate 2.4%, p99 640 ms"), built with the same thresholds that decided the state; null for a healthy or grey system.
 /// Absent lists the signals no source is configured for (requests, errors, latency, instances, cpu, memory, utilisation, throttled, backlog, deadLetters). They are not
 /// zero and not grey: the number in the matching field means nothing, health ignores it and the renderer shows nothing for it. A system whose signals are all absent has no
 /// source at all; it is Stale in State, but it is not grey and it is not counted as missing data.
@@ -127,6 +128,7 @@ public sealed record NodeSnapshot(
     IReadOnlyList<JobSnapshot>? Jobs = null,
     IReadOnlyList<RegionSnapshot>? Regions = null,
     IReadOnlyList<QueueSnapshot>? Queues = null,
+    string? Reason = null,
     IReadOnlyList<SourceAgeSnapshot>? Sources = null);
 
 /// <summary>

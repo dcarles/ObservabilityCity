@@ -335,6 +335,7 @@ export interface components {
             jobs?: components["schemas"]["JobSnapshot"][] | null;
             regions?: components["schemas"]["RegionSnapshot"][] | null;
             queues?: components["schemas"]["QueueSnapshot"][] | null;
+            reason?: string | null;
             sources?: components["schemas"]["SourceAgeSnapshot"][] | null;
         };
         OffscreenLink: {
