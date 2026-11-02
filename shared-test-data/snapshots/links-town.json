@@ -80,7 +80,8 @@
           "app": null,
           "jobs": null,
           "regions": null,
-          "queues": null
+          "queues": null,
+          "reason": null
         },
         {
           "id": "hub.service-bus",
@@ -123,7 +124,8 @@
           "app": null,
           "jobs": null,
           "regions": null,
-          "queues": null
+          "queues": null,
+          "reason": null
         },
         {
           "id": "hub.egress",
@@ -166,7 +168,8 @@
           "app": null,
           "jobs": null,
           "regions": null,
-          "queues": null
+          "queues": null,
+          "reason": null
         },
         {
           "id": "hub.customer-db",
@@ -209,7 +212,8 @@
           "app": null,
           "jobs": null,
           "regions": null,
-          "queues": null
+          "queues": null,
+          "reason": null
         }
       ],
       "assets": []
@@ -285,7 +289,8 @@
           "app": null,
           "jobs": null,
           "regions": null,
-          "queues": null
+          "queues": null,
+          "reason": null
         },
         {
           "id": "ful.orders-worker",
@@ -330,7 +335,8 @@
           "app": null,
           "jobs": null,
           "regions": null,
-          "queues": null
+          "queues": null,
+          "reason": null
         },
         {
           "id": "ful.orders-db",
@@ -373,7 +379,8 @@
           "app": null,
           "jobs": null,
           "regions": null,
-          "queues": null
+          "queues": null,
+          "reason": null
         }
       ],
       "assets": []
@@ -449,7 +456,8 @@
           "app": null,
           "jobs": null,
           "regions": null,
-          "queues": null
+          "queues": null,
+          "reason": null
         },
         {
           "id": "wrk.batch-db",
@@ -492,7 +500,8 @@
           "app": null,
           "jobs": null,
           "regions": null,
-          "queues": null
+          "queues": null,
+          "reason": null
         }
       ],
       "assets": []
@@ -556,7 +565,8 @@
           "app": null,
           "jobs": null,
           "regions": null,
-          "queues": null
+          "queues": null,
+          "reason": null
         },
         {
           "id": "nom.catalog-cache",
@@ -599,7 +609,8 @@
           "app": null,
           "jobs": null,
           "regions": null,
-          "queues": null
+          "queues": null,
+          "reason": null
         }
       ],
       "assets": []
@@ -693,7 +704,8 @@
             }
           ],
           "regions": null,
-          "queues": null
+          "queues": null,
+          "reason": null
         }
       ],
       "assets": []
@@ -764,7 +776,8 @@
           "app": null,
           "jobs": null,
           "regions": null,
-          "queues": null
+          "queues": null,
+          "reason": null
         },
         {
           "id": "leg.feed-worker",
@@ -809,7 +822,8 @@
           "app": null,
           "jobs": null,
           "regions": null,
-          "queues": null
+          "queues": null,
+          "reason": null
         },
         {
           "id": "leg.feed-db",
@@ -852,7 +866,8 @@
           "app": null,
           "jobs": null,
           "regions": null,
-          "queues": null
+          "queues": null,
+          "reason": null
         }
       ],
       "assets": []
@@ -944,7 +959,8 @@
             }
           ],
           "regions": null,
-          "queues": null
+          "queues": null,
+          "reason": null
         }
       ],
       "assets": []
@@ -993,7 +1009,8 @@
         "app": null,
         "jobs": null,
         "regions": null,
-        "queues": null
+        "queues": null,
+        "reason": null
       },
       "calledBy": [
         "ful.orders-api",
@@ -1046,7 +1063,8 @@
         "app": null,
         "jobs": null,
         "regions": null,
-        "queues": null
+        "queues": null,
+        "reason": null
       },
       "calledBy": [
         "nom.catalog-api"
@@ -1098,7 +1116,8 @@
         "app": null,
         "jobs": null,
         "regions": null,
-        "queues": null
+        "queues": null,
+        "reason": null
       },
       "calledBy": [
         "ful.orders-worker"

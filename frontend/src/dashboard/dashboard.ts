@@ -1,0 +1,202 @@
+import '../style.css'
+import '../dashboard.css'
+import { Connection, type ConnectionState } from '../connection'
+import { checkSnapshot } from '../snapshotGuard'
+import { Inspector } from '../inspector'
+import { requestedScope } from '../scope'
+import { ViewBar } from '../viewbar'
+import { NoticesPanel } from '../noticesPanel'
+import { UnknownHostsPanel } from '../unknownHosts'
+import { browserStore, isLighting, LIGHTING_KEY, startLighting, saveLighting, type Lighting } from '../lighting'
+import { pruneTenants, type TenantView } from '../tenants'
+import { islandsParam, parseIslands, pruneIslands, islandChoices } from '../islands'
+import { loadTenantView, saveTenantView, viewSwitchAddress } from '../viewMode'
+import type { Snapshot } from '../types'
+import { buildDashboard, pillarSelection, type Dashboard } from './model'
+import { hiddenHtml, pillarMenuHtml, pillarsHtml, summaryHtml, type UiState } from './render'
+
+const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T
+
+/** The plain dashboard: the same snapshot and the same live feed as the town, as numbers and tables. It never loads three.js. */
+export function startDashboard(): void {
+  const store = browserStore()
+  const scope = requestedScope()
+  document.body.classList.add('dash')
+  $('dash-root').hidden = false
+  // the drawer and the lists the town floats over its scene sit in the page here
+  const filters = $('dash-filters')
+  filters.appendChild($('view-bar'))
+  $('dash-more').append($('unknown-hosts'), $('notices'))
+
+  // light or dark: the same choice the town calls Day and Dusk, so the browser remembers one thing
+  let mode: Lighting = (() => {
+    const asked = startLighting(window.location.search, store, 'day')
+    try { if (!store?.getItem(LIGHTING_KEY) && window.matchMedia('(prefers-color-scheme: dark)').matches) return 'dusk' } catch { /* no storage */ }
+    return asked
+  })()
+  const showMode = (): void => {
+    document.body.dataset.mode = mode === 'dusk' ? 'dark' : 'light'
+    $('dash-theme').textContent = mode === 'dusk' ? 'Light' : 'Dark'
+  }
+  showMode()
+  $('dash-theme').addEventListener('click', () => {
+    mode = mode === 'dusk' ? 'day' : 'dusk'
+    if (isLighting(mode)) saveLighting(store, mode)
+    showMode()
+  })
+
+  $('vs-town').addEventListener('click', () => { window.location.href = viewSwitchAddress(window.location, 'town', store) })
+
+  const ui = { openPillars: new Set<string>(), groups: new Map<string, boolean>(), databases: new Map<string, boolean>() }
+  let tenantView: TenantView = loadTenantView(store)
+  let islands: readonly string[] = parseIslands(window.location.search)
+  let last: Snapshot | null = null
+  let model: Dashboard | null = null
+  const seen = { snapshots: 0, rejected: 0 }
+  const shown = { sum: '', pillars: '', hidden: '', menu: '', brand: '' }
+  const regionChoices = new Map<string, string>()
+
+  const inspector = new Inspector({
+    scope,
+    onScreen: (id) => !!last?.groups.some((g) => g.nodes.some((n) => n.id === id)),
+    go: (id) => inspector.open(id),
+    view: () => tenantView,
+    regionChoice: (id) => (regionChoices.get(id) ?? 'worst') as ReturnType<ConstructorParameters<typeof Inspector>[0]['regionChoice']>,
+    setRegion: (id, choice) => { regionChoices.set(id, choice as string); if (last) inspector.update(last) },
+    closed: () => {},
+  })
+  const notices = new NoticesPanel()
+  const unknownHosts = new UnknownHostsPanel(scope, () => (last?.groups ?? []).flatMap((g) => g.nodes).filter((n) => n.kind === 'Api').map((n) => n.id).sort())
+  unknownHosts.start()
+
+  const setTenantView = (v: TenantView): void => {
+    tenantView = v
+    saveTenantView(store, v)
+    viewBar.refresh()
+    draw()
+  }
+  const setIslands = (ids: readonly string[]): void => {
+    islands = ids
+    connection.setIslands(ids)
+    const q = new URLSearchParams(window.location.search)
+    const p = islandsParam(ids)
+    if (p) q.set('islands', p)
+    else q.delete('islands')
+    const text = q.toString().replace(/%2C/g, ',')
+    window.history.replaceState(null, '', `${window.location.pathname}${text ? `?${text}` : ''}${window.location.hash}`)
+  }
+  const viewBar = new ViewBar({
+    towns: () => [],
+    switchTown: () => {},
+    quality: () => 'high',
+    setQuality: () => {},
+    view: () => tenantView,
+    setView: setTenantView,
+    switchEnv: (id) => { const u = new URL(window.location.href); u.searchParams.set('env', id); window.location.href = u.toString() },
+    islands: () => islands,
+    setIslands: (ids) => setIslands(ids),
+    layers: () => ({ roads: true, dependencies: false }) as never,
+    toggleLayer: () => {},
+    focus: () => '',
+    setFocus: () => {},
+    theme: () => ({ id: 'harbour-town', name: '', blurb: '' }) as never,
+    setTheme: () => {},
+  }, ['env', 'tenant'])
+
+  /** Draws what changed. Open and closed things live in `ui`, so a new snapshot never undoes them, and the page keeps its scroll place. */
+  function draw(): void {
+    if (!last) return
+    model = buildDashboard(last, tenantView)
+    const y = window.scrollY
+    const active = (document.activeElement as HTMLElement | null)?.closest<HTMLElement>('[data-toggle],[data-hide],[data-show],[data-db],[data-group]')
+    const key = active ? (['toggle', 'hide', 'show', 'db', 'group'] as const).map((k) => (active.dataset[k] !== undefined ? `[data-${k}="${CSS.escape(active.dataset[k]!)}"]` : '')).join('') : ''
+    const put = (id: string, html: string, k: keyof typeof shown): void => { if (shown[k] !== html) { shown[k] = html; $(id).innerHTML = html } }
+    if (shown.brand !== model.townName) { shown.brand = model.townName; $('dash-brand').textContent = model.townName }
+    put('dash-sum', summaryHtml(model), 'sum')
+    put('dash-pillars', pillarsHtml(model, ui as UiState), 'pillars')
+    put('hidden-pillars', hiddenHtml(model), 'hidden')
+    put('pillar-menu', pillarMenuHtml(model), 'menu')
+    if (window.scrollY !== y) window.scrollTo(0, y)
+    if (key) document.querySelector<HTMLElement>(key)?.focus({ preventScroll: true })
+  }
+
+  function onSnapshot(raw: unknown): void {
+    const { snapshot: s, problems } = checkSnapshot(raw)
+    for (const p of problems) console.warn(`Snapshot problem: ${p}`)
+    if (!s) { seen.rejected++; setStatus('badData'); return }
+    last = s
+    seen.snapshots++
+    const pruned = pruneTenants(tenantView, s.tenants ?? [])
+    if (pruned !== tenantView) { tenantView = pruned; saveTenantView(store, pruned) }
+    const kept = pruneIslands(islands, islandChoices(s))
+    if (kept !== islands) setIslands(kept)
+    viewBar.update(s)
+    inspector.update(s)
+    notices.show(s.notices, s.notes ?? [])
+    draw()
+    setStatus('live')
+  }
+
+  function setStatus(st: ConnectionState): void {
+    const label = { connecting: 'Connecting…', live: last?.mode === 'demo' ? 'Live (demo data)' : 'Live', reconnecting: 'Reconnecting…', offline: 'Backend offline', badData: 'Bad data, showing the last good data' }[st]
+    const el = $('dash-status')
+    el.className = `livepill ${st === 'live' ? '' : st === 'offline' || st === 'badData' ? 'off' : 'wait'}`
+    el.lastElementChild!.textContent = label
+  }
+
+  const connection = new Connection(onSnapshot, setStatus, scope, (e) => {
+    const b = $('banner')
+    b.textContent = `There is no environment "${e.requested ?? ''}". Available: ${e.environments.join(', ') || 'none'}.`
+    b.hidden = false
+    b.style.display = 'block'
+  }, islands)
+  connection.start()
+
+  // one listener for the whole page: the markup is redrawn with every snapshot
+  const root = $('dash-root')
+  root.addEventListener('click', (e) => {
+    const t = e.target as HTMLElement
+    const attr = (name: string): string | undefined => t.closest<HTMLElement>(`[${name}]`)?.getAttribute(name) ?? undefined
+    const toggle = attr('data-toggle')
+    const hide = attr('data-hide')
+    const show = attr('data-show')
+    const db = attr('data-db')
+    const details = attr('data-details')
+    const group = attr('data-group')
+    const system = t.closest<HTMLElement>('[data-system]')?.dataset.system
+    if (toggle !== undefined) { if (ui.openPillars.has(toggle)) ui.openPillars.delete(toggle); else ui.openPillars.add(toggle); draw(); return }
+    if (hide !== undefined && last) { setIslands(pillarSelection(last, hide, false)); return }
+    if (show !== undefined && last) { setIslands(pillarSelection(last, show, true)); return }
+    if (db !== undefined && model) {
+      const row = model.pillars.flatMap((p) => p.groups.flatMap((g) => g.rows)).find((r) => r.id === db)
+      if (row) { ui.databases.set(db, !(ui.databases.get(db) ?? row.tenantsOpenByDefault)); draw() }
+      return
+    }
+    if (details !== undefined) { inspector.open(details, 'links'); return }
+    if (group !== undefined && model) {
+      const g = model.pillars.flatMap((p) => p.groups).find((x) => x.key === group)
+      if (g) { ui.groups.set(group, !(ui.groups.get(group) ?? (g.level === 'warn' || g.level === 'bad'))); draw() }
+      return
+    }
+    if (system) inspector.open(system)
+  })
+  const menu = $('pillar-menu')
+  const button = $('pillars-button')
+  button.addEventListener('click', () => { menu.hidden = !menu.hidden; button.setAttribute('aria-expanded', String(!menu.hidden)) })
+  document.addEventListener('pointerdown', (e) => { if (!menu.hidden && !(e.target as HTMLElement).closest('.vb')) { menu.hidden = true; button.setAttribute('aria-expanded', 'false') } })
+  menu.addEventListener('change', (e) => {
+    const box = e.target as HTMLInputElement
+    const id = box.dataset.pillarBox
+    if (id && last) setIslands(pillarSelection(last, id, box.checked))
+  })
+
+  ;(window as unknown as { dash: unknown }).dash = {
+    seen,
+    feed: (raw: unknown) => onSnapshot(raw),
+    model: () => model,
+    ui,
+    tenantView: () => tenantView,
+    islands: () => islands,
+    threeLoaded: () => !!document.querySelector('script[src*="three"]') || 'THREE' in window,
+  }
+}

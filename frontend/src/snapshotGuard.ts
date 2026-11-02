@@ -247,6 +247,8 @@ function checkNode(n: unknown, groupId: string, ids: Set<string>, problems: stri
     ? n.inbound.filter(isObject).filter((l) => typeof l.from === 'string' && l.from !== '').map((l) => ({ from: l.from as string, requestsPerSecond: isFiniteNumber(l.requestsPerSecond) && l.requestsPerSecond >= 0 ? l.requestsPerSecond : 0 }))
     : null
   out.inboundEstimated = n.inboundEstimated === true
+  // why the state is not healthy, in words; the backend leaves it out for a healthy system
+  out.reason = typeof n.reason === 'string' && n.reason !== '' ? n.reason : null
   // null: nothing says whether the app runs; a job or region list is only there for a function or a service in two regions
   out.app = APP_STATES.includes(n.app as string) ? n.app : null
   const optionalNumber = (v: unknown) => (isFiniteNumber(v) ? v : null)
