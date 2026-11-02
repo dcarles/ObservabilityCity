@@ -38,6 +38,8 @@ if (args.Contains("--write-schema"))
 
 var fakeOptions = builder.Configuration.GetSection("Fake").Get<FakeOptions>() ?? new FakeOptions();
 var snapshotInterval = TimeSpan.FromSeconds(builder.Configuration.GetValue("Snapshot:IntervalSeconds", 2.0));
+// viewers are sent a snapshot when something changed, and at least this often so the feed shows it is alive (0 sends every tick)
+var keepAliveSeconds = builder.Configuration.GetValue("Snapshot:KeepAliveSeconds", 15.0);
 var staleAfter = TimeSpan.FromSeconds(builder.Configuration.GetValue("Snapshot:StaleAfterSeconds", 30.0));
 
 // The adapters this build has: every module found in adapters/ beside the program (Adapters:Path moves the folder). A live environment starts
@@ -133,7 +135,7 @@ foreach (var (town, runtimes) in hostedByTown)
             builder.Services.AddSingleton<IHostedService>(sp => new LinkTrafficRunner(trafficSource, rt.Scope, rt.Registry, rt.Discovered.Traffic, TimeProvider.System, sp.GetRequiredService<ILogger<LinkTrafficRunner>>(), trafficSource as IRateHistory));
         builder.Services.AddSingleton<IHostedService>(sp => new SnapshotPublisher(rt.Builder, rt.Store,
             new SignalRSnapshotNotifier(sp.GetRequiredService<IHubContext<TownHub>>(), town.Environments, sp.GetRequiredService<IslandViews>()),
-            snapshotInterval, sp.GetRequiredService<ILogger<SnapshotPublisher>>()));
+            snapshotInterval, sp.GetRequiredService<ILogger<SnapshotPublisher>>(), keepAliveSeconds > 0 ? TimeSpan.FromSeconds(keepAliveSeconds) : null));
     }
 }
 builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter()));
