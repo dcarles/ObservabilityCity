@@ -227,6 +227,9 @@ public sealed record RegistrySource(string Name, string Kind, string? Connection
     public double? PollSeconds { get; init; }
     public double? TimeoutSeconds { get; init; }
 
+    /// <summary>For a job source: how long after its schedule says it should run a job may go without a newer run before it counts as late. Null: twice the poll interval (never less than the stale limit). A value below that is ignored, since a reading may lag that much anyway.</summary>
+    public double? LateAfterSeconds { get; init; }
+
     /// <summary>For a source that sends a query: the query template (see <see cref="SourceQuery"/>) and how far back it looks. Null: the adapter's own, or none.</summary>
     public string? Query { get; init; }
     public string? Window { get; init; }

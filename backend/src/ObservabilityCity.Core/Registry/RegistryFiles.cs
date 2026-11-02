@@ -414,6 +414,8 @@ internal sealed class SourceFile
     public double? PollSeconds { get; set; }
     /// <summary>How long one ask may take before it is given up, in seconds.</summary>
     public double? TimeoutSeconds { get; set; }
+    /// <summary>Job sources only (functionjobs): how long after its schedule says it should run a job may stay without a newer run before it counts as late, in seconds.</summary>
+    public double? LateAfterSeconds { get; set; }
     /// <summary>Query sources only (loganalytics): the query to send, a template. {window} and {windowSeconds} stand for the window, {roles} for the telemetry names of the systems it is asked about, quoted and separated by commas; scope variables and {environment} work too.</summary>
     public string? Query { get; set; }
     /// <summary>Request sources only (loganalytics): the query that says how a service's requests divide between regions, a template like query. Returns one row per telemetry name and region with the columns role, region and calls (sampling-corrected counts do: only the proportions are used).</summary>

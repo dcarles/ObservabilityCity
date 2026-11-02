@@ -37,9 +37,16 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
     /// </summary>
     public IReadOnlyDictionary<string, TimeSpan> SourceIntervals { get; init; } = new Dictionary<string, TimeSpan>();
 
+    /// <summary>Per source, how long a scheduled job may be past its time, without a newer run, before it counts as late (see <see cref="Jobs"/>). A source not listed uses its freshness limit.</summary>
+    public IReadOnlyDictionary<string, TimeSpan> SourceLateAfter { get; init; } = new Dictionary<string, TimeSpan>();
+
     /// <summary>How long a reading from this source counts as fresh.</summary>
     internal TimeSpan FreshFor(string source) =>
         SourceIntervals.TryGetValue(source, out var interval) && interval * 2 > StaleAfter ? interval * 2 : StaleAfter;
+
+    /// <summary>How late a job may be: the source's own setting, but never less than the reading is allowed to lag.</summary>
+    internal TimeSpan LateAfter(string source) =>
+        SourceLateAfter.TryGetValue(source, out var late) && late > FreshFor(source) ? late : FreshFor(source);
 
     public string Environment { get; init; } = "demo";
 
@@ -442,7 +449,7 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
     /// </summary>
     private List<JobSnapshot> Jobs(RegistryNode n, IReadOnlyList<JobReading> jobs, Registry.Registry registry, RegistryEnvironment? env, DateTimeOffset now)
     {
-        var grace = registry.SourceFor(n, Signals.Jobs) is { } source ? FreshFor(source) : StaleAfter;
+        var grace = registry.SourceFor(n, Signals.Jobs) is { } source ? LateAfter(source) : StaleAfter;
         return jobs.Select(j =>
         {
             var status = j.Succeeded == false ? JobStatus.Failed
