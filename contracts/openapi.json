@@ -1144,6 +1144,11 @@
           },
           "link": {
             "$ref": "#/components/schemas/ResourceLink"
+          },
+          "perSecond": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
           }
         },
         "additionalProperties": false

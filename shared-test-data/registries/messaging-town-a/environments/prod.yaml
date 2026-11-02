@@ -43,6 +43,7 @@ sources:
       resources: broker
       backlog: { metric: ActiveMessages, aggregation: average }
       deadLetter: { metric: DeadletteredMessages, aggregation: maximum }
+      throughput: { metric: IncomingMessages, aggregation: total }
       # where the support team looks at a consumer's dead letters
       deadLetterLink: { name: Support tool, url: "https://support.example.test/queues/{queue}?team={pillar}&service={service}" }
       patterns:

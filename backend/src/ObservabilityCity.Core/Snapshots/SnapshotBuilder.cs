@@ -410,7 +410,7 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
             OutsideRequestsPerSecond = split?.Outside,
             Inbound = split?.Callers,
             InboundEstimated = split?.Estimated ?? false,
-            Queues = r.Queues?.Select(q => new QueueSnapshot(q.Name, q.Backlog, q.DeadLetters, DeadLetterLinks.For(registry, n, q.Name))).ToList(),
+            Queues = r.Queues?.Select(q => new QueueSnapshot(q.Name, q.Backlog, q.DeadLetters, DeadLetterLinks.For(registry, n, q.Name), q.PerSecond)).ToList(),
             App = r.App,
             Jobs = jobs,
             Regions = regions?.Select(x => new RegionSnapshot(x.Region, Label(env, x.Region), x.Instances, x.Cpu, x.Memory, x.Share, Skewed(x, regions, env))).ToList(),

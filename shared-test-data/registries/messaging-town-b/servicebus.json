@@ -79,6 +79,16 @@
         1,
         1
       ]
+    },
+    {
+      "entity": "bus.aa.orders.in",
+      "metric": "IncomingMessages",
+      "aggregation": "total",
+      "points": [
+        300,
+        300,
+        300
+      ]
     }
   ],
   "sb-acme-westeurope9z": [

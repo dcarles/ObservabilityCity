@@ -12,11 +12,16 @@ import { hashString } from './random'
 import { clamp, speedFactor } from '../visuals'
 import { CarSystem, type Route } from './cars'
 import { BoatSystem, type BoatRoute } from './boats'
-import { archCount, clearArches } from './arches'
+import { archCount, clearArches, deckAt } from './arches'
 import { consumersOf, HarbourStatus, messagingOf, type Messaging } from './harbour'
 import { connectorsOf, portSummary, type Connectors, type PortSummary } from './links'
 import { findLane, harbourLoop, type SeaMap } from './sea'
 import { schedulerRate } from './scheduler'
+
+/** Whether the broker carries messages: boats sail unless it is down. A broker nothing measures is not a stopped one. */
+function brokerRunning(node?: { state: string } | null): boolean {
+  return node?.state !== 'Down'
+}
 import { mergeStatic } from './merge'
 import { bayTo } from './bay'
 import { islandSign } from './sign'
@@ -146,6 +151,8 @@ export class Town {
   private readonly boatLanes = new Set<string>()
   private seaMap: SeaMap = { land: [] }
   private harbourPoints = new Map<string, THREE.Vector3>()
+  /** The middle of each piece of the ring road, for tests. */
+  private ringMiddles: THREE.Vector3[] = []
   private boatRouteEnds: { from: string | null; to: string; scheduler: boolean; rate: () => number }[] = []
   private readonly crossings = new Map<string, number>()
   private hubWeather: Weather | null = null
@@ -224,6 +231,7 @@ export class Town {
     this.vendorBridges.clear()
     this.boatLanes.clear()
     clearArches()
+    this.ringMiddles = []
     this.crossings.clear()
     const connectors = pillars.map((g) => connectorsOf(g))
     this.port = portSummary(s.groups)
@@ -358,11 +366,12 @@ export class Town {
       })
     }
     if (loopR > 0) {
-      // the ring road is one causeway all the way round, built in short pieces
+      // the ring road is one causeway all the way round, built in short pieces, level: it is a road, not a bridge over a sea lane
       const pieces = Math.max(24, Math.ceil((2 * Math.PI * loopR) / 36))
       for (let k = 0; k < pieces; k++) {
         const a0 = (k / pieces) * Math.PI * 2, a1 = ((k + 1) / pieces) * Math.PI * 2
-        bridgeDecor.add(bridge({ from: loopPoint(a0).setY(0), to: loopPoint(a1).setY(0), ends: false }))
+        bridgeDecor.add(bridge({ from: loopPoint(a0).setY(0), to: loopPoint(a1).setY(0), ends: false, flat: true }))
+        this.ringMiddles.push(loopPoint((a0 + a1) / 2).setY(0))
       }
       for (let k = 0; k < 72; k++) {
         const p = dirOf((k / 72) * Math.PI * 2).multiplyScalar(loopR + 14)
@@ -478,7 +487,7 @@ export class Town {
         from: g.id,
         to: g.id,
         scheduler: true,
-        rate: () => (broker?.node && (broker.node.state === 'Healthy' || broker.node.state === 'Degraded') ? schedulerRate(schedules, (id) => island.buildings.get(id)?.node) : 0),
+        rate: () => (brokerRunning(broker?.node) ? schedulerRate(schedules, (id) => island.buildings.get(id)?.node) : 0),
         speed: () => (broker?.node ? speedFactor(broker.node.p99Ms, broker.node.slaP99Ms) : 1),
         load: () => 0.2,
       })
@@ -696,6 +705,11 @@ export class Town {
    * The sea the boats sail: the islands' harbours, every pair of them with no open water between (there must be none, since every bridge is an
    * arch), the boat routes as (publisher island, consumer island) with null for the hub, and how many arched bridges stand. For tests.
    */
+  /** How many pieces the ring road has and how many of them stand above the ground (none should: it is level). For tests. */
+  inspectRing(): { pieces: number; lifted: number } {
+    return { pieces: this.ringMiddles.length, lifted: this.ringMiddles.filter((p) => deckAt(p.x, p.z).lift > 0).length }
+  }
+
   inspectSea(): { harbours: string[]; unreachable: string[]; routes: { from: string | null; to: string; scheduler: boolean; rate: number }[]; arches: number } {
     const ids = [...this.harbourPoints.keys()]
     const unreachable: string[] = []
@@ -1140,9 +1154,11 @@ export class Town {
       from,
       to: island.group.id,
       rate: () => {
-        const bn = broker?.node
-        if (!bn || (bn.state !== 'Healthy' && bn.state !== 'Degraded')) return 0
-        const rps = workers.reduce((a, w) => a + (w.node && w.node.state !== 'Stale' && w.node.state !== 'Down' ? w.node.requestsPerSecond : 0), 0)
+        if (!brokerRunning(broker?.node)) return 0
+        // what really arrives in the queues its workers read; without that number, the workers' own request rate
+        const live = workers.filter((w) => w.node && w.node.state !== 'Down')
+        const queued = live.flatMap((w) => w.node?.queues ?? []).filter((q) => q.perSecond != null)
+        const rps = queued.length > 0 ? queued.reduce((a, q) => a + (q.perSecond ?? 0), 0) : live.reduce((a, w) => a + (w.node && w.node.state !== 'Stale' ? w.node.requestsPerSecond : 0), 0)
         return rps <= 0 ? 0 : 0.016 * Math.sqrt(rps) * weight
       },
       speed: () => (broker?.node ? speedFactor(broker.node.p99Ms, broker.node.slaP99Ms) : 1),
