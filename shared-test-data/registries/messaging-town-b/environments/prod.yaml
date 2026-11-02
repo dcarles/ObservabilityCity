@@ -35,7 +35,7 @@ sources:
       dimension: EntityName
       backlog: { metric: ActiveMessages, aggregation: maximum }
       deadLetter: { metric: DeadletteredMessages, aggregation: total }
-      deadLetterLink: { name: Parked messages, url: "https://parked.example.test/{environment}/{system}" }
+      deadLetterLink: { name: Parked messages, url: "https://parked.example.test/{environment}/{system}/{queue}" }
       patterns:
         - { match: '^bus\.(?<pillar>[a-z]+)\.(?<service>[a-z]+)\.(?:in|feed)$' }
         - { match: '^bus\.[a-z]+\.(?<pillar>[a-z]+)\.(?<service>[a-z]+)\.out$' }

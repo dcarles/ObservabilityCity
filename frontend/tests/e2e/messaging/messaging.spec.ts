@@ -6,9 +6,10 @@ import { test, expect, type Page } from '@playwright/test'
 // proof that the rules, not the program, know the naming.
 
 const B = process.env.E2E_SUITE === 'messagingb'
-const link = B
-  ? { name: 'Parked messages', url: 'https://parked.example.test/prod/aa.orders-worker' }
-  : { name: 'Support tool', url: 'https://support.example.test/queues?team=al&service=ord' }
+const tool = B ? 'Parked messages' : 'Support tool'
+const inbox = B ? 'bus.aa.orders.in' : 'sbq-al-ord-inbox'
+const queues = B ? ['bus.aa.orders.feed', 'bus.aa.orders.in', 'bus.bb.aa.orders.out'] : ['sbq-al-led-ord-outbox', 'sbq-al-ord-changefeed', 'sbq-al-ord-inbox']
+const inboxLink = B ? 'https://parked.example.test/prod/aa.orders-worker/bus.aa.orders.in' : 'https://support.example.test/queues/sbq-al-ord-inbox?team=al&service=ord'
 
 type Reading = { id: string; state: string; queueDepth: number | null; deadLetters: number | null; absent: string[] }
 
@@ -45,25 +46,29 @@ test.describe(`the broker's backlog and dead letters (${B ? 'ids, a total' : 'co
     expect((await reading(page, 'aa.orders-api')).queueDepth).toBeNull()
   })
 
-  test('show in the consumer\'s drawer, with a link to its dead letters in the support tool', async ({ page }) => {
+  test('show in the consumer\'s drawer, one row for each queue, with a link to that queue\'s dead letters in the support tool', async ({ page }) => {
     await open(page)
     await page.evaluate(() => (window as any).city.openSystem('aa.orders-worker'))
 
     await expect(page.locator('#inspector .row', { hasText: 'Dead letters' }).first()).toContainText('2')
-    const row = page.locator('#inspector .row.dead-letters')
-    await expect(row).toHaveCount(1)
+    const rows = page.locator('#inspector .row.queue')
+    await expect(rows).toHaveCount(3)
+    expect((await rows.evaluateAll((els) => els.map((e) => e.getAttribute('data-queue')))).sort()).toEqual(queues)
+
+    const row = page.locator(`#inspector .row.queue[data-queue="${inbox}"]`)
+    await expect(row).toContainText('2 dead') // the dead letters sit in the inbox
     const anchor = row.locator('a.out')
-    await expect(anchor).toContainText(link.name)
-    await expect(anchor).toHaveAttribute('href', link.url)
+    await expect(anchor).toContainText(tool)
+    await expect(anchor).toHaveAttribute('href', inboxLink)
     await expect(anchor).toHaveAttribute('target', '_blank')
   })
 
-  test('are not linked for a system that consumes nothing', async ({ page }) => {
+  test('are not listed for a system that reads no queue', async ({ page }) => {
     await open(page)
     await page.evaluate(() => (window as any).city.openSystem('aa.orders-api'))
 
     await expect(page.locator('#inspector')).toContainText('Orders API')
-    await expect(page.locator('#inspector .row.dead-letters')).toHaveCount(0)
+    await expect(page.locator('#inspector .row.queue')).toHaveCount(0)
   })
 
   test('sail as boats from the island that publishes to the island that reads', async ({ page }) => {

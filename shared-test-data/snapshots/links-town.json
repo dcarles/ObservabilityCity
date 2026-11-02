@@ -79,7 +79,8 @@
           "inboundEstimated": false,
           "app": null,
           "jobs": null,
-          "regions": null
+          "regions": null,
+          "queues": null
         },
         {
           "id": "hub.service-bus",
@@ -121,7 +122,8 @@
           "inboundEstimated": false,
           "app": null,
           "jobs": null,
-          "regions": null
+          "regions": null,
+          "queues": null
         },
         {
           "id": "hub.egress",
@@ -163,7 +165,8 @@
           "inboundEstimated": false,
           "app": null,
           "jobs": null,
-          "regions": null
+          "regions": null,
+          "queues": null
         },
         {
           "id": "hub.customer-db",
@@ -205,7 +208,8 @@
           "inboundEstimated": false,
           "app": null,
           "jobs": null,
-          "regions": null
+          "regions": null,
+          "queues": null
         }
       ],
       "assets": []
@@ -280,7 +284,8 @@
           "inboundEstimated": false,
           "app": null,
           "jobs": null,
-          "regions": null
+          "regions": null,
+          "queues": null
         },
         {
           "id": "ful.orders-worker",
@@ -324,7 +329,8 @@
           "inboundEstimated": false,
           "app": null,
           "jobs": null,
-          "regions": null
+          "regions": null,
+          "queues": null
         },
         {
           "id": "ful.orders-db",
@@ -366,7 +372,8 @@
           "inboundEstimated": false,
           "app": null,
           "jobs": null,
-          "regions": null
+          "regions": null,
+          "queues": null
         }
       ],
       "assets": []
@@ -441,7 +448,8 @@
           "inboundEstimated": false,
           "app": null,
           "jobs": null,
-          "regions": null
+          "regions": null,
+          "queues": null
         },
         {
           "id": "wrk.batch-db",
@@ -483,7 +491,8 @@
           "inboundEstimated": false,
           "app": null,
           "jobs": null,
-          "regions": null
+          "regions": null,
+          "queues": null
         }
       ],
       "assets": []
@@ -546,7 +555,8 @@
           "inboundEstimated": false,
           "app": null,
           "jobs": null,
-          "regions": null
+          "regions": null,
+          "queues": null
         },
         {
           "id": "nom.catalog-cache",
@@ -588,7 +598,8 @@
           "inboundEstimated": false,
           "app": null,
           "jobs": null,
-          "regions": null
+          "regions": null,
+          "queues": null
         }
       ],
       "assets": []
@@ -681,7 +692,8 @@
               "next": "2026-10-25T12:43:03+00:00"
             }
           ],
-          "regions": null
+          "regions": null,
+          "queues": null
         }
       ],
       "assets": []
@@ -751,7 +763,8 @@
           "inboundEstimated": false,
           "app": null,
           "jobs": null,
-          "regions": null
+          "regions": null,
+          "queues": null
         },
         {
           "id": "leg.feed-worker",
@@ -795,7 +808,8 @@
           "inboundEstimated": false,
           "app": null,
           "jobs": null,
-          "regions": null
+          "regions": null,
+          "queues": null
         },
         {
           "id": "leg.feed-db",
@@ -837,7 +851,8 @@
           "inboundEstimated": false,
           "app": null,
           "jobs": null,
-          "regions": null
+          "regions": null,
+          "queues": null
         }
       ],
       "assets": []
@@ -928,7 +943,8 @@
               "next": "2026-10-25T12:43:03+00:00"
             }
           ],
-          "regions": null
+          "regions": null,
+          "queues": null
         }
       ],
       "assets": []
@@ -976,7 +992,8 @@
         "inboundEstimated": false,
         "app": null,
         "jobs": null,
-        "regions": null
+        "regions": null,
+        "queues": null
       },
       "calledBy": [
         "ful.orders-api",
@@ -1028,7 +1045,8 @@
         "inboundEstimated": false,
         "app": null,
         "jobs": null,
-        "regions": null
+        "regions": null,
+        "queues": null
       },
       "calledBy": [
         "nom.catalog-api"
@@ -1079,7 +1097,8 @@
         "inboundEstimated": false,
         "app": null,
         "jobs": null,
-        "regions": null
+        "regions": null,
+        "queues": null
       },
       "calledBy": [
         "ful.orders-worker"

@@ -255,6 +255,14 @@ function checkNode(n: unknown, groupId: string, ids: Set<string>, problems: stri
     ? n.jobs.filter(isObject).filter((j) => typeof j.name === 'string' && j.name !== '')
       .map((j) => ({ name: j.name as string, region: optionalText(j.region), status: JOB_STATUSES.includes(j.status as string) ? j.status : 'Ok', lastRun: optionalText(j.lastRun), next: optionalText(j.next) }))
     : null
+  // the queues a consumer reads: one without a name cannot be shown; a link must be a web address, or it is dropped
+  out.queues = Array.isArray(n.queues)
+    ? n.queues.filter(isObject).filter((q) => typeof q.name === 'string' && q.name !== '')
+      .map((q) => ({
+        name: q.name as string, backlog: optionalNumber(q.backlog), deadLetters: optionalNumber(q.deadLetters),
+        link: isObject(q.link) && typeof q.link.name === 'string' && q.link.name !== '' && typeof q.link.url === 'string' && /^https?:\/\//i.test(q.link.url) ? { name: q.link.name, url: q.link.url } : null,
+      }))
+    : null
   out.regions = Array.isArray(n.regions)
     ? n.regions.filter(isObject).filter((r) => typeof r.region === 'string' && r.region !== '')
       .map((r) => ({ region: r.region as string, label: optionalText(r.label) ?? (r.region as string), instances: optionalNumber(r.instances), cpu: optionalNumber(r.cpu), memory: optionalNumber(r.memory), share: isFiniteNumber(r.share) && r.share >= 0 && r.share <= 1 ? r.share : null, skewed: r.skewed === true }))

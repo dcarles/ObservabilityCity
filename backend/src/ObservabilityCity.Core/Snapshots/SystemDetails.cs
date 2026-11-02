@@ -44,34 +44,7 @@ public static class SystemDetails
 
         var island2 = node.GroupId == RegistryVendor.GroupId ? "Third party" : groups.TryGetValue(node.GroupId, out var own) ? own.DisplayName : node.GroupId;
         return new SystemDetail(node.Id, node.Name, node.Kind, node.Service, node.GroupId, island2, FileOf(node),
-            Config(node), calls, calledBy, gatewayCalls, gatewayCalledBy, outside, topics, subscriptions, DeadLetterLink: DeadLetterLinkOf(registry, node, groups));
-    }
-
-    /// <summary>
-    /// Where a consumer's dead letters open in the support tool the environment names (<c>entities.deadLetterLink</c> of its broker source), or null: the system consumes no
-    /// topic, the environment names no tool, or the address needs a word the system has none of (a pillar or service code).
-    /// </summary>
-    private static ResourceLink? DeadLetterLinkOf(Registry.Registry registry, RegistryNode node, IReadOnlyDictionary<string, RegistryGroup> groups)
-    {
-        if (!registry.ConsumerIds.Contains(node.Id)) return null;
-        var link = registry.ActiveEnvironment?.Sources.Select(s => s.Entities?.DeadLetterLink).FirstOrDefault(l => l is not null);
-        if (link is null) return null;
-        groups.TryGetValue(node.GroupId, out var group);
-        var words = new Dictionary<string, string?>
-        {
-            ["pillar"] = group?.Code ?? group?.Id,
-            ["service"] = node.ServiceCode ?? node.Service,
-            ["system"] = node.Id,
-            ["environment"] = registry.ActiveEnvironment!.Id,
-        };
-        var missing = false;
-        var url = System.Text.RegularExpressions.Regex.Replace(link.Url, @"\{([^{}]*)\}", m =>
-        {
-            if (words.TryGetValue(m.Groups[1].Value, out var word) && !string.IsNullOrEmpty(word)) return Uri.EscapeDataString(word);
-            missing = true;
-            return "";
-        });
-        return missing ? null : new ResourceLink(link.Name, url);
+            Config(node), calls, calledBy, gatewayCalls, gatewayCalledBy, outside, topics, subscriptions);
     }
 
     /// <summary>The path of the registry file a system is declared in, relative to the registry folder.</summary>

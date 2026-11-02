@@ -44,7 +44,7 @@ sources:
       backlog: { metric: ActiveMessages, aggregation: average }
       deadLetter: { metric: DeadletteredMessages, aggregation: maximum }
       # where the support team looks at a consumer's dead letters
-      deadLetterLink: { name: Support tool, url: "https://support.example.test/queues?team={pillar}&service={service}" }
+      deadLetterLink: { name: Support tool, url: "https://support.example.test/queues/{queue}?team={pillar}&service={service}" }
       patterns:
         # sbq-<pillar code>-<service code>-<role>: read by that service's worker
         - { match: '^sbq-(?<pillar>[a-z]+)-(?<service>[a-z]+)-(?:inbox|changefeed)$' }

@@ -410,6 +410,7 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
             OutsideRequestsPerSecond = split?.Outside,
             Inbound = split?.Callers,
             InboundEstimated = split?.Estimated ?? false,
+            Queues = r.Queues?.Select(q => new QueueSnapshot(q.Name, q.Backlog, q.DeadLetters, DeadLetterLinks.For(registry, n, q.Name))).ToList(),
             App = r.App,
             Jobs = jobs,
             Regions = regions?.Select(x => new RegionSnapshot(x.Region, Label(env, x.Region), x.Instances, x.Cpu, x.Memory, x.Share, Skewed(x, regions, env))).ToList(),
@@ -493,6 +494,8 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
             QueueDepth = Gone(Signals.Backlog) ? null : r.QueueDepth,
             OldestMessageSeconds = Gone(Signals.Backlog) ? null : r.OldestMessageSeconds,
             DeadLetters = Gone(Signals.DeadLetters) ? null : r.DeadLetters,
+            Queues = Gone(Signals.Backlog) && Gone(Signals.DeadLetters) ? null
+                : r.Queues?.Select(q => q with { Backlog = Gone(Signals.Backlog) ? null : q.Backlog, DeadLetters = Gone(Signals.DeadLetters) ? null : q.DeadLetters }).ToList(),
         };
     }
 

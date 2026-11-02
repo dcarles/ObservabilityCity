@@ -1079,6 +1079,13 @@
               "$ref": "#/components/schemas/RegionSnapshot"
             },
             "nullable": true
+          },
+          "queues": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QueueSnapshot"
+            },
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -1108,6 +1115,31 @@
           "requestsPerSecond": {
             "type": "number",
             "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
+      "QueueSnapshot": {
+        "required": [
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "backlog": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "deadLetters": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "link": {
+            "$ref": "#/components/schemas/ResourceLink"
           }
         },
         "additionalProperties": false
@@ -1548,9 +1580,6 @@
           },
           "scope": {
             "$ref": "#/components/schemas/ScopeInfo"
-          },
-          "deadLetterLink": {
-            "$ref": "#/components/schemas/ResourceLink"
           }
         },
         "additionalProperties": false

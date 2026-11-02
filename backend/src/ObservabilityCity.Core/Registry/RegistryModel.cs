@@ -254,7 +254,7 @@ public sealed record RegistrySource(string Name, string Kind, string? Connection
 public sealed record EntitiesConfig(string Resources, string Dimension, EntityMetric? Backlog, EntityMetric? DeadLetter, IReadOnlyList<EntityPattern> Patterns, TimeSpan? Interval = null, EntityLink? DeadLetterLink = null)
 {
     /// <summary>The variables a dead-letter link's URL may use.</summary>
-    public static readonly string[] LinkVariables = ["pillar", "service", "system", "environment"];
+    public static readonly string[] LinkVariables = ["pillar", "service", "system", "environment", "queue"];
 
     public const string DefaultDimension = "EntityName";
 }

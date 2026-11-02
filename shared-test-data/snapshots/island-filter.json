@@ -72,7 +72,8 @@
           "inboundEstimated": false,
           "app": null,
           "jobs": null,
-          "regions": null
+          "regions": null,
+          "queues": null
         },
         {
           "id": "hub.service-bus",
@@ -114,7 +115,8 @@
           "inboundEstimated": false,
           "app": null,
           "jobs": null,
-          "regions": null
+          "regions": null,
+          "queues": null
         },
         {
           "id": "hub.egress",
@@ -156,7 +158,8 @@
           "inboundEstimated": false,
           "app": null,
           "jobs": null,
-          "regions": null
+          "regions": null,
+          "queues": null
         },
         {
           "id": "hub.customer-db",
@@ -198,7 +201,8 @@
           "inboundEstimated": false,
           "app": null,
           "jobs": null,
-          "regions": null
+          "regions": null,
+          "queues": null
         }
       ],
       "assets": []
@@ -273,7 +277,8 @@
           "inboundEstimated": false,
           "app": null,
           "jobs": null,
-          "regions": null
+          "regions": null,
+          "queues": null
         },
         {
           "id": "aa.orders-worker",
@@ -317,7 +322,8 @@
           "inboundEstimated": false,
           "app": null,
           "jobs": null,
-          "regions": null
+          "regions": null,
+          "queues": null
         },
         {
           "id": "aa.orders-db",
@@ -359,7 +365,8 @@
           "inboundEstimated": false,
           "app": null,
           "jobs": null,
-          "regions": null
+          "regions": null,
+          "queues": null
         }
       ],
       "assets": []
@@ -443,7 +450,8 @@
           "inboundEstimated": false,
           "app": null,
           "jobs": null,
-          "regions": null
+          "regions": null,
+          "queues": null
         },
         {
           "id": "cc.notify-worker",
@@ -487,7 +495,8 @@
           "inboundEstimated": false,
           "app": null,
           "jobs": null,
-          "regions": null
+          "regions": null,
+          "queues": null
         },
         {
           "id": "cc.notify-db",
@@ -529,7 +538,8 @@
           "inboundEstimated": false,
           "app": null,
           "jobs": null,
-          "regions": null
+          "regions": null,
+          "queues": null
         }
       ],
       "assets": []
@@ -577,7 +587,8 @@
         "inboundEstimated": false,
         "app": null,
         "jobs": null,
-        "regions": null
+        "regions": null,
+        "queues": null
       },
       "calledBy": [
         "aa.orders-api"
@@ -628,7 +639,8 @@
         "inboundEstimated": false,
         "app": null,
         "jobs": null,
-        "regions": null
+        "regions": null,
+        "queues": null
       },
       "calledBy": [
         "cc.notify-worker"

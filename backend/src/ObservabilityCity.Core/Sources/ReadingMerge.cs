@@ -57,7 +57,8 @@ public static class ReadingMerge
             requests?.Calls,
             instances?.App,
             jobs?.Jobs,
-            Regions(instances, cpu, memory, requests));
+            Regions(instances, cpu, memory, requests),
+            backlog?.Queues ?? dead?.Queues);
     }
 
     /// <summary>The regions of a service: the instances of the source that counts them, the CPU and memory of the sources that measure them, and the share of the requests of the source that measures them, joined by region name.</summary>

@@ -3,7 +3,7 @@ import { escapeHtml } from './picker'
 import { scopeParams, type Scope } from './scope'
 import { tenantListOrder, tenantFigures, yardSummary, type TenantView } from './tenants'
 import { regionFigures, regionOptions, validChoice, WORST, type RegionChoice } from './regions'
-import { ago, clockTime, configOrder, deadLetterLinkRow, groupDetail, incidentSummary, jobRows, LAYER_WORD, linkSections, logLinkLabel, logSectionEmpty, logSectionTitle, logTabLabel, pickLogSection, originLabel, type LinkItem, overviewLinks, overviewRows, reasons, repeatLabel, resourceLinks, scopeView, SEVERITY_WORD, sectionLinks, stateTone, vendorWhere } from './inspectorModel'
+import { ago, clockTime, configOrder, queueRows, groupDetail, incidentSummary, jobRows, LAYER_WORD, linkSections, logLinkLabel, logSectionEmpty, logSectionTitle, logTabLabel, pickLogSection, originLabel, type LinkItem, overviewLinks, overviewRows, reasons, repeatLabel, resourceLinks, scopeView, SEVERITY_WORD, sectionLinks, stateTone, vendorWhere } from './inspectorModel'
 
 export type InspectorTab = 'overview' | 'links' | 'logs' | 'config'
 const TABS: { id: InspectorTab; label: string }[] = [
@@ -206,11 +206,19 @@ export class Inspector {
       ${why.length === 0 ? '<p class="fine">Nothing to flag: every number is inside its lines.</p>' : `<ul class="why">${why.map((w) => `<li>${escapeHtml(w)}</li>`).join('')}</ul>`}
       <div class="rows">${overviewRows(n, (id) => this.find(id)?.node.name ?? id, this.snap?.cloud).map((r) => `<div class="row"><span>${r.label}</span><span class="${r.tone}">${escapeHtml(r.value)}</span></div>`).join('')}</div>
       ${this.jobs(n, group)}
+      ${this.queues(n)}
       ${this.regions(n)}
       ${tenants}
       ${this.openIn()}
       ${incidents.length === 0 ? '' : `<h4>Incidents on this island <small>${escapeHtml(incidentSummary(incidents))}</small></h4>
         ${incidents.map((i) => `<div class="row"><span>${escapeHtml(i.title)}</span><span class="warn">sev ${i.severity}${SEVERITY_WORD[i.severity] ? ` · ${SEVERITY_WORD[i.severity]}` : ''} · since ${escapeHtml(clockTime(i.startedAt))}</span></div>`).join('')}`}`
+  }
+
+  /** The queues a consumer reads: each with what waits and what is dead-lettered, and a link to its dead letters when the environment names a support tool. Nothing for a system that reads none. */
+  private queues(n: NodeSnapshot): string {
+    const rows = queueRows(n)
+    if (rows.length === 0) return ''
+    return `<h4>Queues</h4><div class="queues">${rows.map((r) => `<div class="row queue" data-queue="${escapeHtml(r.name)}"><span>${escapeHtml(r.name)}</span><span class="${r.tone}">${escapeHtml(r.text)}${r.link ? ` · ${this.anchor(r.link.name, r.link.url)}` : ''}</span></div>`).join('')}</div>`
   }
 
   /** A function building's scheduled jobs, one row for each job in each region. Nothing for a building without jobs. */
@@ -239,11 +247,8 @@ export class Inspector {
   /** Links that open the system's resources in a portal or console, from the environment's link rules. Nothing without them. */
   private openIn(): string {
     const v = overviewLinks(this.detail?.scope)
-    const dead = deadLetterLinkRow(this.detail)
-    if (!v && !dead) return ''
-    const deadRow = dead ? `<div class="row open-in dead-letters" data-resource="${escapeHtml(dead.resource)}"><span>${escapeHtml(dead.resource)}</span><span>${this.anchor(dead.link.name, dead.link.url)}</span></div>` : ''
-    if (!v) return `<h4>Open in</h4>${deadRow}`
-    const rows = deadRow + v.items.map((i) => `<div class="row open-in" data-resource="${escapeHtml(i.resource)}"><span>${escapeHtml(i.resource)}</span><span>${this.anchor(i.link.name, i.link.url)}</span></div>`).join('')
+    if (!v) return ''
+    const rows = v.items.map((i) => `<div class="row open-in" data-resource="${escapeHtml(i.resource)}"><span>${escapeHtml(i.resource)}</span><span>${this.anchor(i.link.name, i.link.url)}</span></div>`).join('')
     const tenants = v.tenantResources === 0 ? '' : `<p class="note">${v.tenantResources} tenant ${v.tenantResources === 1 ? 'resource has its' : 'resources have their'} own link${v.tenantResources === 1 ? '' : 's'} on the Config tab.</p>`
     const more = v.more === 0 ? '' : `<p class="note">${v.more} more on the Config tab.</p>`
     return `<h4>Open in</h4>${rows}${more}${tenants}`

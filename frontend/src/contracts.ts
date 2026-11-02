@@ -334,6 +334,7 @@ export interface components {
             app?: components["schemas"]["AppState"];
             jobs?: components["schemas"]["JobSnapshot"][] | null;
             regions?: components["schemas"]["RegionSnapshot"][] | null;
+            queues?: components["schemas"]["QueueSnapshot"][] | null;
         };
         OffscreenLink: {
             nodeId: string;
@@ -342,6 +343,14 @@ export interface components {
             incoming: boolean;
             /** Format: double */
             requestsPerSecond: number;
+        };
+        QueueSnapshot: {
+            name: string;
+            /** Format: double */
+            backlog?: number | null;
+            /** Format: double */
+            deadLetters?: number | null;
+            link?: components["schemas"]["ResourceLink"];
         };
         RegionSnapshot: {
             region: string;
@@ -446,7 +455,6 @@ export interface components {
             serviceTopics: string[];
             subscriptions: components["schemas"]["SubscriptionSnapshot"][];
             scope?: components["schemas"]["ScopeInfo"];
-            deadLetterLink?: components["schemas"]["ResourceLink"];
         };
         SystemLogs: {
             /** Format: date-time */

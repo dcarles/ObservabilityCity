@@ -60,6 +60,7 @@ public sealed class ServiceBusSource(
         var dead = Reduced(read, config.DeadLetter);
         var patterns = config.Patterns.Select(p => (Regex: new Regex(p.Match, RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1)), p.Consumer)).ToList();
         var byNode = new Dictionary<string, (double Waiting, double Dead, bool HasWaiting, bool HasDead)>();
+        var queues = new Dictionary<string, List<QueueReading>>();
         var unclaimed = 0;
         foreach (var entity in backlog.Keys.Union(dead.Keys).Order(StringComparer.Ordinal))
         {
@@ -69,10 +70,12 @@ public sealed class ServiceBusSource(
             if (backlog.TryGetValue(entity, out var b)) { w += b; hw = true; }
             if (dead.TryGetValue(entity, out var x)) { d += x; hd = true; }
             byNode[node.Id] = (w, d, hw, hd);
+            if (!queues.TryGetValue(node.Id, out var own)) queues[node.Id] = own = [];
+            own.Add(new QueueReading(entity, backlog.TryGetValue(entity, out var qb) ? Math.Round(qb) : null, dead.TryGetValue(entity, out var qd) ? Math.Round(qd) : null));
         }
         Unclaimed = unclaimed;
         return byNode.ToDictionary(kv => kv.Key, kv => new NodeReading(at, true, 0, 0, 0, 0, 0, 0,
-            QueueDepth: kv.Value.HasWaiting ? Math.Round(kv.Value.Waiting) : null, DeadLetters: kv.Value.HasDead ? Math.Round(kv.Value.Dead) : null));
+            QueueDepth: kv.Value.HasWaiting ? Math.Round(kv.Value.Waiting) : null, DeadLetters: kv.Value.HasDead ? Math.Round(kv.Value.Dead) : null, Queues: queues[kv.Key]));
     }
 
     /// <summary>Each entity's number, added up over the points of each of its series the way the metric says, then summed over the namespaces.</summary>

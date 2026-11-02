@@ -343,13 +343,20 @@ export function overviewLinks(s: ScopeInfo | null | undefined): OverviewLinks | 
   return { items: own.slice(0, OVERVIEW_LINK_LIMIT), tenantResources, more: Math.max(0, own.length - OVERVIEW_LINK_LIMIT) }
 }
 
+/** One queue a consumer reads, as a row of the drawer: its name, what waits and what is dead-lettered in words, and the link to its dead letters. */
+export interface QueueRow { name: string; text: string; tone: Tone; link: ResourceLink | null }
+
 /**
- * The link to a consumer's dead letters in the team's support tool (the environment's `entities.deadLetterLink`), as a row of the "open in" part. Null when the
- * environment names no tool, the system consumes no topic, or the address is not a web address.
+ * The queues a consumer reads, worst first (most dead letters, then the biggest backlog), as rows. A number nothing measures is left out of the words, and a
+ * link that is not a web address is dropped. Nothing for a system that reads no queue.
  */
-export function deadLetterLinkRow(d: { deadLetterLink?: ResourceLink | null } | null | undefined): { resource: string; link: ResourceLink } | null {
-  const link = d?.deadLetterLink
-  return link && link.name !== '' && /^https?:\/\//i.test(link.url) ? { resource: 'Dead letters', link } : null
+export function queueRows(n: Pick<NodeSnapshot, 'queues'>): QueueRow[] {
+  const rows = (n.queues ?? []).map((q) => {
+    const parts = [q.backlog != null ? `${Math.round(q.backlog)} waiting` : null, q.deadLetters != null ? `${Math.round(q.deadLetters)} dead` : null].filter((p): p is string => p !== null)
+    const link = q.link && q.link.name !== '' && /^https?:\/\//i.test(q.link.url) ? q.link : null
+    return { q, row: { name: q.name, text: parts.join(' · ') || 'no numbers', tone: ((q.deadLetters ?? 0) > 0 ? 'bad' : '') as Tone, link } }
+  })
+  return rows.sort((a, b) => (b.q.deadLetters ?? 0) - (a.q.deadLetters ?? 0) || (b.q.backlog ?? 0) - (a.q.backlog ?? 0) || a.q.name.localeCompare(b.q.name)).map((r) => r.row)
 }
 
 /** What kind of outside place a vendor's building is, for the inspector and the lists: a third party, or one of the company's own services outside the monitored platform, with its island when it shares one. */
