@@ -363,14 +363,23 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
     {
         var absent = registry.AbsentSignals(n);
         var bySource = state.GetAll(n.Id);
+        // A source that is late takes only its own signals out (they are left out and listed as absent) while a source of health signals is fresh; the building is grey when none is.
+        // Instance counts and the queue numbers do not say how a building is doing, so a source that supplies only those cannot keep one alive.
+        var ages = SourceAges(n, registry, bySource, now);
+        var late = ages.Where(a => !a.Fresh).Select(a => a.Source).ToHashSet(StringComparer.Ordinal);
+        if (late.Count > 0 && ages.Any(a => a.Fresh && a.Signals.Any(IsHealthSignal)))
+        {
+            bySource = bySource.Where(kv => !late.Contains(kv.Key)).ToDictionary(kv => kv.Key, kv => kv.Value);
+            absent = [.. absent, .. ages.Where(a => !a.Fresh).SelectMany(a => a.Signals).Where(s => !absent.Contains(s)).Distinct()];
+        }
         var r = ReadingMerge.Merge(bySource, signal => registry.SourceFor(n, signal));
         var env = registry.ActiveEnvironment;
         if (r is not null) r = WithoutAbsent(r, absent);
         // The inventory has been read and the app is not there: grey, and it says so. Nothing else about a missing app can be known.
         if (r?.App == AppState.Missing)
-            return Stale(n, r, absent, env) with { App = AppState.Missing };
+            return Stale(n, r, absent, env) with { App = AppState.Missing, Sources = ages.Count > 0 ? ages : null };
         if (r is null || absent.Count == Signals.For(n.Kind).Count || IsStale(n, registry, bySource, r, now))
-            return Stale(n, r, absent, env); // No fresh data: keep the last numbers out of it. Grey, never green.
+            return Stale(n, r, absent, env) with { Sources = ages.Count > 0 ? ages : null }; // No fresh data: keep the last numbers out of it. Grey, never green.
 
         // A count of 0 instances is no count: the source did not say (a plan the cloud gives no worker count for), so the signal is absent rather than 0 of 0.
         if (r.InstancesTotal == 0 && r.InstancesHealthy == 0 && !absent.Contains(Signals.Instances)) absent = [.. absent, Signals.Instances];
@@ -422,6 +431,7 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
             OutsideRequestsPerSecond = split?.Outside,
             Inbound = split?.Callers,
             InboundEstimated = split?.Estimated ?? false,
+            Sources = ages.Any(a => !a.Fresh) ? ages : null,
             Queues = r.Queues?.Select(q => new QueueSnapshot(q.Name, q.Backlog, q.DeadLetters, DeadLetterLinks.For(registry, n, q.Name), q.PerSecond)).ToList(),
             App = r.App,
             Jobs = jobs,
@@ -473,14 +483,26 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
         }).ToList();
     }
 
+    /// <summary>Whether a signal says how a building is doing, as opposed to how many instances it has or what waits in its queues.</summary>
+    private static bool IsHealthSignal(string signal) => signal is not (Signals.Instances or Signals.Backlog or Signals.DeadLetters);
+
+    /// <summary>The sources that have reported and that supply at least one signal of the system; a single source stands for everything.</summary>
+    private static List<string> UsedSources(RegistryNode n, Registry.Registry registry, IReadOnlyDictionary<string, NodeReading> bySource) =>
+        bySource.Count == 1 ? bySource.Keys.ToList()
+            : Signals.For(n.Kind).Select(s => registry.SourceFor(n, s)).OfType<string>().Where(bySource.ContainsKey).Distinct().ToList();
+
+    /// <summary>Each source that feeds the system, how old its last reading is, whether that is fresh, and the signals it supplies.</summary>
+    private List<SourceAgeSnapshot> SourceAges(RegistryNode n, Registry.Registry registry, IReadOnlyDictionary<string, NodeReading> bySource, DateTimeOffset now) =>
+        UsedSources(n, registry, bySource).Select(s => new SourceAgeSnapshot(s, (int)Math.Max(0, (now - bySource[s].At).TotalSeconds), now - bySource[s].At <= FreshFor(s),
+            bySource.Count == 1 ? [] : Signals.For(n.Kind).Where(sig => registry.SourceFor(n, sig) == s).ToList())).ToList();
+
     /// <summary>
     /// Whether the reading is too old to show. Each source that supplies a signal has its own limit (see <see cref="FreshFor"/>) and one stale source
     /// greys the building however fresh the others are. A single source's reading is judged by that source's limit.
     /// </summary>
     private bool IsStale(RegistryNode n, Registry.Registry registry, IReadOnlyDictionary<string, NodeReading> bySource, NodeReading merged, DateTimeOffset now)
     {
-        var used = bySource.Count == 1 ? bySource.Keys.ToList()
-            : Signals.For(n.Kind).Select(s => registry.SourceFor(n, s)).OfType<string>().Where(bySource.ContainsKey).Distinct().ToList();
+        var used = UsedSources(n, registry, bySource);
         return used.Count == 0 ? now - merged.At > StaleAfter : used.Any(s => now - bySource[s].At > FreshFor(s));
     }
 

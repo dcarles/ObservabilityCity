@@ -240,6 +240,11 @@ function checkNode(n: unknown, groupId: string, ids: Set<string>, problems: stri
     absent: strings(n.absent).filter((s) => (KNOWN_SIGNALS as readonly string[]).includes(s)),
     // an older server that does not say has no quiet system
     quiet: n.quiet === true,
+    // which sources feed the system and how old each one's last answer is, only when one is late; an entry without a name cannot be shown
+    sources: Array.isArray(n.sources)
+      ? n.sources.filter(isObject).filter((s) => typeof s.source === 'string' && s.source !== '')
+        .map((s) => ({ source: s.source as string, ageSeconds: isFiniteNumber(s.ageSeconds) && s.ageSeconds >= 0 ? s.ageSeconds : 0, fresh: s.fresh === true, signals: strings(s.signals) }))
+      : null,
   }
   for (const key of REQUIRED_NUMBERS) {
     out[key] = isFiniteNumber(n[key]) ? n[key] : 0
