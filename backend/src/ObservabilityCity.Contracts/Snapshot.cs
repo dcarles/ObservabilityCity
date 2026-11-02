@@ -339,7 +339,14 @@ public sealed record Snapshot(
     double? OutsideRequestsPerSecond = null,
     string? Cloud = null,
     double TrafficDensity = 1,
-    IReadOnlyList<string>? Notes = null);
+    IReadOnlyList<string>? Notes = null,
+    IReadOnlyList<SourceFreshnessSnapshot>? Sources = null);
+
+/// <summary>
+/// How fresh one configured source is: Name is the source's name in the environment file, LastRead when it last reported anything (null: not yet since the server started),
+/// IntervalSeconds how often it is asked, and Overdue says it has not reported within the limit that greys a building (see StaleAfter). Null on the snapshot when no source is configured.
+/// </summary>
+public sealed record SourceFreshnessSnapshot(string Name, DateTimeOffset? LastRead, double IntervalSeconds, bool Overdue);
 
 /// <summary>An island the island filter left out. Vendor is true for a third party's island (the vendor id, or the shared island id of a group of its services).</summary>
 public sealed record HiddenIsland(string Id, string DisplayName, bool Vendor = false);

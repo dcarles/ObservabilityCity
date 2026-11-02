@@ -84,6 +84,30 @@ export interface Pillar {
   configError: string | null
 }
 
+/** A line of the Hub, Vendors and Digital Services lists. Health is null where nothing says (a monitoring resource, a vendor we see no calls to). */
+export interface SideRow {
+  id: string | null
+  name: string
+  level: Level
+  health: string | null
+  detail: string
+  calledBy: Chip[]
+  calls: Chip[]
+  links: { name: string; url: string }[]
+  /** Has a drawer to open (a system or a vendor); a resource that is only links has none. */
+  drawer: boolean
+}
+
+export type SectionId = 'hub' | 'vendors' | 'digital'
+
+export interface Section {
+  id: SectionId
+  title: string
+  /** One line for the closed section; empty when there is nothing to say. */
+  summary: string
+  rows: SideRow[]
+}
+
 export interface Dashboard {
   townName: string
   summary: {
@@ -95,6 +119,7 @@ export interface Dashboard {
     backlog: number | null
   }
   pillars: Pillar[]
+  sections: Section[]
   /** Pillars the viewer has hidden, to show again. */
   hidden: { id: string; name: string }[]
   /** Every pillar, shown or not, for the show/hide list. */
@@ -194,6 +219,65 @@ function groupsOf(g: GroupSnapshot, rows: Row[], nodes: NodeSnapshot[]): Group[]
   }).sort((a, b) => RANK[b.level] - RANK[a.level] || a.name.localeCompare(b.name))
 }
 
+const num = (v: number, digits = 0): string => v.toLocaleString('en-GB', { minimumFractionDigits: digits, maximumFractionDigits: digits })
+
+/** The few numbers a row already has, in words: "12 rps · errors 0.4% · backlog 3". Only what is measured and worth saying. */
+export function detailText(r: Row): string {
+  const parts: string[] = []
+  if (r.rps != null && r.rps > 0) parts.push(`${num(r.rps, r.rps < 10 ? 1 : 0)} rps`)
+  if (r.errorPct != null && r.rps != null && r.rps > 0) parts.push(`errors ${num(r.errorPct, 1)}%`)
+  if (r.p99 != null && r.rps != null && r.rps > 0) parts.push(`p99 ${num(r.p99)} ms`)
+  if (r.cpu != null) parts.push(`CPU ${num(r.cpu)}%`)
+  if (r.ru != null) parts.push(`${num(r.ru)}% RU`)
+  if (r.backlog != null) parts.push(`backlog ${num(r.backlog)}`)
+  if (r.dlq != null) parts.push(`DLQ ${num(r.dlq)}`)
+  return parts.join(' · ')
+}
+
+const healthText = (level: Level, reason: string | null): string | null => (level === 'none' ? null : level === 'ok' ? 'Healthy' : `${level === 'bad' ? 'Down' : 'Degraded'}${reason ? ` · ${reason}` : ''}`)
+
+/** The one line on a closed section: how many, what is wrong, what is not known. Empty when there is nothing to list. */
+export function sectionSummary(noun: string, rows: readonly SideRow[], extra: readonly string[] = []): string {
+  if (rows.length === 0) return ''
+  const down = rows.filter((r) => r.level === 'bad').length
+  const degraded = rows.filter((r) => r.level === 'warn').length
+  const unknown = rows.filter((r) => r.level === 'none').length
+  const known = rows.length - unknown
+  const parts = [`${rows.length} ${noun}${rows.length === 1 ? '' : 's'}`, ...extra]
+  if (down) parts.push(`${down} down`)
+  if (degraded) parts.push(`${degraded} degraded`)
+  if (!down && !degraded && known > 0) parts.push(unknown === 0 ? 'all healthy' : 'none affected')
+  if (unknown > 0 && known > 0) parts.push(`${unknown} without health`)
+  return parts.join(' · ')
+}
+
+function sectionsOf(s: Snapshot, view: TenantView, links: ReturnType<typeof linkIndex>): Section[] {
+  const side = (n: NodeSnapshot, over: Partial<SideRow> = {}): SideRow => {
+    const r = rowOf(n, s, view, links)
+    return { id: n.id, name: n.name, level: r.level, health: healthText(r.level, r.reason), detail: detailText(r), calledBy: r.calledBy, calls: r.calls, links: [], drawer: true, ...over }
+  }
+  const hub = s.groups.find((g) => g.isHub)
+  const hubRows = hub
+    ? [
+        ...hub.nodes.map((n) => side(n)),
+        ...(hub.assets ?? []).map((a) => side({ id: a.id, name: a.name } as NodeSnapshot, { id: null, level: 'none', health: null, detail: a.group ? `${a.label} · ${a.group} · links only` : `${a.label} · links only`, calledBy: [], calls: [], links: a.links ?? [], drawer: false })),
+      ]
+    : []
+  const backlog = hub?.nodes.filter((n) => n.state !== 'Stale' && !isAbsent(n, 'backlog')) ?? []
+  const dlq = hub?.nodes.filter((n) => n.state !== 'Stale' && !isAbsent(n, 'deadLetters')) ?? []
+  const hubExtra = [
+    ...(backlog.length ? [`backlog ${num(backlog.reduce((a, n) => a + (n.queueDepth ?? 0), 0))}`] : []),
+    ...(dlq.length ? [`DLQ ${num(dlq.reduce((a, n) => a + (n.deadLetters ?? 0), 0))}`] : []),
+  ]
+  const vendors = s.vendors.filter((v) => !v.internal).map((v) => side(v.node))
+  const digital = s.vendors.filter((v) => v.internal).map((v) => side(v.node))
+  return [
+    { id: 'hub' as const, title: 'Hub', summary: sectionSummary('resource', hubRows, hubExtra), rows: hubRows },
+    { id: 'vendors' as const, title: 'Vendors', summary: sectionSummary('vendor', vendors), rows: vendors },
+    { id: 'digital' as const, title: 'Digital Services', summary: sectionSummary('service', digital), rows: digital },
+  ].filter((x) => x.rows.length > 0)
+}
+
 /** Everything the dashboard draws, for the tenants the viewer chose. */
 export function buildDashboard(s: Snapshot, view: TenantView): Dashboard {
   const links = linkIndex(s)
@@ -244,6 +328,7 @@ export function buildDashboard(s: Snapshot, view: TenantView): Dashboard {
       backlog: absentEverywhere(s, 'backlog') ? null : queued.reduce((a, n) => a + (n.queueDepth ?? 0), 0),
     },
     pillars,
+    sections: sectionsOf(s, view, links),
     hidden: choices.filter((c) => !c.shown).map((c) => ({ id: c.id, name: c.name })),
     choices,
   }

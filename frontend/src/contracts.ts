@@ -434,6 +434,15 @@ export interface components {
             /** Format: double */
             trafficDensity: number;
             notes?: string[] | null;
+            sources?: components["schemas"]["SourceFreshnessSnapshot"][] | null;
+        };
+        SourceFreshnessSnapshot: {
+            name: string;
+            /** Format: date-time */
+            lastRead?: string | null;
+            /** Format: double */
+            intervalSeconds: number;
+            overdue: boolean;
         };
         SubscriptionSnapshot: {
             topic: string;

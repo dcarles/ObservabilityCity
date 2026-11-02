@@ -13,7 +13,8 @@ import { islandsParam, parseIslands, pruneIslands, islandChoices } from '../isla
 import { loadTenantView, saveTenantView, viewSwitchAddress } from '../viewMode'
 import type { Snapshot } from '../types'
 import { buildDashboard, pillarSelection, type Dashboard } from './model'
-import { hiddenHtml, pillarMenuHtml, pillarsHtml, summaryHtml, type UiState } from './render'
+import { freshnessHtml, hiddenHtml, pillarMenuHtml, pillarsHtml, sectionsHtml, summaryHtml, type UiState } from './render'
+import { feedLateAfter, marker, popupLeft, sourceLines } from './freshness'
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T
 
@@ -47,13 +48,13 @@ export function startDashboard(): void {
 
   $('vs-town').addEventListener('click', () => { window.location.href = viewSwitchAddress(window.location, 'town', store) })
 
-  const ui = { openPillars: new Set<string>(), groups: new Map<string, boolean>(), databases: new Map<string, boolean>() }
+  const ui = { openPillars: new Set<string>(), groups: new Map<string, boolean>(), databases: new Map<string, boolean>(), sections: new Set<string>() }
   let tenantView: TenantView = loadTenantView(store)
   let islands: readonly string[] = parseIslands(window.location.search)
   let last: Snapshot | null = null
   let model: Dashboard | null = null
   const seen = { snapshots: 0, rejected: 0 }
-  const shown = { sum: '', pillars: '', hidden: '', menu: '', brand: '' }
+  const shown = { sum: '', pillars: '', hidden: '', menu: '', brand: '', sections: '' }
   const regionChoices = new Map<string, string>()
 
   const inspector = new Inspector({
@@ -116,6 +117,7 @@ export function startDashboard(): void {
     put('dash-pillars', pillarsHtml(model, ui as UiState), 'pillars')
     put('hidden-pillars', hiddenHtml(model), 'hidden')
     put('pillar-menu', pillarMenuHtml(model), 'menu')
+    put('dash-sections', sectionsHtml(model, ui as UiState), 'sections')
     if (window.scrollY !== y) window.scrollTo(0, y)
     if (key) document.querySelector<HTMLElement>(key)?.focus({ preventScroll: true })
   }
@@ -124,6 +126,9 @@ export function startDashboard(): void {
     const { snapshot: s, problems } = checkSnapshot(raw)
     for (const p of problems) console.warn(`Snapshot problem: ${p}`)
     if (!s) { seen.rejected++; setStatus('badData'); return }
+    const now = Date.now()
+    if (arrivedAt !== null) { gaps.push((now - arrivedAt) / 1000); if (gaps.length > 10) gaps.shift() }
+    arrivedAt = now
     last = s
     seen.snapshots++
     const pruned = pruneTenants(tenantView, s.tenants ?? [])
@@ -134,10 +139,45 @@ export function startDashboard(): void {
     inspector.update(s)
     notices.show(s.notices, s.notes ?? [])
     draw()
+    if (!freshPop.hidden) drawFreshness()
     setStatus('live')
   }
 
+  // how fresh the feed is: seconds since the last snapshot arrived, and the lines of the popup
+  let connected = false
+  let arrivedAt: number | null = null
+  const gaps: number[] = []
+  const freshButton = $('fresh-button')
+  const freshPop = $('fresh-pop')
+  function drawMarker(): void {
+    const since = arrivedAt === null ? null : (Date.now() - arrivedAt) / 1000
+    const m = marker(connected, since, feedLateAfter(gaps))
+    freshButton.textContent = `${m.text} ${freshPop.hidden ? '▾' : '▴'}`
+    freshButton.classList.toggle('late', m.late)
+  }
+  function drawFreshness(): void {
+    freshPop.innerHTML = freshnessHtml(sourceLines(last?.sources, Date.now()))
+    const r = freshButton.getBoundingClientRect()
+    freshPop.style.top = `${r.bottom + 6}px`
+    freshPop.style.left = `${popupLeft(r.left, freshPop.offsetWidth, window.innerWidth)}px`
+  }
+  freshButton.addEventListener('click', () => {
+    freshPop.hidden = !freshPop.hidden
+    freshButton.setAttribute('aria-expanded', String(!freshPop.hidden))
+    if (!freshPop.hidden) drawFreshness()
+    drawMarker()
+  })
+  document.addEventListener('pointerdown', (e) => {
+    if (!freshPop.hidden && !(e.target as HTMLElement).closest('.fresh')) { freshPop.hidden = true; freshButton.setAttribute('aria-expanded', 'false'); drawMarker() }
+  })
+  window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !freshPop.hidden) { freshPop.hidden = true; freshButton.setAttribute('aria-expanded', 'false'); drawMarker() } })
+  window.addEventListener('resize', () => { if (!freshPop.hidden) drawFreshness() })
+  window.setInterval(drawMarker, 1000)
+  drawMarker()
+
   function setStatus(st: ConnectionState): void {
+    connected = st === 'live' || st === 'badData'
+    drawMarker()
     const label = { connecting: 'Connecting…', live: last?.mode === 'demo' ? 'Live (demo data)' : 'Live', reconnecting: 'Reconnecting…', offline: 'Backend offline', badData: 'Bad data, showing the last good data' }[st]
     const el = $('dash-status')
     el.className = `livepill ${st === 'live' ? '' : st === 'offline' || st === 'badData' ? 'off' : 'wait'}`
@@ -180,6 +220,11 @@ export function startDashboard(): void {
     }
     if (system) inspector.open(system)
   })
+  $('dash-sections').addEventListener('toggle', (e) => {
+    const d = e.target as HTMLDetailsElement
+    const id = d.dataset.section
+    if (id) { if (d.open) ui.sections.add(id); else ui.sections.delete(id) }
+  }, true)
   const menu = $('pillar-menu')
   const button = $('pillars-button')
   button.addEventListener('click', () => { menu.hidden = !menu.hidden; button.setAttribute('aria-expanded', String(!menu.hidden)) })
@@ -193,6 +238,9 @@ export function startDashboard(): void {
   ;(window as unknown as { dash: unknown }).dash = {
     seen,
     feed: (raw: unknown) => onSnapshot(raw),
+    freshnessOpen: () => !freshPop.hidden,
+    /** For tests: make the last snapshot look this many seconds older. */
+    ageFeed: (seconds: number) => { if (arrivedAt !== null) arrivedAt -= seconds * 1000; drawMarker() },
     model: () => model,
     ui,
     tenantView: () => tenantView,
