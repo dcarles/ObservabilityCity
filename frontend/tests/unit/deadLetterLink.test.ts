@@ -39,10 +39,10 @@ describe('the snapshot guard and queues', () => {
 
   it('keeps well formed queues, drops one without a name and a link that is not a web address, and treats a missing list as none', () => {
     const t = healthyTown() as any
-    nodeOf(t).queues = [{ name: 'a', backlog: 3, deadLetters: 1, link: { name: 'Tool', url: 'https://t.example.test/a' } }, { name: '', backlog: 1 }, { name: 'b', backlog: 'x', link: { name: 'Tool', url: 'javascript:1' } }, 'junk']
+    nodeOf(t).queues = [{ name: 'a', backlog: 3, deadLetters: 1, perSecond: 2.5, link: { name: 'Tool', url: 'https://t.example.test/a' } }, { name: '', backlog: 1 }, { name: 'b', backlog: 'x', link: { name: 'Tool', url: 'javascript:1' } }, 'junk']
     expect(nodeOf(checkSnapshot(t).snapshot!).queues).toEqual([
-      { name: 'a', backlog: 3, deadLetters: 1, link: { name: 'Tool', url: 'https://t.example.test/a' } },
-      { name: 'b', backlog: null, deadLetters: null, link: null },
+      { name: 'a', backlog: 3, deadLetters: 1, link: { name: 'Tool', url: 'https://t.example.test/a' }, perSecond: 2.5 },
+      { name: 'b', backlog: null, deadLetters: null, link: null, perSecond: null },
     ])
 
     delete nodeOf(t).queues

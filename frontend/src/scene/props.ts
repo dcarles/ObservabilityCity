@@ -146,6 +146,8 @@ export interface BridgeOpts {
   to: THREE.Vector3
   /** Gate posts and a little overrun at both ends. Off for a piece of a longer causeway, which has no ends of its own. */
   ends?: boolean
+  /** A causeway over land or along the ring: the deck stays level and is no arch, so no boat is meant to pass under it. */
+  flat?: boolean
 }
 
 /** The longest piece of an arched deck: short enough that the curve looks smooth, and the lamps and braces of a piece keep their spacing. */
@@ -165,13 +167,13 @@ export function bridge(opts: BridgeOpts): THREE.Group {
   const dir = to.clone().sub(from)
   const len = dir.length()
   const width = ROAD_W + 2.0
-  registerArch(from, to, width)
+  if (!opts.flat) registerArch(from, to, width)
   const yaw = Math.atan2(dir.x, dir.z)
   const pieces = Math.max(1, Math.ceil(len / PIECE))
   const run = len / pieces
   for (let i = 0; i < pieces; i++) {
     const t0 = i / pieces, t1 = (i + 1) / pieces
-    const h0 = archHeight(t0, len), h1 = archHeight(t1, len)
+    const h0 = opts.flat ? 0 : archHeight(t0, len), h1 = opts.flat ? 0 : archHeight(t1, len)
     const along = (t0 + t1) / 2
     const deck = new THREE.Group()
     deck.position.copy(from).addScaledVector(dir, along)

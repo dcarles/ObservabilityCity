@@ -443,6 +443,8 @@ internal sealed class EntitiesFile
     public EntityMetricFile? DeadLetter { get; set; }
     /// <summary>An address that opens a consumer's dead letters in your support tool: a name and a URL template over {pillar}, {service}, {system} and {environment}. Without it, no link.</summary>
     public EntityLinkFile? DeadLetterLink { get; set; }
+    /// <summary>The messages that arrive in an entity, for example a metric of incoming messages added up by total. Their rate sets how many boats sail to the consumer.</summary>
+    public EntityMetricFile? Throughput { get; set; }
     /// <summary>Entity name patterns, tried in order: the first that matches decides whose the entity is. An entity no pattern matches is left out.</summary>
     public List<EntityPatternFile> Patterns { get; set; } = [];
 }
