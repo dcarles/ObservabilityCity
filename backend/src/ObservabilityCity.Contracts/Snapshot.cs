@@ -426,7 +426,8 @@ public sealed record SystemDetail(
     IReadOnlyList<string> OutsideCallers,
     IReadOnlyList<string> ServiceTopics,
     IReadOnlyList<SubscriptionSnapshot> Subscriptions,
-    ScopeInfo? Scope = null);
+    ScopeInfo? Scope = null,
+    ResourceLink? DeadLetterLink = null);
 
 /// <summary>
 /// Where a system lives and what its telemetry calls it, as the environment's scope rules resolve it. Null on a system when the environment has no

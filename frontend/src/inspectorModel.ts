@@ -343,6 +343,15 @@ export function overviewLinks(s: ScopeInfo | null | undefined): OverviewLinks | 
   return { items: own.slice(0, OVERVIEW_LINK_LIMIT), tenantResources, more: Math.max(0, own.length - OVERVIEW_LINK_LIMIT) }
 }
 
+/**
+ * The link to a consumer's dead letters in the team's support tool (the environment's `entities.deadLetterLink`), as a row of the "open in" part. Null when the
+ * environment names no tool, the system consumes no topic, or the address is not a web address.
+ */
+export function deadLetterLinkRow(d: { deadLetterLink?: ResourceLink | null } | null | undefined): { resource: string; link: ResourceLink } | null {
+  const link = d?.deadLetterLink
+  return link && link.name !== '' && /^https?:\/\//i.test(link.url) ? { resource: 'Dead letters', link } : null
+}
+
 /** What kind of outside place a vendor's building is, for the inspector and the lists: a third party, or one of the company's own services outside the monitored platform, with its island when it shares one. */
 export function vendorWhere(v?: { internal: boolean; islandName?: string | null }): string {
   return (v?.internal ? 'Internal service' : 'Third party') + (v?.islandName ? `, ${v.islandName}` : '')

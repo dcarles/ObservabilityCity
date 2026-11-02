@@ -65,7 +65,8 @@ public static partial class RegistryLoader
         f is null ? null : new EntitiesConfig(f.Resources, string.IsNullOrWhiteSpace(f.Dimension) ? EntitiesConfig.DefaultDimension : f.Dimension.Trim(),
             ToEntityMetric(f.Backlog), ToEntityMetric(f.DeadLetter),
             f.Patterns.Select(p => new EntityPattern(p.Match, string.IsNullOrWhiteSpace(p.Consumer) ? "worker" : p.Consumer.Trim().ToLowerInvariant())).ToList(),
-            string.IsNullOrWhiteSpace(f.Interval) ? null : SourceQuery.TryParseWindow(f.Interval, out var interval) ? interval : null);
+            string.IsNullOrWhiteSpace(f.Interval) ? null : SourceQuery.TryParseWindow(f.Interval, out var interval) ? interval : null,
+            f.DeadLetterLink is { } l ? new EntityLink(l.Name.Trim(), l.Url.Trim()) : null);
 
     private static EntityMetric? ToEntityMetric(EntityMetricFile? f) => f is null ? null : new EntityMetric(f.Metric.Trim(), f.Aggregation.Trim().ToLowerInvariant());
 
@@ -87,6 +88,14 @@ public static partial class RegistryLoader
         }
         if (e.Interval is { } grain && (!SourceQuery.TryParseWindow(grain, out var parsed) || !MetricGroup.IntervalMinutes.Contains((int)Math.Round(parsed.TotalMinutes))))
             errors.Add($"{at}: interval '{grain}' is not a time grain the metrics API offers. Use one of {string.Join(", ", MetricGroup.IntervalMinutes.Select(m => m % 1440 == 0 ? $"{m / 1440}d" : m % 60 == 0 ? $"{m / 60}h" : $"{m}m"))}");
+        if (e.DeadLetterLink is { } link)
+        {
+            if (string.IsNullOrWhiteSpace(link.Name)) errors.Add($"{at}.deadLetterLink: name is empty; give the words the link shows");
+            if (!Regex.IsMatch(link.Url ?? "", @"^https?://", RegexOptions.IgnoreCase)) errors.Add($"{at}.deadLetterLink: url must start with http:// or https://");
+            foreach (Match m in Regex.Matches(link.Url ?? "", @"\{([^{}]*)\}"))
+                if (!EntitiesConfig.LinkVariables.Contains(m.Groups[1].Value))
+                    errors.Add($"{at}.deadLetterLink: {{{m.Groups[1].Value}}} is not a variable of the url. Use {string.Join(", ", EntitiesConfig.LinkVariables.Select(v => "{" + v + "}"))}.{DidYouMean.Hint(m.Groups[1].Value, EntitiesConfig.LinkVariables)}");
+        }
         if (e.Patterns.Count == 0) errors.Add($"{at}: patterns is empty. Give at least one pattern: a regular expression with the named groups pillar and service");
         for (var i = 0; i < e.Patterns.Count; i++)
         {

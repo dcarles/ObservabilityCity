@@ -439,8 +439,16 @@ internal sealed class EntitiesFile
     public EntityMetricFile? Backlog { get; set; }
     /// <summary>The dead-lettered messages of an entity, for example a metric of dead-lettered messages added up by maximum.</summary>
     public EntityMetricFile? DeadLetter { get; set; }
+    /// <summary>An address that opens a consumer's dead letters in your support tool: a name and a URL template over {pillar}, {service}, {system} and {environment}. Without it, no link.</summary>
+    public EntityLinkFile? DeadLetterLink { get; set; }
     /// <summary>Entity name patterns, tried in order: the first that matches decides whose the entity is. An entity no pattern matches is left out.</summary>
     public List<EntityPatternFile> Patterns { get; set; } = [];
+}
+
+internal sealed class EntityLinkFile
+{
+    public string Name { get; set; } = "";
+    public string Url { get; set; } = "";
 }
 
 internal sealed class EntityMetricFile

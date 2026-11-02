@@ -446,6 +446,7 @@ export interface components {
             serviceTopics: string[];
             subscriptions: components["schemas"]["SubscriptionSnapshot"][];
             scope?: components["schemas"]["ScopeInfo"];
+            deadLetterLink?: components["schemas"]["ResourceLink"];
         };
         SystemLogs: {
             /** Format: date-time */

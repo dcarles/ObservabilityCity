@@ -312,6 +312,7 @@ signals: { backlog: messaging, deadLetters: messaging }
 | `interval` | no | one minute | The time grain the metrics are asked at, for example `5m`. |
 | `backlog` | no | none | The metric of the messages waiting in an entity. |
 | `deadLetter` | no | none | The metric of the dead-lettered messages of an entity. |
+| `deadLetterLink` | no | none | `{ name, url }`: an address that opens a consumer's dead letters in your support tool, shown in its drawer. The url is a template over `{pillar}`, `{service}` (the codes of the scope rules), `{system}` and `{environment}`. Without it, no link. |
 | `patterns` | yes | | The shapes of entity names, tried in order. |
 
 <!-- file: EntityMetricFile -->

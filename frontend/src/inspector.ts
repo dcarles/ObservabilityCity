@@ -3,7 +3,7 @@ import { escapeHtml } from './picker'
 import { scopeParams, type Scope } from './scope'
 import { tenantListOrder, tenantFigures, yardSummary, type TenantView } from './tenants'
 import { regionFigures, regionOptions, validChoice, WORST, type RegionChoice } from './regions'
-import { ago, clockTime, configOrder, groupDetail, incidentSummary, jobRows, LAYER_WORD, linkSections, logLinkLabel, logSectionEmpty, logSectionTitle, logTabLabel, pickLogSection, originLabel, type LinkItem, overviewLinks, overviewRows, reasons, repeatLabel, resourceLinks, scopeView, SEVERITY_WORD, sectionLinks, stateTone, vendorWhere } from './inspectorModel'
+import { ago, clockTime, configOrder, deadLetterLinkRow, groupDetail, incidentSummary, jobRows, LAYER_WORD, linkSections, logLinkLabel, logSectionEmpty, logSectionTitle, logTabLabel, pickLogSection, originLabel, type LinkItem, overviewLinks, overviewRows, reasons, repeatLabel, resourceLinks, scopeView, SEVERITY_WORD, sectionLinks, stateTone, vendorWhere } from './inspectorModel'
 
 export type InspectorTab = 'overview' | 'links' | 'logs' | 'config'
 const TABS: { id: InspectorTab; label: string }[] = [
@@ -239,8 +239,11 @@ export class Inspector {
   /** Links that open the system's resources in a portal or console, from the environment's link rules. Nothing without them. */
   private openIn(): string {
     const v = overviewLinks(this.detail?.scope)
-    if (!v) return ''
-    const rows = v.items.map((i) => `<div class="row open-in" data-resource="${escapeHtml(i.resource)}"><span>${escapeHtml(i.resource)}</span><span>${this.anchor(i.link.name, i.link.url)}</span></div>`).join('')
+    const dead = deadLetterLinkRow(this.detail)
+    if (!v && !dead) return ''
+    const deadRow = dead ? `<div class="row open-in dead-letters" data-resource="${escapeHtml(dead.resource)}"><span>${escapeHtml(dead.resource)}</span><span>${this.anchor(dead.link.name, dead.link.url)}</span></div>` : ''
+    if (!v) return `<h4>Open in</h4>${deadRow}`
+    const rows = deadRow + v.items.map((i) => `<div class="row open-in" data-resource="${escapeHtml(i.resource)}"><span>${escapeHtml(i.resource)}</span><span>${this.anchor(i.link.name, i.link.url)}</span></div>`).join('')
     const tenants = v.tenantResources === 0 ? '' : `<p class="note">${v.tenantResources} tenant ${v.tenantResources === 1 ? 'resource has its' : 'resources have their'} own link${v.tenantResources === 1 ? '' : 's'} on the Config tab.</p>`
     const more = v.more === 0 ? '' : `<p class="note">${v.more} more on the Config tab.</p>`
     return `<h4>Open in</h4>${rows}${more}${tenants}`

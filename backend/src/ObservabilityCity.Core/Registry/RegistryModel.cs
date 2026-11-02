@@ -248,10 +248,16 @@ public sealed record RegistrySource(string Name, string Kind, string? Connection
 }
 
 /// <summary>How a broker's entities are read: the rule that finds its namespaces, the dimension that names an entity, the metrics for the backlog and the dead letters, and the patterns that say whose an entity is.</summary>
-public sealed record EntitiesConfig(string Resources, string Dimension, EntityMetric? Backlog, EntityMetric? DeadLetter, IReadOnlyList<EntityPattern> Patterns, TimeSpan? Interval = null)
+public sealed record EntitiesConfig(string Resources, string Dimension, EntityMetric? Backlog, EntityMetric? DeadLetter, IReadOnlyList<EntityPattern> Patterns, TimeSpan? Interval = null, EntityLink? DeadLetterLink = null)
 {
+    /// <summary>The variables a dead-letter link's URL may use.</summary>
+    public static readonly string[] LinkVariables = ["pillar", "service", "system", "environment"];
+
     public const string DefaultDimension = "EntityName";
 }
+
+/// <summary>An address that opens a consumer's dead letters elsewhere (a support tool): its name and a URL template over <see cref="EntitiesConfig.LinkVariables"/>.</summary>
+public sealed record EntityLink(string Name, string Url);
 
 /// <summary>A metric and the way its points are added up.</summary>
 public sealed record EntityMetric(string Metric, string Aggregation);
