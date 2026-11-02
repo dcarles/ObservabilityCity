@@ -489,7 +489,6 @@ export class Town {
         scheduler: true,
         rate: () => (brokerRunning(broker?.node) ? schedulerRate(schedules, (id) => island.buildings.get(id)?.node) : 0),
         speed: () => (broker?.node ? speedFactor(broker.node.p99Ms, broker.node.slaP99Ms) : 1),
-        load: () => 0.2,
       })
       this.boatLanes.add(g.id)
     })
@@ -1162,7 +1161,6 @@ export class Town {
         return boatRate(rps, weight)
       },
       speed: () => (broker?.node ? speedFactor(broker.node.p99Ms, broker.node.slaP99Ms) : 1),
-      load: () => Math.log10(1 + island.messaging.perSecond) / 2.5,
     }
   }
 

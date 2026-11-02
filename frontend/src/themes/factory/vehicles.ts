@@ -20,7 +20,7 @@ function van(cab: string, load: string): VehicleParts {
 const CONTAINERS = ['#d9573f', '#3f7fc9', '#e3a72c', '#4f9f6a', '#7d6bb9']
 
 /** A flat-bottomed barge with a deckhouse at the stern and containers on deck. */
-function barge(seed: number): BoatLook {
+function barge(seed: number, internal = false): BoatLook {
   const L = 5.6, W = 2.2
   const hullShape = new THREE.Shape()
   hullShape.moveTo(-W / 2, -L / 2)
@@ -33,7 +33,7 @@ function barge(seed: number): BoatLook {
   const hullGeo = new THREE.ExtrudeGeometry(hullShape, { depth: 0.7, bevelEnabled: false })
   hullGeo.rotateX(-Math.PI / 2)
   hullGeo.translate(0, -0.3, 0)
-  const hull = new THREE.Mesh(hullGeo, flat('#3b4650', { metalness: 0.3 }))
+  const hull = new THREE.Mesh(hullGeo, flat(internal ? '#7a5a3a' : '#3b4650', { metalness: 0.3 }))
   hull.castShadow = true
   hull.receiveShadow = true
   const object = group(
@@ -44,7 +44,7 @@ function barge(seed: number): BoatLook {
     box(0.16, 0.7, 0.16, flat('#23272d'), { x: 0.4, y: 1.5, z: -L / 2 + 0.7 }),
   )
   const cargo = new THREE.Group()
-  for (let i = 0; i < 6; i++) cargo.add(box(0.85, 0.75, 1.2, flat(CONTAINERS[(seed + i) % CONTAINERS.length], { metalness: 0.2 }), { x: i % 2 ? 0.46 : -0.46, y: 0.4, z: 1.6 - Math.floor(i / 2) * 1.35 }))
+  for (let i = 0; i < 6; i++) cargo.add(box(0.95, 0.85, 1.3, flat(CONTAINERS[(seed + i) % CONTAINERS.length], { metalness: 0.2 }), { x: i % 2 ? 0.5 : -0.5, y: 0.45, z: 1.65 - Math.floor(i / 2) * 1.45 }))
   object.add(cargo)
   object.scale.setScalar(0.7)
   return { object, cargo }

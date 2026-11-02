@@ -9,6 +9,9 @@ const CELL = 2.5
 
 /** How far out into the open water a boat sails on a loop from its own harbour, longest first: the longest that is clear of land is used. A long loop keeps each boat in view longer, so busy traffic inside an island shows as several boats at once. */
 export const LOOP_LENGTHS = [44, 34, 26, 16, 11, 7]
+
+/** How far along the coast a loop starts from the harbour's own water, so its boats keep out of the way of the boats that sail to and from other islands. */
+export const LOOP_OFFSET = 4.5
 const LAND_MARGIN = 3.2
 
 function distToSegment(p: THREE.Vector2, a: THREE.Vector2, b: THREE.Vector2): number {
@@ -210,13 +213,19 @@ export function harbourLoop(map: SeaMap, water: THREE.Vector3, centre: THREE.Vec
     return i >= 0 && j >= 0 && i < w && j < h && !blocked[j * w + i]
   }
   const out = Math.atan2(water.z - centre.z, water.x - centre.x)
+  // a lane of its own: start a little along the coast from the water the other boats use, on whichever side is clear
+  let start = water
+  for (const side of [1, -1]) {
+    const s = new THREE.Vector3(water.x - Math.sin(out) * LOOP_OFFSET * side, 0, water.z + Math.cos(out) * LOOP_OFFSET * side)
+    if (free(s.x, s.z)) { start = s; break }
+  }
   for (const length of LOOP_LENGTHS) {
     for (const turn of [0, 0.5, -0.5, 1, -1]) {
       const a = out + turn
-      const end = new THREE.Vector3(water.x + Math.cos(a) * length, 0, water.z + Math.sin(a) * length)
+      const end = new THREE.Vector3(start.x + Math.cos(a) * length, 0, start.z + Math.sin(a) * length)
       let clear = true
-      for (let k = 1; k <= 8 && clear; k++) clear = free(water.x + ((end.x - water.x) * k) / 8, water.z + ((end.z - water.z) * k) / 8)
-      if (clear) return [water.clone().setY(0), end]
+      for (let k = 1; k <= 8 && clear; k++) clear = free(start.x + ((end.x - start.x) * k) / 8, start.z + ((end.z - start.z) * k) / 8)
+      if (clear) return [start.clone().setY(0), end]
     }
   }
   return null

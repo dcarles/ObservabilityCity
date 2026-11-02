@@ -15,8 +15,6 @@ export interface BoatRoute {
   rate: () => number
   /** Sailing speed multiplier from the broker's latency against its SLA. */
   speed: () => number
-  /** How full the boats are, 0 to 1: the island's message rate on a log scale. */
-  load: () => number
 }
 
 interface Boat {
@@ -32,7 +30,7 @@ interface Boat {
 
 const BASE_SPEED = 4.4
 const SEA = 0.12
-const BOAT_SCALE = 0.7
+const BOAT_SCALE = 0.95
 
 /**
  * Messages as boats. Each island has a sea lane from the hub's Service Bus port to its harbour. How many boats
@@ -44,7 +42,9 @@ export class BoatSystem {
   private readonly routes: BoatRoute[] = []
   private readonly acc = new Map<BoatRoute, number>()
   private readonly boats: Boat[] = []
+  /** Idle boats: the ones for lanes between islands, and the differently painted ones for loops out of an island's own harbour. */
   private readonly free: { object: THREE.Group; cargo: THREE.Group }[] = []
+  private readonly freeInternal: { object: THREE.Group; cargo: THREE.Group }[] = []
   private time = 0
   private enabled = true
 
@@ -53,16 +53,28 @@ export class BoatSystem {
     if (on === this.enabled) return
     this.enabled = on
     this.object.visible = on
-    if (!on) for (const b of this.boats.splice(0)) { b.object.visible = false; this.free.push({ object: b.object, cargo: b.cargo as THREE.Group }) }
+    if (!on) for (const b of this.boats.splice(0)) this.release(b)
   }
 
   constructor(max = 48) {
     for (let i = 0; i < max; i++) {
-      const b = vehicles().boat(i)
-      b.object.visible = false
-      this.object.add(b.object)
-      this.free.push(b)
+      for (const internal of [false, true]) {
+        const b = vehicles().boat(i, internal)
+        b.object.visible = false
+        this.object.add(b.object)
+        ;(internal ? this.freeInternal : this.free).push(b)
+      }
     }
+  }
+
+  /** Whether a lane is a loop out of an island's own harbour and back: its boats are the other colour. */
+  private static isInternal(r: BoatRoute): boolean {
+    return r.scheduler === true || (r.from !== null && r.from === r.to)
+  }
+
+  private release(b: Boat): void {
+    b.object.visible = false
+    ;(BoatSystem.isInternal(b.route) ? this.freeInternal : this.free).push({ object: b.object, cargo: b.cargo as THREE.Group })
   }
 
   /** The share of the usual number of boats that are sent out: 1 for all of them, less on a weak PC (see the quality presets). */
@@ -72,7 +84,7 @@ export class BoatSystem {
     this.routes.length = 0
     this.routes.push(...routes)
     this.acc.clear()
-    for (const b of this.boats.splice(0)) { b.object.visible = false; this.free.push({ object: b.object, cargo: b.cargo as THREE.Group }) }
+    for (const b of this.boats.splice(0)) this.release(b)
   }
 
   update(dt: number): void {
@@ -84,14 +96,13 @@ export class BoatSystem {
       const a = (this.acc.get(r) ?? Math.random()) + rate * this.density * dt
       let whole = Math.floor(a)
       this.acc.set(r, a - whole)
-      while (whole-- > 0 && this.free.length > 0) this.spawn(r)
+      while (whole-- > 0 && (BoatSystem.isInternal(r) ? this.freeInternal : this.free).length > 0) this.spawn(r)
     }
     for (let i = this.boats.length - 1; i >= 0; i--) {
       const b = this.boats[i]
       b.dist += BASE_SPEED * b.route.speed() * dt
       if (b.dist >= b.total) {
-        b.object.visible = false
-        this.free.push({ object: b.object, cargo: b.cargo as THREE.Group })
+        this.release(b)
         this.boats.splice(i, 1)
         continue
       }
@@ -111,11 +122,9 @@ export class BoatSystem {
     const lengths: number[] = []
     let total = 0
     for (let i = 1; i < points.length; i++) { const l = points[i].distanceTo(points[i - 1]); lengths.push(l); total += l }
-    const slot = this.free.pop()!
+    const slot = (BoatSystem.isInternal(r) ? this.freeInternal : this.free).pop()!
     slot.object.visible = true
-    // a fuller load for busier traffic: 1 to 6 crates on deck
-    const crates = 1 + Math.round(clamp(r.load(), 0, 1) * 5)
-    slot.cargo.children.forEach((c, i) => { c.visible = i < crates })
+    slot.cargo.children.forEach((c) => { c.visible = true }) // always the full load of crates
     this.boats.push({ object: slot.object, cargo: slot.cargo, points, lengths, total, dist: 0, route: r, phase: Math.random() * 6 })
   }
 

@@ -179,8 +179,22 @@ describe.each(ids)('the %s theme', (id) => {
     expect(size.z).toBeGreaterThan(size.x)
     expect(kit.vehicles.boatLift).toBeGreaterThanOrEqual(0)
     expect(kit.vehicles.boatBob).toBeGreaterThan(0)
-    // the boats are drawn at 0.7 scale and the lane is about this wide: a boat must not be bigger than the lane
-    expect(size.x * 0.7).toBeLessThan(3.2)
+    // the boats are drawn at 0.95 scale and the lane is about this wide: a boat must not be bigger than the lane
+    expect(size.x * 0.95).toBeLessThan(3.2)
+  })
+
+  it('paints the boats that loop out of their own island differently from the boats sailing between islands, with the same crates', () => {
+    const paint = (boat: ReturnType<typeof kit.vehicles.boat>) => {
+      const colours = new Set<string>()
+      boat.object.traverse((o) => {
+        const m = (o as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined
+        if (m?.color && !boat.cargo.children.includes(o)) colours.add(m.color.getHexString())
+      })
+      return colours
+    }
+    const between = kit.vehicles.boat(0), inside = kit.vehicles.boat(0, true)
+    expect([...paint(inside)].some((c) => !paint(between).has(c))).toBe(true)
+    expect(inside.cargo.children).toHaveLength(between.cargo.children.length)
   })
 
   it('has a pier that runs out along +z for as long as it is asked', () => {
