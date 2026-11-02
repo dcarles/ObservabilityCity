@@ -15,7 +15,9 @@
     "deadLetters": 0
   },
   "notices": [
-    "Island \u0027sta\u0027 stands alone: it has no API, no topics or subscriptions, no calls to or from other islands and no third party, so nothing connects it to the town. Add an API, a messaging block or a calls link."
+    "Island \u0027sta\u0027 stands alone: it has no API, no topics or subscriptions, no calls to or from other islands and no third party, so nothing connects it to the town. Add an API, a messaging block or a calls link.",
+    "Job not mapped: hbk.sync-cron runs daily, hourly, which the scheduler: list of hbk.yaml does not say a service for, so it sends no boats.",
+    "Job not mapped: sta.idle-cron runs daily, hourly, which the scheduler: list of sta.yaml does not say a service for, so it sends no boats."
   ],
   "groups": [
     {
@@ -35,7 +37,8 @@
             "service": "egress"
           }
         ],
-        "subscriptions": []
+        "subscriptions": [],
+        "schedules": []
       },
       "nodes": [
         {
@@ -233,7 +236,8 @@
             "consumer": "ful.orders-worker",
             "legacy": false
           }
-        ]
+        ],
+        "schedules": []
       },
       "nodes": [
         {
@@ -393,7 +397,8 @@
             "consumer": "wrk.batch-worker",
             "legacy": false
           }
-        ]
+        ],
+        "schedules": []
       },
       "nodes": [
         {
@@ -497,7 +502,8 @@
       "hasRingBridge": true,
       "messaging": {
         "topics": [],
-        "subscriptions": []
+        "subscriptions": [],
+        "schedules": []
       },
       "nodes": [
         {
@@ -601,7 +607,8 @@
       "hasRingBridge": false,
       "messaging": {
         "topics": [],
-        "subscriptions": []
+        "subscriptions": [],
+        "schedules": []
       },
       "nodes": [
         {
@@ -685,7 +692,8 @@
             "consumer": "leg.feed-worker",
             "legacy": true
           }
-        ]
+        ],
+        "schedules": []
       },
       "nodes": [
         {
@@ -833,7 +841,8 @@
       "hasRingBridge": false,
       "messaging": {
         "topics": [],
-        "subscriptions": []
+        "subscriptions": [],
+        "schedules": []
       },
       "nodes": [
         {

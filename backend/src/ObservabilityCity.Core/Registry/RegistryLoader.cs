@@ -591,9 +591,40 @@ public static partial class RegistryLoader
             Code = p.Scope?.Code,
             TopicServices = p.Messaging?.Topics ?? [],
             SubscriptionDecls = (p.Messaging?.Subscriptions ?? []).Select(x => (x.Topic, x.Consumer, x.Legacy)).ToList(),
+            Schedules = ToSchedules(p, nodes, name, errors),
         };
         CheckMessaging(group, p.Systems.Select(x => x.Id).ToHashSet(), name, errors);
         return group;
+    }
+
+    /// <summary>The pillar's <c>scheduler:</c> list: every entry names a function of the pillar, and every job names services of the pillar.</summary>
+    private static List<RegistrySchedule> ToSchedules(PillarFile p, List<RegistryNode> nodes, string fileName, List<string> errors)
+    {
+        var schedules = new List<RegistrySchedule>();
+        var services = nodes.Select(n => n.Service).OfType<string>().Distinct().ToList();
+        foreach (var entry in p.Scheduler)
+        {
+            var node = nodes.FirstOrDefault(n => n.Id == $"{p.Pillar}.{entry.System}" || n.Id == entry.System);
+            if (node is null)
+            {
+                errors.Add($"{fileName}: scheduler: '{entry.System}' is not a system of this pillar.{DidYouMean.Hint(entry.System, nodes.Select(n => n.Id))}");
+                continue;
+            }
+            if (node.Kind != NodeKind.Function)
+            {
+                errors.Add($"{fileName}: scheduler: '{entry.System}' is a {node.Kind.ToString().ToLowerInvariant()}, but only a function has scheduled jobs");
+                continue;
+            }
+            foreach (var (job, targets) in entry.Jobs)
+            {
+                if (string.IsNullOrWhiteSpace(job)) { errors.Add($"{fileName}: scheduler: a job of '{entry.System}' has no name"); continue; }
+                var clean = (targets ?? []).Where(t => !string.IsNullOrWhiteSpace(t)).Select(t => t.Trim()).Distinct().ToList();
+                foreach (var t in clean.Where(t => !services.Contains(t)))
+                    errors.Add($"{fileName}: scheduler: job '{job}' starts work for '{t}', which is not a service of this pillar.{DidYouMean.Hint(t, services)}");
+                schedules.Add(new RegistrySchedule(node.Id, job.Trim(), clean));
+            }
+        }
+        return schedules;
     }
 
     /// <summary>The parts of a pillar's messaging block that can be checked from its own file alone.</summary>

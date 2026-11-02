@@ -33,7 +33,8 @@
             "service": "egress"
           }
         ],
-        "subscriptions": []
+        "subscriptions": [],
+        "schedules": []
       },
       "nodes": [
         {
@@ -262,6 +263,22 @@
             "publisher": "cl",
             "consumer": "cl.statements-worker",
             "legacy": false
+          }
+        ],
+        "schedules": [
+          {
+            "system": "cl.statement-cron",
+            "job": "daily",
+            "services": [
+              "statements"
+            ]
+          },
+          {
+            "system": "cl.statement-cron",
+            "job": "hourly",
+            "services": [
+              "statements"
+            ]
           }
         ]
       },
@@ -835,6 +852,22 @@
             "consumer": "acc.accounts-worker",
             "legacy": false
           }
+        ],
+        "schedules": [
+          {
+            "system": "acc.interest-cron",
+            "job": "daily",
+            "services": [
+              "accounts"
+            ]
+          },
+          {
+            "system": "acc.interest-cron",
+            "job": "hourly",
+            "services": [
+              "accounts"
+            ]
+          }
         ]
       },
       "nodes": [
@@ -1203,7 +1236,8 @@
             "consumer": "pay.refunds-worker",
             "legacy": false
           }
-        ]
+        ],
+        "schedules": []
       },
       "nodes": [
         {
@@ -1518,7 +1552,8 @@
             "consumer": "frd.screening-worker",
             "legacy": false
           }
-        ]
+        ],
+        "schedules": []
       },
       "nodes": [
         {
@@ -1819,6 +1854,22 @@
             "publisher": "obk",
             "consumer": "cus.consent-worker",
             "legacy": false
+          }
+        ],
+        "schedules": [
+          {
+            "system": "cus.archive-cron",
+            "job": "daily",
+            "services": [
+              "profile"
+            ]
+          },
+          {
+            "system": "cus.archive-cron",
+            "job": "hourly",
+            "services": [
+              "profile"
+            ]
           }
         ]
       },
@@ -2265,7 +2316,8 @@
             "consumer": "acq.leads-worker",
             "legacy": false
           }
-        ]
+        ],
+        "schedules": []
       },
       "nodes": [
         {
@@ -2648,7 +2700,8 @@
             "consumer": "dec.decision-worker",
             "legacy": false
           }
-        ]
+        ],
+        "schedules": []
       },
       "nodes": [
         {
@@ -2941,6 +2994,22 @@
             "publisher": "cl",
             "consumer": "bil.invoices-worker",
             "legacy": false
+          }
+        ],
+        "schedules": [
+          {
+            "system": "bil.billing-cron",
+            "job": "daily",
+            "services": [
+              "invoices"
+            ]
+          },
+          {
+            "system": "bil.billing-cron",
+            "job": "hourly",
+            "services": [
+              "invoices"
+            ]
           }
         ]
       },
@@ -3266,6 +3335,22 @@
             "publisher": "col",
             "consumer": "col.agency-worker",
             "legacy": false
+          }
+        ],
+        "schedules": [
+          {
+            "system": "col.letters-cron",
+            "job": "daily",
+            "services": [
+              "dunning"
+            ]
+          },
+          {
+            "system": "col.letters-cron",
+            "job": "hourly",
+            "services": [
+              "dunning"
+            ]
           }
         ]
       },
@@ -3799,7 +3884,8 @@
             "consumer": "dsp.disputes-worker",
             "legacy": false
           }
-        ]
+        ],
+        "schedules": []
       },
       "nodes": [
         {
@@ -4049,7 +4135,8 @@
             "consumer": "rwd.points-worker",
             "legacy": false
           }
-        ]
+        ],
+        "schedules": []
       },
       "nodes": [
         {
@@ -4341,7 +4428,8 @@
             "consumer": "obk.data-worker",
             "legacy": false
           }
-        ]
+        ],
+        "schedules": []
       },
       "nodes": [
         {
@@ -4646,6 +4734,22 @@
             "publisher": "dsp",
             "consumer": "ntf.dispatch-worker",
             "legacy": false
+          }
+        ],
+        "schedules": [
+          {
+            "system": "ntf.digest-cron",
+            "job": "daily",
+            "services": [
+              "dispatch"
+            ]
+          },
+          {
+            "system": "ntf.digest-cron",
+            "job": "hourly",
+            "services": [
+              "dispatch"
+            ]
           }
         ]
       },
@@ -4970,6 +5074,22 @@
             "publisher": "dat",
             "consumer": "dat.reports-worker",
             "legacy": false
+          }
+        ],
+        "schedules": [
+          {
+            "system": "dat.refresh-cron",
+            "job": "daily",
+            "services": [
+              "ingest"
+            ]
+          },
+          {
+            "system": "dat.refresh-cron",
+            "job": "hourly",
+            "services": [
+              "ingest"
+            ]
           }
         ]
       },
@@ -5372,6 +5492,22 @@
             "consumer": "rcn.matching-worker",
             "legacy": false
           }
+        ],
+        "schedules": [
+          {
+            "system": "rcn.settlement-cron",
+            "job": "daily",
+            "services": [
+              "matching"
+            ]
+          },
+          {
+            "system": "rcn.settlement-cron",
+            "job": "hourly",
+            "services": [
+              "matching"
+            ]
+          }
         ]
       },
       "nodes": [
@@ -5535,7 +5671,8 @@
       "hasRingBridge": false,
       "messaging": {
         "topics": [],
-        "subscriptions": []
+        "subscriptions": [],
+        "schedules": []
       },
       "nodes": [
         {
@@ -5647,7 +5784,8 @@
             "consumer": "lost-found.batch-gateway-worker",
             "legacy": true
           }
-        ]
+        ],
+        "schedules": []
       },
       "nodes": [
         {

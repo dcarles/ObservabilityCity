@@ -33,7 +33,8 @@
             "service": "egress"
           }
         ],
-        "subscriptions": []
+        "subscriptions": [],
+        "schedules": []
       },
       "nodes": [
         {
@@ -224,7 +225,23 @@
             "service": "orders"
           }
         ],
-        "subscriptions": []
+        "subscriptions": [],
+        "schedules": [
+          {
+            "system": "aa.tools-cron",
+            "job": "daily",
+            "services": [
+              "orders"
+            ]
+          },
+          {
+            "system": "aa.tools-cron",
+            "job": "hourly",
+            "services": [
+              "orders"
+            ]
+          }
+        ]
       },
       "nodes": [
         {
@@ -535,7 +552,8 @@
       "hasRingBridge": false,
       "messaging": {
         "topics": [],
-        "subscriptions": []
+        "subscriptions": [],
+        "schedules": []
       },
       "nodes": [
         {

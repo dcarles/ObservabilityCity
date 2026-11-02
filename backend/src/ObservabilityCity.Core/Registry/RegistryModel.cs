@@ -56,6 +56,9 @@ public sealed partial record Registry(
     public IReadOnlyList<string> Problems { get; init; } = [];
 }
 
+/// <summary>A scheduled job of a function and the services (of the same pillar) it starts work for. SystemId is the function's full id.</summary>
+public sealed record RegistrySchedule(string SystemId, string Job, IReadOnlyList<string> Services);
+
 /// <summary>A Service Bus topic. Name is {pillar}-{service}-outbox for a pillar and hub-{name} for the hub; Service is the service (or hub name) that publishes it.</summary>
 public sealed record RegistryTopic(string Name, string GroupId, string Service);
 
@@ -103,6 +106,9 @@ public sealed record RegistryGroup(
     public const string LostFoundId = "lost-found";
 
     public bool IsLostFound => Id == LostFoundId;
+
+    /// <summary>The scheduled jobs the pillar's file maps to services (<c>scheduler:</c>), one entry for each job.</summary>
+    public IReadOnlyList<RegistrySchedule> Schedules { get; init; } = [];
 
     /// <summary>The pillar's code in the scope rules' {pillar} (<c>scope.code</c> in its file). Null: the pillar id.</summary>
     public string? Code { get; init; }

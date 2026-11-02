@@ -93,6 +93,8 @@ internal sealed class PillarFile
     public Dictionary<string, string> Signals { get; set; } = new();
     public List<SystemFile> Systems { get; set; } = [];
     public MessagingFile? Messaging { get; set; }
+    /// <summary>Which services each scheduled job of a function in this pillar starts work for. A job that is not listed sends no boats.</summary>
+    public List<SchedulerFile> Scheduler { get; set; } = [];
     /// <summary>How the pillar is spelt in the environments' scope rules, when that is not its id.</summary>
     public PillarScopeFile? Scope { get; set; }
 }
@@ -115,6 +117,15 @@ internal sealed class MessagingFile
     /// <summary>Pillar files: service names, each published as the topic {pillar}-{service}-outbox. hub.yaml: free names, each published as hub-{name}.</summary>
     public List<string> Topics { get; set; } = [];
     public List<SubscriptionFile> Subscriptions { get; set; } = [];
+}
+
+/// <summary>One entry of a pillar's <c>scheduler:</c> list: a function and, for each of its jobs, the services the job starts work for.</summary>
+internal sealed class SchedulerFile
+{
+    /// <summary>The function system, by its id within the pillar.</summary>
+    public string System { get; set; } = "";
+    /// <summary>Job name (as the logs name it) to the services of this pillar it starts work for.</summary>
+    public Dictionary<string, List<string>> Jobs { get; set; } = [];
 }
 
 internal sealed class SubscriptionFile

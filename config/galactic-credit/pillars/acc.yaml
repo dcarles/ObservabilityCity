@@ -19,3 +19,6 @@ messaging:
   subscriptions:
     - { topic: acq-applications-outbox, consumer: acc.accounts-worker }
     - { topic: cl-ledger-outbox, consumer: acc.accounts-worker }
+scheduler:
+  - system: acc.interest-cron
+    jobs: { daily: [accounts], hourly: [accounts] }

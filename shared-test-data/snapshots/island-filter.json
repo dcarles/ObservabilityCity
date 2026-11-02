@@ -28,7 +28,8 @@
       "hasRingBridge": false,
       "messaging": {
         "topics": [],
-        "subscriptions": []
+        "subscriptions": [],
+        "schedules": []
       },
       "nodes": [
         {
@@ -226,7 +227,8 @@
             "consumer": "aa.orders-worker",
             "legacy": false
           }
-        ]
+        ],
+        "schedules": []
       },
       "nodes": [
         {
@@ -392,7 +394,8 @@
             "consumer": "cc.notify-worker",
             "legacy": false
           }
-        ]
+        ],
+        "schedules": []
       },
       "nodes": [
         {

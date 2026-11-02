@@ -29,3 +29,6 @@ messaging:
     - { topic: pay-payments-outbox, consumer: cl.posting-worker }
     - { topic: pay-refunds-outbox, consumer: cl.posting-worker }
     - { topic: cl-ledger-outbox, consumer: cl.statements-worker }
+scheduler:
+  - system: cl.statement-cron
+    jobs: { daily: [statements], hourly: [statements] }

@@ -265,6 +265,7 @@ export interface components {
         MessagingSnapshot: {
             topics: components["schemas"]["TopicSnapshot"][];
             subscriptions: components["schemas"]["SubscriptionSnapshot"][];
+            schedules?: components["schemas"]["ScheduleSnapshot"][] | null;
         };
         /** @enum {string} */
         NodeKind: "Api" | "Worker" | "Database" | "Cache" | "Function" | "Gateway" | "Broker" | "Egress";
@@ -358,6 +359,11 @@ export interface components {
         ResourceLink: {
             name: string;
             url: string;
+        };
+        ScheduleSnapshot: {
+            system: string;
+            job: string;
+            services: string[];
         };
         ScopeInfo: {
             subscription?: string | null;

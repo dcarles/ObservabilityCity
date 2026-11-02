@@ -11,3 +11,6 @@ messaging:
   topics: [stock]
   subscriptions:
     - { topic: chk-orders-outbox, consumer: inv.stock-worker }
+scheduler:
+  - system: inv.sync-cron
+    jobs: { daily: [stock], hourly: [stock] }

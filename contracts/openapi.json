@@ -847,6 +847,13 @@
             "items": {
               "$ref": "#/components/schemas/SubscriptionSnapshot"
             }
+          },
+          "schedules": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ScheduleSnapshot"
+            },
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -1157,6 +1164,29 @@
           },
           "url": {
             "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ScheduleSnapshot": {
+        "required": [
+          "job",
+          "services",
+          "system"
+        ],
+        "type": "object",
+        "properties": {
+          "system": {
+            "type": "string"
+          },
+          "job": {
+            "type": "string"
+          },
+          "services": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "additionalProperties": false

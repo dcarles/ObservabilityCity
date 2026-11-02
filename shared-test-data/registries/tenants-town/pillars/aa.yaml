@@ -11,3 +11,6 @@ systems:
   - { id: aa.orders-db, service: orders, tenantPattern: "merchant-{tenant}-db", name: Orders DB, role: db }
 messaging:
   topics: [orders]
+scheduler:
+  - system: aa.tools-cron
+    jobs: { daily: [orders], hourly: [orders] }

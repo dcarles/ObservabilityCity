@@ -8,3 +8,9 @@ systems:
   - { id: aa.idle-fn, service: idle, serviceCode: idle, name: Idle jobs, role: function }
   # the old spelling of the role still works
   - { id: aa.ghost-fn, service: ghost, serviceCode: ghost, name: Ghost jobs, role: cron }
+# the same mapping, written with the system's short id and different case
+scheduler:
+  - system: sched-fn
+    jobs:
+      PURGE: [orders]
+      Daily: [reports, orders]

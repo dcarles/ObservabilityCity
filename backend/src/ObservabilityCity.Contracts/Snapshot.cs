@@ -202,10 +202,17 @@ public sealed record TopicSnapshot(string Name, string Service);
 /// </summary>
 public sealed record SubscriptionSnapshot(string Topic, string Publisher, string Consumer, bool Legacy);
 
-/// <summary>The topics an island publishes and the subscriptions its workers hold. Both empty means the island has no messaging, and no pier.</summary>
+/// <summary>A scheduled job the pillar's file maps to services: System is the function's id, Job its name in the logs, Services the services of the island it starts work for.</summary>
+public sealed record ScheduleSnapshot(string System, string Job, IReadOnlyList<string> Services);
+
+/// <summary>
+/// The topics an island publishes and the subscriptions its workers hold. Both empty means the island has no messaging, and no pier.
+/// Schedules maps the island's scheduled jobs to the services they start work for: the boats of a scheduler sail by it.
+/// </summary>
 public sealed record MessagingSnapshot(
     IReadOnlyList<TopicSnapshot> Topics,
-    IReadOnlyList<SubscriptionSnapshot> Subscriptions);
+    IReadOnlyList<SubscriptionSnapshot> Subscriptions,
+    IReadOnlyList<ScheduleSnapshot>? Schedules = null);
 
 /// <summary>
 /// An island (a pillar, a team, ...) or the hub island. IsLostFound marks the island that collects systems no group owns.

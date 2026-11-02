@@ -24,3 +24,6 @@ messaging:
     - { topic: bil-invoices-outbox, consumer: col.cases-worker }
     - { topic: col-cases-outbox, consumer: col.dunning-worker }
     - { topic: col-dunning-outbox, consumer: col.agency-worker }
+scheduler:
+  - system: col.letters-cron
+    jobs: { daily: [dunning], hourly: [dunning] }
