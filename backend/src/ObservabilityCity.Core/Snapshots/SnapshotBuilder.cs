@@ -371,7 +371,7 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
         // Degraded: errors, slow, unhealthy instances, a resource running hot, a data store turning requests away, or a consumer running late.
         var hot = Math.Max(Math.Max(r.Cpu ?? 0, r.Memory ?? 0), utilisation ?? 0) >= n.ResourceAmber;
         var health = !r.Up || jobHealth == HealthState.Down ? HealthState.Down
-            : jobHealth == HealthState.Degraded || r.ErrorRate >= n.ErrorAmber || r.P99Ms > n.SlaP99Ms || r.InstancesHealthy < r.InstancesTotal || hot || (throttled ?? 0) >= n.ThrottleAmber || (r.OldestMessageSeconds ?? 0) >= n.BacklogAmber
+            : jobHealth == HealthState.Degraded || r.ErrorRate >= n.ErrorAmber || r.P99Ms > n.SlaP99Ms || r.InstancesHealthy < r.InstancesTotal || hot || (throttled ?? 0) >= n.ThrottleAmber || (r.OldestMessageSeconds ?? 0) >= n.BacklogAmber || (n.BacklogCountAmber is { } waitingAmber && (r.QueueDepth ?? 0) >= waitingAmber)
                 ? HealthState.Degraded
                 : HealthState.Healthy;
 

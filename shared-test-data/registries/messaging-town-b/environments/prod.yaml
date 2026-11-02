@@ -1,0 +1,58 @@
+# Convention B: a subscription is found by its pillar tag (Beta is named instead), services run as container apps called <service>-<role>, a data account is
+# cosmos-<service>-<tenant> with the customer's name in a tag, and the telemetry name is the system's display name without spaces.
+name: Production
+default: true
+sources:
+  inventory: { kind: resourcegraph, connection: "file:inventory.json" }
+  # a different table, different column names and a window in seconds: the adapter only needs the four result columns back
+  telemetry:
+    kind: loganalytics
+    connection: "file:telemetry.json"
+    window: 300s
+    query: >-
+      Telemetry_CL | where TimeGenerated > ago({windowSeconds}s) and service_s in ({roles})
+      | summarize calls = sum(requests_d), errors = sum(failed_d), latencyMs = avg(latency_ms_d) by role = service_s
+  # container apps report cores and bytes used and the limit they have; a data account reports its normalised use directly as a percentage and counts its 429s by a metric of their own
+  platform:
+    kind: azuremonitor
+    connection: "file:platform.json"
+    window: 300s
+    metrics:
+      - resources: container-apps
+        namespace: microsoft.app/containerapps
+        cpu: { metric: UsageNanoCores, aggregation: average, over: { metric: CpuLimitNanoCores, aggregation: average } }
+        memory: { metric: WorkingSetBytes, aggregation: maximum, over: { metric: MemoryLimitBytes, aggregation: maximum } }
+      - resources: accounts
+        utilisation: { metric: NormalizedRUConsumption, aggregation: maximum, scale: 0.01 }
+        throttled: { metric: Http429, aggregation: count, over: { metric: HttpRequests, aggregation: count } }
+  # the broker, in another shape: the metric is a peak, and entities are named bus.<pillar id>.<service>.<kind>
+  messaging:
+    kind: servicebus
+    connection: "file:servicebus.json"
+    window: 300s
+    entities:
+      resources: broker
+      dimension: EntityName
+      backlog: { metric: ActiveMessages, aggregation: maximum }
+      deadLetter: { metric: DeadletteredMessages, aggregation: total }
+      patterns:
+        - { match: '^bus\.(?<pillar>[a-z]+)\.(?<service>[a-z]+)\.(?:in|feed)$' }
+        - { match: '^bus\.[a-z]+\.(?<pillar>[a-z]+)\.(?<service>[a-z]+)\.out$' }
+scope:
+  variables: { stage: live }
+  # the workspace is written as a name for people, and its id is given outright, so nothing is looked up
+  workspace: "law-{stage}-{environment}"
+  workspaceId: "00000000-0000-0000-0000-00000000c0de"
+  subscription: { tag: { key: pillar, value: "{pillarId}" } }
+  pillars: { bb: 00000000-0000-0000-0000-0000000000b2 }
+  telemetryRole: "{name|nospace}"
+  resources:
+    - { name: broker, types: [microsoft.servicebus/namespaces], roles: [broker], pattern: '^(?<service>sb)-acme-(?<region>[a-z]+)', subscription: { nameLike: "*-{stage}-hub" } }
+    - { name: container-apps, types: [microsoft.app/containerapps], roles: [api, worker], pattern: '^(?<service>[a-z]+)-(?<role>api|worker)$', instances: "toint(properties.template.scale.minReplicas)" }
+    - { name: accounts, types: [microsoft.documentdb/databaseaccounts], roles: [db], pattern: '^cosmos-(?<service>[a-z]+)-(?<tenant>[a-z0-9]+)$', tenantNameTag: customer }
+  # other address shapes: one per resource type, built from names and ids instead of the resource id
+  links:
+    - { name: Console, url: "https://console.example.test/subscriptions/{subscriptionId}/apps/{name}", types: [microsoft.app/containerapps] }
+    - { name: Customer page, url: "https://admin.example.test/customers/{tenantId}?name={tenantName}&env={environment}", types: [microsoft.documentdb/databaseaccounts] }
+signals: { backlog: messaging, deadLetters: messaging, instances: inventory, requests: telemetry, errors: telemetry, latency: telemetry, cpu: platform, memory: platform, utilisation: platform, throttled: platform }
+exclude: [cc.notify-api, cc.notify-worker, cc.notify-db]

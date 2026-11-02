@@ -1,0 +1,106 @@
+{
+  "sb-acme-northeurope1x": [
+    {
+      "entity": "sbq-al-ord-inbox",
+      "metric": "ActiveMessages",
+      "aggregation": "average",
+      "points": [
+        10,
+        20,
+        30
+      ]
+    },
+    {
+      "entity": "sbq-al-ord-inbox",
+      "metric": "DeadletteredMessages",
+      "aggregation": "maximum",
+      "points": [
+        0,
+        2,
+        1
+      ]
+    },
+    {
+      "entity": "sbq-al-ord-changefeed",
+      "metric": "ActiveMessages",
+      "aggregation": "average",
+      "points": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "entity": "sbq-al-led-ord-outbox",
+      "metric": "ActiveMessages",
+      "aggregation": "average",
+      "points": [
+        140,
+        150,
+        160
+      ]
+    },
+    {
+      "entity": "sbq-be-led-inbox",
+      "metric": "ActiveMessages",
+      "aggregation": "average",
+      "points": [
+        3,
+        3,
+        3
+      ]
+    },
+    {
+      "entity": "sbq-be-led-inbox",
+      "metric": "DeadletteredMessages",
+      "aggregation": "maximum",
+      "points": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "entity": "sbq-zz-xyz-inbox",
+      "metric": "ActiveMessages",
+      "aggregation": "average",
+      "points": [
+        9,
+        9,
+        9
+      ]
+    },
+    {
+      "entity": "sbt-egress",
+      "metric": "ActiveMessages",
+      "aggregation": "average",
+      "points": [
+        1,
+        1,
+        1
+      ]
+    }
+  ],
+  "sb-acme-westeurope9z": [
+    {
+      "entity": "sbq-al-ord-inbox",
+      "metric": "ActiveMessages",
+      "aggregation": "average",
+      "points": [
+        5,
+        5,
+        5
+      ]
+    },
+    {
+      "entity": "sbq-al-ord-inbox",
+      "metric": "DeadletteredMessages",
+      "aggregation": "maximum",
+      "points": [
+        0,
+        0,
+        0
+      ]
+    }
+  ]
+}

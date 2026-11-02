@@ -1,0 +1,247 @@
+{
+  "plan-cf-acme-al-ord-northeurope1x": [
+    {
+      "metric": "CpuPercentage",
+      "aggregation": "average",
+      "points": [
+        40,
+        44,
+        42
+      ]
+    },
+    {
+      "metric": "MemoryPercentage",
+      "aggregation": "average",
+      "points": [
+        58,
+        58,
+        58
+      ]
+    }
+  ],
+  "plan-cf-acme-al-ord-westeurope9z": [
+    {
+      "metric": "CpuPercentage",
+      "aggregation": "average",
+      "points": [
+        62,
+        66,
+        64
+      ]
+    },
+    {
+      "metric": "MemoryPercentage",
+      "aggregation": "average",
+      "points": [
+        70,
+        72,
+        71
+      ]
+    }
+  ],
+  "plan-cf-acme-be-led-northeurope1x": [
+    {
+      "metric": "CpuPercentage",
+      "aggregation": "average",
+      "points": [
+        30,
+        30,
+        30
+      ]
+    },
+    {
+      "metric": "MemoryPercentage",
+      "aggregation": "average",
+      "points": [
+        52,
+        52,
+        52
+      ]
+    }
+  ],
+  "plan-cf-acme-be-led-westeurope9z": [
+    {
+      "metric": "CpuPercentage",
+      "aggregation": "average",
+      "points": [
+        40,
+        40,
+        40
+      ]
+    },
+    {
+      "metric": "MemoryPercentage",
+      "aggregation": "average",
+      "points": [
+        49,
+        49,
+        49
+      ]
+    }
+  ],
+  "11111111111111111111111111111111-al-ord": [
+    {
+      "metric": "TotalRequestUnits",
+      "aggregation": "total",
+      "points": [
+        20000,
+        20000,
+        20000
+      ]
+    },
+    {
+      "metric": "ProvisionedThroughput",
+      "aggregation": "maximum",
+      "points": [
+        1000,
+        1000,
+        1000
+      ]
+    },
+    {
+      "metric": "TotalRequests",
+      "aggregation": "count",
+      "points": [
+        1000,
+        1000,
+        1000
+      ]
+    }
+  ],
+  "22222222222222222222222222222222-al-ord": [
+    {
+      "metric": "TotalRequestUnits",
+      "aggregation": "total",
+      "points": [
+        95000,
+        95000,
+        95000
+      ]
+    },
+    {
+      "metric": "ProvisionedThroughput",
+      "aggregation": "maximum",
+      "points": [
+        1000,
+        1000,
+        1000
+      ]
+    },
+    {
+      "metric": "TotalRequests",
+      "aggregation": "count",
+      "points": [
+        500,
+        500,
+        500
+      ]
+    },
+    {
+      "metric": "TotalRequests",
+      "aggregation": "count",
+      "points": [
+        50,
+        50,
+        50
+      ],
+      "filter": "StatusCode eq '429'"
+    }
+  ],
+  "33333333333333333333333333333333-al-ord": [
+    {
+      "metric": "TotalRequestUnits",
+      "aggregation": "total",
+      "points": [
+        40000,
+        40000,
+        40000
+      ]
+    },
+    {
+      "metric": "ProvisionedThroughput",
+      "aggregation": "maximum",
+      "points": [
+        1000,
+        1000,
+        1000
+      ]
+    },
+    {
+      "metric": "TotalRequests",
+      "aggregation": "count",
+      "points": [
+        600,
+        600,
+        600
+      ]
+    },
+    {
+      "metric": "TotalRequests",
+      "aggregation": "count",
+      "points": [
+        0,
+        0,
+        0
+      ],
+      "filter": "StatusCode eq '429'"
+    }
+  ],
+  "11111111111111111111111111111111-be-led": [
+    {
+      "metric": "TotalRequestUnits",
+      "aggregation": "total",
+      "points": [
+        50000,
+        50000,
+        50000
+      ]
+    },
+    {
+      "metric": "ProvisionedThroughput",
+      "aggregation": "maximum",
+      "points": [
+        1000,
+        1000,
+        1000
+      ]
+    },
+    {
+      "metric": "TotalRequests",
+      "aggregation": "count",
+      "points": [
+        300,
+        300,
+        300
+      ]
+    }
+  ],
+  "22222222222222222222222222222222-be-led": [
+    {
+      "metric": "TotalRequestUnits",
+      "aggregation": "total",
+      "points": [
+        30000,
+        30000,
+        30000
+      ]
+    },
+    {
+      "metric": "ProvisionedThroughput",
+      "aggregation": "maximum",
+      "points": [
+        1000,
+        1000,
+        1000
+      ]
+    },
+    {
+      "metric": "TotalRequests",
+      "aggregation": "count",
+      "points": [
+        300,
+        300,
+        300
+      ]
+    }
+  ]
+}

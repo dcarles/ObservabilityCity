@@ -1,0 +1,65 @@
+# Convention A: everything is in the names. A subscription is named <org>-<region>-<env>-<pillar code>; resources are named <kind>-<org>-<pillar code>-<service code>-<region><hash>;
+# a data account is <tenant id>-<pillar code>-<service code>. The telemetry names are written out on each system.
+name: Production
+default: true
+sources:
+  inventory: { kind: resourcegraph, connection: "file:inventory.json" }
+  # the recording stands in for the workspace so the town runs without Azure; with a workspace id as the connection the same query is sent for real
+  telemetry:
+    kind: loganalytics
+    connection: "file:telemetry.json"
+    window: 5m
+    query: |
+      AppMetrics
+      | where TimeGenerated > ago({window}) and AppRoleName in ({roles})
+      | where Name in ("request.calls", "request.duration")
+      | extend status = toint(Properties["status.code"])
+      | summarize calls = sumif(Sum, Name == "request.calls"), errors = sumif(Sum, Name == "request.calls" and status >= 500),
+                  total = sumif(Sum, Name == "request.duration"), n = sumif(ItemCount, Name == "request.duration") by role = AppRoleName
+      | project role, calls, errors, latencyMs = iff(n > 0, total / n, 0.0)
+  # platform metrics: CPU and memory of the plans, and request units and throttling of the data accounts, from the metrics API (a recording stands in for it)
+  platform:
+    kind: azuremonitor
+    connection: "file:platform.json"
+    window: 5m
+    metrics:
+      - resources: plans
+        cpu: { metric: CpuPercentage, aggregation: average, scale: 0.01 }
+        memory: { metric: MemoryPercentage, aggregation: average, scale: 0.01 }
+      - resources: accounts
+        # request units used per second as a share of the provisioned throughput
+        utilisation: { metric: TotalRequestUnits, aggregation: total, perSecond: true, over: { metric: ProvisionedThroughput, aggregation: maximum } }
+        # requests answered with 429 as a share of all requests
+        throttled: { metric: TotalRequests, aggregation: count, filter: "StatusCode eq '429'", over: { metric: TotalRequests, aggregation: count } }
+        requests: { metric: TotalRequests, aggregation: count, perSecond: true }
+        # what is provisioned, as a number, to show beside each tenant's database
+        limit: { metric: ProvisionedThroughput, aggregation: maximum }
+  # the broker: backlog and dead letters of every queue, from the metrics API split by entity name (a recording stands in for it)
+  messaging:
+    kind: servicebus
+    connection: "file:servicebus.json"
+    window: 5m
+    entities:
+      resources: broker
+      backlog: { metric: ActiveMessages, aggregation: average }
+      deadLetter: { metric: DeadletteredMessages, aggregation: maximum }
+      patterns:
+        # sbq-<pillar code>-<service code>-<role>: read by that service's worker
+        - { match: '^sbq-(?<pillar>[a-z]+)-(?<service>[a-z]+)-(?:inbox|changefeed)$' }
+        # sbq-<pillar code>-<from>-<to>-outbox: read by the service it is addressed to
+        - { match: '^sbq-(?<pillar>[a-z]+)-[a-z]+-(?<service>[a-z]+)-outbox$' }
+scope:
+  inventory: inventory
+  variables: { env: prd, directory: example.test }
+  workspace: "ws-{env}-main"
+  subscription: { nameLike: "*-{env}-{pillar}" }
+  resources:
+    - { name: broker, types: [microsoft.servicebus/namespaces], roles: [broker], pattern: '^(?<service>sb)-acme-(?<region>[a-z]+)', subscription: { nameLike: "*-{env}-hub" } }
+    - { name: plans, types: [microsoft.web/serverfarms], roles: [api, worker], pattern: '^plan-cf-[^-]+-(?<pillar>[^-]+)-(?<service>[^-]+)-[a-z]+', instances: "coalesce(toint(properties.numberOfWorkers), toint(sku.capacity))" }
+    - { name: apps, types: [microsoft.web/sites], roles: [api, worker], pattern: '^(?<role>api|worker)-[^-]+-(?<pillar>[^-]+)-(?<service>[^-]+)-(?<region>[a-z]+)' }
+    - { name: accounts, types: [microsoft.documentdb/databaseaccounts], roles: [db], pattern: '^(?<tenant>[0-9a-f]{32})-(?<pillar>[^-]+)-(?<service>[^-]+)$', tenantNameTag: tenant }
+  # one address per resource, a portal page pinned to a directory
+  links:
+    - { name: Cloud portal, url: "https://portal.example.test/#@{directory}/resource{resourceId}" }
+signals: { backlog: messaging, deadLetters: messaging, instances: inventory, requests: telemetry, errors: telemetry, latency: telemetry, cpu: platform, memory: platform, utilisation: platform, throttled: platform }
+exclude: [cc.notify-api, cc.notify-worker, cc.notify-db]

@@ -1,0 +1,106 @@
+{
+  "sb-acme-northeurope1x": [
+    {
+      "entity": "bus.aa.orders.in",
+      "metric": "ActiveMessages",
+      "aggregation": "maximum",
+      "points": [
+        10,
+        25,
+        20
+      ]
+    },
+    {
+      "entity": "bus.aa.orders.in",
+      "metric": "DeadletteredMessages",
+      "aggregation": "total",
+      "points": [
+        1,
+        1,
+        0
+      ]
+    },
+    {
+      "entity": "bus.aa.orders.feed",
+      "metric": "ActiveMessages",
+      "aggregation": "maximum",
+      "points": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "entity": "bus.bb.aa.orders.out",
+      "metric": "ActiveMessages",
+      "aggregation": "maximum",
+      "points": [
+        100,
+        150,
+        120
+      ]
+    },
+    {
+      "entity": "bus.bb.ledger.in",
+      "metric": "ActiveMessages",
+      "aggregation": "maximum",
+      "points": [
+        1,
+        3,
+        2
+      ]
+    },
+    {
+      "entity": "bus.bb.ledger.in",
+      "metric": "DeadletteredMessages",
+      "aggregation": "total",
+      "points": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "entity": "bus.zz.xyz.in",
+      "metric": "ActiveMessages",
+      "aggregation": "maximum",
+      "points": [
+        9,
+        9,
+        9
+      ]
+    },
+    {
+      "entity": "egress-topic",
+      "metric": "ActiveMessages",
+      "aggregation": "maximum",
+      "points": [
+        1,
+        1,
+        1
+      ]
+    }
+  ],
+  "sb-acme-westeurope9z": [
+    {
+      "entity": "bus.aa.orders.in",
+      "metric": "ActiveMessages",
+      "aggregation": "maximum",
+      "points": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "entity": "bus.aa.orders.in",
+      "metric": "DeadletteredMessages",
+      "aggregation": "total",
+      "points": [
+        0,
+        0,
+        0
+      ]
+    }
+  ]
+}

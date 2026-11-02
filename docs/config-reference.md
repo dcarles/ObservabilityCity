@@ -50,6 +50,7 @@ A map from a role name (`api`, `worker`, `db`, `cache`, `cron`, `gateway`, `brok
 | `resources` | no | none | `amber` and `red` for CPU, memory or a data store's utilisation (0 to 1). |
 | `throttle` | no | none | `amber` and `red` for the share of throttled requests (0 to 1). |
 | `backlog` | no | none | `amber` and `red` for the age of the oldest waiting message, in seconds. |
+| `backlogCount` | no | none | `amber` and `red` for the number of messages waiting for a consumer, for a broker that reports counts and not ages (`servicebus`). Without it the count is shown but not judged. |
 | `minCalls` | no | none | The fewest calls in a window that make the error share and latency worth judging. With fewer the system is quiet, not red. |
 | `discoverLinks` | no | `true` | Whether link discovery looks for the calls systems of this role make. Only an `api` or a `worker` makes calls worth finding; it does nothing in an environment without a `links` block. |
 
@@ -95,6 +96,7 @@ One island. The file name is the pillar id.
 | `resources` | no | role default | Resource thresholds. |
 | `throttle` | no | role default | Throttling thresholds. |
 | `backlog` | no | role default | Backlog thresholds. |
+| `backlogCount` | no | role default | Thresholds for the number of messages waiting for this system. |
 | `minCalls` | no | role default | See above. |
 | `discoverLinks` | no | pillar or role default | See above. Set `false` on a system whose calls should only be the declared ones. |
 | `signals` | no | none | Signal → source name (or `none`) for this system alone. |
@@ -226,6 +228,7 @@ One file per environment. The pillar and system files are shared; this file says
 | `query` | no | none | `loganalytics`: the query to send, a template; `functionjobs`: the query that summarises the function apps' logs into one row per app and job (columns `resourceId`, `job`, `lastRun`, `succeeded`, `next`, `region`). `{window}`, `{windowSeconds}`, `{roles}`, scope variables and `{environment}` work. |
 | `window` | no | `5m` | `loganalytics` and `azuremonitor`: how far back one answer looks. |
 | `metrics` | no | none | `azuremonitor`: which metric of which resources fills which signal. |
+| `entities` | no | none | `servicebus`: which namespaces to read, which metrics are the backlog and the dead letters, and how an entity's name says whose it is. Required for a `servicebus` source. |
 
 ### metrics entries (`azuremonitor`)
 <!-- file: MetricGroupFile -->
@@ -271,6 +274,49 @@ sources:
           aggregation: maximum
           orElse: { metric: ProvisionedThroughput, aggregation: maximum }
 ```
+
+### entities (`servicebus`)
+Reads the backlog and the dead letters of a message broker from the platform metrics of its namespaces, split by entity (queue or topic) name, and gives each entity's numbers to the system that consumes it. The program knows no metric name and no naming convention: this block says them. A system's backlog is what waits in all its entities, in every namespace the rule finds (one for each region); a namespace that cannot be read fails the poll, so a number made from only some of them never shows. An entity no pattern claims, or that no system consumes, is left out.
+
+```yaml
+sources:
+  messaging:
+    kind: servicebus
+    pollSeconds: 60
+    window: 15m
+    entities:
+      resources: broker                       # a rule of scope.resources that finds the namespaces
+      backlog: { metric: ActiveMessages, aggregation: average }
+      deadLetter: { metric: DeadletteredMessages, aggregation: maximum }
+      patterns:                               # the first that matches decides; (?<pillar>) and (?<service>) are the pillar and service codes
+        - { match: '^sbq-(?<pillar>[a-z]+)-(?<service>[a-z]+)-(?:inbox|changefeed)$' }
+        - { match: '^sbq-(?<pillar>[a-z]+)-[a-z]+-(?<service>[a-z]+)-outbox$' }
+signals: { backlog: messaging, deadLetters: messaging }
+```
+
+<!-- file: EntitiesFile -->
+| Key | Required | Default | Meaning |
+|---|---|---|---|
+| `resources` | yes | | The name of a rule of `scope.resources`; the resources it finds (the broker's namespaces) are the ones asked. |
+| `dimension` | no | `EntityName` | The metric dimension that carries the entity's name. |
+| `interval` | no | one minute | The time grain the metrics are asked at, for example `5m`. |
+| `backlog` | no | none | The metric of the messages waiting in an entity. |
+| `deadLetter` | no | none | The metric of the dead-lettered messages of an entity. |
+| `patterns` | yes | | The shapes of entity names, tried in order. |
+
+<!-- file: EntityMetricFile -->
+| Key | Required | Default | Meaning |
+|---|---|---|---|
+| `metric` | yes | | The metric's name. |
+| `aggregation` | no | `average` | How its points over the window are added up: `average`, `total`, `count`, `maximum` or `minimum`. |
+
+<!-- file: EntityPatternFile -->
+| Key | Required | Default | Meaning |
+|---|---|---|---|
+| `match` | yes | | A regular expression with the named groups `pillar` and `service`: the pillar's code (or id) and the service's code, which pick the system that reads the entity. |
+| `consumer` | no | `worker` | The role of the system that reads the entity (`worker`, `api`, ...). |
+
+The thresholds that turn a waiting count amber and red are `backlogCount` in the defaults.
 
 ### links
 Finds the calls the systems really make, from the dependency data in the telemetry, and adds them to the declared `calls` and `gatewayCalls`. Without this block an environment has only the declared links.

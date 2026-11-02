@@ -1,0 +1,141 @@
+{
+  "subscriptions": [
+    {
+      "id": "00000000-0000-0000-0000-0000000000b1",
+      "name": "Alpha Production",
+      "tags": {
+        "pillar": "aa"
+      }
+    },
+    {
+      "id": "00000000-0000-0000-0000-0000000000b2",
+      "name": "Beta Production",
+      "tags": {
+        "pillar": "bb"
+      }
+    },
+    {
+      "id": "00000000-0000-0000-0000-0000000000b3",
+      "name": "Alpha Staging",
+      "tags": {
+        "pillar": "aa-stg"
+      }
+    },
+    {
+      "id": "00000000-0000-0000-0000-0000000000a9",
+      "name": "acme-eu-live-hub",
+      "tags": {}
+    }
+  ],
+  "resources": [
+    {
+      "id": "/subscriptions/00000000-0000-0000-0000-0000000000b1/resourceGroups/rg/providers/microsoft.app/containerapps/orders-api",
+      "name": "orders-api",
+      "type": "microsoft.app/containerapps",
+      "subscriptionId": "00000000-0000-0000-0000-0000000000b1",
+      "location": "westeurope",
+      "tags": {},
+      "instances": 3
+    },
+    {
+      "id": "/subscriptions/00000000-0000-0000-0000-0000000000b1/resourceGroups/rg/providers/microsoft.app/containerapps/orders-worker",
+      "name": "orders-worker",
+      "type": "microsoft.app/containerapps",
+      "subscriptionId": "00000000-0000-0000-0000-0000000000b1",
+      "location": "westeurope",
+      "tags": {},
+      "instances": 3
+    },
+    {
+      "id": "/subscriptions/00000000-0000-0000-0000-0000000000b1/resourceGroups/rg/providers/microsoft.documentdb/databaseaccounts/cosmos-orders-acmebank",
+      "name": "cosmos-orders-acmebank",
+      "type": "microsoft.documentdb/databaseaccounts",
+      "subscriptionId": "00000000-0000-0000-0000-0000000000b1",
+      "location": "westeurope",
+      "tags": {
+        "customer": "Acme Bank"
+      }
+    },
+    {
+      "id": "/subscriptions/00000000-0000-0000-0000-0000000000b1/resourceGroups/rg/providers/microsoft.documentdb/databaseaccounts/cosmos-orders-borealis",
+      "name": "cosmos-orders-borealis",
+      "type": "microsoft.documentdb/databaseaccounts",
+      "subscriptionId": "00000000-0000-0000-0000-0000000000b1",
+      "location": "westeurope",
+      "tags": {
+        "customer": "Borealis Credit Union"
+      }
+    },
+    {
+      "id": "/subscriptions/00000000-0000-0000-0000-0000000000b1/resourceGroups/rg/providers/microsoft.documentdb/databaseaccounts/cosmos-orders-cygnus",
+      "name": "cosmos-orders-cygnus",
+      "type": "microsoft.documentdb/databaseaccounts",
+      "subscriptionId": "00000000-0000-0000-0000-0000000000b1",
+      "location": "westeurope",
+      "tags": {
+        "customer": "Cygnus Finance"
+      }
+    },
+    {
+      "id": "/subscriptions/00000000-0000-0000-0000-0000000000b2/resourceGroups/rg/providers/microsoft.app/containerapps/ledger-api",
+      "name": "ledger-api",
+      "type": "microsoft.app/containerapps",
+      "subscriptionId": "00000000-0000-0000-0000-0000000000b2",
+      "location": "westeurope",
+      "tags": {},
+      "instances": 5
+    },
+    {
+      "id": "/subscriptions/00000000-0000-0000-0000-0000000000b2/resourceGroups/rg/providers/microsoft.app/containerapps/ledger-worker",
+      "name": "ledger-worker",
+      "type": "microsoft.app/containerapps",
+      "subscriptionId": "00000000-0000-0000-0000-0000000000b2",
+      "location": "westeurope",
+      "tags": {},
+      "instances": 5
+    },
+    {
+      "id": "/subscriptions/00000000-0000-0000-0000-0000000000b2/resourceGroups/rg/providers/microsoft.documentdb/databaseaccounts/cosmos-ledger-acmebank",
+      "name": "cosmos-ledger-acmebank",
+      "type": "microsoft.documentdb/databaseaccounts",
+      "subscriptionId": "00000000-0000-0000-0000-0000000000b2",
+      "location": "westeurope",
+      "tags": {
+        "customer": "Acme Bank"
+      }
+    },
+    {
+      "id": "/subscriptions/00000000-0000-0000-0000-0000000000b2/resourceGroups/rg/providers/microsoft.documentdb/databaseaccounts/cosmos-ledger-borealis",
+      "name": "cosmos-ledger-borealis",
+      "type": "microsoft.documentdb/databaseaccounts",
+      "subscriptionId": "00000000-0000-0000-0000-0000000000b2",
+      "location": "westeurope",
+      "tags": {
+        "customer": "Borealis Credit Union"
+      }
+    },
+    {
+      "id": "/subscriptions/00000000-0000-0000-0000-0000000000b3/resourceGroups/rg/providers/microsoft.app/containerapps/orders-api",
+      "name": "orders-api",
+      "type": "microsoft.app/containerapps",
+      "subscriptionId": "00000000-0000-0000-0000-0000000000b3",
+      "location": "westeurope",
+      "tags": {},
+      "instances": 9
+    },
+    {
+      "id": "/subscriptions/00000000-0000-0000-0000-0000000000a9/resourceGroups/rg/providers/microsoft.servicebus/namespaces/sb-acme-northeurope1x",
+      "name": "sb-acme-northeurope1x",
+      "type": "microsoft.servicebus/namespaces",
+      "subscriptionId": "00000000-0000-0000-0000-0000000000a9",
+      "tags": {}
+    },
+    {
+      "id": "/subscriptions/00000000-0000-0000-0000-0000000000a9/resourceGroups/rg/providers/microsoft.servicebus/namespaces/sb-acme-westeurope9z",
+      "name": "sb-acme-westeurope9z",
+      "type": "microsoft.servicebus/namespaces",
+      "subscriptionId": "00000000-0000-0000-0000-0000000000a9",
+      "tags": {}
+    }
+  ]
+}
