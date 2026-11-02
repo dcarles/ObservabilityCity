@@ -299,6 +299,7 @@ sources:
       resources: broker                       # a rule of scope.resources that finds the namespaces
       backlog: { metric: ActiveMessages, aggregation: average }
       deadLetter: { metric: DeadletteredMessages, aggregation: maximum }
+      throughput: { metric: IncomingMessages, aggregation: total }
       patterns:                               # the first that matches decides; (?<pillar>) and (?<service>) are the pillar and service codes
         - { match: '^sbq-(?<pillar>[a-z]+)-(?<service>[a-z]+)-(?:inbox|changefeed)$' }
         - { match: '^sbq-(?<pillar>[a-z]+)-[a-z]+-(?<service>[a-z]+)-outbox$' }
@@ -313,6 +314,7 @@ signals: { backlog: messaging, deadLetters: messaging }
 | `interval` | no | one minute | The time grain the metrics are asked at, for example `5m`. |
 | `backlog` | no | none | The metric of the messages waiting in an entity. |
 | `deadLetter` | no | none | The metric of the dead-lettered messages of an entity. |
+| `throughput` | no | none | The metric of the messages that arrive in an entity, usually incoming messages added up by `total`. Their rate (per second over the window) sets how many boats sail to the consumer; without it the boats follow the consumer's request rate. |
 | `deadLetterLink` | no | none | `{ name, url }`: an address that opens one queue's dead letters in your support tool, shown for each queue in its consumer's drawer. The url is a template over `{queue}`, `{pillar}`, `{service}` (the codes of the scope rules), `{system}` and `{environment}`. Without it, no link. |
 | `patterns` | yes | | The shapes of entity names, tried in order. |
 

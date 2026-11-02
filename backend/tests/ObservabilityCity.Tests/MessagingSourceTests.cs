@@ -124,9 +124,26 @@ public class MessagingSourceTests
         var url = Uri.UnescapeDataString(http.Sent[0].Uri!.Query);
         Assert.Contains("$filter=EntityName eq '*'", url);
         Assert.Contains("metricnames=ActiveMessages", url);
-        Assert.Equal(4, http.Sent.Count(r => r.Uri!.AbsolutePath.Contains("/namespaces/sb-acme-"))); // the backlog and the dead letters add up differently, so each namespace is asked twice
+        Assert.Equal(6, http.Sent.Count(r => r.Uri!.AbsolutePath.Contains("/namespaces/sb-acme-"))); // the backlog, the dead letters and the arrivals add up differently, so each namespace is asked three times
         Assert.Equal(30, readings["aa.orders-worker"].QueueDepth); // 15 in each of the two namespaces the same answer was given for
         Assert.Equal(8, readings["bb.ledger-worker"].QueueDepth); // a point with no value is a gap, not a zero
+    }
+
+    [Fact]
+    public async Task The_arrivals_of_a_queue_become_messages_a_second_over_the_window()
+    {
+        var http = new CannedHttp().Respond(r => Uri.UnescapeDataString(r.Uri!.Query).Contains("metricnames=IncomingMessages") ? CannedHttp.Reply("""
+            { "value": [ { "name": { "value": "IncomingMessages" }, "timeseries": [
+                { "metadatavalues": [ { "name": { "value": "entityname" }, "value": "sbq-al-ord-inbox" } ], "data": [ { "total": 300 }, { "total": 300 }, { "total": 300 } ] } ] } ] }
+            """) : CannedHttp.Reply("""{ "value": [] }"""));
+        var (source, registry) = await Messaging(TownA, http);
+
+        var readings = await source.PollAsync(registry, CancellationToken.None);
+
+        var queue = Assert.Single(readings["aa.orders-worker"].Queues!);
+        Assert.Equal("sbq-al-ord-inbox", queue.Name);
+        Assert.Equal(6.0, queue.PerSecond!.Value, 3); // 900 in each of two namespaces over the 5 minute window of the town, 3 a second in each
+        Assert.Null(queue.Backlog); // what is not asked for stays unknown
     }
 
     [Fact]

@@ -66,7 +66,8 @@ public static partial class RegistryLoader
             ToEntityMetric(f.Backlog), ToEntityMetric(f.DeadLetter),
             f.Patterns.Select(p => new EntityPattern(p.Match, string.IsNullOrWhiteSpace(p.Consumer) ? "worker" : p.Consumer.Trim().ToLowerInvariant())).ToList(),
             string.IsNullOrWhiteSpace(f.Interval) ? null : SourceQuery.TryParseWindow(f.Interval, out var interval) ? interval : null,
-            f.DeadLetterLink is { } l ? new EntityLink(l.Name.Trim(), l.Url.Trim()) : null);
+            f.DeadLetterLink is { } l ? new EntityLink(l.Name.Trim(), l.Url.Trim()) : null,
+            ToEntityMetric(f.Throughput));
 
     private static EntityMetric? ToEntityMetric(EntityMetricFile? f) => f is null ? null : new EntityMetric(f.Metric.Trim(), f.Aggregation.Trim().ToLowerInvariant());
 
@@ -78,8 +79,8 @@ public static partial class RegistryLoader
         var rules = f.Scope?.Resources.Select(r => r.Name).ToList() ?? [];
         if (!rules.Contains(e.Resources))
             errors.Add($"{at}: resources '{e.Resources}' is not a rule of scope.resources.{(rules.Count == 0 ? " This file has no scope.resources." : $" Use {string.Join(", ", rules)}.")}{DidYouMean.Hint(e.Resources, rules)}");
-        if (e.Backlog is null && e.DeadLetter is null) errors.Add($"{at}: it asks for no metric. Give backlog, deadLetter or both");
-        foreach (var (label, metric) in new[] { ("backlog", e.Backlog), ("deadLetter", e.DeadLetter) })
+        if (e.Backlog is null && e.DeadLetter is null && e.Throughput is null) errors.Add($"{at}: it asks for no metric. Give backlog, deadLetter, throughput or any of them");
+        foreach (var (label, metric) in new[] { ("backlog", e.Backlog), ("deadLetter", e.DeadLetter), ("throughput", e.Throughput) })
         {
             if (metric is null) continue;
             if (string.IsNullOrWhiteSpace(metric.Metric)) errors.Add($"{at}.{label}: metric is empty; give the metric's name");
