@@ -61,6 +61,46 @@ public static partial class RegistryLoader
             string.IsNullOrWhiteSpace(g.Interval) ? null : SourceQuery.TryParseWindow(g.Interval, out var interval) ? interval : null,
             string.IsNullOrWhiteSpace(g.Window) ? null : SourceQuery.TryParseWindow(g.Window, out var window) ? window : null)).ToList();
 
+    private static EntitiesConfig? ToEntities(EntitiesFile? f) =>
+        f is null ? null : new EntitiesConfig(f.Resources, string.IsNullOrWhiteSpace(f.Dimension) ? EntitiesConfig.DefaultDimension : f.Dimension.Trim(),
+            ToEntityMetric(f.Backlog), ToEntityMetric(f.DeadLetter),
+            f.Patterns.Select(p => new EntityPattern(p.Match, string.IsNullOrWhiteSpace(p.Consumer) ? "worker" : p.Consumer.Trim().ToLowerInvariant())).ToList(),
+            string.IsNullOrWhiteSpace(f.Interval) ? null : SourceQuery.TryParseWindow(f.Interval, out var interval) ? interval : null);
+
+    private static EntityMetric? ToEntityMetric(EntityMetricFile? f) => f is null ? null : new EntityMetric(f.Metric.Trim(), f.Aggregation.Trim().ToLowerInvariant());
+
+    /// <summary>A broker source's entities: the rule must exist, the metrics must be named, and each pattern must be a regular expression with the groups pillar and service.</summary>
+    private static void CheckEntities(EnvironmentFile f, SourceFile def, string source, string name, List<string> errors)
+    {
+        var at = $"{name}: source '{source}' entities";
+        if (def.Entities is not { } e) return; // a servicebus source without the block is refused when it starts, as an azuremonitor source without metrics is
+        var rules = f.Scope?.Resources.Select(r => r.Name).ToList() ?? [];
+        if (!rules.Contains(e.Resources))
+            errors.Add($"{at}: resources '{e.Resources}' is not a rule of scope.resources.{(rules.Count == 0 ? " This file has no scope.resources." : $" Use {string.Join(", ", rules)}.")}{DidYouMean.Hint(e.Resources, rules)}");
+        if (e.Backlog is null && e.DeadLetter is null) errors.Add($"{at}: it asks for no metric. Give backlog, deadLetter or both");
+        foreach (var (label, metric) in new[] { ("backlog", e.Backlog), ("deadLetter", e.DeadLetter) })
+        {
+            if (metric is null) continue;
+            if (string.IsNullOrWhiteSpace(metric.Metric)) errors.Add($"{at}.{label}: metric is empty; give the metric's name");
+            if (!MetricGroup.Aggregations.Contains(metric.Aggregation.Trim().ToLowerInvariant()))
+                errors.Add($"{at}.{label}: aggregation '{metric.Aggregation}'. Use {string.Join(", ", MetricGroup.Aggregations)}.{DidYouMean.Hint(metric.Aggregation, MetricGroup.Aggregations)}");
+        }
+        if (e.Interval is { } grain && (!SourceQuery.TryParseWindow(grain, out var parsed) || !MetricGroup.IntervalMinutes.Contains((int)Math.Round(parsed.TotalMinutes))))
+            errors.Add($"{at}: interval '{grain}' is not a time grain the metrics API offers. Use one of {string.Join(", ", MetricGroup.IntervalMinutes.Select(m => m % 1440 == 0 ? $"{m / 1440}d" : m % 60 == 0 ? $"{m / 60}h" : $"{m}m"))}");
+        if (e.Patterns.Count == 0) errors.Add($"{at}: patterns is empty. Give at least one pattern: a regular expression with the named groups pillar and service");
+        for (var i = 0; i < e.Patterns.Count; i++)
+        {
+            try
+            {
+                var regex = new Regex(e.Patterns[i].Match, RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
+                var names = regex.GetGroupNames();
+                foreach (var need in new[] { "pillar", "service" })
+                    if (!names.Contains(need)) errors.Add($"{at}.patterns[{i}]: the match has no group named '{need}'. Write it as (?<{need}>...)");
+            }
+            catch (ArgumentException ex) { errors.Add($"{at}.patterns[{i}]: the match is not a valid regular expression: {ex.Message}"); }
+        }
+    }
+
     private static void CheckMetrics(EnvironmentFile f, SourceFile def, string source, string name, List<string> errors)
     {
         if (def.Metrics.Count == 0) return;
