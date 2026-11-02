@@ -223,6 +223,7 @@ One file per environment. The pillar and system files are shared; this file says
 | `credential` | no | Azure CLI login | A name from `credentials`. Azure sources only. |
 | `pollSeconds` | no | 30 | How often the source is asked. Above 0. |
 | `timeoutSeconds` | no | 10 | How long one ask may take. Above 0. |
+| `lateAfterSeconds` | no | twice `pollSeconds` | `functionjobs`: how long after its schedule says a job should run it may go without a newer run before it counts as late (amber). A value below the default is ignored, since a reading may lag that much anyway. Lets a log that arrives late stay quiet without polling slower. Above 0. |
 | `query` | no | none | `loganalytics`: the query to send, a template; `functionjobs`: the query that summarises the function apps' logs into one row per app and job (columns `resourceId`, `job`, `lastRun`, `succeeded`, `next`, `region`). `{window}`, `{windowSeconds}`, `{roles}`, scope variables and `{environment}` work. |
 | `window` | no | `5m` | `loganalytics` and `azuremonitor`: how far back one answer looks. |
 | `metrics` | no | none | `azuremonitor`: which metric of which resources fills which signal. |
