@@ -300,9 +300,10 @@ sources:
       backlog: { metric: ActiveMessages, aggregation: average }
       deadLetter: { metric: DeadletteredMessages, aggregation: maximum }
       throughput: { metric: IncomingMessages, aggregation: total }
-      patterns:                               # the first that matches decides; (?<pillar>) and (?<service>) are the pillar and service codes
-        - { match: '^sbq-(?<pillar>[a-z]+)-(?<service>[a-z]+)-(?:inbox|changefeed)$' }
-        - { match: '^sbq-(?<pillar>[a-z]+)-[a-z]+-(?<service>[a-z]+)-outbox$' }
+      patterns:                               # the first that matches decides; (?<service>) is the service code of the reader, (?<pillar>) the pillar code of the reader (left out: any pillar)
+        - { match: '^sbq-(?<pillar>[a-z]+)-(?<service>[a-z]+)-(?:inbox|changefeed-worker)$' }
+        # the name also says who publishes it, so the town builds the topic and the subscription itself: no `messaging:` block in a pillar file
+        - { match: '^sbq-(?<producerPillar>[a-z]+)-(?<producer>[a-z]+)-(?<service>[a-z]+)-outbox$' }
 signals: { backlog: messaging, deadLetters: messaging }
 ```
 
@@ -316,7 +317,7 @@ signals: { backlog: messaging, deadLetters: messaging }
 | `deadLetter` | no | none | The metric of the dead-lettered messages of an entity. |
 | `throughput` | no | none | The metric of the messages that arrive in an entity, usually incoming messages added up by `total`. Their rate (per second over the window) sets how many boats sail to the consumer; without it the boats follow the consumer's request rate. |
 | `deadLetterLink` | no | none | `{ name, url }`: an address that opens one queue's dead letters in your support tool, shown for each queue in its consumer's drawer. The url is a template over `{queue}`, `{pillar}`, `{service}` (the codes of the scope rules), `{system}` and `{environment}`. Without it, no link. |
-| `patterns` | yes | | The shapes of entity names, tried in order. |
+| `patterns` | yes | | The shapes of entity names, tried in order: a regular expression with the group `service` (the code of the system that reads the entity; it must belong to one system of the kind only, or the entity is left out), optionally `pillar` (the code or id of the reader's pillar; without it the reader may be in any pillar), and optionally both `producerPillar` and `producer` (the code of the pillar and of the service that publish it). An entity whose name says its publisher is a route: the town adds that service's topic and the reader's subscription to what the pillar files say, on every poll, so queues teams add later appear without a config change. A queue Azure sends nothing for in one poll keeps its place with no numbers. |
 
 <!-- file: EntityLinkFile -->
 | Key | Required | Default | Meaning |

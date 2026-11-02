@@ -75,7 +75,7 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
     public Snapshot Build(IReadOnlyCollection<string>? islands = null)
     {
         var now = clock.GetUtcNow();
-        var registry = registries.Current;
+        var registry = WithRoutes(registries.Current);
         var incidents = OpenIncidents(registry);
         NoteIncidents(incidents.Where(kv => kv.Value.Count > 0).Select(kv => kv.Key), now);
         var links = TownLinks.Of(registry);
@@ -257,6 +257,28 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
                     yield return $"Job not mapped: {n.Id} runs {string.Join(", ", missing)}, which the scheduler: list of {g.Id}.yaml does not say a service for, so it sends no boats.";
             }
         }
+    }
+
+    /// <summary>
+    /// The registry with the routes the broker's queue names add: a queue whose name says who publishes it (see the <c>producerPillar</c> and <c>producer</c> groups of an entity pattern)
+    /// is a topic of that publisher and a subscription of the worker that reads it. What the pillar files already say is kept; a route they already hold is not added twice.
+    /// </summary>
+    private Registry.Registry WithRoutes(Registry.Registry registry)
+    {
+        var topics = registry.Topics.ToList();
+        var subscriptions = registry.Subscriptions.ToList();
+        var added = false;
+        foreach (var n in registry.Groups.Where(g => !g.IsHub).SelectMany(g => g.Nodes))
+        {
+            if (registry.SourceFor(n, Signals.Backlog) is not { } source || !state.GetAll(n.Id).TryGetValue(source, out var reading)) continue;
+            foreach (var q in reading.Queues ?? [])
+            {
+                if (q.ProducerGroup is null || q.ProducerService is null) continue;
+                if (!topics.Any(t => t.Name == q.Name)) { topics.Add(new RegistryTopic(q.Name, q.ProducerGroup, q.ProducerService)); added = true; }
+                if (!subscriptions.Any(s => s.Topic == q.Name && s.ConsumerId == n.Id)) { subscriptions.Add(new RegistrySubscription(q.Name, q.ProducerGroup, n.Id, n.GroupId, false)); added = true; }
+            }
+        }
+        return added ? registry with { Topics = topics, Subscriptions = subscriptions } : registry;
     }
 
     private static MessagingSnapshot MessagingOf(Registry.Registry registry, RegistryGroup g) => new(
