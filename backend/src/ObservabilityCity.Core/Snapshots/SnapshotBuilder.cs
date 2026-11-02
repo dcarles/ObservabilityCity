@@ -125,6 +125,7 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
         var dependencies = Dependencies(registry, onScreenNodes);
         var view = new ViewInfo([], [], [], []);
         var notices = registries.Notices;
+        notices = [.. notices, .. UnmappedJobs(registry, onScreenNodes)];
         if (filter is not null)
         {
             var known = allGroups.Where(g => !g.IsHub).Select(g => g.Id).Concat(vendorIslands.Keys).ToHashSet();
@@ -228,9 +229,28 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
         return all.Select(t => new TenantInfo(t.Id, t.Name, t.Kind, sum > 0 ? Weight(t.Key, t.Kind) / sum : 0, judge && declaredKeys.Contains(t.Key) && !reported.Contains(t.Key))).ToList();
     }
 
+    /// <summary>
+    /// One notice for each function with a scheduled job the pillar's file does not map to services (<c>scheduler:</c>). Such a job sends no boats, and the notice
+    /// says which jobs, so the file can be completed. Several regions of one job count once.
+    /// </summary>
+    private static IEnumerable<string> UnmappedJobs(Registry.Registry registry, IReadOnlyDictionary<string, NodeSnapshot> nodes)
+    {
+        foreach (var g in registry.Groups.Where(g => !g.IsHub))
+        {
+            foreach (var n in g.Nodes.Where(n => n.Kind == NodeKind.Function && nodes.ContainsKey(n.Id)))
+            {
+                var mapped = g.Schedules.Where(x => x.SystemId == n.Id).Select(x => x.Job).ToHashSet(StringComparer.OrdinalIgnoreCase);
+                var missing = (nodes[n.Id].Jobs ?? []).Select(j => j.Name).Distinct(StringComparer.OrdinalIgnoreCase).Where(j => !mapped.Contains(j)).Order(StringComparer.OrdinalIgnoreCase).ToList();
+                if (missing.Count > 0)
+                    yield return $"Job not mapped: {n.Id} runs {string.Join(", ", missing)}, which the scheduler: list of {g.Id}.yaml does not say a service for, so it sends no boats.";
+            }
+        }
+    }
+
     private static MessagingSnapshot MessagingOf(Registry.Registry registry, RegistryGroup g) => new(
         registry.Topics.Where(t => t.GroupId == g.Id).Select(t => new TopicSnapshot(t.Name, t.Service)).ToList(),
-        registry.Subscriptions.Where(s => s.ConsumerGroupId == g.Id).Select(s => new SubscriptionSnapshot(s.Topic, s.PublisherGroupId, s.ConsumerId, s.Legacy)).ToList());
+        registry.Subscriptions.Where(s => s.ConsumerGroupId == g.Id).Select(s => new SubscriptionSnapshot(s.Topic, s.PublisherGroupId, s.ConsumerId, s.Legacy)).ToList(),
+        g.Schedules.Select(x => new ScheduleSnapshot(x.SystemId, x.Job, x.Services)).ToList());
 
     /// <summary>Open incidents per group, worst first. Incidents for a group the registry lacks are dropped.</summary>
     private Dictionary<string, IReadOnlyList<IncidentSnapshot>> OpenIncidents(Registry.Registry registry)
@@ -390,6 +410,7 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
             OutsideRequestsPerSecond = split?.Outside,
             Inbound = split?.Callers,
             InboundEstimated = split?.Estimated ?? false,
+            Queues = r.Queues?.Select(q => new QueueSnapshot(q.Name, q.Backlog, q.DeadLetters, DeadLetterLinks.For(registry, n, q.Name))).ToList(),
             App = r.App,
             Jobs = jobs,
             Regions = regions?.Select(x => new RegionSnapshot(x.Region, Label(env, x.Region), x.Instances, x.Cpu, x.Memory, x.Share, Skewed(x, regions, env))).ToList(),
@@ -473,6 +494,8 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
             QueueDepth = Gone(Signals.Backlog) ? null : r.QueueDepth,
             OldestMessageSeconds = Gone(Signals.Backlog) ? null : r.OldestMessageSeconds,
             DeadLetters = Gone(Signals.DeadLetters) ? null : r.DeadLetters,
+            Queues = Gone(Signals.Backlog) && Gone(Signals.DeadLetters) ? null
+                : r.Queues?.Select(q => q with { Backlog = Gone(Signals.Backlog) ? null : q.Backlog, DeadLetters = Gone(Signals.DeadLetters) ? null : q.DeadLetters }).ToList(),
         };
     }
 

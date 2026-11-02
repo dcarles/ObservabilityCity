@@ -9,3 +9,9 @@ systems:
   - { id: aa.idle-fn, service: idle, serviceCode: idl, name: Idle jobs, role: function }
   # the old spelling of the role still works
   - { id: aa.ghost-fn, service: ghost, serviceCode: gho, name: Ghost jobs, role: cron }
+# the jobs of the scheduler that start work for a service; the hourly job is left out on purpose
+scheduler:
+  - system: aa.sched-fn
+    jobs:
+      purge: [orders]
+      daily: [orders, reports]

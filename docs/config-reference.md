@@ -74,6 +74,7 @@ One island. The file name is the pillar id.
 | `signals` | no | none | Signal → source name (or `none`) for every system of the pillar. |
 | `systems` | yes | | The pillar's systems, below. |
 | `messaging` | no | none | Outboxes it publishes and topics it consumes, below. |
+| `scheduler` | no | none | Which services each scheduled job of a function starts work for, below. |
 | `scope` | no | none | How the pillar is spelt in an environment's scope rules. |
 
 <!-- file: PillarScopeFile -->
@@ -124,6 +125,15 @@ One island. The file name is the pillar id.
 | `topic` | yes | | Full topic name. |
 | `consumer` | yes | | A worker in this pillar. |
 | `legacy` | no | `false` | A read of the hub's egress topic, the old way. Drawn with an amber pennant. |
+
+### scheduler (pillar)
+A function's jobs are found in its logs, and nothing in the logs says which service a job starts work for, so the pillar file says it. A job that is not listed sends no boats, and the town shows a "Job not mapped" notice naming it. A job's boats sail from the function's island to the services' islands; for the services of the same pillar that is a short out-and-back lane from the harbour.
+
+<!-- file: SchedulerFile -->
+| Key | Required | Default | Meaning |
+|---|---|---|---|
+| `jobs` | yes | | Job name (as the logs name it) → the services of this pillar it starts work for. |
+| `system` | yes | | The function, by its id within the pillar. |
 
 ## hub.yaml
 <!-- file: HubFile -->
@@ -303,7 +313,14 @@ signals: { backlog: messaging, deadLetters: messaging }
 | `interval` | no | one minute | The time grain the metrics are asked at, for example `5m`. |
 | `backlog` | no | none | The metric of the messages waiting in an entity. |
 | `deadLetter` | no | none | The metric of the dead-lettered messages of an entity. |
+| `deadLetterLink` | no | none | `{ name, url }`: an address that opens one queue's dead letters in your support tool, shown for each queue in its consumer's drawer. The url is a template over `{queue}`, `{pillar}`, `{service}` (the codes of the scope rules), `{system}` and `{environment}`. Without it, no link. |
 | `patterns` | yes | | The shapes of entity names, tried in order. |
+
+<!-- file: EntityLinkFile -->
+| Key | Required | Default | Meaning |
+|---|---|---|---|
+| `name` | yes | | The words the link shows (for example `Support tool`). |
+| `url` | yes | | An `http://` or `https://` address, a template over `{queue}` (the queue's name), `{pillar}`, `{service}`, `{system}` and `{environment}`. A system with no code for a word it uses gets no link. |
 
 <!-- file: EntityMetricFile -->
 | Key | Required | Default | Meaning |

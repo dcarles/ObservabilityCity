@@ -265,6 +265,7 @@ export interface components {
         MessagingSnapshot: {
             topics: components["schemas"]["TopicSnapshot"][];
             subscriptions: components["schemas"]["SubscriptionSnapshot"][];
+            schedules?: components["schemas"]["ScheduleSnapshot"][] | null;
         };
         /** @enum {string} */
         NodeKind: "Api" | "Worker" | "Database" | "Cache" | "Function" | "Gateway" | "Broker" | "Egress";
@@ -333,6 +334,7 @@ export interface components {
             app?: components["schemas"]["AppState"];
             jobs?: components["schemas"]["JobSnapshot"][] | null;
             regions?: components["schemas"]["RegionSnapshot"][] | null;
+            queues?: components["schemas"]["QueueSnapshot"][] | null;
         };
         OffscreenLink: {
             nodeId: string;
@@ -341,6 +343,14 @@ export interface components {
             incoming: boolean;
             /** Format: double */
             requestsPerSecond: number;
+        };
+        QueueSnapshot: {
+            name: string;
+            /** Format: double */
+            backlog?: number | null;
+            /** Format: double */
+            deadLetters?: number | null;
+            link?: components["schemas"]["ResourceLink"];
         };
         RegionSnapshot: {
             region: string;
@@ -358,6 +368,11 @@ export interface components {
         ResourceLink: {
             name: string;
             url: string;
+        };
+        ScheduleSnapshot: {
+            system: string;
+            job: string;
+            services: string[];
         };
         ScopeInfo: {
             subscription?: string | null;

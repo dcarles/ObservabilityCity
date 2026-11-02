@@ -198,6 +198,9 @@ function checkMessaging(m: unknown): MessagingSnapshot {
     subscriptions: (Array.isArray(raw.subscriptions) ? raw.subscriptions : []).filter(isObject)
       .filter((x) => typeof x.topic === 'string' && typeof x.consumer === 'string' && x.consumer !== '')
       .map((x) => ({ topic: x.topic as string, publisher: str(x.publisher), consumer: x.consumer as string, legacy: x.legacy === true })),
+    schedules: (Array.isArray(raw.schedules) ? raw.schedules : []).filter(isObject)
+      .filter((x) => typeof x.system === 'string' && x.system !== '' && typeof x.job === 'string' && x.job !== '')
+      .map((x) => ({ system: x.system as string, job: x.job as string, services: (Array.isArray(x.services) ? x.services : []).filter((v): v is string => typeof v === 'string' && v !== '') })),
   }
 }
 
@@ -251,6 +254,14 @@ function checkNode(n: unknown, groupId: string, ids: Set<string>, problems: stri
   out.jobs = Array.isArray(n.jobs)
     ? n.jobs.filter(isObject).filter((j) => typeof j.name === 'string' && j.name !== '')
       .map((j) => ({ name: j.name as string, region: optionalText(j.region), status: JOB_STATUSES.includes(j.status as string) ? j.status : 'Ok', lastRun: optionalText(j.lastRun), next: optionalText(j.next) }))
+    : null
+  // the queues a consumer reads: one without a name cannot be shown; a link must be a web address, or it is dropped
+  out.queues = Array.isArray(n.queues)
+    ? n.queues.filter(isObject).filter((q) => typeof q.name === 'string' && q.name !== '')
+      .map((q) => ({
+        name: q.name as string, backlog: optionalNumber(q.backlog), deadLetters: optionalNumber(q.deadLetters),
+        link: isObject(q.link) && typeof q.link.name === 'string' && q.link.name !== '' && typeof q.link.url === 'string' && /^https?:\/\//i.test(q.link.url) ? { name: q.link.name, url: q.link.url } : null,
+      }))
     : null
   out.regions = Array.isArray(n.regions)
     ? n.regions.filter(isObject).filter((r) => typeof r.region === 'string' && r.region !== '')

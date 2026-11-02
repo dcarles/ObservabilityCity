@@ -19,3 +19,6 @@ messaging:
   subscriptions:
     - { topic: acq-applications-outbox, consumer: cus.profile-worker }
     - { topic: obk-data-outbox, consumer: cus.consent-worker }
+scheduler:
+  - system: cus.archive-cron
+    jobs: { daily: [profile], hourly: [profile] }

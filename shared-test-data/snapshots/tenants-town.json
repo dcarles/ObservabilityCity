@@ -33,7 +33,8 @@
             "service": "egress"
           }
         ],
-        "subscriptions": []
+        "subscriptions": [],
+        "schedules": []
       },
       "nodes": [
         {
@@ -76,7 +77,8 @@
           "inboundEstimated": false,
           "app": null,
           "jobs": null,
-          "regions": null
+          "regions": null,
+          "queues": null
         },
         {
           "id": "hub.service-bus",
@@ -118,7 +120,8 @@
           "inboundEstimated": false,
           "app": null,
           "jobs": null,
-          "regions": null
+          "regions": null,
+          "queues": null
         },
         {
           "id": "hub.egress",
@@ -160,7 +163,8 @@
           "inboundEstimated": false,
           "app": null,
           "jobs": null,
-          "regions": null
+          "regions": null,
+          "queues": null
         },
         {
           "id": "hub.customer-db",
@@ -202,7 +206,8 @@
           "inboundEstimated": false,
           "app": null,
           "jobs": null,
-          "regions": null
+          "regions": null,
+          "queues": null
         }
       ],
       "assets": []
@@ -224,7 +229,23 @@
             "service": "orders"
           }
         ],
-        "subscriptions": []
+        "subscriptions": [],
+        "schedules": [
+          {
+            "system": "aa.tools-cron",
+            "job": "daily",
+            "services": [
+              "orders"
+            ]
+          },
+          {
+            "system": "aa.tools-cron",
+            "job": "hourly",
+            "services": [
+              "orders"
+            ]
+          }
+        ]
       },
       "nodes": [
         {
@@ -270,7 +291,8 @@
           "inboundEstimated": false,
           "app": null,
           "jobs": null,
-          "regions": null
+          "regions": null,
+          "queues": null
         },
         {
           "id": "aa.audit-cache",
@@ -312,7 +334,8 @@
           "inboundEstimated": false,
           "app": null,
           "jobs": null,
-          "regions": null
+          "regions": null,
+          "queues": null
         },
         {
           "id": "aa.orders-worker",
@@ -356,7 +379,8 @@
           "inboundEstimated": false,
           "app": null,
           "jobs": null,
-          "regions": null
+          "regions": null,
+          "queues": null
         },
         {
           "id": "aa.tools-cron",
@@ -415,7 +439,8 @@
               "next": "2026-10-25T12:43:02+00:00"
             }
           ],
-          "regions": null
+          "regions": null,
+          "queues": null
         },
         {
           "id": "aa.orders-db",
@@ -518,7 +543,8 @@
           "inboundEstimated": false,
           "app": null,
           "jobs": null,
-          "regions": null
+          "regions": null,
+          "queues": null
         }
       ],
       "assets": []
@@ -535,7 +561,8 @@
       "hasRingBridge": false,
       "messaging": {
         "topics": [],
-        "subscriptions": []
+        "subscriptions": [],
+        "schedules": []
       },
       "nodes": [
         {
@@ -581,7 +608,8 @@
           "inboundEstimated": false,
           "app": null,
           "jobs": null,
-          "regions": null
+          "regions": null,
+          "queues": null
         },
         {
           "id": "bb.billing-db",
@@ -684,7 +712,8 @@
           "inboundEstimated": false,
           "app": null,
           "jobs": null,
-          "regions": null
+          "regions": null,
+          "queues": null
         },
         {
           "id": "bb.shared-db",
@@ -726,7 +755,8 @@
           "inboundEstimated": false,
           "app": null,
           "jobs": null,
-          "regions": null
+          "regions": null,
+          "queues": null
         }
       ],
       "assets": []

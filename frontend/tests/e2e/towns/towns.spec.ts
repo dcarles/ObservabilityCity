@@ -247,3 +247,28 @@ test.describe('the sample towns show regions and basic buildings', () => {
     expect(regionLine).toBe(2)
   })
 })
+
+test.describe('the scheduler of Galactic Credit', () => {
+  test('its mapped jobs sail short loops out of the island\'s own harbour, and no job is left unmapped', async ({ town, page }) => {
+    await town.open()
+    await town.step(20)
+
+    const sea = await town.sea()
+    const loops = sea.routes.filter((r) => r.scheduler)
+    expect(loops.length).toBeGreaterThan(0)
+    for (const r of loops) expect(r.from).toBe(r.to) // every mapped service is on the scheduler's own island
+    expect(sea.routes.some((r) => r.scheduler && r.to === 'cl')).toBe(true)
+    await expect.poll(async () => (await town.sea()).routes.filter((r) => r.scheduler).some((r) => r.rate > 0), { timeout: 20_000 }).toBe(true)
+
+    const notices = await page.evaluate(() => (window as any).city.seen.last.notices as string[])
+    expect(notices.filter((n) => n.startsWith('Job not mapped'))).toEqual([])
+  })
+
+  test('the drawer says which service each job starts work for', async ({ town, page }) => {
+    await town.open()
+    await page.evaluate(() => (window as any).city.openSystem('cl.statement-cron'))
+    const jobs = page.locator('#inspector .job')
+    await expect(jobs).toHaveCount(2)
+    for (const text of await jobs.allTextContents()) expect(text).toContain('starts statements')
+  })
+})

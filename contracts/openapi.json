@@ -847,6 +847,13 @@
             "items": {
               "$ref": "#/components/schemas/SubscriptionSnapshot"
             }
+          },
+          "schedules": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ScheduleSnapshot"
+            },
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -1072,6 +1079,13 @@
               "$ref": "#/components/schemas/RegionSnapshot"
             },
             "nullable": true
+          },
+          "queues": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QueueSnapshot"
+            },
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -1101,6 +1115,31 @@
           "requestsPerSecond": {
             "type": "number",
             "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
+      "QueueSnapshot": {
+        "required": [
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "backlog": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "deadLetters": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "link": {
+            "$ref": "#/components/schemas/ResourceLink"
           }
         },
         "additionalProperties": false
@@ -1157,6 +1196,29 @@
           },
           "url": {
             "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ScheduleSnapshot": {
+        "required": [
+          "job",
+          "services",
+          "system"
+        ],
+        "type": "object",
+        "properties": {
+          "system": {
+            "type": "string"
+          },
+          "job": {
+            "type": "string"
+          },
+          "services": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "additionalProperties": false

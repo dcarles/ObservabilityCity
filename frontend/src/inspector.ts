@@ -3,7 +3,7 @@ import { escapeHtml } from './picker'
 import { scopeParams, type Scope } from './scope'
 import { tenantListOrder, tenantFigures, yardSummary, type TenantView } from './tenants'
 import { regionFigures, regionOptions, validChoice, WORST, type RegionChoice } from './regions'
-import { ago, clockTime, configOrder, groupDetail, incidentSummary, jobRows, LAYER_WORD, linkSections, logLinkLabel, logSectionEmpty, logSectionTitle, logTabLabel, pickLogSection, originLabel, type LinkItem, overviewLinks, overviewRows, reasons, repeatLabel, resourceLinks, scopeView, SEVERITY_WORD, sectionLinks, stateTone, vendorWhere } from './inspectorModel'
+import { ago, clockTime, configOrder, queueRows, groupDetail, incidentSummary, jobRows, LAYER_WORD, linkSections, logLinkLabel, logSectionEmpty, logSectionTitle, logTabLabel, pickLogSection, originLabel, type LinkItem, overviewLinks, overviewRows, reasons, repeatLabel, resourceLinks, scopeView, SEVERITY_WORD, sectionLinks, stateTone, vendorWhere } from './inspectorModel'
 
 export type InspectorTab = 'overview' | 'links' | 'logs' | 'config'
 const TABS: { id: InspectorTab; label: string }[] = [
@@ -205,7 +205,8 @@ export class Inspector {
     return `
       ${why.length === 0 ? '<p class="fine">Nothing to flag: every number is inside its lines.</p>' : `<ul class="why">${why.map((w) => `<li>${escapeHtml(w)}</li>`).join('')}</ul>`}
       <div class="rows">${overviewRows(n, (id) => this.find(id)?.node.name ?? id, this.snap?.cloud).map((r) => `<div class="row"><span>${r.label}</span><span class="${r.tone}">${escapeHtml(r.value)}</span></div>`).join('')}</div>
-      ${this.jobs(n)}
+      ${this.jobs(n, group)}
+      ${this.queues(n)}
       ${this.regions(n)}
       ${tenants}
       ${this.openIn()}
@@ -213,9 +214,16 @@ export class Inspector {
         ${incidents.map((i) => `<div class="row"><span>${escapeHtml(i.title)}</span><span class="warn">sev ${i.severity}${SEVERITY_WORD[i.severity] ? ` · ${SEVERITY_WORD[i.severity]}` : ''} · since ${escapeHtml(clockTime(i.startedAt))}</span></div>`).join('')}`}`
   }
 
+  /** The queues a consumer reads: each with what waits and what is dead-lettered, and a link to its dead letters when the environment names a support tool. Nothing for a system that reads none. */
+  private queues(n: NodeSnapshot): string {
+    const rows = queueRows(n)
+    if (rows.length === 0) return ''
+    return `<h4>Queues</h4><div class="queues">${rows.map((r) => `<div class="row queue" data-queue="${escapeHtml(r.name)}"><span>${escapeHtml(r.name)}</span><span class="${r.tone}">${escapeHtml(r.text)}${r.link ? ` · ${this.anchor(r.link.name, r.link.url)}` : ''}</span></div>`).join('')}</div>`
+  }
+
   /** A function building's scheduled jobs, one row for each job in each region. Nothing for a building without jobs. */
-  private jobs(n: NodeSnapshot): string {
-    const rows = jobRows(n)
+  private jobs(n: NodeSnapshot, group: GroupSnapshot | null): string {
+    const rows = jobRows(n, Date.now(), group?.messaging.schedules ?? [])
     if (rows.length === 0) return ''
     return `<h4>Jobs</h4><div class="jobs">${rows.map((r) => `<div class="row job" data-job="${escapeHtml(r.label)}"><span>${escapeHtml(r.label)}</span><span class="${r.tone}">${escapeHtml(r.value)}</span></div>`).join('')}</div>`
   }

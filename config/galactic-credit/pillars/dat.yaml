@@ -22,3 +22,6 @@ messaging:
     - { topic: cl-ledger-outbox, consumer: dat.ingest-worker }
     - { topic: rcn-matching-outbox, consumer: dat.ingest-worker }
     - { topic: dat-ingest-outbox, consumer: dat.reports-worker }
+scheduler:
+  - system: dat.refresh-cron
+    jobs: { daily: [ingest], hourly: [ingest] }

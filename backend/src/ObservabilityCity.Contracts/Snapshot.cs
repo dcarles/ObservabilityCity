@@ -77,6 +77,7 @@ public enum HealthState
 /// OutsideRequestsPerSecond and Inbound say where an API's traffic comes from, once the environment measures it (links.traffic): the part no town system explains,
 /// which arrives at the airport, and the part each town system sends. Both are null while nothing measures it; the renderer then shares the rate evenly between the
 /// declared callers. InboundEstimated says the share stands on too few calls and is the last good one.
+/// Queues lists the queues a message consumer reads, each with its backlog, dead letters and a link to its dead letters (null: not read, or none).
 /// App says whether the cloud runs the app (see <see cref="AppState"/>); Jobs lists the scheduled jobs of a function building; Regions lists a service's regions
 /// when it runs in two or more, and the instances, Cpu and Memory above are then those of its worst region. A count of instances of 0 is never sent: it is not known, so
 /// "instances" is in Absent.
@@ -124,7 +125,14 @@ public sealed record NodeSnapshot(
     bool InboundEstimated = false,
     AppState? App = null,
     IReadOnlyList<JobSnapshot>? Jobs = null,
-    IReadOnlyList<RegionSnapshot>? Regions = null);
+    IReadOnlyList<RegionSnapshot>? Regions = null,
+    IReadOnlyList<QueueSnapshot>? Queues = null);
+
+/// <summary>
+/// One queue a consumer reads: what waits in it and what is dead-lettered (each null when nothing measures it), and Link, the address that opens its dead letters in the
+/// support tool the environment names (entities.deadLetterLink), null when it names none.
+/// </summary>
+public sealed record QueueSnapshot(string Name, double? Backlog, double? DeadLetters, ResourceLink? Link = null);
 
 /// <summary>
 /// A resource that is not a system but stands in the town as a small building without health (a key vault, a storage account). Label is what it is
@@ -202,10 +210,17 @@ public sealed record TopicSnapshot(string Name, string Service);
 /// </summary>
 public sealed record SubscriptionSnapshot(string Topic, string Publisher, string Consumer, bool Legacy);
 
-/// <summary>The topics an island publishes and the subscriptions its workers hold. Both empty means the island has no messaging, and no pier.</summary>
+/// <summary>A scheduled job the pillar's file maps to services: System is the function's id, Job its name in the logs, Services the services of the island it starts work for.</summary>
+public sealed record ScheduleSnapshot(string System, string Job, IReadOnlyList<string> Services);
+
+/// <summary>
+/// The topics an island publishes and the subscriptions its workers hold. Both empty means the island has no messaging, and no pier.
+/// Schedules maps the island's scheduled jobs to the services they start work for: the boats of a scheduler sail by it.
+/// </summary>
 public sealed record MessagingSnapshot(
     IReadOnlyList<TopicSnapshot> Topics,
-    IReadOnlyList<SubscriptionSnapshot> Subscriptions);
+    IReadOnlyList<SubscriptionSnapshot> Subscriptions,
+    IReadOnlyList<ScheduleSnapshot>? Schedules = null);
 
 /// <summary>
 /// An island (a pillar, a team, ...) or the hub island. IsLostFound marks the island that collects systems no group owns.

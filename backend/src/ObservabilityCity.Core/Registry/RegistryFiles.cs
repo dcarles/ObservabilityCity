@@ -93,6 +93,8 @@ internal sealed class PillarFile
     public Dictionary<string, string> Signals { get; set; } = new();
     public List<SystemFile> Systems { get; set; } = [];
     public MessagingFile? Messaging { get; set; }
+    /// <summary>Which services each scheduled job of a function in this pillar starts work for. A job that is not listed sends no boats.</summary>
+    public List<SchedulerFile> Scheduler { get; set; } = [];
     /// <summary>How the pillar is spelt in the environments' scope rules, when that is not its id.</summary>
     public PillarScopeFile? Scope { get; set; }
 }
@@ -115,6 +117,15 @@ internal sealed class MessagingFile
     /// <summary>Pillar files: service names, each published as the topic {pillar}-{service}-outbox. hub.yaml: free names, each published as hub-{name}.</summary>
     public List<string> Topics { get; set; } = [];
     public List<SubscriptionFile> Subscriptions { get; set; } = [];
+}
+
+/// <summary>One entry of a pillar's <c>scheduler:</c> list: a function and, for each of its jobs, the services the job starts work for.</summary>
+internal sealed class SchedulerFile
+{
+    /// <summary>The function system, by its id within the pillar.</summary>
+    public string System { get; set; } = "";
+    /// <summary>Job name (as the logs name it) to the services of this pillar it starts work for.</summary>
+    public Dictionary<string, List<string>> Jobs { get; set; } = [];
 }
 
 internal sealed class SubscriptionFile
@@ -430,8 +441,16 @@ internal sealed class EntitiesFile
     public EntityMetricFile? Backlog { get; set; }
     /// <summary>The dead-lettered messages of an entity, for example a metric of dead-lettered messages added up by maximum.</summary>
     public EntityMetricFile? DeadLetter { get; set; }
+    /// <summary>An address that opens a consumer's dead letters in your support tool: a name and a URL template over {pillar}, {service}, {system} and {environment}. Without it, no link.</summary>
+    public EntityLinkFile? DeadLetterLink { get; set; }
     /// <summary>Entity name patterns, tried in order: the first that matches decides whose the entity is. An entity no pattern matches is left out.</summary>
     public List<EntityPatternFile> Patterns { get; set; } = [];
+}
+
+internal sealed class EntityLinkFile
+{
+    public string Name { get; set; } = "";
+    public string Url { get; set; } = "";
 }
 
 internal sealed class EntityMetricFile
