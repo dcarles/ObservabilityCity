@@ -6,6 +6,9 @@ export interface SeaMap {
 }
 
 const CELL = 2.5
+
+/** How far out into the open water a boat sails on a loop from its own harbour, longest first: the longest that is clear of land is used. A long loop keeps each boat in view longer, so busy traffic inside an island shows as several boats at once. */
+export const LOOP_LENGTHS = [44, 34, 26, 16, 11, 7]
 const LAND_MARGIN = 3.2
 
 function distToSegment(p: THREE.Vector2, a: THREE.Vector2, b: THREE.Vector2): number {
@@ -207,7 +210,7 @@ export function harbourLoop(map: SeaMap, water: THREE.Vector3, centre: THREE.Vec
     return i >= 0 && j >= 0 && i < w && j < h && !blocked[j * w + i]
   }
   const out = Math.atan2(water.z - centre.z, water.x - centre.x)
-  for (const length of [16, 11, 7]) {
+  for (const length of LOOP_LENGTHS) {
     for (const turn of [0, 0.5, -0.5, 1, -1]) {
       const a = out + turn
       const end = new THREE.Vector3(water.x + Math.cos(a) * length, 0, water.z + Math.sin(a) * length)
