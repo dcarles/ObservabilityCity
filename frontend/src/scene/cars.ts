@@ -5,6 +5,7 @@ import { canvasTexture, roundRect } from '../buildings/mk'
 import { vehicles } from '../themes/active'
 import { carRate, clamp } from '../visuals'
 import type { TenantInfo } from '../types'
+import { deckAt } from './arches'
 import { carShown, pickTenant, type TenantView } from '../tenants'
 
 /** Where a request comes from decides the car: internal calls are blue sedans, external calls yellow taxis. */
@@ -141,6 +142,8 @@ export class CarSystem {
   private readonly up = new THREE.Vector3(0, 1, 0)
   private readonly pos = new THREE.Vector3()
   private readonly scaleV = new THREE.Vector3()
+  private readonly tilt = new THREE.Quaternion()
+  private readonly across = new THREE.Vector3(1, 0, 0)
   private readonly one = new THREE.Vector3(1, 1, 1)
   private readonly unit: number[] = []
   private nextId = 1
@@ -364,6 +367,8 @@ export class CarSystem {
     const blink = Math.floor(this.time * 2.4) % 2 === 0
     for (const c of this.cars) {
       this.sample(c)
+      const deck = deckAt(this.pos.x, this.pos.z, c.dx, c.dz) // on a bridge the road is an arch: the car rides up it and down
+      this.pos.y += deck.lift
       const target = Math.atan2(c.dx, c.dz)
       let d = target - c.yaw
       d = Math.atan2(Math.sin(d), Math.cos(d))
@@ -372,6 +377,7 @@ export class CarSystem {
       if (!carShown(c.tenant, this.tenantKinds, this.view)) continue
       const s = this.unit[c.model] * (c.fade >= 0 ? Math.max(0.01, c.fade / 0.5) : Math.min(1, 0.05 + c.age / GROW))
       this.q.setFromAxisAngle(this.up, c.yaw)
+      if (deck.slope !== 0) this.q.multiply(this.tilt.setFromAxisAngle(this.across, -Math.atan(deck.slope)))
       this.m.compose(this.pos, this.q, this.scaleV.set(s, s, s))
       this.meshes[c.model].setMatrixAt(counts[c.model]++, this.m)
       if (c.failed) {

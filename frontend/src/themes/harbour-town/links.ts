@@ -5,6 +5,7 @@ import { palette } from '../active'
 import { GROUND } from '../../scene/island'
 import { ROAD_W } from '../../scene/props'
 import type { BridgeStyle } from '../types'
+import { endList } from '../common'
 
 /** A stone and concrete deck on tapered piers, with parapets, lamps and gate posts at each end. */
 export const harbourBridge: BridgeStyle = {
@@ -30,7 +31,7 @@ export const harbourBridge: BridgeStyle = {
       }
     }
     // gate posts at both ends
-    for (const end of ends ? [-1, 1] : []) {
+    for (const end of endList(ends)) {
       for (const side of [-1, 1]) {
         const x = side * (width / 2 - 0.2), z = end * (len / 2 - 0.25)
         deck.add(box(0.7, 1.9, 0.7, stone, { x, y: GROUND - 0.06, z }), box(0.9, 0.14, 0.9, cap, { x, y: GROUND + 1.84, z }))

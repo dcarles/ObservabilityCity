@@ -157,6 +157,11 @@ export class Town {
     return s as IslandStatus
   }
 
+  /** The sea the boats sail: the harbours, the pairs of harbours with no water between them, the boat routes (publisher island, consumer island) and the arched bridges. */
+  async sea(): Promise<{ harbours: string[]; unreachable: string[]; routes: { from: string | null; to: string }[]; arches: number }> {
+    return await this.page.evaluate(() => (window as any).city.town.inspectSea())
+  }
+
   /** What the Service Bus port shows. */
   async hub(): Promise<HubStatus> {
     return (await this.page.evaluate(() => (window as any).city.town.inspectHub())) as HubStatus

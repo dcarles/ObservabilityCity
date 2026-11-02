@@ -4,7 +4,7 @@ import { GROUND } from '../../scene/island'
 import { ROAD_W } from '../../scene/props'
 import { palette } from '../active'
 import type { BridgeStyle } from '../types'
-import { glow } from '../common'
+import { endList, glow } from '../common'
 
 const STEEL = '#59626c'
 const YELLOW = '#f2c230'
@@ -37,7 +37,7 @@ export const factoryBridge: BridgeStyle = {
     // cross beams along the top
     for (let i = 0; i <= bays; i++) deck.add(box(width - 0.3, 0.1, 0.1, steel, { y: GROUND + H + 0.03, z: -len / 2 + i * bay }))
     // gate posts: tall girders with an amber lamp
-    for (const end of ends ? [-1, 1] : []) {
+    for (const end of endList(ends)) {
       for (const side of [-1, 1]) {
         const x = side * (width / 2 - 0.2), z = end * (len / 2 - 0.25)
         deck.add(box(0.5, 2.3, 0.5, yellow, { x, y: GROUND - 0.06, z }))
