@@ -44,6 +44,13 @@ describe('a function building', () => {
     expect(reasons(n)[1]).toMatch(/^Job purge \(West\) failed its last run at /)
   })
 
+  it('shows a job past its time as fine when the server, allowing for the source\'s late tolerance, still calls it Ok', () => {
+    // the browser never judges lateness: its next time passed an hour ago, but the server said Ok, so no amber and no reason is shown
+    const n = fn({ state: 'Healthy', jobs: [{ ...job('every-minute', 'Ok'), next: '2026-01-01T09:00:00Z' }] })
+    expect(beaconLevel(n)).toBe('green')
+    expect(reasons(n)).toEqual([])
+  })
+
   it('is red for a failed job and amber for a late one, whatever else is quiet', () => {
     expect(beaconLevel({ ...fn({ state: 'Down', jobs: [job('a', 'Failed')] }) })).toBe('red')
     expect(beaconLevel({ ...fn({ state: 'Degraded', jobs: [job('a', 'Overdue')] }) })).toBe('amber')

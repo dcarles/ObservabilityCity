@@ -79,6 +79,42 @@ public class FunctionBuildingTests
         Assert.Equal(HealthState.Degraded, report.State);
     }
 
+    // the hourly job should have run an hour before T0; how long it may stay without a newer run before it counts as late is the source's lateAfterSeconds
+    private static async Task<JobStatus> HourlyStatus(string town, TimeSpan? lateAfter, TimeSpan? interval = null)
+    {
+        var folder = Town(town);
+        var registry = Prod(folder);
+        var set = new AdapterCatalog([new AzureAdapters()]).Build(registry.ActiveEnvironment!, folder);
+        var state = new LatestState();
+        foreach (var source in set.Sources) state.Update(source.Name, await source.PollAsync(registry, CancellationToken.None));
+        var snapshot = new SnapshotBuilder(registry, state, new FakeTimeProvider(T0))
+        {
+            Environment = "prod",
+            SourceIntervals = interval is null ? new Dictionary<string, TimeSpan>() : new Dictionary<string, TimeSpan> { ["jobs"] = interval.Value },
+            SourceLateAfter = lateAfter is null ? new Dictionary<string, TimeSpan>() : new Dictionary<string, TimeSpan> { ["jobs"] = lateAfter.Value },
+        }.Build();
+        return Node(snapshot, "aa.sched-fn").Jobs!.Single(j => j.Name == "hourly").Status;
+    }
+
+    [Theory]
+    [InlineData("a")]
+    [InlineData("b")]
+    public async Task A_job_is_late_only_after_the_sources_lateAfter_has_passed_without_polling_slower(string town)
+    {
+        Assert.Equal(JobStatus.Overdue, await HourlyStatus(town, null)); // an hour past its time, nothing allowed
+        Assert.Equal(JobStatus.Overdue, await HourlyStatus(town, TimeSpan.FromMinutes(30)));
+        Assert.Equal(JobStatus.Ok, await HourlyStatus(town, TimeSpan.FromMinutes(90)));
+    }
+
+    [Theory]
+    [InlineData("a")]
+    [InlineData("b")]
+    public async Task A_lateAfter_shorter_than_the_reading_may_lag_changes_nothing(string town)
+    {
+        // polled every 45 minutes, the reading may be 90 minutes old; asking for 5 minutes cannot make the job late sooner
+        Assert.Equal(JobStatus.Ok, await HourlyStatus(town, TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(45)));
+    }
+
     [Theory]
     [InlineData("a")]
     [InlineData("b")]
