@@ -2,13 +2,16 @@
 // overall verdict, and nothing about towns, islands or buildings.
 
 import { escapeHtml as esc } from '../picker'
-import type { Chip, Dashboard, Group, Issue, JobRow, Level, Pillar, Row, TenantRow } from './model'
+import type { Chip, Dashboard, Group, Issue, JobRow, Level, Pillar, Row, Section, SideRow, TenantRow } from './model'
+import type { SourceLine } from './freshness'
 
 /** What the viewer has opened or closed. A group or a database that is not in the maps follows its own default. */
 export interface UiState {
   openPillars: ReadonlySet<string>
   groups: ReadonlyMap<string, boolean>
   databases: ReadonlyMap<string, boolean>
+  /** The lists under the pillars the viewer has opened; all start closed. */
+  sections: ReadonlySet<string>
 }
 
 const num = (v: number | null, digits = 0): string => (v == null ? '–' : v.toLocaleString('en-GB', { minimumFractionDigits: digits, maximumFractionDigits: digits }))
@@ -101,4 +104,30 @@ export function hiddenHtml(d: Dashboard): string {
 /** The Pillars dropdown: one checkbox for each pillar. */
 export function pillarMenuHtml(d: Dashboard): string {
   return d.choices.map((c) => `<label class="vb-row"><input type="checkbox" data-pillar-box="${esc(c.id)}" ${c.shown ? 'checked' : ''} /><span>${esc(c.name)}</span></label>`).join('')
+}
+
+function sideRowHtml(r: SideRow, columns: 'hub' | 'list'): string {
+  const links = [...r.links.map((l) => `<a class="lk" href="${esc(l.url)}" target="_blank" rel="noopener noreferrer">${esc(l.name)} ↗</a>`), ...(r.drawer && r.id ? [`<button class="lk" data-details="${esc(r.id)}">Details ›</button>`] : [])].join('') || '<span class="dim">–</span>'
+  const name = `${dot(r.level)} ${esc(r.name)}`
+  const health = r.health ? `<span class="${r.level === 'bad' ? 'bad' : r.level === 'warn' ? 'warn' : ''}">${esc(r.health)}</span>` : '<span class="dim">no health available</span>'
+  return columns === 'hub'
+    ? `<tr data-side="${esc(r.id ?? r.name)}"><td>${name}</td><td>${r.detail ? esc(r.detail) : '<span class="dim">–</span>'}</td><td>${r.health ? health : '<span class="dim">–</span>'}</td><td>${links}</td></tr>`
+    : `<tr data-side="${esc(r.id ?? r.name)}"><td>${name}</td><td>${health}${r.detail ? ` <span class="dim">· ${esc(r.detail)}</span>` : ''}</td><td class="wrapc">${chips(r.calledBy)}</td><td class="wrapc">${chips(r.calls)}</td><td>${links}</td></tr>`
+}
+
+export function sectionHtml(x: Section, open: boolean): string {
+  const head = x.id === 'hub'
+    ? '<thead><tr><th>Resource</th><th>Details</th><th>Health</th><th>Links</th></tr></thead>'
+    : '<thead><tr><th>Name</th><th>Health</th><th>Called by</th><th>Calls</th><th>Links</th></tr></thead>'
+  return `<details class="sec" data-section="${x.id}" ${open ? 'open' : ''}><summary><b>${esc(x.title)}</b>${x.summary ? `<span>${esc(x.summary)}</span>` : ''}</summary>
+    <div class="panel"><table>${head}<tbody>${x.rows.map((r) => sideRowHtml(r, x.id === 'hub' ? 'hub' : 'list')).join('')}</tbody></table></div></details>`
+}
+
+export function sectionsHtml(d: Dashboard, ui: UiState): string {
+  return d.sections.map((x) => sectionHtml(x, ui.sections.has(x.id))).join('')
+}
+
+export function freshnessHtml(lines: readonly SourceLine[]): string {
+  if (lines.length === 0) return '<div class="sub-title" style="margin-top:0">Data freshness</div><div class="dim">No source reports its read time.</div>'
+  return `<div class="sub-title" style="margin-top:0">Data freshness</div><table><thead><tr><th>Source</th><th>Last read</th><th>Interval</th></tr></thead><tbody>${lines.map((l) => `<tr class="${l.overdue ? 'warn' : ''}"><td>${esc(l.name)}</td><td>${esc(l.lastRead)}</td><td>${esc(l.interval)}${l.overdue ? ' (overdue)' : ''}</td></tr>`).join('')}</tbody></table>`
 }

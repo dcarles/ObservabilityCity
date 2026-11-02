@@ -435,6 +435,7 @@ export interface components {
             /** Format: double */
             trafficDensity: number;
             notes?: string[] | null;
+            sources?: components["schemas"]["SourceFreshnessSnapshot"][] | null;
         };
         SourceAgeSnapshot: {
             source: string;
@@ -442,6 +443,14 @@ export interface components {
             ageSeconds: number;
             fresh: boolean;
             signals: string[];
+        };
+        SourceFreshnessSnapshot: {
+            name: string;
+            /** Format: date-time */
+            lastRead?: string | null;
+            /** Format: double */
+            intervalSeconds: number;
+            overdue: boolean;
         };
         SubscriptionSnapshot: {
             topic: string;
