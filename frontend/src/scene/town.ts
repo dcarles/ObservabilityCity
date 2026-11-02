@@ -12,9 +12,10 @@ import { hashString } from './random'
 import { clamp, speedFactor } from '../visuals'
 import { CarSystem, type Route } from './cars'
 import { BoatSystem, type BoatRoute } from './boats'
+import { archCount, clearArches } from './arches'
 import { consumersOf, HarbourStatus, messagingOf, type Messaging } from './harbour'
 import { connectorsOf, portSummary, type Connectors, type PortSummary } from './links'
-import { findLane, type SeaMap } from './sea'
+import { findLane, harbourLoop, type SeaMap } from './sea'
 import { mergeStatic } from './merge'
 import { bayTo } from './bay'
 import { islandSign } from './sign'
@@ -142,6 +143,9 @@ export class Town {
   private port: PortSummary = { topics: 0, subscriptions: 0, piers: 0, legacy: 0 }
   /** The islands that have a sea lane for boats, and how many car routes cross each one's bridge. */
   private readonly boatLanes = new Set<string>()
+  private seaMap: SeaMap = { land: [] }
+  private harbourPoints = new Map<string, THREE.Vector3>()
+  private boatRouteEnds: { from: string | null; to: string }[] = []
   private readonly crossings = new Map<string, number>()
   private hubWeather: Weather | null = null
   /** Third parties on their own small islands, by vendor id. */
@@ -195,7 +199,6 @@ export class Town {
     const pillars = s.groups.filter((g) => !g.isHub)
     const routes: Route[] = []
     const boatRoutes: BoatRoute[] = []
-    const bridges: [THREE.Vector2, THREE.Vector2][] = []
 
     // Islands stand round the hub in registry order, `ringCapacity` to a ring and the rest in a staggered second ring, with the airport
     // in the second ring's northernmost place. The hub grows with their number, so every spoke road has room where it leaves the plaza.
@@ -219,6 +222,7 @@ export class Town {
     this.vendors.clear()
     this.vendorBridges.clear()
     this.boatLanes.clear()
+    clearArches()
     this.crossings.clear()
     const connectors = pillars.map((g) => connectorsOf(g))
     this.port = portSummary(s.groups)
@@ -296,7 +300,6 @@ export class Town {
       const gate = island.root.localToWorld(new THREE.Vector3(0, GROUND, coastScan(island.outline, 'z') - 0.7))
       if (connectors[index].bridge) {
         bridgeDecor.add(bridge({ from: hubCoasts[index].clone().setY(0), to: gate.clone().setY(0) }))
-        bridges.push([new THREE.Vector2(hubCoasts[index].x, hubCoasts[index].z), new THREE.Vector2(gate.x, gate.z)])
       }
       gates.push({ bridged: connectors[index].bridge, island, plan, gate, coast: hubCoasts[index].clone().setY(GROUND), angle: ports[index], ringed: bridgedIslands.has(g.id), ringAngle: angles[index] })
     })
@@ -325,7 +328,6 @@ export class Town {
       }
       const gate = vi.gate()
       bridgeDecor.add(bridge({ from: new THREE.Vector3(spot.loopX, 0, spot.loopZ), to: gate.clone().setY(0) }))
-      bridges.push([new THREE.Vector2(spot.loopX, spot.loopZ), new THREE.Vector2(gate.x, gate.z)])
       const landIsland = (id: string) => {
         const index = order.indexOf(id)
         if (landed.has(id)) return
@@ -333,7 +335,6 @@ export class Town {
         const back = backGate(id)
         const land = loopPoint(angles[index])
         bridgeDecor.add(bridge({ from: back.clone().setY(0), to: land.clone().setY(0) }))
-        bridges.push([new THREE.Vector2(back.x, back.z), new THREE.Vector2(land.x, land.z)])
       }
       for (const vendor of group.members) {
         const links = callerIslands(vendor.calledBy).filter((g) => bridgedIslands.has(g))
@@ -353,7 +354,6 @@ export class Town {
         const back = backGate(g.island.group.id)
         const land = loopPoint(g.ringAngle)
         bridgeDecor.add(bridge({ from: back.clone().setY(0), to: land.clone().setY(0) }))
-        bridges.push([new THREE.Vector2(back.x, back.z), new THREE.Vector2(land.x, land.z)])
       })
     }
     if (loopR > 0) {
@@ -384,7 +384,6 @@ export class Town {
       // a hub-and-spoke town's airport has a spoke to the hub; a direct town's, like a third party, a bridge to the ring road
       const coast = (direct ? loopPoint(angles[pillars.length]) : hubCoasts[pillars.length]).clone().setY(0)
       bridgeDecor.add(bridge({ from: coast, to: gate.clone().setY(0) }))
-      bridges.push([new THREE.Vector2(coast.x, coast.z), new THREE.Vector2(gate.x, gate.z)])
       this.airportPath = [airport.doorWorld(), gate.setY(GROUND), coast.clone().setY(GROUND)]
       this.airportJoin = ports[pillars.length]
       this.airportAngle = angles[pillars.length]
@@ -392,12 +391,11 @@ export class Town {
       if (back && loopR > 0) {
         const land = loopPoint(angles[pillars.length])
         bridgeDecor.add(bridge({ from: back.clone().setY(0), to: land.clone().setY(0) }))
-        bridges.push([new THREE.Vector2(back.x, back.z), new THREE.Vector2(land.x, land.z)])
         this.airportBack = { landing: land.clone().setY(GROUND), angle: angles[pillars.length], path: [back.clone().setY(GROUND), ...airport.backPath().slice(1)] }
       }
     }
 
-    // ── Sea lanes: boats sail from a hub quay in the gap beside each bridge to the island's harbour ──
+    // ── Sea lanes: every bridge is an arch, so boats sail island to island by the shortest open water and pass under the bridges ──
     this.root.updateMatrixWorld(true)
     const land = [this.hubOutline.points.map((p) => new THREE.Vector2(p.x, p.y))]
     for (const isl of this.islands) land.push(isl.outline.points.map((p) => {
@@ -412,7 +410,7 @@ export class Town {
       const w = airport.root.localToWorld(new THREE.Vector3(p.x, 0, p.y))
       return new THREE.Vector2(w.x, w.z)
     }))
-    const sea: SeaMap = { land, bridges }
+    const sea: SeaMap = { land }
     const quays = new Map<number, THREE.Vector3>()
     const quayAt = (a: number) => {
       const key = Math.round(wrapAngle(a) * 100)
@@ -423,8 +421,15 @@ export class Town {
       }
       return q
     }
-    pillars.forEach((_g, index) => {
-      if (!connectors[index].pier) return // boats sail only to a pier
+    const harbours = pillars.map((_g, index) => (connectors[index].pier ? this.harbourWater(this.islands[index], plans[index]) : null))
+    const lanes = new Map<string, THREE.Vector3[] | null>()
+    const laneBetween = (a: number, b: number): THREE.Vector3[] | null => {
+      const key = `${a}>${b}`
+      if (!lanes.has(key)) lanes.set(key, a === b ? harbourLoop(sea, harbours[a]!, this.islands[a].root.position) : findLane(sea, harbours[a]!, harbours[b]!))
+      return lanes.get(key)!
+    }
+    // from the hub's own port, for a topic the hub owns (the old egress route): the quay in the gap beside the island's bridge
+    const hubLane = (index: number): THREE.Vector3[] | null => {
       const n = pillars.length
       const here = ports[index]
       const sides = n > 1 ? [wrapAngle(ports[(index + 1) % n] - here) / 2, wrapAngle(ports[(index + n - 1) % n] - here) / 2] : [Math.PI / 2]
@@ -434,14 +439,42 @@ export class Town {
         const a = here + half
         const dir = dirOf(a)
         const tip = coastPoint(this.hubOutline, dir, 1.6 - (QUAY + 3)).setY(0)
-        const lane = findLane(sea, tip, this.harbourWater(this.islands[index], plans[index]))
+        const lane = findLane(sea, tip, harbours[index]!)
         if (lane && (!best || laneLength(lane) < laneLength(best))) { best = lane; bestAngle = a }
       }
-      if (!best) return
-      quayAt(bestAngle)
-      boatRoutes.push(this.boatRoute(this.islands[index], best, hubBuildings))
-      this.boatLanes.add(this.islands[index].group.id)
+      if (best) quayAt(bestAngle)
+      return best
+    }
+    const indexOfIsland = new Map(pillars.map((g, i) => [g.id, i]))
+    pillars.forEach((g, to) => {
+      if (!harbours[to]) return // boats sail only to a pier
+      const subs = (g.messaging?.subscriptions ?? [])
+      if (subs.length === 0) return
+      const share = new Map<number, number>() // publisher island (-1 for the hub) to its share of this island's subscriptions
+      for (const sub of subs) {
+        const from = indexOfIsland.get(sub.publisher) ?? -1
+        share.set(from, (share.get(from) ?? 0) + 1 / subs.length)
+      }
+      for (const [from, weight] of share) {
+        const path = from === -1 ? hubLane(to) : harbours[from] ? laneBetween(from, to) : null
+        if (!path) continue
+        boatRoutes.push(this.boatRoute(this.islands[to], path, hubBuildings, weight, from === -1 ? null : pillars[from].id))
+        this.boatLanes.add(g.id)
+        if (from !== -1) this.boatLanes.add(pillars[from].id)
+      }
     })
+
+    // an island with a pier always has a lane, so the water by its harbour is proven open even while nothing sails (a loop out and back)
+    pillars.forEach((g, index) => {
+      if (!harbours[index] || this.boatLanes.has(g.id)) return
+      const loop = laneBetween(index, index)
+      if (!loop) return
+      boatRoutes.push(this.boatRoute(this.islands[index], loop, hubBuildings, 1, g.id))
+      this.boatLanes.add(g.id)
+    })
+    this.seaMap = sea
+    this.harbourPoints = new Map(pillars.flatMap((g, i) => (harbours[i] ? [[g.id, harbours[i]!] as [string, THREE.Vector3]] : [])))
+    this.boatRouteEnds = boatRoutes.map((r) => ({ from: r.from, to: r.to }))
 
     mergeStatic(bridgeDecor)
     mergeStatic(this.hubDecor)
@@ -638,6 +671,19 @@ export class Town {
   }
 
   /** Where the third parties stand (the island's centre and each building) and what is bridged to them, as plain values. For tests. */
+  /**
+   * The sea the boats sail: the islands' harbours, every pair of them with no open water between (there must be none, since every bridge is an
+   * arch), the boat routes as (publisher island, consumer island) with null for the hub, and how many arched bridges stand. For tests.
+   */
+  inspectSea(): { harbours: string[]; unreachable: string[]; routes: { from: string | null; to: string }[]; arches: number } {
+    const ids = [...this.harbourPoints.keys()]
+    const unreachable: string[] = []
+    for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) {
+      if (!findLane(this.seaMap, this.harbourPoints.get(ids[i])!, this.harbourPoints.get(ids[j])!)) unreachable.push(`${ids[i]}|${ids[j]}`)
+    }
+    return { harbours: ids, unreachable, routes: this.boatRouteEnds, arches: archCount() }
+  }
+
   inspectVendors(): { id: string; island: string; x: number; z: number; bx: number; bz: number; bridges: number }[] {
     return [...this.vendors].map(([id, vi]) => {
       const at = vi.buildings.get(id)!.root.getWorldPosition(new THREE.Vector3())
@@ -1064,17 +1110,19 @@ export class Town {
     return island.root.localToWorld(new THREE.Vector3(coast + 7, 0, harbourZ + 3.6)).setY(0)
   }
 
-  /** The sea lane from a hub quay to an island's harbour, sailed there and back. */
-  private boatRoute(island: Island, path: THREE.Vector3[], hubBuildings: Building[]): BoatRoute {
+  /** A sea lane to an island's harbour, sailed there and back: its share (`weight`) of the island's messages is what these boats carry. */
+  private boatRoute(island: Island, path: THREE.Vector3[], hubBuildings: Building[], weight: number, from: string | null): BoatRoute {
     const broker = hubBuildings.find((b) => b.kind === 'Broker')
     const workers = [...island.buildings.values()].filter((b) => b.kind === 'Worker' && island.consumers.has(b.id))
     return {
       path,
+      from,
+      to: island.group.id,
       rate: () => {
         const bn = broker?.node
         if (!bn || (bn.state !== 'Healthy' && bn.state !== 'Degraded')) return 0
         const rps = workers.reduce((a, w) => a + (w.node && w.node.state !== 'Stale' && w.node.state !== 'Down' ? w.node.requestsPerSecond : 0), 0)
-        return rps <= 0 ? 0 : 0.016 * Math.sqrt(rps)
+        return rps <= 0 ? 0 : 0.016 * Math.sqrt(rps) * weight
       },
       speed: () => (broker?.node ? speedFactor(broker.node.p99Ms, broker.node.slaP99Ms) : 1),
       load: () => Math.log10(1 + island.messaging.perSecond) / 2.5,

@@ -118,6 +118,7 @@ All 10 Phase 1 topics decided 2026-10-24.
 ## Slice 1 look, round 5 (Dan, 2026-10-24)
 - All cars are the same size: each model is scaled to one length, and the grow-in at route ends is gone.
 - Boats stay on water. A bridge is a low road deck, so a boat cannot pass under it, and a lane round the hub would cross every bridge. Instead each island has a quay on the hub in the water gap beside its bridge, and a lane over open sea (grid search around land and bridges, scripts in frontend/src/scene/sea.ts) to the island's harbour.
+- Superseded (slice 5): every bridge is now an arch (`frontend/src/scene/arches.ts`, built by `bridge()` in short lifted pieces in every theme), so a boat passes under any bridge and the sea is never walled off by a road. Cars follow the same curve (`deckAt`). Boats sail island to island by the shortest open water (grid search around land only), from the island that publishes a topic to the island whose worker reads it; messages that stay on one island sail a short out-and-back lane from their own harbour. Only a topic the hub owns (the old egress route) still starts at a hub quay.
 - Worker: a yellow-brick factory with chimneys and rooftop units on the roof (the sawtooth roof read as black blobs) and a FACTORY sign.
 
 ## Data rule: metrics first (Dan, 2026-10-24)

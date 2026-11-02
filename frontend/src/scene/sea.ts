@@ -1,14 +1,12 @@
 import * as THREE from 'three'
 
-/** What boats must stay clear of: every island's coast (in world x/z) and the bridges between them. */
+/** What boats must stay clear of: every island's coast, in world x/z. Bridges are not on the list: every bridge is an arch, and boats sail under it. */
 export interface SeaMap {
   land: THREE.Vector2[][]
-  bridges: [THREE.Vector2, THREE.Vector2][]
 }
 
 const CELL = 2.5
 const LAND_MARGIN = 3.2
-const BRIDGE_MARGIN = 4.5
 
 function distToSegment(p: THREE.Vector2, a: THREE.Vector2, b: THREE.Vector2): number {
   const abx = b.x - a.x, aby = b.y - a.y
@@ -35,7 +33,7 @@ interface Grid {
 
 const grids = new WeakMap<SeaMap, Grid>()
 
-/** Which sea cells are land, shore or under a bridge. Worked out once per map, since every island's lane uses the same one. */
+/** Which sea cells are land or shore. Worked out once per map, since every island's lane uses the same one. */
 function gridOf(map: SeaMap, pts: THREE.Vector2[]): Grid {
   const cached = grids.get(map)
   if (cached) return cached
@@ -66,21 +64,12 @@ function gridOf(map: SeaMap, pts: THREE.Vector2[]): Grid {
         }
     }
   }
-  const probe = new THREE.Vector2()
-  for (const [a, c] of map.bridges) {
-    const reach = Math.ceil(BRIDGE_MARGIN / CELL) + 1
-    for (let j = cell(Math.min(a.y, c.y), minZ) - reach; j <= cell(Math.max(a.y, c.y), minZ) + reach; j++)
-      for (let i = cell(Math.min(a.x, c.x), minX) - reach; i <= cell(Math.max(a.x, c.x), minX) + reach; i++) {
-        probe.set(minX + (i + 0.5) * CELL, minZ + (j + 0.5) * CELL)
-        if (distToSegment(probe, a, c) < BRIDGE_MARGIN) mark(i, j)
-      }
-  }
   const grid = { minX, minZ, w, h, blocked }
   grids.set(map, grid)
   return grid
 }
 
-/** Finds a sea lane between two points that never touches land or passes under a bridge. Null when there is none. */
+/** Finds a sea lane between two points that never touches land. It passes under any bridge in its way, as every bridge is an arch. Null when there is none. */
 export function findLane(map: SeaMap, from: THREE.Vector3, to: THREE.Vector3): THREE.Vector3[] | null {
   const pts = map.land.flat()
   if (pts.length === 0) return null
@@ -203,4 +192,29 @@ export function findLane(map: SeaMap, from: THREE.Vector3, to: THREE.Vector3): T
     return i < 0 || j < 0 || i >= w || j >= h || !blocked[j * w + i] || p === smooth[0] || p === smooth[smooth.length - 1]
   })
   return ok ? smooth : tight
+}
+
+/**
+ * A short out-and-back lane for messages that stay on one island: from the water by its harbour a little way out to sea, away from the island's
+ * centre, in the first direction that is clear. A two-point lane, sailed there and back.
+ */
+export function harbourLoop(map: SeaMap, water: THREE.Vector3, centre: THREE.Vector3): THREE.Vector3[] | null {
+  const pts = map.land.flat()
+  if (pts.length === 0) return null
+  const { minX, minZ, w, h, blocked } = gridOf(map, pts)
+  const free = (x: number, z: number) => {
+    const i = Math.floor((x - minX) / CELL), j = Math.floor((z - minZ) / CELL)
+    return i >= 0 && j >= 0 && i < w && j < h && !blocked[j * w + i]
+  }
+  const out = Math.atan2(water.z - centre.z, water.x - centre.x)
+  for (const length of [16, 11, 7]) {
+    for (const turn of [0, 0.5, -0.5, 1, -1]) {
+      const a = out + turn
+      const end = new THREE.Vector3(water.x + Math.cos(a) * length, 0, water.z + Math.sin(a) * length)
+      let clear = true
+      for (let k = 1; k <= 8 && clear; k++) clear = free(water.x + ((end.x - water.x) * k) / 8, water.z + ((end.z - water.z) * k) / 8)
+      if (clear) return [water.clone().setY(0), end]
+    }
+  }
+  return null
 }

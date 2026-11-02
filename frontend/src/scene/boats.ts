@@ -6,6 +6,9 @@ import { clamp } from '../visuals'
 export interface BoatRoute {
   /** From the hub's port out to the island's harbour. Boats sail it there (loaded) and back (empty). */
   path: THREE.Vector3[]
+  /** The island whose topic the boats carry out of (null for the hub's own), and the island they sail to. */
+  from: string | null
+  to: string
   /** Boats leaving per second. Zero while the broker is down or has no data. */
   rate: () => number
   /** Sailing speed multiplier from the broker's latency against its SLA. */

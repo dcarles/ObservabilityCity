@@ -15,6 +15,19 @@ import { test, expect } from '../support/test'
 //   sta  nothing                     no bridge, no pier, a registry warning
 
 test.describe('connectors follow real links', () => {
+  test('every bridge is an arch, so every harbour reaches every other by sea and boats sail island to island', async ({ town }) => {
+    await town.open()
+    await town.step(20)
+    const sea = await town.sea()
+    expect(sea.arches).toBeGreaterThan(0)
+    expect(sea.harbours.length).toBeGreaterThan(1)
+    expect(sea.unreachable).toEqual([]) // no road walls an island off from the water
+    // a worker reads a topic another island publishes: the boats sail from that island to this one, not through the hub
+    expect(sea.routes.some((r) => r.from !== null && r.from !== r.to)).toBe(true)
+    // every island with a pier has a lane, even one nothing sails to yet
+    for (const id of sea.harbours) expect(sea.routes.some((r) => r.to === id), id).toBe(true)
+  })
+
   test('each island gets exactly the bridge and the pier its links call for', async ({ town }) => {
     await town.open()
     await town.step(20)
