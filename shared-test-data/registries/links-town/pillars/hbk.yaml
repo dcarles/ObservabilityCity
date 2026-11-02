@@ -3,4 +3,7 @@ pillar: hbk
 displayName: Hub link only
 color: "#b08968"
 systems:
-  - { id: hbk.sync-cron, name: Customer sync, role: cron, calls: [hub.customer-db] }
+  - { id: hbk.sync-cron, service: sync, name: Customer sync, role: cron, calls: [hub.customer-db] }
+scheduler:
+  - system: hbk.sync-cron
+    jobs: { daily: [sync], hourly: [sync] }

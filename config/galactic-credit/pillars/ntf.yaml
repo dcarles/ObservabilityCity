@@ -17,3 +17,6 @@ messaging:
     - { topic: cl-posting-outbox, consumer: ntf.dispatch-worker }
     - { topic: col-dunning-outbox, consumer: ntf.dispatch-worker }
     - { topic: dsp-disputes-outbox, consumer: ntf.dispatch-worker }
+scheduler:
+  - system: ntf.digest-cron
+    jobs: { daily: [dispatch], hourly: [dispatch] }

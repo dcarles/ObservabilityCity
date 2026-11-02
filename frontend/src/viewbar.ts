@@ -51,7 +51,8 @@ export class ViewBar {
   private focusChoices: IslandChoice[] = []
   private trouble = new Map<string, 'amber' | 'red'>()
 
-  constructor(private readonly host: ViewBarHost) {
+  /** `only` names the dropdowns to draw (the dashboard has the environment and the tenants and nothing of the town's); left out, all of them. */
+  constructor(private readonly host: ViewBarHost, private readonly only?: readonly Exclude<Open, null>[]) {
     document.addEventListener('pointerdown', (e) => {
       if (this.open && !(e.target as HTMLElement).closest('#view-bar')) this.close()
     })
@@ -177,7 +178,8 @@ export class ViewBar {
           ${this.open === 'theme' ? `<div class="vb-list" id="theme-list">${THEMES.map((th) => `<div class="vb-row ${th.id === theme.id ? 'sel' : ''}" data-act="theme" data-id="${th.id}"><span>${escapeHtml(th.name)}<br /><small class="hint">${escapeHtml(th.blurb)}</small></span></div>`).join('')}</div>` : ''}</div>`
     const qualityBtn = `<div class="vb">${button('open-quality', 'quality-button', qualityName(quality), 'Quality: how much detail the town is drawn with. Lower it on a weak PC', this.open === 'quality')}
           ${this.open === 'quality' ? `<div class="vb-list" id="quality-list">${QUALITIES.map((q) => `<div class="vb-row ${q.id === quality ? 'sel' : ''}" data-act="quality" data-id="${q.id}"><span>${escapeHtml(q.name)}<br /><small class="hint">${escapeHtml(q.hint)}</small></span></div>`).join('')}</div>` : ''}</div>`
-    this.el.innerHTML = townBtn + envBtn + tenantBtn + islandBtn + layerBtn + themeBtn + qualityBtn
+    const has = (k: Exclude<Open, null>) => !this.only || this.only.includes(k)
+    this.el.innerHTML = (has('town') ? townBtn : '') + (has('env') ? envBtn : '') + (has('tenant') ? tenantBtn : '') + (has('islands') ? islandBtn : '') + (has('layers') ? layerBtn : '') + (has('theme') ? themeBtn : '') + (has('quality') ? qualityBtn : '')
     if (keepFocus) {
       const input = this.el.querySelector<HTMLInputElement>('.vb-list input[type=search]')
       if (input) { input.focus(); input.setSelectionRange(this.query.length, this.query.length) }

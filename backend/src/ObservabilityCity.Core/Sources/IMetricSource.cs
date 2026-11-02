@@ -28,7 +28,11 @@ public sealed record NodeReading(
     double? Calls = null,
     AppState? App = null,
     IReadOnlyList<JobReading>? Jobs = null,
-    IReadOnlyList<RegionReading>? Regions = null);
+    IReadOnlyList<RegionReading>? Regions = null,
+    IReadOnlyList<QueueReading>? Queues = null);
+
+/// <summary>One queue (or other broker entity) a consumer reads, with what waits in it and what is dead-lettered; a number the source cannot tell is null.</summary>
+public sealed record QueueReading(string Name, double? Backlog, double? DeadLetters, double? PerSecond = null);
 
 /// <summary>
 /// What one region of a service reports: how many instances it runs, and how busy its plan is, and Share is the part of the service's requests it took (0 to 1, the regions add up to 1; null when nothing measures it). Region is the label the scope rules gave (see <c>scope.regions</c>).

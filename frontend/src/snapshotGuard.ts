@@ -198,6 +198,9 @@ function checkMessaging(m: unknown): MessagingSnapshot {
     subscriptions: (Array.isArray(raw.subscriptions) ? raw.subscriptions : []).filter(isObject)
       .filter((x) => typeof x.topic === 'string' && typeof x.consumer === 'string' && x.consumer !== '')
       .map((x) => ({ topic: x.topic as string, publisher: str(x.publisher), consumer: x.consumer as string, legacy: x.legacy === true })),
+    schedules: (Array.isArray(raw.schedules) ? raw.schedules : []).filter(isObject)
+      .filter((x) => typeof x.system === 'string' && x.system !== '' && typeof x.job === 'string' && x.job !== '')
+      .map((x) => ({ system: x.system as string, job: x.job as string, services: (Array.isArray(x.services) ? x.services : []).filter((v): v is string => typeof v === 'string' && v !== '') })),
   }
 }
 
@@ -244,6 +247,8 @@ function checkNode(n: unknown, groupId: string, ids: Set<string>, problems: stri
     ? n.inbound.filter(isObject).filter((l) => typeof l.from === 'string' && l.from !== '').map((l) => ({ from: l.from as string, requestsPerSecond: isFiniteNumber(l.requestsPerSecond) && l.requestsPerSecond >= 0 ? l.requestsPerSecond : 0 }))
     : null
   out.inboundEstimated = n.inboundEstimated === true
+  // why the state is not healthy, in words; the backend leaves it out for a healthy system
+  out.reason = typeof n.reason === 'string' && n.reason !== '' ? n.reason : null
   // null: nothing says whether the app runs; a job or region list is only there for a function or a service in two regions
   out.app = APP_STATES.includes(n.app as string) ? n.app : null
   const optionalNumber = (v: unknown) => (isFiniteNumber(v) ? v : null)
@@ -251,6 +256,14 @@ function checkNode(n: unknown, groupId: string, ids: Set<string>, problems: stri
   out.jobs = Array.isArray(n.jobs)
     ? n.jobs.filter(isObject).filter((j) => typeof j.name === 'string' && j.name !== '')
       .map((j) => ({ name: j.name as string, region: optionalText(j.region), status: JOB_STATUSES.includes(j.status as string) ? j.status : 'Ok', lastRun: optionalText(j.lastRun), next: optionalText(j.next) }))
+    : null
+  // the queues a consumer reads: one without a name cannot be shown; a link must be a web address, or it is dropped
+  out.queues = Array.isArray(n.queues)
+    ? n.queues.filter(isObject).filter((q) => typeof q.name === 'string' && q.name !== '')
+      .map((q) => ({
+        name: q.name as string, backlog: optionalNumber(q.backlog), deadLetters: optionalNumber(q.deadLetters), perSecond: optionalNumber(q.perSecond),
+        link: isObject(q.link) && typeof q.link.name === 'string' && q.link.name !== '' && typeof q.link.url === 'string' && /^https?:\/\//i.test(q.link.url) ? { name: q.link.name, url: q.link.url } : null,
+      }))
     : null
   out.regions = Array.isArray(n.regions)
     ? n.regions.filter(isObject).filter((r) => typeof r.region === 'string' && r.region !== '')

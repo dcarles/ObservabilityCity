@@ -38,6 +38,8 @@ internal sealed class RoleDefaultsFile
     public ErrorThresholdsFile? Throttle { get; set; }
     /// <summary>When the oldest waiting message of a consumer turns amber and red, in seconds.</summary>
     public ErrorThresholdsFile? Backlog { get; set; }
+    /// <summary>When the number of messages waiting for a consumer turns amber and red, for a broker that reports counts and not ages. Off unless set.</summary>
+    public ErrorThresholdsFile? BacklogCount { get; set; }
     /// <summary>The fewest calls in a source's window that make the error share and latency worth judging. With fewer, the system is quiet.</summary>
     public int? MinCalls { get; set; }
     /// <summary>Whether link discovery looks for the calls systems of this role make (an api or a worker). Default yes.</summary>
@@ -62,6 +64,7 @@ internal sealed class SystemFile
     public ErrorThresholdsFile? Resources { get; set; }
     public ErrorThresholdsFile? Throttle { get; set; }
     public ErrorThresholdsFile? Backlog { get; set; }
+    public ErrorThresholdsFile? BacklogCount { get; set; }
     public int? MinCalls { get; set; }
     /// <summary>Whether link discovery looks for the calls this system makes. Without it, the pillar's or the defaults' choice.</summary>
     public bool? DiscoverLinks { get; set; }
@@ -90,6 +93,8 @@ internal sealed class PillarFile
     public Dictionary<string, string> Signals { get; set; } = new();
     public List<SystemFile> Systems { get; set; } = [];
     public MessagingFile? Messaging { get; set; }
+    /// <summary>Which services each scheduled job of a function in this pillar starts work for. A job that is not listed sends no boats.</summary>
+    public List<SchedulerFile> Scheduler { get; set; } = [];
     /// <summary>How the pillar is spelt in the environments' scope rules, when that is not its id.</summary>
     public PillarScopeFile? Scope { get; set; }
 }
@@ -112,6 +117,15 @@ internal sealed class MessagingFile
     /// <summary>Pillar files: service names, each published as the topic {pillar}-{service}-outbox. hub.yaml: free names, each published as hub-{name}.</summary>
     public List<string> Topics { get; set; } = [];
     public List<SubscriptionFile> Subscriptions { get; set; } = [];
+}
+
+/// <summary>One entry of a pillar's <c>scheduler:</c> list: a function and, for each of its jobs, the services the job starts work for.</summary>
+internal sealed class SchedulerFile
+{
+    /// <summary>The function system, by its id within the pillar.</summary>
+    public string System { get; set; } = "";
+    /// <summary>Job name (as the logs name it) to the services of this pillar it starts work for.</summary>
+    public Dictionary<string, List<string>> Jobs { get; set; } = [];
 }
 
 internal sealed class SubscriptionFile
@@ -400,6 +414,8 @@ internal sealed class SourceFile
     public double? PollSeconds { get; set; }
     /// <summary>How long one ask may take before it is given up, in seconds.</summary>
     public double? TimeoutSeconds { get; set; }
+    /// <summary>Job sources only (functionjobs): how long after its schedule says it should run a job may stay without a newer run before it counts as late, in seconds.</summary>
+    public double? LateAfterSeconds { get; set; }
     /// <summary>Query sources only (loganalytics): the query to send, a template. {window} and {windowSeconds} stand for the window, {roles} for the telemetry names of the systems it is asked about, quoted and separated by commas; scope variables and {environment} work too.</summary>
     public string? Query { get; set; }
     /// <summary>Request sources only (loganalytics): the query that says how a service's requests divide between regions, a template like query. Returns one row per telemetry name and region with the columns role, region and calls (sampling-corrected counts do: only the proportions are used).</summary>
@@ -408,6 +424,49 @@ internal sealed class SourceFile
     public string? Window { get; set; }
     /// <summary>Platform-metric sources only (azuremonitor): which metric of which resources fills which signal. Everything about the metrics is written here; the program knows none.</summary>
     public List<MetricGroupFile> Metrics { get; set; } = [];
+    /// <summary>Message-broker sources only (servicebus): which namespaces to read, which metrics fill the backlog and the dead letters, and how an entity's name says whose it is.</summary>
+    public EntitiesFile? Entities { get; set; }
+}
+
+/// <summary>How a broker's queues and topics are read: the namespaces come from a scope.resources rule, the metrics are split by the entity's name, and patterns say which system an entity belongs to.</summary>
+internal sealed class EntitiesFile
+{
+    /// <summary>The name of a scope.resources rule: the resources it finds (the broker's namespaces) are the ones asked.</summary>
+    public string Resources { get; set; } = "";
+    /// <summary>The metric dimension that carries the entity's name. Default EntityName.</summary>
+    public string? Dimension { get; set; }
+    /// <summary>The time grain the metrics are asked at, for example 5m. Default: one minute.</summary>
+    public string? Interval { get; set; }
+    /// <summary>The messages waiting in an entity, for example a metric of active messages added up by average.</summary>
+    public EntityMetricFile? Backlog { get; set; }
+    /// <summary>The dead-lettered messages of an entity, for example a metric of dead-lettered messages added up by maximum.</summary>
+    public EntityMetricFile? DeadLetter { get; set; }
+    /// <summary>An address that opens a consumer's dead letters in your support tool: a name and a URL template over {pillar}, {service}, {system} and {environment}. Without it, no link.</summary>
+    public EntityLinkFile? DeadLetterLink { get; set; }
+    /// <summary>The messages that arrive in an entity, for example a metric of incoming messages added up by total. Their rate sets how many boats sail to the consumer.</summary>
+    public EntityMetricFile? Throughput { get; set; }
+    /// <summary>Entity name patterns, tried in order: the first that matches decides whose the entity is. An entity no pattern matches is left out.</summary>
+    public List<EntityPatternFile> Patterns { get; set; } = [];
+}
+
+internal sealed class EntityLinkFile
+{
+    public string Name { get; set; } = "";
+    public string Url { get; set; } = "";
+}
+
+internal sealed class EntityMetricFile
+{
+    public string Metric { get; set; } = "";
+    public string Aggregation { get; set; } = "average";
+}
+
+/// <summary>One shape of entity name: a regular expression with the named groups pillar and service, which pick the system that consumes the entity (the one of the given kind whose pillar and service code they name).</summary>
+internal sealed class EntityPatternFile
+{
+    public string Match { get; set; } = "";
+    /// <summary>The kind of system that reads the entity: worker (default), api, and so on.</summary>
+    public string? Consumer { get; set; }
 }
 
 /// <summary>The metrics of one kind of resource: <see cref="Resources"/> names a rule of scope.resources, and each signal says where its number comes from.</summary>

@@ -35,7 +35,8 @@
             "service": "egress"
           }
         ],
-        "subscriptions": []
+        "subscriptions": [],
+        "schedules": []
       },
       "nodes": [
         {
@@ -78,7 +79,9 @@
           "inboundEstimated": false,
           "app": null,
           "jobs": null,
-          "regions": null
+          "regions": null,
+          "queues": null,
+          "reason": null
         },
         {
           "id": "hub.service-bus",
@@ -120,7 +123,9 @@
           "inboundEstimated": false,
           "app": null,
           "jobs": null,
-          "regions": null
+          "regions": null,
+          "queues": null,
+          "reason": null
         },
         {
           "id": "hub.egress",
@@ -162,7 +167,9 @@
           "inboundEstimated": false,
           "app": null,
           "jobs": null,
-          "regions": null
+          "regions": null,
+          "queues": null,
+          "reason": null
         },
         {
           "id": "hub.customer-db",
@@ -204,7 +211,9 @@
           "inboundEstimated": false,
           "app": null,
           "jobs": null,
-          "regions": null
+          "regions": null,
+          "queues": null,
+          "reason": null
         }
       ],
       "assets": []
@@ -233,7 +242,8 @@
             "consumer": "ful.orders-worker",
             "legacy": false
           }
-        ]
+        ],
+        "schedules": []
       },
       "nodes": [
         {
@@ -278,7 +288,9 @@
           "inboundEstimated": false,
           "app": null,
           "jobs": null,
-          "regions": null
+          "regions": null,
+          "queues": null,
+          "reason": null
         },
         {
           "id": "ful.orders-worker",
@@ -322,7 +334,9 @@
           "inboundEstimated": false,
           "app": null,
           "jobs": null,
-          "regions": null
+          "regions": null,
+          "queues": null,
+          "reason": null
         },
         {
           "id": "ful.orders-db",
@@ -364,7 +378,9 @@
           "inboundEstimated": false,
           "app": null,
           "jobs": null,
-          "regions": null
+          "regions": null,
+          "queues": null,
+          "reason": null
         }
       ],
       "assets": []
@@ -393,7 +409,8 @@
             "consumer": "wrk.batch-worker",
             "legacy": false
           }
-        ]
+        ],
+        "schedules": []
       },
       "nodes": [
         {
@@ -438,7 +455,9 @@
           "inboundEstimated": false,
           "app": null,
           "jobs": null,
-          "regions": null
+          "regions": null,
+          "queues": null,
+          "reason": null
         },
         {
           "id": "wrk.batch-db",
@@ -480,7 +499,9 @@
           "inboundEstimated": false,
           "app": null,
           "jobs": null,
-          "regions": null
+          "regions": null,
+          "queues": null,
+          "reason": null
         }
       ],
       "assets": []
@@ -497,7 +518,8 @@
       "hasRingBridge": true,
       "messaging": {
         "topics": [],
-        "subscriptions": []
+        "subscriptions": [],
+        "schedules": []
       },
       "nodes": [
         {
@@ -542,7 +564,9 @@
           "inboundEstimated": false,
           "app": null,
           "jobs": null,
-          "regions": null
+          "regions": null,
+          "queues": null,
+          "reason": null
         },
         {
           "id": "nom.catalog-cache",
@@ -584,7 +608,9 @@
           "inboundEstimated": false,
           "app": null,
           "jobs": null,
-          "regions": null
+          "regions": null,
+          "queues": null,
+          "reason": null
         }
       ],
       "assets": []
@@ -601,14 +627,30 @@
       "hasRingBridge": false,
       "messaging": {
         "topics": [],
-        "subscriptions": []
+        "subscriptions": [],
+        "schedules": [
+          {
+            "system": "hbk.sync-cron",
+            "job": "daily",
+            "services": [
+              "sync"
+            ]
+          },
+          {
+            "system": "hbk.sync-cron",
+            "job": "hourly",
+            "services": [
+              "sync"
+            ]
+          }
+        ]
       },
       "nodes": [
         {
           "id": "hbk.sync-cron",
           "name": "Customer sync",
           "kind": "Function",
-          "service": null,
+          "service": "sync",
           "external": false,
           "state": "Healthy",
           "instancesTotal": 1,
@@ -661,7 +703,9 @@
               "next": "2026-10-25T12:43:03+00:00"
             }
           ],
-          "regions": null
+          "regions": null,
+          "queues": null,
+          "reason": null
         }
       ],
       "assets": []
@@ -685,7 +729,8 @@
             "consumer": "leg.feed-worker",
             "legacy": true
           }
-        ]
+        ],
+        "schedules": []
       },
       "nodes": [
         {
@@ -730,7 +775,9 @@
           "inboundEstimated": false,
           "app": null,
           "jobs": null,
-          "regions": null
+          "regions": null,
+          "queues": null,
+          "reason": null
         },
         {
           "id": "leg.feed-worker",
@@ -774,7 +821,9 @@
           "inboundEstimated": false,
           "app": null,
           "jobs": null,
-          "regions": null
+          "regions": null,
+          "queues": null,
+          "reason": null
         },
         {
           "id": "leg.feed-db",
@@ -816,7 +865,9 @@
           "inboundEstimated": false,
           "app": null,
           "jobs": null,
-          "regions": null
+          "regions": null,
+          "queues": null,
+          "reason": null
         }
       ],
       "assets": []
@@ -833,14 +884,30 @@
       "hasRingBridge": false,
       "messaging": {
         "topics": [],
-        "subscriptions": []
+        "subscriptions": [],
+        "schedules": [
+          {
+            "system": "sta.idle-cron",
+            "job": "daily",
+            "services": [
+              "idle"
+            ]
+          },
+          {
+            "system": "sta.idle-cron",
+            "job": "hourly",
+            "services": [
+              "idle"
+            ]
+          }
+        ]
       },
       "nodes": [
         {
           "id": "sta.idle-cron",
           "name": "Idle job",
           "kind": "Function",
-          "service": null,
+          "service": "idle",
           "external": false,
           "state": "Healthy",
           "instancesTotal": 1,
@@ -891,7 +958,9 @@
               "next": "2026-10-25T12:43:03+00:00"
             }
           ],
-          "regions": null
+          "regions": null,
+          "queues": null,
+          "reason": null
         }
       ],
       "assets": []
@@ -939,7 +1008,9 @@
         "inboundEstimated": false,
         "app": null,
         "jobs": null,
-        "regions": null
+        "regions": null,
+        "queues": null,
+        "reason": null
       },
       "calledBy": [
         "ful.orders-api",
@@ -991,7 +1062,9 @@
         "inboundEstimated": false,
         "app": null,
         "jobs": null,
-        "regions": null
+        "regions": null,
+        "queues": null,
+        "reason": null
       },
       "calledBy": [
         "nom.catalog-api"
@@ -1042,7 +1115,9 @@
         "inboundEstimated": false,
         "app": null,
         "jobs": null,
-        "regions": null
+        "regions": null,
+        "queues": null,
+        "reason": null
       },
       "calledBy": [
         "ful.orders-worker"

@@ -118,6 +118,7 @@ All 10 Phase 1 topics decided 2026-10-24.
 ## Slice 1 look, round 5 (Dan, 2026-10-24)
 - All cars are the same size: each model is scaled to one length, and the grow-in at route ends is gone.
 - Boats stay on water. A bridge is a low road deck, so a boat cannot pass under it, and a lane round the hub would cross every bridge. Instead each island has a quay on the hub in the water gap beside its bridge, and a lane over open sea (grid search around land and bridges, scripts in frontend/src/scene/sea.ts) to the island's harbour.
+- Superseded (slice 5): every bridge is now an arch (`frontend/src/scene/arches.ts`, built by `bridge()` in short lifted pieces in every theme), so a boat passes under any bridge and the sea is never walled off by a road. Cars follow the same curve (`deckAt`). Boats sail island to island by the shortest open water (grid search around land only), from the island that publishes a topic to the island whose worker reads it; messages that stay on one island sail a short out-and-back lane from their own harbour. Only a topic the hub owns (the old egress route) still starts at a hub quay.
 - Worker: a yellow-brick factory with chimneys and rooftop units on the roof (the sawtooth roof read as black blobs) and a FACTORY sign.
 
 ## Data rule: metrics first (Dan, 2026-10-24)
@@ -185,3 +186,12 @@ All 10 Phase 1 topics decided 2026-10-24.
 - A model keeps the footprint, door, door direction and plaque place of the harbour town's, within a tolerance a unit test holds it to, so the layout, the cars and the walkers work unchanged.
 - Space and works use no model files: they are procedural geometry, so there is nothing to license. The harbour town's roads are tinted (space) rather than redrawn.
 - The legend keeps its entries, tones and meanings in every theme; only what each thing looks like is reworded (`legendWords.ts`).
+
+## Slice 5, PR 3: what a scheduled job starts work for, and where dead letters are looked at
+- **A job's target services are said in the pillar file (`scheduler:`), never read from queue names.** The logs name a job but not what it feeds, and other pillars' queue names are free-form. A job the file does not list sends no boats, and the town says "Job not mapped" in its notices and on the job's row, so the file can be completed.
+- **Scheduler boats are approximate on purpose.** A job's runs are not measured as messages, so each mapped job that runs fine sends a small steady trickle of boats (and none while it fails or is late). They sail the short out-and-back lane from the island's own harbour, since a mapped service is on the same island.
+- **The dead-letter address belongs to the broker source** (`entities.deadLetterLink`), a template over the queue name, the pillar and service codes, the system id and the environment, made for each queue a consumer reads (the support tool has a page per queue). The source reports the queue names with their counts and the drawer lists them. The program knows no support tool; a system with no code for a word the address needs gets no link instead of a broken one.
+
+## Slice 5, PR 4: boats follow the messages that arrive
+- **A boat's rate comes from what arrives in the queues, not from the broker building's health.** The broker's own building may have no data source (it is monitored through its queues), and a building nothing measures is not a stopped one. The optional `entities.throughput` metric gives each queue's arrivals a second; an island's boats follow the sum for the queues its workers read, and fall back to the workers' request rate without it. Only a broker that is Down stops the boats. Scheduler loops follow the same rule.
+- **The ring road is level.** It is a road round the town, not a bridge over a sea lane, so it is a flat causeway; the bridges that cross water stay arched.

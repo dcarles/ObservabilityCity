@@ -3,7 +3,7 @@ import { box, cyl, flat } from '../../buildings/mk'
 import { GROUND } from '../../scene/island'
 import { ROAD_W } from '../../scene/props'
 import type { BridgeStyle } from '../types'
-import { glow } from '../common'
+import { endList, glow } from '../common'
 
 const METAL = '#2c3152'
 const PLATE = '#8d97c4'
@@ -31,7 +31,7 @@ export const spaceBridge: BridgeStyle = {
       }
     }
     // gate pylons at both ends
-    for (const end of ends ? [-1, 1] : []) {
+    for (const end of endList(ends)) {
       for (const side of [-1, 1]) {
         const x = side * (width / 2 - 0.2), z = end * (len / 2 - 0.25)
         deck.add(cyl(0.22, 0.34, 2.3, flat(PLATE, { metalness: 0.4 }), { x, y: GROUND - 0.06, z }, 8))

@@ -28,7 +28,8 @@
       "hasRingBridge": false,
       "messaging": {
         "topics": [],
-        "subscriptions": []
+        "subscriptions": [],
+        "schedules": []
       },
       "nodes": [
         {
@@ -71,7 +72,9 @@
           "inboundEstimated": false,
           "app": null,
           "jobs": null,
-          "regions": null
+          "regions": null,
+          "queues": null,
+          "reason": null
         },
         {
           "id": "hub.service-bus",
@@ -113,7 +116,9 @@
           "inboundEstimated": false,
           "app": null,
           "jobs": null,
-          "regions": null
+          "regions": null,
+          "queues": null,
+          "reason": null
         },
         {
           "id": "hub.egress",
@@ -155,7 +160,9 @@
           "inboundEstimated": false,
           "app": null,
           "jobs": null,
-          "regions": null
+          "regions": null,
+          "queues": null,
+          "reason": null
         },
         {
           "id": "hub.customer-db",
@@ -197,7 +204,9 @@
           "inboundEstimated": false,
           "app": null,
           "jobs": null,
-          "regions": null
+          "regions": null,
+          "queues": null,
+          "reason": null
         }
       ],
       "assets": []
@@ -226,7 +235,8 @@
             "consumer": "aa.orders-worker",
             "legacy": false
           }
-        ]
+        ],
+        "schedules": []
       },
       "nodes": [
         {
@@ -271,7 +281,9 @@
           "inboundEstimated": false,
           "app": null,
           "jobs": null,
-          "regions": null
+          "regions": null,
+          "queues": null,
+          "reason": "error rate 18.2%"
         },
         {
           "id": "aa.orders-worker",
@@ -315,7 +327,9 @@
           "inboundEstimated": false,
           "app": null,
           "jobs": null,
-          "regions": null
+          "regions": null,
+          "queues": null,
+          "reason": null
         },
         {
           "id": "aa.orders-db",
@@ -357,7 +371,9 @@
           "inboundEstimated": false,
           "app": null,
           "jobs": null,
-          "regions": null
+          "regions": null,
+          "queues": null,
+          "reason": null
         }
       ],
       "assets": []
@@ -392,7 +408,8 @@
             "consumer": "cc.notify-worker",
             "legacy": false
           }
-        ]
+        ],
+        "schedules": []
       },
       "nodes": [
         {
@@ -440,7 +457,9 @@
           "inboundEstimated": false,
           "app": null,
           "jobs": null,
-          "regions": null
+          "regions": null,
+          "queues": null,
+          "reason": null
         },
         {
           "id": "cc.notify-worker",
@@ -484,7 +503,9 @@
           "inboundEstimated": false,
           "app": null,
           "jobs": null,
-          "regions": null
+          "regions": null,
+          "queues": null,
+          "reason": null
         },
         {
           "id": "cc.notify-db",
@@ -526,7 +547,9 @@
           "inboundEstimated": false,
           "app": null,
           "jobs": null,
-          "regions": null
+          "regions": null,
+          "queues": null,
+          "reason": null
         }
       ],
       "assets": []
@@ -574,7 +597,9 @@
         "inboundEstimated": false,
         "app": null,
         "jobs": null,
-        "regions": null
+        "regions": null,
+        "queues": null,
+        "reason": null
       },
       "calledBy": [
         "aa.orders-api"
@@ -625,7 +650,9 @@
         "inboundEstimated": false,
         "app": null,
         "jobs": null,
-        "regions": null
+        "regions": null,
+        "queues": null,
+        "reason": null
       },
       "calledBy": [
         "cc.notify-worker"

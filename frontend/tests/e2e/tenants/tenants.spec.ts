@@ -424,14 +424,15 @@ test.describe('a quiet tenant database', () => {
 })
 
 test.describe('a tenant no database reports', () => {
-  test('is marked "not found" in the tenant dropdown, and the others are not', async ({ town, page }) => {
-    await town.open()
-    await page.evaluate(() => {
-      const c = (window as any).city
-      const s = JSON.parse(JSON.stringify(c.seen.last))
-      s.tenants = s.tenants.map((t: any, i: number) => ({ ...t, notFound: i === 0 }))
-      c.feed(s)
-    })
+  test('is marked "not found" in the tenant dropdown, and the others are not', async ({ page, request }) => {
+    // The page is served one fixed snapshot and no live feed (as the quiet database test does): a snapshot pushed from the server between feeding a
+    // changed one and opening the list would put the tenants back as they were and the note would never show.
+    const real = await (await request.get(`${API}/api/snapshot/latest`)).json()
+    real.tenants = real.tenants.map((t: any, i: number) => ({ ...t, notFound: i === 0 }))
+    await page.route('**/hubs/town**', (r) => r.abort())
+    await page.route('**/api/snapshot/latest**', (r) => r.fulfill({ json: real }))
+    await page.goto('/?test=1&quality=low')
+    await page.waitForFunction(() => (window as any).city?.seen.snapshots > 0)
     await page.locator('#tenant-button').click()
     await expect(page.locator('#tenant-list .vb-note')).toHaveCount(1)
     await expect(page.locator('#tenant-list .vb-note')).toHaveText('not found')

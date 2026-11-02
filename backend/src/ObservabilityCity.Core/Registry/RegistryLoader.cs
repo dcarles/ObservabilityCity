@@ -31,7 +31,7 @@ public static partial class RegistryLoader
         "externalCallers", "islands", "role", "service", "slaP99Ms", "errors", "resources", "throttle", "backlog", "calls", "aliases",
         "amber", "red", "vendors", "calledBy", "gatewayCalls", "messaging", "topics", "subscriptions", "topic", "consumer", "legacy",
         "tenantPattern", "order", "default", "sources", "kind", "connection", "tenants", "exclude", "fake", "undeclaredTenants",
-        "signals", "credentials", "credential", "pollSeconds", "timeoutSeconds", "tenantId", "clientId", "clientSecretEnv",
+        "signals", "credentials", "credential", "pollSeconds", "timeoutSeconds", "lateAfterSeconds", "tenantId", "clientId", "clientSecretEnv",
         "scope", "inventory", "workspace", "variables", "subscription", "pillars", "types", "pattern", "roles", "serviceTag", "tenantNameTag",
         "telemetryRole", "queries", "links", "url", "nameLike", "tag", "key", "value", "code", "serviceCode", "telemetry", "minCalls", "query", "window", "discoverLinks", "regions", "tag", "names", "skew", "state", "running", "minDays", "keepFor", "firstRead", "interval", "ignoreHosts", "rules", "host", "path", "target", "gateway", "domains", "services", "internal", "match", "traffic", "shareWindow", "logs", "section", "resources",
     ];
@@ -334,7 +334,7 @@ public static partial class RegistryLoader
             parsed.Add((new RegistryEnvironment(
                 stem, f.Name ?? stem, f.Default,
                 f.Sources.Select(kv => new RegistrySource(kv.Key, kv.Value.Kind.ToLowerInvariant(), kv.Value.Connection)
-                    { Credential = kv.Value.Credential, PollSeconds = kv.Value.PollSeconds, TimeoutSeconds = kv.Value.TimeoutSeconds, Query = kv.Value.Query, RegionQuery = kv.Value.RegionQuery, Window = kv.Value.Window, Metrics = ToMetrics(kv.Value.Metrics) }).ToList(),
+                    { Credential = kv.Value.Credential, PollSeconds = kv.Value.PollSeconds, TimeoutSeconds = kv.Value.TimeoutSeconds, LateAfterSeconds = kv.Value.LateAfterSeconds, Query = kv.Value.Query, RegionQuery = kv.Value.RegionQuery, Window = kv.Value.Window, Metrics = ToMetrics(kv.Value.Metrics), Entities = ToEntities(kv.Value.Entities) }).ToList(),
                 f.Tenants.Select(t => new RegistryTenant(t.Id, t.Name ?? t.Id, t.Kind.Equals("test", StringComparison.OrdinalIgnoreCase) ? TenantKind.Test : TenantKind.Customer)).ToList(),
                 excluded, f.Fake?.UndeclaredTenants ?? [])
             {
@@ -473,8 +473,10 @@ public static partial class RegistryLoader
                 errors.Add($"{name}: source '{source}' has kind '{def.Kind}', which must be lowercase kebab-case. Which kinds exist depends on the adapters loaded; `validate` checks that");
             if (def.PollSeconds is <= 0) errors.Add($"{name}: source '{source}' has pollSeconds {def.PollSeconds}; it must be above 0");
             if (def.TimeoutSeconds is <= 0) errors.Add($"{name}: source '{source}' has timeoutSeconds {def.TimeoutSeconds}; it must be above 0");
+            if (def.LateAfterSeconds is <= 0) errors.Add($"{name}: source '{source}' has lateAfterSeconds {def.LateAfterSeconds}; it must be above 0");
             CheckQuery(f, def, source, name, errors);
             CheckMetrics(f, def, source, name, errors);
+            CheckEntities(f, def, source, name, errors);
             if (def.Credential is not null && !f.Credentials.ContainsKey(def.Credential))
                 errors.Add($"{name}: source '{source}' uses credential '{def.Credential}', which this file does not define.{DidYouMean.Hint(def.Credential, f.Credentials.Keys)}");
         }
@@ -590,9 +592,40 @@ public static partial class RegistryLoader
             Code = p.Scope?.Code,
             TopicServices = p.Messaging?.Topics ?? [],
             SubscriptionDecls = (p.Messaging?.Subscriptions ?? []).Select(x => (x.Topic, x.Consumer, x.Legacy)).ToList(),
+            Schedules = ToSchedules(p, nodes, name, errors),
         };
         CheckMessaging(group, p.Systems.Select(x => x.Id).ToHashSet(), name, errors);
         return group;
+    }
+
+    /// <summary>The pillar's <c>scheduler:</c> list: every entry names a function of the pillar, and every job names services of the pillar.</summary>
+    private static List<RegistrySchedule> ToSchedules(PillarFile p, List<RegistryNode> nodes, string fileName, List<string> errors)
+    {
+        var schedules = new List<RegistrySchedule>();
+        var services = nodes.Select(n => n.Service).OfType<string>().Distinct().ToList();
+        foreach (var entry in p.Scheduler)
+        {
+            var node = nodes.FirstOrDefault(n => n.Id == $"{p.Pillar}.{entry.System}" || n.Id == entry.System);
+            if (node is null)
+            {
+                errors.Add($"{fileName}: scheduler: '{entry.System}' is not a system of this pillar.{DidYouMean.Hint(entry.System, nodes.Select(n => n.Id))}");
+                continue;
+            }
+            if (node.Kind != NodeKind.Function)
+            {
+                errors.Add($"{fileName}: scheduler: '{entry.System}' is a {node.Kind.ToString().ToLowerInvariant()}, but only a function has scheduled jobs");
+                continue;
+            }
+            foreach (var (job, targets) in entry.Jobs)
+            {
+                if (string.IsNullOrWhiteSpace(job)) { errors.Add($"{fileName}: scheduler: a job of '{entry.System}' has no name"); continue; }
+                var clean = (targets ?? []).Where(t => !string.IsNullOrWhiteSpace(t)).Select(t => t.Trim()).Distinct().ToList();
+                foreach (var t in clean.Where(t => !services.Contains(t)))
+                    errors.Add($"{fileName}: scheduler: job '{job}' starts work for '{t}', which is not a service of this pillar.{DidYouMean.Hint(t, services)}");
+                schedules.Add(new RegistrySchedule(node.Id, job.Trim(), clean));
+            }
+        }
+        return schedules;
     }
 
     /// <summary>The parts of a pillar's messaging block that can be checked from its own file alone.</summary>
@@ -731,6 +764,8 @@ public static partial class RegistryLoader
             return fallback;
         }
 
+        double? OptionalNumber(Func<RoleDefaultsFile?, double?> pick, double? own) => own ?? pick(pillar) ?? pick(app);
+
         origins["role"] = new SettingOrigin(SettingLayer.System, fileName);
         origins["external"] = s.External is not null ? new SettingOrigin(SettingLayer.System, fileName)
             : pillarExternal ? new SettingOrigin(SettingLayer.Pillar, fileName)
@@ -755,6 +790,8 @@ public static partial class RegistryLoader
             s.Calls)
         {
             MinCalls = Math.Max(1, (int)Resolve("minCalls", d => d?.MinCalls, s.MinCalls)),
+            BacklogCountAmber = OptionalNumber(d => d?.BacklogCount?.Amber, s.BacklogCount?.Amber),
+            BacklogCountRed = OptionalNumber(d => d?.BacklogCount?.Red, s.BacklogCount?.Red),
             DiscoverLinks = ResolveFlag("discoverLinks", d => d?.DiscoverLinks, s.DiscoverLinks, true),
             GatewayCalls = s.GatewayCalls,
             ServiceCode = s.ServiceCode,

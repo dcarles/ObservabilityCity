@@ -81,6 +81,20 @@ test.describe(`functions and regions (${B ? 'tags, Started, a region tag' : 'nam
     await expect(page.locator('#inspector .why li')).toHaveCount(2)
   })
 
+  test('the drawer says which services a mapped job starts work for, and that a job the file leaves out is not mapped, which the town also says in a notice', async ({ page }) => {
+    await open(page)
+    await page.evaluate(() => (window as any).city.openSystem('aa.sched-fn'))
+    await expect(page.locator(`#inspector .job[data-job="purge (${town.hot})"]`)).toContainText('starts orders')
+    await expect(page.locator(`#inspector .job[data-job="daily (${town.calm})"]`)).toContainText(/starts (orders, reports|reports, orders)/)
+    await expect(page.locator(`#inspector .job[data-job="hourly (${town.hot})"]`)).toContainText('not mapped')
+
+    const notices = await page.evaluate(() => (window as any).city.seen.last.notices as string[])
+    const unmapped = notices.filter((n) => n.startsWith('Job not mapped: aa.sched-fn'))
+    expect(unmapped).toHaveLength(1)
+    expect(unmapped[0]).toContain('hourly')
+    expect(unmapped[0]).not.toContain('purge')
+  })
+
   test('a job time that is not today names its date, and shows no seconds', async ({ page }) => {
     await open(page)
     await page.evaluate(() => (window as any).city.openSystem('aa.sched-fn'))
