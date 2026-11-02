@@ -437,6 +437,13 @@ export interface components {
             notes?: string[] | null;
             sources?: components["schemas"]["SourceFreshnessSnapshot"][] | null;
         };
+        SourceAgeSnapshot: {
+            source: string;
+            /** Format: int32 */
+            ageSeconds: number;
+            fresh: boolean;
+            signals: string[];
+        };
         SourceFreshnessSnapshot: {
             name: string;
             /** Format: date-time */
@@ -444,13 +451,6 @@ export interface components {
             /** Format: double */
             intervalSeconds: number;
             overdue: boolean;
-        };
-        SourceAgeSnapshot: {
-            source: string;
-            /** Format: int32 */
-            ageSeconds: number;
-            fresh: boolean;
-            signals: string[];
         };
         SubscriptionSnapshot: {
             topic: string;

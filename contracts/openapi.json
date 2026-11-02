@@ -1488,32 +1488,6 @@
         },
         "additionalProperties": false
       },
-      "SourceFreshnessSnapshot": {
-        "required": [
-          "intervalSeconds",
-          "name",
-          "overdue"
-        ],
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string"
-          },
-          "lastRead": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "intervalSeconds": {
-            "type": "number",
-            "format": "double"
-          },
-          "overdue": {
-            "type": "boolean"
-          }
-        },
-        "additionalProperties": false
-      },
       "SourceAgeSnapshot": {
         "required": [
           "ageSeconds",
@@ -1538,6 +1512,32 @@
             "items": {
               "type": "string"
             }
+          }
+        },
+        "additionalProperties": false
+      },
+      "SourceFreshnessSnapshot": {
+        "required": [
+          "intervalSeconds",
+          "name",
+          "overdue"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "lastRead": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "intervalSeconds": {
+            "type": "number",
+            "format": "double"
+          },
+          "overdue": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false
