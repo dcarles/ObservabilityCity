@@ -334,7 +334,7 @@ public static partial class RegistryLoader
             parsed.Add((new RegistryEnvironment(
                 stem, f.Name ?? stem, f.Default,
                 f.Sources.Select(kv => new RegistrySource(kv.Key, kv.Value.Kind.ToLowerInvariant(), kv.Value.Connection)
-                    { Credential = kv.Value.Credential, PollSeconds = kv.Value.PollSeconds, TimeoutSeconds = kv.Value.TimeoutSeconds, Query = kv.Value.Query, RegionQuery = kv.Value.RegionQuery, Window = kv.Value.Window, Metrics = ToMetrics(kv.Value.Metrics) }).ToList(),
+                    { Credential = kv.Value.Credential, PollSeconds = kv.Value.PollSeconds, TimeoutSeconds = kv.Value.TimeoutSeconds, Query = kv.Value.Query, RegionQuery = kv.Value.RegionQuery, Window = kv.Value.Window, Metrics = ToMetrics(kv.Value.Metrics), Entities = ToEntities(kv.Value.Entities) }).ToList(),
                 f.Tenants.Select(t => new RegistryTenant(t.Id, t.Name ?? t.Id, t.Kind.Equals("test", StringComparison.OrdinalIgnoreCase) ? TenantKind.Test : TenantKind.Customer)).ToList(),
                 excluded, f.Fake?.UndeclaredTenants ?? [])
             {
@@ -475,6 +475,7 @@ public static partial class RegistryLoader
             if (def.TimeoutSeconds is <= 0) errors.Add($"{name}: source '{source}' has timeoutSeconds {def.TimeoutSeconds}; it must be above 0");
             CheckQuery(f, def, source, name, errors);
             CheckMetrics(f, def, source, name, errors);
+            CheckEntities(f, def, source, name, errors);
             if (def.Credential is not null && !f.Credentials.ContainsKey(def.Credential))
                 errors.Add($"{name}: source '{source}' uses credential '{def.Credential}', which this file does not define.{DidYouMean.Hint(def.Credential, f.Credentials.Keys)}");
         }
@@ -731,6 +732,8 @@ public static partial class RegistryLoader
             return fallback;
         }
 
+        double? OptionalNumber(Func<RoleDefaultsFile?, double?> pick, double? own) => own ?? pick(pillar) ?? pick(app);
+
         origins["role"] = new SettingOrigin(SettingLayer.System, fileName);
         origins["external"] = s.External is not null ? new SettingOrigin(SettingLayer.System, fileName)
             : pillarExternal ? new SettingOrigin(SettingLayer.Pillar, fileName)
@@ -755,6 +758,8 @@ public static partial class RegistryLoader
             s.Calls)
         {
             MinCalls = Math.Max(1, (int)Resolve("minCalls", d => d?.MinCalls, s.MinCalls)),
+            BacklogCountAmber = OptionalNumber(d => d?.BacklogCount?.Amber, s.BacklogCount?.Amber),
+            BacklogCountRed = OptionalNumber(d => d?.BacklogCount?.Red, s.BacklogCount?.Red),
             DiscoverLinks = ResolveFlag("discoverLinks", d => d?.DiscoverLinks, s.DiscoverLinks, true),
             GatewayCalls = s.GatewayCalls,
             ServiceCode = s.ServiceCode,

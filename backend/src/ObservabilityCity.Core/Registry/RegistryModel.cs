@@ -164,6 +164,10 @@ public sealed record RegistryNode(
     /// <summary>The fewest calls in a source's window that make the error share and latency worth judging. A system below it is quiet. Always at least 1: a window with no calls says nothing.</summary>
     public int MinCalls { get; init; } = 1;
 
+    /// <summary>The number of messages waiting that turns a consumer amber and red, for a broker that reports counts and not ages. Null: the count is not judged.</summary>
+    public double? BacklogCountAmber { get; init; }
+    public double? BacklogCountRed { get; init; }
+
     /// <summary>For a data store with one database per tenant: its name with {tenant} where the tenant id goes. Null for everything else.</summary>
     public string? TenantPattern { get; init; }
 
@@ -227,12 +231,27 @@ public sealed record RegistrySource(string Name, string Kind, string? Connection
     /// <summary>For a platform-metric source: which metric of which resources fills which signal. Empty for every other kind of source.</summary>
     public IReadOnlyList<MetricGroup> Metrics { get; init; } = [];
 
+    /// <summary>For a message-broker source: how its entities are read and whose they are. Null for every other kind of source.</summary>
+    public EntitiesConfig? Entities { get; init; }
+
     public const double DefaultPollSeconds = 30;
     public const double DefaultTimeoutSeconds = 10;
 
     public TimeSpan PollInterval => TimeSpan.FromSeconds(PollSeconds ?? DefaultPollSeconds);
     public TimeSpan Timeout => TimeSpan.FromSeconds(TimeoutSeconds ?? DefaultTimeoutSeconds);
 }
+
+/// <summary>How a broker's entities are read: the rule that finds its namespaces, the dimension that names an entity, the metrics for the backlog and the dead letters, and the patterns that say whose an entity is.</summary>
+public sealed record EntitiesConfig(string Resources, string Dimension, EntityMetric? Backlog, EntityMetric? DeadLetter, IReadOnlyList<EntityPattern> Patterns, TimeSpan? Interval = null)
+{
+    public const string DefaultDimension = "EntityName";
+}
+
+/// <summary>A metric and the way its points are added up.</summary>
+public sealed record EntityMetric(string Metric, string Aggregation);
+
+/// <summary>One shape of entity name. <see cref="Match"/> has the named groups <c>pillar</c> and <c>service</c>; <see cref="Consumer"/> is the role of the system that reads the entity.</summary>
+public sealed record EntityPattern(string Match, string Consumer);
 
 /// <summary>The metrics of the resources one rule of <c>scope.resources</c> finds, by signal (cpu, memory, utilisation, throttled, requests, and limit, the provisioned size shown as a number). <c>Interval</c> is the time grain they are asked at; none means the adapter's default (one minute). <c>Window</c> is how far back the entry looks; none means the source's own window.</summary>
 public sealed record MetricGroup(string Resources, string? Namespace, IReadOnlyDictionary<string, MetricSignal> Signals, TimeSpan? Interval = null, TimeSpan? Window = null)

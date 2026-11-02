@@ -16,6 +16,9 @@ public sealed record MetricCall(string? Namespace, string Aggregation, string? F
         new(ns, spec.Aggregation, spec.Filter, interval is { } i ? AzureMonitorReader.Iso(i) : AzureMonitorReader.Interval);
 }
 
+/// <summary>The points one metric gave for one entity (the value of the dimension the answer was split by) over the window.</summary>
+public sealed record EntitySeries(string Entity, string Metric, string Aggregation, IReadOnlyList<double> Points);
+
 /// <summary>The points one metric gave over the window, as asked: this metric, added up this way, with this filter. No point is a gap the cloud left, not a zero.</summary>
 public sealed record MetricSeries(string Metric, string Aggregation, string? Filter, IReadOnlyList<double> Points);
 
@@ -57,6 +60,51 @@ public sealed class AzureMonitorReader(HttpClient http, ICredentialSource? crede
         if (!response.IsSuccessStatusCode)
             throw new HttpRequestException($"Azure Monitor answered {(int)response.StatusCode} {response.ReasonPhrase} for {Last(resourceId)}: {Trim(text)}");
         return Parse(text, call);
+    }
+
+    /// <summary>Like <see cref="ReadAsync"/>, but split by a dimension (<c>$filter=Dimension eq '*'</c>): one series for each value of it, for example each queue of a namespace.</summary>
+    public async Task<IReadOnlyList<EntitySeries>> ReadByDimensionAsync(string resourceId, MetricCall call, IReadOnlyList<string> metrics, string dimension, DateTimeOffset end, TimeSpan window, CancellationToken ct)
+    {
+        var split = call with { Filter = $"{dimension} eq '*'" };
+        using var request = new HttpRequestMessage(HttpMethod.Get, Url(resourceId, split, metrics, end, window));
+        if (credential is not null)
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await credential.GetTokenAsync(TokenScope, ct));
+        using var response = await http.SendAsync(request, ct);
+        var text = await response.Content.ReadAsStringAsync(ct);
+        if (!response.IsSuccessStatusCode)
+            throw new HttpRequestException($"Azure Monitor answered {(int)response.StatusCode} {response.ReasonPhrase} for {Last(resourceId)}: {Trim(text)}");
+        return ParseByDimension(text, call, dimension);
+    }
+
+    /// <summary>The series of an answer split by a dimension, each with the value of the dimension it is for. A series without that value is left out.</summary>
+    public static IReadOnlyList<EntitySeries> ParseByDimension(string json, MetricCall call, string dimension)
+    {
+        using var doc = JsonDocument.Parse(json);
+        if (!doc.RootElement.TryGetProperty("value", out var value) || value.ValueKind != JsonValueKind.Array)
+            throw new InvalidOperationException("the answer has no list of metrics; was it an Azure Monitor metrics answer?");
+        var field = call.Aggregation.ToLowerInvariant();
+        var all = new List<EntitySeries>();
+        foreach (var metric in value.EnumerateArray())
+        {
+            var name = metric.TryGetProperty("name", out var n) && n.TryGetProperty("value", out var v) ? v.GetString() : null;
+            if (name is null || !metric.TryGetProperty("timeseries", out var series) || series.ValueKind != JsonValueKind.Array) continue;
+            foreach (var one in series.EnumerateArray())
+            {
+                string? entity = null;
+                if (one.TryGetProperty("metadatavalues", out var meta) && meta.ValueKind == JsonValueKind.Array)
+                    foreach (var m in meta.EnumerateArray())
+                        if (m.TryGetProperty("name", out var mn) && mn.TryGetProperty("value", out var mv) && string.Equals(mv.GetString(), dimension, StringComparison.OrdinalIgnoreCase) && m.TryGetProperty("value", out var ev))
+                            entity = ev.GetString();
+                if (entity is null) continue;
+                var points = new List<double>();
+                if (one.TryGetProperty("data", out var data) && data.ValueKind == JsonValueKind.Array)
+                    foreach (var point in data.EnumerateArray())
+                        if (point.TryGetProperty(field, out var number) && number.ValueKind == JsonValueKind.Number && number.TryGetDouble(out var d) && double.IsFinite(d))
+                            points.Add(d);
+                all.Add(new EntitySeries(entity, name, call.Aggregation, points));
+            }
+        }
+        return all;
     }
 
     private static string Capitalised(string text) => text.Length == 0 ? text : char.ToUpperInvariant(text[0]) + text[1..].ToLowerInvariant();
