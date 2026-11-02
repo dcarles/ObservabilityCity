@@ -317,7 +317,8 @@ The sample town has 17 islands, about 110 buildings and up to 420 cars. Roads, l
 | `Registry:Towns:0` ... | every `config/*/town.yaml` | The folders of the towns to run |
 | `Registry:DefaultTown` | `galactic-credit` | The town a page gets when it asks for none |
 | `Fake:DayLengthSeconds` | `120` | Real seconds per simulated day |
-| `Snapshot:IntervalSeconds` | `2` | How often a snapshot is pushed |
+| `Snapshot:IntervalSeconds` | `2` | How often a snapshot is built (the newest is always at `/api/snapshot/latest`) |
+| `Snapshot:KeepAliveSeconds` | `15` | Viewers are sent a snapshot when something in it changed, and at least this often so the feed shows it is alive. `0` sends every build |
 | `Snapshot:StaleAfterSeconds` | `30` | Readings older than this are shown as stale |
 | `Registry:WatchSeconds` | `5` | How often the registry folder is checked for changes (0 turns reloading off) |
 

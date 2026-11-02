@@ -12,11 +12,11 @@ export const intervalText = (seconds: number): string => {
   return s < 60 ? `${s} s` : s < 3600 ? `${Math.round(s / 60)} min` : `${Math.round(s / 3600)} h`
 }
 
-/** How long to wait for the next snapshot before the feed counts as late: three times the usual gap between snapshots, never under ten seconds. */
+/** How long to wait for the next snapshot before the feed counts as late: three times the usual gap between snapshots, never under thirty seconds (the server sends one at least every fifteen). */
 export function feedLateAfter(gapsSeconds: readonly number[]): number {
   if (gapsSeconds.length === 0) return 30
   const sorted = [...gapsSeconds].sort((a, b) => a - b)
-  return Math.max(10, 3 * sorted[Math.floor(sorted.length / 2)])
+  return Math.max(30, 3 * sorted[Math.floor(sorted.length / 2)])
 }
 
 /** The marker's words and whether it is amber. `sinceSnapshot` is seconds since the last snapshot arrived. */

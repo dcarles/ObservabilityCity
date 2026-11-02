@@ -197,4 +197,66 @@ test.describe('the dashboard view', () => {
     await snapshots(page, 1)
     await expect(button).not.toHaveClass(/late/)
   })
+
+  /** The brightness (0 to 255) of an element's background, from its computed colour. */
+  const brightness = (page: Page, selector: string) =>
+    page.locator(selector).first().evaluate((el) => {
+      const [r, g, b] = getComputedStyle(el).backgroundColor.match(/[\d.]+/g)!.map(Number)
+      return (r + g + b) / 3
+    })
+
+  test('in dark mode the drawer and the tenant list are dark, in light mode they are light', async ({ town, page }) => {
+    for (const [scheme, dark] of [['dark', true], ['light', false]] as const) {
+      await page.emulateMedia({ colorScheme: scheme })
+      await open(town, page)
+      await page.locator('#tenant-button').click()
+      await expect(page.locator('#tenant-list')).toBeVisible()
+      expect((await brightness(page, '#tenant-list')) < 128).toBe(dark)
+      expect((await brightness(page, '#tenant-query')) < 128).toBe(dark)
+      expect((await brightness(page, '#tenant-button')) < 128).toBe(dark)
+      await page.keyboard.press('Escape')
+      const card = page.locator('[data-pillar="aa"]')
+      await card.locator('[data-toggle]').click()
+      await openGroup(page, 'aa', 'orders')
+      await card.locator('tr.row[data-system="aa.orders-api"] td').first().click()
+      await expect(page.locator('#inspector')).toBeVisible()
+      expect((await brightness(page, '#inspector')) < 128).toBe(dark)
+    }
+  })
+
+  test('the page scrolls down when it is longer than the screen, and so does an open drawer', async ({ town, page }) => {
+    await page.setViewportSize({ width: 1000, height: 420 })
+    await open(town, page)
+    for (const id of ['aa', 'bb']) {
+      await page.locator(`[data-pillar="${id}"] [data-toggle]`).click()
+      for (const g of await page.locator(`[data-pillar="${id}"] tr.g`).all()) await g.click()
+    }
+    expect(await page.evaluate(() => document.scrollingElement!.scrollHeight > window.innerHeight)).toBe(true)
+    // the town's stylesheet locks the page; the dashboard must not inherit that
+    expect(await page.evaluate(() => [getComputedStyle(document.documentElement).overflowY, getComputedStyle(document.body).overflowY])).not.toContain('hidden')
+    await page.mouse.move(300, 300)
+    await page.mouse.wheel(0, 400)
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(100)
+    await page.locator('[data-pillar="aa"] tr.row').first().locator('td').first().click()
+    await expect(page.locator('#inspector')).toBeVisible()
+    const body = page.locator('#inspector .body')
+    const scrollable = await body.evaluate((el) => el.scrollHeight > el.clientHeight)
+    if (scrollable) {
+      await body.hover()
+      await page.mouse.wheel(0, 300)
+      await expect.poll(() => body.evaluate((el) => el.scrollTop)).toBeGreaterThan(0)
+    }
+    const box = (await page.locator('#inspector').boundingBox())!
+    expect(box.y + box.height).toBeLessThanOrEqual(420)
+  })
+
+  test('the status dot sits level with the text in the Services chips', async ({ town, page }) => {
+    await open(town, page)
+    await town.effect('aa.orders-api', 'Errors', 1)
+    const chip = page.locator('#kpi-services .ch').first()
+    await expect(chip).toBeVisible({ timeout: 30_000 })
+    const [dot, box] = await Promise.all([chip.locator('.dot').boundingBox(), chip.boundingBox()])
+    expect(Math.abs(dot!.y + dot!.height / 2 - (box!.y + box!.height / 2))).toBeLessThanOrEqual(3)
+    expect(box!.height).toBeLessThan(40) // one line, the dot is not on a line of its own
+  })
 })
