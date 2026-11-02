@@ -34,6 +34,21 @@ describe('the queues of a consumer', () => {
   })
 })
 
+describe('messages a second in the queue rows', () => {
+  it('are shown after what waits and what is dead', () => {
+    const rows = queueRows({ queues: [{ name: 'a', backlog: 3, deadLetters: 1, perSecond: 2.5 }, { name: 'b', backlog: null, deadLetters: null, perSecond: 0.05 }, { name: 'c', backlog: 1, deadLetters: null, perSecond: 120.4 }] })
+    const text = (n: string) => rows.find((r) => r.name === n)!.text
+
+    expect(text('a')).toBe('3 waiting · 1 dead · 2.5 msg/s')
+    expect(text('b')).toBe('0.05 msg/s')
+    expect(text('c')).toBe('1 waiting · 120 msg/s')
+  })
+
+  it('are left out when nothing measures them', () => {
+    expect(queueRows({ queues: [{ name: 'a', backlog: 3, deadLetters: null }] })[0]!.text).toBe('3 waiting')
+  })
+})
+
 describe('the snapshot guard and the sources of a system', () => {
   const nodeOf = (t: any) => t.groups.flatMap((g: any) => g.nodes)[0]
 

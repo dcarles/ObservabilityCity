@@ -23,7 +23,7 @@
     "e2e:tenants": "cross-env E2E_SUITE=tenants playwright test",
     "e2e:dashboard": "cross-env E2E_SUITE=dashboard playwright test",
     "e2e:wide": "cross-env E2E_SUITE=wide playwright test",
-    "e2e:messaging": "cross-env E2E_SUITE=messaging playwright test && cross-env E2E_SUITE=messagingb playwright test",
+    "e2e:messaging": "cross-env E2E_SUITE=messaging playwright test && cross-env E2E_SUITE=messagingb playwright test && cross-env E2E_SUITE=routes playwright test",
     "e2e:towns": "cross-env E2E_SUITE=towns playwright test",
     "e2e:slow": "npm run e2e:stress && npm run e2e:stress35 && npm run e2e:town",
     "e2e:stress": "cross-env E2E_SUITE=stress playwright test",

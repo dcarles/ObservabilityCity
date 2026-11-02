@@ -65,20 +65,31 @@ public sealed class ServiceBusSource(
         var unclaimed = 0;
         foreach (var entity in backlog.Keys.Union(dead.Keys).Union(arrived.Keys).Order(StringComparer.Ordinal))
         {
-            var node = Consumer(registry, patterns, entity);
-            if (node is null) { unclaimed++; continue; }
+            var claim = Claim(registry, patterns, entity);
+            if (claim is null) { unclaimed++; continue; }
+            _seen[entity] = claim;
+        }
+        foreach (var (entity, claim) in _seen.OrderBy(kv => kv.Key, StringComparer.Ordinal))
+        {
+            var node = claim.Node;
             var (w, d, hw, hd) = byNode.GetValueOrDefault(node.Id);
             if (backlog.TryGetValue(entity, out var b)) { w += b; hw = true; }
             if (dead.TryGetValue(entity, out var x)) { d += x; hd = true; }
             byNode[node.Id] = (w, d, hw, hd);
             if (!queues.TryGetValue(node.Id, out var own)) queues[node.Id] = own = [];
+            // an entity Azure sent nothing for this time keeps its place in the list (with no numbers), so a quiet queue neither vanishes nor ages
             own.Add(new QueueReading(entity, backlog.TryGetValue(entity, out var qb) ? Math.Round(qb) : null, dead.TryGetValue(entity, out var qd) ? Math.Round(qd) : null,
-                arrived.TryGetValue(entity, out var qa) ? Math.Round(qa / Window.TotalSeconds, 3) : null));
+                arrived.TryGetValue(entity, out var qa) ? Math.Round(qa / Window.TotalSeconds, 3) : null, claim.ProducerGroup, claim.ProducerService));
         }
         Unclaimed = unclaimed;
         return byNode.ToDictionary(kv => kv.Key, kv => new NodeReading(at, true, 0, 0, 0, 0, 0, 0,
             QueueDepth: kv.Value.HasWaiting ? Math.Round(kv.Value.Waiting) : null, DeadLetters: kv.Value.HasDead ? Math.Round(kv.Value.Dead) : null, Queues: queues[kv.Key]));
     }
+
+    /// <summary>What the source has worked out about each entity it has seen: whose it is to read and, when the name says, who publishes it. Kept between polls.</summary>
+    private readonly Dictionary<string, EntityClaim> _seen = new(StringComparer.Ordinal);
+
+    private sealed record EntityClaim(RegistryNode Node, string? ProducerGroup, string? ProducerService);
 
     /// <summary>Each entity's number, added up over the points of each of its series the way the metric says, then summed over the namespaces.</summary>
     private static Dictionary<string, double> Reduced(IEnumerable<EntitySeries> all, EntityMetric? metric)
@@ -90,21 +101,34 @@ public sealed class ServiceBusSource(
         return sums;
     }
 
-    /// <summary>The system that consumes an entity: the first pattern that matches its name, and in the registry the system of that kind whose pillar and service code the match names.</summary>
-    private static RegistryNode? Consumer(TownRegistry registry, List<(Regex Regex, string Consumer)> patterns, string entity)
+    /// <summary>
+    /// Whose an entity is: the first pattern that matches its name decides. The consumer is the system of the pattern's kind whose service code the group <c>service</c> names, in the
+    /// pillar the group <c>pillar</c> names, or in any pillar when the pattern has no such group (then the code must belong to one system only). The groups <c>producerPillar</c>
+    /// and <c>producer</c> name the publisher the same way, and the entity is then a route from that service to the consumer.
+    /// </summary>
+    private static EntityClaim? Claim(TownRegistry registry, List<(Regex Regex, string Consumer)> patterns, string entity)
     {
         foreach (var (regex, consumer) in patterns)
         {
             var match = regex.Match(entity);
             if (!match.Success) continue;
-            var pillar = match.Groups["pillar"].Value;
             var service = match.Groups["service"].Value;
-            return registry.Groups.Where(g => !g.IsHub && (pillar.Equals(g.Code ?? g.Id, StringComparison.OrdinalIgnoreCase) || pillar.Equals(g.Id, StringComparison.OrdinalIgnoreCase)))
-                .SelectMany(g => g.Nodes)
-                .FirstOrDefault(n => n.Kind.ToString().Equals(consumer, StringComparison.OrdinalIgnoreCase) && (n.ServiceCode ?? n.Service)?.Equals(service, StringComparison.OrdinalIgnoreCase) == true);
+            var pillars = registry.Groups.Where(g => !g.IsHub).ToList();
+            if (match.Groups["pillar"] is { Success: true } named) pillars = pillars.Where(g => Is(g, named.Value)).ToList();
+            var found = pillars.SelectMany(g => g.Nodes)
+                .Where(n => n.Kind.ToString().Equals(consumer, StringComparison.OrdinalIgnoreCase) && (n.ServiceCode ?? n.Service)?.Equals(service, StringComparison.OrdinalIgnoreCase) == true).ToList();
+            if (found.Count != 1) return null; // none, or the code is shared by several pillars: not claimed rather than guessed
+            string? group = null, publisher = null;
+            if (match.Groups["producerPillar"] is { Success: true } producerPillar && match.Groups["producer"] is { Success: true } producer
+                && registry.Groups.FirstOrDefault(g => !g.IsHub && Is(g, producerPillar.Value)) is { } from
+                && from.Nodes.FirstOrDefault(n => (n.ServiceCode ?? n.Service)?.Equals(producer.Value, StringComparison.OrdinalIgnoreCase) == true)?.Service is { } name)
+                (group, publisher) = (from.Id, name);
+            return new EntityClaim(found[0], group, publisher);
         }
         return null;
     }
+
+    private static bool Is(RegistryGroup g, string pillar) => pillar.Equals(g.Code ?? g.Id, StringComparison.OrdinalIgnoreCase) || pillar.Equals(g.Id, StringComparison.OrdinalIgnoreCase);
 
     private async Task<IReadOnlyList<EntitySeries>> ReadNamespace(EntitiesConfig config, ResolvedResource ns, DateTimeOffset at, CancellationToken ct)
     {

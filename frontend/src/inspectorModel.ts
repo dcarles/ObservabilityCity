@@ -358,6 +358,11 @@ export function overviewLinks(s: ScopeInfo | null | undefined): OverviewLinks | 
   return { items: own.slice(0, OVERVIEW_LINK_LIMIT), tenantResources, more: Math.max(0, own.length - OVERVIEW_LINK_LIMIT) }
 }
 
+/** Messages a second in as few digits as say something: 120, 3.4, 0.05. */
+export function messageRate(perSecond: number): string {
+  return perSecond >= 10 ? `${Math.round(perSecond)}` : perSecond >= 1 ? perSecond.toFixed(1) : perSecond.toFixed(2)
+}
+
 /** One queue a consumer reads, as a row of the drawer: its name, what waits and what is dead-lettered in words, and the link to its dead letters. */
 export interface QueueRow { name: string; text: string; tone: Tone; link: ResourceLink | null }
 
@@ -367,7 +372,7 @@ export interface QueueRow { name: string; text: string; tone: Tone; link: Resour
  */
 export function queueRows(n: Pick<NodeSnapshot, 'queues'>): QueueRow[] {
   const rows = (n.queues ?? []).map((q) => {
-    const parts = [q.backlog != null ? `${Math.round(q.backlog)} waiting` : null, q.deadLetters != null ? `${Math.round(q.deadLetters)} dead` : null].filter((p): p is string => p !== null)
+    const parts = [q.backlog != null ? `${Math.round(q.backlog)} waiting` : null, q.deadLetters != null ? `${Math.round(q.deadLetters)} dead` : null, q.perSecond != null ? `${messageRate(q.perSecond)} msg/s` : null].filter((p): p is string => p !== null)
     const link = q.link && q.link.name !== '' && /^https?:\/\//i.test(q.link.url) ? q.link : null
     return { q, row: { name: q.name, text: parts.join(' · ') || 'no numbers', tone: ((q.deadLetters ?? 0) > 0 ? 'bad' : '') as Tone, link } }
   })

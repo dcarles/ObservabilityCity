@@ -71,7 +71,7 @@ public static partial class RegistryLoader
 
     private static EntityMetric? ToEntityMetric(EntityMetricFile? f) => f is null ? null : new EntityMetric(f.Metric.Trim(), f.Aggregation.Trim().ToLowerInvariant());
 
-    /// <summary>A broker source's entities: the rule must exist, the metrics must be named, and each pattern must be a regular expression with the groups pillar and service.</summary>
+    /// <summary>A broker source's entities: the rule must exist, the metrics must be named, and each pattern must be a regular expression with the group service (and pillar, producerPillar and producer when the name says them).</summary>
     private static void CheckEntities(EnvironmentFile f, SourceFile def, string source, string name, List<string> errors)
     {
         var at = $"{name}: source '{source}' entities";
@@ -97,15 +97,17 @@ public static partial class RegistryLoader
                 if (!EntitiesConfig.LinkVariables.Contains(m.Groups[1].Value))
                     errors.Add($"{at}.deadLetterLink: {{{m.Groups[1].Value}}} is not a variable of the url. Use {string.Join(", ", EntitiesConfig.LinkVariables.Select(v => "{" + v + "}"))}.{DidYouMean.Hint(m.Groups[1].Value, EntitiesConfig.LinkVariables)}");
         }
-        if (e.Patterns.Count == 0) errors.Add($"{at}: patterns is empty. Give at least one pattern: a regular expression with the named groups pillar and service");
+        if (e.Patterns.Count == 0) errors.Add($"{at}: patterns is empty. Give at least one pattern: a regular expression with the named group service (and pillar when the name says it)");
         for (var i = 0; i < e.Patterns.Count; i++)
         {
             try
             {
                 var regex = new Regex(e.Patterns[i].Match, RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
                 var names = regex.GetGroupNames();
-                foreach (var need in new[] { "pillar", "service" })
-                    if (!names.Contains(need)) errors.Add($"{at}.patterns[{i}]: the match has no group named '{need}'. Write it as (?<{need}>...)");
+                if (!names.Contains("service")) errors.Add($"{at}.patterns[{i}]: the match has no group named 'service'. Write it as (?<service>...)");
+                // the publisher is named by both groups or by neither
+                if (names.Contains("producer") != names.Contains("producerPillar"))
+                    errors.Add($"{at}.patterns[{i}]: a route needs both groups, (?<producerPillar>...) and (?<producer>...); this match has only {(names.Contains("producer") ? "producer" : "producerPillar")}");
             }
             catch (ArgumentException ex) { errors.Add($"{at}.patterns[{i}]: the match is not a valid regular expression: {ex.Message}"); }
         }

@@ -1,0 +1,85 @@
+{
+  "sb-acme-northeurope1x": [
+    {
+      "entity": "bus.aa.orders.in",
+      "metric": "ActiveMessages",
+      "aggregation": "maximum",
+      "points": [
+        30,
+        40,
+        35
+      ]
+    },
+    {
+      "entity": "bus.aa.orders.in",
+      "metric": "IncomingMessages",
+      "aggregation": "total",
+      "points": [
+        300,
+        300,
+        300
+      ]
+    },
+    {
+      "entity": "bus.bb.ledger.orders.out",
+      "metric": "ActiveMessages",
+      "aggregation": "maximum",
+      "points": [
+        5,
+        5,
+        5
+      ]
+    },
+    {
+      "entity": "bus.bb.ledger.orders.out",
+      "metric": "IncomingMessages",
+      "aggregation": "total",
+      "points": [
+        600,
+        600,
+        600
+      ]
+    },
+    {
+      "entity": "bus.aa.orders.ledger.out",
+      "metric": "ActiveMessages",
+      "aggregation": "maximum",
+      "points": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "entity": "bus.aa.orders.ledger.out",
+      "metric": "IncomingMessages",
+      "aggregation": "total",
+      "points": [
+        300,
+        300,
+        300
+      ]
+    },
+    {
+      "entity": "bus.aa.orders.notify.out",
+      "metric": "ActiveMessages",
+      "aggregation": "maximum",
+      "points": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "entity": "bus.aa.orders.notify.out",
+      "metric": "IncomingMessages",
+      "aggregation": "total",
+      "points": [
+        300,
+        300,
+        300
+      ]
+    }
+  ],
+  "sb-acme-westeurope9z": []
+}

@@ -31,6 +31,9 @@ public sealed class AzureMonitorReader(HttpClient http, ICredentialSource? crede
     /// <summary>How many times a read is tried when Azure answers with a hiccup (busy, unavailable, a dropped connection) before it counts as failed.</summary>
     public const int Attempts = 3;
 
+    /// <summary>How many series a read split by a dimension asks for: Azure answers with only 10 unless asked for more, and a broker holds hundreds of queues.</summary>
+    public const int MaxSeries = 1000;
+
     public const string TokenScope = "https://management.azure.com/.default";
     public const string Endpoint = "https://management.azure.com";
     public const string ApiVersion = "2018-01-01";
@@ -62,7 +65,7 @@ public sealed class AzureMonitorReader(HttpClient http, ICredentialSource? crede
     public async Task<IReadOnlyList<EntitySeries>> ReadByDimensionAsync(string resourceId, MetricCall call, IReadOnlyList<string> metrics, string dimension, DateTimeOffset end, TimeSpan window, CancellationToken ct)
     {
         var split = call with { Filter = $"{dimension} eq '*'" };
-        return ParseByDimension(await GetAsync(resourceId, Url(resourceId, split, metrics, end, window), ct), call, dimension);
+        return ParseByDimension(await GetAsync(resourceId, Url(resourceId, split, metrics, end, window) + $"&top={MaxSeries}", ct), call, dimension);
     }
 
     /// <summary>

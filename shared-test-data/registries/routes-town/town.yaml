@@ -1,0 +1,4 @@
+id: routes-town
+name: Routes town
+groupLabel: Pillar
+topology: hub-and-spoke
