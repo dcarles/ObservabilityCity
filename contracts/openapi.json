@@ -1086,6 +1086,10 @@
               "$ref": "#/components/schemas/QueueSnapshot"
             },
             "nullable": true
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false

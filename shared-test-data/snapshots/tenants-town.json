@@ -78,7 +78,8 @@
           "app": null,
           "jobs": null,
           "regions": null,
-          "queues": null
+          "queues": null,
+          "reason": null
         },
         {
           "id": "hub.service-bus",
@@ -121,7 +122,8 @@
           "app": null,
           "jobs": null,
           "regions": null,
-          "queues": null
+          "queues": null,
+          "reason": null
         },
         {
           "id": "hub.egress",
@@ -164,7 +166,8 @@
           "app": null,
           "jobs": null,
           "regions": null,
-          "queues": null
+          "queues": null,
+          "reason": null
         },
         {
           "id": "hub.customer-db",
@@ -207,7 +210,8 @@
           "app": null,
           "jobs": null,
           "regions": null,
-          "queues": null
+          "queues": null,
+          "reason": null
         }
       ],
       "assets": []
@@ -292,7 +296,8 @@
           "app": null,
           "jobs": null,
           "regions": null,
-          "queues": null
+          "queues": null,
+          "reason": null
         },
         {
           "id": "aa.audit-cache",
@@ -335,7 +340,8 @@
           "app": null,
           "jobs": null,
           "regions": null,
-          "queues": null
+          "queues": null,
+          "reason": null
         },
         {
           "id": "aa.orders-worker",
@@ -380,7 +386,8 @@
           "app": null,
           "jobs": null,
           "regions": null,
-          "queues": null
+          "queues": null,
+          "reason": null
         },
         {
           "id": "aa.tools-cron",
@@ -440,7 +447,8 @@
             }
           ],
           "regions": null,
-          "queues": null
+          "queues": null,
+          "reason": null
         },
         {
           "id": "aa.orders-db",
@@ -544,7 +552,8 @@
           "app": null,
           "jobs": null,
           "regions": null,
-          "queues": null
+          "queues": null,
+          "reason": "error rate 6.4%, tenant Acme \u00B7 108% RU \u00B7 31.2% throttled"
         }
       ],
       "assets": []
@@ -609,7 +618,8 @@
           "app": null,
           "jobs": null,
           "regions": null,
-          "queues": null
+          "queues": null,
+          "reason": null
         },
         {
           "id": "bb.billing-db",
@@ -713,7 +723,8 @@
           "app": null,
           "jobs": null,
           "regions": null,
-          "queues": null
+          "queues": null,
+          "reason": null
         },
         {
           "id": "bb.shared-db",
@@ -756,7 +767,8 @@
           "app": null,
           "jobs": null,
           "regions": null,
-          "queues": null
+          "queues": null,
+          "reason": null
         }
       ],
       "assets": []
