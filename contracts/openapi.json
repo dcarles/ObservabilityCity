@@ -1086,6 +1086,13 @@
               "$ref": "#/components/schemas/QueueSnapshot"
             },
             "nullable": true
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SourceAgeSnapshot"
+            },
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -1461,6 +1468,34 @@
               "type": "string"
             },
             "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "SourceAgeSnapshot": {
+        "required": [
+          "ageSeconds",
+          "fresh",
+          "signals",
+          "source"
+        ],
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string"
+          },
+          "ageSeconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "fresh": {
+            "type": "boolean"
+          },
+          "signals": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "additionalProperties": false

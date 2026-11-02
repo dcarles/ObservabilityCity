@@ -335,6 +335,7 @@ export interface components {
             jobs?: components["schemas"]["JobSnapshot"][] | null;
             regions?: components["schemas"]["RegionSnapshot"][] | null;
             queues?: components["schemas"]["QueueSnapshot"][] | null;
+            sources?: components["schemas"]["SourceAgeSnapshot"][] | null;
         };
         OffscreenLink: {
             nodeId: string;
@@ -431,6 +432,13 @@ export interface components {
             /** Format: double */
             trafficDensity: number;
             notes?: string[] | null;
+        };
+        SourceAgeSnapshot: {
+            source: string;
+            /** Format: int32 */
+            ageSeconds: number;
+            fresh: boolean;
+            signals: string[];
         };
         SubscriptionSnapshot: {
             topic: string;

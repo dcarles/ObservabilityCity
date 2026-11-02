@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { ago, clockTime, configOrder, groupDetail, incidentSummary, linkSections, logSectionEmpty, logSectionTitle, originLabel, isWebAddress, overviewLinks, overviewRows, reasons, repeatLabel, resourceLinks, scopeView, logLinkLabel, logTabLabel, pickLogSection, sectionLinks, stateTone } from '../../src/inspectorModel'
+import { sourceRows, ago, clockTime, configOrder, groupDetail, incidentSummary, linkSections, logSectionEmpty, logSectionTitle, originLabel, isWebAddress, overviewLinks, overviewRows, reasons, repeatLabel, resourceLinks, scopeView, logLinkLabel, logTabLabel, pickLogSection, sectionLinks, stateTone } from '../../src/inspectorModel'
 import type { ConfigValue, LogGroup, LogSection, ScopeInfo, ScopeResource, SystemDetail, NodeSnapshot, Snapshot } from '../../src/types'
 
 const bad = JSON.parse(readFileSync(resolve(__dirname, '../../../shared-test-data/snapshots/bad-day.json'), 'utf8')) as Snapshot
@@ -348,5 +348,36 @@ describe('the Logs sub-tabs', () => {
   it('names a link button after the store in its brackets, and keeps a whole name that has none', () => {
     expect(logLinkLabel('5xx in App Insights (appi-1)')).toEqual({ text: 'appi-1', title: '5xx in App Insights' })
     expect(logLinkLabel('5xx in App Insights')).toEqual({ text: '5xx in App Insights', title: '5xx in App Insights' })
+  })
+})
+
+describe('where the numbers come from when a source is late', () => {
+  const src = (source: string, ageSeconds: number, fresh: boolean, signals: string[]) => ({ source, ageSeconds, fresh, signals })
+
+  it('says nothing when every source is fresh or the server did not say', () => {
+    expect(sourceRows({ sources: null })).toEqual([])
+    expect(sourceRows({ sources: [src('platform', 5, true, ['cpu'])] })).toEqual([])
+  })
+
+  it('lists the late source first with its age and what is left out, then the fresh ones with theirs', () => {
+    const rows = sourceRows({ sources: [src('telemetry', 8, true, ['requests']), src('platform', 240, false, ['cpu', 'memory'])] })
+
+    expect(rows).toEqual([
+      { label: 'From platform', value: '4m ago, late: no cpu, memory', tone: 'stale' },
+      { label: 'From telemetry', value: '8s ago', tone: '' },
+    ])
+  })
+
+  it('is listed in the overview of a grey system too, after "none fresh"', () => {
+    const rows = overviewRows(node({ state: 'Stale', sources: [src('inventory', 30, true, ['instances']), src('telemetry', 400, false, ['requests'])] }))
+
+    expect(rows.map((r) => r.label)).toEqual(['Data', 'From telemetry', 'From inventory'])
+    expect(rows[0]!.value).toBe('none fresh')
+  })
+
+  it('is listed in the overview of a system that still shows numbers', () => {
+    const rows = overviewRows(node({ state: 'Healthy', sources: [src('platform', 240, false, ['cpu']), src('telemetry', 8, true, ['requests'])] }))
+
+    expect(rows.map((r) => r.label)).toContain('From platform')
   })
 })

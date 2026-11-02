@@ -58,7 +58,7 @@ export interface Row {
 export function overviewRows(n: NodeSnapshot, nameOf: (id: string) => string = (id) => id, cloud?: string | null): Row[] {
   if (isUnmonitored(n)) return [{ label: 'Data', value: 'no source configured', tone: '' }]
   if (n.app === 'Missing') return [{ label: 'App', value: notFoundText(cloud), tone: 'stale' }]
-  if (n.state === 'Stale') return [{ label: 'Data', value: 'none fresh', tone: 'stale' }]
+  if (n.state === 'Stale') return [{ label: 'Data', value: 'none fresh', tone: 'stale' }, ...sourceRows(n)]
   const rows: Row[] = []
   if (n.app === 'Running' || n.app === 'Stopped') rows.push({ label: 'App', value: n.app === 'Running' ? 'running' : 'stopped (under construction)', tone: n.app === 'Stopped' ? 'warn' : '' })
   if (!isAbsent(n, 'instances')) rows.push({ label: 'Instances', value: plaqueText(n), tone: n.instancesHealthy < n.instancesTotal ? 'warn' : '' })
@@ -78,7 +78,22 @@ export function overviewRows(n: NodeSnapshot, nameOf: (id: string) => string = (
   if (n.queueDepth != null && !isAbsent(n, 'backlog')) rows.push({ label: 'Waiting', value: `${formatRate(n.queueDepth)} messages`, tone: '' })
   if (n.oldestMessageSeconds != null && !isAbsent(n, 'backlog')) rows.push({ label: 'Oldest message', value: formatAge(n.oldestMessageSeconds), tone: n.oldestMessageSeconds >= n.backlogRed ? 'bad' : n.oldestMessageSeconds >= n.backlogAmber ? 'warn' : '' })
   if (n.deadLetters != null && !isAbsent(n, 'deadLetters')) rows.push({ label: 'Dead letters', value: formatRate(n.deadLetters), tone: n.deadLetters > 0 ? 'bad' : '' })
+  rows.push(...sourceRows(n))
   return rows
+}
+
+/**
+ * Where a system's numbers come from when one of the sources is late: a row for each source with how long ago it last answered, and for a late one the signals
+ * that are left out because of it. Nothing when every source is fresh (the server then says nothing about them).
+ */
+export function sourceRows(n: Pick<NodeSnapshot, 'sources'>): Row[] {
+  const sources = n.sources ?? []
+  if (!sources.some((s) => !s.fresh)) return []
+  return [...sources].sort((a, b) => Number(a.fresh) - Number(b.fresh) || a.source.localeCompare(b.source)).map((s) => ({
+    label: `From ${s.source}`,
+    value: s.fresh ? `${formatAge(s.ageSeconds)} ago` : `${formatAge(s.ageSeconds)} ago, late${s.signals.length > 0 ? `: no ${s.signals.join(', ')}` : ''}`,
+    tone: (s.fresh ? '' : 'stale') as Tone,
+  }))
 }
 
 const JOB_TONE: Record<JobSnapshot['status'], Tone> = { Ok: '', Failed: 'bad', Overdue: 'warn' }
