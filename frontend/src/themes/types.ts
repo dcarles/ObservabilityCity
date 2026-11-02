@@ -31,10 +31,13 @@ export interface VehicleKit {
   boatBob: number
 }
 
+/** Which ends of a piece of bridge get gate posts: both (true), neither (false), or only the one at -z (-1) or +z (1). A bridge is dressed in short pieces, and only its first and last carry a gate. */
+export type BridgeEnds = boolean | -1 | 1
+
 /** How a bridge looks. The road across it is the same in every theme; this dresses the deck, rails, lamps, gates and piers. */
 export interface BridgeStyle {
   /** Adds the look to a deck group centred on the bridge, running along z, `len` long and `width` wide. */
-  dress(deck: THREE.Group, len: number, width: number, ends: boolean): void
+  dress(deck: THREE.Group, len: number, width: number, ends: BridgeEnds): void
 }
 
 /** Where things stand on the airport island, island-local: the runway runs along x, the terminal stands behind the apron, and the gate is where the bridge starts. */

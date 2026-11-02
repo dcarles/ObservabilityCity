@@ -58,3 +58,8 @@ export function mast(h: number, color = '#9aa3ad'): THREE.Mesh {
 export function isComplete(m: BuildingModel): boolean {
   return m.floorHeight > 0 && m.radius > 0 && m.beaconAt instanceof THREE.Vector3 && m.door instanceof THREE.Vector3 && m.makeFloor(0).uniforms !== undefined
 }
+
+/** The ends of a bridge piece that carry a gate, as -1 (the -z end) and 1 (the +z end). */
+export function endList(ends: boolean | -1 | 1): (-1 | 1)[] {
+  return ends === true ? [-1, 1] : ends === false ? [] : [ends]
+}

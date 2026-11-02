@@ -2,6 +2,8 @@ import * as THREE from 'three'
 import { box, flat, group } from '../buildings/mk'
 import { kit } from '../assets/kit'
 import { activeKit, bridgeStyle, palette } from '../themes/active'
+import type { BridgeEnds } from '../themes/types'
+import { archHeight, registerArch } from './arches'
 import { GROUND } from './island'
 
 export const ROAD_W = 4.2
@@ -146,7 +148,13 @@ export interface BridgeOpts {
   ends?: boolean
 }
 
-/** A road bridge: the road on a deck, dressed in the theme's own way (stone parapets and piers, a light bridge, a steel gantry). */
+/** The longest piece of an arched deck: short enough that the curve looks smooth, and the lamps and braces of a piece keep their spacing. */
+const PIECE = 7
+
+/**
+ * A road bridge: the road on a deck, dressed in the theme's own way (stone parapets, a light bridge, a steel gantry). Every bridge is an arch, so
+ * boats pass under it: the deck is built in short pieces, each lifted and tilted along the curve, and the first and last carry the gate.
+ */
 export function bridge(opts: BridgeOpts): THREE.Group {
   const g = new THREE.Group()
   // run the deck a little onto both shores so it meets the roads without a seam
@@ -156,20 +164,33 @@ export function bridge(opts: BridgeOpts): THREE.Group {
   const to = opts.to.clone().addScaledVector(unit, overrun)
   const dir = to.clone().sub(from)
   const len = dir.length()
-  const mid = from.clone().add(to).multiplyScalar(0.5)
-  const deck = new THREE.Group()
-  deck.position.copy(mid)
-  deck.rotation.y = Math.atan2(dir.x, dir.z)
   const width = ROAD_W + 2.0
-  bridgeStyle().dress(deck, len, width, opts.ends !== false)
-  const tiles = Math.max(1, Math.round(len / ROAD_W))
-  for (let i = 0; i < tiles; i++) {
-    const t = kit('road_straight')
-    t.scale.set(ROAD_W / 2, 1.2, len / tiles / 2)
-    t.position.set(0, ROAD_TOP - 0.12, -len / 2 + (i + 0.5) * (len / tiles))
-    deck.add(t)
+  registerArch(from, to, width)
+  const yaw = Math.atan2(dir.x, dir.z)
+  const pieces = Math.max(1, Math.ceil(len / PIECE))
+  const run = len / pieces
+  for (let i = 0; i < pieces; i++) {
+    const t0 = i / pieces, t1 = (i + 1) / pieces
+    const h0 = archHeight(t0, len), h1 = archHeight(t1, len)
+    const along = (t0 + t1) / 2
+    const deck = new THREE.Group()
+    deck.position.copy(from).addScaledVector(dir, along)
+    deck.position.y += (h0 + h1) / 2
+    deck.rotation.order = 'YXZ'
+    deck.rotation.y = yaw
+    deck.rotation.x = -Math.atan2(h1 - h0, run)
+    const pieceLen = Math.hypot(run, h1 - h0) + 0.06
+    const ends: BridgeEnds = opts.ends === false ? false : pieces === 1 ? true : i === 0 ? -1 : i === pieces - 1 ? 1 : false
+    bridgeStyle().dress(deck, pieceLen, width, ends)
+    const tiles = Math.max(1, Math.round(pieceLen / ROAD_W))
+    for (let k = 0; k < tiles; k++) {
+      const t = kit('road_straight')
+      t.scale.set(ROAD_W / 2, 1.2, pieceLen / tiles / 2)
+      t.position.set(0, ROAD_TOP - 0.12, -pieceLen / 2 + (k + 0.5) * (pieceLen / tiles))
+      deck.add(t)
+    }
+    g.add(deck)
   }
-  g.add(deck)
   return g
 }
 
