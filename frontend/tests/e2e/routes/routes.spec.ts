@@ -35,8 +35,8 @@ test.describe('the town the queue names build', () => {
     const s = await sea(page)
 
     expect(s.unreachable).toEqual([])
-    expect(s.routes.some((r) => r.from === 'bb' && r.to === 'aa' && r.rate > 0)).toBe(true)
-    expect(s.routes.some((r) => r.from === 'aa' && r.to === 'bb' && r.rate > 0)).toBe(true)
+    expect(s.routes.some((r) => r.from === 'bb' && r.to === 'aa' && r.rate >= 1 / 30 - 1e-9)).toBe(true)
+    expect(s.routes.some((r) => r.from === 'aa' && r.to === 'bb' && r.rate >= 1 / 30 - 1e-9)).toBe(true)
   })
 
   test('list each queue in the reader\'s drawer, with its messages a second', async ({ page }) => {
