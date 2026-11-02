@@ -9,7 +9,7 @@ import { buildIslandBody, GROUND, makeOutline, scatterNature, type Outline, type
 import { layoutWithHubRoom } from './hubRoom'
 import { CURB, LANE_Z, PAD_D, PAD_W, coastScan, hubFree, laneStart, padX, placeHubClusters, planIsland, rowEdge, type HubCluster, type Placed, type Plan } from './plan'
 import { hashString } from './random'
-import { clamp, speedFactor } from '../visuals'
+import { boatRate, clamp, speedFactor } from '../visuals'
 import { CarSystem, type Route } from './cars'
 import { BoatSystem, type BoatRoute } from './boats'
 import { archCount, clearArches, deckAt } from './arches'
@@ -1159,7 +1159,7 @@ export class Town {
         const live = workers.filter((w) => w.node && w.node.state !== 'Down')
         const queued = live.flatMap((w) => w.node?.queues ?? []).filter((q) => q.perSecond != null)
         const rps = queued.length > 0 ? queued.reduce((a, q) => a + (q.perSecond ?? 0), 0) : live.reduce((a, w) => a + (w.node && w.node.state !== 'Stale' ? w.node.requestsPerSecond : 0), 0)
-        return rps <= 0 ? 0 : 0.016 * Math.sqrt(rps) * weight
+        return boatRate(rps, weight)
       },
       speed: () => (broker?.node ? speedFactor(broker.node.p99Ms, broker.node.slaP99Ms) : 1),
       load: () => Math.log10(1 + island.messaging.perSecond) / 2.5,
