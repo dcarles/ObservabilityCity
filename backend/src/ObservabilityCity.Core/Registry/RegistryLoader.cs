@@ -31,7 +31,7 @@ public static partial class RegistryLoader
         "externalCallers", "islands", "role", "service", "slaP99Ms", "errors", "resources", "throttle", "backlog", "calls", "aliases",
         "amber", "red", "vendors", "calledBy", "gatewayCalls", "messaging", "topics", "subscriptions", "topic", "consumer", "legacy",
         "tenantPattern", "order", "default", "sources", "kind", "connection", "tenants", "exclude", "fake", "undeclaredTenants",
-        "signals", "credentials", "credential", "pollSeconds", "timeoutSeconds", "tenantId", "clientId", "clientSecretEnv",
+        "signals", "credentials", "credential", "pollSeconds", "timeoutSeconds", "lateAfterSeconds", "tenantId", "clientId", "clientSecretEnv",
         "scope", "inventory", "workspace", "variables", "subscription", "pillars", "types", "pattern", "roles", "serviceTag", "tenantNameTag",
         "telemetryRole", "queries", "links", "url", "nameLike", "tag", "key", "value", "code", "serviceCode", "telemetry", "minCalls", "query", "window", "discoverLinks", "regions", "tag", "names", "skew", "state", "running", "minDays", "keepFor", "firstRead", "interval", "ignoreHosts", "rules", "host", "path", "target", "gateway", "domains", "services", "internal", "match", "traffic", "shareWindow", "logs", "section", "resources",
     ];
@@ -334,7 +334,7 @@ public static partial class RegistryLoader
             parsed.Add((new RegistryEnvironment(
                 stem, f.Name ?? stem, f.Default,
                 f.Sources.Select(kv => new RegistrySource(kv.Key, kv.Value.Kind.ToLowerInvariant(), kv.Value.Connection)
-                    { Credential = kv.Value.Credential, PollSeconds = kv.Value.PollSeconds, TimeoutSeconds = kv.Value.TimeoutSeconds, Query = kv.Value.Query, RegionQuery = kv.Value.RegionQuery, Window = kv.Value.Window, Metrics = ToMetrics(kv.Value.Metrics), Entities = ToEntities(kv.Value.Entities) }).ToList(),
+                    { Credential = kv.Value.Credential, PollSeconds = kv.Value.PollSeconds, TimeoutSeconds = kv.Value.TimeoutSeconds, LateAfterSeconds = kv.Value.LateAfterSeconds, Query = kv.Value.Query, RegionQuery = kv.Value.RegionQuery, Window = kv.Value.Window, Metrics = ToMetrics(kv.Value.Metrics), Entities = ToEntities(kv.Value.Entities) }).ToList(),
                 f.Tenants.Select(t => new RegistryTenant(t.Id, t.Name ?? t.Id, t.Kind.Equals("test", StringComparison.OrdinalIgnoreCase) ? TenantKind.Test : TenantKind.Customer)).ToList(),
                 excluded, f.Fake?.UndeclaredTenants ?? [])
             {
@@ -473,6 +473,7 @@ public static partial class RegistryLoader
                 errors.Add($"{name}: source '{source}' has kind '{def.Kind}', which must be lowercase kebab-case. Which kinds exist depends on the adapters loaded; `validate` checks that");
             if (def.PollSeconds is <= 0) errors.Add($"{name}: source '{source}' has pollSeconds {def.PollSeconds}; it must be above 0");
             if (def.TimeoutSeconds is <= 0) errors.Add($"{name}: source '{source}' has timeoutSeconds {def.TimeoutSeconds}; it must be above 0");
+            if (def.LateAfterSeconds is <= 0) errors.Add($"{name}: source '{source}' has lateAfterSeconds {def.LateAfterSeconds}; it must be above 0");
             CheckQuery(f, def, source, name, errors);
             CheckMetrics(f, def, source, name, errors);
             CheckEntities(f, def, source, name, errors);

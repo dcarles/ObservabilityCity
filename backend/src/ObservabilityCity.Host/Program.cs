@@ -99,6 +99,7 @@ foreach (var (folder, registry) in loaded)
             Mode = mode,
             StaleAfter = staleAfter,
             SourceIntervals = set.Sources.GroupBy(s => s.Name).ToDictionary(g => g.Key, g => g.First().PollInterval),
+            SourceLateAfter = (registry.Environments.FirstOrDefault(e => e.Id == environmentId)?.Sources ?? []).Where(s => s.LateAfterSeconds is not null).ToDictionary(s => s.Name, s => TimeSpan.FromSeconds(s.LateAfterSeconds!.Value)),
             // a demo town has its own sped-up day; a live one shows the real time of day
             DayFraction = fake is null ? () => TimeProvider.System.GetLocalNow().TimeOfDay.TotalDays : () => fake.DayFraction,
         };

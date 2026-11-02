@@ -101,6 +101,7 @@ public class SourcePlumbingTests
     [Theory]
     [InlineData("sources:\n  metrics: { kind: prometheus, pollSeconds: 0 }\n", "source 'metrics' has pollSeconds 0; it must be above 0")]
     [InlineData("sources:\n  metrics: { kind: prometheus, timeoutSeconds: -5 }\n", "source 'metrics' has timeoutSeconds -5; it must be above 0")]
+    [InlineData("sources:\n  jobs: { kind: functionjobs, lateAfterSeconds: 0 }\n", "source 'jobs' has lateAfterSeconds 0; it must be above 0")]
     [InlineData("sources:\n  metrics: { kind: loganalytics, credential: reader }\n", "source 'metrics' uses credential 'reader', which this file does not define")]
     [InlineData("sources:\n  metrics: { kind: prometheus }\nsignals:\n  cpuu: metrics\n", "unknown signal 'cpuu'. Use requests, errors, latency, instances, cpu, memory, utilisation, throttled, backlog, deadLetters, jobs. Did you mean 'cpu'?")]
     [InlineData("sources:\n  metrics: { kind: prometheus }\nsignals:\n  cpu: metrcs\n", "signal 'cpu' comes from source 'metrcs', which this file does not define. Did you mean 'metrics'?")]
