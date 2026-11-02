@@ -58,11 +58,12 @@ public sealed class ServiceBusSource(
         // an entity's number in one namespace, then the sum over the namespaces that hold an entity of the same name
         var backlog = Reduced(read, config.Backlog);
         var dead = Reduced(read, config.DeadLetter);
+        var arrived = Reduced(read, config.Throughput);
         var patterns = config.Patterns.Select(p => (Regex: new Regex(p.Match, RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1)), p.Consumer)).ToList();
         var byNode = new Dictionary<string, (double Waiting, double Dead, bool HasWaiting, bool HasDead)>();
         var queues = new Dictionary<string, List<QueueReading>>();
         var unclaimed = 0;
-        foreach (var entity in backlog.Keys.Union(dead.Keys).Order(StringComparer.Ordinal))
+        foreach (var entity in backlog.Keys.Union(dead.Keys).Union(arrived.Keys).Order(StringComparer.Ordinal))
         {
             var node = Consumer(registry, patterns, entity);
             if (node is null) { unclaimed++; continue; }
@@ -71,7 +72,8 @@ public sealed class ServiceBusSource(
             if (dead.TryGetValue(entity, out var x)) { d += x; hd = true; }
             byNode[node.Id] = (w, d, hw, hd);
             if (!queues.TryGetValue(node.Id, out var own)) queues[node.Id] = own = [];
-            own.Add(new QueueReading(entity, backlog.TryGetValue(entity, out var qb) ? Math.Round(qb) : null, dead.TryGetValue(entity, out var qd) ? Math.Round(qd) : null));
+            own.Add(new QueueReading(entity, backlog.TryGetValue(entity, out var qb) ? Math.Round(qb) : null, dead.TryGetValue(entity, out var qd) ? Math.Round(qd) : null,
+                arrived.TryGetValue(entity, out var qa) ? Math.Round(qa / Window.TotalSeconds, 3) : null));
         }
         Unclaimed = unclaimed;
         return byNode.ToDictionary(kv => kv.Key, kv => new NodeReading(at, true, 0, 0, 0, 0, 0, 0,
@@ -107,7 +109,7 @@ public sealed class ServiceBusSource(
     private async Task<IReadOnlyList<EntitySeries>> ReadNamespace(EntitiesConfig config, ResolvedResource ns, DateTimeOffset at, CancellationToken ct)
     {
         var all = new List<EntitySeries>();
-        foreach (var group in new[] { config.Backlog, config.DeadLetter }.Where(m => m is not null).GroupBy(m => m!.Aggregation))
+        foreach (var group in new[] { config.Backlog, config.DeadLetter, config.Throughput }.Where(m => m is not null).GroupBy(m => m!.Aggregation))
         {
             var call = new MetricCall(null, group.Key, null, config.Interval is { } i ? AzureMonitorReader.Iso(i) : AzureMonitorReader.Interval);
             all.AddRange(await reader.ReadByDimensionAsync(ns.Id, call, group.Select(m => m!.Metric).Distinct(StringComparer.OrdinalIgnoreCase).ToList(), config.Dimension, at, Window, ct));

@@ -78,4 +78,12 @@ test.describe(`the broker's backlog and dead letters (${B ? 'ids, a total' : 'co
     expect(sea.unreachable).toEqual([])
     expect(sea.routes.some((r) => r.from === 'bb' && r.to === 'aa')).toBe(true) // aa's worker reads bb's outbox
   })
+
+  test('sail from the number of messages that arrive, even when nothing reads the broker itself', async ({ page }) => {
+    await open(page)
+    const state = await page.evaluate(() => (window as any).city.seen.last.groups.flatMap((g: any) => g.nodes).find((n: any) => n.kind === 'Broker')?.state)
+    expect(['Stale', 'Unknown']).toContain(state) // the broker building has no source of its own
+    const sea = await page.evaluate(() => (window as any).city.town.inspectSea() as { routes: { to: string; scheduler: boolean; rate: number }[] })
+    expect(sea.routes.filter((r) => r.to === 'aa' && !r.scheduler).some((r) => r.rate > 0)).toBe(true) // 3 messages a second arrive in aa's inbox
+  })
 })

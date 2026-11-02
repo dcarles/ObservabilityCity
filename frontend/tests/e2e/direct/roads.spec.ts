@@ -39,6 +39,16 @@ test.describe('a town without a hub in between', () => {
     expect(r.hubBridges).toEqual([])
   })
 
+  test('the ring road is level: it is a road, not a bridge over a sea lane', async ({ town, page }) => {
+    await town.open()
+    const ring = await page.evaluate(() => (window as any).city.town.inspectRing()) as { pieces: number; lifted: number }
+    const r = await roads(page)
+    expect(ring.pieces).toBeGreaterThan(0)
+    // only where an island's bridge lands on the ring does the ground rise; the road itself never does (an arched ring would lift every piece)
+    expect(ring.lifted).toBeLessThanOrEqual(r.ringBridges.length)
+    expect(ring.lifted).toBeLessThan(ring.pieces / 2)
+  })
+
   test('the airport is on the ring road, not on a spoke of the central island', async ({ town, page }) => {
     await town.open()
 

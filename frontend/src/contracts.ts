@@ -352,6 +352,8 @@ export interface components {
             /** Format: double */
             deadLetters?: number | null;
             link?: components["schemas"]["ResourceLink"];
+            /** Format: double */
+            perSecond?: number | null;
         };
         RegionSnapshot: {
             region: string;

@@ -264,7 +264,7 @@ function checkNode(n: unknown, groupId: string, ids: Set<string>, problems: stri
   out.queues = Array.isArray(n.queues)
     ? n.queues.filter(isObject).filter((q) => typeof q.name === 'string' && q.name !== '')
       .map((q) => ({
-        name: q.name as string, backlog: optionalNumber(q.backlog), deadLetters: optionalNumber(q.deadLetters),
+        name: q.name as string, backlog: optionalNumber(q.backlog), deadLetters: optionalNumber(q.deadLetters), perSecond: optionalNumber(q.perSecond),
         link: isObject(q.link) && typeof q.link.name === 'string' && q.link.name !== '' && typeof q.link.url === 'string' && /^https?:\/\//i.test(q.link.url) ? { name: q.link.name, url: q.link.url } : null,
       }))
     : null
