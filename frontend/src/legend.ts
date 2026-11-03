@@ -40,7 +40,7 @@ export const LEGEND: readonly LegendSection[] = [
       { id: 'windows', sees: 'Lit windows', means: 'Load: more windows light up as requests and resources rise', tone: 'neutral' },
       { id: 'dark', sees: 'Dark, cracked floors', means: 'Instances that are not healthy, in the same share', tone: 'amber' },
       { id: 'beacon-green', sees: 'Green beacon on the roof', means: 'Errors are below the amber line', tone: 'green' },
-      { id: 'beacon-amber', sees: 'Amber beacon', means: 'A warning: some errors, throttling, or CPU, memory or storage running hot', tone: 'amber' },
+      { id: 'beacon-amber', sees: 'Amber beacon', means: 'A warning: some errors, throttling, dead letters, or CPU, memory or storage running hot', tone: 'amber' },
       { id: 'beacon-red', sees: 'Red beacon', means: 'Requests are failing. A steady red light and a closed sign mean it is down', tone: 'red' },
       { id: 'grey', sees: 'Everything grey', means: 'No fresh data. Never read as healthy', tone: 'grey' },
     ],

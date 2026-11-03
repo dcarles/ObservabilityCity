@@ -1,5 +1,6 @@
 import './style.css'
 import { isUnmonitored } from './signals'
+import { deadLetterItems } from './deadLetters'
 import * as THREE from 'three'
 import { Stage } from './scene/stage'
 import { Town } from './scene/town'
@@ -104,8 +105,10 @@ export async function startTown(): Promise<void> {
   }
 
   const stateList = new StateList(
-    (state) => {
+    (state, island) => {
       const groups = seen.last?.groups ?? []
+      if (state === 'DeadLetters')
+        return deadLetterItems(groups, island).map<PickItem>((d) => ({ kind: 'building', id: d.nodeId, name: d.nodeName, where: d.groupName, detail: `${d.queue} · ${Math.round(d.count)} dead` }))
       if (state === 'Incidents')
         return groups.filter((g) => g.incidents.length > 0).map<PickItem>((g) => ({ kind: 'island', id: g.id, name: g.displayName, where: `sev ${g.incidents[0].severity}, ${g.incidents.length} open` }))
       const inGroups = groups.flatMap((g) => g.nodes.filter((n) => n.state === state && !isUnmonitored(n)).map<PickItem>((n) => ({ kind: 'building', id: n.id, name: n.name, where: g.displayName, state: n.state })))
@@ -379,6 +382,8 @@ export async function startTown(): Promise<void> {
     // a resource building (a vault, a storage account) opens its own small card
     const asset = b || svc ? undefined : ray.intersectObjects(town.assetHits(), false)[0]?.object.userData.assetId as string | undefined
     const av = asset && seen.last ? town.assetSummary(asset, seen.last) : null
+    // the pier, the crates or the dead-letter pen of an island: that island's queues with dead letters
+    const pier = b || svc || asset ? undefined : ray.intersectObjects(town.harbourHits(), false)[0]?.object.userData.harbourIsland as string | undefined
     // a scenario waiting for its target takes the click instead of opening the building
     if (breakPanel?.armed) {
       if (b) breakPanel.aimAt(b.id)
@@ -387,6 +392,7 @@ export async function startTown(): Promise<void> {
     if (b) { servicePanel.close(); inspector.open(b.id) }
     else if (sv) { inspector.close(); servicePanel.show(sv) }
     else if (av) { inspector.close(); servicePanel.showAsset(av) }
+    else if (pier) { servicePanel.close(); inspector.close(); stateList.toggle('DeadLetters', new DOMRect(e.clientX, e.clientY, 0, 0), pier) }
     else { servicePanel.close(); inspector.close() }
     town.select(b?.id ?? null)
     const focus = b ? town.focusOf(b.id) : null
@@ -455,6 +461,19 @@ export async function startTown(): Promise<void> {
       stage.camera.updateMatrixWorld()
       const v = f.target.clone().setY(3).project(stage.camera)
       return { x: ((v.x + 1) / 2) * window.innerWidth, y: ((1 - v.y) / 2) * window.innerHeight }
+    },
+    /** Where an island's pier is on the screen, in page pixels, so a test can click it. */
+    screenOfPier: (islandId: string) => {
+      const hit = town.harbourHits().find((h) => h.userData.harbourIsland === islandId)
+      if (!hit) return null
+      stage.camera.updateMatrixWorld()
+      const v = hit.getWorldPosition(new THREE.Vector3()).project(stage.camera)
+      return { x: ((v.x + 1) / 2) * window.innerWidth, y: ((1 - v.y) / 2) * window.innerHeight }
+    },
+    /** Frames an island's pier close up. */
+    framePier: (islandId: string) => {
+      const hit = town.harbourHits().find((h) => h.userData.harbourIsland === islandId)
+      if (hit) stage.focus(hit.getWorldPosition(new THREE.Vector3()), 24, true)
     },
     layers: () => layers,
     /** The headline numbers as the top bar shows them for the tenants chosen. */

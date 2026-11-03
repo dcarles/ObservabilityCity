@@ -230,3 +230,53 @@ export function harbourLoop(map: SeaMap, water: THREE.Vector3, centre: THREE.Vec
   }
   return null
 }
+
+/** How far off the coast, nearest first, the circuit round an island runs: the nearest of these that is clear of every other island is used. */
+export const CIRCUIT_OFFSETS = [8, 10, 6.5]
+
+/**
+ * A circuit round the island: out of the harbour, once round the coast in the water just off it, one way only, and back to the harbour. Boats on it all go the
+ * same way, so they follow each other and never meet. Null where no ring of open water goes all the way round (a crowded sea); the straight loop is used then.
+ */
+export function harbourCircuit(map: SeaMap, water: THREE.Vector3, centre: THREE.Vector3): THREE.Vector3[] | null {
+  const pts = map.land.flat()
+  if (pts.length === 0) return null
+  const { minX, minZ, w, h, blocked } = gridOf(map, pts)
+  const free = (x: number, z: number) => {
+    const i = Math.floor((x - minX) / CELL), j = Math.floor((z - minZ) / CELL)
+    return i >= 0 && j >= 0 && i < w && j < h && !blocked[j * w + i]
+  }
+  // this island's coast: the one whose middle is nearest its centre
+  let coast: THREE.Vector2[] | null = null
+  let best = Infinity
+  let mid = new THREE.Vector2()
+  for (const poly of map.land) {
+    const c = poly.reduce((a, q) => a.add(q), new THREE.Vector2()).divideScalar(poly.length)
+    const d = Math.hypot(c.x - centre.x, c.y - centre.z)
+    if (d < best) { best = d; coast = poly; mid = c }
+  }
+  if (!coast || coast.length < 6) return null
+  // one direction for every island: the way round that has the sea on its right-hand side, whatever way the outline was drawn
+  let area = 0
+  for (let i = 0, j = coast.length - 1; i < coast.length; j = i++) area += coast[j].x * coast[i].y - coast[i].x * coast[j].y
+  const ring = area >= 0 ? coast : [...coast].reverse()
+  for (const offset of CIRCUIT_OFFSETS) {
+    const loop = ring.map((q) => {
+      const away = new THREE.Vector2(q.x - mid.x, q.y - mid.y).normalize()
+      return new THREE.Vector3(q.x + away.x * offset, 0, q.y + away.y * offset)
+    })
+    let clear = true
+    for (let i = 0; i < loop.length && clear; i++) {
+      const a = loop[i], b = loop[(i + 1) % loop.length]
+      for (let k = 0; k <= 4 && clear; k++) clear = free(a.x + ((b.x - a.x) * k) / 4, a.z + ((b.z - a.z) * k) / 4)
+    }
+    if (!clear) continue
+    // start at the ring point nearest the harbour and come back to it
+    let first = 0
+    let nearest = Infinity
+    loop.forEach((q, i) => { const d = Math.hypot(q.x - water.x, q.z - water.z); if (d < nearest) { nearest = d; first = i } })
+    const round = [...loop.slice(first), ...loop.slice(0, first), loop[first].clone()]
+    return [water.clone().setY(0), ...round, water.clone().setY(0)]
+  }
+  return null
+}

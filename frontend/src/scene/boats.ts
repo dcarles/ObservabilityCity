@@ -9,8 +9,10 @@ export interface BoatRoute {
   /** The island whose topic the boats carry out of (null for the hub's own), and the island they sail to. */
   from: string | null
   to: string
-  /** True for the boats of a scheduler's mapped jobs: a short loop out of the island's own harbour. */
+  /** True for the boats of a scheduler's mapped jobs: a loop out of the island's own harbour. */
   scheduler?: boolean
+  /** True when the path is a closed circuit round the island: sailed once, one way, instead of there and back. */
+  circuit?: boolean
   /** Boats leaving per second. Zero while the broker is down or has no data. */
   rate: () => number
   /** Sailing speed multiplier from the broker's latency against its SLA. */
@@ -118,7 +120,7 @@ export class BoatSystem {
     const out = r.path
     if (out.length < 2) return
     // there and back: the way back is the same lane in reverse, so boats pass each other
-    const points = [...out, ...[...out].reverse().slice(1)]
+    const points = r.circuit ? [...out] : [...out, ...[...out].reverse().slice(1)]
     const lengths: number[] = []
     let total = 0
     for (let i = 1; i < points.length; i++) { const l = points[i].distanceTo(points[i - 1]); lengths.push(l); total += l }

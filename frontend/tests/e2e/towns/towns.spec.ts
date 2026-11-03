@@ -258,6 +258,7 @@ test.describe('the scheduler of Galactic Credit', () => {
     expect(loops.length).toBeGreaterThan(0)
     for (const r of loops) expect(r.from).toBe(r.to) // every mapped service is on the scheduler's own island
     expect(sea.routes.some((r) => r.scheduler && r.to === 'cl')).toBe(true)
+    expect(loops.every((r) => r.circuit)).toBe(true) // each sails once round its island, one way, not there and back along one line
     await expect.poll(async () => (await town.sea()).routes.filter((r) => r.scheduler).some((r) => r.rate > 0), { timeout: 20_000 }).toBe(true)
 
     const notices = await page.evaluate(() => (window as any).city.seen.last.notices as string[])
