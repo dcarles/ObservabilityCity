@@ -37,12 +37,12 @@ export function resourceUse(n: Pick<NodeSnapshot, 'cpu' | 'memory' | 'utilisatio
 }
 
 type BeaconInput = Pick<NodeSnapshot, 'state' | 'errorRate' | 'errorAmber' | 'errorRed'> &
-  Partial<Pick<NodeSnapshot, 'cpu' | 'memory' | 'utilisation' | 'throttled' | 'resourceAmber' | 'throttleAmber' | 'throttleRed' | 'absent' | 'jobs'>>
+  Partial<Pick<NodeSnapshot, 'cpu' | 'memory' | 'utilisation' | 'throttled' | 'resourceAmber' | 'throttleAmber' | 'throttleRed' | 'absent' | 'jobs' | 'deadLetters'>>
 
 /**
  * Rooftop beacon colour. Red means requests are failing: a system that is down (the beacon then stays on, steady), errors
  * past the red threshold, or a data store turning requests away past its throttle threshold. Amber is the warning: errors, throttling or CPU,
- * memory or utilisation past their amber thresholds.
+ * memory or utilisation past their amber thresholds, and dead letters in a queue it reads.
  */
 export function beaconLevel(n: BeaconInput): BeaconLevel {
   if (!drivesBeacon(n)) return 'off' // nothing here is measured: not grey, there is no data to be missing
@@ -54,6 +54,8 @@ export function beaconLevel(n: BeaconInput): BeaconLevel {
   if (n.errorRate >= n.errorRed || (n.throttleRed !== undefined && throttled >= n.throttleRed)) return 'red'
   if (n.errorRate >= n.errorAmber || n.jobs?.some((j) => j.status === 'Overdue')) return 'amber'
   if (n.throttleAmber !== undefined && throttled >= n.throttleAmber) return 'amber'
+  // messages that could not be delivered sit in the queue this system reads: a warning on it, so the one to open is not green
+  if ((n.deadLetters ?? 0) > 0 && !isAbsent(n, 'deadLetters')) return 'amber'
   if (n.resourceAmber !== undefined && resourceUse(n) >= n.resourceAmber) return 'amber'
   return 'green'
 }

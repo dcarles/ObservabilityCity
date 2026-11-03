@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import { box, cone, cyl, flat, group, sphere } from '../../buildings/mk'
 import type { BoatLook, VehicleKit, VehicleParts } from '../types'
+import { boatPaint } from '../boatColours'
 import { coloured, glow, paintedMaterial, slab } from '../common'
 
 /** A hover pod: a rounded canopy on a slim hull, riding a little above the road on a strip of light. */
@@ -20,8 +21,8 @@ const CRATES = ['#ff7a59', '#59b0ff', '#ffd45e', '#59e3a0', '#b08cff']
 
 /** A cargo shuttle: a blunt hull with a nose cone, twin engines and a cradle of crates. It hovers above the lane. */
 function shuttle(seed: number, internal = false): BoatLook {
-  const hull = flat(internal ? '#ffd9a0' : '#e6eaf8', { metalness: 0.3, roughness: 0.4 })
-  const trim = flat('#59618f', { metalness: 0.4 })
+  const hull = flat(boatPaint(internal).body, { metalness: 0.3, roughness: 0.4 })
+  const trim = flat(boatPaint(internal).trim, { metalness: 0.4 })
   const object = group(
     box(2.0, 0.7, 4.6, hull, { y: 0.1, z: -0.2 }),
     cone(1.0, 1.7, hull, { y: 0.45, z: 2.1, rx: Math.PI / 2 }, 12),
