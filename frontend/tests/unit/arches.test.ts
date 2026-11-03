@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { afterEach, describe, expect, it } from 'vitest'
 import { ARCH_MAX, ARCH_MIN, archCount, archHeight, archPeak, archSlope, clearArches, deckAt, registerArch } from '../../src/scene/arches'
-import { findLane, harbourLoop, type SeaMap } from '../../src/scene/sea'
+import { findLane, harbourLoop, LOOP_LENGTHS, LOOP_OFFSET, type SeaMap } from '../../src/scene/sea'
 
 afterEach(() => clearArches())
 
@@ -77,5 +77,19 @@ describe('boats under bridges', () => {
     expect(loop).not.toBeNull()
     expect(loop).toHaveLength(2)
     expect(loop![0].distanceTo(loop![1])).toBeGreaterThan(5)
+  })
+
+  it('sails as far out as the open water allows, so a busy loop shows several boats at once', () => {
+    const open: SeaMap = { land: [box(-80, -20, -20, 20)] }
+    const loop = harbourLoop(open, new THREE.Vector3(-15, 0, 0), new THREE.Vector3(-50, 0, 0))
+    expect(loop![0].distanceTo(loop![1])).toBeCloseTo(LOOP_LENGTHS[0], 5)
+    expect(LOOP_LENGTHS[0]).toBeGreaterThan(16) // longer than the old short hop
+  })
+
+  it('starts a loop a little along the coast from the harbour, a lane of its own beside the one to other islands', () => {
+    const water = new THREE.Vector3(-15, 0, 0)
+    const loop = harbourLoop(sea, water, new THREE.Vector3(-50, 0, 0))
+    expect(loop![0].distanceTo(water)).toBeCloseTo(LOOP_OFFSET, 5)
+    expect(Math.abs(loop![0].z)).toBeCloseTo(LOOP_OFFSET, 5) // sideways, along the coast
   })
 })
