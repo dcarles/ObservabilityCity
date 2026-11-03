@@ -15,7 +15,7 @@ import { BoatSystem, type BoatRoute } from './boats'
 import { archCount, clearArches, deckAt } from './arches'
 import { consumersOf, HarbourStatus, messagingOf, type Messaging } from './harbour'
 import { connectorsOf, portSummary, type Connectors, type PortSummary } from './links'
-import { findLane, harbourLoop, type SeaMap } from './sea'
+import { findLane, harbourCircuit, harbourLoop, type SeaMap } from './sea'
 import { schedulerRate } from './scheduler'
 
 /** Whether the broker carries messages: boats sail unless it is down. A broker nothing measures is not a stopped one. */
@@ -153,7 +153,7 @@ export class Town {
   private harbourPoints = new Map<string, THREE.Vector3>()
   /** The middle of each piece of the ring road, for tests. */
   private ringMiddles: THREE.Vector3[] = []
-  private boatRouteEnds: { from: string | null; to: string; scheduler: boolean; rate: () => number }[] = []
+  private boatRouteEnds: { from: string | null; to: string; scheduler: boolean; circuit: boolean; rate: () => number }[] = []
   private readonly crossings = new Map<string, number>()
   private hubWeather: Weather | null = null
   /** Third parties on their own small islands, by vendor id. */
@@ -435,7 +435,7 @@ export class Town {
     const lanes = new Map<string, THREE.Vector3[] | null>()
     const laneBetween = (a: number, b: number): THREE.Vector3[] | null => {
       const key = `${a}>${b}`
-      if (!lanes.has(key)) lanes.set(key, a === b ? harbourLoop(sea, harbours[a]!, this.islands[a].root.position) : findLane(sea, harbours[a]!, harbours[b]!))
+      if (!lanes.has(key)) lanes.set(key, a === b ? (harbourCircuit(sea, harbours[a]!, this.islands[a].root.position) ?? harbourLoop(sea, harbours[a]!, this.islands[a].root.position)) : findLane(sea, harbours[a]!, harbours[b]!))
       return lanes.get(key)!
     }
     // from the hub's own port, for a topic the hub owns (the old egress route): the quay in the gap beside the island's bridge
@@ -487,6 +487,7 @@ export class Town {
         from: g.id,
         to: g.id,
         scheduler: true,
+        circuit: loop.length > 2,
         rate: () => (brokerRunning(broker?.node) ? schedulerRate(schedules, (id) => island.buildings.get(id)?.node) : 0),
         speed: () => (broker?.node ? speedFactor(broker.node.p99Ms, broker.node.slaP99Ms) : 1),
       })
@@ -503,7 +504,7 @@ export class Town {
     })
     this.seaMap = sea
     this.harbourPoints = new Map(pillars.flatMap((g, i) => (harbours[i] ? [[g.id, harbours[i]!] as [string, THREE.Vector3]] : [])))
-    this.boatRouteEnds = boatRoutes.map((r) => ({ from: r.from, to: r.to, scheduler: r.scheduler === true, rate: r.rate }))
+    this.boatRouteEnds = boatRoutes.map((r) => ({ from: r.from, to: r.to, scheduler: r.scheduler === true, circuit: r.circuit === true, rate: r.rate }))
 
     mergeStatic(bridgeDecor)
     mergeStatic(this.hubDecor)
@@ -643,6 +644,11 @@ export class Town {
     return this.islands.flatMap((i) => [...i.services.values()].flatMap((s) => s.hits))
   }
 
+  /** Boxes over every island's pier, crate pile and dead-letter pen, for picking with the pointer. Each carries `userData.harbourIsland`. */
+  harbourHits(): THREE.Object3D[] {
+    return this.islands.flatMap((i) => i.harbour?.hits ?? [])
+  }
+
   /** Boxes over every resource building, for picking with the pointer. Each carries `userData.assetId`. */
   assetHits(): THREE.Object3D[] {
     return [...this.islands.flatMap((i) => [...i.assets.values()].map((a) => a.hit)), ...[...this.hubAssets.values()].map((a) => a.hit)]
@@ -709,13 +715,13 @@ export class Town {
     return { pieces: this.ringMiddles.length, lifted: this.ringMiddles.filter((p) => deckAt(p.x, p.z).lift > 0).length }
   }
 
-  inspectSea(): { harbours: string[]; unreachable: string[]; routes: { from: string | null; to: string; scheduler: boolean; rate: number }[]; arches: number } {
+  inspectSea(): { harbours: string[]; unreachable: string[]; routes: { from: string | null; to: string; scheduler: boolean; circuit: boolean; rate: number }[]; arches: number } {
     const ids = [...this.harbourPoints.keys()]
     const unreachable: string[] = []
     for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) {
       if (!findLane(this.seaMap, this.harbourPoints.get(ids[i])!, this.harbourPoints.get(ids[j])!)) unreachable.push(`${ids[i]}|${ids[j]}`)
     }
-    return { harbours: ids, unreachable, routes: this.boatRouteEnds.map((r) => ({ from: r.from, to: r.to, scheduler: r.scheduler, rate: r.rate() })), arches: archCount() }
+    return { harbours: ids, unreachable, routes: this.boatRouteEnds.map((r) => ({ from: r.from, to: r.to, scheduler: r.scheduler, circuit: r.circuit, rate: r.rate() })), arches: archCount() }
   }
 
   inspectVendors(): { id: string; island: string; x: number; z: number; bx: number; bz: number; bridges: number }[] {
@@ -1038,6 +1044,7 @@ export class Town {
     if (links.pier) {
       decor.add(this.harbour(harbourCoast, harbourZ))
       status = new HarbourStatus(harbourCoast, harbourZ)
+      status.setIsland(g.id)
       root.add(status.group)
       avoid.push({ x: harbourCoast - 4, z: harbourZ - 2, w: 13, d: 16 })
     }
@@ -1152,6 +1159,7 @@ export class Town {
       path,
       from,
       to: island.group.id,
+      circuit: from === island.group.id && path.length > 2,
       rate: () => {
         if (!brokerRunning(broker?.node)) return 0
         // what really arrives in the queues its workers read; without that number, the workers' own request rate

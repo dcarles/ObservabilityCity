@@ -70,6 +70,8 @@ export const halo = (() => {
  */
 export class HarbourStatus {
   readonly group = new THREE.Group()
+  /** Invisible boxes over the pen, the crates and the quay, for picking with the pointer: a click opens the island's dead-letter queues. Each carries `userData.harbourIsland` once the island sets it. */
+  readonly hits: THREE.Mesh[] = []
   private readonly pile: THREE.Mesh[] = []
   private readonly broken: THREE.Mesh[] = []
   private readonly beam: THREE.Mesh
@@ -82,6 +84,9 @@ export class HarbourStatus {
   private lit = false
   private visibleCrates = 0
   private visibleBroken = 0
+
+  /** Says which island this harbour belongs to, so a click on it can open that island's list. */
+  setIsland(id: string): void { for (const h of this.hits) h.userData.harbourIsland = id }
   private phase = Math.random() * 6
 
   constructor(coastX: number, z: number) {
@@ -121,6 +126,14 @@ export class HarbourStatus {
       c.visible = false
       this.broken.push(c)
       this.group.add(c)
+    }
+
+    // what a click on the pier, the crate pile or the pen picks
+    for (const [w, d, x, zz] of [[6.4, 5.2, px, pz], [9, 7.4, coastX - 4.2, z]] as const) {
+      const hit = new THREE.Mesh(new THREE.BoxGeometry(w, 3, d), new THREE.MeshBasicMaterial({ visible: false }))
+      hit.position.set(x, GROUND + 1.5, zz)
+      this.hits.push(hit)
+      this.group.add(hit)
     }
 
     // a red light on a mast that sweeps while the dead-letter queue is not empty

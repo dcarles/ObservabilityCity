@@ -158,7 +158,7 @@ export class Town {
   }
 
   /** The sea the boats sail: the harbours, the pairs of harbours with no water between them, the boat routes (publisher island, consumer island) and the arched bridges. */
-  async sea(): Promise<{ harbours: string[]; unreachable: string[]; routes: { from: string | null; to: string; scheduler: boolean; rate: number }[]; arches: number }> {
+  async sea(): Promise<{ harbours: string[]; unreachable: string[]; routes: { from: string | null; to: string; scheduler: boolean; circuit: boolean; rate: number }[]; arches: number }> {
     return await this.page.evaluate(() => (window as any).city.town.inspectSea())
   }
 
