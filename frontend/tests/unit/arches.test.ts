@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { afterEach, describe, expect, it } from 'vitest'
 import { ARCH_MAX, ARCH_MIN, archCount, archHeight, archPeak, archSlope, clearArches, deckAt, registerArch } from '../../src/scene/arches'
-import { findLane, harbourCircuit, harbourLoop, LOOP_LENGTHS, LOOP_OFFSET, PIER_GAP, type SeaMap } from '../../src/scene/sea'
+import { findLane, CIRCUIT_OFFSETS, harbourCircuit, harbourLoop, LOOP_LENGTHS, LOOP_OFFSET, OUTER_PAD, padLand, PIER_GAP, type SeaMap } from '../../src/scene/sea'
 
 afterEach(() => clearArches())
 
@@ -146,6 +146,28 @@ describe('boats under bridges', () => {
     it('is not made where another island leaves no open water round it', () => {
       const crowded: SeaMap = { land: [island(0, 20), island(40, 20)] }
       expect(harbourCircuit(crowded, pier, centre)).toBeNull()
+    })
+  })
+
+  describe('lanes between islands, planned over the islands made bigger', () => {
+    const island = (cx: number, r: number) => Array.from({ length: 24 }, (_, k) => new THREE.Vector2(cx + Math.cos((k / 24) * Math.PI * 2) * r, Math.sin((k / 24) * Math.PI * 2) * r))
+
+    it('keep further from every island\'s coast than the circuit round it runs', () => {
+      const sea: SeaMap = { land: [island(0, 20), island(120, 20)] }
+      const lane = findLane(padLand(sea, [0, 1], OUTER_PAD), new THREE.Vector3(36, 0, 0), new THREE.Vector3(84, 0, 0))!
+      expect(lane).not.toBeNull()
+      const farthestCircuit = 20 + Math.max(...CIRCUIT_OFFSETS)
+      for (const p of lane) {
+        expect(Math.hypot(p.x, p.z), 'first island').toBeGreaterThan(farthestCircuit + 1)
+        expect(Math.hypot(p.x - 120, p.z), 'second island').toBeGreaterThan(farthestCircuit + 1)
+      }
+    })
+
+    it('leave the polygons of other things as they were', () => {
+      const sea: SeaMap = { land: [island(0, 20), island(120, 20)] }
+      const padded = padLand(sea, [0], OUTER_PAD)
+      expect(padded.land[1]).toBe(sea.land[1])
+      expect(Math.hypot(padded.land[0][0].x, padded.land[0][0].y)).toBeCloseTo(20 + OUTER_PAD, 5)
     })
   })
 })

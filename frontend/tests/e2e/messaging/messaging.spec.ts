@@ -150,8 +150,8 @@ test.describe(`the broker's backlog and dead letters (${B ? 'ids, a total' : 'co
     for (const id of ids) {
       const { between, internalStart, quay } = sea.docks[id]
       expect(gap(internalStart, quay), id).toBeGreaterThan(5) // the two ends are on either side of the pier
-      expect(gap(between, internalStart), id).toBeGreaterThan(5) // boats between islands dock off the pier tip, not where the loop starts or ends
-      expect(gap(between, quay), id).toBeGreaterThan(5)
+      expect(gap(between, internalStart), id).toBeGreaterThan(10) // boats between islands dock off the pier tip, not where the loop starts or ends
+      expect(gap(between, quay), id).toBeGreaterThan(10)
     }
   })
 

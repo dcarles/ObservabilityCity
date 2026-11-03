@@ -232,4 +232,24 @@ describe('a boat at the end of its circuit', () => {
     expect(loaded.length * 0.05).toBeGreaterThan(UNLOAD_STEP * 3) // it stays while they do
     expect(visible(boats)).toHaveLength(0) // then it is gone
   })
+
+  it('makes the boat behind it slow down instead of running into it at the quay', () => {
+    const boats = new BoatSystem(4)
+    boats.setRoutes([circuit()])
+    on = 20
+    boats.update(0.05)
+    on = 0
+    for (let t = 0; t < 3.1; t += 0.05) boats.update(0.05)
+    on = 20 // a second boat starts a little behind
+    boats.update(0.05)
+    on = 0
+    let closest = Infinity
+    for (let t = 0; t < 12; t += 0.05) {
+      boats.update(0.05)
+      const v = visible(boats)
+      if (v.length >= 2) closest = Math.min(closest, v[0].position.distanceTo(v[1].position))
+    }
+
+    expect(closest).toBeGreaterThan(AVOID_GAP - 0.3)
+  })
 })

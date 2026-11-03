@@ -52,7 +52,7 @@ const AVOID_EASE = 3
 /** How far a boat keeps to the right of the middle of its lane, so a boat going out and one coming back pass side by side. */
 export const LANE_SIDE = 1.3
 /** A boat at the end of its circuit lies at the quay and unloads one crate every UNLOAD_STEP seconds, then leaves. */
-export const UNLOAD_STEP = 0.5
+export const UNLOAD_STEP = 0.15
 const UNLOAD_LEAVE = 0.7
 
 /** The same path moved sideways by `side` (positive: to the right of the way it runs), corners included. */
@@ -180,7 +180,16 @@ export class BoatSystem {
    */
   private avoid(dt: number): void {
     const sail = this.boats.filter((b) => !BoatSystem.isInternal(b.route))
-    for (const b of sail) { b.slow = 1; b.want = 0 }
+    for (const b of this.boats) { b.slow = 1; b.want = 0 }
+    // boats on a circuit queue behind the one ahead on the same circuit, mostly the one lying at the quay unloading
+    const ring = this.boats.filter((b) => b.route.circuit === true)
+    for (const b of ring) {
+      for (const c of ring) {
+        if (c === b || c.route !== b.route || c.dist <= b.dist) continue
+        const d = b.object.position.distanceTo(c.object.position)
+        if (d < AVOID_RADIUS && c.dist - b.dist < AVOID_RADIUS * 3) b.slow = Math.min(b.slow, clamp((d - AVOID_GAP) / (AVOID_RADIUS - AVOID_GAP), AVOID_SLOWEST, 1))
+      }
+    }
     const slowFor = (b: Boat, d: number) => { b.slow = Math.min(b.slow, clamp((d - AVOID_GAP) / (AVOID_RADIUS - AVOID_GAP), AVOID_SLOWEST, 1)) }
     for (let i = 0; i < sail.length; i++) {
       const a = sail[i]
