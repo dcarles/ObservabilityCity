@@ -33,6 +33,18 @@ interface Boat {
 const BASE_SPEED = 4.4
 const SEA = 0.12
 const BOAT_SCALE = 0.95
+/** How far a boat keeps to the right of the middle of its lane, so a boat going out and one coming back pass side by side. */
+export const LANE_SIDE = 1.1
+
+/** The same path moved sideways by `side` (positive: to the right of the way it runs), corners included. */
+export function sidestep(path: THREE.Vector3[], side: number): THREE.Vector3[] {
+  return path.map((p, i) => {
+    const a = path[Math.max(0, i - 1)], b = path[Math.min(path.length - 1, i + 1)]
+    const dx = b.x - a.x, dz = b.z - a.z
+    const len = Math.hypot(dx, dz) || 1
+    return new THREE.Vector3(p.x - (dz / len) * side, p.y, p.z + (dx / len) * side)
+  })
+}
 
 /**
  * Messages as boats. Each island has a sea lane from the hub's Service Bus port to its harbour. How many boats
@@ -119,8 +131,8 @@ export class BoatSystem {
   private spawn(r: BoatRoute): void {
     const out = r.path
     if (out.length < 2) return
-    // there and back: the way back is the same lane in reverse, so boats pass each other
-    const points = r.circuit ? [...out] : [...out, ...[...out].reverse().slice(1)]
+    // there and back: the way back is the same lane in reverse, but each way keeps to its own side of it, like the cars, so boats going out and coming back pass side by side
+    const points = r.circuit ? [...out] : [...sidestep(out, LANE_SIDE), ...sidestep([...out].reverse(), LANE_SIDE).slice(1)]
     const lengths: number[] = []
     let total = 0
     for (let i = 1; i < points.length; i++) { const l = points[i].distanceTo(points[i - 1]); lengths.push(l); total += l }
@@ -146,7 +158,8 @@ export class BoatSystem {
     const kit = vehicles()
     o.position.y = SEA + kit.boatLift + bob * kit.boatBob
     o.rotation.z = bob * kit.boatBob * 0.5
-    b.cargo.visible = b.dist < b.total / 2
+    // a boat on a circuit round its island is loaded all the way and unloads at the quay; there and back, it is loaded only on the way out
+    b.cargo.visible = b.route.circuit === true || b.dist < b.total / 2
     // ease in and out at the quays
     const fade = clamp(Math.min(b.dist, b.total - b.dist) / 4, 0, 1)
     o.scale.setScalar(BOAT_SCALE * (0.4 + 0.6 * fade))
