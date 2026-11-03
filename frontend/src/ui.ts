@@ -7,6 +7,7 @@ import { tenantFigures, yardSummary, type TenantView } from './tenants'
 import { systemNumbers, type ServiceSummary } from './scene/service'
 import { assetWhere, type AssetSummary } from './scene/assets'
 import { viewTotals } from './viewTotals'
+import { fitTopBar } from './topbarFit'
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T
 
@@ -71,6 +72,7 @@ export class TopBar {
         <button class="chip clickable ${t.incidents ? 'warn' : ''}" data-list="Incidents" title="Show the islands with open incidents"><b>${t.incidents}</b><span>incidents</span></button>
         <div class="chip time"><b>${day}</b><span>town time</span></div>` : ''}
       <span class="status" title="${label}"><i class="dot ${dot}"></i><span class="label">${label}</span></span>`
+    fitTopBar(this.el)
   }
 }
 

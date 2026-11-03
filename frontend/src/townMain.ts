@@ -34,6 +34,7 @@ import type { PickItem } from './picker'
 import type { Snapshot, TenantInfo } from './types'
 import { vendorWhere } from './inspectorModel'
 import { checkSnapshot } from './snapshotGuard'
+import { fitTopBar } from './topbarFit'
 import { Building } from './buildings/building'
 import { WINDOW_GLOW } from './buildings/windowMaterial'
 
@@ -71,7 +72,7 @@ export async function startTown(): Promise<void> {
   const bar = document.getElementById('topbar')!
   const measureBar = (): void => document.documentElement.style.setProperty('--bar-h', `${bar.offsetHeight}px`)
   measureBar()
-  new ResizeObserver(measureBar).observe(bar)
+  new ResizeObserver(() => { measureBar(); fitTopBar(bar) }).observe(bar)
 
   const banner = document.getElementById('banner')!
   let bannerTimer: number | undefined
