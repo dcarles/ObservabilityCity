@@ -111,6 +111,33 @@ describe('arrivals', () => {
     expect(airport.status().board.length).toBeGreaterThan(1)
   })
 
+  it('shows internal traffic under the arrivals, in two lines with the rate beside TRAFFIC, in every theme', () => {
+    for (const [id] of themes) {
+      activateTheme(kitById(id))
+      const airport = new Airport()
+      airport.setCallers(callers, 7.5, 38.1)
+      expect(airport.status().board).toEqual(['ARRIVALS  7.5 req/s', 'INTERNAL', 'TRAFFIC  38 req/s'])
+      airport.setCallers(callers, 7.5, 3.25)
+      expect(airport.status().board.slice(1)).toEqual(['INTERNAL', 'TRAFFIC  3.3 req/s'])
+    }
+  })
+
+  it('shows 0 req/s of internal traffic when it is measured and there is none, and leaves the block out when it is not measured', () => {
+    activateTheme(kitById('harbour-town'))
+    const airport = new Airport()
+    airport.setCallers(callers, 7.5, 0)
+    expect(airport.status().board).toEqual(['ARRIVALS  7.5 req/s', 'INTERNAL', 'TRAFFIC  0.0 req/s'])
+    airport.setCallers(callers, 7.5, null)
+    expect(airport.status().board).toEqual(['ARRIVALS  7.5 req/s'])
+  })
+
+  it('keeps the callers\' names above the internal traffic when outside traffic is not measured', () => {
+    activateTheme(kitById('harbour-town'))
+    const airport = new Airport()
+    airport.setCallers(callers, null, 12)
+    expect(airport.status().board).toEqual(['ARRIVALS  40 req/s', 'Partner  40/s', 'INTERNAL', 'TRAFFIC  12 req/s'])
+  })
+
   it('arrives at the same rate whatever the theme', () => {
     const landed = themes.map(([id]) => fly(id, 120).airport.status().landed)
     expect(new Set(landed).size).toBe(1)
