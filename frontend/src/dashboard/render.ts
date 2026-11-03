@@ -114,7 +114,7 @@ function rowHtml(r: Row, ui: UiState): string {
   const conn = connectionsLabel(r)
   const showConn = ui.connections.has(r.id)
   const connCell = conn ? `<button class="conn" data-conn="${esc(r.id)}" aria-expanded="${showConn}">${conn}<span class="chev">${showConn ? '▴' : '▾'}</span></button>` : '<span class="dim">–</span>'
-  const main = `<tr class="row" data-system="${esc(r.id)}"><td class="ind">${dot(r.level)}<span class="nm">${label}${esc(r.name)}</span>${count}<small>${esc(r.type)}${r.instancesText ? ` · ${esc(r.instancesText)}` : ''}</small></td>
+  const main = `<tr class="row" data-system="${esc(r.id)}"><td class="ind">${dot(r.level)}<span class="nm">${label}${esc(r.name)}</span>${count}${r.dlq ? `<b class="bad dlq">DLQ ${num(r.dlq)}</b>` : ''}<small>${esc(r.type)}${r.instancesText ? ` · ${esc(r.instancesText)}` : ''}</small></td>
     <td class="n">${trafficCell(r)}</td><td class="n">${errorCell(r)}</td><td class="n">${latencyCell(r)}</td><td class="ld">${loadCell(r)}</td>
     <td>${connCell}</td><td><button class="det" data-details="${esc(r.id)}">Details <b>›</b></button></td></tr>`
   const connRow = showConn && conn
@@ -126,7 +126,7 @@ function rowHtml(r: Row, ui: UiState): string {
 function groupHtml(g: Group, ui: UiState): string {
   const open = groupIsOpen(g, ui)
   const facts = [plural(g.rows.length, 'service'), g.rps != null ? `${num(g.rps, g.rps < 10 ? 1 : 0)} req/s` : ''].filter(Boolean).join(' · ')
-  const head = `<tr class="g" data-group="${esc(g.key)}" aria-expanded="${open}"><td colspan="7">${dot(g.level)}<span class="gt">${open ? '▾' : '▸'} <span class="nm">${esc(g.name)}</span></span><small>${facts}</small></td></tr>`
+  const head = `<tr class="g" data-group="${esc(g.key)}" aria-expanded="${open}"><td colspan="7">${dot(g.level)}<span class="gt">${open ? '▾' : '▸'} <span class="nm">${esc(g.name)}</span></span><small>${facts}</small>${g.dlq ? `<b class="bad dlq">DLQ ${num(g.dlq)}</b>` : ''}</td></tr>`
   return head + (open ? g.rows.map((r) => rowHtml(r, ui)).join('') : '')
 }
 

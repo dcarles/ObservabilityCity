@@ -20,6 +20,15 @@ export function levelOf(n: Pick<NodeSnapshot, 'absent' | 'kind' | 'jobs'>, state
   return state === 'Down' ? 'bad' : state === 'Degraded' ? 'warn' : 'ok'
 }
 
+/** Dead letters make a service at least amber (never red): a message nobody could handle is waiting. */
+export function dlqCount(n: Pick<NodeSnapshot, 'absent' | 'kind' | 'jobs' | 'deadLetters'>): number {
+  return isAbsent(n as NodeSnapshot, 'deadLetters') ? 0 : n.deadLetters ?? 0
+}
+export function levelWithDlq(n: NodeSnapshot, level: Level): Level {
+  return level === 'ok' && dlqCount(n) > 0 ? 'warn' : level
+}
+const dlqReason = (n: NodeSnapshot): string => `${dlqCount(n).toLocaleString('en-GB')} dead letter${dlqCount(n) === 1 ? '' : 's'}`
+
 export interface Chip { id: string; name: string; rps: number | null }
 
 export interface TenantRow {
@@ -222,7 +231,7 @@ function tenantRows(n: NodeSnapshot, view: TenantView): TenantRow[] | null {
 }
 
 function rowOf(n: NodeSnapshot, s: Snapshot, view: TenantView, links: ReturnType<typeof linkIndex>): Row {
-  const level = levelOf(n, stateFor(n, s.tenants ?? [], view))
+  const level = levelWithDlq(n, levelOf(n, stateFor(n, s.tenants ?? [], view)))
   const db = n.kind === 'Database'
   const tenants = tenantRows(n, view)
   const outside = n.outsideRequestsPerSecond ?? 0
@@ -248,7 +257,7 @@ function rowOf(n: NodeSnapshot, s: Snapshot, view: TenantView, links: ReturnType
     name: n.name,
     type: TYPE[n.kind] ?? n.kind,
     level,
-    reason: level === 'warn' || level === 'bad' ? n.reason ?? null : null,
+    reason: level === 'warn' || level === 'bad' ? n.reason ?? (dlqCount(n) > 0 ? dlqReason(n) : null) : null,
     rps: db || absent('requests') ? null : n.requestsPerSecond,
     errorPct: db || absent('errors') || n.quiet ? null : n.errorRate * 100,
     p99,
@@ -351,8 +360,8 @@ export function buildDashboard(s: Snapshot, view: TenantView): Dashboard {
   const links = linkIndex(s)
   const issues = (nodes: NodeSnapshot[], where: string): Issue[] =>
     nodes.flatMap((n) => {
-      const level = levelOf(n, stateFor(n, s.tenants ?? [], view))
-      return level === 'warn' || level === 'bad' ? [{ id: n.id, name: n.name, where, level, reason: n.reason ?? null }] : []
+      const level = levelWithDlq(n, levelOf(n, stateFor(n, s.tenants ?? [], view)))
+      return level === 'warn' || level === 'bad' ? [{ id: n.id, name: n.name, where, level, reason: n.reason ?? (dlqCount(n) > 0 ? dlqReason(n) : null) }] : []
     })
   const worstFirst = (a: Issue, b: Issue): number => (a.level === b.level ? a.name.localeCompare(b.name) : a.level === 'bad' ? -1 : 1)
 

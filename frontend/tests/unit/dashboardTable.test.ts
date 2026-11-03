@@ -178,3 +178,31 @@ describe('sticky column titles', () => {
     expect(headShift(56, 52, -300)).toBe(-408)
   })
 })
+
+describe('dead letters on a service', () => {
+  it('shows red DLQ text on the service line, makes the service, its group and the pillar amber, and counts it as degraded', () => {
+    const s = golden('calm')
+    const n = node(s, 'pay.payments-api')
+    n.deadLetters = 3; n.absent = n.absent.filter((a) => a !== 'deadLetters')
+    const r = row(s, 'pay.payments-api')
+    expect(r.level).toBe('warn')
+    expect(r.reason).toBe('3 dead letters')
+    const p = buildDashboard(s, ALL_TENANTS).pillars.find((x) => x.id === 'pay')!
+    expect(p.level).toBe('warn')
+    expect(p.degraded).toBe(1)
+    expect(p.groups.some((g) => g.level === 'warn' && g.dlq === 3)).toBe(true)
+    const html = table(s, 'pay')
+    expect(html).toContain('<b class="bad dlq">DLQ 3</b>')
+    expect(html.match(/class="bad dlq"/g)!.length).toBe(2)
+  })
+
+  it('stays red when the service is down, and shows nothing when there are none or nobody reads them', () => {
+    const s = golden('calm')
+    const n = node(s, 'pay.payments-api')
+    n.deadLetters = 0
+    expect(table(s, 'pay')).not.toContain('dlq')
+    n.deadLetters = 5; n.absent = [...n.absent, 'deadLetters']
+    expect(row(s, 'pay.payments-api').level).not.toBe('warn')
+    expect(table(s, 'pay')).not.toContain('dlq')
+  })
+})
