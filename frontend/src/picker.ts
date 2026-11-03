@@ -6,6 +6,8 @@ export interface PickItem {
   /** The island's name, or the island a building stands on. */
   where: string
   state?: string
+  /** A second line under the name in a list, for example the dead-letter queue and its count. */
+  detail?: string
 }
 
 /**

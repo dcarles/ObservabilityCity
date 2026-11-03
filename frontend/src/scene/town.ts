@@ -644,6 +644,11 @@ export class Town {
     return this.islands.flatMap((i) => [...i.services.values()].flatMap((s) => s.hits))
   }
 
+  /** Boxes over every island's pier, crate pile and dead-letter pen, for picking with the pointer. Each carries `userData.harbourIsland`. */
+  harbourHits(): THREE.Object3D[] {
+    return this.islands.flatMap((i) => i.harbour?.hits ?? [])
+  }
+
   /** Boxes over every resource building, for picking with the pointer. Each carries `userData.assetId`. */
   assetHits(): THREE.Object3D[] {
     return [...this.islands.flatMap((i) => [...i.assets.values()].map((a) => a.hit)), ...[...this.hubAssets.values()].map((a) => a.hit)]
@@ -1039,6 +1044,7 @@ export class Town {
     if (links.pier) {
       decor.add(this.harbour(harbourCoast, harbourZ))
       status = new HarbourStatus(harbourCoast, harbourZ)
+      status.setIsland(g.id)
       root.add(status.group)
       avoid.push({ x: harbourCoast - 4, z: harbourZ - 2, w: 13, d: 16 })
     }

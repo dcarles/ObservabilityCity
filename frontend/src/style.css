@@ -337,3 +337,6 @@ body.wall .island-label { font-size: 16px; }
 :root[data-lighting='dusk'] #break-panel[data-armed='true'] .hint { color: #ffc46b; }
 :root[data-lighting='dusk'] button.on, :root[data-lighting='dusk'] #inspector .logtabs button.on { color: #fff; }
 :root[data-lighting='dusk'] #inspector .tabs button.on { color: var(--ink); }
+
+/* a dead-letter row in a top bar list: the queue and its count under the service and its island */
+#state-list .hit .detail { display: block; font-size: 11px; opacity: 0.8; margin-top: 1px; }

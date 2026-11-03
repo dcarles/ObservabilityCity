@@ -214,3 +214,9 @@ All 10 Phase 1 topics decided 2026-10-24.
 - Two colours: boats that loop out of their own island's harbour (messages inside one island, and a scheduler's jobs) are painted differently from boats that sail to another island, in every theme.
 - Internal boats sail a circuit: out of the harbour, once round the island in the water just off its coast (8 units, or 10 or 6.5 where neighbours crowd it), one way for every island, and home. They follow each other and never meet. Where no ring of open water goes all the way round, they fall back to a straight loop out and back, as far as the open water allows, on a lane of its own beside the harbour water.
 - The paints are blue for boats between islands and yellow for internal boats, in every theme (`themes/boatColours.ts`), like the two cars. The harbour boat and the factory barge were redrawn with a taller hull in the lane's colour, a deckhouse with a funnel, rails and a bow lantern.
+
+## Finding the dead letters
+- The top bar's DLQ number is a button: it lists every queue with dead letters, worst first, each row naming the service that reads the queue, its island, the queue and its count. A click on a row opens that service's drawer, where the queue row (with its portal link) sits at the top. The list has no portal link of its own, so a row has one click.
+- A click on an island's pier, crate pile or dead-letter pen opens the same list for that island only.
+- A service that reads a queue with dead letters has an amber roof beacon (red still wins). Its sign already shows DLQ in red.
+- No backend field: the queues already sit on the system that reads them (`queues` of its snapshot). The dashboard has its own list, built by the dashboard's own change.

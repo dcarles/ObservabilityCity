@@ -14,6 +14,7 @@ const inboxLink = B ? 'https://parked.example.test/prod/aa.orders-worker/bus.aa.
 type Reading = { id: string; state: string; queueDepth: number | null; deadLetters: number | null; absent: string[] }
 
 async function open(page: Page): Promise<void> {
+  await page.setViewportSize({ width: 1600, height: 900 }) // wide enough for the whole top bar, which drops its DLQ number on a narrow screen
   await page.goto('/?test=1&quality=low')
   await page.waitForFunction(() => (window as any).city?.seen.snapshots > 0)
   // the inventory is read on the first poll and the broker's numbers after it, so wait until the consumer has its backlog
@@ -61,6 +62,66 @@ test.describe(`the broker's backlog and dead letters (${B ? 'ids, a total' : 'co
     await expect(anchor).toContainText(tool)
     await expect(anchor).toHaveAttribute('href', inboxLink)
     await expect(anchor).toHaveAttribute('target', '_blank')
+  })
+
+  test('the top bar DLQ number lists the queues with dead letters, and a click on a row opens the service that reads it', async ({ page }) => {
+    await open(page)
+    await page.locator('#topbar .chip.dlq').click()
+
+    const list = page.locator('#state-list')
+    await expect(list).toBeVisible()
+    await expect(list.locator('.head')).toContainText('1 queue with dead letters')
+    const row = list.locator('.hit')
+    await expect(row).toHaveCount(1)
+    await expect(row).toContainText('Orders worker')
+    await expect(row).toContainText(inbox) // the queue, and how many
+    await expect(row).toContainText('2 dead')
+    await expect(list.locator('a')).toHaveCount(0) // no portal link in the list: the drawer has it
+
+    await row.click()
+    await expect(list).toBeHidden()
+    await expect(page.locator('#inspector')).toContainText('Orders worker')
+    await expect(page.locator(`#inspector .row.queue[data-queue="${inbox}"]`)).toContainText('2 dead')
+    expect(await page.evaluate(() => (window as any).city.inspector().id)).toBe('aa.orders-worker')
+  })
+
+  test('the DLQ number is clicked closed again, and says so when nothing is dead', async ({ page }) => {
+    await open(page)
+    await page.locator('#topbar .chip.dlq').click()
+    await expect(page.locator('#state-list')).toBeVisible()
+    await page.locator('#topbar .chip.dlq').click()
+    await expect(page.locator('#state-list')).toBeHidden()
+  })
+
+  test('a click on an island\'s pier opens that island\'s queues with dead letters', async ({ page }) => {
+    await open(page)
+    await page.evaluate(() => (window as any).city.framePier('aa'))
+    await page.waitForTimeout(600)
+    const at = await page.evaluate(() => (window as any).city.screenOfPier('aa'))
+    expect(at).not.toBeNull()
+    await page.mouse.click(at.x, at.y)
+
+    const list = page.locator('#state-list')
+    await expect(list).toBeVisible()
+    await expect(list.locator('.hit')).toHaveCount(1)
+    await expect(list.locator('.hit')).toContainText('Orders worker')
+    await list.locator('.hit').click()
+    expect(await page.evaluate(() => (window as any).city.inspector().id)).toBe('aa.orders-worker')
+
+    // another island's pier lists only its own: bb has no dead letters
+    await page.evaluate(() => (window as any).city.framePier('bb'))
+    await page.waitForTimeout(600)
+    const bb = await page.evaluate(() => (window as any).city.screenOfPier('bb'))
+    await page.mouse.click(bb.x, bb.y)
+    await expect(page.locator('#state-list')).toContainText('No queue has dead letters right now')
+  })
+
+  test('the roof beacon of a service with dead letters is amber, not green, and one without stays as it was', async ({ page }) => {
+    await open(page)
+    await page.evaluate(() => (window as any).city.step(2)) // time only moves when a test moves it
+    const beacon = (id: string) => page.evaluate((want) => (window as any).city.inspect(want).beacon, id)
+    expect(await beacon('aa.orders-worker')).toBe('amber')
+    expect(await beacon('bb.ledger-worker')).not.toBe('amber')
   })
 
   test('are not listed for a system that reads no queue', async ({ page }) => {

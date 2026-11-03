@@ -11,7 +11,7 @@ import { viewTotals } from './viewTotals'
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T
 
 /** The states the top bar's counters can list. */
-export type ListedState = 'Degraded' | 'Down' | 'Stale' | 'Incidents'
+export type ListedState = 'Degraded' | 'Down' | 'Stale' | 'Incidents' | 'DeadLetters'
 
 export class TopBar {
   private readonly el = $('topbar')
@@ -64,7 +64,7 @@ export class TopBar {
         ${absentEverywhere(s!, 'requests') ? '' : `<div class="chip" id="chip-requests" title="${escapeHtml(scope + share)}"><b>${formatRate(t.requestsPerSecond)}</b><span>req/s</span></div>`}
         ${absentEverywhere(s!, 'errors') ? '' : `<div class="chip ${t.errorRate >= 0.05 ? 'bad' : t.errorRate >= 0.01 ? 'warn' : ''}" title="${escapeHtml(scope + wide)}"><b>${(t.errorRate * 100).toFixed(1)}%</b><span>errors</span></div>`}
         ${absentEverywhere(s!, 'latency') ? '' : `<div class="chip p99" title="${escapeHtml(scope + wide)}"><b>${formatMs(t.p99Ms)}</b><span>p99</span></div>`}
-        ${absentEverywhere(s!, 'deadLetters') ? '' : `<div class="chip dlq ${t.deadLetters > 0 ? 'bad' : ''}" title="${escapeHtml(`Messages in dead-letter queues. ${scope}${wide}`)}"><b>${formatRate(t.deadLetters)}</b><span>DLQ</span></div>`}
+        ${absentEverywhere(s!, 'deadLetters') ? '' : `<button class="chip clickable dlq ${t.deadLetters > 0 ? 'bad' : ''}" data-list="DeadLetters" title="${escapeHtml(`Messages in dead-letter queues: click to see which queues. ${scope}${wide}`)}"><b>${formatRate(t.deadLetters)}</b><span>DLQ</span></button>`}
         <button class="chip clickable ${t.degraded ? 'warn' : ''}" data-list="Degraded" title="Show the degraded systems"><b>${t.degraded}</b><span>degraded</span></button>
         <button class="chip clickable ${t.down ? 'bad' : ''}" data-list="Down" title="Show the systems that are down"><b>${t.down}</b><span>down</span></button>
         <button class="chip clickable ${t.stale ? 'stale' : ''}" data-list="Stale" title="Show the systems with no fresh data"><b>${t.stale}</b><span>no data</span></button>
@@ -149,10 +149,11 @@ export class Search {
 export class StateList {
   private readonly el = $('state-list')
   private state: ListedState | null = null
+  private island: string | null = null
   private key = ''
   private anchor: DOMRect | null = null
 
-  constructor(private readonly systems: (state: ListedState) => PickItem[], private readonly onPick: (item: PickItem) => void) {
+  constructor(private readonly systems: (state: ListedState, island: string | null) => PickItem[], private readonly onPick: (item: PickItem) => void) {
     document.addEventListener('pointerdown', (e) => {
       const t = e.target as HTMLElement
       if (!this.el.hidden && !t.closest('#state-list') && !t.closest('[data-list]')) this.close()
@@ -161,9 +162,10 @@ export class StateList {
   }
 
   /** Opens the list for a state, or closes it if that one is already open. */
-  toggle(state: ListedState, anchor: DOMRect): void {
-    if (this.state === state && !this.el.hidden) { this.close(); return }
+  toggle(state: ListedState, anchor: DOMRect, island: string | null = null): void {
+    if (this.state === state && this.island === island && !this.el.hidden) { this.close(); return }
     this.state = state
+    this.island = island
     this.anchor = anchor
     this.key = ''
     this.refresh()
@@ -172,15 +174,16 @@ export class StateList {
   /** Redraws the list when the systems in that state have changed. */
   refresh(): void {
     if (!this.state) return
-    const items = this.systems(this.state).sort((a, b) => a.name.localeCompare(b.name))
-    const key = `${this.state}|${items.map((i) => i.id).join(',')}`
+    const found = this.systems(this.state, this.island)
+    const items = this.state === 'DeadLetters' ? found : found.sort((a, b) => a.name.localeCompare(b.name)) // dead letters come worst first
+    const key = `${this.state}|${this.island ?? ''}|${items.map((i) => `${i.id}:${i.detail ?? ''}`).join(',')}`
     if (key === this.key) return
     this.key = key
-    const word = { Down: 'down', Degraded: 'degraded', Stale: 'with no data', Incidents: 'with open incidents' }[this.state]
-    const none = this.state === 'Incidents' ? 'No incidents are open right now.' : `Nothing is ${word} right now.`
+    const word = { Down: 'down', Degraded: 'degraded', Stale: 'with no data', Incidents: 'with open incidents', DeadLetters: items.length === 1 ? 'queue with dead letters' : 'queues with dead letters' }[this.state]
+    const none = this.state === 'Incidents' ? 'No incidents are open right now.' : this.state === 'DeadLetters' ? 'No queue has dead letters right now.' : `Nothing is ${word} right now.`
     this.el.innerHTML = `
       <div class="head"><b>${items.length} ${word}</b><button id="state-list-close" title="Close">✕</button></div>
-      ${items.length === 0 ? `<p class="none">${none}</p>` : items.map((m, i) => `<div class="hit" data-i="${i}"><b>${escapeHtml(m.name)}</b><span>${escapeHtml(m.where)}</span></div>`).join('')}`
+      ${items.length === 0 ? `<p class="none">${none}</p>` : items.map((m, i) => `<div class="hit" data-i="${i}"><b>${escapeHtml(m.name)}</b><span>${escapeHtml(m.where)}</span>${m.detail ? `<span class="detail">${escapeHtml(m.detail)}</span>` : ''}</div>`).join('')}`
     this.el.querySelector('#state-list-close')!.addEventListener('click', () => this.close())
     this.el.querySelectorAll<HTMLElement>('.hit').forEach((row) =>
       row.addEventListener('click', () => { const item = items[Number(row.dataset.i)]; this.close(); this.onPick(item) }))
