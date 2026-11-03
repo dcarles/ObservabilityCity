@@ -10,6 +10,8 @@ export interface UiState {
   openPillars: ReadonlySet<string>
   groups: ReadonlyMap<string, boolean>
   databases: ReadonlyMap<string, boolean>
+  /** The services whose called-by and calls chips the viewer has opened. */
+  connections: ReadonlySet<string>
   /** The lists under the pillars the viewer has opened; all start closed. */
   sections: ReadonlySet<string>
 }
@@ -17,6 +19,11 @@ export interface UiState {
 const num = (v: number | null, digits = 0): string => (v == null ? '–' : v.toLocaleString('en-GB', { minimumFractionDigits: digits, maximumFractionDigits: digits }))
 const ms = (v: number | null): string => (v == null ? '–' : v >= 1000 ? `${(v / 1000).toFixed(1)} s` : `${Math.round(v)}`)
 const dot = (l: Level): string => `<span class="dot ${l}" title="${l === 'none' ? 'No fresh data' : ''}"></span>`
+/** A share in percent for a bar and its figure; null draws a dash. */
+const meter = (v: number | null, amber: number): string => (v == null
+  ? '<span class="dim">–</span>'
+  : `<span class="meter${v >= amber ? ' hot' : ''}"><i style="width:${Math.min(100, Math.max(0, v))}%"></i></span><span class="mv">${Math.round(v)}%</span>`)
+const loadRow = (label: string, bars: string): string => `<div class="lrow"><span class="lt">${label}</span>${bars}</div>`
 const plural = (n: number, word: string): string => `${n} ${word}${n === 1 ? '' : 's'}`
 
 export const countsText = (down: number, degraded: number): string => `${down} down · ${degraded} degraded`
@@ -48,9 +55,55 @@ export function summaryHtml(d: Dashboard): string {
   return services + traffic + dlq
 }
 
+const CPU_AMBER = 80
+const MEM_AMBER = 85
+const RU_AMBER = 85
+
 function tenantLine(t: TenantRow): string {
-  return `<tr class="sub" data-tenant="${esc(t.id)}"><td class="ind2">${dot(t.level)} ${esc(t.name)}${t.test ? '<span class="test">test</span>' : ''}${t.unknown ? '<span class="test">unknown</span>' : ''}</td><td>Tenant</td><td></td><td></td><td></td><td></td><td></td>
-    <td class="n ${t.hot && (t.ru ?? 0) > 0 ? 'warn' : ''}">${num(t.ru)}</td><td class="${(t.throttled ?? 0) > 0 ? 'warn' : 'dim'}" style="white-space:nowrap">${(t.throttled ?? 0) > 0 ? `${num(t.throttled, 1)}% throttled` : 'no throttling'}</td><td></td><td></td><td></td><td></td></tr>`
+  const throttled = (t.throttled ?? 0) > 0
+  return `<tr class="sub" data-tenant="${esc(t.id)}"><td class="ind2">${dot(t.level)}<span class="tn">${esc(t.name)}</span>${t.test ? '<span class="test">test</span>' : ''}${t.unknown ? '<span class="test">unknown</span>' : ''}</td><td></td><td></td><td></td>
+    <td class="ld">${loadRow('RU', `${meter(t.ru, RU_AMBER)}${t.limit != null ? `<span class="mx">max ${num(t.limit)} RU/s</span>` : ''}`)}</td>
+    <td colspan="2">${throttled ? `<span class="thr">${num(t.throttled, 1)}% throttled</span>` : '<span class="dim">no throttling</span>'}</td></tr>`
+}
+
+function trafficCell(r: Row): string {
+  if (r.rps == null) return '<span class="dim">–</span>'
+  const regions = (r.regions ?? []).filter((g) => g.share != null)
+  const split = regions.length >= 2
+    ? `<span class="rg"><span class="rbar">${regions.map((g, i) => `<i class="r${i % 2}" style="width:${g.share}%"></i>`).join('')}</span><span class="rl">${regions.map((g) => `${esc(g.label)} ${Math.round(g.share ?? 0)}%`).join(' · ')}</span></span>`
+    : ''
+  return `<b>${num(r.rps, r.rps < 10 ? 1 : 0)}</b><small>req/s</small>${split}`
+}
+
+function errorCell(r: Row): string {
+  if (r.errorPct == null) return '<span class="dim">–</span>'
+  return `<span class="${r.errorPct > 0 ? 'err' : 'errok'}">${num(r.errorPct, 1)}%</span>`
+}
+
+function latencyCell(r: Row): string {
+  if (r.p99 == null) return '<span class="dim">–</span>'
+  return `<span class="lat ${r.latency}">${ms(r.p99)}${r.p99 < 1000 ? '<small>ms</small>' : ''}</span>${r.sla != null ? `<span class="sla">SLA ${ms(r.sla)}${r.sla < 1000 ? ' ms' : ''}</span>` : ''}`
+}
+
+function loadCell(r: Row): string {
+  if (r.type === 'DB') {
+    if (r.ru == null) return '<span class="dim">–</span>'
+    const max = r.ruMax ? `<span class="mx">max ${num(r.ruMax.limit)} RU/s<i>${esc(r.ruMax.tenant)}</i></span>` : ''
+    return loadRow('RU', `${meter(r.ru, RU_AMBER)}${max}`)
+  }
+  const per = (label: string, whole: number | null, key: 'cpu' | 'memory', amber: number): string => {
+    if (r.regions && r.regions.length >= 2) {
+      return loadRow(label, r.regions.map((g) => `<span class="rseg" title="${esc(g.label)}"><span class="rt">${esc(g.tag)}</span>${meter(g[key], amber)}</span>`).join(''))
+    }
+    return whole == null ? '' : loadRow(label, meter(whole, amber))
+  }
+  const rows = per('CPU', r.cpu, 'cpu', CPU_AMBER) + per('Mem', r.memory, 'memory', MEM_AMBER)
+  return rows || '<span class="dim">–</span>'
+}
+
+function connectionsLabel(r: Row): string {
+  const parts = [r.calledBy.length ? plural(r.calledBy.length, 'caller') : '', r.calls.length ? plural(r.calls.length, 'call') : ''].filter(Boolean)
+  return parts.length ? parts.join(' · ') : ''
 }
 
 function rowHtml(r: Row, ui: UiState): string {
@@ -58,21 +111,26 @@ function rowHtml(r: Row, ui: UiState): string {
   const open = tenants ? databaseIsOpen(r, ui) : false
   const label = tenants ? `<button class="twist" data-db="${esc(r.id)}" aria-expanded="${open}">${open ? '▾' : '▸'}</button>` : ''
   const count = tenants ? `<span class="test">${plural(tenants.length, 'tenant')}</span>` : ''
-  const main = `<tr class="row" data-system="${esc(r.id)}"><td class="ind">${dot(r.level)} ${label}${esc(r.name)}${count}</td><td>${esc(r.type)}</td>
-    <td class="n">${num(r.rps, r.rps != null && r.rps < 10 ? 1 : 0)}</td><td class="n">${num(r.errorPct, 1)}</td><td class="n">${ms(r.p99)}</td><td class="n">${r.instances ?? '–'}</td>
-    <td class="n">${num(r.cpu)}</td><td class="n">${num(r.ru)}</td><td class="n">${num(r.backlog)}</td><td class="n ${(r.dlq ?? 0) > 0 ? 'bad' : ''}">${num(r.dlq)}</td>
-    <td class="wrapc">${chips(r.calledBy)}</td><td class="wrapc">${chips(r.calls)}</td><td><button class="lk" data-details="${esc(r.id)}">Details ›</button></td></tr>`
-  return main + (tenants && open ? tenants.map(tenantLine).join('') : '')
+  const conn = connectionsLabel(r)
+  const showConn = ui.connections.has(r.id)
+  const connCell = conn ? `<button class="conn" data-conn="${esc(r.id)}" aria-expanded="${showConn}">${conn}<span class="chev">${showConn ? '▴' : '▾'}</span></button>` : '<span class="dim">–</span>'
+  const main = `<tr class="row" data-system="${esc(r.id)}"><td class="ind">${dot(r.level)}<span class="nm">${label}${esc(r.name)}</span>${count}<small>${esc(r.type)}${r.instancesText ? ` · ${esc(r.instancesText)}` : ''}</small></td>
+    <td class="n">${trafficCell(r)}</td><td class="n">${errorCell(r)}</td><td class="n">${latencyCell(r)}</td><td class="ld">${loadCell(r)}</td>
+    <td>${connCell}</td><td><button class="det" data-details="${esc(r.id)}">Details <b>›</b></button></td></tr>`
+  const connRow = showConn && conn
+    ? `<tr class="sub cxrow" data-system="${esc(r.id)}"><td></td><td colspan="6"><div class="cx"><div><span class="lbl">Called by</span>${chips(r.calledBy)}</div><div><span class="lbl">Calls</span>${chips(r.calls)}</div></div></td></tr>`
+    : ''
+  return main + connRow + (tenants && open ? tenants.map(tenantLine).join('') : '')
 }
 
 function groupHtml(g: Group, ui: UiState): string {
   const open = groupIsOpen(g, ui)
-  const head = `<tr class="g" data-group="${esc(g.key)}" aria-expanded="${open}"><td>${dot(g.level)} ${open ? '▾' : '▸'} ${esc(g.name)}</td><td>${plural(g.rows.length, 'service')}</td>
-    <td class="n">${num(g.rps)}</td><td></td><td></td><td></td><td></td><td></td><td></td><td class="n ${(g.dlq ?? 0) > 0 ? 'bad' : ''}">${num(g.dlq)}</td><td></td><td></td><td></td></tr>`
+  const facts = [plural(g.rows.length, 'service'), g.rps != null ? `${num(g.rps, g.rps < 10 ? 1 : 0)} req/s` : ''].filter(Boolean).join(' · ')
+  const head = `<tr class="g" data-group="${esc(g.key)}" aria-expanded="${open}"><td colspan="7">${dot(g.level)}<span class="gt">${open ? '▾' : '▸'} <span class="nm">${esc(g.name)}</span></span><small>${facts}</small></td></tr>`
   return head + (open ? g.rows.map((r) => rowHtml(r, ui)).join('') : '')
 }
 
-const HEAD = '<thead><tr><th>Service</th><th>Type</th><th class="n">rps</th><th class="n">Err %</th><th class="n">p99 ms</th><th class="n">Inst</th><th class="n">CPU %</th><th class="n">%RU</th><th class="n">Backlog</th><th class="n">DLQ</th><th>Called by</th><th>Calls</th><th>Links</th></tr></thead>'
+const HEAD = '<thead><tr><th>Service</th><th class="n">Traffic<small>requests / s</small></th><th class="n">Errors<small>share of requests</small></th><th class="n">Latency<small>p99 · against SLA</small></th><th>Load<small>CPU, memory, DB use</small></th><th>Connections<small>who talks to it</small></th><th></th></tr></thead>'
 
 function jobsHtml(jobs: readonly JobRow[]): string {
   if (!jobs.length) return ''

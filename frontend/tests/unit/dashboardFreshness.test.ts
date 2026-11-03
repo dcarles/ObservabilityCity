@@ -9,7 +9,7 @@ import { ALL_TENANTS } from '../../src/tenants'
 import type { Snapshot } from '../../src/types'
 
 const golden = (name: string) => JSON.parse(readFileSync(resolve(__dirname, `../../../shared-test-data/snapshots/${name}.json`), 'utf8')) as Snapshot
-const ui = (open: string[] = []): UiState => ({ openPillars: new Set(), groups: new Map(), databases: new Map(), sections: new Set(open) })
+const ui = (open: string[] = []): UiState => ({ openPillars: new Set(), groups: new Map(), databases: new Map(), connections: new Set(), sections: new Set(open) })
 
 describe('the freshness marker', () => {
   it('says how old the last snapshot is, and turns amber only when snapshots stop', () => {
@@ -118,7 +118,7 @@ describe('the lists under the pillars', () => {
   })
 
   it('details are only what is measured', () => {
-    const base: Row = { id: 'x', name: 'x', type: 'API', level: 'ok', reason: null, rps: 12, errorPct: 0.4, p99: 90, instances: null, cpu: null, ru: null, backlog: 3, dlq: 0, calledBy: [], calls: [], tenants: null, tenantsOpenByDefault: false }
+    const base: Row = { id: 'x', name: 'x', type: 'API', level: 'ok', reason: null, rps: 12, errorPct: 0.4, p99: 90, instances: null, instancesText: null, regions: null, sla: null, latency: 'none', memory: null, ruMax: null, cpu: null, ru: null, backlog: 3, dlq: 0, calledBy: [], calls: [], tenants: null, tenantsOpenByDefault: false }
     expect(detailText(base)).toBe('12 rps · errors 0.4% · p99 90 ms · backlog 3 · DLQ 0')
     expect(detailText({ ...base, rps: null, errorPct: null, p99: null, backlog: null, dlq: null })).toBe('')
   })

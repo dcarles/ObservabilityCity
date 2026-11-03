@@ -1,3 +1,4 @@
+import { fitHeads } from './sticky'
 import '../style.css'
 import '../dashboard.css'
 import { Connection, type ConnectionState } from '../connection'
@@ -48,13 +49,24 @@ export function startDashboard(): void {
 
   // panels start below the menu, which wraps to more rows on a narrow screen
   const menuBar = $('dash-menu')
-  const measureMenu = (): void => document.documentElement.style.setProperty('--bar-h', `${menuBar.offsetHeight - 12}px`)
+  const measureMenu = (): void => {
+    document.documentElement.style.setProperty('--bar-h', `${menuBar.offsetHeight - 12}px`)
+    document.documentElement.style.setProperty('--menu-h', `${menuBar.offsetHeight}px`)
+    fit()
+  }
+  // the column titles of each table stay under the menu and leave with the table's last service row
+  let frame = 0
+  function fit(): void {
+    if (frame) return
+    frame = requestAnimationFrame(() => { frame = 0; fitHeads(document.getElementById('dash-pillars') ?? document, menuBar.offsetHeight) })
+  }
+  window.addEventListener('scroll', fit, { passive: true })
   measureMenu()
   new ResizeObserver(measureMenu).observe(menuBar)
 
   $('vs-town').addEventListener('click', () => { window.location.href = viewSwitchAddress(window.location, 'town', store) })
 
-  const ui = { openPillars: new Set<string>(), groups: new Map<string, boolean>(), databases: new Map<string, boolean>(), sections: new Set<string>() }
+  const ui = { openPillars: new Set<string>(), groups: new Map<string, boolean>(), databases: new Map<string, boolean>(), connections: new Set<string>(), sections: new Set<string>() }
   let tenantView: TenantView = loadTenantView(store)
   let islands: readonly string[] = parseIslands(window.location.search)
   let last: Snapshot | null = null
@@ -115,7 +127,7 @@ export function startDashboard(): void {
     if (!last) return
     model = buildDashboard(last, tenantView)
     const y = window.scrollY
-    const active = (document.activeElement as HTMLElement | null)?.closest<HTMLElement>('[data-toggle],[data-hide],[data-show],[data-db],[data-group]')
+    const active = (document.activeElement as HTMLElement | null)?.closest<HTMLElement>('[data-toggle],[data-hide],[data-show],[data-db],[data-group],[data-conn]')
     const key = active ? (['toggle', 'hide', 'show', 'db', 'group'] as const).map((k) => (active.dataset[k] !== undefined ? `[data-${k}="${CSS.escape(active.dataset[k]!)}"]` : '')).join('') : ''
     const put = (id: string, html: string, k: keyof typeof shown): void => { if (shown[k] !== html) { shown[k] = html; $(id).innerHTML = html } }
     if (shown.brand !== model.townName) { shown.brand = model.townName; $('dash-brand').textContent = model.townName }
@@ -125,6 +137,7 @@ export function startDashboard(): void {
     put('pillar-menu', pillarMenuHtml(model), 'menu')
     put('dash-sections', sectionsHtml(model, ui as UiState), 'sections')
     if (window.scrollY !== y) window.scrollTo(0, y)
+    fit()
     if (key) document.querySelector<HTMLElement>(key)?.focus({ preventScroll: true })
   }
 
@@ -208,6 +221,7 @@ export function startDashboard(): void {
     const show = attr('data-show')
     const db = attr('data-db')
     const details = attr('data-details')
+    const conn = attr('data-conn')
     const group = attr('data-group')
     const system = t.closest<HTMLElement>('[data-system]')?.dataset.system
     if (toggle !== undefined) { if (ui.openPillars.has(toggle)) ui.openPillars.delete(toggle); else ui.openPillars.add(toggle); draw(); return }
@@ -218,6 +232,7 @@ export function startDashboard(): void {
       if (row) { ui.databases.set(db, !(ui.databases.get(db) ?? row.tenantsOpenByDefault)); draw() }
       return
     }
+    if (conn !== undefined) { if (ui.connections.has(conn)) ui.connections.delete(conn); else ui.connections.add(conn); draw(); return }
     if (details !== undefined) { inspector.open(details, 'links'); return }
     if (group !== undefined && model) {
       const g = model.pillars.flatMap((p) => p.groups).find((x) => x.key === group)

@@ -31,10 +31,26 @@ export interface TenantRow {
   ru: number | null
   /** Share of requests turned away, in percent. */
   throttled: number | null
+  /** Capacity provisioned for it (request units per second for Cosmos), when the source reads one. */
+  limit: number | null
   level: Level
   /** Past its amber line or throttling. */
   hot: boolean
 }
+
+/** One region of a service that runs in two or more: its own instances, CPU, memory (percent) and share of the requests (percent). */
+export interface RegionRow {
+  label: string
+  /** A short tag for tight places: "N" for North, with a second letter when two regions start the same. */
+  tag: string
+  instances: number | null
+  cpu: number | null
+  memory: number | null
+  share: number | null
+}
+
+/** How a p99 stands against its target: green under it, amber from 90% of it, red over it; none when there is no target or no number. */
+export type LatencyLevel = 'ok' | 'warn' | 'bad' | 'none'
 
 export interface Row {
   id: string
@@ -45,8 +61,18 @@ export interface Row {
   rps: number | null
   errorPct: number | null
   p99: number | null
+  /** The latency target in ms (the service's SLA), null when none is set. */
+  sla: number | null
+  latency: LatencyLevel
   instances: string | null
+  /** Under the name: "3 North · 3 West" for a service in two or more regions, "6 instances" otherwise; null when nobody counts them. */
+  instancesText: string | null
+  /** Each region of a service in two or more; null for any other. */
+  regions: RegionRow[] | null
   cpu: number | null
+  memory: number | null
+  /** The largest provisioned throughput of the tenant whose %RU the row shows (the worst tenant), with its name; null when no limit is read. */
+  ruMax: { limit: number; tenant: string } | null
   ru: number | null
   backlog: number | null
   dlq: number | null
@@ -130,6 +156,28 @@ const TYPE: Record<string, string> = { Api: 'API', Worker: 'Worker', Database: '
 const KIND_ORDER = ['Api', 'Function', 'Worker', 'Database', 'Cache', 'Gateway', 'Broker', 'Egress']
 const pct = (v: number | null | undefined): number | null => (v == null ? null : v * 100)
 
+/** p99 against its target: over is red, from 90% of it amber, under is green. No target or no number: none. */
+export function latencyLevel(p99: number | null, sla: number | null): LatencyLevel {
+  if (p99 == null || sla == null || sla <= 0) return 'none'
+  const ratio = p99 / sla
+  return ratio > 1 ? 'bad' : ratio >= 0.9 ? 'warn' : 'ok'
+}
+
+/** Short tags for region labels: the first letter, and two letters where the first letters of two regions are the same. */
+export function regionTags(labels: readonly string[]): string[] {
+  const first = labels.map((l) => (l.trim()[0] ?? '?').toUpperCase())
+  return labels.map((l, i) => (first.filter((f) => f === first[i]).length > 1 ? l.trim().slice(0, 2) : first[i]))
+}
+
+/** The busiest first, then by name; a chip with no measured rate goes last. */
+export const byRate = (list: readonly Chip[]): Chip[] => [...list].sort((a, b) => (b.rps ?? -1) - (a.rps ?? -1) || a.name.localeCompare(b.name))
+
+/** A group's id turned into words for the header: "merchant-gateway" is "Merchant Gateway". Words that are already capitals are left alone. */
+export function groupTitle(id: string): string {
+  const words = id.split(/[-_.\s]+/).filter(Boolean)
+  return words.length === 0 ? id : words.map((w) => (w === w.toUpperCase() ? w : w[0]!.toUpperCase() + w.slice(1))).join(' ')
+}
+
 /** What calls what, from the links the registry declares, with the rate each caller sends when the snapshot measures it. */
 function linkIndex(s: Snapshot): { calledBy: Map<string, Chip[]>; calls: Map<string, Chip[]> } {
   const nodes = new Map<string, NodeSnapshot>()
@@ -166,6 +214,7 @@ function tenantRows(n: NodeSnapshot, view: TenantView): TenantRow[] | null {
       unknown: u.kind === 'Unknown',
       ru: pct(u.utilisation),
       throttled: pct(u.throttled),
+      limit: u.limit != null && u.limit > 0 ? u.limit : null,
       level: ({ green: 'ok', amber: 'warn', red: 'bad', grey: 'none' } as const)[tenantLevel(u)],
       hot: (u.utilisation ?? 0) >= n.resourceAmber || isThrottled(u, n.throttleAmber),
     }))
@@ -182,6 +231,18 @@ function rowOf(n: NodeSnapshot, s: Snapshot, view: TenantView, links: ReturnType
   const measured = level !== 'none'
   const absent = (sig: Parameters<typeof isAbsent>[1]): boolean => !measured || isAbsent(n, sig)
   const worstRu = tenants && tenants.length > 0 ? Math.max(...tenants.map((t) => t.ru ?? 0)) : null
+  const worstTenant = tenants && tenants.length > 0 ? tenants.reduce((a, t) => ((t.ru ?? 0) > (a.ru ?? 0) ? t : a), tenants[0]!) : null
+  const listed = (n.regions ?? []).length >= 2 ? n.regions! : null
+  const tags = listed ? regionTags(listed.map((r) => r.label)) : []
+  const regions: RegionRow[] | null = listed
+    ? listed.map((r, i) => ({ label: r.label, tag: tags[i]!, instances: r.instances ?? null, cpu: absent('cpu') ? null : pct(r.cpu), memory: absent('memory') ? null : pct(r.memory), share: pct(r.share) }))
+    : null
+  const counted = regions?.filter((r) => r.instances != null) ?? []
+  const instancesText = absent('instances') || n.instancesTotal === 0 ? null
+    : counted.length >= 2 ? counted.map((r) => `${r.instances} ${r.label}`).join(' · ')
+    : `${n.instancesTotal} instance${n.instancesTotal === 1 ? '' : 's'}`
+  const sla = n.slaP99Ms > 0 ? n.slaP99Ms : null
+  const p99 = db || absent('latency') || n.quiet ? null : n.p99Ms
   return {
     id: n.id,
     name: n.name,
@@ -190,14 +251,20 @@ function rowOf(n: NodeSnapshot, s: Snapshot, view: TenantView, links: ReturnType
     reason: level === 'warn' || level === 'bad' ? n.reason ?? null : null,
     rps: db || absent('requests') ? null : n.requestsPerSecond,
     errorPct: db || absent('errors') || n.quiet ? null : n.errorRate * 100,
-    p99: db || absent('latency') || n.quiet ? null : n.p99Ms,
+    p99,
+    sla: p99 == null ? null : sla,
+    latency: latencyLevel(p99, sla),
     instances: absent('instances') || n.instancesTotal === 0 ? null : `${n.instancesHealthy}/${n.instancesTotal}`,
+    instancesText,
+    regions,
     cpu: absent('cpu') ? null : pct(n.cpu),
+    memory: absent('memory') ? null : pct(n.memory),
+    ruMax: worstTenant?.limit != null ? { limit: worstTenant.limit, tenant: worstTenant.name } : null,
     ru: absent('utilisation') ? null : worstRu ?? pct(n.utilisation),
     backlog: absent('backlog') ? null : n.queueDepth ?? null,
     dlq: absent('deadLetters') ? null : n.deadLetters ?? null,
-    calledBy,
-    calls: links.calls.get(n.id) ?? [],
+    calledBy: byRate(calledBy),
+    calls: byRate(links.calls.get(n.id) ?? []),
     tenants,
     tenantsOpenByDefault: tenants?.some((t) => t.hot) ?? false,
   }
@@ -208,7 +275,8 @@ function groupsOf(g: GroupSnapshot, rows: Row[], nodes: NodeSnapshot[]): Group[]
   nodes.forEach((n, i) => {
     const name = n.service ?? n.name
     const key = `${g.id}/${name}`
-    const entry = byKey.get(key) ?? byKey.set(key, { name, rows: [] }).get(key)!
+    // a service id is turned into words; a system with no service keeps its own name
+    const entry = byKey.get(key) ?? byKey.set(key, { name: n.service ? groupTitle(n.service) : n.name, rows: [] }).get(key)!
     entry.rows.push(rows[i])
   })
   const kindIndex = new Map(nodes.map((n, i) => [rows[i].id, KIND_ORDER.indexOf(n.kind)]))
