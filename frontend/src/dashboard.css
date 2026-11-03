@@ -122,3 +122,4 @@ body.dash #view-bar .vb-list { background: var(--surface); color: var(--fg); }
 body.dash #view-bar .vb-row:hover, body.dash #view-bar .vb-row.sel { background: color-mix(in srgb, var(--daccent) 14%, transparent); }
 body.dash #view-bar .vb-group, body.dash #view-bar .vb-none, body.dash #view-bar small { color: var(--muted); }
 body.dash #view-bar .vb-btn, body.dash #view-bar .vb-list input[type=search] { background: var(--surface2); color: var(--fg); border-color: var(--dline); }
+.svc .dlq, tr.g .dlq { font-size: 12.5px; font-weight: 600; margin-left: 10px; }

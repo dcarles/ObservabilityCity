@@ -169,7 +169,7 @@ test.describe('the dashboard view', () => {
     const heads = await page.locator('[data-pillar="aa"] thead th').evaluateAll((cells) => cells.map((c) => c.firstChild?.textContent ?? ''))
     expect(heads).toEqual(['Service', 'Traffic', 'Errors', 'Latency', 'Load', 'Connections', ''])
     const text = await page.locator('[data-pillar="aa"] table.svc').innerText()
-    expect(text).not.toMatch(/backlog|DLQ|dead letter|waiting|queue/i)
+    expect(text).not.toMatch(/backlog|waiting|queue/i)
     // a group header is words, not an id
     await expect(page.locator('[data-pillar="aa"] tr.g .nm').first()).not.toHaveText(/[-_.]/)
   })
@@ -201,6 +201,31 @@ test.describe('the dashboard view', () => {
       return new Function('document', readCode)(document)
     }, [edit, read]) as Promise<T>
   }
+
+  test('a service with dead letters shows a red DLQ on its line and turns amber, with its group and pillar', async ({ town, page }) => {
+    await open(town, page)
+    await page.locator('[data-pillar="aa"] [data-toggle]').click()
+    await openGroup(page, 'aa', 'orders')
+    const read = `const c = document.querySelector('[data-pillar="aa"]'); const r = c.querySelector('tr.row[data-system="aa.orders-api"]')
+      return { line: r.querySelector('.ind .dlq')?.textContent, lineClass: r.querySelector('.ind .dlq')?.className, dot: r.querySelector('.dot')?.className, group: c.querySelector('tr.g .dot')?.className, pillar: c.className, head: c.querySelector('.head .m b.bad')?.textContent }`
+    const got = await withSnapshot<Record<string, string>>(page, `const n = node('aa.orders-api'); n.deadLetters = 3; n.absent = n.absent.filter(a => a !== 'deadLetters'); for (const m of s.groups.flatMap(g => g.nodes)) if (m.id !== n.id) m.deadLetters = 0`, read)
+    expect(got.line).toBe('DLQ 3')
+    expect(got.lineClass).toContain('bad')
+    expect(got.dot).toContain('warn')
+    expect(got.pillar).toContain('warn')
+    expect(got.head).toBe('3')
+  })
+
+  test('Details on a service row opens the drawer on the Overview tab', async ({ town, page }) => {
+    await open(town, page)
+    const card = page.locator('[data-pillar="aa"]')
+    await card.locator('[data-toggle]').click()
+    await openGroup(page, 'aa', 'orders')
+    await card.locator('tr.row[data-system="aa.orders-api"] .det').click()
+    await expect(page.locator('#inspector')).toBeVisible()
+    await expect(page.locator('#inspector')).toContainText('Orders API')
+    await expect(page.locator('#inspector [data-tab].on')).toHaveText(/Overview/)
+  })
 
   test('errors are green at zero and red above, and latency is green under its target, amber near it and red over it', async ({ town, page }) => {
     await open(town, page)
