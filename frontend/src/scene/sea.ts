@@ -246,6 +246,20 @@ export function harbourLoop(map: SeaMap, water: THREE.Vector3, centre: THREE.Vec
  */
 export const CIRCUIT_OFFSETS = [5, 4.2, 6]
 
+/** How far out from an island's coast the boats between islands keep, so they never share water with the boats that sail round the island itself. */
+export const OUTER_PAD = 9
+
+/** The same sea with the chosen islands bigger all round by `pad`: lanes planned over it keep that much further from their coasts. */
+export function padLand(map: SeaMap, which: number[], pad: number): SeaMap {
+  return {
+    land: map.land.map((poly, i) => {
+      if (!which.includes(i)) return poly
+      const mid = poly.reduce((a, q) => a.add(q), new THREE.Vector2()).divideScalar(poly.length)
+      return poly.map((q) => { const away = q.clone().sub(mid).normalize(); return new THREE.Vector2(q.x + away.x * pad, q.y + away.y * pad) })
+    }),
+  }
+}
+
 /** How far from the pier's middle line the circuit's two ends are: the boats start and finish on either side of the pier, never across it. */
 export const PIER_GAP = 3.4
 

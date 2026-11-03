@@ -16,7 +16,7 @@ import { BoatSystem, type BoatRoute } from './boats'
 import { archCount, clearArches, deckAt } from './arches'
 import { consumersOf, HarbourStatus, messagingOf, type Messaging } from './harbour'
 import { connectorsOf, portSummary, type Connectors, type PortSummary } from './links'
-import { findLane, harbourCircuit, harbourLoop, type SeaMap } from './sea'
+import { findLane, harbourCircuit, harbourLoop, OUTER_PAD, padLand, type SeaMap } from './sea'
 import { schedulerRate } from './scheduler'
 
 /** Whether the broker carries messages: boats sail unless it is down. A broker nothing measures is not a stopped one. */
@@ -423,6 +423,9 @@ export class Town {
       return new THREE.Vector2(w.x, w.z)
     }))
     const sea: SeaMap = { land }
+    // lanes between islands keep OUTER_PAD further from every island's coast than the circuit round it runs, so a boat leaving a pier never crosses it
+    const outer = padLand(sea, this.islands.map((_i, k) => k + 1), OUTER_PAD)
+    const lane = (from: THREE.Vector3, to: THREE.Vector3) => findLane(outer, from, to) ?? findLane(sea, from, to)
     const quays = new Map<number, THREE.Vector3>()
     const quayAt = (a: number) => {
       const key = Math.round(wrapAngle(a) * 100)
@@ -439,7 +442,7 @@ export class Town {
     const lanes = new Map<string, THREE.Vector3[] | null>()
     const laneBetween = (a: number, b: number): THREE.Vector3[] | null => {
       const key = `${a}>${b}`
-      if (!lanes.has(key)) lanes.set(key, a === b ? (harbourCircuit(sea, piers[a]!, this.islands[a].root.position) ?? harbourLoop(sea, harbours[a]!, this.islands[a].root.position)) : findLane(sea, harbours[a]!, harbours[b]!))
+      if (!lanes.has(key)) lanes.set(key, a === b ? (harbourCircuit(sea, piers[a]!, this.islands[a].root.position) ?? harbourLoop(sea, harbours[a]!, this.islands[a].root.position)) : lane(harbours[a]!, harbours[b]!))
       return lanes.get(key)!
     }
     // from the hub's own port, for a topic the hub owns (the old egress route): the quay in the gap beside the island's bridge
@@ -453,7 +456,7 @@ export class Town {
         const a = here + half
         const dir = dirOf(a)
         const tip = coastPoint(this.hubOutline, dir, 1.6 - (QUAY + 3)).setY(0)
-        const lane = findLane(sea, tip, harbours[index]!)
+        const lane = findLane(outer, tip, harbours[index]!) ?? findLane(sea, tip, harbours[index]!)
         if (lane && (!best || laneLength(lane) < laneLength(best))) { best = lane; bestAngle = a }
       }
       if (best) quayAt(bestAngle)
@@ -1154,7 +1157,7 @@ export class Town {
   private harbourWater(island: Island, plan: Plan): THREE.Vector3 {
     const harbourZ = plan.rowRoadZ[Math.floor((plan.rows - 1) / 2)]
     const coast = coastScan(island.outline, 'x', harbourZ)
-    return island.root.localToWorld(new THREE.Vector3(coast + 10, 0, harbourZ)).setY(0)
+    return island.root.localToWorld(new THREE.Vector3(coast + 16, 0, harbourZ)).setY(0)
   }
 
   /** An island's pier as a line in world coordinates: from its root on the island to its tip. */
