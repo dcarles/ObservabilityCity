@@ -6,7 +6,7 @@ import type { BoatLook, VehicleKit } from '../types'
 const CRATE_COLORS = ['#e0573f', '#3f8fd9', '#f2b632', '#4fb37a', '#8e6bd9']
 
 /** One cargo boat: a pointed hull, a wheelhouse and a deck load of crates. */
-function makeBoat(seed: number): BoatLook {
+function makeBoat(seed: number, internal = false): BoatLook {
   const L = 5.4, W = 1.9
   const prof = new THREE.Shape()
   prof.moveTo(-W / 2, L / 2)
@@ -18,7 +18,7 @@ function makeBoat(seed: number): BoatLook {
   const hullGeo = new THREE.ExtrudeGeometry(prof, { depth: 0.75, bevelEnabled: false })
   hullGeo.rotateX(-Math.PI / 2)
   hullGeo.translate(0, -0.3, 0)
-  const hull = new THREE.Mesh(hullGeo, flat('#2f5d8a'))
+  const hull = new THREE.Mesh(hullGeo, flat(internal ? '#c9772a' : '#2f5d8a'))
   hull.castShadow = true
   hull.receiveShadow = true
   const stripe = box(W + 0.04, 0.12, L + 1.3, flat('#f4efe2'), { y: 0.3 })
@@ -30,7 +30,7 @@ function makeBoat(seed: number): BoatLook {
   )
   const cargo = new THREE.Group()
   for (let i = 0; i < 6; i++) {
-    cargo.add(box(0.75, 0.7, 0.75, flat(CRATE_COLORS[(seed + i) % CRATE_COLORS.length]), { x: i % 2 ? 0.42 : -0.42, y: 0.46, z: 1.2 - Math.floor(i / 2) * 0.9 }))
+    cargo.add(box(0.85, 0.8, 0.85, flat(CRATE_COLORS[(seed + i) % CRATE_COLORS.length]), { x: i % 2 ? 0.48 : -0.48, y: 0.5, z: 1.25 - Math.floor(i / 2) * 1.0 }))
   }
   const object = new THREE.Group()
   object.add(hull, stripe, deck, house, cargo)

@@ -207,3 +207,9 @@ All 10 Phase 1 topics decided 2026-10-24.
 - **One late source no longer greys a whole building.** A building used to go grey when any source that feeds it was late, so a Service Bus read that failed once blanked every worker that reads queues. Now a late source takes only its own signals out (listed as absent, so no health rule uses them) while some source of health signals is fresh. A building is grey when none is: a source that supplies only instance counts or queue numbers cannot keep one alive, because they do not say how it is doing.
 - **Each system says where its numbers come from when one is late.** `sources` lists every source with its age in seconds, whether it is fresh and the signals it supplies. It is left out when all are fresh. The drawer shows a row for each source ("From platform: 4m ago, late: no cpu, memory"), also for a grey building, so a late source can be named at a glance.
 - **A hiccup in Azure Monitor is tried again.** A read answered with 429, 500, 502, 503 or 504, or a dropped connection, is tried up to three times a moment apart before it counts as failed. A refusal (403, 400) fails at once.
+
+## Boats: how they look and where they sail
+- A boat always carries a full deck of crates. The crates used to show how busy the island was, but every boat into an island showed the same number, so they said almost nothing the boat count did not already say. The crate logic is gone.
+- Boats are bigger, and their crates a little bigger still.
+- Two colours: boats that loop out of their own island's harbour (messages inside one island, and a scheduler's jobs) are painted differently from boats that sail to another island, in every theme.
+- A loop sails out as far as the open water allows (up to 44 units) and starts a little along the coast from the harbour water, on a lane of its own, so it keeps out of the way of the boats sailing to and from other islands.
