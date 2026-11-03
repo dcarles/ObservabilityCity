@@ -233,7 +233,7 @@ export function startDashboard(): void {
       return
     }
     if (conn !== undefined) { if (ui.connections.has(conn)) ui.connections.delete(conn); else ui.connections.add(conn); draw(); return }
-    if (details !== undefined) { inspector.open(details, 'links'); return }
+    if (details !== undefined) { inspector.open(details, 'overview'); return }
     if (group !== undefined && model) {
       const g = model.pillars.flatMap((p) => p.groups).find((x) => x.key === group)
       if (g) { ui.groups.set(group, !(ui.groups.get(group) ?? (g.level === 'warn' || g.level === 'bad'))); draw() }
