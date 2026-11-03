@@ -16,7 +16,7 @@ import { BoatSystem, type BoatRoute } from './boats'
 import { archCount, clearArches, deckAt } from './arches'
 import { consumersOf, HarbourStatus, messagingOf, type Messaging } from './harbour'
 import { connectorsOf, portSummary, type Connectors, type PortSummary } from './links'
-import { findLane, harbourCircuit, harbourLoop, isOpenWater, type SeaMap } from './sea'
+import { findLane, harbourCircuit, harbourLoop, type SeaMap } from './sea'
 import { schedulerRate } from './scheduler'
 
 /** Whether the broker carries messages: boats sail unless it is down. A broker nothing measures is not a stopped one. */
@@ -152,7 +152,7 @@ export class Town {
   private readonly boatLanes = new Set<string>()
   private seaMap: SeaMap = { land: [] }
   private harbourPoints = new Map<string, THREE.Vector3>()
-  private internalDocks = new Map<string, THREE.Vector3>()
+  private internalDocks = new Map<string, { start: THREE.Vector3; end: THREE.Vector3 }>()
   /** The middle of each piece of the ring road, for tests. */
   private ringMiddles: THREE.Vector3[] = []
   private boatRouteEnds: { from: string | null; to: string; scheduler: boolean; circuit: boolean; rate: () => number }[] = []
@@ -434,16 +434,12 @@ export class Town {
       return q
     }
     const harbours = pillars.map((_g, index) => (connectors[index].pier ? this.harbourWater(this.islands[index], plans[index]) : null))
-    // the internal boats dock on the other side of the pier from the boats that sail between islands, so the two never meet at the harbour
-    const internalHarbours = pillars.map((_g, index) => {
-      if (!harbours[index]) return null
-      const other = this.harbourWater(this.islands[index], plans[index], -1)
-      return isOpenWater(sea, other.x, other.z) ? other : harbours[index]
-    })
+    // the pier's middle line in the world, from its root to its tip: the circuit round the island runs from one side of it to the other and never across it
+    const piers = pillars.map((_g, index) => (harbours[index] ? this.pierLine(this.islands[index], plans[index]) : null))
     const lanes = new Map<string, THREE.Vector3[] | null>()
     const laneBetween = (a: number, b: number): THREE.Vector3[] | null => {
       const key = `${a}>${b}`
-      if (!lanes.has(key)) lanes.set(key, a === b ? (harbourCircuit(sea, internalHarbours[a]!, this.islands[a].root.position) ?? harbourLoop(sea, internalHarbours[a]!, this.islands[a].root.position)) : findLane(sea, harbours[a]!, harbours[b]!))
+      if (!lanes.has(key)) lanes.set(key, a === b ? (harbourCircuit(sea, piers[a]!, this.islands[a].root.position) ?? harbourLoop(sea, harbours[a]!, this.islands[a].root.position)) : findLane(sea, harbours[a]!, harbours[b]!))
       return lanes.get(key)!
     }
     // from the hub's own port, for a topic the hub owns (the old egress route): the quay in the gap beside the island's bridge
@@ -511,7 +507,7 @@ export class Town {
       this.boatLanes.add(g.id)
     })
     this.seaMap = sea
-    this.internalDocks = new Map(pillars.flatMap((g, i) => (internalHarbours[i] ? [[g.id, internalHarbours[i]!] as [string, THREE.Vector3]] : [])))
+    this.internalDocks = new Map(pillars.flatMap((g, i) => { const c = harbours[i] ? laneBetween(i, i) : null; return c ? [[g.id, { start: c[0], end: c[c.length - 1] }] as [string, { start: THREE.Vector3; end: THREE.Vector3 }]] : [] }))
     this.harbourPoints = new Map(pillars.flatMap((g, i) => (harbours[i] ? [[g.id, harbours[i]!] as [string, THREE.Vector3]] : [])))
     this.boatRouteEnds = boatRoutes.map((r) => ({ from: r.from, to: r.to, scheduler: r.scheduler === true, circuit: r.circuit === true, rate: r.rate }))
 
@@ -724,13 +720,13 @@ export class Town {
     return { pieces: this.ringMiddles.length, lifted: this.ringMiddles.filter((p) => deckAt(p.x, p.z).lift > 0).length }
   }
 
-  inspectSea(): { harbours: string[]; docks: Record<string, { between: { x: number; z: number }; internal: { x: number; z: number } }>; unreachable: string[]; routes: { from: string | null; to: string; scheduler: boolean; circuit: boolean; rate: number }[]; arches: number } {
+  inspectSea(): { harbours: string[]; docks: Record<string, { between: { x: number; z: number }; internalStart: { x: number; z: number }; quay: { x: number; z: number } }>; unreachable: string[]; routes: { from: string | null; to: string; scheduler: boolean; circuit: boolean; rate: number }[]; arches: number } {
     const ids = [...this.harbourPoints.keys()]
     const unreachable: string[] = []
     for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) {
       if (!findLane(this.seaMap, this.harbourPoints.get(ids[i])!, this.harbourPoints.get(ids[j])!)) unreachable.push(`${ids[i]}|${ids[j]}`)
     }
-    const docks = Object.fromEntries(ids.map((id) => [id, { between: { x: this.harbourPoints.get(id)!.x, z: this.harbourPoints.get(id)!.z }, internal: { x: this.internalDocks.get(id)!.x, z: this.internalDocks.get(id)!.z } }]))
+    const docks = Object.fromEntries(ids.map((id) => [id, { between: { x: this.harbourPoints.get(id)!.x, z: this.harbourPoints.get(id)!.z }, internalStart: { x: this.internalDocks.get(id)!.start.x, z: this.internalDocks.get(id)!.start.z }, quay: { x: this.internalDocks.get(id)!.end.x, z: this.internalDocks.get(id)!.end.z } }]))
     return { harbours: ids, docks, unreachable, routes: this.boatRouteEnds.map((r) => ({ from: r.from, to: r.to, scheduler: r.scheduler, circuit: r.circuit, rate: r.rate() })), arches: archCount() }
   }
 
@@ -1154,11 +1150,18 @@ export class Town {
     return coast.clone().addScaledVector(dir, QUAY + 3).setY(0)
   }
 
-  /** The open water beside an island's harbour pier, in world coordinates: on one side of the pier for the boats between islands (side 1), on the other for the island's own loop (side -1). */
-  private harbourWater(island: Island, plan: Plan, side: 1 | -1 = 1): THREE.Vector3 {
+  /** The open water off the tip of an island's harbour pier, in world coordinates, outside the circuit round the island: where the boats between islands dock, out and back on lanes side by side. */
+  private harbourWater(island: Island, plan: Plan): THREE.Vector3 {
     const harbourZ = plan.rowRoadZ[Math.floor((plan.rows - 1) / 2)]
     const coast = coastScan(island.outline, 'x', harbourZ)
-    return island.root.localToWorld(new THREE.Vector3(coast + 7, 0, harbourZ + 3.6 * side)).setY(0)
+    return island.root.localToWorld(new THREE.Vector3(coast + 10, 0, harbourZ)).setY(0)
+  }
+
+  /** An island's pier as a line in world coordinates: from its root on the island to its tip. */
+  private pierLine(island: Island, plan: Plan): { from: THREE.Vector3; to: THREE.Vector3 } {
+    const harbourZ = plan.rowRoadZ[Math.floor((plan.rows - 1) / 2)]
+    const coast = coastScan(island.outline, 'x', harbourZ)
+    return { from: island.root.localToWorld(new THREE.Vector3(coast - 7, 0, harbourZ)).setY(0), to: island.root.localToWorld(new THREE.Vector3(coast + 4, 0, harbourZ)).setY(0) }
   }
 
   /** A sea lane to an island's harbour, sailed there and back: its share (`weight`) of the island's messages is what these boats carry. */

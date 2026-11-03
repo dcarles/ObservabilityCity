@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from 'vitest'
 import * as THREE from 'three'
-import { AVOID_GAP, AVOID_STEP, BoatSystem, LANE_SIDE, sidestep, type BoatRoute } from '../../src/scene/boats'
+import { AVOID_GAP, AVOID_STEP, BoatSystem, LANE_SIDE, UNLOAD_STEP, sidestep, type BoatRoute } from '../../src/scene/boats'
 import { BOAT_PAINT } from '../../src/themes/boatColours'
 import { activateTheme } from '../../src/themes/active'
 import { KITS } from '../../src/themes/kits'
@@ -202,3 +202,34 @@ describe('boats that sail between islands meeting each other', () => {
   })
 })
 
+
+describe('a boat at the end of its circuit', () => {
+  beforeAll(() => activateTheme(KITS[Object.keys(KITS)[0]]))
+  const circuit = (): BoatRoute => ({ path: [0, 5, 10, 15, 20].map((x) => new THREE.Vector3(x, 0, 0)), from: 'aa', to: 'aa', circuit: true, scheduler: true, rate: () => on, speed: () => 1 })
+  let on = 0
+
+  it('lies at the quay and hands its crates over one by one before it leaves', () => {
+    const boats = new BoatSystem(2)
+    boats.setRoutes([circuit()])
+    on = 20
+    boats.update(0.05)
+    on = 0
+    const loaded: number[] = []
+    let sawBoatAtEnd = false
+    for (let t = 0; t < 20; t += 0.05) {
+      boats.update(0.05)
+      for (const b of visible(boats)) {
+        const crates = b.children.find((c) => c.children.length >= 6)!
+        const left = crates.children.filter((c) => c.visible).length
+        if (b.position.x > 19.9) { sawBoatAtEnd = true; loaded.push(left) }
+      }
+    }
+
+    expect(sawBoatAtEnd).toBe(true)
+    expect(loaded[0]).toBeGreaterThan(0) // arrives loaded
+    expect(Math.min(...loaded)).toBe(0) // and every crate is off before it goes
+    expect(loaded.every((n, i) => i === 0 || n <= loaded[i - 1])).toBe(true) // they only ever come off
+    expect(loaded.length * 0.05).toBeGreaterThan(UNLOAD_STEP * 3) // it stays while they do
+    expect(visible(boats)).toHaveLength(0) // then it is gone
+  })
+})

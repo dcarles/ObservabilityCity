@@ -246,11 +246,19 @@ export function harbourLoop(map: SeaMap, water: THREE.Vector3, centre: THREE.Vec
  */
 export const CIRCUIT_OFFSETS = [5, 4.2, 6]
 
+/** How far from the pier's middle line the circuit's two ends are: the boats start and finish on either side of the pier, never across it. */
+export const PIER_GAP = 3.4
+
+function distToLine(p: THREE.Vector3, a: THREE.Vector3, b: THREE.Vector3): number {
+  return distToSegment(new THREE.Vector2(p.x, p.z), new THREE.Vector2(a.x, a.z), new THREE.Vector2(b.x, b.z))
+}
+
 /**
- * A circuit round the island: out of the harbour, once round the coast in the water just off it, one way only, and back to the harbour. Boats on it all go the
- * same way, so they follow each other and never meet. Null where no ring of open water goes all the way round (a crowded sea); the straight loop is used then.
+ * A circuit round the island: it starts at the water beside the pier on one side, goes once round the coast in the water just off it, one way only, and finishes at
+ * the water beside the pier on the other side, where the boats unload. It never crosses the pier (`pier` is the pier's middle line, from its root to its tip). Boats on it all
+ * go the same way, so they follow each other and never meet. Null where no ring of open water goes all the way round (a crowded sea); the straight loop is used then.
  */
-export function harbourCircuit(map: SeaMap, water: THREE.Vector3, centre: THREE.Vector3): THREE.Vector3[] | null {
+export function harbourCircuit(map: SeaMap, pier: { from: THREE.Vector3; to: THREE.Vector3 }, centre: THREE.Vector3): THREE.Vector3[] | null {
   const pts = map.land.flat()
   if (pts.length === 0) return null
   const { minX, minZ, w, h, blocked } = gridOf(map, pts)
@@ -283,12 +291,27 @@ export function harbourCircuit(map: SeaMap, water: THREE.Vector3, centre: THREE.
       for (let k = 0; k <= 4 && clear; k++) clear = free(a.x + ((b.x - a.x) * k) / 4, a.z + ((b.z - a.z) * k) / 4)
     }
     if (!clear) continue
-    // start at the ring point nearest the harbour and come back to it
-    let first = 0
-    let nearest = Infinity
-    loop.forEach((q, i) => { const d = Math.hypot(q.x - water.x, q.z - water.z); if (d < nearest) { nearest = d; first = i } })
-    const round = [...loop.slice(first), ...loop.slice(0, first), loop[first].clone()]
-    return [water.clone().setY(0), ...round, water.clone().setY(0)]
+    // a point every couple of units, so the ends can sit right beside the pier
+    const dense: THREE.Vector3[] = []
+    loop.forEach((a, i) => {
+      const b = loop[(i + 1) % loop.length]
+      const steps = Math.max(1, Math.ceil(a.distanceTo(b) / 2))
+      for (let k = 0; k < steps; k++) dense.push(a.clone().lerp(b, k / steps))
+    })
+    // the ring point nearest the pier, then the run of points within the gap round it is left out
+    let nearest = 0
+    let nearestD = Infinity
+    dense.forEach((q, i) => { const d = distToLine(q, pier.from, pier.to); if (d < nearestD) { nearestD = d; nearest = i } })
+    if (nearestD > PIER_GAP) continue // the pier is not near this ring
+    const n = dense.length
+    let after = nearest
+    while (distToLine(dense[after % n], pier.from, pier.to) < PIER_GAP && after < nearest + n) after++
+    let before = nearest
+    while (distToLine(dense[((before % n) + n) % n], pier.from, pier.to) < PIER_GAP && before > nearest - n) before--
+    if (after - before >= n) continue
+    const round: THREE.Vector3[] = []
+    for (let k = after; k <= before + n; k++) round.push(dense[k % n].clone().setY(0))
+    return round
   }
   return null
 }
