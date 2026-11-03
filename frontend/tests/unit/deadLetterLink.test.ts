@@ -11,7 +11,7 @@ const tool = { name: 'Support tool', url: 'https://support.example.test/queues/x
 
 describe('the queues of a consumer', () => {
   it('are rows with what waits, what is dead-lettered and the link', () => {
-    expect(queueRows({ queues: [q('sbq-a-inbox', 25, 2, tool)] })).toEqual([{ name: 'sbq-a-inbox', text: '25 waiting · 2 dead', tone: 'bad', link: tool }])
+    expect(queueRows({ queues: [q('sbq-a-inbox', 25, 2, tool)] })).toEqual([{ name: 'sbq-a-inbox', text: '25 waiting · 2 dead', tone: 'bad', link: tool, types: null }])
   })
 
   it('put the queue with dead letters first, then the biggest backlog', () => {
@@ -72,8 +72,8 @@ describe('the snapshot guard and queues', () => {
     const t = healthyTown() as any
     nodeOf(t).queues = [{ name: 'a', backlog: 3, deadLetters: 1, perSecond: 2.5, link: { name: 'Tool', url: 'https://t.example.test/a' } }, { name: '', backlog: 1 }, { name: 'b', backlog: 'x', link: { name: 'Tool', url: 'javascript:1' } }, 'junk']
     expect(nodeOf(checkSnapshot(t).snapshot!).queues).toEqual([
-      { name: 'a', backlog: 3, deadLetters: 1, link: { name: 'Tool', url: 'https://t.example.test/a' }, perSecond: 2.5 },
-      { name: 'b', backlog: null, deadLetters: null, link: null, perSecond: null },
+      { name: 'a', backlog: 3, deadLetters: 1, link: { name: 'Tool', url: 'https://t.example.test/a' }, perSecond: 2.5, types: null, typesCut: 0 },
+      { name: 'b', backlog: null, deadLetters: null, link: null, perSecond: null, types: null, typesCut: 0 },
     ])
 
     delete nodeOf(t).queues

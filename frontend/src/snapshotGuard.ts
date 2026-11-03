@@ -272,6 +272,11 @@ function checkNode(n: unknown, groupId: string, ids: Set<string>, problems: stri
       .map((q) => ({
         name: q.name as string, backlog: optionalNumber(q.backlog), deadLetters: optionalNumber(q.deadLetters), perSecond: optionalNumber(q.perSecond),
         link: isObject(q.link) && typeof q.link.name === 'string' && q.link.name !== '' && typeof q.link.url === 'string' && /^https?:\/\//i.test(q.link.url) ? { name: q.link.name, url: q.link.url } : null,
+        // the kinds of message it handled: null when nothing measures them; one without a name or a rate cannot be shown
+        types: Array.isArray(q.types)
+          ? q.types.filter(isObject).filter((t) => typeof t.type === 'string' && t.type !== '' && isFiniteNumber(t.perSecond) && t.perSecond >= 0).map((t) => ({ type: t.type as string, perSecond: t.perSecond as number }))
+          : null,
+        typesCut: isFiniteNumber(q.typesCut) && q.typesCut > 0 ? Math.round(q.typesCut) : 0,
       }))
     : null
   out.regions = Array.isArray(n.regions)

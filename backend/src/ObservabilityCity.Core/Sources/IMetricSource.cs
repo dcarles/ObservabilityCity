@@ -32,7 +32,11 @@ public sealed record NodeReading(
     IReadOnlyList<QueueReading>? Queues = null);
 
 /// <summary>One queue (or other broker entity) a consumer reads, with what waits in it and what is dead-lettered; a number the source cannot tell is null. ProducerGroup and ProducerService say whose outbox it is, when the entity's name does: the island and the service that publish what the consumer reads.</summary>
-public sealed record QueueReading(string Name, double? Backlog, double? DeadLetters, double? PerSecond = null, string? ProducerGroup = null, string? ProducerService = null);
+public sealed record QueueReading(string Name, double? Backlog, double? DeadLetters, double? PerSecond = null, string? ProducerGroup = null, string? ProducerService = null,
+    IReadOnlyList<MessageTypeReading>? Types = null, int TypesCut = 0);
+
+/// <summary>How many messages a second of one kind (the message type) a queue handled. Types is highest first; TypesCut counts the quietest kinds a queue had beyond the ceiling, which are left out.</summary>
+public sealed record MessageTypeReading(string Type, double PerSecond);
 
 /// <summary>
 /// What one region of a service reports: how many instances it runs, and how busy its plan is, and Share is the part of the service's requests it took (0 to 1, the regions add up to 1; null when nothing measures it). Region is the label the scope rules gave (see <c>scope.regions</c>).

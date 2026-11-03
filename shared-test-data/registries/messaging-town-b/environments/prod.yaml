@@ -30,6 +30,11 @@ sources:
     kind: servicebus
     connection: "file:servicebus.json"
     window: 300s
+    # the kinds of message each queue handled, from the span metrics of the consumers
+    typesQuery: |
+      AppMetrics
+      | where TimeGenerated > ago({window}) and Name == "servicebus.span.metrics.calls"
+      | summarize calls = sum(Sum) by queue = tostring(Properties["messaging.consumer"]), type = tostring(Properties["messaging.type"])
     entities:
       resources: broker
       dimension: EntityName

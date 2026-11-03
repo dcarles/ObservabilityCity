@@ -30,6 +30,10 @@ sources:
     kind: servicebus
     connection: "file:servicebus.json"
     window: 300s
+    # which kinds of message each queue handled: one row per queue and kind
+    typesQuery: >-
+      Telemetry_CL | where TimeGenerated > ago({windowSeconds}s) and kind_s == "queue"
+      | summarize calls = sum(handled_d) by queue = queue_s, type = message_s
     entities:
       resources: broker
       dimension: EntityName

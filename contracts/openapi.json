@@ -829,6 +829,23 @@
         },
         "additionalProperties": false
       },
+      "MessageTypeSnapshot": {
+        "required": [
+          "perSecond",
+          "type"
+        ],
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "perSecond": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
       "MessagingSnapshot": {
         "required": [
           "subscriptions",
@@ -1155,6 +1172,18 @@
           "perSecond": {
             "type": "number",
             "format": "double",
+            "nullable": true
+          },
+          "types": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MessageTypeSnapshot"
+            },
+            "nullable": true
+          },
+          "typesCut": {
+            "type": "integer",
+            "format": "int32",
             "nullable": true
           }
         },

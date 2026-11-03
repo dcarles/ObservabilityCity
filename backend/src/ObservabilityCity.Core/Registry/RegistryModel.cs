@@ -237,6 +237,9 @@ public sealed record RegistrySource(string Name, string Kind, string? Connection
     /// <summary>For a request source: the query that gives how the requests divide between regions (columns role, region, calls). Null: the split is not measured.</summary>
     public string? RegionQuery { get; init; }
 
+    /// <summary>For a broker source (servicebus): the query that gives how many messages each queue handled by message type (columns queue, type, calls). Null: the types are not measured.</summary>
+    public string? TypesQuery { get; init; }
+
     /// <summary>For a platform-metric source: which metric of which resources fills which signal. Empty for every other kind of source.</summary>
     public IReadOnlyList<MetricGroup> Metrics { get; init; } = [];
 
