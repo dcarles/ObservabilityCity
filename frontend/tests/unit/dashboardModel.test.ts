@@ -8,7 +8,7 @@ import { checkSnapshot } from '../../src/snapshotGuard'
 import type { NodeSnapshot, Snapshot } from '../../src/types'
 
 const golden = (name: string) => JSON.parse(readFileSync(resolve(__dirname, `../../../shared-test-data/snapshots/${name}.json`), 'utf8')) as Snapshot
-const ui = (over: Partial<UiState> = {}): UiState => ({ openPillars: new Set(), groups: new Map(), databases: new Map(), sections: new Set(), ...over })
+const ui = (over: Partial<UiState> = {}): UiState => ({ openPillars: new Set(), groups: new Map(), databases: new Map(), connections: new Set(), sections: new Set(), ...over })
 const node = (s: Snapshot, id: string): NodeSnapshot => s.groups.flatMap((g) => g.nodes).find((n) => n.id === id)!
 
 describe('summary counts', () => {

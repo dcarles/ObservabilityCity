@@ -153,12 +153,135 @@ test.describe('the dashboard view', () => {
         expect(await page.evaluate(() => document.body.dataset.mode)).toBe(scheme)
       })
 
-  test('the narrow screen drops the minor columns', async ({ town, page }) => {
+  test('the narrow screen drops the minor columns and keeps traffic, connections and the details button', async ({ town, page }) => {
     await page.setViewportSize({ width: 700, height: 800 })
     await open(town, page)
     await page.locator('[data-pillar="aa"] [data-toggle]').click()
-    for (const h of ['Inst', 'CPU %', 'Calls', 'rps', 'p99 ms', 'Called by']) await expect(page.locator('[data-pillar="aa"] thead th', { hasText: h }).first()).toBeHidden()
-    await expect(page.locator('[data-pillar="aa"] thead th', { hasText: 'Err %' })).toBeVisible()
+    for (const h of ['Errors', 'Latency', 'Load']) await expect(page.locator('[data-pillar="aa"] thead th', { hasText: h }).first()).toBeHidden()
+    for (const h of ['Service', 'Traffic', 'Connections']) await expect(page.locator('[data-pillar="aa"] thead th', { hasText: h }).first()).toBeVisible()
+    await openGroup(page, 'aa', 'orders')
+    await expect(page.locator('[data-pillar="aa"] tr.row[data-system="aa.orders-api"] .det')).toBeVisible()
+  })
+
+  test('the table has the new columns and says nothing about queues', async ({ town, page }) => {
+    await open(town, page)
+    await page.locator('[data-pillar="aa"] [data-toggle]').click()
+    const heads = await page.locator('[data-pillar="aa"] thead th').evaluateAll((cells) => cells.map((c) => c.firstChild?.textContent ?? ''))
+    expect(heads).toEqual(['Service', 'Traffic', 'Errors', 'Latency', 'Load', 'Connections', ''])
+    const text = await page.locator('[data-pillar="aa"] table.svc').innerText()
+    expect(text).not.toMatch(/backlog|DLQ|dead letter|waiting|queue/i)
+    // a group header is words, not an id
+    await expect(page.locator('[data-pillar="aa"] tr.g .nm').first()).not.toHaveText(/[-_.]/)
+  })
+
+  test('the connections button opens the callers and calls under its row and closes them again', async ({ town, page }) => {
+    await open(town, page)
+    await page.locator('[data-pillar="aa"] [data-toggle]').click()
+    await openGroup(page, 'aa', 'orders')
+    const row = page.locator('[data-pillar="aa"] tr.row[data-system="aa.orders-api"]')
+    const button = row.locator('.conn')
+    await expect(button).toHaveText(/caller|call/)
+    await expect(page.locator('[data-pillar="aa"] .cx')).toHaveCount(0)
+    await button.click()
+    await expect(page.locator('[data-pillar="aa"] .cx')).toHaveCount(1)
+    await expect(button).toHaveAttribute('aria-expanded', 'true')
+    await snapshots(page, 2)
+    await expect(page.locator('[data-pillar="aa"] .cx')).toHaveCount(1) // stays open across snapshots
+    await button.click()
+    await expect(page.locator('[data-pillar="aa"] .cx')).toHaveCount(0)
+  })
+
+  /** Feeds the page a snapshot made from the live one and reads the table in the same breath, so a newer snapshot cannot undo it. */
+  async function withSnapshot<T>(page: Page, edit: string, read: string): Promise<T> {
+    return page.evaluate(async ([editCode, readCode]) => {
+      const s = await (await fetch('/api/snapshot/latest')).json()
+      const node = (id: string) => s.groups.flatMap((g: any) => g.nodes).find((n: any) => n.id === id)
+      new Function('s', 'node', editCode)(s, node)
+      ;(window as any).dash.feed(s)
+      return new Function('document', readCode)(document)
+    }, [edit, read]) as Promise<T>
+  }
+
+  test('errors are green at zero and red above, and latency is green under its target, amber near it and red over it', async ({ town, page }) => {
+    await open(town, page)
+    await page.locator('[data-pillar="aa"] [data-toggle]').click()
+    await openGroup(page, 'aa', 'orders')
+    const cls = (id: string, sel: string) => `return document.querySelector('[data-pillar="aa"] tr.row[data-system="${id}"] ${sel}')?.className`
+    const zero = await withSnapshot<string>(page, `node('aa.orders-api').errorRate = 0`, cls('aa.orders-api', 'td:nth-child(3) span'))
+    expect(zero).toBe('errok')
+    const some = await withSnapshot<string>(page, `node('aa.orders-api').errorRate = 0.004`, cls('aa.orders-api', 'td:nth-child(3) span'))
+    expect(some).toBe('err')
+    for (const [p99, want] of [[400, 'ok'], [95, 'warn'], [130, 'bad']] as const) {
+      const got = await withSnapshot<string>(page, `const n = node('aa.orders-api'); n.p99Ms = ${p99}; n.slaP99Ms = ${want === 'ok' ? 500 : 100}`, cls('aa.orders-api', 'td:nth-child(4) .lat'))
+      expect(got).toBe(`lat ${want}`)
+    }
+    const sla = await withSnapshot<string>(page, `const n = node('aa.orders-api'); n.p99Ms = 400; n.slaP99Ms = 500`, `return document.querySelector('[data-pillar="aa"] tr.row[data-system="aa.orders-api"] .sla')?.textContent`)
+    expect(sla).toBe('SLA 500 ms')
+  })
+
+  test('a service in two regions shows its instances, traffic share, CPU and memory for each region', async ({ town, page }) => {
+    await open(town, page)
+    await page.locator('[data-pillar="aa"] [data-toggle]').click()
+    await openGroup(page, 'aa', 'orders')
+    const edit = `const n = node('aa.orders-api')
+      n.regions = [{ region: 'a', label: 'North', instances: 2, cpu: 0.35, memory: 0.6, share: 0.62 }, { region: 'b', label: 'West', instances: 1, cpu: 0.41, memory: 0.66, share: 0.38 }]`
+    const read = `const r = document.querySelector('[data-pillar="aa"] tr.row[data-system="aa.orders-api"]')
+      return { name: r.querySelector('.ind small').textContent, traffic: r.querySelector('.rl')?.textContent, segs: r.querySelectorAll('.ld .rseg').length, tags: [...r.querySelectorAll('.ld .lrow:first-child .rt')].map(x => x.textContent), figures: [...r.querySelectorAll('.ld .lrow:first-child .mv')].map(x => x.textContent) }`
+    const got = await withSnapshot<{ name: string; traffic: string; segs: number; tags: string[]; figures: string[] }>(page, edit, read)
+    expect(got.name).toContain('2 North · 1 West')
+    expect(got.traffic).toBe('North 62% · West 38%')
+    expect(got.segs).toBe(4)
+    expect(got.tags).toEqual(['N', 'W'])
+    expect(got.figures).toEqual(['35%', '41%'])
+  })
+
+  test('a database shows the max throughput of its worst tenant, and each tenant line its own', async ({ town, page }) => {
+    await open(town, page)
+    await page.locator('[data-pillar="aa"] [data-toggle]').click()
+    await openGroup(page, 'aa', 'orders')
+    const edit = `const t = node('aa.orders-db').tenants
+      t.forEach((u, i) => { u.utilisation = 0.2 + i * 0.01; u.limit = 1000 * (i + 1); u.throttled = 0 })
+      t[0].utilisation = 0.9; t[0].limit = 4000`
+    const read = `const r = document.querySelector('[data-pillar="aa"] tr.row[data-system="aa.orders-db"] .mx')
+      return { db: r?.textContent, lines: [...document.querySelectorAll('[data-pillar="aa"] tr.sub .mx')].map(x => x.textContent) }`
+    const got = await withSnapshot<{ db: string; lines: string[] }>(page, edit, read)
+    expect(got.db).toContain('max 4,000 RU/s')
+    expect(got.lines).toContain('max 4,000 RU/s')
+    expect(got.lines.length).toBeGreaterThan(1)
+  })
+
+  test('the column titles stay under the menu while the table scrolls, and leave when the last service row reaches them', async ({ town, page }) => {
+    await page.setViewportSize({ width: 1300, height: 380 })
+    await open(town, page)
+    await page.locator('[data-pillar="aa"] [data-toggle]').click()
+    for (const g of await page.locator('[data-pillar="aa"] tr.g').all()) if ((await g.getAttribute('aria-expanded')) === 'false') await g.click()
+    const measure = () => page.evaluate(() => {
+      const t = document.querySelector('[data-pillar="aa"] table.svc')!
+      const th = t.querySelector('thead th')!.getBoundingClientRect()
+      const rows = t.querySelectorAll('tbody tr.row')
+      const last = rows[rows.length - 1]!.getBoundingClientRect()
+      const menu = document.getElementById('dash-menu')!.getBoundingClientRect()
+      return { thTop: th.top, thBottom: th.bottom, lastTop: last.top, menuBottom: menu.bottom }
+    })
+    await page.evaluate(() => window.scrollTo(0, 0))
+    await page.waitForTimeout(150)
+    const start = await measure()
+    expect(start.thTop).toBeGreaterThan(start.menuBottom) // before the table scrolls they sit in their own place
+    // scrolled into the table: stuck right under the menu
+    await page.evaluate(() => window.scrollTo(0, document.querySelector('[data-pillar="aa"] table.svc thead')!.getBoundingClientRect().top + window.scrollY + 150))
+    await page.waitForTimeout(150)
+    const mid = await measure()
+    expect(Math.abs(mid.thTop - mid.menuBottom)).toBeLessThan(2)
+    // scrolled until the last row is just below the titles: they sit on it and go up with it
+    await page.evaluate(() => { const rows = document.querySelectorAll('[data-pillar="aa"] table.svc tbody tr.row'); const r = rows[rows.length - 1]!; window.scrollTo(0, window.scrollY + r.getBoundingClientRect().top - 130) })
+    await page.waitForTimeout(150)
+    const end = await measure()
+    expect(end.thBottom).toBeLessThanOrEqual(end.lastTop + 1)
+    // and back to the top: they return to their own place
+    await page.evaluate(() => window.scrollTo(0, 0))
+    await page.waitForTimeout(150)
+    const top = await measure()
+    expect(top.thTop).toBeCloseTo(start.thTop, 0)
   })
 
   test('the hub list starts closed with a one-line summary, opens on a click and stays open across snapshots', async ({ town, page }) => {
@@ -201,7 +324,10 @@ test.describe('the dashboard view', () => {
   /** The brightness (0 to 255) of an element's background, from its computed colour. */
   const brightness = (page: Page, selector: string) =>
     page.locator(selector).first().evaluate((el) => {
-      const [r, g, b] = getComputedStyle(el).backgroundColor.match(/[\d.]+/g)!.map(Number)
+      // a control that was just drawn has no colour for a moment (it fades in): -1 means "not yet"
+      const m = getComputedStyle(el).backgroundColor.match(/[\d.]+/g)
+      if (!m) return -1
+      const [r, g, b] = m.map(Number)
       return (r + g + b) / 3
     })
 
@@ -223,6 +349,7 @@ test.describe('the dashboard view', () => {
       expect((await brightness(page, '#inspector')) < 128).toBe(dark)
       await page.locator('#inspector [data-tab="logs"]').click()
       await expect(page.locator('#inspector [data-refresh-logs]')).toBeVisible()
+      await expect.poll(() => brightness(page, '#inspector [data-refresh-logs]')).toBeGreaterThanOrEqual(0)
       expect((await brightness(page, '#inspector [data-refresh-logs]')) < 128).toBe(dark)
     }
   })
