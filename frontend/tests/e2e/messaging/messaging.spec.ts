@@ -140,6 +140,18 @@ test.describe(`the broker's backlog and dead letters (${B ? 'ids, a total' : 'co
     expect(sea.routes.some((r) => r.from === 'bb' && r.to === 'aa')).toBe(true) // aa's worker reads bb's outbox
   })
 
+  test('keep a docking spot for the loops inside an island apart from the one for boats that sail between islands', async ({ page }) => {
+    await open(page)
+    const sea = await page.evaluate(() => (window as any).city.town.inspectSea() as { docks: Record<string, { between: { x: number; z: number }; internal: { x: number; z: number } }> })
+
+    const ids = Object.keys(sea.docks)
+    expect(ids.length).toBeGreaterThan(0)
+    for (const id of ids) {
+      const { between, internal } = sea.docks[id]
+      expect(Math.hypot(between.x - internal.x, between.z - internal.z), id).toBeGreaterThan(2)
+    }
+  })
+
   test('sail from the number of messages that arrive, even when nothing reads the broker itself', async ({ page }) => {
     await open(page)
     const state = await page.evaluate(() => (window as any).city.seen.last.groups.flatMap((g: any) => g.nodes).find((n: any) => n.kind === 'Broker')?.state)

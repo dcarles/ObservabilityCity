@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from 'vitest'
 import * as THREE from 'three'
-import { BoatSystem, LANE_SIDE, sidestep, type BoatRoute } from '../../src/scene/boats'
+import { AVOID_GAP, AVOID_STEP, BoatSystem, LANE_SIDE, sidestep, type BoatRoute } from '../../src/scene/boats'
 import { BOAT_PAINT } from '../../src/themes/boatColours'
 import { activateTheme } from '../../src/themes/active'
 import { KITS } from '../../src/themes/kits'
@@ -125,3 +125,80 @@ describe('the sides of a there-and-back lane', () => {
     expect(Math.abs(going - coming)).toBeGreaterThan(LANE_SIDE)
   })
 })
+
+describe('boats that sail between islands meeting each other', () => {
+  beforeAll(() => activateTheme(KITS[Object.keys(KITS)[0]]))
+  /** A straight lane with a point every few units, as real lanes have, so the way back keeps its own side all along. */
+  const at = (...p: [number, number][]) => {
+    const [a, b] = p
+    const n = Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 4)
+    return Array.from({ length: n + 1 }, (_, i) => new THREE.Vector3(a[0] + ((b[0] - a[0]) * i) / n, 0, a[1] + ((b[1] - a[1]) * i) / n))
+  }
+  const route = (path: THREE.Vector3[], from: string, to: string, speed = 1): BoatRoute => ({ path, from, to, rate: () => on, speed: () => speed })
+  let on = 0
+
+  /** Sails one boat on each route from the same moment and reports the closest the first two boats on the water came, and how many seconds it took until none was left. */
+  function sail(routes: BoatRoute[], seconds = 40) {
+    const boats = new BoatSystem(routes.length)
+    boats.setRoutes(routes)
+    on = 20 // one boat for each route in the first step
+    boats.update(0.05)
+    on = 0
+    let closest = Infinity
+    for (let t = 0; t < seconds; t += 0.05) {
+      boats.update(0.05)
+      const out = visible(boats)
+      if (out.length >= 2) closest = Math.min(closest, out[0].position.distanceTo(out[1].position))
+    }
+    return { closest, boats }
+  }
+
+  it('give way where their lanes cross: the one with the other on its right slows, and they never come within the gap', () => {
+    const { closest } = sail([route(at([-30, 0], [30, 0]), 'aa', 'bb'), route(at([0, -30], [0, 30]), 'cc', 'dd')])
+
+    expect(closest).toBeGreaterThan(AVOID_GAP - 0.2)
+  })
+
+  it('keep apart when one catches up with the one in front: the one behind slows', () => {
+    const { closest } = sail([route(at([10, 0], [90, 0]), 'aa', 'bb', 1), route(at([-30, 0], [90, 0]), 'cc', 'dd', 2)], 15) // before the one in front reaches the end of the lane and turns
+
+    expect(closest).toBeGreaterThan(AVOID_GAP - 0.2)
+  })
+
+  it('pass head on with a step to the right each, so they are further apart than their lanes alone', () => {
+    const { closest } = sail([route(at([-30, 0], [30, 0]), 'aa', 'bb'), route(at([30, 0], [-30, 0]), 'cc', 'dd')])
+
+    expect(closest).toBeGreaterThan(2 * LANE_SIDE + 0.2)
+    expect(AVOID_STEP).toBeGreaterThan(0)
+  })
+
+  it('leave the boats of an island\'s own loop alone, whatever sails across them', () => {
+    const loop = (): BoatRoute => ({ path: at([-30, 0], [30, 0]), from: 'aa', to: 'aa', rate: () => on, speed: () => 1 })
+    const progress = (withOther: boolean) => {
+      const boats = new BoatSystem(2)
+      boats.setRoutes(withOther ? [loop(), route(at([0, -30], [0, 30]), 'cc', 'dd')] : [loop()])
+      on = 20
+      boats.update(0.05)
+      on = 0
+      for (let t = 0; t < 7; t += 0.05) boats.update(0.05)
+      return visible(boats).map((b) => b.position.x).filter((x) => Math.abs(x) <= 31)
+    }
+
+    expect(progress(true)).toContain(progress(false)[0]) // the same place at the same time as when nothing crossed it
+  })
+
+  it('go back to the middle of their lane once clear, and never leave it by more than the step', () => {
+    const boats = new BoatSystem(2)
+    boats.setRoutes([route(at([-30, 0], [30, 0]), 'aa', 'bb'), route(at([30, 0], [-30, 0]), 'cc', 'dd')])
+    on = 20
+    boats.update(0.05)
+    on = 0
+    let widest = 0
+    for (let t = 0; t < 30; t += 0.05) {
+      boats.update(0.05)
+      for (const b of visible(boats)) widest = Math.max(widest, Math.abs(b.position.z))
+    }
+    expect(widest).toBeLessThanOrEqual(LANE_SIDE + AVOID_STEP + 0.01)
+  })
+})
+

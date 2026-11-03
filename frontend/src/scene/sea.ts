@@ -14,6 +14,15 @@ export const LOOP_LENGTHS = [44, 34, 26, 16, 11, 7]
 export const LOOP_OFFSET = 4.5
 const LAND_MARGIN = 3.2
 
+/** Whether a spot is open water: not land, and not within the margin boats keep from a coast. */
+export function isOpenWater(map: SeaMap, x: number, z: number): boolean {
+  const pts = map.land.flat()
+  if (pts.length === 0) return true
+  const { minX, minZ, w, h, blocked } = gridOf(map, pts)
+  const i = Math.floor((x - minX) / CELL), j = Math.floor((z - minZ) / CELL)
+  return i >= 0 && j >= 0 && i < w && j < h && !blocked[j * w + i]
+}
+
 function distToSegment(p: THREE.Vector2, a: THREE.Vector2, b: THREE.Vector2): number {
   const abx = b.x - a.x, aby = b.y - a.y
   const t = Math.max(0, Math.min(1, ((p.x - a.x) * abx + (p.y - a.y) * aby) / (abx * abx + aby * aby || 1)))

@@ -216,7 +216,9 @@ All 10 Phase 1 topics decided 2026-10-24.
 - The paints are yellow for boats between islands and blue for internal boats, in every theme (`themes/boatColours.ts`), the same way round as the two cars (an earlier build had them the wrong way round). The harbour boat and the factory barge were redrawn with a taller hull in the lane's colour, a deckhouse with a funnel, rails and a bow lantern.
 
 - A boat on a circuit keeps its crates for the whole lap and unloads at the quay (the crates used to vanish halfway round, a leftover of the there-and-back trip, where they are shown on the way out only).
-- On a there-and-back lane each way keeps to its own side (1.1 units to the right of the lane's middle, like the cars), so a boat going out and one coming back pass side by side instead of through each other. No steering round one another: separate lanes already prevent it.
+- On a there-and-back lane each way keeps to its own side (1.3 units to the right of the lane's middle, like the cars), so a boat going out and one coming back pass side by side instead of through each other.
+- Each island has two docking spots in the water: one for boats between islands (as before) and one on the other side of the pier for internal loops. Where that second spot is not open water, internal boats use the first.
+- Boats between islands check each other (not internal boats, which have their own circuit): following the same way, the one behind slows; crossing, the boat with the other on its right gives way and slows; head on, both step to their right. The step is capped at 1.2 units beyond the lane side and eases back once clear. Only speed and the sideways step change, so a boat never leaves its lane by much and never needs a new route.
 
 ## Finding the dead letters
 - The top bar's DLQ number is a button: it lists every queue with dead letters, worst first, each row naming the service that reads the queue, its island, the queue and its count. A click on a row opens that service's drawer, where the queue row (with its portal link) sits at the top. The list has no portal link of its own, so a row has one click.
