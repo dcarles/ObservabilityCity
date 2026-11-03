@@ -140,15 +140,18 @@ test.describe(`the broker's backlog and dead letters (${B ? 'ids, a total' : 'co
     expect(sea.routes.some((r) => r.from === 'bb' && r.to === 'aa')).toBe(true) // aa's worker reads bb's outbox
   })
 
-  test('keep a docking spot for the loops inside an island apart from the one for boats that sail between islands', async ({ page }) => {
+  test('start and finish the loops inside an island on either side of its pier, apart from the dock for boats between islands', async ({ page }) => {
     await open(page)
-    const sea = await page.evaluate(() => (window as any).city.town.inspectSea() as { docks: Record<string, { between: { x: number; z: number }; internal: { x: number; z: number } }> })
+    const sea = await page.evaluate(() => (window as any).city.town.inspectSea() as { docks: Record<string, { between: { x: number; z: number }; internalStart: { x: number; z: number }; quay: { x: number; z: number } }> })
 
     const ids = Object.keys(sea.docks)
     expect(ids.length).toBeGreaterThan(0)
+    const gap = (a: { x: number; z: number }, b: { x: number; z: number }) => Math.hypot(a.x - b.x, a.z - b.z)
     for (const id of ids) {
-      const { between, internal } = sea.docks[id]
-      expect(Math.hypot(between.x - internal.x, between.z - internal.z), id).toBeGreaterThan(2)
+      const { between, internalStart, quay } = sea.docks[id]
+      expect(gap(internalStart, quay), id).toBeGreaterThan(5) // the two ends are on either side of the pier
+      expect(gap(between, internalStart), id).toBeGreaterThan(5) // boats between islands dock off the pier tip, not where the loop starts or ends
+      expect(gap(between, quay), id).toBeGreaterThan(5)
     }
   })
 

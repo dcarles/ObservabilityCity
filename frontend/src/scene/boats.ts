@@ -35,6 +35,8 @@ interface Boat {
   /** The way it is heading, a unit vector on the water, from where it was last placed. */
   hx: number
   hz: number
+  /** Seconds spent unloading at the quay at the end of a circuit. */
+  hold: number
 }
 
 const BASE_SPEED = 4.4
@@ -49,6 +51,9 @@ export const AVOID_STEP = 1.2
 const AVOID_EASE = 3
 /** How far a boat keeps to the right of the middle of its lane, so a boat going out and one coming back pass side by side. */
 export const LANE_SIDE = 1.3
+/** A boat at the end of its circuit lies at the quay and unloads one crate every UNLOAD_STEP seconds, then leaves. */
+export const UNLOAD_STEP = 0.5
+const UNLOAD_LEAVE = 0.7
 
 /** The same path moved sideways by `side` (positive: to the right of the way it runs), corners included. */
 export function sidestep(path: THREE.Vector3[], side: number): THREE.Vector3[] {
@@ -131,6 +136,15 @@ export class BoatSystem {
       const b = this.boats[i]
       b.dist += BASE_SPEED * b.route.speed() * b.slow * dt
       if (b.dist >= b.total) {
+        if (b.route.circuit === true) {
+          // lies at the quay and hands its crates over one by one, then leaves
+          b.dist = b.total
+          b.hold += dt
+          const crates = b.cargo.children
+          const gone = Math.min(crates.length, Math.floor(b.hold / UNLOAD_STEP))
+          crates.forEach((c, k) => { c.visible = k >= gone })
+          if (b.hold < crates.length * UNLOAD_STEP + UNLOAD_LEAVE) { this.place(b); continue }
+        }
         this.release(b)
         this.boats.splice(i, 1)
         continue
@@ -154,7 +168,7 @@ export class BoatSystem {
     const slot = (BoatSystem.isInternal(r) ? this.freeInternal : this.free).pop()!
     slot.object.visible = true
     slot.cargo.children.forEach((c) => { c.visible = true }) // always the full load of crates
-    const boat: Boat = { object: slot.object, cargo: slot.cargo, points, lengths, total, dist: 0, route: r, phase: Math.random() * 6, lateral: 0, want: 0, slow: 1, hx: 0, hz: 1 }
+    const boat: Boat = { object: slot.object, cargo: slot.cargo, points, lengths, total, dist: 0, route: r, phase: Math.random() * 6, lateral: 0, want: 0, slow: 1, hx: 0, hz: 1, hold: 0 }
     this.boats.push(boat)
     this.place(boat) // on the water from the start, so the checks between boats see it where it is
   }
@@ -214,7 +228,9 @@ export class BoatSystem {
     // a boat on a circuit round its island is loaded all the way and unloads at the quay; there and back, it is loaded only on the way out
     b.cargo.visible = b.route.circuit === true || b.dist < b.total / 2
     // ease in and out at the quays
-    const fade = clamp(Math.min(b.dist, b.total - b.dist) / 4, 0, 1)
+    const fade = b.route.circuit === true
+      ? Math.min(clamp(b.dist / 4, 0, 1), clamp(1 - (b.hold - (b.cargo.children.length * UNLOAD_STEP)) / UNLOAD_LEAVE, 0, 1)) // a circuit boat stays full size at the quay until its crates are off
+      : clamp(Math.min(b.dist, b.total - b.dist) / 4, 0, 1)
     o.scale.setScalar(BOAT_SCALE * (0.4 + 0.6 * fade))
   }
 }

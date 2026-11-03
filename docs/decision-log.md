@@ -217,7 +217,8 @@ All 10 Phase 1 topics decided 2026-10-24.
 
 - A boat on a circuit keeps its crates for the whole lap and unloads at the quay (the crates used to vanish halfway round, a leftover of the there-and-back trip, where they are shown on the way out only).
 - On a there-and-back lane each way keeps to its own side (1.3 units to the right of the lane's middle, like the cars), so a boat going out and one coming back pass side by side instead of through each other.
-- Each island has two docking spots in the water: one for boats between islands (as before) and one on the other side of the pier for internal loops. Where that second spot is not open water, internal boats use the first.
+- The internal circuit is open: it starts in the water beside the pier on one side, goes once round the island and ends beside the pier on the other side (3.4 units from the pier's middle line), where the boats lie at the quay. It never crosses the pier. The boats between islands dock off the pier's tip, 10 units out, outside the circuit, on their own out and in lanes side by side, so the two kinds never share water leaving or arriving.
+- A circuit boat unloads at the quay: it lies there at full size and hands over one crate every half second, then leaves (it used to shrink and vanish with its crates still on deck).
 - Boats between islands check each other (not internal boats, which have their own circuit): following the same way, the one behind slows; crossing, the boat with the other on its right gives way and slows; head on, both step to their right. The step is capped at 1.2 units beyond the lane side and eases back once clear. Only speed and the sideways step change, so a boat never leaves its lane by much and never needs a new route.
 
 ## Finding the dead letters
