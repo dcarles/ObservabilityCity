@@ -88,6 +88,14 @@ button.on { background: var(--accent); color: #fff; border-color: var(--accent);
 @media (max-width: 1100px) { #topbar .brand { display: none; } }
 /* what is left out, one step at a time, when the bar is still too full on one line (fitTopBar adds the classes) */
 #topbar.fit-1 .chip.time, #topbar.fit-2 .chip.p99, #topbar.fit-3 .status, #topbar.fit-4 .chip.dlq { display: none; }
+/* last: everything stays, drawn tighter, and the search may be narrower */
+#topbar.fit-5 { gap: 6px 4px; }
+#topbar.fit-5 #view-bar { gap: 4px; }
+#topbar.fit-5 #view-bar .vb-btn { padding: 6px 7px; }
+#topbar.fit-5 #tools { gap: 3px; }
+#topbar.fit-5 button { padding: 4px 5px; }
+#topbar.fit-5 .chip { padding: 2px 3px; }
+#topbar.fit-5 #search { min-width: 80px; }
 .chip { white-space: nowrap; }
 .status { white-space: nowrap; }
 .chip.stale b { color: #8d949e; }

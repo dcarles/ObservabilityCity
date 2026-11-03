@@ -43,11 +43,13 @@ function overlaps(a: { l: number; r: number; t: number; b: number }, b: { l: num
 }
 
 test.describe('the top bar with a long town name', () => {
-  for (const width of [1920, 1440, 1280, 960]) {
+  for (const width of [1920, 1440, 1360, 1320, 1280, 960]) {
     test(`shows the name once, and nothing overlaps or is cut off at ${width}px`, async ({ town, page }) => {
       await page.route('**/api/towns', (route) => route.fulfill({ json: TOWNS }))
       await page.setViewportSize({ width, height: 800 })
       await town.open()
+      // the widest ordinary font, so a machine whose fonts are wider than the developer's does not make the bar overflow
+      await page.addStyleTag({ content: "* { font-family: 'DejaVu Sans', sans-serif !important; }" })
       await expect(page.locator('#town-button')).toBeVisible()
 
       const m = await measure(page, LONG)
@@ -68,7 +70,7 @@ test.describe('the top bar with a long town name', () => {
       for (const c of m.chips) expect(c.r).toBeLessThanOrEqual(m.right.r + 0.5)
       // the search keeps room to type in
       const search = m.items.find((i) => i.id === 'search-input')!
-      expect(search.r - search.l).toBeGreaterThanOrEqual(110)
+      expect(search.r - search.l).toBeGreaterThanOrEqual(80)
       // the list that opens shows the full name
       await page.locator('#town-button').click()
       await expect(page.locator('#town-list')).toContainText(LONG)
