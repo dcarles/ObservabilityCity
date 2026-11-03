@@ -500,3 +500,30 @@ test.describe('island names', () => {
     expect(await page.evaluate(() => (window as any).city.town.islandAt(5000, 5000))).toBeNull()
   })
 })
+
+test.describe('the bar and the panels at Dusk', () => {
+  const lum = (css: string) => { const [r, g, b] = css.match(/[\d.]+/g)!.slice(0, 3).map(Number); return 0.2126 * r + 0.7152 * g + 0.0722 * b }
+  const paint = (page: any, sel: string) => page.evaluate((s: string) => { const c = getComputedStyle(document.querySelector(s)!); return { bg: c.backgroundColor, fg: c.color } }, sel)
+
+  test('the top bar, the drawer and the buttons are dark with light text', async ({ town, page }) => {
+    await town.open('&light=dusk')
+    for (const sel of ['#topbar', '#inspector', '#legend', '#search-input', '#home']) {
+      const p = await paint(page, sel)
+      expect(lum(p.bg), `${sel} background ${p.bg}`).toBeLessThan(90)
+      expect(lum(p.fg), `${sel} text ${p.fg}`).toBeGreaterThan(170)
+    }
+    await town.open('&light=day')
+    expect(lum((await paint(page, '#topbar')).bg)).toBeGreaterThan(200)
+  })
+
+  for (const width of [1440, 1920]) {
+    test(`the top bar stays on one row at ${width} px wide`, async ({ town, page }) => {
+      await page.setViewportSize({ width, height: 900 })
+      await town.open('&light=dusk')
+      const h = await page.evaluate(() => document.getElementById('topbar')!.getBoundingClientRect().height)
+      expect(h).toBeLessThan(60)
+      const rows = await page.evaluate(() => new Set([...document.querySelectorAll('#topbar button, #topbar input')].map((e) => Math.round(e.getBoundingClientRect().top / 10))).size)
+      expect(rows).toBe(1)
+    })
+  }
+})
