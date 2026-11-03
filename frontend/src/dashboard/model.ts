@@ -5,6 +5,7 @@ import { absentEverywhere, isAbsent, isUnmonitored } from '../signals'
 import { isFollowed, isFollowing, isShown, isThrottled, tenantLevel, type TenantView } from '../tenants'
 import { islandChoices } from '../islands'
 import { stateFor, viewTotals } from '../viewTotals'
+import { trafficSplit } from '../trafficSplit'
 import type { GroupSnapshot, HealthState, JobSnapshot, NodeSnapshot, Snapshot } from '../types'
 
 /** ok / warn / bad are the three colours; none is grey: no fresh data, or no source at all. */
@@ -389,8 +390,6 @@ export function buildDashboard(s: Snapshot, view: TenantView): Dashboard {
   ].sort(worstFirst)
 
   const totals = viewTotals(s, view)
-  const outside = s.outsideRequestsPerSecond ?? s.externalCallers.reduce((a, c) => a + c.requestsPerSecond, 0)
-  const external = Math.min(totals.requestsPerSecond, outside * totals.tenantShare)
   const queued = s.groups.flatMap((g) => g.nodes).filter((n) => n.state !== 'Stale' && !isAbsent(n, 'backlog'))
   const choices = islandChoices(s).filter((c) => !c.vendor)
 
@@ -400,7 +399,7 @@ export function buildDashboard(s: Snapshot, view: TenantView): Dashboard {
       down: affected.filter((i) => i.level === 'bad').length,
       degraded: affected.filter((i) => i.level === 'warn').length,
       affected,
-      traffic: absentEverywhere(s, 'requests') ? null : { total: totals.requestsPerSecond, external, internal: Math.max(0, totals.requestsPerSecond - external) },
+      traffic: trafficSplit(s, totals.requestsPerSecond, totals.tenantShare),
       deadLetters: absentEverywhere(s, 'deadLetters') ? null : totals.deadLetters,
       backlog: absentEverywhere(s, 'backlog') ? null : queued.reduce((a, n) => a + (n.queueDepth ?? 0), 0),
     },

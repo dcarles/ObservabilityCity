@@ -41,6 +41,13 @@ export interface AirportStatus {
   board: string[]
 }
 
+/** The board's canvas and the world size of one of its pixels. */
+const BOARD_W = 448
+const BOARD_H = 384
+const BOARD_UNIT = 10.5 / 448
+
+interface BoardRow { left?: string; right?: string; head?: boolean; divider?: boolean }
+
 interface Plane {
   mesh: THREE.Group
   t: number
@@ -69,6 +76,8 @@ export class Airport {
   private rps = 0
   private callers: ExternalCallerSnapshot[] = []
   private measured = false
+  /** Requests per second inside the town (the board's second block); null when not measured, then the block is left out. */
+  private internal: number | null = null
   private readonly board: { sprite: THREE.Sprite; key: string }
   private readonly rand = rng(hashString('airport'))
   private readonly kit: AirportKit
@@ -103,10 +112,11 @@ export class Airport {
     mergeStatic(decor)
     this.root.add(scatterNature(this.outline, avoid, hashString('airport-nature'), { trees: 40, rocks: 10 }))
 
-    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: canvasTexture(448, 256, () => {}), transparent: true, depthTest: false, toneMapped: false }))
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: canvasTexture(BOARD_W, BOARD_H, () => {}), transparent: true, depthTest: false, toneMapped: false }))
     sprite.renderOrder = 10
-    sprite.scale.set(10.5, 6, 1)
-    sprite.position.set(0, GROUND + 11.5, TERMINAL_Z)
+    sprite.center.set(0.5, 0) // anchored at its bottom edge: the board grows upward when it has more to say
+    sprite.scale.set(BOARD_UNIT * BOARD_W, BOARD_UNIT * BOARD_H, 1)
+    sprite.position.set(0, GROUND + 8.5, TERMINAL_Z)
     this.root.add(sprite)
     this.board = { sprite, key: '' }
     this.drawBoard()
@@ -148,7 +158,8 @@ export class Airport {
    * The outside traffic coming in. When the server measures it, `measured` is the total no town system explains, for every API; the callers
    * the hub declares are then only names, as there is no way to tell which of them sent what, and the board shows the total alone.
    */
-  setCallers(callers: readonly ExternalCallerSnapshot[], measured: number | null = null): void {
+  setCallers(callers: readonly ExternalCallerSnapshot[], measured: number | null = null, internal: number | null = null): void {
+    this.internal = internal
     this.callers = [...callers].sort((a, b) => b.requestsPerSecond - a.requestsPerSecond)
     this.measured = measured !== null
     this.rps = measured ?? this.callers.reduce((a, c) => a + c.requestsPerSecond, 0)
@@ -267,27 +278,47 @@ export class Airport {
 
   // ── the arrivals board ──────────────────────────────────────────────────────
 
+  /** The rows of the board: the arrivals, the callers' names when outside traffic is not measured, then a divider and the internal traffic over two lines. */
+  private boardRows(): BoardRow[] {
+    const rows: BoardRow[] = [{ left: 'ARRIVALS', right: `${formatRate(this.rps)} req/s`, head: true }]
+    if (!this.measured) for (const c of this.callers.slice(0, 4)) rows.push({ left: c.name, right: `${formatRate(c.requestsPerSecond)}/s` })
+    if (this.internal !== null) rows.push({ divider: true }, { left: 'INTERNAL', head: true }, { left: 'TRAFFIC', right: `${formatRate(this.internal)} req/s`, head: true })
+    return rows
+  }
+
   private boardLines(): string[] {
-    const lines = [`ARRIVALS  ${formatRate(this.rps)} req/s`]
-    if (!this.measured) for (const c of this.callers.slice(0, 4)) lines.push(`${c.name}  ${formatRate(c.requestsPerSecond)}/s`)
-    return lines
+    return this.boardRows().filter((r) => !r.divider).map((r) => (r.right ? `${r.left}  ${r.right}` : r.left ?? ''))
   }
 
   private drawBoard(): void {
-    const lines = this.boardLines()
-    const key = lines.join('|')
+    const rows = this.boardRows()
+    const key = this.boardLines().join('|')
     if (key === this.board.key) return
     this.board.key = key
     const tex = (this.board.sprite.material as THREE.SpriteMaterial).map as THREE.CanvasTexture
     const ctx = (tex.image as HTMLCanvasElement).getContext('2d')!
-    ctx.clearRect(0, 0, 448, 256)
-    ctx.fillStyle = 'rgba(20,28,40,0.94)'; roundRect(ctx, 6, 6, 436, 244, 24); ctx.fill()
+    ctx.clearRect(0, 0, BOARD_W, BOARD_H)
+    // laid out from the top; the panel is as tall as its rows need, never less than before, and sits on the bottom of the canvas
+    const ys: number[] = []
+    let y = 44
+    for (const r of rows) { ys.push(y); y += r.divider ? 26 : 46 }
+    const height = Math.max(256, ys[ys.length - 1] + 40)
+    const top = BOARD_H - height
+    ctx.fillStyle = 'rgba(20,28,40,0.94)'; roundRect(ctx, 6, top + 6, 436, height - 12, 24); ctx.fill()
     ctx.strokeStyle = '#f0c24a'; ctx.lineWidth = 6; ctx.stroke()
-    ctx.textAlign = 'left'; ctx.textBaseline = 'middle'
-    lines.forEach((l, i) => {
-      ctx.fillStyle = i === 0 ? '#f0c24a' : '#dbe6f3'
-      ctx.font = i === 0 ? '800 34px system-ui, sans-serif' : '600 28px system-ui, sans-serif'
-      ctx.fillText(l, 28, 44 + i * 46, 392)
+    ctx.textBaseline = 'middle'
+    rows.forEach((r, i) => {
+      const yy = top + ys[i]
+      if (r.divider) {
+        ctx.strokeStyle = '#f0c24a'; ctx.lineWidth = 3
+        ctx.beginPath(); ctx.moveTo(28, yy); ctx.lineTo(420, yy); ctx.stroke()
+        return
+      }
+      ctx.fillStyle = r.head ? '#f0c24a' : '#dbe6f3'
+      ctx.font = r.head ? '800 34px system-ui, sans-serif' : '600 28px system-ui, sans-serif'
+      ctx.textAlign = 'left'
+      ctx.fillText(r.left ?? '', 28, yy, r.right ? 200 : 392)
+      if (r.right) { ctx.textAlign = 'right'; ctx.fillText(r.right, 420, yy, r.head ? 200 : 180) }
     })
     tex.needsUpdate = true
   }
@@ -295,6 +326,6 @@ export class Airport {
   private fadeBoard(camera: THREE.Camera): void {
     const d = camera.position.distanceTo(this.board.sprite.getWorldPosition(new THREE.Vector3()))
     const scale = clamp(d / 60, 1, 2.4)
-    this.board.sprite.scale.set(10.5 * scale, 6 * scale, 1)
+    this.board.sprite.scale.set(BOARD_UNIT * BOARD_W * scale, BOARD_UNIT * BOARD_H * scale, 1)
   }
 }

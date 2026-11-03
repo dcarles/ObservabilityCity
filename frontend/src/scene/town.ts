@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { trafficSplit } from '../trafficSplit'
 import { Building, type BuildingStatus } from '../buildings/building'
 import { box, canvasTexture, cyl, flat, group, roundRect } from '../buildings/mk'
 import { kit } from '../assets/kit'
@@ -587,7 +588,7 @@ export class Town {
       for (const isl of this.islands) if (isl.signpost) this.guard(`signpost ${isl.group.id}`, () => isl.signpost!.set(signLines(links, isl.nodeIds)))
     }
     for (const v of s.vendors) this.guard(`apply ${v.node.id}`, () => this.buildings.get(v.node.id)?.setNode(v.node))
-    this.guard('airport', () => this.airport?.setCallers(s.externalCallers, s.outsideRequestsPerSecond ?? null))
+    this.guard('airport', () => this.airport?.setCallers(s.externalCallers, s.outsideRequestsPerSecond ?? null, trafficSplit(s, s.totals.requestsPerSecond)?.internal ?? null))
     this.guard('overlay', () => this.overlay.set(s.dependencies))
     // weather: each island's own open incidents, and nothing anywhere else
     for (const g of s.groups) {

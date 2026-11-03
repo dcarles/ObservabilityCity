@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { buildDashboard, pillarSelection, worstOf } from '../../src/dashboard/model'
 import { databaseIsOpen, groupIsOpen, hiddenHtml, pillarHtml, summaryHtml, type UiState } from '../../src/dashboard/render'
+import { trafficSplit } from '../../src/trafficSplit'
 import { ALL_TENANTS } from '../../src/tenants'
 import { checkSnapshot } from '../../src/snapshotGuard'
 import type { NodeSnapshot, Snapshot } from '../../src/types'
@@ -37,6 +38,7 @@ describe('summary counts', () => {
     const d = buildDashboard(s, ALL_TENANTS)
     expect(d.summary.traffic!.total).toBeCloseTo(s.totals.requestsPerSecond)
     expect(d.summary.traffic!.external + d.summary.traffic!.internal).toBeCloseTo(d.summary.traffic!.total)
+    expect(d.summary.traffic).toEqual(trafficSplit(s, s.totals.requestsPerSecond)) // the airport board reads the same split
     for (const g of s.groups) for (const n of g.nodes) n.absent = [...n.absent, 'requests', 'deadLetters', 'backlog']
     const bare = buildDashboard(s, ALL_TENANTS)
     expect(bare.summary.traffic).toBeNull()

@@ -45,7 +45,24 @@ test.describe('where an API\'s traffic comes from', () => {
     expect(out.shares['bb.ledger-api']).toEqual([expect.closeTo(1, 6)])
     expect(out.shares['cc.notify-api']).toEqual([expect.closeTo(0.25, 6)])
     expect(out.airport.board[0]).toContain('ARRIVALS')
-    expect(out.airport.board).toHaveLength(1) // the declared callers are only names: the board shows the total alone
+    expect(out.airport.board[1]).toBe('INTERNAL') // the declared callers are only names: the board shows the totals alone, outside then internal
+    expect(out.airport.board).toHaveLength(3)
+  })
+
+  test('the airport board says how much traffic is internal, the town total less the outside part, and the dashboard says the same', async ({ town, page }) => {
+    await town.open()
+
+    const board = await page.evaluate(() => {
+      const c = (window as any).city
+      const s = structuredClone(c.seen.last)
+      for (const n of s.groups.flatMap((g: any) => g.nodes)) n.absent = (n.absent ?? []).filter((x: string) => x !== 'requests')
+      s.totals.requestsPerSecond = 50
+      s.outsideRequestsPerSecond = 12
+      c.feed(s)
+      return c.inspectAirport().board
+    })
+
+    expect(board).toEqual(['ARRIVALS  12 req/s', 'INTERNAL', 'TRAFFIC  38 req/s'])
   })
 
   test('not measured, an external API with no known caller gets all of it from outside and no fixed share is made up', async ({ town, page }) => {
