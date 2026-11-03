@@ -34,4 +34,12 @@ describe('fitting the top bar on one line', () => {
     fitTopBar(bar, () => false)
     expect([...on]).toEqual([])
   })
+
+  it('leaves the messages a second out before the dead letters, which stay until last', async () => {
+    const { readFileSync } = await import('node:fs')
+    const css = readFileSync(new URL('../../src/style.css', import.meta.url), 'utf8')
+    expect(css).toMatch(/#topbar\.fit-5 \.chip\.msgs/)
+    expect(css).toMatch(/#topbar\.fit-6 \.chip\.dlq/)
+    expect(css).not.toMatch(/#topbar\.fit-5 \.chip\.dlq/)
+  })
 })

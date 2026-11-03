@@ -65,7 +65,7 @@ export class TopBar {
       <span class="spacer"></span>
       ${t ? `
         ${absentEverywhere(s!, 'requests') ? '' : `<div class="chip" id="chip-requests" title="${escapeHtml(scope + share)}"><b>${formatRate(t.requestsPerSecond)}</b><span>req/s</span></div>`}
-        ${messages == null ? '' : `<div class="chip" id="chip-messages" title="${escapeHtml('Messages a second taken in by all the queues of the town. Each queue counts where it is read, so a message that crosses two queues is counted twice, once in each.')}"><b>${formatRate(messages)}</b><span>msg/s</span></div>`}
+        ${messages == null ? '' : `<div class="chip msgs" id="chip-messages" title="${escapeHtml('Messages a second taken in by all the queues of the town. Each queue counts where it is read, so a message that crosses two queues is counted twice, once in each.')}"><b>${formatRate(messages)}</b><span>msg/s</span></div>`}
         ${absentEverywhere(s!, 'errors') ? '' : `<div class="chip ${t.errorRate >= 0.05 ? 'bad' : t.errorRate >= 0.01 ? 'warn' : ''}" title="${escapeHtml(scope + wide)}"><b>${(t.errorRate * 100).toFixed(1)}%</b><span>errors</span></div>`}
         ${absentEverywhere(s!, 'latency') ? '' : `<div class="chip p99" title="${escapeHtml(scope + wide)}"><b>${formatMs(t.p99Ms)}</b><span>p99</span></div>`}
         ${absentEverywhere(s!, 'deadLetters') ? '' : `<button class="chip clickable dlq ${t.deadLetters > 0 ? 'bad' : ''}" data-list="DeadLetters" title="${escapeHtml(`Messages in dead-letter queues: click to see which queues. ${scope}${wide}`)}"><b>${formatRate(t.deadLetters)}</b><span>DLQ</span></button>`}
