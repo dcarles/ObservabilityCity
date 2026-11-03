@@ -58,4 +58,21 @@ describe.each(Object.keys(KITS))('boats in the %s theme', (id) => {
     loop.update(1)
     expect(hullColours(visible(sched)[0])).toBe(hullColours(visible(loop)[0]))
   })
+
+  it('sail a circuit once, one way, instead of there and back', () => {
+    const ring = [new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, 40), new THREE.Vector3(40, 0, 40), new THREE.Vector3(40, 0, 0), new THREE.Vector3(0, 0, 0)]
+    const total = 160
+    let rate = 100
+    const run = (circuit: boolean) => {
+      rate = 100
+      const boats = new BoatSystem(1)
+      boats.setRoutes([{ path: ring, from: 'aa', to: 'aa', circuit, rate: () => rate, speed: () => 1 }])
+      boats.update(0.05) // one boat leaves
+      rate = 0
+      boats.update(((total * 1.15) / 4.4) - 0.05) // longer than one way round, shorter than there and back
+      return visible(boats).length
+    }
+    expect(run(true)).toBe(0) // it has come home and gone
+    expect(run(false)).toBe(1) // there and back is still on the water
+  })
 })

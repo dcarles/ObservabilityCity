@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { afterEach, describe, expect, it } from 'vitest'
 import { ARCH_MAX, ARCH_MIN, archCount, archHeight, archPeak, archSlope, clearArches, deckAt, registerArch } from '../../src/scene/arches'
-import { findLane, harbourLoop, LOOP_LENGTHS, LOOP_OFFSET, type SeaMap } from '../../src/scene/sea'
+import { findLane, harbourCircuit, harbourLoop, LOOP_LENGTHS, LOOP_OFFSET, type SeaMap } from '../../src/scene/sea'
 
 afterEach(() => clearArches())
 
@@ -91,5 +91,42 @@ describe('boats under bridges', () => {
     const loop = harbourLoop(sea, water, new THREE.Vector3(-50, 0, 0))
     expect(loop![0].distanceTo(water)).toBeCloseTo(LOOP_OFFSET, 5)
     expect(Math.abs(loop![0].z)).toBeCloseTo(LOOP_OFFSET, 5) // sideways, along the coast
+  })
+
+  describe('the circuit round an island', () => {
+    const island = (cx: number, r: number) => Array.from({ length: 24 }, (_, k) => new THREE.Vector2(cx + Math.cos((k / 24) * Math.PI * 2) * r, Math.sin((k / 24) * Math.PI * 2) * r))
+    const open: SeaMap = { land: [island(0, 20)] }
+    const water = new THREE.Vector3(27, 0, 0)
+    const centre = new THREE.Vector3(0, 0, 0)
+
+    it('goes once all the way round the coast, off it, and comes back to the harbour', () => {
+      const circuit = harbourCircuit(open, water, centre)
+      expect(circuit).not.toBeNull()
+      expect(circuit![0].distanceTo(water)).toBeLessThan(0.001)
+      expect(circuit![circuit!.length - 1].distanceTo(water)).toBeLessThan(0.001)
+      // every point is off the coast, and the angles it passes cover the whole way round
+      for (const p of circuit!) expect(Math.hypot(p.x, p.z)).toBeGreaterThan(20)
+      let turned = 0
+      for (let i = 2; i < circuit!.length - 1; i++) {
+        let d = Math.atan2(circuit![i].z, circuit![i].x) - Math.atan2(circuit![i - 1].z, circuit![i - 1].x)
+        d = Math.atan2(Math.sin(d), Math.cos(d))
+        turned += d
+      }
+      expect(Math.abs(turned)).toBeGreaterThan(Math.PI * 1.8)
+    })
+
+    it('goes the same way round for an island whatever way its outline was drawn', () => {
+      const way = (poly: THREE.Vector2[]) => {
+        const c = harbourCircuit({ land: [poly] }, water, centre)!
+        return Math.sign(c[2].x * c[3].z - c[2].z * c[3].x)
+      }
+      const outline = island(0, 20)
+      expect(way(outline)).toBe(way([...outline].reverse()))
+    })
+
+    it('is not made where another island leaves no open water round it', () => {
+      const crowded: SeaMap = { land: [island(0, 20), island(40, 20)] }
+      expect(harbourCircuit(crowded, water, centre)).toBeNull()
+    })
   })
 })
