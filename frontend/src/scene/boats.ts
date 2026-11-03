@@ -28,13 +28,27 @@ interface Boat {
   dist: number
   route: BoatRoute
   phase: number
+  /** Sideways offset from the lane now (to the boat's right), the one it is easing to, and how much it slows down for another boat: all set by the checks between boats. */
+  lateral: number
+  want: number
+  slow: number
+  /** The way it is heading, a unit vector on the water, from where it was last placed. */
+  hx: number
+  hz: number
 }
 
 const BASE_SPEED = 4.4
 const SEA = 0.12
 const BOAT_SCALE = 0.95
+/** The checks between boats that sail between islands: how close another boat must be to count, how near it may come at the most, and how slow a boat gives way. */
+export const AVOID_RADIUS = 3.4
+export const AVOID_GAP = 1.4
+const AVOID_SLOWEST = 0.2
+/** How far a boat steps to its right to pass another head on, at the most; the lanes keep clear of land by more than this and the lane's own side step together. */
+export const AVOID_STEP = 1.2
+const AVOID_EASE = 3
 /** How far a boat keeps to the right of the middle of its lane, so a boat going out and one coming back pass side by side. */
-export const LANE_SIDE = 1.1
+export const LANE_SIDE = 1.3
 
 /** The same path moved sideways by `side` (positive: to the right of the way it runs), corners included. */
 export function sidestep(path: THREE.Vector3[], side: number): THREE.Vector3[] {
@@ -104,6 +118,7 @@ export class BoatSystem {
   update(dt: number): void {
     if (!this.enabled) return
     this.time += dt
+    this.avoid(dt)
     for (const r of this.routes) {
       const rate = r.rate()
       if (rate <= 0) continue
@@ -114,7 +129,7 @@ export class BoatSystem {
     }
     for (let i = this.boats.length - 1; i >= 0; i--) {
       const b = this.boats[i]
-      b.dist += BASE_SPEED * b.route.speed() * dt
+      b.dist += BASE_SPEED * b.route.speed() * b.slow * dt
       if (b.dist >= b.total) {
         this.release(b)
         this.boats.splice(i, 1)
@@ -139,7 +154,41 @@ export class BoatSystem {
     const slot = (BoatSystem.isInternal(r) ? this.freeInternal : this.free).pop()!
     slot.object.visible = true
     slot.cargo.children.forEach((c) => { c.visible = true }) // always the full load of crates
-    this.boats.push({ object: slot.object, cargo: slot.cargo, points, lengths, total, dist: 0, route: r, phase: Math.random() * 6 })
+    const boat: Boat = { object: slot.object, cargo: slot.cargo, points, lengths, total, dist: 0, route: r, phase: Math.random() * 6, lateral: 0, want: 0, slow: 1, hx: 0, hz: 1 }
+    this.boats.push(boat)
+    this.place(boat) // on the water from the start, so the checks between boats see it where it is
+  }
+
+  /**
+   * The checks between the boats that sail between islands (a loop round an island has its own lane and is left alone). For every pair that is close:
+   * following the same way, the one behind slows; crossing, the one with the other on its right gives way and slows; head on, both step to their right.
+   * Only a boat's own speed and its sideways step change, so a boat never leaves its lane by more than AVOID_STEP.
+   */
+  private avoid(dt: number): void {
+    const sail = this.boats.filter((b) => !BoatSystem.isInternal(b.route))
+    for (const b of sail) { b.slow = 1; b.want = 0 }
+    const slowFor = (b: Boat, d: number) => { b.slow = Math.min(b.slow, clamp((d - AVOID_GAP) / (AVOID_RADIUS - AVOID_GAP), AVOID_SLOWEST, 1)) }
+    for (let i = 0; i < sail.length; i++) {
+      const a = sail[i]
+      for (let j = i + 1; j < sail.length; j++) {
+        const c = sail[j]
+        const dx = c.object.position.x - a.object.position.x, dz = c.object.position.z - a.object.position.z
+        const d = Math.hypot(dx, dz)
+        if (d > AVOID_RADIUS || d < 1e-6) continue
+        const along = a.hx * c.hx + a.hz * c.hz
+        const aheadOfA = (a.hx * dx + a.hz * dz) / d // how far in front of a the other boat is, -1 to 1
+        const aheadOfC = -(c.hx * dx + c.hz * dz) / d
+        if (along > 0.5) {
+          if (aheadOfA > 0.3) slowFor(a, d)
+          else if (aheadOfC > 0.3) slowFor(c, d)
+        } else if (along < -0.5) {
+          if (aheadOfA > 0.3 && aheadOfC > 0.3) { a.want = AVOID_STEP; c.want = AVOID_STEP }
+        } else if ((-a.hz * dx + a.hx * dz) / d > 0) slowFor(a, d) // the other boat is on a's right: a gives way
+        else slowFor(c, d)
+      }
+    }
+    const ease = Math.min(1, AVOID_EASE * dt)
+    for (const b of sail) b.lateral += (b.want - b.lateral) * ease
   }
 
   private place(b: Boat): void {
@@ -150,6 +199,10 @@ export class BoatSystem {
     const o = b.object
     o.position.lerpVectors(b.points[i], b.points[i + 1], t)
     const dx = b.points[i + 1].x - b.points[i].x, dz = b.points[i + 1].z - b.points[i].z
+    const len = Math.hypot(dx, dz)
+    if (len > 1e-6) { b.hx = dx / len; b.hz = dz / len }
+    o.position.x += -b.hz * b.lateral // to the boat's right
+    o.position.z += b.hx * b.lateral
     const target = Math.atan2(dx, dz)
     let d = target - o.rotation.y
     d = Math.atan2(Math.sin(d), Math.cos(d))
