@@ -420,6 +420,8 @@ internal sealed class SourceFile
     public string? Query { get; set; }
     /// <summary>Request sources only (loganalytics): the query that says how a service's requests divide between regions, a template like query. Returns one row per telemetry name and region with the columns role, region and calls (sampling-corrected counts do: only the proportions are used).</summary>
     public string? RegionQuery { get; set; }
+    /// <summary>Broker sources only (servicebus): the query that says which kinds of message each queue handled, a template like query. Returns one row per queue and message type with the columns queue, type and calls (counts over the window). Without it the types are not shown.</summary>
+    public string? TypesQuery { get; set; }
     /// <summary>Query sources only: how far back one answer looks, for example 5m. Default 5m.</summary>
     public string? Window { get; set; }
     /// <summary>Platform-metric sources only (azuremonitor): which metric of which resources fills which signal. Everything about the metrics is written here; the program knows none.</summary>

@@ -45,6 +45,12 @@ public static partial class RegistryLoader
             var knownRegion = f.Scope?.Variables.Keys.Append(ScopeRules.EnvironmentVariable).Concat(SourceQuery.Variables) ?? [ScopeRules.EnvironmentVariable, .. SourceQuery.Variables];
             foreach (var problem in ScopeTemplate.Check(regionQuery, knownRegion)) errors.Add($"{name}: source '{source}' regionQuery: {problem}");
         }
+        if (def.TypesQuery is { } typesQuery)
+        {
+            if (typesQuery.Trim().Length == 0) errors.Add($"{name}: source '{source}' has an empty typesQuery; give the query that returns queue, type and calls, or leave it out");
+            var knownTypes = f.Scope?.Variables.Keys.Append(ScopeRules.EnvironmentVariable).Concat(SourceQuery.Variables) ?? [ScopeRules.EnvironmentVariable, .. SourceQuery.Variables];
+            foreach (var problem in ScopeTemplate.Check(typesQuery, knownTypes)) errors.Add($"{name}: source '{source}' typesQuery: {problem}");
+        }
         if (def.Query is not { } query) return;
         if (query.Trim().Length == 0) errors.Add($"{name}: source '{source}' has an empty query; give the query to send, or leave it out");
         var known = f.Scope?.Variables.Keys.Append(ScopeRules.EnvironmentVariable).Concat(SourceQuery.Variables) ?? [ScopeRules.EnvironmentVariable, .. SourceQuery.Variables];

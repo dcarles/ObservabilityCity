@@ -223,3 +223,9 @@ All 10 Phase 1 topics decided 2026-10-24.
 - A click on an island's pier, crate pile or dead-letter pen opens the same list for that island only.
 - A service that reads a queue with dead letters has an amber roof beacon (red still wins). Its sign already shows DLQ in red.
 - No backend field: the queues already sit on the system that reads them (`queues` of its snapshot). The dashboard has its own list, built by the dashboard's own change.
+
+## Kinds of message and messages a second in all
+- A queue row in a reading system's drawer can list the kinds of message the queue handled, each with its messages a second, highest first. They come from one optional query on the broker source (`typesQuery`: columns queue, type, calls, run over the source's window), so the program knows no table, no property and no queue naming. Without the query nothing is shown and nothing is guessed.
+- Under each queue row the busiest five kinds are listed. One line says "N more kinds, X msg/s" with the rest added up, so the rows always account for the queue's whole flow, and a click opens the full list in place (it stays open while the drawer redraws). The server sends at most 200 kinds per queue, the busiest first; the count of the quietest it left out is sent too, and the line says "and more" when there were any.
+- A failed types query fails the poll with its message, like the region and job queries, instead of silently showing no kinds.
+- Messages a second in all is the sum of every queue's rate, each queue counted where it is read. A message that crosses two queues counts twice, because each hop is work for a service (Dan's call). It is shown in the worker drawer next to the queues, in the top bar next to the request rate, and in the Service Bus building's drawer, whose row is shown even when the broker itself has no fresh numbers. A system with no fresh data and a queue nothing measures are left out of the sum.

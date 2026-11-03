@@ -48,3 +48,66 @@ test.describe('the town the queue names build', () => {
     await expect(row).toContainText('6.0 msg/s') // 600 messages in each of three minutes, over the 300 second window of the source
   })
 })
+
+test.describe('the kinds of message and the messages a second in all', () => {
+  test.use({ viewport: { width: 1600, height: 900 } })
+
+  test('a queue row lists its busiest kinds with their rate and the rest behind one line that opens the full list', async ({ page }) => {
+    await open(page)
+    await page.evaluate(() => (window as any).city.openSystem('aa.orders-worker'))
+
+    const types = page.locator('#inspector .types[data-types-for="bus.bb.ledger.orders.out"]')
+    await expect(types.locator('.row.type')).toHaveCount(5) // the busiest five of seven
+    await expect(types.locator('.row.type').first()).toContainText('OrderPlaced')
+    await expect(types.locator('.row.type').first()).toContainText('2.0 msg/s') // 600 calls over the 300 second window
+    await expect(types.locator('.types-toggle')).toHaveText('2 more kinds, 0.50 msg/s')
+
+    await types.locator('.types-toggle').click()
+    await expect(types.locator('.row.type')).toHaveCount(7)
+    await expect(types.locator('.row.type').last()).toContainText('NoteAdded')
+    await expect(types.locator('.types-toggle')).toHaveText('Show fewer kinds')
+
+    await types.locator('.types-toggle').click()
+    await expect(types.locator('.row.type')).toHaveCount(5)
+  })
+
+  test('the full list stays open when the drawer redraws with new numbers', async ({ page }) => {
+    await open(page)
+    await page.evaluate(() => (window as any).city.openSystem('aa.orders-worker'))
+    const types = page.locator('#inspector .types[data-types-for="bus.bb.ledger.orders.out"]')
+    await types.locator('.types-toggle').click()
+    await expect(types.locator('.row.type')).toHaveCount(7)
+
+    await page.evaluate(() => (window as any).city.step?.(5))
+    await page.waitForTimeout(500)
+
+    await expect(page.locator('#inspector .types[data-types-for="bus.bb.ledger.orders.out"] .row.type')).toHaveCount(7)
+  })
+
+  test('the worker drawer says how many messages a second its queues take in all', async ({ page }) => {
+    await open(page)
+    await page.evaluate(() => (window as any).city.openSystem('aa.orders-worker'))
+
+    await expect(page.locator('#inspector h4', { hasText: 'Queues' }).locator('small')).toContainText('msg/s in total')
+  })
+
+  test('the top bar has the messages a second of the whole town, the sum of every queue', async ({ page }) => {
+    await open(page)
+    const sum = await page.evaluate(() => (window as any).city.seen.last.groups.flatMap((g: any) => g.nodes).flatMap((n: any) => n.queues ?? []).reduce((a: number, q: any) => a + (q.perSecond ?? 0), 0))
+    expect(sum).toBeGreaterThan(0)
+
+    const chip = page.locator('#chip-messages')
+    await expect(chip).toContainText('msg/s')
+    const shown = parseFloat((await chip.locator('b').innerText()).replace('k', ''))
+    expect(Math.abs(shown - sum)).toBeLessThan(Math.max(0.06, sum * 0.06))
+    await expect(chip).toHaveAttribute('title', /counted twice/)
+  })
+
+  test('the Service Bus drawer has the same total, as a row', async ({ page }) => {
+    await open(page)
+    const broker = await page.evaluate(() => (window as any).city.seen.last.groups.flatMap((g: any) => g.nodes).find((n: any) => n.kind === 'Broker')?.id)
+    await page.evaluate((id) => (window as any).city.openSystem(id), broker)
+
+    await expect(page.locator('#inspector .row', { hasText: 'Messages' })).toContainText('msg/s through the queues')
+  })
+})

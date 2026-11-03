@@ -14,15 +14,20 @@ namespace ObservabilityCity.Adapters.Azure;
 /// which the dead letters, and which patterns turn an entity's name into the pillar and service that read it. Each entity's numbers go to the
 /// system that consumes it; a system's backlog is what waits in all its entities, in every namespace (one for each region). A namespace that cannot
 /// be read fails the poll, so a number made from only some of the namespaces never reaches the town.
+/// With a <c>typesQuery</c> (a Log Analytics query returning <c>queue</c>, <c>type</c> and <c>calls</c>) each queue also lists the kinds of message it handled and how many a second,
+/// highest first, up to <see cref="TypeCeiling"/> kinds; a recording keeps them in a sibling <c>name.types.json</c>.
 /// <c>file:name.json</c> replays recorded series (<c>{ "&lt;namespace name&gt;": [ { "entity", "metric", "aggregation", "points": [...] } ] }</c>).
 /// </summary>
 public sealed class ServiceBusSource(
-    string name, string environmentId, RegistrySource definition, AzureMonitorReader reader, ScopeStore store, string? recording, TimeProvider time) : IMetricSource
+    string name, string environmentId, RegistrySource definition, AzureMonitorReader reader, ScopeStore store, string? recording, TimeProvider time, LogAnalyticsReader? logs = null, ScopeRules? rules = null) : IMetricSource
 {
     public string Name => name;
     public TimeSpan PollInterval => definition.PollInterval;
     public TimeSpan Timeout => definition.Timeout;
     public TimeSpan Window { get; } = SourceQuery.WindowOf(definition);
+
+    /// <summary>The most kinds of message listed for one queue; the quietest beyond it are counted, not listed.</summary>
+    public const int TypeCeiling = 200;
 
     /// <summary>How many entities the last poll found that no pattern claimed or no system consumes. They are left out; this is for the log and for tests.</summary>
     public int Unclaimed { get; private set; }
@@ -69,6 +74,7 @@ public sealed class ServiceBusSource(
             if (claim is null) { unclaimed++; continue; }
             _seen[entity] = claim;
         }
+        var types = definition.TypesQuery is { } typesQuery ? TypesByQueue(await ReadTypes(typesQuery, resolution, ct), Window) : null;
         foreach (var (entity, claim) in _seen.OrderBy(kv => kv.Key, StringComparer.Ordinal))
         {
             var node = claim.Node;
@@ -79,11 +85,39 @@ public sealed class ServiceBusSource(
             if (!queues.TryGetValue(node.Id, out var own)) queues[node.Id] = own = [];
             // an entity Azure sent nothing for this time keeps its place in the list (with no numbers), so a quiet queue neither vanishes nor ages
             own.Add(new QueueReading(entity, backlog.TryGetValue(entity, out var qb) ? Math.Round(qb) : null, dead.TryGetValue(entity, out var qd) ? Math.Round(qd) : null,
-                arrived.TryGetValue(entity, out var qa) ? Math.Round(qa / Window.TotalSeconds, 3) : null, claim.ProducerGroup, claim.ProducerService));
+                arrived.TryGetValue(entity, out var qa) ? Math.Round(qa / Window.TotalSeconds, 3) : null, claim.ProducerGroup, claim.ProducerService,
+                types is null ? null : types.GetValueOrDefault(entity).Types ?? [], types?.GetValueOrDefault(entity).Cut ?? 0));
         }
         Unclaimed = unclaimed;
         return byNode.ToDictionary(kv => kv.Key, kv => new NodeReading(at, true, 0, 0, 0, 0, 0, 0,
             QueueDepth: kv.Value.HasWaiting ? Math.Round(kv.Value.Waiting) : null, DeadLetters: kv.Value.HasDead ? Math.Round(kv.Value.Dead) : null, Queues: queues[kv.Key]));
+    }
+
+    private async Task<IReadOnlyList<TypeRow>> ReadTypes(string query, Resolution resolution, CancellationToken ct)
+    {
+        if (recording is not null)
+        {
+            var sibling = Path.ChangeExtension(recording, ".types.json");
+            return File.Exists(sibling) ? LogAnalyticsReader.ParseTypes(await File.ReadAllTextAsync(sibling, ct)) : [];
+        }
+        if (logs is null) throw new InvalidOperationException("the types query cannot be sent: the source has no login for Log Analytics");
+        return await logs.QueryTypesAsync(LogAnalyticsSource.Workspace(name, definition, resolution), SourceQuery.Render(query, definition, environmentId, rules ?? ScopeRules.None, []), Window, ct);
+    }
+
+    /// <summary>
+    /// The kinds of message each queue handled, from the rows of the types query: calls of the same queue and kind added up (a queue can come back in several rows), a rate over the window, highest first and
+    /// by name among equals. A queue lists at most <see cref="TypeCeiling"/> kinds; Cut counts the quietest ones left out. A kind with no calls is not listed.
+    /// </summary>
+    public static Dictionary<string, (IReadOnlyList<MessageTypeReading> Types, int Cut)> TypesByQueue(IEnumerable<TypeRow> rows, TimeSpan window)
+    {
+        var result = new Dictionary<string, (IReadOnlyList<MessageTypeReading>, int)>(StringComparer.Ordinal);
+        foreach (var queue in rows.GroupBy(r => r.Queue, StringComparer.Ordinal))
+        {
+            var all = queue.GroupBy(r => r.Type, StringComparer.Ordinal).Select(g => (Type: g.Key, Calls: g.Sum(r => Math.Max(0, r.Calls)))).Where(t => t.Calls > 0)
+                .OrderByDescending(t => t.Calls).ThenBy(t => t.Type, StringComparer.Ordinal).ToList();
+            result[queue.Key] = (all.Take(TypeCeiling).Select(t => new MessageTypeReading(t.Type, Math.Round(t.Calls / window.TotalSeconds, 3))).ToList(), Math.Max(0, all.Count - TypeCeiling));
+        }
+        return result;
     }
 
     /// <summary>What the source has worked out about each entity it has seen: whose it is to read and, when the name says, who publishes it. Kept between polls.</summary>
@@ -172,7 +206,7 @@ public sealed class ServiceBusSourceFactory(HttpClient? http = null, TimeProvide
             if (!File.Exists(recording)) throw new InvalidOperationException($"the recording {file} does not exist");
         }
         return new ServiceBusSource(context.Source.Name, context.EnvironmentId, context.Source, new AzureMonitorReader(http ?? Shared, context.Credential),
-            context.Scope ?? new ScopeStore(), recording, time ?? TimeProvider.System);
+            context.Scope ?? new ScopeStore(), recording, time ?? TimeProvider.System, new LogAnalyticsReader(http ?? Shared, context.Credential), context.Rules);
     }
 
     private static readonly HttpClient Shared = new();

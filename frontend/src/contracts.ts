@@ -262,6 +262,11 @@ export interface components {
             groups: components["schemas"]["LogGroup"][];
             links?: components["schemas"]["ResourceLink"][] | null;
         };
+        MessageTypeSnapshot: {
+            type: string;
+            /** Format: double */
+            perSecond: number;
+        };
         MessagingSnapshot: {
             topics: components["schemas"]["TopicSnapshot"][];
             subscriptions: components["schemas"]["SubscriptionSnapshot"][];
@@ -355,6 +360,9 @@ export interface components {
             link?: components["schemas"]["ResourceLink"];
             /** Format: double */
             perSecond?: number | null;
+            types?: components["schemas"]["MessageTypeSnapshot"][] | null;
+            /** Format: int32 */
+            typesCut?: number | null;
         };
         RegionSnapshot: {
             region: string;

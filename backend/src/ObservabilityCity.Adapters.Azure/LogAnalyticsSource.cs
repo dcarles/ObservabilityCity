@@ -93,6 +93,30 @@ public sealed class LogAnalyticsReader(HttpClient http, ICredentialSource? crede
         };
     }
 
+    public static readonly string[] TypeColumns = ["queue", "type", "calls"];
+
+    /// <summary>The message type rows over the last <paramref name="window"/>.</summary>
+    public async Task<IReadOnlyList<TypeRow>> QueryTypesAsync(string workspace, string query, TimeSpan window, CancellationToken ct) =>
+        ParseTypes(await SendAsync(workspace, query, System.Xml.XmlConvert.ToString(window), ct));
+
+    /// <summary>The rows of the types query: <c>queue</c> (the entity's name), <c>type</c> (the kind of message) and <c>calls</c> (how many were handled in the window). A row without a queue or a type is skipped.</summary>
+    public static IReadOnlyList<TypeRow> ParseTypes(string json)
+    {
+        using var doc = JsonDocument.Parse(json);
+        if (!doc.RootElement.TryGetProperty("tables", out var tables) || tables.ValueKind != JsonValueKind.Array || tables.GetArrayLength() == 0)
+            throw new InvalidOperationException("the answer has no table; was the query a query that returns rows?");
+        var table = tables[0];
+        var names = table.GetProperty("columns").EnumerateArray().Select(c => c.GetProperty("name").GetString() ?? "").ToList();
+        int Index(string column) => names.FindIndex(n => n.Equals(column, StringComparison.OrdinalIgnoreCase));
+        var (queue, type, calls) = (Index("queue"), Index("type"), Index("calls"));
+        if (queue < 0 || type < 0 || calls < 0)
+            throw new InvalidOperationException($"the types query must return the columns {string.Join(", ", TypeColumns)}; it returned {string.Join(", ", names)}");
+        var rows = new List<TypeRow>();
+        foreach (var row in table.GetProperty("rows").EnumerateArray())
+            if (Text(row[queue]) is { Length: > 0 } q && Text(row[type]) is { Length: > 0 } t) rows.Add(new TypeRow(q, t, Number(row, calls) ?? 0));
+        return rows;
+    }
+
     public static readonly string[] RegionColumns = ["role", "region", "calls"];
 
     /// <summary>The rows of the region query: <c>role</c> (the telemetry name), <c>region</c> and <c>calls</c> (counts; only their proportions are used). A row without a role or a region is skipped.</summary>
@@ -247,6 +271,9 @@ public sealed class LogAnalyticsReader(HttpClient http, ICredentialSource? crede
 public sealed record JobRow(string ResourceId, string Job, DateTimeOffset? LastRun, bool? Succeeded, DateTimeOffset? Next, string? Region);
 
 /// <summary>One telemetry name's calls in the window, how many of them were errors and their latency in milliseconds (null when the query gave none).</summary>
+/// <summary>How many messages of one kind a queue handled in the window, by the types query.</summary>
+public sealed record TypeRow(string Queue, string Type, double Calls);
+
 /// <summary>How many requests a service (by telemetry name) answered in one region, by the region query.</summary>
 public sealed record RegionRow(string Role, string Region, double Calls);
 

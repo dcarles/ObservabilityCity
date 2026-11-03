@@ -141,7 +141,11 @@ public sealed record SourceAgeSnapshot(string Source, int AgeSeconds, bool Fresh
 /// One queue a consumer reads: what waits in it and what is dead-lettered (each null when nothing measures it), and Link, the address that opens its dead letters in the
 /// support tool the environment names (entities.deadLetterLink), null when it names none.
 /// </summary>
-public sealed record QueueSnapshot(string Name, double? Backlog, double? DeadLetters, ResourceLink? Link = null, double? PerSecond = null);
+public sealed record QueueSnapshot(string Name, double? Backlog, double? DeadLetters, ResourceLink? Link = null, double? PerSecond = null,
+    IReadOnlyList<MessageTypeSnapshot>? Types = null, int? TypesCut = null);
+
+/// <summary>The messages a second of one kind a queue handled, when the environment measures it (typesQuery). A queue's Types are highest first, up to a ceiling; TypesCut counts the quietest kinds beyond it that are left out.</summary>
+public sealed record MessageTypeSnapshot(string Type, double PerSecond);
 
 /// <summary>
 /// A resource that is not a system but stands in the town as a small building without health (a key vault, a storage account). Label is what it is
