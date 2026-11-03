@@ -261,7 +261,8 @@ test.describe('the inspector drawer', () => {
 
   test('says which source is late, with how long ago it answered, and keeps the numbers of the sources that are fresh', async ({ town, page }) => {
     await town.open()
-    await page.evaluate(() => {
+    // the live town keeps sending its own snapshots, so the late source is fed again until the drawer shows it (a snapshot arriving between the feed and the read would otherwise wipe it)
+    const feedLate = () => page.evaluate(() => {
       const c = (window as any).city
       const s = structuredClone(c.seen.last)
       const n = s.groups.flatMap((g: any) => g.nodes).find((x: any) => x.id === 'cc.notify-api')
@@ -272,9 +273,13 @@ test.describe('the inspector drawer', () => {
       n.absent = [...n.absent, 'cpu', 'memory']
       c.feed(s)
     })
+    await feedLate()
     await openByName(page, 'Notify API')
     const rows = page.locator('#inspector .rows')
-    await expect(rows).toContainText('From platform')
+    await expect(async () => {
+      await feedLate()
+      await expect(rows).toContainText('From platform', { timeout: 1000 })
+    }).toPass({ timeout: 15000 })
     await expect(rows).toContainText('4m ago, late: no cpu, memory')
     await expect(rows).toContainText('From telemetry')
     await expect(rows).toContainText('Requests') // what the fresh source says is still shown
