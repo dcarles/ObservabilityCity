@@ -115,6 +115,11 @@ describe('boats under bridges', () => {
       expect(Math.abs(turned)).toBeGreaterThan(Math.PI * 1.8)
     })
 
+    it('runs on the inside lane, closer to the coast than the water where the boats from other islands arrive', () => {
+      const circuit = harbourCircuit(open, water, centre)!
+      for (const p of circuit.slice(1, -1)) expect(Math.hypot(p.x, p.z)).toBeLessThan(Math.hypot(water.x, water.z))
+    })
+
     it('goes the same way round for an island whatever way its outline was drawn', () => {
       const way = (poly: THREE.Vector2[]) => {
         const c = harbourCircuit({ land: [poly] }, water, centre)!

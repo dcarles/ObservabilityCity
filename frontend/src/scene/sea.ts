@@ -231,8 +231,11 @@ export function harbourLoop(map: SeaMap, water: THREE.Vector3, centre: THREE.Vec
   return null
 }
 
-/** How far off the coast, nearest first, the circuit round an island runs: the nearest of these that is clear of every other island is used. */
-export const CIRCUIT_OFFSETS = [8, 10, 6.5]
+/**
+ * How far off the coast, nearest first, the circuit round an island runs: the nearest of these that is clear of every other island is used.
+ * It is the inside lane: closer to the coast than the water by the harbour where the boats from other islands arrive, so those never cross it.
+ */
+export const CIRCUIT_OFFSETS = [5, 4.2, 6]
 
 /**
  * A circuit round the island: out of the harbour, once round the coast in the water just off it, one way only, and back to the harbour. Boats on it all go the
