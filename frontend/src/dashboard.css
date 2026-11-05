@@ -137,3 +137,7 @@ body.dash #view-bar .vb-btn, body.dash #view-bar .vb-list input[type=search] { b
 .il.bad .st { color: var(--bad); } .il.ok .st, .il.ok .what { color: var(--ok); }
 .il .idis { flex: none; font-size: 11px; padding: 0 6px; cursor: pointer; }
 .il { flex-wrap: wrap; } .il .sub { flex-basis: 100%; display: flex; gap: 8px; align-items: center; justify-content: space-between; } .il .tm { color: var(--muted); font-size: 11px; }
+
+.kpi .dlist { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; max-height: 190px; overflow-y: auto; }
+.dl { display: flex; flex-direction: column; font-size: 12px; min-width: 0; cursor: pointer; overflow-wrap: anywhere; }
+.dl .q { color: var(--muted); } .dl .q i { color: var(--bad); font-style: normal; font-weight: 600; }

@@ -51,11 +51,19 @@ export function summaryHtml(d: Dashboard): string {
   const t = s.traffic
   const traffic = t ? `<div class="kpi" id="kpi-traffic"><span>Total traffic</span><b>${num(t.total)} rps</b>
     <div class="bar"><i style="width:${t.total > 0 ? (t.external / t.total) * 100 : 0}%"></i></div><small>External ${num(t.external)} · Internal ${num(t.internal)}</small></div>` : ''
-  const dlq = s.deadLetters != null ? `<div class="kpi" id="kpi-dlq"><span>Dead letters</span><b>${num(s.deadLetters)}</b>${s.backlog != null ? `<small>Backlog ${num(s.backlog)} messages</small>` : ''}</div>` : ''
+  const dlq = s.deadLetters != null ? `<div class="kpi" id="kpi-dlq"><span>Dead letters</span><b>${num(s.deadLetters)}</b>${s.backlog != null ? `<small>Backlog ${num(s.backlog)} messages</small>` : ''}
+    <div class="dlist">${deadQueuesHtml(s.deadQueues)}</div></div>` : ''
   const inc = s.incidents
   const incidents = inc ? `<div class="kpi" id="kpi-incidents"><span>Incidents</span><b class="${inc.open > 0 ? 'bad' : 'ok'}">${num(inc.open)}</b>
     <div class="ilist">${inc.rows.length ? inc.rows.map(incidentLine).join('') : '<small>No incidents</small>'}</div></div>` : ''
   return services + traffic + dlq + incidents
+}
+
+/** The queues with dead letters, worst first: the service that reads each, its pillar, the queue and how many. */
+export function deadQueuesHtml(items: Dashboard['summary']['deadQueues']): string {
+  if (!items.length) return '<small>No queue has dead letters right now.</small>'
+  const head = `<small class="dh">${items.length} ${items.length === 1 ? 'queue' : 'queues'} with dead letters</small>`
+  return head + items.map((d) => `<div class="dl" data-system="${esc(d.nodeId)}"><span class="what"><b>${esc(d.nodeName)}</b> · ${esc(d.groupName)}</span><span class="q">${esc(d.queue)} · <i>${num(Math.round(d.count))}</i> dead</span></div>`).join('')
 }
 
 function incidentLine(r: IncidentRow): string {

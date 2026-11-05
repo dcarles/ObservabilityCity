@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { buildDashboard, incidentName, pillarSelection, worstOf } from '../../src/dashboard/model'
-import { databaseIsOpen, groupIsOpen, hiddenHtml, pillarHtml, summaryHtml, type UiState } from '../../src/dashboard/render'
+import { deadQueuesHtml, databaseIsOpen, groupIsOpen, hiddenHtml, pillarHtml, summaryHtml, type UiState } from '../../src/dashboard/render'
 import { trafficSplit } from '../../src/trafficSplit'
 import { ALL_TENANTS } from '../../src/tenants'
 import { checkSnapshot } from '../../src/snapshotGuard'
@@ -231,6 +231,39 @@ describe('worstOf', () => {
     expect(worstOf(['none'])).toBe('none')
     expect(worstOf(['ok', 'bad', 'warn'])).toBe('bad')
     expect(worstOf([])).toBe('none')
+  })
+})
+
+describe('the Dead letters card list', () => {
+  const withQueues = (): Snapshot => {
+    const s = golden('calm')
+    const nodes = s.groups.flatMap((g) => g.nodes)
+    for (const n of nodes) n.queues = []
+    nodes[0].absent = []
+    nodes[0].queues = [{ name: 'orders<small>', backlog: 0, deadLetters: 2 }, { name: 'orders-big', backlog: 0, deadLetters: 40 }, { name: 'clean', backlog: 3, deadLetters: 0 }]
+    return s
+  }
+
+  it('lists only queues with dead letters, worst first, with the service and its pillar, like the town list', () => {
+    const d = buildDashboard(withQueues(), ALL_TENANTS)
+    expect(d.summary.deadQueues.map((q) => [q.queue, q.count])).toEqual([['orders-big', 40], ['orders<small>', 2]])
+    const html = deadQueuesHtml(d.summary.deadQueues)
+    expect(html).toContain('2 queues with dead letters')
+    expect(html).toContain('orders-big · <i>40</i> dead')
+    expect(html).toContain('orders&lt;small&gt;') // escaped
+    expect(html).toContain(`data-system="${d.summary.deadQueues[0].nodeId}"`)
+  })
+
+  it('leaves out a service with no fresh data, and says so when nothing is left', () => {
+    const s = withQueues()
+    s.groups.flatMap((g) => g.nodes)[0].state = 'Stale'
+    const d = buildDashboard(s, ALL_TENANTS)
+    expect(d.summary.deadQueues).toEqual([])
+    expect(deadQueuesHtml(d.summary.deadQueues)).toContain('No queue has dead letters right now.')
+  })
+
+  it('uses a singular for one queue', () => {
+    expect(deadQueuesHtml([{ nodeId: 'a.b', nodeName: 'B', groupId: 'a', groupName: 'A', queue: 'q', count: 1 }])).toContain('1 queue with dead letters')
   })
 })
 
