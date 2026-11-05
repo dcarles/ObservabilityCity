@@ -227,6 +227,9 @@ test.describe('the dashboard view', () => {
     expect(got.rows).toHaveLength(2)
     expect(got.rows[0]).toContain('q-big · 7 dead')
     expect(got.rows[1]).toContain('q-small · 2 dead')
+    // small text and no scroll bar: the card grows with the list
+    const look = await page.locator('#kpi-dlq').evaluate((c) => ({ size: getComputedStyle(c.querySelector('.dl .what')!).fontSize, scrolls: [...c.querySelectorAll('*')].some((e) => e.scrollHeight > e.clientHeight + 1 && /auto|scroll/.test(getComputedStyle(e).overflowY)) }))
+    expect(look).toEqual({ size: '12px', scrolls: false })
     await page.locator('#kpi-dlq .dl').first().click()
     await expect(page.locator('#inspector')).toBeVisible()
   })
