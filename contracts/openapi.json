@@ -506,6 +506,26 @@
         },
         "additionalProperties": false
       },
+      "DeadLetterRegionSnapshot": {
+        "required": [
+          "count",
+          "region"
+        ],
+        "type": "object",
+        "properties": {
+          "region": {
+            "type": "string"
+          },
+          "count": {
+            "type": "number",
+            "format": "double"
+          },
+          "link": {
+            "$ref": "#/components/schemas/ResourceLink"
+          }
+        },
+        "additionalProperties": false
+      },
       "DependencySnapshot": {
         "required": [
           "from",
@@ -1282,6 +1302,13 @@
           "typesCut": {
             "type": "integer",
             "format": "int32",
+            "nullable": true
+          },
+          "deadLetterRegions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DeadLetterRegionSnapshot"
+            },
             "nullable": true
           }
         },

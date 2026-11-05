@@ -109,7 +109,7 @@ export async function startTown(): Promise<void> {
     (state, island) => {
       const groups = seen.last?.groups ?? []
       if (state === 'DeadLetters')
-        return deadLetterItems(groups, island).map<PickItem>((d) => ({ kind: 'building', id: d.nodeId, name: d.nodeName, where: d.groupName, detail: `${d.queue} · ${Math.round(d.count)} dead` }))
+        return deadLetterItems(groups, island).map<PickItem>((d) => ({ kind: 'building', id: d.nodeId, name: d.nodeName, where: d.groupName, detail: `${d.queue} · ${d.region ? `${d.region} · ` : ''}${Math.round(d.count)} dead` }))
       if (state === 'Incidents')
         return [
           ...groups.filter((g) => g.incidents.length > 0).map<PickItem>((g) => ({ kind: 'island', id: g.id, name: g.displayName, where: `sev ${g.incidents[0].severity}, ${g.incidents.length} open` })),

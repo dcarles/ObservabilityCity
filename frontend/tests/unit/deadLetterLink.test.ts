@@ -11,7 +11,7 @@ const tool = { name: 'Support tool', url: 'https://support.example.test/queues/x
 
 describe('the queues of a consumer', () => {
   it('are rows with what waits, what is dead-lettered and the link', () => {
-    expect(queueRows({ queues: [q('sbq-a-inbox', 25, 2, tool)] })).toEqual([{ name: 'sbq-a-inbox', text: '25 waiting · 2 dead', tone: 'bad', link: tool, types: null }])
+    expect(queueRows({ queues: [q('sbq-a-inbox', 25, 2, tool)] })).toEqual([{ name: 'sbq-a-inbox', text: '25 waiting · 2 dead', tone: 'bad', link: tool, types: null, regions: [] }])
   })
 
   it('put the queue with dead letters first, then the biggest backlog', () => {
@@ -31,6 +31,30 @@ describe('the queues of a consumer', () => {
     expect(queueRows({ queues: [q('a', 1, 1, { name: 'x', url: 'javascript:alert(1)' })] })[0]!.link).toBeNull()
     expect(queueRows({ queues: [q('a', 1, 1, { name: 'x', url: '//evil.example.test' })] })[0]!.link).toBeNull()
     expect(queueRows({ queues: [q('a', 1, 1, { name: '', url: 'https://ok.example.test' })] })[0]!.link).toBeNull()
+  })
+})
+
+describe('dead letters in more than one region', () => {
+  const north = { name: 'Support tool North', url: 'https://north.example.test/queues/a' }
+  const west = { name: 'Support tool West', url: 'https://west.example.test/queues/a' }
+  const split = (): QueueSnapshot => ({ name: 'a', backlog: 0, deadLetters: 11, link: tool, deadLetterRegions: [{ region: 'northeurope', count: 3, link: north }, { region: 'westeurope', count: 8, link: west }] })
+
+  it('give the drawer row a tag, a count and its own link for each region, and not the one link for all', () => {
+    const row = queueRows({ queues: [split()] })[0]!
+    expect(row.link).toBeNull()
+    expect(row.regions).toEqual([{ region: 'North', count: 3, link: north }, { region: 'West', count: 8, link: west }])
+    expect(row.text).toBe('0 waiting · 11 dead')
+  })
+
+  it('drop a regional link that is not a web address, and a region with no dead letters', () => {
+    const q2: QueueSnapshot = { ...split(), deadLetterRegions: [{ region: 'westeurope', count: 8, link: { name: 'x', url: 'javascript:1' } }, { region: 'northeurope', count: 0, link: north }] }
+    expect(queueRows({ queues: [q2] })[0]!.regions).toEqual([{ region: 'West', count: 8, link: null }])
+  })
+
+  it('pass the snapshot guard, which repairs a bad region entry', () => {
+    const t = healthyTown() as any
+    t.groups[0].nodes[0].queues = [{ ...split(), deadLetterRegions: [{ region: 'westeurope', count: 8, link: west }, { region: '', count: 2 }, { region: 'x', count: 'many' }, { region: 'northeurope', count: 3, link: { name: 'T', url: 'javascript:1' } }, 'junk'] }]
+    expect(checkSnapshot(t).snapshot!.groups[0].nodes[0].queues![0].deadLetterRegions).toEqual([{ region: 'westeurope', count: 8, link: west }, { region: 'northeurope', count: 3, link: null }])
   })
 })
 
@@ -72,8 +96,8 @@ describe('the snapshot guard and queues', () => {
     const t = healthyTown() as any
     nodeOf(t).queues = [{ name: 'a', backlog: 3, deadLetters: 1, perSecond: 2.5, link: { name: 'Tool', url: 'https://t.example.test/a' } }, { name: '', backlog: 1 }, { name: 'b', backlog: 'x', link: { name: 'Tool', url: 'javascript:1' } }, 'junk']
     expect(nodeOf(checkSnapshot(t).snapshot!).queues).toEqual([
-      { name: 'a', backlog: 3, deadLetters: 1, link: { name: 'Tool', url: 'https://t.example.test/a' }, perSecond: 2.5, types: null, typesCut: 0 },
-      { name: 'b', backlog: null, deadLetters: null, link: null, perSecond: null, types: null, typesCut: 0 },
+      { name: 'a', backlog: 3, deadLetters: 1, link: { name: 'Tool', url: 'https://t.example.test/a' }, perSecond: 2.5, types: null, typesCut: 0, deadLetterRegions: null },
+      { name: 'b', backlog: null, deadLetters: null, link: null, perSecond: null, types: null, typesCut: 0, deadLetterRegions: null },
     ])
 
     delete nodeOf(t).queues

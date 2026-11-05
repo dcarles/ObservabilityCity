@@ -260,7 +260,7 @@ public sealed record RegistrySource(string Name, string Kind, string? Connection
 }
 
 /// <summary>How a broker's entities are read: the rule that finds its namespaces, the dimension that names an entity, the metrics for the backlog and the dead letters, and the patterns that say whose an entity is.</summary>
-public sealed record EntitiesConfig(string Resources, string Dimension, EntityMetric? Backlog, EntityMetric? DeadLetter, IReadOnlyList<EntityPattern> Patterns, TimeSpan? Interval = null, EntityLink? DeadLetterLink = null, EntityMetric? Throughput = null)
+public sealed record EntitiesConfig(string Resources, string Dimension, EntityMetric? Backlog, EntityMetric? DeadLetter, IReadOnlyList<EntityPattern> Patterns, TimeSpan? Interval = null, EntityLink? DeadLetterLink = null, EntityMetric? Throughput = null, IReadOnlyList<EntityRegionLink>? DeadLetterLinks = null)
 {
     /// <summary>The variables a dead-letter link's URL may use.</summary>
     public static readonly string[] LinkVariables = ["pillar", "service", "system", "environment", "queue"];
@@ -270,6 +270,9 @@ public sealed record EntitiesConfig(string Resources, string Dimension, EntityMe
 
 /// <summary>An address that opens a consumer's dead letters elsewhere (a support tool): its name and a URL template over <see cref="EntitiesConfig.LinkVariables"/>.</summary>
 public sealed record EntityLink(string Name, string Url);
+
+/// <summary>The support-tool address for the dead letters of one region (matched ignoring case against the region of the broker's namespace).</summary>
+public sealed record EntityRegionLink(string Region, EntityLink Link);
 
 /// <summary>A metric and the way its points are added up.</summary>
 public sealed record EntityMetric(string Metric, string Aggregation);

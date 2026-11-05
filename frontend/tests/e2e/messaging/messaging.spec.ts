@@ -116,6 +116,59 @@ test.describe(`the broker's backlog and dead letters (${B ? 'ids, a total' : 'co
     await expect(page.locator('#state-list')).toContainText('No queue has dead letters right now')
   })
 
+  /** Feeds the town a snapshot in which the inbox's dead letters are in both regions: 3 in the north one and 8 in the west one, each with its own support tool. */
+  async function feedRegions(page: Page): Promise<void> {
+    await page.evaluate((queue) => {
+      const c = (window as any).city
+      const s = JSON.parse(JSON.stringify(c.seen.last))
+      const n = s.groups.flatMap((g: any) => g.nodes).find((x: any) => x.id === 'aa.orders-worker')
+      n.deadLetters = 11
+      n.queues = n.queues.map((q: any) => q.name !== queue ? q : { ...q, deadLetters: 11, deadLetterRegions: [
+        { region: 'northeurope', count: 3, link: { name: 'Support North', url: 'https://north.example.test/q' } },
+        { region: 'westeurope', count: 8, link: { name: 'Support West', url: 'https://west.example.test/q' } }] })
+      c.feed(s)
+    }, inbox)
+  }
+
+  test('dead letters in two regions: the top bar list has a row for each region with its tag, one queue, and the drawer links each region to its own tool', async ({ page }) => {
+    await open(page)
+    await page.locator('#topbar .chip.dlq').click()
+
+    const list = page.locator('#state-list')
+    const rows = list.locator('.hit')
+    // the live town keeps sending its own snapshots, which would undo the fed one: feed again until the list shows it
+    await expect(async () => { await feedRegions(page); await expect(rows).toHaveCount(2, { timeout: 1500 }) }).toPass({ timeout: 15_000 })
+    await expect(list.locator('.head')).toContainText('1 queue with dead letters')
+    await expect(rows.nth(0)).toContainText('West · 8 dead') // worst first
+    await expect(rows.nth(1)).toContainText('North · 3 dead')
+
+    await rows.nth(0).click()
+    const row = page.locator(`#inspector .row.queue[data-queue="${inbox}"]`)
+    const links = row.locator('a.out')
+    // a newer live snapshot would undo the fed one in the drawer too: feed again until it shows
+    await expect(async () => { await feedRegions(page); await expect(links).toHaveCount(2, { timeout: 1500 }) }).toPass({ timeout: 15_000 }) // one for each region, and not the one tool for all
+    await expect(row).toContainText('11 dead')
+    await expect(links.nth(0)).toHaveAttribute('href', 'https://north.example.test/q')
+    await expect(links.nth(1)).toHaveAttribute('href', 'https://west.example.test/q')
+    await expect(row).toContainText('North 3 dead')
+    await expect(row).toContainText('West 8 dead')
+  })
+
+  test('dead letters in two regions: the island pier lists a row for each region too', async ({ page }) => {
+    await open(page)
+    await page.evaluate(() => (window as any).city.framePier('aa'))
+    await page.waitForTimeout(600)
+    const at = await page.evaluate(() => (window as any).city.screenOfPier('aa'))
+    await page.mouse.click(at.x, at.y)
+
+    const list = page.locator('#state-list')
+    // the live town keeps sending its own snapshots, which would undo the fed one: feed again until the list shows it
+    await expect(async () => { await feedRegions(page); await expect(list.locator('.hit')).toHaveCount(2, { timeout: 1500 }) }).toPass({ timeout: 15_000 })
+    await expect(list.locator('.head')).toContainText('1 queue with dead letters')
+    await expect(list.locator('.hit').nth(0)).toContainText('West · 8 dead')
+    await expect(list.locator('.hit').nth(1)).toContainText('North · 3 dead')
+  })
+
   test('the roof beacon of a service with dead letters is amber, not green, and one without stays as it was', async ({ page }) => {
     await open(page)
     await page.evaluate(() => (window as any).city.step(2)) // time only moves when a test moves it

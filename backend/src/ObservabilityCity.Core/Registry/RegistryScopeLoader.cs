@@ -73,7 +73,8 @@ public static partial class RegistryLoader
             f.Patterns.Select(p => new EntityPattern(p.Match, string.IsNullOrWhiteSpace(p.Consumer) ? "worker" : p.Consumer.Trim().ToLowerInvariant())).ToList(),
             string.IsNullOrWhiteSpace(f.Interval) ? null : SourceQuery.TryParseWindow(f.Interval, out var interval) ? interval : null,
             f.DeadLetterLink is { } l ? new EntityLink(l.Name.Trim(), l.Url.Trim()) : null,
-            ToEntityMetric(f.Throughput));
+            ToEntityMetric(f.Throughput),
+            f.DeadLetterLinks.Count == 0 ? null : f.DeadLetterLinks.Select(l => new EntityRegionLink((l.Region ?? "").Trim(), new EntityLink(l.Name.Trim(), l.Url.Trim()))).ToList());
 
     private static EntityMetric? ToEntityMetric(EntityMetricFile? f) => f is null ? null : new EntityMetric(f.Metric.Trim(), f.Aggregation.Trim().ToLowerInvariant());
 
@@ -103,6 +104,19 @@ public static partial class RegistryLoader
             foreach (Match m in Regex.Matches(link.Url ?? "", @"\{([^{}]*)\}"))
                 if (!EntitiesConfig.LinkVariables.Contains(m.Groups[1].Value))
                     errors.Add($"{at}.deadLetterLink: {{{m.Groups[1].Value}}} is not a variable of the url. Use {string.Join(", ", EntitiesConfig.LinkVariables.Select(v => "{" + v + "}"))}.{DidYouMean.Hint(m.Groups[1].Value, EntitiesConfig.LinkVariables)}");
+        }
+        var seenRegions = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        for (var i = 0; i < e.DeadLetterLinks.Count; i++)
+        {
+            var l = e.DeadLetterLinks[i];
+            var where = $"{at}.deadLetterLinks[{i}]";
+            if (string.IsNullOrWhiteSpace(l.Region)) errors.Add($"{where}: region is empty; give the region the address is for");
+            else if (!seenRegions.Add(l.Region.Trim())) errors.Add($"{where}: region '{l.Region.Trim()}' is given twice");
+            if (string.IsNullOrWhiteSpace(l.Name)) errors.Add($"{where}: name is empty; give the words the link shows");
+            if (!Regex.IsMatch(l.Url ?? "", @"^https?://", RegexOptions.IgnoreCase)) errors.Add($"{where}: url must start with http:// or https://");
+            foreach (Match m in Regex.Matches(l.Url ?? "", @"\{([^{}]*)\}"))
+                if (!EntitiesConfig.LinkVariables.Contains(m.Groups[1].Value))
+                    errors.Add($"{where}: {{{m.Groups[1].Value}}} is not a variable of the url. Use {string.Join(", ", EntitiesConfig.LinkVariables.Select(v => "{" + v + "}"))}.{DidYouMean.Hint(m.Groups[1].Value, EntitiesConfig.LinkVariables)}");
         }
         if (e.Patterns.Count == 0) errors.Add($"{at}: patterns is empty. Give at least one pattern: a regular expression with the named group service (and pillar when the name says it)");
         for (var i = 0; i < e.Patterns.Count; i++)

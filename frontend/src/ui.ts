@@ -185,10 +185,12 @@ export class StateList {
     if (key === this.key) return
     this.key = key
     const resolved = this.state === 'Incidents' ? items.filter((i) => i.state === 'Resolved').length : 0
-    const word = { Down: 'down', Degraded: 'degraded', Stale: 'with no data', Incidents: 'with open incidents', DeadLetters: items.length === 1 ? 'queue with dead letters' : 'queues with dead letters' }[this.state]
+    // a queue with dead letters in two regions is two rows but one queue (a row's detail starts with the queue's name)
+    const queues = this.state === 'DeadLetters' ? new Set(items.map((i) => `${i.id}|${(i.detail ?? '').split(' · ')[0]}`)).size : items.length
+    const word = { Down: 'down', Degraded: 'degraded', Stale: 'with no data', Incidents: 'with open incidents', DeadLetters: queues === 1 ? 'queue with dead letters' : 'queues with dead letters' }[this.state]
     const none = this.state === 'Incidents' ? 'No incidents are open right now.' : this.state === 'DeadLetters' ? 'No queue has dead letters right now.' : `Nothing is ${word} right now.`
     this.el.innerHTML = `
-      <div class="head"><b>${items.length - resolved} ${word}${resolved ? ` · ${resolved} resolved` : ''}</b><button id="state-list-close" title="Close">✕</button></div>
+      <div class="head"><b>${(this.state === 'DeadLetters' ? queues : items.length) - resolved} ${word}${resolved ? ` · ${resolved} resolved` : ''}</b><button id="state-list-close" title="Close">✕</button></div>
       ${items.length === 0 ? `<p class="none">${none}</p>` : items.map((m, i) => `<div class="hit${m.dismiss ? ' stacked' : ''}${m.inert ? ' inert' : ''}${m.state === 'Resolved' ? ' resolved' : ''}" data-i="${i}"${m.inert ? ' data-inert="1"' : ''}><b>${escapeHtml(m.name)}</b><span>${escapeHtml(m.where)}</span>${m.detail ? `<span class="detail">${escapeHtml(m.detail)}</span>` : ''}${m.dismiss ? '<button class="dismiss" title="Hide this report until the server restarts">Dismiss</button>' : ''}</div>`).join('')}`
     this.el.classList.toggle('wide', items.some((i) => i.dismiss))
     this.el.querySelector('#state-list-close')!.addEventListener('click', () => this.close())

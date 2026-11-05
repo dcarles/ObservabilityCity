@@ -33,7 +33,10 @@ public sealed record NodeReading(
 
 /// <summary>One queue (or other broker entity) a consumer reads, with what waits in it and what is dead-lettered; a number the source cannot tell is null. ProducerGroup and ProducerService say whose outbox it is, when the entity's name does: the island and the service that publish what the consumer reads.</summary>
 public sealed record QueueReading(string Name, double? Backlog, double? DeadLetters, double? PerSecond = null, string? ProducerGroup = null, string? ProducerService = null,
-    IReadOnlyList<MessageTypeReading>? Types = null, int TypesCut = 0);
+    IReadOnlyList<MessageTypeReading>? Types = null, int TypesCut = 0, IReadOnlyList<DeadLetterRegionReading>? DeadLetterRegions = null);
+
+/// <summary>The dead letters of a queue in one region (the region of the broker's namespace that holds them). Only regions that hold some are listed, and only when the broker spans more than one region.</summary>
+public sealed record DeadLetterRegionReading(string Region, double Count);
 
 /// <summary>How many messages a second of one kind (the message type) a queue handled. Types is highest first; TypesCut counts the quietest kinds a queue had beyond the ceiling, which are left out.</summary>
 public sealed record MessageTypeReading(string Type, double PerSecond);

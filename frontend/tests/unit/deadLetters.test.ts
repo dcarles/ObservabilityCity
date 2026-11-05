@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { deadLetterItems } from '../../src/deadLetters'
+import { deadLetterItems, regionLabel } from '../../src/deadLetters'
 import { beaconLevel } from '../../src/visuals'
 import type { NodeSnapshot, Snapshot } from '../../src/types'
 import { healthyTown, withState } from './wall.testutil'
@@ -49,6 +49,19 @@ describe('the queues with dead letters', () => {
     expect(deadLetterItems(replayed.groups).map((i) => i.queue)).not.toContain('q-big')
   })
 
+  it('lists a queue with dead letters in two regions as two rows, each with its region, worst first', () => {
+    const s = townWithDead()
+    const reader = deadLetterItems(s.groups).find((i) => i.queue === 'q-big')!.nodeId
+    const split = withState(s, reader, 'Healthy', { deadLetters: 12, queues: [{ ...queue('q-big', 12), deadLetterRegions: [{ region: 'northeurope', count: 4 }, { region: 'westeurope', count: 8 }, { region: 'quiet', count: 0 }] }] })
+
+    const rows = deadLetterItems(split.groups).filter((i) => i.queue === 'q-big')
+    expect(rows.map((r) => [r.region, r.count])).toEqual([['West', 8], ['North', 4]])
+  })
+
+  it('names no region for a queue in a broker with one region (no region list)', () => {
+    expect(deadLetterItems(townWithDead().groups).every((i) => i.region === null)).toBe(true)
+  })
+
   it('lists only one island\'s when asked', () => {
     const s = townWithDead()
     const all = deadLetterItems(s.groups)
@@ -78,5 +91,13 @@ describe('the roof beacon of a system with dead letters', () => {
 
   it('ignores a number nothing supplies', () => {
     expect(beaconLevel(base({ deadLetters: 4, errorRate: 0, absent: ['deadLetters'] }))).toBe('green')
+  })
+})
+
+describe('the region as a short word', () => {
+  it('turns North and West Europe into North and West and keeps any other name', () => {
+    expect(regionLabel('northeurope')).toBe('North')
+    expect(regionLabel('WestEurope')).toBe('West')
+    expect(regionLabel('eastus')).toBe('eastus')
   })
 })
