@@ -241,6 +241,17 @@ test.describe('the dashboard view', () => {
     expect(text).toBe('No queue has dead letters right now.')
   })
 
+  test('a queue whose dead letters were replayed leaves the Dead letters card on the next snapshot', async ({ town, page }) => {
+    await open(town, page)
+    const base = `for (const m of s.groups.flatMap(g => g.nodes)) { m.deadLetters = 0; m.queues = [] }
+      const a = node('aa.orders-api'); a.absent = a.absent.filter(x => x !== 'deadLetters'); a.state = 'Healthy'; `
+    const read = `return [...document.querySelectorAll('#kpi-dlq .dl')].map(r => r.textContent)`
+    const before = await withSnapshot<string[]>(page, `${base}a.deadLetters = 12; s.totals.deadLetters = 12; a.queues = [{ name: 'q-replayed', backlog: 0, deadLetters: 12 }]`, read)
+    expect(before).toHaveLength(1)
+    const after = await withSnapshot<string[]>(page, `${base}a.deadLetters = 0; s.totals.deadLetters = 0; a.queues = [{ name: 'q-replayed', backlog: 0, deadLetters: 0 }]`, read)
+    expect(after).toEqual([])
+  })
+
   test('Details on a service row opens the drawer on the Overview tab', async ({ town, page }) => {
     await open(town, page)
     const card = page.locator('[data-pillar="aa"]')

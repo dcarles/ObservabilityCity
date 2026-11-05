@@ -163,7 +163,7 @@ public sealed class AzureMonitorReader(HttpClient http, ICredentialSource? crede
         return series;
     }
 
-    /// <summary>The points added up the way the aggregation says: the average of averages, the sum of totals and counts, the highest maximum, the lowest minimum. Null with no point.</summary>
+    /// <summary>The points added up the way the aggregation says: the average of averages, the sum of totals and counts, the highest maximum, the lowest minimum, the newest point for last (the points are in time order). Null with no point.</summary>
     public static double? Reduce(IReadOnlyList<double> points, string aggregation)
     {
         if (points.Count == 0) return null;
@@ -172,6 +172,7 @@ public sealed class AzureMonitorReader(HttpClient http, ICredentialSource? crede
             "total" or "count" => points.Sum(),
             "maximum" => points.Max(),
             "minimum" => points.Min(),
+            "last" => points[^1],
             _ => points.Average(),
         };
     }
