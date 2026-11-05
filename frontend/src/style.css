@@ -368,3 +368,9 @@ body.wall .island-label { font-size: 16px; }
 #state-list .hit.resolved .detail { color: var(--ok-ink, #3fae6a); }
 #state-list .hit .dismiss, #inspector .azure-dismiss { margin-left: auto; font-size: 11px; padding: 1px 8px; cursor: pointer; }
 #inspector .azure-dismiss { margin: 6px 0 0; display: block; }
+
+/* Azure health reports: each entry stacks its lines, so a long resource name wraps instead of pushing the panel sideways */
+#state-list.wide { width: 440px; max-width: 94vw; max-height: 75vh; overflow-x: hidden; }
+#state-list .hit.stacked { display: block; }
+#state-list .hit.stacked b, #state-list .hit.stacked span { display: block; overflow-wrap: anywhere; }
+#state-list .hit.stacked .dismiss { display: inline-block; margin: 6px 0 0; }

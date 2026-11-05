@@ -61,6 +61,21 @@ test.describe(`the cloud's own health reports (${B ? 'tags, azure-health' : 'nam
     await expect(page.locator('#inspector .azure')).toContainText('UserInitiated')
   })
 
+  test('the Incidents list shows every entry in full: stacked lines, no sideways scroll and no inner scroll', async ({ page }) => {
+    await open(page)
+    await incidents(page).click()
+
+    const panel = page.locator('#state-list')
+    await expect(listed(page)).toHaveCount(4)
+    const fit = await panel.evaluate((el) => ({ across: el.scrollWidth <= el.clientWidth, down: el.scrollHeight <= el.clientHeight }))
+    expect(fit).toEqual({ across: true, down: true })
+    const first = listed(page).first()
+    const name = await first.locator('b').boundingBox()
+    const where = await first.locator('span').first().boundingBox()
+    expect(where!.y).toBeGreaterThan(name!.y + name!.height - 2) // the lines stack: the island line is under the name
+    await expect(first.locator('.dismiss')).toBeVisible()
+  })
+
   test('a report no building owns is listed and goes nowhere', async ({ page }) => {
     await open(page)
     await incidents(page).click()

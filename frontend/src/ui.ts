@@ -189,7 +189,8 @@ export class StateList {
     const none = this.state === 'Incidents' ? 'No incidents are open right now.' : this.state === 'DeadLetters' ? 'No queue has dead letters right now.' : `Nothing is ${word} right now.`
     this.el.innerHTML = `
       <div class="head"><b>${items.length - resolved} ${word}${resolved ? ` · ${resolved} resolved` : ''}</b><button id="state-list-close" title="Close">✕</button></div>
-      ${items.length === 0 ? `<p class="none">${none}</p>` : items.map((m, i) => `<div class="hit${m.inert ? ' inert' : ''}${m.state === 'Resolved' ? ' resolved' : ''}" data-i="${i}"${m.inert ? ' data-inert="1"' : ''}><b>${escapeHtml(m.name)}</b><span>${escapeHtml(m.where)}</span>${m.detail ? `<span class="detail">${escapeHtml(m.detail)}</span>` : ''}${m.dismiss ? '<button class="dismiss" title="Hide this report until the server restarts">Dismiss</button>' : ''}</div>`).join('')}`
+      ${items.length === 0 ? `<p class="none">${none}</p>` : items.map((m, i) => `<div class="hit${m.dismiss ? ' stacked' : ''}${m.inert ? ' inert' : ''}${m.state === 'Resolved' ? ' resolved' : ''}" data-i="${i}"${m.inert ? ' data-inert="1"' : ''}><b>${escapeHtml(m.name)}</b><span>${escapeHtml(m.where)}</span>${m.detail ? `<span class="detail">${escapeHtml(m.detail)}</span>` : ''}${m.dismiss ? '<button class="dismiss" title="Hide this report until the server restarts">Dismiss</button>' : ''}</div>`).join('')}`
+    this.el.classList.toggle('wide', items.some((i) => i.dismiss))
     this.el.querySelector('#state-list-close')!.addEventListener('click', () => this.close())
     this.el.querySelectorAll<HTMLElement>('.hit').forEach((row) => {
       row.querySelector('.dismiss')?.addEventListener('click', (e) => { e.stopPropagation(); this.onDismiss(items[Number(row.dataset.i)].dismiss!) })
