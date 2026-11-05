@@ -217,7 +217,7 @@ public sealed record IncidentSnapshot(
 /// <summary>
 /// A resource the cloud itself reports as Degraded or Unavailable (an Azure incident): State is "Degraded" or "Unavailable", Previous what it was before and Cause why, as the cloud
 /// said (null when it gave none), Since when the event started. Resource is the resource's name. NodeId and GroupId say the building and the island that own the resource; both are null
-/// for a resource no system of the town owns, which the lists show without a place to go to. Summary is the cloud's own one-line title for the event, when it has one. Id stays the same
+/// for a resource no system of the town owns, which the lists show without a place to go to. Summary is the cloud's own one-line title for the event, when it has one. Tenant is the tenant the resource belongs to (its friendly name when the scope has one), for a resource kept per tenant such as a database; null otherwise. Id stays the same
 /// for as long as the same event lasts.
 /// </summary>
 public sealed record HealthEventSnapshot(
@@ -230,7 +230,8 @@ public sealed record HealthEventSnapshot(
     string? NodeId,
     string? GroupId,
     string? Summary = null,
-    DateTimeOffset? ResolvedAt = null);
+    DateTimeOffset? ResolvedAt = null,
+    string? Tenant = null);
 
 /// <summary>A Service Bus topic: Name is the full topic name, Service the service (or hub resource name) that publishes it.</summary>
 public sealed record TopicSnapshot(string Name, string Service);

@@ -164,11 +164,12 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
     private List<HealthEventSnapshot> HealthEventsOf(Registry.Registry registry)
     {
         var resolution = ScopeSource?.Resolve(registry);
-        var owner = new Dictionary<string, (string SystemId, string Name)>(StringComparer.OrdinalIgnoreCase);
+        var owner = new Dictionary<string, (string SystemId, string Name, string? Tenant)>(StringComparer.OrdinalIgnoreCase);
+        var tenantNames = resolution?.TenantNames.ToDictionary(t => t.Id, t => t.Name, StringComparer.OrdinalIgnoreCase) ?? [];
         if (resolution is not null)
             foreach (var system in resolution.Systems)
                 foreach (var resource in system.Resources)
-                    owner.TryAdd(resource.Id, (system.SystemId, resource.Name));
+                    owner.TryAdd(resource.Id, (system.SystemId, resource.Name, resource.Tenant is { } t ? tenantNames.GetValueOrDefault(t) ?? t : null));
         var groupOf = registry.Groups.SelectMany(g => g.Nodes.Select(n => (Node: n.Id, Group: g.Id))).GroupBy(x => x.Node).ToDictionary(g => g.Key, g => g.First().Group);
         var all = new List<HealthEventSnapshot>();
         foreach (var source in HealthSources)
@@ -176,7 +177,7 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
             {
                 var found = owner.TryGetValue(e.ResourceId, out var own);
                 var node = found && groupOf.ContainsKey(own.SystemId) ? own.SystemId : null;
-                all.Add(new HealthEventSnapshot(e.Id, found ? own.Name : e.ResourceName, e.State, e.Previous, e.Cause, e.Since, node, node is null ? null : groupOf[node], e.Summary, e.ResolvedAt));
+                all.Add(new HealthEventSnapshot(e.Id, found ? own.Name : e.ResourceName, e.State, e.Previous, e.Cause, e.Since, node, node is null ? null : groupOf[node], e.Summary, e.ResolvedAt, found ? own.Tenant : null));
             }
         // open ones first (Unavailable before Degraded, oldest first), then the resolved ones, the latest resolution first
         return all.OrderBy(e => e.State == "Resolved" ? 2 : e.State == "Unavailable" ? 0 : 1).ThenBy(e => e.State == "Resolved" ? 0 : e.Since.Ticks).ThenByDescending(e => e.ResolvedAt).ThenBy(e => e.Id, StringComparer.Ordinal).ToList();

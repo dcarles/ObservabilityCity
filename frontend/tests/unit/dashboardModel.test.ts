@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { buildDashboard, pillarSelection, worstOf } from '../../src/dashboard/model'
+import { buildDashboard, incidentName, pillarSelection, worstOf } from '../../src/dashboard/model'
 import { databaseIsOpen, groupIsOpen, hiddenHtml, pillarHtml, summaryHtml, type UiState } from '../../src/dashboard/render'
 import { trafficSplit } from '../../src/trafficSplit'
 import { ALL_TENANTS } from '../../src/tenants'
@@ -255,6 +255,27 @@ describe('the Incidents card', () => {
     expect(html).toContain('data-dismiss="r"')
     expect(d.summary.incidents?.rows[1].times).toMatch(/^declared .* · resolved /)
     expect(d.summary.incidents?.rows[0].times).not.toContain('resolved')
+  })
+
+  it('names a report by the system as the service table does, adds the tenant for a store kept per tenant, and says the cause', () => {
+    const calm = golden('calm')
+    const node = calm.groups.find((g) => !g.isHub)!.nodes[0]
+    const s = { ...calm, healthEvents: [event({ id: 'o', state: 'Degraded', resource: '2222-al-ord', nodeId: node.id, tenant: 'Acme Bank', cause: 'PlatformInitiated' })] }
+    const row = buildDashboard(s, ALL_TENANTS).summary.incidents!.rows[0]
+    expect(row.what).toBe(`${node.name} · Acme Bank`)
+    expect(row.cause).toBe('PlatformInitiated')
+    expect(summaryHtml(buildDashboard(s, ALL_TENANTS))).toContain('cause PlatformInitiated')
+    expect(incidentName({ resource: 'raw-name', nodeId: node.id }, new Map([[node.id, node.name]]))).toBe(node.name) // no tenant: the name alone
+    expect(incidentName({ resource: 'raw-name', nodeId: null, tenant: null }, new Map())).toBe('raw-name') // no system owns it: the cloud's name
+  })
+
+  it('marks a service row only while its report is open: a resolved one is left to the card', () => {
+    const calm = golden('calm')
+    const node = calm.groups.find((g) => !g.isHub)!.nodes[0]
+    const open = JSON.stringify(buildDashboard({ ...calm, healthEvents: [event({ nodeId: node.id })] as never }, ALL_TENANTS))
+    const resolved = JSON.stringify(buildDashboard({ ...calm, healthEvents: [event({ nodeId: node.id, state: 'Resolved', resolvedAt: '2026-11-05T17:00:00Z' })] as never }, ALL_TENANTS))
+    expect(open).toContain('"azure":{"state":"Degraded"')
+    expect(resolved).not.toContain('"azure":{')
   })
 
   it('turns the number green when everything listed is resolved, and shows the card with no reports at all', () => {

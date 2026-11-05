@@ -59,7 +59,7 @@ export function summaryHtml(d: Dashboard): string {
 }
 
 function incidentLine(r: IncidentRow): string {
-  const body = `<span class="src">${r.source}</span><span class="what">${esc(r.what)}</span><span class="st">${esc(r.status)}</span>`
+  const body = `<span class="src">${r.source}</span><span class="what">${esc(r.what)}</span><span class="st">${esc(r.status)}</span>${r.cause ? `<span class="cs">cause ${esc(r.cause)}</span>` : ''}`
   return `<div class="il ${r.tone}"${r.nodeId ? ` data-system="${esc(r.nodeId)}"` : ''}${r.times ? ` title="${esc(r.times)}"` : ''}>${body}${r.times || r.dismiss ? `<span class="sub">${r.times ? `<span class="tm">${esc(r.times)}</span>` : ''}${r.dismiss ? `<button class="idis" data-dismiss="${esc(r.dismiss)}" title="Hide this report until the server restarts">Dismiss</button>` : ''}</span>` : ''}</div>`
 }
 
@@ -122,7 +122,7 @@ function rowHtml(r: Row, ui: UiState): string {
   const conn = connectionsLabel(r)
   const showConn = ui.connections.has(r.id)
   const connCell = conn ? `<button class="conn" data-conn="${esc(r.id)}" aria-expanded="${showConn}">${conn}<span class="chev">${showConn ? '▴' : '▾'}</span></button>` : '<span class="dim">–</span>'
-  const main = `<tr class="row" data-system="${esc(r.id)}"><td class="ind">${dot(r.level)}<span class="nm">${label}${esc(r.name)}</span>${count}${r.dlq ? `<b class="bad dlq">DLQ ${num(r.dlq)}</b>` : ''}${r.azure ? `<b class="${r.azure.state === 'Resolved' ? 'ok' : r.azure.state === 'Unavailable' ? 'bad' : 'warn'} azure" title="Azure Resource Health reports this resource ${esc(r.azure.state.toLowerCase())}. Open Details for when and why.">${r.azure.state === 'Resolved' ? '✓ Azure resolved' : `! Azure ${esc(r.azure.state)}`}</b>` : ''}<small>${esc(r.type)}${r.instancesText ? ` · ${esc(r.instancesText)}` : ''}</small></td>
+  const main = `<tr class="row" data-system="${esc(r.id)}"><td class="ind">${dot(r.level)}<span class="nm">${label}${esc(r.name)}</span>${count}${r.dlq ? `<b class="bad dlq">DLQ ${num(r.dlq)}</b>` : ''}${r.azure ? `<b class="azure ${r.azure.state === 'Unavailable' ? 'down' : 'bad'}" title="Azure Resource Health reports this resource ${esc(r.azure.state.toLowerCase())}. Open Details for when and why.">! Azure incident</b>` : ''}<small>${esc(r.type)}${r.instancesText ? ` · ${esc(r.instancesText)}` : ''}</small></td>
     <td class="n">${trafficCell(r)}</td><td class="n">${errorCell(r)}</td><td class="n">${latencyCell(r)}</td><td class="ld">${loadCell(r)}</td>
     <td>${connCell}</td><td><button class="det" data-details="${esc(r.id)}">Details <b>›</b></button></td></tr>`
   const connRow = showConn && conn

@@ -116,11 +116,12 @@ test.describe(`the cloud's own health reports (${B ? 'tags, azure-health' : 'nam
     }
 
     const ledger = page.locator('tr.row[data-system="bb.ledger-db"] .azure')
-    await expect(ledger).toContainText('Unavailable', { timeout: 30_000 })
-    await expect(ledger).toHaveClass(/bad/)
+    await expect(ledger).toContainText('Azure incident', { timeout: 30_000 }) // one plain words, in red, whatever the state; the state is in Details
+    await expect(ledger).toHaveClass(/down/)
     const orders = page.locator('tr.row[data-system="aa.orders-db"] .azure')
-    await expect(orders).toContainText('Degraded')
-    await expect(orders).toHaveClass(/warn/)
+    await expect(orders).toContainText('Azure incident')
+    await expect(orders).toHaveClass(/bad/)
+    expect(await orders.evaluate((e) => getComputedStyle(e).backgroundColor)).not.toBe('rgba(0, 0, 0, 0)') // a red label, not faint text
 
     await page.locator('tr.row[data-system="bb.ledger-db"] .det').click()
     await expect(page.locator('#inspector .azure')).toHaveAttribute('data-azure', 'Unavailable')
@@ -137,6 +138,11 @@ test.describe(`the cloud's own health reports (${B ? 'tags, azure-health' : 'nam
     await expect(card.locator('.il.ok')).toHaveCount(1)
     await expect(card.locator('.il.bad').first()).toContainText('Azure')
     await expect(card.locator('.il.bad').first()).toContainText('Unavailable')
+    await expect(card.locator('.il.bad').first().locator('.cs')).toContainText('cause UserInitiated') // why, as the cloud said it
+    // the name is the system's own, as the service table shows it, and not cut off
+    const names = await card.locator('.il .what').allTextContents()
+    expect(names.some((n) => /DB/.test(n))).toBe(true)
+    expect(await card.locator('.il .what').evaluateAll((els) => els.every((e) => e.scrollWidth <= e.clientWidth + 1))).toBe(true)
     await expect(card.locator('.il.ok .tm')).toContainText(/declared .* · resolved /) // when it was declared and when it ended
     await expect(card.locator('.il.bad .tm').first()).toContainText('declared')
     await expect(card.locator('.il.bad .tm').first()).not.toContainText('resolved')
