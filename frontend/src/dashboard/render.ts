@@ -63,7 +63,7 @@ export function summaryHtml(d: Dashboard): string {
 export function deadQueuesHtml(items: Dashboard['summary']['deadQueues']): string {
   if (!items.length) return '<small>No queue has dead letters right now.</small>'
   const head = `<small class="dh">${items.length} ${items.length === 1 ? 'queue' : 'queues'} with dead letters</small>`
-  return head + items.map((d) => `<div class="dl" data-system="${esc(d.nodeId)}"><span class="what"><b>${esc(d.nodeName)}</b> · ${esc(d.groupName)}</span><span class="q">${esc(d.queue)} · <i>${num(Math.round(d.count))}</i> dead</span></div>`).join('')
+  return head + items.map((d) => `<div class="dl" data-system="${esc(d.nodeId)}"><span class="what">${esc(d.nodeName)} <em>· ${esc(d.groupName)}</em></span><span class="q">${esc(d.queue)} · <i>${num(Math.round(d.count))}</i> dead</span></div>`).join('')
 }
 
 function incidentLine(r: IncidentRow): string {
