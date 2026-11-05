@@ -90,8 +90,9 @@ public static partial class RegistryLoader
         {
             if (metric is null) continue;
             if (string.IsNullOrWhiteSpace(metric.Metric)) errors.Add($"{at}.{label}: metric is empty; give the metric's name");
-            if (!MetricGroup.Aggregations.Contains(metric.Aggregation.Trim().ToLowerInvariant()))
-                errors.Add($"{at}.{label}: aggregation '{metric.Aggregation}'. Use {string.Join(", ", MetricGroup.Aggregations)}.{DidYouMean.Hint(metric.Aggregation, MetricGroup.Aggregations)}");
+            var allowed = label == "throughput" ? MetricGroup.Aggregations : MetricGroup.BrokerLevelAggregations; // last reads a level; a throughput is added up
+            if (!allowed.Contains(metric.Aggregation.Trim().ToLowerInvariant()))
+                errors.Add($"{at}.{label}: aggregation '{metric.Aggregation}'. Use {string.Join(", ", allowed)}.{DidYouMean.Hint(metric.Aggregation, allowed)}");
         }
         if (e.Interval is { } grain && (!SourceQuery.TryParseWindow(grain, out var parsed) || !MetricGroup.IntervalMinutes.Contains((int)Math.Round(parsed.TotalMinutes))))
             errors.Add($"{at}: interval '{grain}' is not a time grain the metrics API offers. Use one of {string.Join(", ", MetricGroup.IntervalMinutes.Select(m => m % 1440 == 0 ? $"{m / 1440}d" : m % 60 == 0 ? $"{m / 60}h" : $"{m}m"))}");

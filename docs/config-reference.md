@@ -301,7 +301,7 @@ sources:
     entities:
       resources: broker                       # a rule of scope.resources that finds the namespaces
       backlog: { metric: ActiveMessages, aggregation: average }
-      deadLetter: { metric: DeadletteredMessages, aggregation: maximum }
+      deadLetter: { metric: DeadletteredMessages, aggregation: last }   # last = the newest point: what is dead-lettered now, so a replayed queue clears at once. maximum would keep the peak of the whole window
       throughput: { metric: IncomingMessages, aggregation: total }
       patterns:                               # the first that matches decides; (?<service>) is the service code of the reader, (?<pillar>) the pillar code of the reader (left out: any pillar)
         - { match: '^sbq-(?<pillar>[a-z]+)-(?<service>[a-z]+)-(?:inbox|changefeed-worker)$' }
@@ -332,7 +332,7 @@ signals: { backlog: messaging, deadLetters: messaging }
 | Key | Required | Default | Meaning |
 |---|---|---|---|
 | `metric` | yes | | The metric's name. |
-| `aggregation` | no | `average` | How its points over the window are added up: `average`, `total`, `count`, `maximum` or `minimum`. |
+| `aggregation` | no | `average` | How its points over the window are added up: `average`, `total`, `count`, `maximum` or `minimum`. `backlog` and `deadLetter` may also use `last`, the newest point of the window (what is there now, not the worst of the last minutes). Azure Monitor has no such aggregation, so the maximum of each grain is asked for and the newest grain is read. `throughput` cannot use `last`. |
 
 <!-- file: EntityPatternFile -->
 | Key | Required | Default | Meaning |

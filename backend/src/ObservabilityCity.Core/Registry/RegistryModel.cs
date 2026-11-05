@@ -286,6 +286,9 @@ public sealed record MetricGroup(string Resources, string? Namespace, IReadOnlyD
     public static readonly string[] SignalNames = ["cpu", "memory", "utilisation", "throttled", "requests"];
     public static readonly string[] WhenEmptyValues = ["unknown", "idle"];
     public static readonly string[] Aggregations = ["average", "total", "count", "maximum", "minimum"];
+
+    /// <summary>What a message broker's backlog and dead letters may use: those, and <c>last</c>, the newest point of the window (a count of what is there now, not the worst of the last minutes).</summary>
+    public static readonly string[] BrokerLevelAggregations = [.. Aggregations, "last"];
 }
 
 /// <summary>

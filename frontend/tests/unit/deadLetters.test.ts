@@ -40,6 +40,15 @@ describe('the queues with dead letters', () => {
     expect(deadLetterItems(stale.groups).some((i) => i.nodeId === reader)).toBe(false)
   })
 
+  it('drops a queue from the list on the next snapshot once its dead letters are replayed (0)', () => {
+    const s = townWithDead()
+    const reader = deadLetterItems(s.groups).find((i) => i.queue === 'q-big')!.nodeId
+    const replayed = withState(s, reader, 'Healthy', { deadLetters: 2, queues: [queue('q-big', 0), queue('q-small', 2), queue('q-none', 0)] })
+
+    expect(deadLetterItems(s.groups).map((i) => i.queue)).toContain('q-big')
+    expect(deadLetterItems(replayed.groups).map((i) => i.queue)).not.toContain('q-big')
+  })
+
   it('lists only one island\'s when asked', () => {
     const s = townWithDead()
     const all = deadLetterItems(s.groups)

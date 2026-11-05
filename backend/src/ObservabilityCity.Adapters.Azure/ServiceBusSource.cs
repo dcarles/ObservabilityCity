@@ -169,8 +169,11 @@ public sealed class ServiceBusSource(
         var all = new List<EntitySeries>();
         foreach (var group in new[] { config.Backlog, config.DeadLetter, config.Throughput }.Where(m => m is not null).GroupBy(m => m!.Aggregation))
         {
-            var call = new MetricCall(null, group.Key, null, config.Interval is { } i ? AzureMonitorReader.Iso(i) : AzureMonitorReader.Interval);
-            all.AddRange(await reader.ReadByDimensionAsync(ns.Id, call, group.Select(m => m!.Metric).Distinct(StringComparer.OrdinalIgnoreCase).ToList(), config.Dimension, at, Window, ct));
+            // Azure Monitor has no "last": it is asked for the maximum of each grain, and the newest grain's point is the one the entity reads
+            var asked = group.Key.Equals("last", StringComparison.OrdinalIgnoreCase) ? "maximum" : group.Key;
+            var call = new MetricCall(null, asked, null, config.Interval is { } i ? AzureMonitorReader.Iso(i) : AzureMonitorReader.Interval);
+            var read = await reader.ReadByDimensionAsync(ns.Id, call, group.Select(m => m!.Metric).Distinct(StringComparer.OrdinalIgnoreCase).ToList(), config.Dimension, at, Window, ct);
+            all.AddRange(asked == group.Key ? read : read.Select(r => r with { Aggregation = group.Key }));
         }
         return all;
     }

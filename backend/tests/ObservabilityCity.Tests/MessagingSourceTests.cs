@@ -131,6 +131,73 @@ public class MessagingSourceTests
     }
 
     [Fact]
+    public void Last_reads_the_newest_point_and_nothing_when_there_is_none()
+    {
+        Assert.Equal(0, AzureMonitorReader.Reduce([12, 12, 0], "last"));
+        Assert.Equal(5, AzureMonitorReader.Reduce([0, 0, 5], "last"));
+        Assert.Null(AzureMonitorReader.Reduce([], "last"));
+    }
+
+    [Fact]
+    public async Task A_replayed_queue_reads_zero_at_once_when_the_dead_letters_use_last_but_still_its_peak_with_maximum()
+    {
+        const string answer = """
+            { "value": [ { "name": { "value": "DeadletteredMessages" }, "timeseries": [
+                { "metadatavalues": [ { "name": { "value": "entityname" }, "value": "sbq-al-ord-inbox" } ], "data": [ { "maximum": 12 }, { "maximum": 12 }, { "maximum": 0 } ] } ] } ] }
+            """;
+        foreach (var (aggregation, expected) in new[] { ("last", 0.0), ("maximum", 24.0) }) // two namespaces answer the same
+        {
+            var folder = CopyWith(yaml => yaml.Replace("deadLetter: { metric: DeadletteredMessages, aggregation: maximum }", $"deadLetter: {{ metric: DeadletteredMessages, aggregation: {aggregation} }}"));
+            try
+            {
+                var http = new CannedHttp().Respond(r => Uri.UnescapeDataString(r.Uri!.Query).Contains("metricnames=DeadletteredMessages") ? CannedHttp.Reply(answer) : CannedHttp.Reply("""{ "value": [] }"""));
+                var (source, registry) = await Messaging(folder, http);
+
+                var readings = await source.PollAsync(registry, CancellationToken.None);
+
+                Assert.Equal(expected, readings["aa.orders-worker"].DeadLetters);
+                Assert.Contains(http.Sent, r => Uri.UnescapeDataString(r.Uri!.Query).Contains("aggregation=Maximum")); // Azure has no "last": it is asked for the maximum of each grain
+                Assert.DoesNotContain(http.Sent, r => Uri.UnescapeDataString(r.Uri!.Query).Contains("aggregation=Last"));
+            }
+            finally { Directory.Delete(folder, true); }
+        }
+    }
+
+    [Theory]
+    [InlineData("backlog: { metric: ActiveMessages, aggregation: average }", "backlog: { metric: ActiveMessages, aggregation: last }", true)]
+    [InlineData("throughput: { metric: IncomingMessages, aggregation: total }", "throughput: { metric: IncomingMessages, aggregation: last }", false)]
+    public void Last_is_allowed_for_the_backlog_but_refused_for_the_arrivals_which_are_added_up(string from, string to, bool allowed)
+    {
+        var folder = CopyWith(yaml => yaml.Replace(from, to));
+        try
+        {
+            if (allowed) { RegistryLoader.Load(folder); return; }
+            var error = Assert.Throws<RegistryException>(() => RegistryLoader.Load(folder));
+            Assert.Contains("aggregation 'last'", error.Message);
+        }
+        finally { Directory.Delete(folder, true); }
+    }
+
+    private static string CopyWith(Func<string, string> env)
+    {
+        var target = Path.Combine(Path.GetTempPath(), "oc-last-" + Guid.NewGuid().ToString("N"));
+        CopyDirectory(TownA, target);
+        var file = Path.Combine(target, "environments", "prod.yaml");
+        var before = File.ReadAllText(file);
+        var after = env(before);
+        Assert.Contains("aggregation: maximum }", before); // the lines the tests change are there
+        File.WriteAllText(file, after);
+        return target;
+    }
+
+    private static void CopyDirectory(string from, string to)
+    {
+        Directory.CreateDirectory(to);
+        foreach (var f in Directory.GetFiles(from)) File.Copy(f, Path.Combine(to, Path.GetFileName(f)));
+        foreach (var d in Directory.GetDirectories(from)) CopyDirectory(d, Path.Combine(to, Path.GetFileName(d)));
+    }
+
+    [Fact]
     public async Task The_arrivals_of_a_queue_become_messages_a_second_over_the_window()
     {
         var http = new CannedHttp().Respond(r => Uri.UnescapeDataString(r.Uri!.Query).Contains("metricnames=IncomingMessages") ? CannedHttp.Reply("""
