@@ -127,11 +127,13 @@ public static class ResourceHealthLog
 /// The cloud's own word on the health of resources: the activity log's resource-health entries for the providers the environment lists (<c>providers</c>), read for each subscription the
 /// scope found, folded into the events that are open (see <see cref="ResourceHealthLog.Open"/>). For each open event the resource's current status is asked too, so a marker clears the moment
 /// the cloud says Available, whether or not a resolution ever reached the log; a status that cannot be read leaves the log's word standing. The source fills no signal and reports no readings.
-/// A read that fails keeps the last good list and says why through <see cref="Problem"/>, which the town shows as a notice. The program lists no provider: the environment does.
+/// Only the subscription and provider pairs the inventory has resources for are read. A round where every read fails keeps the last good list; one where some fail keeps what the others found
+/// and the failed pairs' reports from the last good round. Either way <see cref="Problem"/> says why, which the town shows as a notice. Until the inventory is read the source asks to be
+/// polled again in 30 seconds (<see cref="RetryIn"/>). The program lists no provider: the environment does.
 /// <c>file:name.json</c> replays a recording: <c>{ "events": { "value": [ ...an activity log answer... ] }, "status": { "&lt;resource name&gt;": "Available" } }</c>.
 /// </summary>
 public sealed class ResourceHealthSource(
-    string name, string environmentId, RegistrySource definition, AzureMonitorReader reader, ScopeStore store, string? recording, TimeProvider time) : IMetricSource, IHealthEventSource
+    string name, string environmentId, RegistrySource definition, AzureMonitorReader reader, ScopeStore store, string? recording, TimeProvider time) : IMetricSource, IHealthEventSource, IRoundNote, IRetrySoon
 {
     /// <summary>How far back the log is read when the source gives no window: a problem that lasts days must still be listed.</summary>
     public const string DefaultWindow = "3d";
@@ -144,6 +146,8 @@ public sealed class ResourceHealthSource(
     private volatile IReadOnlyList<ResourceHealthEvent> _events = [];
     private readonly ConcurrentDictionary<string, byte> _dismissed = new(StringComparer.Ordinal);
     private volatile string? _problem;
+    private volatile string? _roundNote;
+    private TimeSpan? _retryIn;
 
     public string Name => name;
     public TimeSpan PollInterval => TimeSpan.FromSeconds(definition.PollSeconds ?? DefaultPollSeconds);
@@ -162,23 +166,35 @@ public sealed class ResourceHealthSource(
         return true;
     }
     public string? Problem => _problem;
+    public string? RoundNote => _roundNote;
+    public TimeSpan? RetryIn => _retryIn;
+
+    /// <summary>How soon a round that found no inventory yet is tried again (instead of the poll interval).</summary>
+    public static readonly TimeSpan RetryWhileWaiting = TimeSpan.FromSeconds(30);
 
     public async Task<IReadOnlyDictionary<string, NodeReading>> PollAsync(TownRegistry registry, CancellationToken ct)
     {
         var none = new Dictionary<string, NodeReading>();
+        _retryIn = null;
         if (recording is null)
         {
             if (store.Inventory is null) await store.WaitForReadAsync(Timeout / 2, ct); // the subscriptions to ask are in the inventory
-            if (store.Inventory is null) return none; // nothing says where to look yet
+            if (store.Inventory is null)
+            {
+                // nothing says where to look yet: try again soon rather than a whole interval later, so a slow start still shows its reports early
+                _retryIn = RetryWhileWaiting;
+                _roundNote = $"waiting for the resource inventory, retrying in {RetryWhileWaiting.TotalSeconds:0}s";
+                return none;
+            }
         }
         try
         {
             _events = await ReadAsync(registry.ForEnvironment(environmentId), time.GetUtcNow(), ct);
-            _problem = null;
         }
         catch (Exception e) when (e is not OperationCanceledException || !ct.IsCancellationRequested)
         {
             _problem = e.Message;
+            _roundNote = $"health read failed: {e.Message}";
             throw;
         }
         return none;
@@ -189,6 +205,9 @@ public sealed class ResourceHealthSource(
         var from = now - Window;
         IReadOnlyList<HealthLogEntry> entries;
         IReadOnlyDictionary<string, string>? recorded = null;
+        var failedPairs = new List<(string Subscription, string Provider)>();
+        var reads = 0;
+        string? firstError = null;
         if (recording is not null)
         {
             (entries, recorded) = ReadRecording(await File.ReadAllTextAsync(recording, ct));
@@ -198,7 +217,13 @@ public sealed class ResourceHealthSource(
             var resolution = store.Resolve(view);
             var subscriptions = resolution.Systems.Select(s => s.SubscriptionId).Concat(resolution.Pillars.Select(p => p.SubscriptionId)).Concat(resolution.AssetList.Select(a => a.SubscriptionId))
                 .Where(id => !string.IsNullOrEmpty(id)).Select(id => id!).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-            entries = await ReadLogAsync(subscriptions, from, ct);
+            var asks = AsksOf(subscriptions, store.Inventory);
+            reads = asks.Count;
+            (entries, var failed, firstError) = await ReadLogAsync(asks, from, ct);
+            failedPairs.AddRange(failed);
+            // every read failing is a failed round (the last good list stays); some failing is a partial one (see below)
+            if (reads > 0 && failed.Count == reads)
+                throw new HttpRequestException($"all {reads} activity log reads failed, so the list was not updated this time; the first: {firstError}");
         }
         // a recording is already the answer for its window, whenever it is replayed
         var open = ResourceHealthLog.Open(recording is null ? entries.Where(e => e.At >= from) : entries);
@@ -222,13 +247,38 @@ public sealed class ResourceHealthSource(
                 resolved[x.Event.Id] = x.Event with { State = "Resolved", ResolvedAt = was.ResolvedAt ?? now };
         // an event that is open again is not also listed as resolved
         var openIds = stillOpen.Select(e => e.Id).ToHashSet();
-        return [.. stillOpen, .. resolved.Values.Where(e => !openIds.Contains(e.Id) && (e.ResolvedAt ?? now) >= cutoff)];
+        var found = new List<ResourceHealthEvent>([.. stillOpen, .. resolved.Values.Where(e => !openIds.Contains(e.Id) && (e.ResolvedAt ?? now) >= cutoff)]);
+        // what a failed read could not say stays as it was: a report of a subscription and provider that could not be read this round is kept from the last good one, so a slow read never hides the one in trouble
+        var known = found.Select(e => e.Id).ToHashSet();
+        foreach (var old in _events.Where(e => !known.Contains(e.Id) && failedPairs.Any(f => Covers(f, e.ResourceId)))) found.Add(old);
+        _problem = failedPairs.Count == 0 ? null : $"{failedPairs.Count} of {reads} activity log reads failed, so the list may be incomplete (reports from the failed reads are kept from the last good one); the first: {firstError}";
+        _roundNote = recording is not null ? $"replayed a recording: {Count(found)}"
+            : $"health read: {reads} reads, {failedPairs.Count} failed, {Count(found)}";
+        return found;
     }
 
-    private async Task<IReadOnlyList<HealthLogEntry>> ReadLogAsync(IReadOnlyList<string> subscriptions, DateTimeOffset from, CancellationToken ct)
+    private static string Count(IReadOnlyCollection<ResourceHealthEvent> events) =>
+        $"{events.Count} reports ({events.Count(e => e.State != "Resolved")} open)";
+
+    /// <summary>The subscription and provider pairs to read: a pair is asked only when the inventory has a resource of that provider in that subscription, since an empty one cannot have a report that lands on a building.</summary>
+    public IReadOnlyList<(string Subscription, string Provider)> AsksOf(IReadOnlyList<string> subscriptions, Inventory? inventory)
     {
-        var asks = subscriptions.SelectMany(s => definition.Providers.Select(p => (Subscription: s, Provider: p))).ToList();
+        var has = inventory is null ? null : inventory.Resources.Select(r => (r.SubscriptionId.ToLowerInvariant(), ProviderOf(r.Type))).ToHashSet();
+        return subscriptions.SelectMany(s => definition.Providers.Select(p => (Subscription: s, Provider: p)))
+            .Where(a => has is null || has.Contains((a.Subscription.ToLowerInvariant(), a.Provider.ToLowerInvariant()))).ToList();
+    }
+
+    private static string ProviderOf(string type) => type.Split('/')[0].ToLowerInvariant();
+
+    private static bool Covers((string Subscription, string Provider) pair, string resourceId) =>
+        resourceId.Contains($"/subscriptions/{pair.Subscription}/", StringComparison.OrdinalIgnoreCase)
+        && resourceId.Contains($"/providers/{pair.Provider}/", StringComparison.OrdinalIgnoreCase);
+
+    private async Task<(IReadOnlyList<HealthLogEntry> Entries, IReadOnlyList<(string Subscription, string Provider)> Failed, string? FirstError)> ReadLogAsync(
+        IReadOnlyList<(string Subscription, string Provider)> asks, DateTimeOffset from, CancellationToken ct)
+    {
         var all = new List<HealthLogEntry>();
+        var failed = new List<(string Subscription, string Provider)>();
         var errors = new List<string>();
         var gate = new SemaphoreSlim(MaxParallel);
         await Task.WhenAll(asks.Select(async ask =>
@@ -238,20 +288,22 @@ public sealed class ResourceHealthSource(
             {
                 var url = ResourceHealthLog.ActivityUrl(ask.Subscription, ask.Provider, from);
                 var seen = new HashSet<string>();
+                var page = new List<HealthLogEntry>();
                 while (url is not null && seen.Add(url))
                 {
-                    var (page, next) = ResourceHealthLog.Parse(await reader.GetAsync(ask.Subscription, url, ct, "the Azure activity log"));
-                    lock (all) all.AddRange(page);
+                    var (entries, next) = ResourceHealthLog.Parse(await reader.GetAsync(ask.Subscription, url, ct, "the Azure activity log"));
+                    page.AddRange(entries);
                     url = next;
                 }
+                lock (all) all.AddRange(page); // a read counts only when all its pages arrived
             }
-            catch (Exception e) when (e is not OperationCanceledException || !ct.IsCancellationRequested) { lock (errors) errors.Add(e.Message); }
+            catch (Exception e) when (e is not OperationCanceledException || !ct.IsCancellationRequested || e is TaskCanceledException)
+            {
+                lock (errors) { errors.Add(e is TaskCanceledException ? "the read ran out of time" : e.Message); failed.Add(ask); }
+            }
             finally { gate.Release(); }
         }));
-        // a list made from only some of the subscriptions could hide the one in trouble, so a failed read keeps the last good list
-        if (errors.Count > 0)
-            throw new HttpRequestException($"{errors.Count} of {asks.Count} activity log reads failed, so the list was not updated this time; the first: {errors[0]}");
-        return all;
+        return (all, failed, errors.FirstOrDefault());
     }
 
     /// <summary>The state the cloud gives the resource right now, or null when it cannot be read (the log's word then stands).</summary>
