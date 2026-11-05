@@ -30,7 +30,7 @@ public sealed partial record Registry
 
     /// <summary>Sources an environment defines but no signal reads: probably a typo in a signal's source name or a leftover.</summary>
     internal IEnumerable<string> UnusedSourceWarnings(RegistryEnvironment env) =>
-        env.Sources.Where(s => s.Name is not ("metrics" or "incidents" or "messaging" or "jobs")
+        env.Sources.Where(s => s.Name is not ("metrics" or "incidents" or "messaging" or "jobs") && s.Kind != SourceKinds.ResourceHealth
                                && !env.Signals.Values.Contains(s.Name) && !AllNodes.Any(n => n.Signals.Values.Contains(s.Name)))
             .Select(s => $"Environment '{env.Id}' defines source '{s.Name}', but no signal uses it. Point a signal at it in environments/{env.Id}.yaml, a pillar or a system, or remove it.");
 

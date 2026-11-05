@@ -1,0 +1,179 @@
+{
+  "events": {
+    "value": [
+      {
+        "category": {
+          "value": "ResourceHealth",
+          "localizedValue": "ResourceHealth"
+        },
+        "eventTimestamp": "2026-01-01T00:50:15.8851803Z",
+        "operationName": {
+          "value": "Microsoft.Resourcehealth/healthevent/Activated/action"
+        },
+        "resourceId": "/SUBSCRIPTIONS/00000000-0000-0000-0000-0000000000A1/RESOURCEGROUPS/RG/PROVIDERS/MICROSOFT.DOCUMENTDB/DATABASEACCOUNTS/22222222222222222222222222222222-AL-ORD",
+        "status": {
+          "value": "Active"
+        },
+        "properties": {
+          "currentHealthStatus": "Degraded",
+          "previousHealthStatus": "Available",
+          "cause": "Unknown",
+          "title": "Cosmos DB is degraded"
+        }
+      },
+      {
+        "category": {
+          "value": "ResourceHealth",
+          "localizedValue": "ResourceHealth"
+        },
+        "eventTimestamp": "2026-01-01T00:20:00Z",
+        "operationName": {
+          "value": "Microsoft.Resourcehealth/healthevent/Activated/action"
+        },
+        "resourceId": "/SUBSCRIPTIONS/00000000-0000-0000-0000-0000000000A1/RESOURCEGROUPS/RG/PROVIDERS/MICROSOFT.DOCUMENTDB/DATABASEACCOUNTS/11111111111111111111111111111111-AL-ORD",
+        "status": {
+          "value": "Active"
+        },
+        "properties": {
+          "currentHealthStatus": "Degraded",
+          "previousHealthStatus": "Available",
+          "cause": "PlatformInitiated"
+        }
+      },
+      {
+        "category": {
+          "value": "ResourceHealth",
+          "localizedValue": "ResourceHealth"
+        },
+        "eventTimestamp": "2026-01-01T00:40:00Z",
+        "operationName": {
+          "value": "Microsoft.Resourcehealth/healthevent/Resolved/action"
+        },
+        "resourceId": "/SUBSCRIPTIONS/00000000-0000-0000-0000-0000000000A1/RESOURCEGROUPS/RG/PROVIDERS/MICROSOFT.DOCUMENTDB/DATABASEACCOUNTS/11111111111111111111111111111111-AL-ORD",
+        "status": {
+          "value": "Resolved"
+        },
+        "properties": {
+          "currentHealthStatus": "Available",
+          "previousHealthStatus": "Degraded",
+          "cause": "PlatformInitiated"
+        }
+      },
+      {
+        "category": {
+          "value": "ResourceHealth",
+          "localizedValue": "ResourceHealth"
+        },
+        "eventTimestamp": "2026-01-01T00:30:00Z",
+        "operationName": {
+          "value": "Microsoft.Resourcehealth/healthevent/Activated/action"
+        },
+        "resourceId": "/SUBSCRIPTIONS/00000000-0000-0000-0000-0000000000A1/RESOURCEGROUPS/RG/PROVIDERS/MICROSOFT.DOCUMENTDB/DATABASEACCOUNTS/33333333333333333333333333333333-AL-ORD",
+        "status": {
+          "value": "Active"
+        },
+        "properties": {
+          "currentHealthStatus": "Unavailable",
+          "previousHealthStatus": "Available",
+          "cause": "UserInitiated"
+        }
+      },
+      {
+        "category": {
+          "value": "ResourceHealth",
+          "localizedValue": "ResourceHealth"
+        },
+        "eventTimestamp": "2026-01-01T00:10:00Z",
+        "operationName": {
+          "value": "Microsoft.Resourcehealth/healthevent/Activated/action"
+        },
+        "resourceId": "/SUBSCRIPTIONS/00000000-0000-0000-0000-0000000000A2/RESOURCEGROUPS/RG/PROVIDERS/MICROSOFT.DOCUMENTDB/DATABASEACCOUNTS/22222222222222222222222222222222-BE-LED",
+        "status": {
+          "value": "Active"
+        },
+        "properties": {
+          "currentHealthStatus": "Degraded",
+          "previousHealthStatus": "Available",
+          "cause": "Unknown"
+        }
+      },
+      {
+        "category": {
+          "value": "ResourceHealth",
+          "localizedValue": "ResourceHealth"
+        },
+        "eventTimestamp": "2026-01-01T00:45:00Z",
+        "operationName": {
+          "value": "Microsoft.Resourcehealth/healthevent/Updated/action"
+        },
+        "resourceId": "/SUBSCRIPTIONS/00000000-0000-0000-0000-0000000000A2/RESOURCEGROUPS/RG/PROVIDERS/MICROSOFT.DOCUMENTDB/DATABASEACCOUNTS/22222222222222222222222222222222-BE-LED",
+        "status": {
+          "value": "Updated"
+        },
+        "properties": {
+          "currentHealthStatus": "Unavailable",
+          "previousHealthStatus": "Degraded",
+          "cause": "UserInitiated"
+        }
+      },
+      {
+        "category": {
+          "value": "ResourceHealth",
+          "localizedValue": "ResourceHealth"
+        },
+        "eventTimestamp": "2026-01-01T00:55:00Z",
+        "operationName": {
+          "value": "Microsoft.Resourcehealth/healthevent/Activated/action"
+        },
+        "resourceId": "/SUBSCRIPTIONS/00000000-0000-0000-0000-0000000000A1/RESOURCEGROUPS/RG/PROVIDERS/MICROSOFT.DOCUMENTDB/DATABASEACCOUNTS/9999-OUTSIDE",
+        "status": {
+          "value": "Active"
+        },
+        "properties": {
+          "currentHealthStatus": "Degraded",
+          "previousHealthStatus": "Available",
+          "cause": "Unknown"
+        }
+      },
+      {
+        "category": {
+          "value": "ResourceHealth",
+          "localizedValue": "ResourceHealth"
+        },
+        "eventTimestamp": "2026-01-01T00:56:00Z",
+        "operationName": {
+          "value": "Microsoft.Resourcehealth/healthevent/Activated/action"
+        },
+        "resourceId": "/SUBSCRIPTIONS/00000000-0000-0000-0000-0000000000A2/RESOURCEGROUPS/RG/PROVIDERS/MICROSOFT.DOCUMENTDB/DATABASEACCOUNTS/11111111111111111111111111111111-BE-LED",
+        "status": {
+          "value": "Active"
+        },
+        "properties": {
+          "currentHealthStatus": "Unknown",
+          "previousHealthStatus": "Available",
+          "cause": "Unknown"
+        }
+      },
+      {
+        "category": {
+          "value": "Administrative",
+          "localizedValue": "Administrative"
+        },
+        "eventTimestamp": "2026-01-01T00:57:00Z",
+        "operationName": {
+          "value": "Microsoft.DocumentDB/databaseAccounts/readonlykeys/action"
+        },
+        "resourceId": "/SUBSCRIPTIONS/00000000-0000-0000-0000-0000000000A1/RESOURCEGROUPS/RG/PROVIDERS/MICROSOFT.DOCUMENTDB/DATABASEACCOUNTS/11111111111111111111111111111111-AL-ORD",
+        "status": {
+          "value": "Succeeded"
+        },
+        "properties": {}
+      }
+    ]
+  },
+  "status": {
+    "22222222222222222222222222222222-al-ord": "Degraded",
+    "33333333333333333333333333333333-al-ord": "Available",
+    "22222222222222222222222222222222-be-led": "Unavailable"
+  }
+}

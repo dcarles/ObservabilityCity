@@ -67,6 +67,9 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
     /// <summary>Where open incidents come from. Without a source, the sky is clear.</summary>
     public IReadOnlyList<IIncidentSource> IncidentSources { get; init; } = [];
 
+    /// <summary>Where the cloud's own health reports come from (resources it calls Degraded or Unavailable). Without a source the snapshot has none, which is not the same as an empty list: nothing reads them.</summary>
+    public IReadOnlyList<IHealthEventSource> HealthSources { get; init; } = [];
+
     /// <summary>
     /// The whole town, or with <paramref name="islands"/> only those islands (and always the hub). What is left out is left out of everything: the
     /// totals count only what is on screen, and a third party shows only while one of the islands that call it does. The traffic that crosses the edge
@@ -77,7 +80,9 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
         var now = clock.GetUtcNow();
         var registry = WithRoutes(registries.Current);
         var incidents = OpenIncidents(registry);
-        NoteIncidents(incidents.Where(kv => kv.Value.Count > 0).Select(kv => kv.Key), now);
+        var healthEvents = HealthSources.Count == 0 ? null : HealthEventsOf(registry);
+        // a cloud health event stands for an incident of the island that owns the resource, for "since the last incident" as for the count
+        NoteIncidents(incidents.Where(kv => kv.Value.Count > 0).Select(kv => kv.Key).Concat((healthEvents ?? []).Where(e => e.GroupId is not null && e.State != "Resolved").Select(e => e.GroupId!)), now);
         var links = TownLinks.Of(registry);
         var allGroups = registry.Groups
             .Select(g => new GroupSnapshot(g.Id, g.DisplayName, g.Color, g.IsHub, g.IsLostFound, g.ConfigError,
@@ -99,6 +104,8 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
                 .Select(v => v with { CalledBy = v.CalledBy.Where(shownIds.Contains).ToList(), Calls = (v.Calls ?? []).Where(shownIds.Contains).ToList() }).ToList();
         var visible = shownIds.Concat(vendors.Select(v => v.Node.Id)).ToHashSet();
         var groups = shown;
+        // what is not on screen is left out; an event no building owns has no island to be left out with, so it stays
+        var events = healthEvents?.Where(e => e.NodeId is null || shownIds.Contains(e.NodeId)).ToList();
 
         var nodes = groups.SelectMany(g => g.Nodes).ToList();
         var live = nodes.Where(n => n.State != HealthState.Stale).ToList();
@@ -111,7 +118,7 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
             RequestWeightedP99(live),
             live.Concat(liveVendors).Count(n => n.State == HealthState.Degraded),
             live.Concat(liveVendors).Count(n => n.State == HealthState.Down),
-            groups.Sum(g => g.Incidents.Count),
+            groups.Sum(g => g.Incidents.Count) + (events?.Count(e => e.State != "Resolved") ?? 0), // a resolved report is listed, not counted
             live.Where(n => registry.ConsumerIds.Contains(n.Id)).Sum(n => n.DeadLetters ?? 0));
 
         var env = registry.ActiveEnvironment;
@@ -126,6 +133,7 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
         var view = new ViewInfo([], [], [], []);
         var notices = registries.Notices;
         notices = [.. notices, .. UnmappedJobs(registry, onScreenNodes)];
+        notices = [.. notices, .. HealthSources.Where(h => h.Problem is not null).Select(h => $"Source '{h.Name}' could not read the cloud's health reports, so the list of resources it calls degraded may be out of date: {h.Problem}")];
         if (filter is not null)
         {
             var known = allGroups.Where(g => !g.IsHub).Select(g => g.Id).Concat(vendorIslands.Keys).ToHashSet();
@@ -141,12 +149,37 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
                 notices = [.. notices, .. unknown.Select(i => $"Island '{i}' is not in this town, so the island filter ignores it.")];
         }
 
-        var (incidentFreeSince, incidentsSeen) = IncidentHistory(groups.Select(g => g.Id), groups.Any(g => g.Incidents.Count > 0));
+        var (incidentFreeSince, incidentsSeen) = IncidentHistory(groups.Select(g => g.Id), groups.Any(g => g.Incidents.Count > 0) || events?.Any(e => e.State != "Resolved") == true);
 
         return new Snapshot(registry.Town.Id, registry.Town.Name, registry.Town.GroupLabel, env?.Id ?? Environment, now, DayFraction(), totals, notices, groups,
             vendors, callers, dependencies, registry.RingCapacity,
             env?.Name ?? Environment, environments, TenantsOf(env, allNodes), registry.Town.Topology, Mode ?? registry.Town.Mode, view, incidentFreeSince, incidentsSeen,
-            OutsideRate(onScreenNodes.Values), env?.Scope.Cloud, registry.Town.TrafficDensity, registries.Notes is { Count: > 0 } notes ? notes : null, SourceFreshness(now));
+            OutsideRate(onScreenNodes.Values), env?.Scope.Cloud, registry.Town.TrafficDensity, registries.Notes is { Count: > 0 } notes ? notes : null, SourceFreshness(now), events);
+    }
+
+    /// <summary>
+    /// The cloud's health events (open, then recently resolved), each tied to the building that owns the resource (by the resource's id, case aside, through the resources the scope rules found for each system)
+    /// and that building's island. A resource no system owns stays in the list without either. Worst first (Unavailable before Degraded), then the oldest.
+    /// </summary>
+    private List<HealthEventSnapshot> HealthEventsOf(Registry.Registry registry)
+    {
+        var resolution = ScopeSource?.Resolve(registry);
+        var owner = new Dictionary<string, (string SystemId, string Name)>(StringComparer.OrdinalIgnoreCase);
+        if (resolution is not null)
+            foreach (var system in resolution.Systems)
+                foreach (var resource in system.Resources)
+                    owner.TryAdd(resource.Id, (system.SystemId, resource.Name));
+        var groupOf = registry.Groups.SelectMany(g => g.Nodes.Select(n => (Node: n.Id, Group: g.Id))).GroupBy(x => x.Node).ToDictionary(g => g.Key, g => g.First().Group);
+        var all = new List<HealthEventSnapshot>();
+        foreach (var source in HealthSources)
+            foreach (var e in source.Current())
+            {
+                var found = owner.TryGetValue(e.ResourceId, out var own);
+                var node = found && groupOf.ContainsKey(own.SystemId) ? own.SystemId : null;
+                all.Add(new HealthEventSnapshot(e.Id, found ? own.Name : e.ResourceName, e.State, e.Previous, e.Cause, e.Since, node, node is null ? null : groupOf[node], e.Summary, e.ResolvedAt));
+            }
+        // open ones first (Unavailable before Degraded, oldest first), then the resolved ones, the latest resolution first
+        return all.OrderBy(e => e.State == "Resolved" ? 2 : e.State == "Unavailable" ? 0 : 1).ThenBy(e => e.State == "Resolved" ? 0 : e.Since.Ticks).ThenByDescending(e => e.ResolvedAt).ThenBy(e => e.Id, StringComparer.Ordinal).ToList();
     }
 
     /// <summary>One line per configured source: when it last reported, how often it is asked, and whether it is overdue by the limit that greys a building.</summary>

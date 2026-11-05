@@ -231,15 +231,17 @@ One file per environment. The pillar and system files are shared; this file says
 |---|---|---|---|
 | `regionQuery` | no | none | `loganalytics`: the query that says how a service's requests divide between regions: one row per telemetry name and region with the columns `role`, `region` and `calls`. Sampled counts are fine, only the proportions are used. Same template holes as `query`. With it each region shows its share of the requests. |
 | `typesQuery` | no | none | `servicebus`: a Log Analytics query that says which kinds of message each queue handled: one row per queue and message type with the columns `queue` (the entity's name, as the broker names it), `type` and `calls` (how many were handled over the window). Same template holes as `query`. With it each queue row of a reading system's drawer lists the kinds with their messages a second, highest first, up to 200 kinds per queue; the quietest beyond that are counted, not listed. The source needs the workspace the environment's scope gives (`scope.workspaceId`). Without it no kinds are shown. |
-| `kind` | yes | | `fake`, `resourcegraph`, `loganalytics`, `azuremonitor`, `functionjobs`, `servicebus`, `prometheus` or `grafana-irm`. |
+| `kind` | yes | | `fake`, `resourcegraph`, `loganalytics`, `azuremonitor`, `functionjobs`, `servicebus`, `resourcehealth`, `prometheus` or `grafana-irm`. |
 | `connection` | no | from `scope` | How to reach it (a workspace id, an endpoint). Not used by `fake`. |
 | `credential` | no | Azure CLI login | A name from `credentials`. Azure sources only. |
-| `pollSeconds` | no | 30 | How often the source is asked. Above 0. |
-| `timeoutSeconds` | no | 10 | How long one ask may take. Above 0. |
+| `pollSeconds` | no | 30 (300 for `resourcehealth`) | How often the source is asked. Above 0. |
+| `timeoutSeconds` | no | 10 (60 for `resourcehealth`) | How long one ask may take. Above 0. |
 | `lateAfterSeconds` | no | twice `pollSeconds` | `functionjobs`: how long after its schedule says a job should run it may go without a newer run before it counts as late (amber). A value below the default is ignored, since a reading may lag that much anyway. Lets a log that arrives late stay quiet without polling slower. Above 0. |
 | `query` | no | none | `loganalytics`: the query to send, a template; `functionjobs`: the query that summarises the function apps' logs into one row per app and job (columns `resourceId`, `job`, `lastRun`, `succeeded`, `next`, `region`). `{window}`, `{windowSeconds}`, `{roles}`, scope variables and `{environment}` work. |
-| `window` | no | `5m` | `loganalytics` and `azuremonitor`: how far back one answer looks. |
+| `window` | no | `5m` (`3d` for `resourcehealth`) | `loganalytics`, `azuremonitor` and `resourcehealth`: how far back one answer looks. A unit is `s`, `m`, `h` or `d`. |
 | `metrics` | no | none | `azuremonitor`: which metric of which resources fills which signal. |
+| `providers` | no | none | `resourcehealth`: the resource providers whose health reports are read, as the cloud names them (`Namespace.Service`, for example the data store's). Required for a `resourcehealth` source. A resource's report is matched to the system that owns it by the resource's id, through `scope.resources`. |
+| `keepResolvedFor` | no | `4h` | `resourcehealth`: how long a report stays listed, in green, after the resource recovered (a number and a unit: `4h`, `90m`, `1d`). The marker on the building goes away at once; the list entry and the drawer lines say resolved. A report can be dismissed earlier (the Dismiss button); a dismissal lasts until the server restarts. |
 | `entities` | no | none | `servicebus`: which namespaces to read, which metrics are the backlog and the dead letters, and how an entity's name says whose it is. Required for a `servicebus` source. |
 
 ### metrics entries (`azuremonitor`)

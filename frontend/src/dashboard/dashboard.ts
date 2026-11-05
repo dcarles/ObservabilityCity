@@ -4,6 +4,7 @@ import '../dashboard.css'
 import { Connection, type ConnectionState } from '../connection'
 import { checkSnapshot } from '../snapshotGuard'
 import { Inspector } from '../inspector'
+import { dismissEvent } from '../healthEvents'
 import { requestedScope } from '../scope'
 import { ViewBar } from '../viewbar'
 import { NoticesPanel } from '../noticesPanel'
@@ -223,6 +224,8 @@ export function startDashboard(): void {
     const details = attr('data-details')
     const conn = attr('data-conn')
     const group = attr('data-group')
+    const dismiss = attr('data-dismiss')
+    if (dismiss !== undefined) { void dismissEvent(dismiss); return }
     const system = t.closest<HTMLElement>('[data-system]')?.dataset.system
     if (toggle !== undefined) { if (ui.openPillars.has(toggle)) ui.openPillars.delete(toggle); else ui.openPillars.add(toggle); draw(); return }
     if (hide !== undefined && last) { setIslands(pillarSelection(last, hide, false)); return }

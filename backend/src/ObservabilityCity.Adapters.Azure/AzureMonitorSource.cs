@@ -72,7 +72,7 @@ public sealed class AzureMonitorReader(HttpClient http, ICredentialSource? crede
     /// The answer's text. A hiccup of Azure's (too many requests, busy, unavailable, a connection that drops) is tried again a couple of times a moment later, since it
     /// nearly always passes; any other answer, such as a refusal, fails at once.
     /// </summary>
-    private async Task<string> GetAsync(string resourceId, string url, CancellationToken ct)
+    public async Task<string> GetAsync(string resourceId, string url, CancellationToken ct, string service = "Azure Monitor")
     {
         var token = credential is null ? null : await credential.GetTokenAsync(TokenScope, ct);
         for (var attempt = 1; ; attempt++)
@@ -93,7 +93,7 @@ public sealed class AzureMonitorReader(HttpClient http, ICredentialSource? crede
                 {
                     if (response.IsSuccessStatusCode) return text;
                     if (attempt >= Attempts || !IsHiccup(response.StatusCode))
-                        throw new HttpRequestException($"Azure Monitor answered {(int)response.StatusCode} {response.ReasonPhrase} for {Last(resourceId)}: {Trim(text)}");
+                        throw new HttpRequestException($"{service} answered {(int)response.StatusCode} {response.ReasonPhrase} for {Last(resourceId)}: {Trim(text)}");
                 }
             }
             await Task.Delay((retryDelay ?? TimeSpan.FromMilliseconds(400)) * attempt, ct);

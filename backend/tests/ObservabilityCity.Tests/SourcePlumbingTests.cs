@@ -598,7 +598,7 @@ public class SourcePlumbingTests
     }
 
     [Theory]
-    [InlineData("sources:\n  metrics: { kind: loganalytic }\n", "source 'metrics' has kind 'loganalytic', which is not a kind of source this build knows. Use fake, prometheus, grafana-irm, resourcegraph, loganalytics, azuremonitor, servicebus, functionjobs. Did you mean 'loganalytics'?")]
+    [InlineData("sources:\n  metrics: { kind: loganalytic }\n", "source 'metrics' has kind 'loganalytic', which is not a kind of source this build knows. Use fake, prometheus, grafana-irm, resourcegraph, loganalytics, azuremonitor, servicebus, functionjobs, resourcehealth. Did you mean 'loganalytics'?")]
     [InlineData("sources:\n  metrics: { kind: prometheus, credential: reader }\ncredentials:\n  reader: { kind: azure-cli }\n", "source 'metrics' names a credential, but a prometheus source does not sign in")]
     [InlineData("credentials:\n  reader: { kind: azure-clu }\n", "credential 'reader' has kind 'azure-clu'. Use azure-cli, default, managed-identity, service-principal. Did you mean 'azure-cli'?")]
     [InlineData("credentials:\n  reader: { kind: service-principal, tenantId: t }\n", "credential 'reader' is a service-principal, which needs clientId and clientSecretEnv")]

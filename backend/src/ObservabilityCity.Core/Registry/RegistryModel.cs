@@ -246,6 +246,12 @@ public sealed record RegistrySource(string Name, string Kind, string? Connection
     /// <summary>For a message-broker source: how its entities are read and whose they are. Null for every other kind of source.</summary>
     public EntitiesConfig? Entities { get; init; }
 
+    /// <summary>For a resource-health source (resourcehealth): the resource providers whose health reports it reads, as the cloud names them. Empty for every other kind of source.</summary>
+    public IReadOnlyList<string> Providers { get; init; } = [];
+
+    /// <summary>For a resource-health source: how long a resolved report stays listed (green) after the resource recovered, a number and a unit like 4h. Null: 4h.</summary>
+    public string? KeepResolvedFor { get; init; }
+
     public const double DefaultPollSeconds = 30;
     public const double DefaultTimeoutSeconds = 10;
 

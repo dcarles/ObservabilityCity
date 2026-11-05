@@ -355,9 +355,16 @@ body.wall .island-label { font-size: 16px; }
 
 /* a dead-letter row in a top bar list: the queue and its count under the service and its island */
 #state-list .hit .detail { display: block; font-size: 11px; opacity: 0.8; margin-top: 1px; }
+#state-list .hit.inert { cursor: default; }
+#state-list .hit.inert:hover { background: none; }
 
 /* the kinds of message a queue handled, under its row in the drawer */
 #inspector .types { margin: 0 0 6px 10px; padding-left: 8px; border-left: 2px solid rgba(128, 128, 128, 0.35); font-size: 0.92em; }
 #inspector .types .row span:first-child { word-break: break-all; }
 #inspector .types .types-total { opacity: 0.8; }
 #inspector .types-toggle { background: none; border: 0; padding: 2px 0; color: inherit; font: inherit; text-decoration: underline; cursor: pointer; opacity: 0.85; }
+
+#state-list .hit.resolved b { color: var(--ok-ink, #3fae6a); }
+#state-list .hit.resolved .detail { color: var(--ok-ink, #3fae6a); }
+#state-list .hit .dismiss, #inspector .azure-dismiss { margin-left: auto; font-size: 11px; padding: 1px 8px; cursor: pointer; }
+#inspector .azure-dismiss { margin: 6px 0 0; display: block; }

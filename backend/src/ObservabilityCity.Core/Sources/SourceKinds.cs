@@ -4,4 +4,7 @@ namespace ObservabilityCity.Core.Sources;
 public static class SourceKinds
 {
     public const string Fake = "fake";
+
+    /// <summary>Kind of a source that reads the cloud's own health reports (<see cref="IHealthEventSource"/>). It fills no signal, so no signal names it.</summary>
+    public const string ResourceHealth = "resourcehealth";
 }

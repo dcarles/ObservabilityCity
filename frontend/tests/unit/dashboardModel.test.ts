@@ -233,3 +233,33 @@ describe('worstOf', () => {
     expect(worstOf([])).toBe('none')
   })
 })
+
+describe('the Incidents card', () => {
+  const event = (o: object) => ({ id: 'e', resource: 'orders-db', state: 'Degraded', previous: null, cause: null, since: '2026-11-05T16:00:00Z', resolvedAt: null, nodeId: 'aa.orders-db', groupId: 'aa', summary: null, ...o })
+
+  it('is not there when no health source is configured and no incident is open', () => {
+    const d = buildDashboard(golden('calm'), ALL_TENANTS)
+    expect(d.summary.incidents).toBeNull()
+    expect(summaryHtml(d)).not.toContain('kpi-incidents')
+  })
+
+  it('counts the open reports in red, lists them first and the resolved ones in green, and says what and where', () => {
+    const s = { ...golden('calm'), healthEvents: [event({ id: 'r', state: 'Resolved', resolvedAt: '2026-11-05T17:00:00Z' }), event({ id: 'o', state: 'Unavailable', resource: 'ledger-db', nodeId: null })] }
+    const d = buildDashboard(s, ALL_TENANTS)
+    expect(d.summary.incidents?.open).toBe(1)
+    expect(d.summary.incidents?.rows.map((r) => [r.source, r.status, r.tone])).toEqual([['Azure', 'Unavailable', 'bad'], ['Azure', 'Resolved', 'ok']])
+    const html = summaryHtml(d)
+    expect(html).toContain('<b class="bad">1</b>')
+    expect(html).toContain('class="il bad"')
+    expect(html).toContain('class="il ok" data-system="aa.orders-db"')
+    expect(html).toContain('data-dismiss="r"')
+    expect(d.summary.incidents?.rows[1].times).toMatch(/^declared .* · resolved /)
+    expect(d.summary.incidents?.rows[0].times).not.toContain('resolved')
+  })
+
+  it('turns the number green when everything listed is resolved, and shows the card with no reports at all', () => {
+    const resolved = buildDashboard({ ...golden('calm'), healthEvents: [event({ state: 'Resolved', resolvedAt: '2026-11-05T17:00:00Z' })] }, ALL_TENANTS)
+    expect(summaryHtml(resolved)).toContain('<b class="ok">0</b>')
+    expect(summaryHtml(buildDashboard({ ...golden('calm'), healthEvents: [] }, ALL_TENANTS))).toContain('No incidents')
+  })
+})

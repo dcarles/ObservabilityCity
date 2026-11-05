@@ -38,6 +38,7 @@ import type { TenantView } from '../tenants'
 import { DEFAULT_LAYERS, buildingShown, type LayerState } from '../layers'
 import { edgeKey, edgeLinks, edgeMode, signLines, type EdgeMode } from '../edgeTraffic'
 import { Signpost } from './signpost'
+import { eventsByNode } from '../healthEvents'
 import { portCountsLine, portSignText } from '../portSign'
 import { regionLine, splitLine, validChoice, withRegion, WORST, type RegionChoice } from '../regions'
 
@@ -581,6 +582,10 @@ export class Town {
       const nodes = new Map(g.nodes.map((n) => [n.id, n]))
       for (const [key, sign] of isl.services) this.guard(`service ${key}`, () => { const sv = summariseService(sign.pad, g.id, g.displayName, nodes); sign.set(sv.state, sv.monitored) })
     }
+    this.guard('azure health', () => {
+      const worst = eventsByNode(s.healthEvents)
+      for (const [id, b] of this.buildings) b.setHealthEvent(worst.get(id) ?? null)
+    })
     this.guard('tenants', () => this.cars.setTenants(s.tenants ?? []))
     if (this.edge.mode === 'signpost') {
       const links = edgeLinks(s)

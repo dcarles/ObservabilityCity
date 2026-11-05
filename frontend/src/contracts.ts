@@ -100,6 +100,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/health-events/dismiss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["DismissHealthEvent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/added-rules": {
         parameters: {
             query?: never;
@@ -176,6 +192,9 @@ export interface components {
             /** Format: double */
             requestsPerSecond: number;
         };
+        DismissHealthEventRequest: {
+            id: string;
+        };
         EnvironmentInfo: {
             id: string;
             name: string;
@@ -201,6 +220,20 @@ export interface components {
             messaging: components["schemas"]["MessagingSnapshot"];
             nodes: components["schemas"]["NodeSnapshot"][];
             assets?: components["schemas"]["AssetSnapshot"][] | null;
+        };
+        HealthEventSnapshot: {
+            id: string;
+            resource: string;
+            state: string;
+            previous?: string | null;
+            cause?: string | null;
+            /** Format: date-time */
+            since: string;
+            nodeId?: string | null;
+            groupId?: string | null;
+            summary?: string | null;
+            /** Format: date-time */
+            resolvedAt?: string | null;
         };
         /** @enum {string} */
         HealthState: "Healthy" | "Degraded" | "Down" | "Stale";
@@ -444,6 +477,7 @@ export interface components {
             trafficDensity: number;
             notes?: string[] | null;
             sources?: components["schemas"]["SourceFreshnessSnapshot"][] | null;
+            healthEvents?: components["schemas"]["HealthEventSnapshot"][] | null;
         };
         SourceAgeSnapshot: {
             source: string;
@@ -758,6 +792,30 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["AddedHostSnapshot"][];
                 };
+            };
+        };
+    };
+    DismissHealthEvent: {
+        parameters: {
+            query?: {
+                env?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DismissHealthEventRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

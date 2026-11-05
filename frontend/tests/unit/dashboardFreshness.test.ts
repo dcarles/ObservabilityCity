@@ -118,7 +118,7 @@ describe('the lists under the pillars', () => {
   })
 
   it('details are only what is measured', () => {
-    const base: Row = { id: 'x', name: 'x', type: 'API', level: 'ok', reason: null, rps: 12, errorPct: 0.4, p99: 90, instances: null, instancesText: null, regions: null, sla: null, latency: 'none', memory: null, ruMax: null, cpu: null, ru: null, backlog: 3, dlq: 0, calledBy: [], calls: [], tenants: null, tenantsOpenByDefault: false }
+    const base: Row = { id: 'x', name: 'x', type: 'API', level: 'ok', reason: null, rps: 12, errorPct: 0.4, p99: 90, instances: null, instancesText: null, regions: null, sla: null, latency: 'none', memory: null, ruMax: null, cpu: null, ru: null, backlog: 3, dlq: 0, calledBy: [], calls: [], tenants: null, tenantsOpenByDefault: false, azure: null }
     expect(detailText(base)).toBe('12 rps · errors 0.4% · p99 90 ms · backlog 3 · DLQ 0')
     expect(detailText({ ...base, rps: null, errorPct: null, p99: null, backlog: null, dlq: null })).toBe('')
   })

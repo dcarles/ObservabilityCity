@@ -428,6 +428,11 @@ internal sealed class SourceFile
     public List<MetricGroupFile> Metrics { get; set; } = [];
     /// <summary>Message-broker sources only (servicebus): which namespaces to read, which metrics fill the backlog and the dead letters, and how an entity's name says whose it is.</summary>
     public EntitiesFile? Entities { get; set; }
+    /// <summary>Resource-health sources only (resourcehealth): the resource providers whose health reports are read, for example the data store's. The program lists none; a source without any does not start.</summary>
+    public List<string> Providers { get; set; } = [];
+
+    /// <summary>Resource-health sources: how long a resolved report stays listed after the resource recovered, like 4h. Default 4h.</summary>
+    public string? KeepResolvedFor { get; set; }
 }
 
 /// <summary>How a broker's queues and topics are read: the namespaces come from a scope.resources rule, the metrics are split by the entity's name, and patterns say which system an entity belongs to.</summary>
