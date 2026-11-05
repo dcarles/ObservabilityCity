@@ -30,6 +30,7 @@ public sealed class SourcePoller(
                     await progressive.PollAsync(registries.Current, found => state.Update(source.Name, found), timeout.Token);
                 else
                     state.Update(source.Name, await source.PollAsync(registries.Current, timeout.Token));
+                if (source is IRoundNote { RoundNote: { } note }) log.LogInformation("Source {Source}: {Note}", source.Name, note);
             }
             catch (Exception e) when (e is not OperationCanceledException || !ct.IsCancellationRequested)
             {
@@ -37,7 +38,13 @@ public sealed class SourcePoller(
             }
             cache?.Save(source.Name, state.Of(source.Name));
         }
-        while (await WaitNext(timer, ct));
+        while (source is IRetrySoon { RetryIn: { } soon } ? await WaitSoon(soon, ct) : await WaitNext(timer, ct));
+    }
+
+    private static async Task<bool> WaitSoon(TimeSpan soon, CancellationToken ct)
+    {
+        try { await Task.Delay(soon, ct); return true; }
+        catch (OperationCanceledException) { return false; }
     }
 
     private static async Task<bool> WaitNext(PeriodicTimer timer, CancellationToken ct)

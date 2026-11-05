@@ -370,12 +370,14 @@ sources:
     pollSeconds: 300
 ```
 
-The source fills no signal, so nothing else is wired. It asks each subscription the scope found, once for each provider, and ties a report to the building that owns the resource through `scope.resources` (the resource id, case aside). What it shows:
+The source fills no signal, so nothing else is wired. It asks each subscription the scope found, once for each provider that the inventory shows has resources in that subscription (a subscription with no resource of a provider is not asked for it), and ties a report to the building that owns the resource through `scope.resources` (the resource id, case aside). What it shows:
 
 - **Open reports** (Degraded or Unavailable) put a red exclamation mark above the building, a line in the Overview tab of its drawer (state, since when, what it was before, the cause), a chip on its row of the dashboard, and an entry in the top bar's **Incidents** list that goes to the building. They count in the incident number. A report no building owns is still listed, and goes nowhere.
 - **A report ends** when the log says it resolved or the resource is Available again, and also when the cloud's current status for the resource says Available even though no resolution reached the log. It then stays listed for `keepResolvedFor`, in green, with when it began and when it ended; the mark on the building goes away at once and it no longer counts as an incident.
 - **Dismiss** (a button in the list and in the drawer) hides one report, open or resolved, for everyone until the server restarts.
-- If the log cannot be read, the last good list stays and a notice says so.
+- If the log cannot be read at all, the last good list stays and a notice says so. If only some reads fail (a slow subscription, a denied one), the reports from the reads that worked are shown, the reports of the failed subscription and provider are kept from the last good round, and the notice says how many reads failed, so the list may be incomplete. The notice goes away after the next round where every read works.
+- Each round writes one line to the server log, for example `health read: 12 reads, 0 failed, 3 reports (1 open)`, so a slow or half-empty round can be seen.
+- At startup the source needs the inventory to know where to look. Until the inventory is read, it tries again every 30 seconds instead of waiting a whole `pollSeconds`, so reports show soon after the inventory arrives. A round may take up to `timeoutSeconds` (60 by default); raise it if your subscriptions are many or slow.
 
 Needs the sign-in to be allowed to read the activity log of each subscription (Monitoring Reader or the like) and the resource's own health status.
 

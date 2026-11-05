@@ -3,6 +3,8 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Azure.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.Logging;
+using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 using ObservabilityCity.Adapters.Azure;
@@ -415,6 +417,50 @@ public class SourcePlumbingTests
             Assert.Equal(["a.one"], new ReadingCache(folder).Load("progressive").Keys);
         }
         finally { if (Directory.Exists(folder)) Directory.Delete(folder, true); }
+    }
+
+    [Fact]
+    public async Task A_source_that_asks_to_retry_soon_is_polled_again_soon_until_it_is_ready_then_waits_its_interval_and_its_round_note_is_logged()
+    {
+        var source = new NotReadyTwice();
+        var log = new ListLogger();
+        var poller = new SourcePoller([source], new RegistryHolder(RegistryLoader.Load(TestPaths.LiveTown)), new LatestState(), log);
+
+        await poller.StartAsync(TestContext.Current.CancellationToken);
+        await Task.WhenAny(source.Ready.Task, Task.Delay(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
+        await Task.Delay(300, TestContext.Current.CancellationToken);
+        await poller.StopAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(3, source.Polls); // two quick retries, then the ten-minute interval
+        Assert.Contains(log.Lines, l => l.Contains("Source soon: not ready, retrying"));
+        Assert.Contains(log.Lines, l => l.Contains("Source soon: read 3 things"));
+    }
+
+    private sealed class NotReadyTwice : IMetricSource, IRetrySoon, IRoundNote
+    {
+        public TaskCompletionSource Ready { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public int Polls;
+        public string Name => "soon";
+        public TimeSpan PollInterval => TimeSpan.FromMinutes(10);
+        public TimeSpan? RetryIn => Polls < 3 ? TimeSpan.FromMilliseconds(20) : null;
+        public string? RoundNote => Polls < 3 ? "not ready, retrying" : "read 3 things";
+
+        public Task<IReadOnlyDictionary<string, NodeReading>> PollAsync(Registry registry, CancellationToken ct)
+        {
+            if (Interlocked.Increment(ref Polls) == 3) Ready.TrySetResult();
+            return Task.FromResult<IReadOnlyDictionary<string, NodeReading>>(new Dictionary<string, NodeReading>());
+        }
+    }
+
+    private sealed class ListLogger : ILogger<SourcePoller>
+    {
+        public List<string> Lines { get; } = [];
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(LogLevel logLevel) => true;
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+        {
+            lock (Lines) Lines.Add(formatter(state, exception));
+        }
     }
 
     private sealed class PublishThenFail : IProgressiveMetricSource

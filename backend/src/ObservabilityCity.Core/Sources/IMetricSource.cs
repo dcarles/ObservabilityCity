@@ -81,3 +81,21 @@ public interface IProgressiveMetricSource : IMetricSource
 {
     Task PollAsync(Registry.Registry registry, Action<IReadOnlyDictionary<string, NodeReading>> publish, CancellationToken ct);
 }
+
+/// <summary>
+/// A source that can say, in one line, what its last round did (how many reads, how many failed, what it found). The poller writes the line to the log after each round, so a
+/// slow or half-empty round can be seen without guessing. Null until the first round has finished.
+/// </summary>
+public interface IRoundNote
+{
+    string? RoundNote { get; }
+}
+
+/// <summary>
+/// A source whose last round could not run yet (what it needs to read was not there, say) can ask for the next round sooner than its interval. Null: the normal interval.
+/// The poller waits this long once, then goes back to the interval; a source that is still not ready asks again.
+/// </summary>
+public interface IRetrySoon
+{
+    TimeSpan? RetryIn { get; }
+}

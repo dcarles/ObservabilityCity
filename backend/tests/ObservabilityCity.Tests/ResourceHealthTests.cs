@@ -356,8 +356,8 @@ public class ResourceHealthTests
         fail = true;
         var ex = await Assert.ThrowsAsync<HttpRequestException>(() => source.PollAsync(registry, CancellationToken.None));
 
-        Assert.Contains("activity log reads failed", ex.Message);
-        Assert.Single(source.Current()); // a list made from only some of the subscriptions could hide the one in trouble
+        Assert.Contains("all 2 activity log reads failed", ex.Message);
+        Assert.Single(source.Current()); // nothing was read, so the last good list stands
         Assert.Contains("403", source.Problem);
         var builder = new SnapshotBuilder(registry, new LatestState(), new FakeTimeProvider(T1)) { Environment = "prod", ScopeSource = set.Scope, HealthSources = [source] };
         Assert.Contains(builder.Build().Notices, n => n.Contains("'health' could not read the cloud's health reports") && n.Contains("403"));
@@ -380,6 +380,93 @@ public class ResourceHealthTests
         await source.PollAsync(registry, CancellationToken.None);
 
         Assert.Empty(http.Sent);
+        var waiting = (ResourceHealthSource)source;
+        Assert.Equal(TimeSpan.FromSeconds(30), waiting.RetryIn); // tried again soon, not a whole interval later
+        Assert.Equal("waiting for the resource inventory, retrying in 30s", waiting.RoundNote);
+    }
+
+    [Fact]
+    public async Task Once_the_inventory_is_there_a_round_goes_back_to_the_normal_interval()
+    {
+        var (source, registry, _) = await Live(new CannedHttp().Answer(Page()));
+
+        await source.PollAsync(registry, CancellationToken.None);
+
+        Assert.Null(source.RetryIn);
+        Assert.Equal("health read: 2 reads, 0 failed, 0 reports (0 open)", source.RoundNote);
+    }
+
+    private const string BeLedger = "/subscriptions/00000000-0000-0000-0000-0000000000a2/resourceGroups/rg/providers/microsoft.documentdb/databaseaccounts/11111111111111111111111111111111-be-led";
+
+    [Fact]
+    public void Only_the_subscription_and_provider_pairs_the_inventory_has_resources_for_are_read()
+    {
+        var registry = RegistryLoader.Load(TownA).ForEnvironment("prod");
+        var env = registry.ActiveEnvironment!;
+        var definition = env.Sources.Single(s => s.Name == "health") with { Connection = null, Providers = ["Microsoft.DocumentDB", "Microsoft.Web", "Microsoft.KeyVault"] };
+        var source = (ResourceHealthSource)new ResourceHealthSourceFactory(new HttpClient(new CannedHttp()), new FakeTimeProvider(T1))
+            .Create(new SourceContext("prod", definition, null, env.Scope, new ObservabilityCity.Core.Scope.ScopeStore(), TownA));
+        static ObservabilityCity.Core.Scope.InventoryResource R(string sub, string type) => new($"/subscriptions/{sub}/x", "x", type, sub, null, new Dictionary<string, string>());
+        var inventory = new ObservabilityCity.Core.Scope.Inventory([], [R("S1", "microsoft.documentdb/databaseaccounts"), R("s1", "Microsoft.Web/sites"), R("s2", "microsoft.web/serverfarms")]);
+
+        var asks = source.AsksOf(["s1", "s2", "s3"], inventory);
+
+        Assert.Equal([("s1", "Microsoft.DocumentDB"), ("s1", "Microsoft.Web"), ("s2", "Microsoft.Web")], asks); // no key vault anywhere, nothing in s3: not asked
+        Assert.Equal(9, source.AsksOf(["s1", "s2", "s3"], null).Count); // no inventory to go by: every pair
+    }
+
+    [Fact]
+    public async Task A_read_that_fails_keeps_its_reports_from_the_last_good_round_the_others_are_updated_and_a_notice_says_the_list_may_be_incomplete()
+    {
+        var failA2 = false;
+        var a1Event = true;
+        var http = new CannedHttp().Respond(r =>
+        {
+            var url = r.Uri!.ToString();
+            if (url.Contains("availabilityStatuses")) return CannedHttp.Reply("""{ "properties": { "availabilityState": "Degraded" } }""");
+            if (url.Contains("0000000000a2"))
+                return failA2 ? CannedHttp.Reply("""{ "error": "boom" }""", HttpStatusCode.Forbidden) : CannedHttp.Reply(Page(Row(BeLedger, "2026-01-01T00:40:00Z", "Activated", "Degraded")));
+            return CannedHttp.Reply(a1Event ? Page(Row(BorealisOrders, "2026-01-01T00:50:00Z", "Activated", "Degraded")) : Page());
+        });
+        var (source, registry, set) = await Live(http);
+        await source.PollAsync(registry, CancellationToken.None);
+        Assert.Equal(2, source.Current().Count);
+
+        failA2 = true;
+        a1Event = false; // the read that works says the a1 report is gone
+        await source.PollAsync(registry, CancellationToken.None); // a partial round is not a failed one
+
+        var kept = Assert.Single(source.Current());
+        Assert.Equal(BeLedger, kept.ResourceId, ignoreCase: true); // kept: its read failed, so nothing says it ended
+        Assert.Contains("1 of 2 activity log reads failed, so the list may be incomplete", source.Problem);
+        Assert.Contains("403", source.Problem);
+        Assert.Equal("health read: 2 reads, 1 failed, 1 reports (1 open)", source.RoundNote);
+        var builder = new SnapshotBuilder(registry, new LatestState(), new FakeTimeProvider(T1)) { Environment = "prod", ScopeSource = set.Scope, HealthSources = [source] };
+        var snapshot = builder.Build();
+        Assert.Contains(snapshot.Notices, n => n.Contains("'health' could not read the cloud's health reports") && n.Contains("1 of 2"));
+        Assert.Single(snapshot.HealthEvents!);
+
+        failA2 = false;
+        await source.PollAsync(registry, CancellationToken.None);
+        Assert.Null(source.Problem);
+    }
+
+    [Fact]
+    public async Task A_read_that_runs_out_of_time_counts_as_a_failed_read_and_the_others_still_count()
+    {
+        var http = new CannedHttp().Respond(r =>
+        {
+            var url = r.Uri!.ToString();
+            if (url.Contains("availabilityStatuses")) return CannedHttp.Reply("""{ "properties": { "availabilityState": "Degraded" } }""");
+            if (url.Contains("0000000000a2")) throw new TaskCanceledException("slow");
+            return CannedHttp.Reply(Page(Row(BorealisOrders, "2026-01-01T00:50:00Z", "Activated", "Degraded")));
+        });
+        var (source, registry, _) = await Live(http);
+
+        await source.PollAsync(registry, CancellationToken.None);
+
+        Assert.Single(source.Current());
+        Assert.Contains("the read ran out of time", source.Problem);
     }
 
     // ---- the config ----
