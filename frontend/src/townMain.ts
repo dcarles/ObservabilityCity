@@ -36,6 +36,7 @@ import type { Snapshot, TenantInfo } from './types'
 import { vendorWhere } from './inspectorModel'
 import { checkSnapshot } from './snapshotGuard'
 import { fitTopBar } from './topbarFit'
+import { dismissEvent, eventItems } from './healthEvents'
 import { Building } from './buildings/building'
 import { WINDOW_GLOW } from './buildings/windowMaterial'
 
@@ -110,12 +111,16 @@ export async function startTown(): Promise<void> {
       if (state === 'DeadLetters')
         return deadLetterItems(groups, island).map<PickItem>((d) => ({ kind: 'building', id: d.nodeId, name: d.nodeName, where: d.groupName, detail: `${d.queue} · ${Math.round(d.count)} dead` }))
       if (state === 'Incidents')
-        return groups.filter((g) => g.incidents.length > 0).map<PickItem>((g) => ({ kind: 'island', id: g.id, name: g.displayName, where: `sev ${g.incidents[0].severity}, ${g.incidents.length} open` }))
+        return [
+          ...groups.filter((g) => g.incidents.length > 0).map<PickItem>((g) => ({ kind: 'island', id: g.id, name: g.displayName, where: `sev ${g.incidents[0].severity}, ${g.incidents.length} open` })),
+          ...eventItems(seen.last?.healthEvents, (id) => groups.find((g) => g.nodes.some((n) => n.id === id))?.displayName ?? 'Platform hub'),
+        ]
       const inGroups = groups.flatMap((g) => g.nodes.filter((n) => n.state === state && !isUnmonitored(n)).map<PickItem>((n) => ({ kind: 'building', id: n.id, name: n.name, where: g.displayName, state: n.state })))
       const vendors = (seen.last?.vendors ?? []).filter((v) => v.node.state === state && !isUnmonitored(v.node)).map<PickItem>((v) => ({ kind: 'building', id: v.node.id, name: v.node.name, where: vendorWhere(v), state: v.node.state }))
       return [...inGroups, ...vendors]
     },
     goTo,
+    (id) => { void dismissEvent(id) },
   )
   let tenantView: TenantView = loadTenantView(store)
   const topbar = new TopBar((state, anchor) => stateList.toggle(state, anchor), () => tenantView)

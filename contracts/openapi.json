@@ -250,6 +250,38 @@
         }
       }
     },
+    "/api/health-events/dismiss": {
+      "post": {
+        "tags": [
+          "ObservabilityCity.Host, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+        ],
+        "operationId": "DismissHealthEvent",
+        "parameters": [
+          {
+            "name": "env",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DismissHealthEventRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/api/added-rules": {
       "post": {
         "tags": [
@@ -495,6 +527,18 @@
         },
         "additionalProperties": false
       },
+      "DismissHealthEventRequest": {
+        "required": [
+          "id"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
       "EnvironmentInfo": {
         "required": [
           "id",
@@ -603,6 +647,56 @@
             "items": {
               "$ref": "#/components/schemas/AssetSnapshot"
             },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "HealthEventSnapshot": {
+        "required": [
+          "id",
+          "resource",
+          "since",
+          "state"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "resource": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "previous": {
+            "type": "string",
+            "nullable": true
+          },
+          "cause": {
+            "type": "string",
+            "nullable": true
+          },
+          "since": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "nodeId": {
+            "type": "string",
+            "nullable": true
+          },
+          "groupId": {
+            "type": "string",
+            "nullable": true
+          },
+          "summary": {
+            "type": "string",
+            "nullable": true
+          },
+          "resolvedAt": {
+            "type": "string",
+            "format": "date-time",
             "nullable": true
           }
         },
@@ -1511,6 +1605,13 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/SourceFreshnessSnapshot"
+            },
+            "nullable": true
+          },
+          "healthEvents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HealthEventSnapshot"
             },
             "nullable": true
           }

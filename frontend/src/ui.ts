@@ -158,7 +158,7 @@ export class StateList {
   private key = ''
   private anchor: DOMRect | null = null
 
-  constructor(private readonly systems: (state: ListedState, island: string | null) => PickItem[], private readonly onPick: (item: PickItem) => void) {
+  constructor(private readonly systems: (state: ListedState, island: string | null) => PickItem[], private readonly onPick: (item: PickItem) => void, private readonly onDismiss: (id: string) => void = () => {}) {
     document.addEventListener('pointerdown', (e) => {
       const t = e.target as HTMLElement
       if (!this.el.hidden && !t.closest('#state-list') && !t.closest('[data-list]')) this.close()
@@ -181,17 +181,21 @@ export class StateList {
     if (!this.state) return
     const found = this.systems(this.state, this.island)
     const items = this.state === 'DeadLetters' ? found : found.sort((a, b) => a.name.localeCompare(b.name)) // dead letters come worst first
-    const key = `${this.state}|${this.island ?? ''}|${items.map((i) => `${i.id}:${i.detail ?? ''}`).join(',')}`
+    const key = `${this.state}|${this.island ?? ''}|${items.map((i) => `${i.id}:${i.state ?? ''}:${i.detail ?? ''}`).join(',')}`
     if (key === this.key) return
     this.key = key
+    const resolved = this.state === 'Incidents' ? items.filter((i) => i.state === 'Resolved').length : 0
     const word = { Down: 'down', Degraded: 'degraded', Stale: 'with no data', Incidents: 'with open incidents', DeadLetters: items.length === 1 ? 'queue with dead letters' : 'queues with dead letters' }[this.state]
     const none = this.state === 'Incidents' ? 'No incidents are open right now.' : this.state === 'DeadLetters' ? 'No queue has dead letters right now.' : `Nothing is ${word} right now.`
     this.el.innerHTML = `
-      <div class="head"><b>${items.length} ${word}</b><button id="state-list-close" title="Close">✕</button></div>
-      ${items.length === 0 ? `<p class="none">${none}</p>` : items.map((m, i) => `<div class="hit" data-i="${i}"><b>${escapeHtml(m.name)}</b><span>${escapeHtml(m.where)}</span>${m.detail ? `<span class="detail">${escapeHtml(m.detail)}</span>` : ''}</div>`).join('')}`
+      <div class="head"><b>${items.length - resolved} ${word}${resolved ? ` · ${resolved} resolved` : ''}</b><button id="state-list-close" title="Close">✕</button></div>
+      ${items.length === 0 ? `<p class="none">${none}</p>` : items.map((m, i) => `<div class="hit${m.inert ? ' inert' : ''}${m.state === 'Resolved' ? ' resolved' : ''}" data-i="${i}"${m.inert ? ' data-inert="1"' : ''}><b>${escapeHtml(m.name)}</b><span>${escapeHtml(m.where)}</span>${m.detail ? `<span class="detail">${escapeHtml(m.detail)}</span>` : ''}${m.dismiss ? '<button class="dismiss" title="Hide this report until the server restarts">Dismiss</button>' : ''}</div>`).join('')}`
     this.el.querySelector('#state-list-close')!.addEventListener('click', () => this.close())
+    this.el.querySelectorAll<HTMLElement>('.hit').forEach((row) => {
+      row.querySelector('.dismiss')?.addEventListener('click', (e) => { e.stopPropagation(); this.onDismiss(items[Number(row.dataset.i)].dismiss!) })
+    })
     this.el.querySelectorAll<HTMLElement>('.hit').forEach((row) =>
-      row.addEventListener('click', () => { const item = items[Number(row.dataset.i)]; this.close(); this.onPick(item) }))
+      row.addEventListener('click', () => { if (row.dataset.inert) return; const item = items[Number(row.dataset.i)]; this.close(); this.onPick(item) }))
     this.el.hidden = false
     if (this.anchor) {
       const w = this.el.offsetWidth

@@ -1,6 +1,8 @@
 // What the dashboard shows, worked out from a snapshot as plain data. Nothing here touches the page, so every rule is unit tested.
 // The numbers are the snapshot's own; the dashboard invents nothing, and a signal nobody measures is null (shown as a dash), never a zero.
 
+import { dayTime } from '../inspectorModel'
+import { eventOfNode, healthEventsOf, isResolved } from '../healthEvents'
 import { absentEverywhere, isAbsent, isUnmonitored } from '../signals'
 import { isFollowed, isFollowing, isShown, isThrottled, tenantLevel, type TenantView } from '../tenants'
 import { islandChoices } from '../islands'
@@ -92,6 +94,8 @@ export interface Row {
   tenants: TenantRow[] | null
   /** The tenant lines show by themselves: a tenant is at its amber line or throttling. */
   tenantsOpenByDefault: boolean
+  /** Azure Resource Health's open report for this system's resource ("Degraded", "Unavailable"), with since when; null when Azure reports nothing. */
+  azure: { state: string; since: string } | null
 }
 
 export interface Group {
@@ -144,6 +148,21 @@ export interface Section {
   rows: SideRow[]
 }
 
+/** One line of the Incidents card: an Azure health report or an incident of the incident tool, with what it is about and its status. */
+export interface IncidentRow {
+  source: 'Azure' | 'Incident'
+  what: string
+  status: string
+  /** Red while unresolved, green once resolved. */
+  tone: 'bad' | 'ok'
+  /** The system to open on a click; null when the report belongs to no system of the town. */
+  nodeId: string | null
+  /** When it was declared and, once resolved, when it ended ("declared 16:21 · resolved 18:17"); empty when the source gives no times. */
+  times: string
+  /** The id of the Azure report, for its Dismiss button; null for an incident of the incident tool. */
+  dismiss: string | null
+}
+
 export interface Dashboard {
   townName: string
   summary: {
@@ -153,6 +172,8 @@ export interface Dashboard {
     traffic: { total: number; external: number; internal: number } | null
     deadLetters: number | null
     backlog: number | null
+    /** The Incidents card: how many are open, and every line, open ones first. Null when nothing reports incidents (no health source, no incident tool with an incident). */
+    incidents: { open: number; rows: IncidentRow[] } | null
   }
   pillars: Pillar[]
   sections: Section[]
@@ -277,7 +298,21 @@ function rowOf(n: NodeSnapshot, s: Snapshot, view: TenantView, links: ReturnType
     calls: byRate(links.calls.get(n.id) ?? []),
     tenants,
     tenantsOpenByDefault: tenants?.some((t) => t.hot) ?? false,
+    azure: azureOf(n.id, s),
   }
+}
+
+function incidentsOf(s: Snapshot): Dashboard['summary']['incidents'] {
+  const tool: IncidentRow[] = s.groups.flatMap((g) => g.incidents.map<IncidentRow>((i) => ({ source: 'Incident', what: `${i.title} · ${g.displayName}`, status: `sev ${i.severity}`, tone: 'bad', nodeId: null, times: i.startedAt ? `declared ${dayTime(i.startedAt, Date.now())}` : '', dismiss: null })))
+  const azure = healthEventsOf(s.healthEvents).map<IncidentRow>((e) => ({ source: 'Azure', what: e.resource, status: e.state, tone: isResolved(e) ? 'ok' : 'bad', nodeId: e.nodeId ?? null, times: [`declared ${dayTime(e.since, Date.now())}`, isResolved(e) && e.resolvedAt ? `resolved ${dayTime(e.resolvedAt, Date.now())}` : null].filter(Boolean).join(' · '), dismiss: e.id }))
+  if (s.healthEvents == null && tool.length === 0) return null
+  const rows = [...tool, ...azure].sort((a, b) => Number(a.tone === 'ok') - Number(b.tone === 'ok'))
+  return { open: rows.filter((r) => r.tone === 'bad').length, rows }
+}
+
+function azureOf(id: string, s: Snapshot): Row['azure'] {
+  const e = eventOfNode(s.healthEvents, id)
+  return e ? { state: e.state, since: e.resolvedAt ?? e.since } : null
 }
 
 function groupsOf(g: GroupSnapshot, rows: Row[], nodes: NodeSnapshot[]): Group[] {
@@ -402,6 +437,7 @@ export function buildDashboard(s: Snapshot, view: TenantView): Dashboard {
       traffic: trafficSplit(s, totals.requestsPerSecond, totals.tenantShare),
       deadLetters: absentEverywhere(s, 'deadLetters') ? null : totals.deadLetters,
       backlog: absentEverywhere(s, 'backlog') ? null : queued.reduce((a, n) => a + (n.queueDepth ?? 0), 0),
+      incidents: incidentsOf(s),
     },
     pillars,
     sections: sectionsOf(s, view, links),

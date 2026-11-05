@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import type { NodeSnapshot } from '../types'
+import type { HealthEventSnapshot, NodeSnapshot } from '../types'
 import { isAbsent, isUnmonitored } from '../signals'
 import { beaconLevel, clamp, darkFloorsFor, floorsFor, formatAge, formatMs, formatRate, lerp, MAX_FLOORS, plaqueText, type BeaconLevel } from '../visuals'
 import { buildModel, palette } from '../themes/active'
@@ -32,6 +32,8 @@ export interface BuildingStatus {
   region: string
   /** How the requests divide between the regions ("North 95% · West 5%"), with a warning sign in front when one region takes too much; empty when nothing measures it. */
   split: string
+  /** The state Azure Resource Health reports for this building's resource while its red exclamation mark is up; null when nothing is reported. */
+  azure: string | null
 }
 
 interface FloorState {
@@ -40,6 +42,19 @@ interface FloorState {
   height: number
   dark: number
 }
+
+/** A red disc with a white exclamation mark: Azure reports the building's resource as degraded or unavailable. */
+const alertTexture = (() => {
+  let t: THREE.CanvasTexture | null = null
+  return () => (t ??= canvasTexture(128, 128, (ctx) => {
+    ctx.beginPath(); ctx.arc(64, 64, 58, 0, Math.PI * 2)
+    ctx.fillStyle = '#e5322d'; ctx.fill()
+    ctx.lineWidth = 8; ctx.strokeStyle = '#ffffff'; ctx.stroke()
+    ctx.fillStyle = '#ffffff'
+    roundRect(ctx, 54, 24, 20, 52, 8); ctx.fill()
+    ctx.beginPath(); ctx.arc(64, 94, 11, 0, Math.PI * 2); ctx.fill()
+  }))
+})()
 
 const haloTexture = (() => {
   let t: THREE.CanvasTexture | null = null
@@ -75,6 +90,8 @@ export class Building {
   private readonly halo: THREE.Sprite
   private readonly beaconAnchor = new THREE.Group()
   private level: BeaconLevel = 'green'
+  private readonly alert: THREE.Sprite
+  private azure: HealthEventSnapshot | null = null
   private pulsePhase = Math.random() * 6
   private readonly plaque: THREE.Mesh
   private plaqueCanvas: { ctx: CanvasRenderingContext2D; tex: THREE.CanvasTexture } | null = null
@@ -125,6 +142,11 @@ export class Building {
     this.roof.add(this.beaconAnchor)
     this.beaconAnchor.position.copy(m.beaconAt)
 
+    this.alert = new THREE.Sprite(new THREE.SpriteMaterial({ map: alertTexture(), transparent: true, depthWrite: false, depthTest: false, toneMapped: false }))
+    this.alert.renderOrder = 10
+    this.alert.visible = false
+    this.beaconAnchor.add(this.alert)
+
     this.plaque = this.makePlaque()
     this.pivot.add(this.plaque)
 
@@ -166,6 +188,12 @@ export class Building {
   setTenantView(view: TenantView): void {
     this.tenantView = view
     if (this.node) this.model.setTenants?.(this.node.tenants ?? [], this.node.throttleAmber, view)
+  }
+
+  /** Azure Resource Health's open report for this building's resource, or null: shows or hides the red exclamation mark above the beacon. */
+  setHealthEvent(e: HealthEventSnapshot | null): void {
+    this.azure = e
+    this.alert.visible = e !== null
   }
 
   /** `region` is the line that says which region the numbers are (see regionLine); empty for a service in one region. */
@@ -237,6 +265,7 @@ export class Building {
     this.roof.position.y = y
 
     this.updateBeacon(n, time, camera)
+    this.updateAlert(time, camera)
     this.model.animate?.(time, dt)
     this.hit.scale.y = y + 2
     this.hit.position.y = (y + 2) / 2
@@ -269,6 +298,7 @@ export class Building {
       underConstruction: n.app === 'Stopped',
       region: this.regionText,
       split: this.split ? (this.split.hot ? '⚠ ' : '') + this.split.text : '',
+      azure: this.azure?.state ?? null,
     }
   }
 
@@ -308,6 +338,15 @@ export class Building {
     this.halo.scale.setScalar(size * (0.85 + 0.25 * pulse))
     // keep the bulb itself visible from afar too
     this.bulb.scale.setScalar(clamp(dist / 55, 1, 2.6))
+  }
+
+  /** The exclamation mark floats above the beacon, bobbing a little, and keeps a minimum size on screen so it reads from afar. */
+  private updateAlert(time: number, camera: THREE.Camera): void {
+    if (!this.azure) return
+    const world = this.beaconAnchor.getWorldPosition(new THREE.Vector3())
+    const size = Math.max(2.2, camera.position.distanceTo(world) * 0.032)
+    this.alert.scale.setScalar(size)
+    this.alert.position.y = size * 2.3 + 0.25 * Math.sin(time * 3 + this.pulsePhase)
   }
 
   // ── plaque, label, closed sign ────────────────────────────────────────────

@@ -1,0 +1,57 @@
+{
+  "tables": [
+    {
+      "name": "PrimaryResult",
+      "columns": [
+        {
+          "name": "role",
+          "type": "string"
+        },
+        {
+          "name": "calls",
+          "type": "real"
+        },
+        {
+          "name": "errors",
+          "type": "real"
+        },
+        {
+          "name": "latencyMs",
+          "type": "real"
+        }
+      ],
+      "rows": [
+        [
+          "ApiGateway",
+          6000,
+          0,
+          30
+        ],
+        [
+          "OrdersApi",
+          3000,
+          60,
+          120
+        ],
+        [
+          "OrdersWorker",
+          600,
+          0,
+          400
+        ],
+        [
+          "LedgerApi",
+          4,
+          4,
+          5000
+        ],
+        [
+          "SomeoneElse",
+          9,
+          9,
+          9
+        ]
+      ]
+    }
+  ]
+}

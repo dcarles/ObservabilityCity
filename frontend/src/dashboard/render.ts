@@ -2,7 +2,7 @@
 // overall verdict, and nothing about towns, islands or buildings.
 
 import { escapeHtml as esc } from '../picker'
-import type { Chip, Dashboard, Group, Issue, JobRow, Level, Pillar, Row, Section, SideRow, TenantRow } from './model'
+import type { Chip, Dashboard, Group, IncidentRow, Issue, JobRow, Level, Pillar, Row, Section, SideRow, TenantRow } from './model'
 import type { SourceLine } from './freshness'
 
 /** What the viewer has opened or closed. A group or a database that is not in the maps follows its own default. */
@@ -46,13 +46,21 @@ function issueChip(i: Issue, withWhere: boolean): string {
 
 export function summaryHtml(d: Dashboard): string {
   const s = d.summary
-  const services = `<div class="kpi wide" id="kpi-services"><span>Services</span><b>${countsText(s.down, s.degraded)}</b>
+  const services = `<div class="kpi" id="kpi-services"><span>Services</span><b>${countsText(s.down, s.degraded)}</b>
     <div class="lst">${s.affected.length ? s.affected.map((i) => `<span class="ch" data-system="${esc(i.id)}">${dot(i.level)} ${esc(i.name)} <i>${esc(i.where)} · ${i.level === 'bad' ? 'down' : 'degraded'}</i></span>`).join('') : '<small>All services are healthy</small>'}</div></div>`
   const t = s.traffic
   const traffic = t ? `<div class="kpi" id="kpi-traffic"><span>Total traffic</span><b>${num(t.total)} rps</b>
     <div class="bar"><i style="width:${t.total > 0 ? (t.external / t.total) * 100 : 0}%"></i></div><small>External ${num(t.external)} · Internal ${num(t.internal)}</small></div>` : ''
   const dlq = s.deadLetters != null ? `<div class="kpi" id="kpi-dlq"><span>Dead letters</span><b>${num(s.deadLetters)}</b>${s.backlog != null ? `<small>Backlog ${num(s.backlog)} messages</small>` : ''}</div>` : ''
-  return services + traffic + dlq
+  const inc = s.incidents
+  const incidents = inc ? `<div class="kpi" id="kpi-incidents"><span>Incidents</span><b class="${inc.open > 0 ? 'bad' : 'ok'}">${num(inc.open)}</b>
+    <div class="ilist">${inc.rows.length ? inc.rows.map(incidentLine).join('') : '<small>No incidents</small>'}</div></div>` : ''
+  return services + traffic + dlq + incidents
+}
+
+function incidentLine(r: IncidentRow): string {
+  const body = `<span class="src">${r.source}</span><span class="what">${esc(r.what)}</span><span class="st">${esc(r.status)}</span>`
+  return `<div class="il ${r.tone}"${r.nodeId ? ` data-system="${esc(r.nodeId)}"` : ''}${r.times ? ` title="${esc(r.times)}"` : ''}>${body}${r.times || r.dismiss ? `<span class="sub">${r.times ? `<span class="tm">${esc(r.times)}</span>` : ''}${r.dismiss ? `<button class="idis" data-dismiss="${esc(r.dismiss)}" title="Hide this report until the server restarts">Dismiss</button>` : ''}</span>` : ''}</div>`
 }
 
 const CPU_AMBER = 80
@@ -114,7 +122,7 @@ function rowHtml(r: Row, ui: UiState): string {
   const conn = connectionsLabel(r)
   const showConn = ui.connections.has(r.id)
   const connCell = conn ? `<button class="conn" data-conn="${esc(r.id)}" aria-expanded="${showConn}">${conn}<span class="chev">${showConn ? '▴' : '▾'}</span></button>` : '<span class="dim">–</span>'
-  const main = `<tr class="row" data-system="${esc(r.id)}"><td class="ind">${dot(r.level)}<span class="nm">${label}${esc(r.name)}</span>${count}${r.dlq ? `<b class="bad dlq">DLQ ${num(r.dlq)}</b>` : ''}<small>${esc(r.type)}${r.instancesText ? ` · ${esc(r.instancesText)}` : ''}</small></td>
+  const main = `<tr class="row" data-system="${esc(r.id)}"><td class="ind">${dot(r.level)}<span class="nm">${label}${esc(r.name)}</span>${count}${r.dlq ? `<b class="bad dlq">DLQ ${num(r.dlq)}</b>` : ''}${r.azure ? `<b class="${r.azure.state === 'Resolved' ? 'ok' : r.azure.state === 'Unavailable' ? 'bad' : 'warn'} azure" title="Azure Resource Health reports this resource ${esc(r.azure.state.toLowerCase())}. Open Details for when and why.">${r.azure.state === 'Resolved' ? '✓ Azure resolved' : `! Azure ${esc(r.azure.state)}`}</b>` : ''}<small>${esc(r.type)}${r.instancesText ? ` · ${esc(r.instancesText)}` : ''}</small></td>
     <td class="n">${trafficCell(r)}</td><td class="n">${errorCell(r)}</td><td class="n">${latencyCell(r)}</td><td class="ld">${loadCell(r)}</td>
     <td>${connCell}</td><td><button class="det" data-details="${esc(r.id)}">Details <b>›</b></button></td></tr>`
   const connRow = showConn && conn

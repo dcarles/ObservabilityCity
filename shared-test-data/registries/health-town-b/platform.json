@@ -1,0 +1,272 @@
+{
+  "orders-api": [
+    {
+      "metric": "UsageNanoCores",
+      "aggregation": "average",
+      "points": [
+        320000000,
+        320000000,
+        320000000
+      ]
+    },
+    {
+      "metric": "CpuLimitNanoCores",
+      "aggregation": "average",
+      "points": [
+        500000000,
+        500000000,
+        500000000
+      ]
+    },
+    {
+      "metric": "WorkingSetBytes",
+      "aggregation": "maximum",
+      "points": [
+        710,
+        710,
+        710
+      ]
+    },
+    {
+      "metric": "MemoryLimitBytes",
+      "aggregation": "maximum",
+      "points": [
+        1000,
+        1000,
+        1000
+      ]
+    }
+  ],
+  "orders-worker": [
+    {
+      "metric": "UsageNanoCores",
+      "aggregation": "average",
+      "points": [
+        320000000,
+        320000000,
+        320000000
+      ]
+    },
+    {
+      "metric": "CpuLimitNanoCores",
+      "aggregation": "average",
+      "points": [
+        500000000,
+        500000000,
+        500000000
+      ]
+    },
+    {
+      "metric": "WorkingSetBytes",
+      "aggregation": "maximum",
+      "points": [
+        710,
+        710,
+        710
+      ]
+    },
+    {
+      "metric": "MemoryLimitBytes",
+      "aggregation": "maximum",
+      "points": [
+        1000,
+        1000,
+        1000
+      ]
+    }
+  ],
+  "ledger-api": [
+    {
+      "metric": "UsageNanoCores",
+      "aggregation": "average",
+      "points": [
+        200000000,
+        200000000,
+        200000000
+      ]
+    },
+    {
+      "metric": "CpuLimitNanoCores",
+      "aggregation": "average",
+      "points": [
+        500000000,
+        500000000,
+        500000000
+      ]
+    },
+    {
+      "metric": "WorkingSetBytes",
+      "aggregation": "maximum",
+      "points": [
+        520,
+        520,
+        520
+      ]
+    },
+    {
+      "metric": "MemoryLimitBytes",
+      "aggregation": "maximum",
+      "points": [
+        1000,
+        1000,
+        1000
+      ]
+    }
+  ],
+  "ledger-worker": [
+    {
+      "metric": "UsageNanoCores",
+      "aggregation": "average",
+      "points": [
+        200000000,
+        200000000,
+        200000000
+      ]
+    },
+    {
+      "metric": "CpuLimitNanoCores",
+      "aggregation": "average",
+      "points": [
+        500000000,
+        500000000,
+        500000000
+      ]
+    },
+    {
+      "metric": "WorkingSetBytes",
+      "aggregation": "maximum",
+      "points": [
+        520,
+        520,
+        520
+      ]
+    },
+    {
+      "metric": "MemoryLimitBytes",
+      "aggregation": "maximum",
+      "points": [
+        1000,
+        1000,
+        1000
+      ]
+    }
+  ],
+  "cosmos-orders-acmebank": [
+    {
+      "metric": "NormalizedRUConsumption",
+      "aggregation": "maximum",
+      "points": [
+        20,
+        20,
+        20
+      ]
+    },
+    {
+      "metric": "HttpRequests",
+      "aggregation": "count",
+      "points": [
+        1000,
+        1000,
+        1000
+      ]
+    }
+  ],
+  "cosmos-orders-borealis": [
+    {
+      "metric": "NormalizedRUConsumption",
+      "aggregation": "maximum",
+      "points": [
+        95,
+        95,
+        95
+      ]
+    },
+    {
+      "metric": "HttpRequests",
+      "aggregation": "count",
+      "points": [
+        500,
+        500,
+        500
+      ]
+    },
+    {
+      "metric": "Http429",
+      "aggregation": "count",
+      "points": [
+        50,
+        50,
+        50
+      ]
+    }
+  ],
+  "cosmos-orders-cygnus": [
+    {
+      "metric": "NormalizedRUConsumption",
+      "aggregation": "maximum",
+      "points": [
+        40,
+        40,
+        40
+      ]
+    },
+    {
+      "metric": "HttpRequests",
+      "aggregation": "count",
+      "points": [
+        600,
+        600,
+        600
+      ]
+    },
+    {
+      "metric": "Http429",
+      "aggregation": "count",
+      "points": [
+        0,
+        0,
+        0
+      ]
+    }
+  ],
+  "cosmos-ledger-acmebank": [
+    {
+      "metric": "NormalizedRUConsumption",
+      "aggregation": "maximum",
+      "points": [
+        50,
+        50,
+        50
+      ]
+    },
+    {
+      "metric": "HttpRequests",
+      "aggregation": "count",
+      "points": [
+        300,
+        300,
+        300
+      ]
+    }
+  ],
+  "cosmos-ledger-borealis": [
+    {
+      "metric": "NormalizedRUConsumption",
+      "aggregation": "maximum",
+      "points": [
+        30,
+        30,
+        30
+      ]
+    },
+    {
+      "metric": "HttpRequests",
+      "aggregation": "count",
+      "points": [
+        300,
+        300,
+        300
+      ]
+    }
+  ]
+}

@@ -104,6 +104,13 @@ export function checkSnapshot(raw: unknown): Checked {
     sources: Array.isArray(raw.sources)
       ? raw.sources.filter(isObject).filter((x) => typeof x.name === 'string' && isFiniteNumber(x.intervalSeconds)).map((x) => ({ name: x.name as string, lastRead: typeof x.lastRead === 'string' ? x.lastRead : null, intervalSeconds: x.intervalSeconds as number, overdue: x.overdue === true }))
       : null,
+    // the cloud's own health reports; one without an id, a resource or a state cannot be listed and is dropped
+    healthEvents: Array.isArray(raw.healthEvents)
+      ? raw.healthEvents.filter(isObject).filter((e) => typeof e.id === 'string' && e.id !== '' && typeof e.resource === 'string' && typeof e.state === 'string' && typeof e.since === 'string').map((e) => ({
+        id: e.id as string, resource: e.resource as string, state: e.state as string, previous: str(e.previous) || null, cause: str(e.cause) || null, since: e.since as string,
+        nodeId: str(e.nodeId) || null, groupId: str(e.groupId) || null, summary: str(e.summary) || null, resolvedAt: typeof e.resolvedAt === 'string' ? e.resolvedAt : null,
+      }))
+      : null,
     groups,
     vendors,
     externalCallers: (Array.isArray(raw.externalCallers) ? raw.externalCallers : []).filter(isObject).filter((c) => typeof c.id === 'string' && c.id !== '').map<ExternalCallerSnapshot>((c) => ({

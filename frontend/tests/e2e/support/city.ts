@@ -28,6 +28,8 @@ export interface Status {
   region: string
   /** How the requests divide between the regions ("⚠ North 95% · West 5%", the warning when one takes too much); empty when nothing measures it. */
   split: string
+  /** The state Azure Resource Health reports for the building's resource while its red exclamation mark is up; null otherwise. */
+  azure: string | null
 }
 
 export interface TenantYard {
