@@ -161,6 +161,8 @@ export interface IncidentRow {
   times: string
   /** The id of the Azure report, for its Dismiss button; null for an incident of the incident tool. */
   dismiss: string | null
+  /** Why, as the cloud said it; null when it gave none or the line is not an Azure report. */
+  cause: string | null
 }
 
 export interface Dashboard {
@@ -303,16 +305,24 @@ function rowOf(n: NodeSnapshot, s: Snapshot, view: TenantView, links: ReturnType
 }
 
 function incidentsOf(s: Snapshot): Dashboard['summary']['incidents'] {
-  const tool: IncidentRow[] = s.groups.flatMap((g) => g.incidents.map<IncidentRow>((i) => ({ source: 'Incident', what: `${i.title} · ${g.displayName}`, status: `sev ${i.severity}`, tone: 'bad', nodeId: null, times: i.startedAt ? `declared ${dayTime(i.startedAt, Date.now())}` : '', dismiss: null })))
-  const azure = healthEventsOf(s.healthEvents).map<IncidentRow>((e) => ({ source: 'Azure', what: e.resource, status: e.state, tone: isResolved(e) ? 'ok' : 'bad', nodeId: e.nodeId ?? null, times: [`declared ${dayTime(e.since, Date.now())}`, isResolved(e) && e.resolvedAt ? `resolved ${dayTime(e.resolvedAt, Date.now())}` : null].filter(Boolean).join(' · '), dismiss: e.id }))
+  const tool: IncidentRow[] = s.groups.flatMap((g) => g.incidents.map<IncidentRow>((i) => ({ source: 'Incident', what: `${i.title} · ${g.displayName}`, status: `sev ${i.severity}`, tone: 'bad', nodeId: null, times: i.startedAt ? `declared ${dayTime(i.startedAt, Date.now())}` : '', dismiss: null, cause: null })))
+  const nameOf = new Map(s.groups.flatMap((g) => g.nodes.map((n) => [n.id, n.name] as const)))
+  const azure = healthEventsOf(s.healthEvents).map<IncidentRow>((e) => ({ source: 'Azure', what: incidentName(e, nameOf), status: e.state, tone: isResolved(e) ? 'ok' : 'bad', nodeId: e.nodeId ?? null, times: [`declared ${dayTime(e.since, Date.now())}`, isResolved(e) && e.resolvedAt ? `resolved ${dayTime(e.resolvedAt, Date.now())}` : null].filter(Boolean).join(' · '), dismiss: e.id, cause: e.cause ?? null }))
   if (s.healthEvents == null && tool.length === 0) return null
   const rows = [...tool, ...azure].sort((a, b) => Number(a.tone === 'ok') - Number(b.tone === 'ok'))
   return { open: rows.filter((r) => r.tone === 'bad').length, rows }
 }
 
+/** The name a report goes by in the card: the system's own name, as the service table shows it, and for a resource kept per tenant (a database) the tenant too; a resource no system owns keeps the cloud's name. */
+export function incidentName(e: { resource: string; nodeId?: string | null; tenant?: string | null }, nameOf: ReadonlyMap<string, string>): string {
+  const own = e.nodeId ? nameOf.get(e.nodeId) : undefined
+  return own ? (e.tenant ? `${own} · ${e.tenant}` : own) : e.resource
+}
+
+/** Only an open report marks a row: once resolved it is left to the Incidents card. */
 function azureOf(id: string, s: Snapshot): Row['azure'] {
   const e = eventOfNode(s.healthEvents, id)
-  return e ? { state: e.state, since: e.resolvedAt ?? e.since } : null
+  return e && !isResolved(e) ? { state: e.state, since: e.since } : null
 }
 
 function groupsOf(g: GroupSnapshot, rows: Row[], nodes: NodeSnapshot[]): Group[] {

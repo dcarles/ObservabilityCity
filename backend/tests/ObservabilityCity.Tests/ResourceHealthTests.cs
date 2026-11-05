@@ -196,6 +196,21 @@ public class ResourceHealthTests
     [Theory]
     [InlineData("a")]
     [InlineData("b")]
+    public async Task An_event_of_a_store_kept_per_tenant_says_which_tenant_by_its_friendly_name_and_one_no_system_owns_says_none(string town)
+    {
+        var rig = await Run(Folder(town), SourceName(town));
+
+        var events = rig.Builder.Build().HealthEvents!;
+
+        var orders = events.Single(e => e.NodeId == "aa.orders-db" && e.State != "Resolved");
+        Assert.False(string.IsNullOrEmpty(orders.Tenant));
+        Assert.DoesNotMatch("^[0-9a-f]{32}$", orders.Tenant!); // the name the scope found on the resource, not the id
+        Assert.Null(events.Single(e => e.NodeId is null).Tenant);
+    }
+
+    [Theory]
+    [InlineData("a")]
+    [InlineData("b")]
     public async Task The_events_are_open_incidents_in_the_count_and_the_islands_they_belong_to_are_not_incident_free(string town)
     {
         var rig = await Run(Folder(town), SourceName(town));
