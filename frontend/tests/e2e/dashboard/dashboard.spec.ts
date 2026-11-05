@@ -216,6 +216,28 @@ test.describe('the dashboard view', () => {
     expect(got.head).toBe('3')
   })
 
+  test('the Dead letters card lists each queue with dead letters, worst first, and a row opens that service', async ({ town, page }) => {
+    await open(town, page)
+    const edit = `for (const m of s.groups.flatMap(g => g.nodes)) { m.deadLetters = 0; m.queues = [] }
+      const a = node('aa.orders-api'); a.absent = a.absent.filter(x => x !== 'deadLetters'); a.state = 'Healthy'; a.deadLetters = 9; s.totals.deadLetters = 9; a.queues = [{ name: 'q-small', backlog: 0, deadLetters: 2 }, { name: 'q-big', backlog: 0, deadLetters: 7 }]`
+    const read = `const c = document.querySelector('#kpi-dlq'); return { total: c.querySelector('b').textContent, head: c.querySelector('.dh')?.textContent, rows: [...c.querySelectorAll('.dl')].map(r => r.textContent) }`
+    const got = await withSnapshot<{ total: string; head: string; rows: string[] }>(page, edit, read)
+    expect(got.total).toBe('9')
+    expect(got.head).toBe('2 queues with dead letters')
+    expect(got.rows).toHaveLength(2)
+    expect(got.rows[0]).toContain('q-big · 7 dead')
+    expect(got.rows[1]).toContain('q-small · 2 dead')
+    await page.locator('#kpi-dlq .dl').first().click()
+    await expect(page.locator('#inspector')).toBeVisible()
+  })
+
+  test('the Dead letters card says so when no queue has dead letters', async ({ town, page }) => {
+    await open(town, page)
+    const read = `return document.querySelector('#kpi-dlq .dlist').textContent`
+    const text = await withSnapshot<string>(page, `for (const m of s.groups.flatMap(g => g.nodes)) { m.deadLetters = 0; m.queues = [] }`, read)
+    expect(text).toBe('No queue has dead letters right now.')
+  })
+
   test('Details on a service row opens the drawer on the Overview tab', async ({ town, page }) => {
     await open(town, page)
     const card = page.locator('[data-pillar="aa"]')

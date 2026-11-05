@@ -6,6 +6,7 @@ import { eventOfNode, healthEventsOf, isResolved } from '../healthEvents'
 import { absentEverywhere, isAbsent, isUnmonitored } from '../signals'
 import { isFollowed, isFollowing, isShown, isThrottled, tenantLevel, type TenantView } from '../tenants'
 import { islandChoices } from '../islands'
+import { deadLetterItems, type DeadLetterItem } from '../deadLetters'
 import { stateFor, viewTotals } from '../viewTotals'
 import { trafficSplit } from '../trafficSplit'
 import type { GroupSnapshot, HealthState, JobSnapshot, NodeSnapshot, Snapshot } from '../types'
@@ -174,6 +175,8 @@ export interface Dashboard {
     traffic: { total: number; external: number; internal: number } | null
     deadLetters: number | null
     backlog: number | null
+    /** The queues with dead letters, worst first, for the Dead letters card. */
+    deadQueues: DeadLetterItem[]
     /** The Incidents card: how many are open, and every line, open ones first. Null when nothing reports incidents (no health source, no incident tool with an incident). */
     incidents: { open: number; rows: IncidentRow[] } | null
   }
@@ -447,6 +450,7 @@ export function buildDashboard(s: Snapshot, view: TenantView): Dashboard {
       traffic: trafficSplit(s, totals.requestsPerSecond, totals.tenantShare),
       deadLetters: absentEverywhere(s, 'deadLetters') ? null : totals.deadLetters,
       backlog: absentEverywhere(s, 'backlog') ? null : queued.reduce((a, n) => a + (n.queueDepth ?? 0), 0),
+      deadQueues: deadLetterItems(s.groups),
       incidents: incidentsOf(s),
     },
     pillars,
