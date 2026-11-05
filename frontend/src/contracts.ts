@@ -234,6 +234,7 @@ export interface components {
             summary?: string | null;
             /** Format: date-time */
             resolvedAt?: string | null;
+            tenant?: string | null;
         };
         /** @enum {string} */
         HealthState: "Healthy" | "Degraded" | "Down" | "Stale";
