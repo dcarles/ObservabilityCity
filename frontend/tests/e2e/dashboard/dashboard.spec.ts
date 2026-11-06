@@ -234,6 +234,28 @@ test.describe('the dashboard view', () => {
     await expect(page.locator('#inspector')).toBeVisible()
   })
 
+  test('dead letters in two regions: the Dead letters card has a row for each region with its tag, counts one queue, and the drawer links each region to its own tool', async ({ town, page }) => {
+    await open(town, page)
+    const edit = `for (const m of s.groups.flatMap(g => g.nodes)) { m.deadLetters = 0; m.queues = [] }
+      const a = node('aa.orders-api'); a.absent = a.absent.filter(x => x !== 'deadLetters'); a.state = 'Healthy'; a.deadLetters = 11; s.totals.deadLetters = 11
+      a.queues = [{ name: 'q-split', backlog: 0, deadLetters: 11, deadLetterRegions: [{ region: 'northeurope', count: 3, link: { name: 'Support North', url: 'https://north.example.test/q' } }, { region: 'westeurope', count: 8, link: { name: 'Support West', url: 'https://west.example.test/q' } }] }]`
+    const read = `const c = document.querySelector('#kpi-dlq'); return { head: c.querySelector('.dh').textContent, rows: [...c.querySelectorAll('.dl')].map(r => r.textContent) }`
+    const got = await withSnapshot<{ head: string; rows: string[] }>(page, edit, read)
+    expect(got.head).toBe('1 queue with dead letters')
+    expect(got.rows).toHaveLength(2)
+    expect(got.rows[0]).toContain('q-split · West · 8 dead') // worst first
+    expect(got.rows[1]).toContain('q-split · North · 3 dead')
+
+    await page.locator('#kpi-dlq .dl').first().click()
+    const row = page.locator('#inspector .row.queue[data-queue="q-split"]')
+    await expect(row).toContainText('North 3 dead')
+    await expect(row).toContainText('West 8 dead')
+    const links = row.locator('a.out')
+    await expect(links).toHaveCount(2)
+    await expect(links.nth(0)).toHaveAttribute('href', 'https://north.example.test/q')
+    await expect(links.nth(1)).toHaveAttribute('href', 'https://west.example.test/q')
+  })
+
   test('the Dead letters card says so when no queue has dead letters', async ({ town, page }) => {
     await open(town, page)
     const read = `return document.querySelector('#kpi-dlq .dlist').textContent`

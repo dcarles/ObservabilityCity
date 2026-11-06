@@ -284,6 +284,11 @@ function checkNode(n: unknown, groupId: string, ids: Set<string>, problems: stri
           ? q.types.filter(isObject).filter((t) => typeof t.type === 'string' && t.type !== '' && isFiniteNumber(t.perSecond) && t.perSecond >= 0).map((t) => ({ type: t.type as string, perSecond: t.perSecond as number }))
           : null,
         typesCut: isFiniteNumber(q.typesCut) && q.typesCut > 0 ? Math.round(q.typesCut) : 0,
+        // where the dead letters are, when the broker spans regions: one without a region or a count cannot be shown; a link must be a web address
+        deadLetterRegions: Array.isArray(q.deadLetterRegions)
+          ? q.deadLetterRegions.filter(isObject).filter((r) => typeof r.region === 'string' && r.region !== '' && isFiniteNumber(r.count) && r.count > 0)
+            .map((r) => ({ region: r.region as string, count: r.count as number, link: isObject(r.link) && typeof r.link.name === 'string' && r.link.name !== '' && typeof r.link.url === 'string' && /^https?:\/\//i.test(r.link.url) ? { name: r.link.name, url: r.link.url } : null }))
+          : null,
       }))
     : null
   out.regions = Array.isArray(n.regions)

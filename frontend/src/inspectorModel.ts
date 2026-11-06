@@ -1,5 +1,6 @@
 // What the inspector drawer says, as pure functions: a system's numbers in, rows and sentences out.
 
+import { regionLabel } from './deadLetters'
 import type { ConfigValue, HealthState, ScheduleSnapshot, IncidentSnapshot, JobSnapshot, LinkRef, LogGroup, LogSection, NodeSnapshot, ResourceLink, ScopeInfo, ScopeResource, SettingLayer, SystemDetail } from './types'
 import { inboundSplitText } from './inbound'
 import { limitRange, throttleWho } from './tenants'
@@ -387,7 +388,8 @@ export interface QueueTypes {
 }
 
 /** One queue a consumer reads, as a row of the drawer: its name, what waits and what is dead-lettered in words, and the link to its dead letters. */
-export interface QueueRow { name: string; text: string; tone: Tone; link: ResourceLink | null; types: QueueTypes | null }
+export interface QueueRegionLink { region: string; count: number; link: ResourceLink | null }
+export interface QueueRow { name: string; text: string; tone: Tone; link: ResourceLink | null; types: QueueTypes | null; regions: QueueRegionLink[] }
 
 /** A queue's kinds of message for the drawer. Null when the environment does not measure them (no list at all) or the queue handled none. */
 export function queueTypes(q: Pick<NonNullable<NodeSnapshot['queues']>[number], 'types' | 'typesCut'>): QueueTypes | null {
@@ -418,8 +420,11 @@ export function messagesPerSecond(nodes: readonly Pick<NodeSnapshot, 'queues' | 
 export function queueRows(n: Pick<NodeSnapshot, 'queues'>): QueueRow[] {
   const rows = (n.queues ?? []).map((q) => {
     const parts = [q.backlog != null ? `${Math.round(q.backlog)} waiting` : null, q.deadLetters != null ? `${Math.round(q.deadLetters)} dead` : null, q.perSecond != null ? `${messageRate(q.perSecond)} msg/s` : null].filter((p): p is string => p !== null)
-    const link = q.link && q.link.name !== '' && /^https?:\/\//i.test(q.link.url) ? q.link : null
-    return { q, row: { name: q.name, text: parts.join(' · ') || 'no numbers', tone: ((q.deadLetters ?? 0) > 0 ? 'bad' : '') as Tone, link, types: queueTypes(q) } }
+    const web = (l?: ResourceLink | null) => (l && l.name !== '' && /^https?:\/\//i.test(l.url) ? l : null)
+    // dead letters in several regions: each region has its own count and its own support tool, so the one link for all is not shown
+    const regions = (q.deadLetterRegions ?? []).filter((r) => r.count > 0).map((r) => ({ region: regionLabel(r.region), count: Math.round(r.count), link: web(r.link) }))
+    const link = regions.length > 0 ? null : web(q.link)
+    return { q, row: { name: q.name, text: parts.join(' · ') || 'no numbers', tone: ((q.deadLetters ?? 0) > 0 ? 'bad' : '') as Tone, link, types: queueTypes(q), regions } }
   })
   return rows.sort((a, b) => (b.q.deadLetters ?? 0) - (a.q.deadLetters ?? 0) || (b.q.backlog ?? 0) - (a.q.backlog ?? 0) || a.q.name.localeCompare(b.q.name)).map((r) => r.row)
 }

@@ -186,6 +186,12 @@ export interface components {
             layer: components["schemas"]["SettingLayer"];
             source: string;
         };
+        DeadLetterRegionSnapshot: {
+            region: string;
+            /** Format: double */
+            count: number;
+            link?: components["schemas"]["ResourceLink"];
+        };
         DependencySnapshot: {
             from: string;
             to: string;
@@ -397,6 +403,7 @@ export interface components {
             types?: components["schemas"]["MessageTypeSnapshot"][] | null;
             /** Format: int32 */
             typesCut?: number | null;
+            deadLetterRegions?: components["schemas"]["DeadLetterRegionSnapshot"][] | null;
         };
         RegionSnapshot: {
             region: string;

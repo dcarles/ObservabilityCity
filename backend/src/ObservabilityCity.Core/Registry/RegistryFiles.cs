@@ -450,6 +450,8 @@ internal sealed class EntitiesFile
     public EntityMetricFile? DeadLetter { get; set; }
     /// <summary>An address that opens a consumer's dead letters in your support tool: a name and a URL template over {pillar}, {service}, {system} and {environment}. Without it, no link.</summary>
     public EntityLinkFile? DeadLetterLink { get; set; }
+    /// <summary>One support-tool address for each region, when the regions have their own tool: each is a name, a URL template and the region it is for. A queue's dead letters in a region open the entry of that region; a region with no entry uses deadLetterLink.</summary>
+    public List<EntityLinkFile> DeadLetterLinks { get; set; } = [];
     /// <summary>The messages that arrive in an entity, for example a metric of incoming messages added up by total. Their rate sets how many boats sail to the consumer.</summary>
     public EntityMetricFile? Throughput { get; set; }
     /// <summary>Entity name patterns, tried in order: the first that matches decides whose the entity is. An entity no pattern matches is left out.</summary>
@@ -460,6 +462,8 @@ internal sealed class EntityLinkFile
 {
     public string Name { get; set; } = "";
     public string Url { get; set; } = "";
+    /// <summary>Only in deadLetterLinks: the region the address is for, as the town names it (for example the region of the broker's namespace), matched ignoring case.</summary>
+    public string? Region { get; set; }
 }
 
 internal sealed class EntityMetricFile

@@ -488,7 +488,8 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
             Inbound = split?.Callers,
             InboundEstimated = split?.Estimated ?? false,
             Sources = ages.Any(a => !a.Fresh) ? ages : null,
-            Queues = r.Queues?.Select(q => new QueueSnapshot(q.Name, q.Backlog, q.DeadLetters, DeadLetterLinks.For(registry, n, q.Name), q.PerSecond, q.Types?.Select(t => new MessageTypeSnapshot(t.Type, t.PerSecond)).ToList(), q.TypesCut > 0 ? q.TypesCut : null)).ToList(),
+            Queues = r.Queues?.Select(q => new QueueSnapshot(q.Name, q.Backlog, q.DeadLetters, DeadLetterLinks.For(registry, n, q.Name), q.PerSecond, q.Types?.Select(t => new MessageTypeSnapshot(t.Type, t.PerSecond)).ToList(), q.TypesCut > 0 ? q.TypesCut : null,
+                q.DeadLetterRegions?.Select(d => new DeadLetterRegionSnapshot(d.Region, d.Count, DeadLetterLinks.For(registry, n, q.Name, d.Region))).ToList())).ToList(),
             App = r.App,
             Jobs = jobs,
             Regions = regions?.Select(x => new RegionSnapshot(x.Region, Label(env, x.Region), x.Instances, x.Cpu, x.Memory, x.Share, Skewed(x, regions, env))).ToList(),
@@ -586,7 +587,7 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
             OldestMessageSeconds = Gone(Signals.Backlog) ? null : r.OldestMessageSeconds,
             DeadLetters = Gone(Signals.DeadLetters) ? null : r.DeadLetters,
             Queues = Gone(Signals.Backlog) && Gone(Signals.DeadLetters) ? null
-                : r.Queues?.Select(q => q with { Backlog = Gone(Signals.Backlog) ? null : q.Backlog, DeadLetters = Gone(Signals.DeadLetters) ? null : q.DeadLetters }).ToList(),
+                : r.Queues?.Select(q => q with { Backlog = Gone(Signals.Backlog) ? null : q.Backlog, DeadLetters = Gone(Signals.DeadLetters) ? null : q.DeadLetters, DeadLetterRegions = Gone(Signals.DeadLetters) ? null : q.DeadLetterRegions }).ToList(),
         };
     }
 

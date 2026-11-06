@@ -263,7 +263,16 @@ describe('the Dead letters card list', () => {
   })
 
   it('uses a singular for one queue', () => {
-    expect(deadQueuesHtml([{ nodeId: 'a.b', nodeName: 'B', groupId: 'a', groupName: 'A', queue: 'q', count: 1 }])).toContain('1 queue with dead letters')
+    expect(deadQueuesHtml([{ nodeId: 'a.b', nodeName: 'B', groupId: 'a', groupName: 'A', queue: 'q', count: 1, region: null }])).toContain('1 queue with dead letters')
+  })
+
+  it('card shows the region of each row and counts a queue in two regions once', () => {
+    const base = { nodeId: 'a.b', nodeName: 'B', groupId: 'a', groupName: 'A', queue: 'q' }
+    const html = deadQueuesHtml([{ ...base, count: 8, region: 'West' }, { ...base, count: 3, region: 'North' }])
+    expect(html).toContain('1 queue with dead letters')
+    expect(html).toContain('<b class="rg">West</b> · <i>8</i> dead')
+    expect(html).toContain('<b class="rg">North</b> · <i>3</i> dead')
+    expect(deadQueuesHtml([{ ...base, count: 1, region: null }])).not.toContain('class="rg"')
   })
 })
 

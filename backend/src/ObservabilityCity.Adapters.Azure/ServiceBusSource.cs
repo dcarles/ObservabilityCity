@@ -52,7 +52,7 @@ public sealed class ServiceBusSource(
             try
             {
                 var series = recorded is not null ? recorded.GetValueOrDefault(ns.Name) ?? [] : await ReadNamespace(config, ns, at, ct);
-                lock (read) read.AddRange(series);
+                lock (read) read.AddRange(series.Select(s => s with { Region = ns.Region }));
             }
             catch (Exception e) when (e is not OperationCanceledException || !ct.IsCancellationRequested) { lock (errors) errors.Add(e.Message); }
             finally { gate.Release(); }
@@ -63,6 +63,9 @@ public sealed class ServiceBusSource(
         // an entity's number in one namespace, then the sum over the namespaces that hold an entity of the same name
         var backlog = Reduced(read, config.Backlog);
         var dead = Reduced(read, config.DeadLetter);
+        // where the dead letters are, only worth saying when the broker's namespaces are in more than one region
+        var spansRegions = namespaces.Select(n => n.Region).Where(r => !string.IsNullOrWhiteSpace(r)).Distinct(StringComparer.OrdinalIgnoreCase).Count() > 1;
+        var deadByRegion = spansRegions ? ReducedByRegion(read, config.DeadLetter) : null;
         var arrived = Reduced(read, config.Throughput);
         var patterns = config.Patterns.Select(p => (Regex: new Regex(p.Match, RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1)), p.Consumer)).ToList();
         var byNode = new Dictionary<string, (double Waiting, double Dead, bool HasWaiting, bool HasDead)>();
@@ -86,7 +89,8 @@ public sealed class ServiceBusSource(
             // an entity Azure sent nothing for this time keeps its place in the list (with no numbers), so a quiet queue neither vanishes nor ages
             own.Add(new QueueReading(entity, backlog.TryGetValue(entity, out var qb) ? Math.Round(qb) : null, dead.TryGetValue(entity, out var qd) ? Math.Round(qd) : null,
                 arrived.TryGetValue(entity, out var qa) ? Math.Round(qa / Window.TotalSeconds, 3) : null, claim.ProducerGroup, claim.ProducerService,
-                types is null ? null : types.GetValueOrDefault(entity).Types ?? [], types?.GetValueOrDefault(entity).Cut ?? 0));
+                types is null ? null : types.GetValueOrDefault(entity).Types ?? [], types?.GetValueOrDefault(entity).Cut ?? 0,
+                deadByRegion is null || !deadByRegion.TryGetValue(entity, out var regions) ? null : regions.Where(r => Math.Round(r.Value) > 0).OrderBy(r => r.Key, StringComparer.OrdinalIgnoreCase).Select(r => new DeadLetterRegionReading(r.Key, Math.Round(r.Value))).ToList()));
         }
         Unclaimed = unclaimed;
         return byNode.ToDictionary(kv => kv.Key, kv => new NodeReading(at, true, 0, 0, 0, 0, 0, 0,
@@ -133,6 +137,20 @@ public sealed class ServiceBusSource(
         foreach (var series in all.Where(s => s.Metric.Equals(metric.Metric, StringComparison.OrdinalIgnoreCase) && s.Aggregation.Equals(metric.Aggregation, StringComparison.OrdinalIgnoreCase)))
             if (AzureMonitorReader.Reduce(series.Points, metric.Aggregation) is { } value) sums[series.Entity] = sums.GetValueOrDefault(series.Entity) + Math.Max(0, value);
         return sums;
+    }
+
+    /// <summary>Each entity's number in each region, the way <see cref="Reduced"/> reads it: the entity's number in the namespaces of one region added up. A series with no region is left out.</summary>
+    private static Dictionary<string, Dictionary<string, double>> ReducedByRegion(IEnumerable<EntitySeries> all, EntityMetric? metric)
+    {
+        var result = new Dictionary<string, Dictionary<string, double>>(StringComparer.Ordinal);
+        if (metric is null) return result;
+        foreach (var series in all.Where(s => !string.IsNullOrWhiteSpace(s.Region) && s.Metric.Equals(metric.Metric, StringComparison.OrdinalIgnoreCase) && s.Aggregation.Equals(metric.Aggregation, StringComparison.OrdinalIgnoreCase)))
+            if (AzureMonitorReader.Reduce(series.Points, metric.Aggregation) is { } value)
+            {
+                if (!result.TryGetValue(series.Entity, out var regions)) result[series.Entity] = regions = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
+                regions[series.Region!] = regions.GetValueOrDefault(series.Region!) + Math.Max(0, value);
+            }
+        return result;
     }
 
     /// <summary>

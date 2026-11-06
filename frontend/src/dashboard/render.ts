@@ -62,8 +62,9 @@ export function summaryHtml(d: Dashboard): string {
 /** The queues with dead letters, worst first: the service that reads each, its pillar, the queue and how many. */
 export function deadQueuesHtml(items: Dashboard['summary']['deadQueues']): string {
   if (!items.length) return '<small>No queue has dead letters right now.</small>'
-  const head = `<small class="dh">${items.length} ${items.length === 1 ? 'queue' : 'queues'} with dead letters</small>`
-  return head + items.map((d) => `<div class="dl" data-system="${esc(d.nodeId)}"><span class="what">${esc(d.nodeName)} <em>· ${esc(d.groupName)}</em></span><span class="q">${esc(d.queue)} · <i>${num(Math.round(d.count))}</i> dead</span></div>`).join('')
+  const queues = new Set(items.map((d) => `${d.nodeId}|${d.queue}`)).size // a queue with dead letters in two regions is one queue, two rows
+  const head = `<small class="dh">${queues} ${queues === 1 ? 'queue' : 'queues'} with dead letters</small>`
+  return head + items.map((d) => `<div class="dl" data-system="${esc(d.nodeId)}"><span class="what">${esc(d.nodeName)} <em>· ${esc(d.groupName)}</em></span><span class="q">${esc(d.queue)} · ${d.region ? `<b class="rg">${esc(d.region)}</b> · ` : ''}<i>${num(Math.round(d.count))}</i> dead</span></div>`).join('')
 }
 
 function incidentLine(r: IncidentRow): string {

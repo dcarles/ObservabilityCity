@@ -17,7 +17,7 @@ public sealed record MetricCall(string? Namespace, string Aggregation, string? F
 }
 
 /// <summary>The points one metric gave for one entity (the value of the dimension the answer was split by) over the window.</summary>
-public sealed record EntitySeries(string Entity, string Metric, string Aggregation, IReadOnlyList<double> Points);
+public sealed record EntitySeries(string Entity, string Metric, string Aggregation, IReadOnlyList<double> Points, string? Region = null);
 
 /// <summary>The points one metric gave over the window, as asked: this metric, added up this way, with this filter. No point is a gap the cloud left, not a zero.</summary>
 public sealed record MetricSeries(string Metric, string Aggregation, string? Filter, IReadOnlyList<double> Points);
