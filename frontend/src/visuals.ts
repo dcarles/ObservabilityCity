@@ -121,6 +121,11 @@ export function formatRate(v: number): string {
   return v >= 1000 ? `${(v / 1000).toFixed(1)}k` : v >= 10 ? v.toFixed(0) : v.toFixed(1)
 }
 
+/** A count of messages (dead letters): a whole number, or thousands as 1.2k. Not for rates, which keep their decimals (see formatRate). */
+export function formatCount(v: number): string {
+  return v >= 1000 ? `${(v / 1000).toFixed(1)}k` : String(Math.round(v))
+}
+
 /** Age of the oldest waiting message: seconds, minutes or hours. */
 export function formatAge(seconds: number): string {
   return seconds < 90 ? `${Math.round(seconds)}s` : seconds < 5400 ? `${Math.round(seconds / 60)}m` : `${(seconds / 3600).toFixed(1)}h`

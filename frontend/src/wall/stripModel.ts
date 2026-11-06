@@ -1,7 +1,7 @@
 // What the wall's status strip says, as data: a headline in words, how bad it is, and the numbers. Pure.
 
 import type { Snapshot } from '../types'
-import { formatMs, formatRate } from '../visuals'
+import { formatCount, formatMs, formatRate } from '../visuals'
 import { viewTotals } from '../viewTotals'
 import { ALL_TENANTS } from '../tenants'
 import { healthyCaption } from './calm'
@@ -35,7 +35,7 @@ export function stripModel(s: Snapshot): StripModel {
     { label: 'req/s', value: formatRate(t.requestsPerSecond), tone: 'ok' },
     { label: 'errors', value: `${(t.errorRate * 100).toFixed(1)}%`, tone: t.errorRate >= 0.05 ? 'bad' : t.errorRate >= 0.01 ? 'warn' : 'ok' },
     { label: 'p99', value: formatMs(t.p99Ms), tone: 'ok' },
-    { label: 'DLQ', value: formatRate(t.deadLetters), tone: t.deadLetters > 0 ? 'bad' : 'ok' },
+    { label: 'DLQ', value: formatCount(t.deadLetters), tone: t.deadLetters > 0 ? 'bad' : 'ok' },
   ]
   return {
     tone,

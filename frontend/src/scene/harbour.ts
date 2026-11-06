@@ -2,7 +2,7 @@ import * as THREE from 'three'
 import { box, canvasTexture, cyl, flat, roundRect } from '../buildings/mk'
 import type { MessagingSnapshot, NodeSnapshot } from '../types'
 import { palette } from '../themes/active'
-import { clamp, formatAge, formatRate } from '../visuals'
+import { clamp, formatAge, formatCount, formatRate } from '../visuals'
 import { GROUND } from './island'
 
 const CRATE_COLORS = ['#e0573f', '#3f8fd9', '#f2b632', '#4fb37a', '#8e6bd9']
@@ -239,7 +239,7 @@ export class HarbourStatus {
     if (m.deadLetters != null) {
       y += 38
       ctx.fillStyle = dead ? '#ff5a4d' : '#b8c7da'; ctx.font = '700 26px system-ui, sans-serif'
-      ctx.fillText(`DLQ ${formatRate(m.deadLetters)}`, 24, y)
+      ctx.fillText(`DLQ ${formatCount(m.deadLetters)}`, 24, y)
     }
     tex.needsUpdate = true
   }

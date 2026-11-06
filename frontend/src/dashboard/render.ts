@@ -64,7 +64,7 @@ export function deadQueuesHtml(items: Dashboard['summary']['deadQueues']): strin
   if (!items.length) return '<small>No queue has dead letters right now.</small>'
   const queues = new Set(items.map((d) => `${d.nodeId}|${d.queue}`)).size // a queue with dead letters in two regions is one queue, two rows
   const head = `<small class="dh">${queues} ${queues === 1 ? 'queue' : 'queues'} with dead letters</small>`
-  return head + items.map((d) => `<div class="dl" data-system="${esc(d.nodeId)}"><span class="what">${esc(d.nodeName)} <em>· ${esc(d.groupName)}</em></span><span class="q">${esc(d.queue)} · ${d.region ? `<b class="rg">${esc(d.region)}</b> · ` : ''}<i>${num(Math.round(d.count))}</i> dead</span></div>`).join('')
+  return head + items.map((d) => `<div class="dl" data-system="${esc(d.nodeId)}"><span class="what">${esc(d.nodeName)} <em>· ${esc(d.groupName)}</em></span><span class="q">${esc(d.queue)} · ${d.region ? `<span class="qreg">${esc(d.region)}</span> · ` : ''}<i>${num(Math.round(d.count))}</i> dead</span></div>`).join('')
 }
 
 function incidentLine(r: IncidentRow): string {
