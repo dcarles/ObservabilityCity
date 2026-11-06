@@ -239,8 +239,11 @@ test.describe('the dashboard view', () => {
     const edit = `for (const m of s.groups.flatMap(g => g.nodes)) { m.deadLetters = 0; m.queues = [] }
       const a = node('aa.orders-api'); a.absent = a.absent.filter(x => x !== 'deadLetters'); a.state = 'Healthy'; a.deadLetters = 11; s.totals.deadLetters = 11
       a.queues = [{ name: 'q-split', backlog: 0, deadLetters: 11, deadLetterRegions: [{ region: 'northeurope', count: 3, link: { name: 'Support North', url: 'https://north.example.test/q' } }, { region: 'westeurope', count: 8, link: { name: 'Support West', url: 'https://west.example.test/q' } }] }]`
-    const read = `const c = document.querySelector('#kpi-dlq'); return { head: c.querySelector('.dh').textContent, rows: [...c.querySelectorAll('.dl')].map(r => r.textContent) }`
-    const got = await withSnapshot<{ head: string; rows: string[] }>(page, edit, read)
+    // the tag is small text on the same line as the queue and the count, not a big number on a line of its own (read in the same breath as the feed)
+    const read = `const c = document.querySelector('#kpi-dlq'); const r = c.querySelector('.dl'); const tag = r.querySelector('.qreg'); const box = tag.getBoundingClientRect(); const line = r.querySelector('.q').getBoundingClientRect()
+      return { head: c.querySelector('.dh').textContent, rows: [...c.querySelectorAll('.dl')].map(r => r.textContent), look: { size: getComputedStyle(tag).fontSize, display: getComputedStyle(tag).display, inside: box.top >= line.top - 1 && box.bottom <= line.bottom + 1, oneLine: line.height < 20 } }`
+    const got = await withSnapshot<{ head: string; rows: string[]; look: object }>(page, edit, read)
+    expect(got.look).toEqual({ size: '12px', display: 'inline', inside: true, oneLine: true })
     expect(got.head).toBe('1 queue with dead letters')
     expect(got.rows).toHaveLength(2)
     expect(got.rows[0]).toContain('q-split · West · 8 dead') // worst first

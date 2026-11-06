@@ -66,6 +66,7 @@ test.describe(`the broker's backlog and dead letters (${B ? 'ids, a total' : 'co
 
   test('the top bar DLQ number lists the queues with dead letters, and a click on a row opens the service that reads it', async ({ page }) => {
     await open(page)
+    await expect(page.locator('#topbar .chip.dlq b')).toHaveText('2') // a whole number, not 2.0
     await page.locator('#topbar .chip.dlq').click()
 
     const list = page.locator('#state-list')

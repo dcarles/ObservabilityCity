@@ -270,9 +270,9 @@ describe('the Dead letters card list', () => {
     const base = { nodeId: 'a.b', nodeName: 'B', groupId: 'a', groupName: 'A', queue: 'q' }
     const html = deadQueuesHtml([{ ...base, count: 8, region: 'West' }, { ...base, count: 3, region: 'North' }])
     expect(html).toContain('1 queue with dead letters')
-    expect(html).toContain('<b class="rg">West</b> · <i>8</i> dead')
-    expect(html).toContain('<b class="rg">North</b> · <i>3</i> dead')
-    expect(deadQueuesHtml([{ ...base, count: 1, region: null }])).not.toContain('class="rg"')
+    expect(html).toContain('<span class="qreg">West</span> · <i>8</i> dead')
+    expect(html).toContain('<span class="qreg">North</span> · <i>3</i> dead')
+    expect(deadQueuesHtml([{ ...base, count: 1, region: null }])).not.toContain('class="qreg"')
   })
 })
 

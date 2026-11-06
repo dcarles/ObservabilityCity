@@ -35,7 +35,7 @@ describe('why a system is not healthy', () => {
     expect(text).toContain('Resources are at 90%, past the amber line of 80%')
     expect(text).toContain('Turning away 5.0% of requests')
     expect(text).toContain('oldest message has waited 2m')
-    expect(text).toContain('3.0 messages are in the dead-letter queue')
+    expect(text).toContain('3 messages are in the dead-letter queue')
   })
 
   it('explains a system that is down, and one with no data', () => {

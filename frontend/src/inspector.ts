@@ -236,7 +236,7 @@ export class Inspector {
     if (rows.length === 0) return ''
     const total = messagesPerSecond([n])
     const head = total == null ? 'Queues' : `Queues <small title="Each queue this system reads counts, so a message that crosses two queues is counted twice, once in each.">${escapeHtml(messageRate(total))} msg/s in total</small>`
-    return `<h4>${head}</h4><div class="queues">${rows.map((r) => `<div class="row queue" data-queue="${escapeHtml(r.name)}"><span>${escapeHtml(r.name)}</span><span class="${r.tone}">${escapeHtml(r.text)}${r.link ? ` · ${this.anchor(r.link.name, r.link.url)}` : ''}${r.regions.map((g) => ` · <b class="rg">${escapeHtml(g.region)}</b> ${g.count} dead${g.link ? ` ${this.anchor(g.link.name, g.link.url)}` : ''}`).join('')}</span></div>${this.types(r)}`).join('')}</div>`
+    return `<h4>${head}</h4><div class="queues">${rows.map((r) => `<div class="row queue" data-queue="${escapeHtml(r.name)}"><span>${escapeHtml(r.name)}</span><span class="${r.tone}">${escapeHtml(r.text)}${r.link ? ` · ${this.anchor(r.link.name, r.link.url)}` : ''}${r.regions.map((g) => ` · <span class="qreg">${escapeHtml(g.region)}</span> ${g.count} dead${g.link ? ` ${this.anchor(g.link.name, g.link.url)}` : ''}`).join('')}</span></div>${this.types(r)}`).join('')}</div>`
   }
 
   /** The kinds of message one queue handled: the busiest few, then a line that opens the full list (and closes it again). Nothing when the environment does not measure them. */

@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import type { HealthEventSnapshot, NodeSnapshot } from '../types'
 import { isAbsent, isUnmonitored } from '../signals'
-import { beaconLevel, clamp, darkFloorsFor, floorsFor, formatAge, formatMs, formatRate, lerp, MAX_FLOORS, plaqueText, type BeaconLevel } from '../visuals'
+import { beaconLevel, clamp, darkFloorsFor, floorsFor, formatAge, formatCount, formatMs, formatRate, lerp, MAX_FLOORS, plaqueText, type BeaconLevel } from '../visuals'
 import { buildModel, palette } from '../themes/active'
 import { labelRise, type BuildingModel, type FloorModule, type TenantYardStatus } from './model'
 import { ALL_TENANTS, type TenantView } from '../tenants'
@@ -550,7 +550,7 @@ export class Building {
     if (hasQueue) {
       const late = (n.oldestMessageSeconds ?? 0) >= n.backlogAmber
       note(24, `QUEUE ${formatRate(n.queueDepth ?? 0)}${n.oldestMessageSeconds ? ` · oldest ${formatAge(n.oldestMessageSeconds)}` : ''}`, late)
-      note(300, `DLQ ${formatRate(n.deadLetters ?? 0)}`, (n.deadLetters ?? 0) > 0)
+      note(300, `DLQ ${formatCount(n.deadLetters ?? 0)}`, (n.deadLetters ?? 0) > 0)
       top += 38
     }
     if (extra) {

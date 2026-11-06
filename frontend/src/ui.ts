@@ -1,7 +1,7 @@
 import { absentEverywhere, isAbsent, isUnmonitored, QUIET_TEXT, type Signal } from './signals'
 import type { Snapshot, NodeSnapshot } from './types'
 import type { ConnectionState } from './connection'
-import { formatMs, formatRate } from './visuals'
+import { formatCount, formatMs, formatRate } from './visuals'
 import { messagesPerSecond } from './inspectorModel'
 import { escapeHtml, Picker, type PickItem } from './picker'
 import { tenantFigures, yardSummary, type TenantView } from './tenants'
@@ -68,7 +68,7 @@ export class TopBar {
         ${messages == null ? '' : `<div class="chip msgs" id="chip-messages" title="${escapeHtml('Messages a second taken in by all the queues of the town. Each queue counts where it is read, so a message that crosses two queues is counted twice, once in each.')}"><b>${formatRate(messages)}</b><span>msg/s</span></div>`}
         ${absentEverywhere(s!, 'errors') ? '' : `<div class="chip ${t.errorRate >= 0.05 ? 'bad' : t.errorRate >= 0.01 ? 'warn' : ''}" title="${escapeHtml(scope + wide)}"><b>${(t.errorRate * 100).toFixed(1)}%</b><span>errors</span></div>`}
         ${absentEverywhere(s!, 'latency') ? '' : `<div class="chip p99" title="${escapeHtml(scope + wide)}"><b>${formatMs(t.p99Ms)}</b><span>p99</span></div>`}
-        ${absentEverywhere(s!, 'deadLetters') ? '' : `<button class="chip clickable dlq ${t.deadLetters > 0 ? 'bad' : ''}" data-list="DeadLetters" title="${escapeHtml(`Messages in dead-letter queues: click to see which queues. ${scope}${wide}`)}"><b>${formatRate(t.deadLetters)}</b><span>DLQ</span></button>`}
+        ${absentEverywhere(s!, 'deadLetters') ? '' : `<button class="chip clickable dlq ${t.deadLetters > 0 ? 'bad' : ''}" data-list="DeadLetters" title="${escapeHtml(`Messages in dead-letter queues: click to see which queues. ${scope}${wide}`)}"><b>${formatCount(t.deadLetters)}</b><span>DLQ</span></button>`}
         <button class="chip clickable ${t.degraded ? 'warn' : ''}" data-list="Degraded" title="Show the degraded systems"><b>${t.degraded}</b><span>degraded</span></button>
         <button class="chip clickable ${t.down ? 'bad' : ''}" data-list="Down" title="Show the systems that are down"><b>${t.down}</b><span>down</span></button>
         <button class="chip clickable ${t.stale ? 'stale' : ''}" data-list="Stale" title="Show the systems with no fresh data"><b>${t.stale}</b><span>no data</span></button>

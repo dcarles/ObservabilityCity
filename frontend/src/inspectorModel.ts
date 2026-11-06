@@ -5,7 +5,7 @@ import type { ConfigValue, HealthState, ScheduleSnapshot, IncidentSnapshot, JobS
 import { inboundSplitText } from './inbound'
 import { limitRange, throttleWho } from './tenants'
 import { isAbsent, isUnmonitored, QUIET_TEXT } from './signals'
-import { formatAge, formatMs, formatRate, plaqueText, resourceUse } from './visuals'
+import { formatAge, formatCount, formatMs, formatRate, plaqueText, resourceUse } from './visuals'
 
 export type Tone = 'ok' | 'warn' | 'bad' | 'stale' | ''
 
@@ -45,7 +45,7 @@ export function reasons(n: NodeSnapshot, cloud?: string | null): string[] {
   else if (use >= n.resourceAmber) out.push(`Resources are at ${pct(use)}, past the amber line of ${pct(n.resourceAmber)}.`)
   if (!isAbsent(n, 'throttled') && (n.throttled ?? 0) >= n.throttleAmber && (n.throttled ?? 0) > 0) out.push(`Turning away ${pct(n.throttled!, 1)} of requests (throttled).`)
   if (!isAbsent(n, 'backlog') && (n.oldestMessageSeconds ?? 0) >= n.backlogAmber && (n.oldestMessageSeconds ?? 0) > 0) out.push(`The oldest message has waited ${formatAge(n.oldestMessageSeconds!)}, past the ${formatAge(n.backlogAmber)} line.`)
-  if (!isAbsent(n, 'deadLetters') && (n.deadLetters ?? 0) > 0) out.push(`${formatRate(n.deadLetters!)} message${n.deadLetters === 1 ? ' is' : 's are'} in the dead-letter queue.`)
+  if (!isAbsent(n, 'deadLetters') && (n.deadLetters ?? 0) > 0) out.push(`${formatCount(n.deadLetters!)} message${n.deadLetters === 1 ? ' is' : 's are'} in the dead-letter queue.`)
   return out
 }
 
@@ -84,7 +84,7 @@ function ownRows(n: NodeSnapshot, nameOf: (id: string) => string, cloud?: string
   if (provisioned) rows.push({ label: 'Provisioned', value: provisioned, tone: '' })
   if (n.queueDepth != null && !isAbsent(n, 'backlog')) rows.push({ label: 'Waiting', value: `${formatRate(n.queueDepth)} messages`, tone: '' })
   if (n.oldestMessageSeconds != null && !isAbsent(n, 'backlog')) rows.push({ label: 'Oldest message', value: formatAge(n.oldestMessageSeconds), tone: n.oldestMessageSeconds >= n.backlogRed ? 'bad' : n.oldestMessageSeconds >= n.backlogAmber ? 'warn' : '' })
-  if (n.deadLetters != null && !isAbsent(n, 'deadLetters')) rows.push({ label: 'Dead letters', value: formatRate(n.deadLetters), tone: n.deadLetters > 0 ? 'bad' : '' })
+  if (n.deadLetters != null && !isAbsent(n, 'deadLetters')) rows.push({ label: 'Dead letters', value: formatCount(n.deadLetters), tone: n.deadLetters > 0 ? 'bad' : '' })
   rows.push(...sourceRows(n))
   return rows
 }

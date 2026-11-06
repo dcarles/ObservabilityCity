@@ -141,4 +141,4 @@ body.dash #view-bar .vb-btn, body.dash #view-bar .vb-list input[type=search] { b
 .kpi .dlist { margin-top: 8px; display: flex; flex-direction: column; gap: 5px; }
 .dl { display: flex; flex-direction: column; font-size: 12px; line-height: 1.3; min-width: 0; cursor: pointer; overflow-wrap: anywhere; }
 .dl .what { font-weight: 600; } .dl .what em { font-style: normal; font-weight: 400; color: var(--muted); }
-.dl .q { color: var(--muted); } .dl .q i { color: var(--bad); font-style: normal; font-weight: 600; }
+.dl .q { color: var(--muted); } .dl .q .qreg { font-weight: 600; } .dl .q i { color: var(--bad); font-style: normal; font-weight: 600; }
