@@ -1448,6 +1448,20 @@ export class Town {
     return { target: b.root.getWorldPosition(new THREE.Vector3()).setY(2), distance: 46 }
   }
 
+  /** The round footprint of everything that stands in the sea (the pillars' islands, the third parties', the hub and the airport), for placing things beside the town. */
+  footprints(): { x: number; z: number; r: number }[] {
+    const reach = (pts: { x: number; y: number }[]): number => pts.reduce((m, p) => Math.max(m, Math.hypot(p.x, p.y)), 0)
+    const at = (o: THREE.Object3D, r: number): { x: number; z: number; r: number } => {
+      const p = o.getWorldPosition(new THREE.Vector3())
+      return { x: p.x, z: p.z, r }
+    }
+    const out = [{ x: 0, z: 0, r: reach(this.hubOutline.points) }]
+    for (const i of this.islands) out.push(at(i.root, reach(i.outline.points)))
+    for (const v of new Set(this.vendors.values())) out.push(at(v.root, reach(v.outline.points)))
+    if (this.airport) out.push(at(this.airport.root, reach(this.airport.outline.points)))
+    return out
+  }
+
   /** The same for a whole island, standing back far enough to show it. */
   islandFocusOf(groupId: string): { target: THREE.Vector3; distance: number } | null {
     if (groupId === 'hub') return { target: new THREE.Vector3(0, 0, 0), distance: Math.max(this.hubGeo.rx, this.hubGeo.rz) * 2.6 }

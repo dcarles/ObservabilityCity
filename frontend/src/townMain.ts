@@ -39,6 +39,8 @@ import { fitTopBar } from './topbarFit'
 import { dismissEvent, eventItems } from './healthEvents'
 import { Building } from './buildings/building'
 import { WINDOW_GLOW } from './buildings/windowMaterial'
+import { EventDirector } from './events/director'
+import { isTyping, KonamiWatcher } from './events/konami'
 
 /** Draws the 3D town. Loaded only when the page opens in town view, so the dashboard never loads three.js. */
 export async function startTown(): Promise<void> {
@@ -69,6 +71,16 @@ export async function startTown(): Promise<void> {
   town.setDependencyFocus(focus)
   stage.setLighting(lighting, true)
   document.documentElement.dataset.theme = theme.id
+
+  // the Konami code (or ?event in the address) plays the theme's scripted event on a patch of sea beside a random island; Escape ends it
+  const events = new EventDirector(stage, theme.id, { footprints: () => town.footprints(), pick: testMode ? () => 0.5 : Math.random })
+  const konami = new KonamiWatcher()
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') events.stop()
+    if (e.ctrlKey || e.metaKey || e.altKey || isTyping(e.target)) return
+    if (konami.push(e.key)) void events.play()
+  })
+  if (params.has('event')) void events.play()
 
   /** The space under the top bar, which wraps to more rows on a narrow window: panels start below it. */
   const bar = document.getElementById('topbar')!
@@ -433,6 +445,7 @@ export async function startTown(): Promise<void> {
       simTime += dt
       stage.tick(dt, simTime)
       town.update(dt, simTime, stage.camera)
+      events.update(dt)
       wall?.tick(simTime)
     }
     updateIslandLabels()
@@ -441,6 +454,18 @@ export async function startTown(): Promise<void> {
   // Debug handle for automated tests, screenshots and poking from the console.
   ;(window as unknown as { city: unknown }).city = {
     stage, town, THREE, seen, step, islandLabels,
+    /** The scripted event of the theme: start it, stop it, jump to a moment, or read what is going on. */
+    event: {
+      id: () => events.eventId,
+      play: () => events.play(),
+      stop: () => events.stop(),
+      playing: () => events.playing,
+      time: () => events.time,
+      setTime: (t: number) => events.setTime(t),
+      inspect: () => events.current?.inspect(events.time) ?? null,
+      caption: () => { const el = document.getElementById('event-caption'); return el && !el.hidden ? el.textContent ?? '' : '' },
+      placement: () => events.lastPlacement,
+    },
     /** Hand the page a snapshot as if the server had sent it. */
     feed: (raw: unknown) => onSnapshot(raw),
     unknownHosts,
@@ -535,6 +560,7 @@ export async function startTown(): Promise<void> {
     try {
       stage.tick(dt, time)
       town.update(dt, time, stage.camera)
+      events.update(dt)
       wall?.tick(time)
       updateIslandLabels()
       hover()

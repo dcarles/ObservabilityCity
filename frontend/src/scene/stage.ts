@@ -128,6 +128,23 @@ export class Stage {
     return this.lightingFade
   }
 
+  /** The point Home looks at, which is the middle of the town. */
+  get homeAt(): THREE.Vector3 {
+    return this.homeTarget
+  }
+
+  /** Lets the view reach out to this far from the middle of the town (an event is played beside the outermost island); returns what it was. */
+  widenPan(limit: number): number {
+    const was = this.panLimit
+    this.panLimit = Math.max(this.panLimit, limit)
+    return was
+  }
+
+  /** Puts the view's reach back after `widenPan`. */
+  setPanLimit(limit: number): void {
+    this.panLimit = limit
+  }
+
   /** Where Home frames the town. Centre it on the islands and pull back to fit. */
   setHome(target: THREE.Vector3, distance: number): void {
     this.homeTarget.copy(target)
