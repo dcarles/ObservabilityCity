@@ -7,12 +7,15 @@ type Words = Record<string, Partial<Pick<LegendEntry, 'sees' | 'means' | 'icon'>
 
 export const THEME_WORDS: Record<string, Words> = {
   space: {
+    gateway: { sees: 'Docking gate' },
+    broker: { sees: 'Spaceport' },
+    egress: { sees: 'Relay station' },
     api: { sees: 'Habitat module', icon: '🛰️' },
     worker: { sees: 'Fabricator with stacks', icon: '⚙️', means: 'A worker: it reads messages. Its plasma plume thickens with CPU' },
     database: { sees: 'Data vault', icon: '🗄️', means: 'A database. One storage unit for each tenant where each has its own' },
     cache: { sees: 'Fusion sphere', icon: '🔮' },
     function: { sees: 'Chrono spire with spinning rings', icon: '⏳' },
-    hub: { sees: 'The platform in the middle', icon: '🛸', means: 'The platform hub: API gateway, message broker spaceport (Service Bus, Kafka), central egress, shared database' },
+    hub: { sees: 'The platform in the middle', icon: '🛸' },
     car: { sees: 'Hover pod with a cyan canopy', icon: '🚀' },
     taxi: { sees: 'Amber hover pod', icon: '🛩️' },
     bridge: { sees: 'Light bridge', icon: '🌈' },
@@ -22,12 +25,15 @@ export const THEME_WORDS: Record<string, Words> = {
     airport: { sees: 'Spaceport', icon: '🛸', means: 'Callers from outside. Flying saucers follow the inbound traffic' },
   },
   factory: {
+    gateway: { sees: 'Gatehouse' },
+    broker: { sees: 'Freight depot' },
+    egress: { sees: 'Radio mast' },
     api: { sees: 'Office block' },
     worker: { sees: 'Production hall with chimneys', means: 'A worker: it reads messages. Its chimney smoke thickens with CPU' },
     database: { sees: 'Warehouse', means: 'A database. One storage unit for each tenant where each has its own' },
     cache: { sees: 'Pressure tank' },
     function: { sees: 'Tower with a clock and a siren' },
-    hub: { sees: 'The yard in the middle', means: 'The platform hub: API gateway, message broker depot (Service Bus, Kafka), central egress, shared database' },
+    hub: { sees: 'The yard in the middle' },
     car: { sees: 'Blue-cab van', icon: '🚐' },
     taxi: { sees: 'Yellow-cab van', icon: '🚚' },
     bridge: { sees: 'Steel truss bridge', icon: '🏗️' },

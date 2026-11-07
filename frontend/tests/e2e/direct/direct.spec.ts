@@ -41,3 +41,16 @@ test.describe('hidden islands in a town without a hub', () => {
     expect(edge.signposts.every((s: any) => s.lines.length === 0)).toBe(true)
   })
 })
+
+test.describe('the legend in a town without a hub', () => {
+  test('explains the ring road and the direct way between islands, and not the hub', async ({ town, page }) => {
+    await town.open('&legend=1')
+    await town.step(1)
+    await page.locator('#legend-tab-traffic').click()
+    for (const id of ['flow-direct', 'flow-outside-direct', 'flow-vendor-direct', 'signpost']) await expect(page.locator(`#legend [data-id="${id}"]`)).toBeVisible()
+    await expect(page.locator('#legend [data-id="flow-hub"]')).toHaveCount(0)
+    await page.locator('#legend-tab-islands').click()
+    await expect(page.locator('#legend [data-id="ring-direct"]')).toBeVisible()
+    await expect(page.locator('#legend [data-id="spoke"]')).toHaveCount(0)
+  })
+})
