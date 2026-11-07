@@ -501,6 +501,29 @@
           }
         }
       },
+      "DatabaseEngineSnapshot": {
+        "required": [
+          "id",
+          "name",
+          "type",
+          "typeName"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "typeName": {
+            "type": "string"
+          }
+        }
+      },
       "DeadLetterRegionSnapshot": {
         "required": [
           "region",
@@ -1211,6 +1234,9 @@
               "$ref": "#/components/schemas/SourceAgeSnapshot"
             },
             "nullable": true
+          },
+          "engine": {
+            "$ref": "#/components/schemas/DatabaseEngineSnapshot"
           }
         }
       },

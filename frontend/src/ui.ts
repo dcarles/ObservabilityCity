@@ -108,6 +108,7 @@ export function showTooltip(n: NodeSnapshot | null, x: number, y: number, view: 
   el.innerHTML = `
     <b>${n.name}</b> <span class="${none ? '' : cls}">· ${none ? 'no source' : n.state}</span>
     <div class="row"><span>id</span><span>${n.id}</span></div>
+    ${n.engine ? `<div class="row engine"><span>engine</span><span>${escapeHtml(n.engine.name)} · ${escapeHtml(n.engine.typeName)}</span></div>` : ''}
     ${row('instances', `<div class="row"><span>instances</span><span>${n.instancesHealthy}/${n.instancesTotal} healthy</span></div>`)}
     ${row('requests', `<div class="row"><span>requests</span><span>${formatRate(n.requestsPerSecond)}/s</span></div>`)}
     ${row('errors', n.quiet ? `<div class="row"><span>errors</span><span>${QUIET_TEXT}</span></div>` : `<div class="row"><span>errors</span><span class="${n.errorRate >= n.errorRed ? 'bad' : n.errorRate >= n.errorAmber ? 'warn' : ''}">${(n.errorRate * 100).toFixed(2)}%</span></div>`)}

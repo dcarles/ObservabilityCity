@@ -382,3 +382,8 @@ body.event-playing #island-labels { display: none; }
 
 /* The feed has gone quiet: grey everything, so numbers that may be old are never read as current. */
 body.feed-silent #town, body.feed-silent #dash-sum, body.feed-silent #dash-pillars, body.feed-silent #dash-sections { filter: grayscale(1) brightness(0.85); transition: filter 0.6s; }
+
+/* what a database runs on: a clear badge under the name in the inspector, a plain row in the tooltip */
+#inspector .engine { display: inline-flex; align-items: baseline; gap: 6px; margin-top: 6px; padding: 3px 9px; border: 1px solid var(--line); border-radius: 999px; background: rgba(255, 255, 255, 0.08); }
+#inspector .engine b { font-size: 14px; }
+#inspector .engine span { font-size: 12px; opacity: 0.75; text-transform: uppercase; letter-spacing: 0.05em; }

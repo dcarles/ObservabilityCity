@@ -54,10 +54,9 @@ Start from the sample (`config/galactic-credit`) and keep the same layout:
 
 ```
 config/<company>/
-  town.yaml
+  town.yaml                 the town, and the island order and database engines
   defaults.yaml
   hub.yaml                  shared resources (gateway, message broker, egress, shared databases)
-  layout.yaml
   third-parties.yaml
   pillars/<pillar>.yaml     one island per pillar
   environments/<env>.yaml   dev, staging, prod...

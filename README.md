@@ -125,7 +125,7 @@ How to read the town, as built so far:
 | API, worker and database side by side | One service. Systems that share a `service` in the registry stand next to each other on one pad, with their fronts toward the road. Pads sit on a grid, so every building's front is visible from the road side. A small island has two pads a row, one each side of the main road; a bigger one has four, six or eight, whichever makes the smallest island for its pads, so it grows wider as well as longer |
 | Name board above a building | System name and "N/M healthy". Fades out when the camera is far away, except for troubled buildings |
 | Bridges | One road bridge from the hub's plaza to an island's gate, for an island that has an API or a call link over its coast (to a hub database or cache, through the gateway, or into it from another island). All sync traffic between islands goes through the hub. An island with neither has no bridge, and no car drives to it |
-| Islands on a ring round the hub, a few further out | Pillars, in the order of `layout.yaml`. `ringCapacity` (default 12, 6 to 18) fit on the first ring, the rest stand in a staggered second ring with their bridges passing between first-ring islands. Two rings only, so at most (ringCapacity x 2) - 1 pillars. The airport takes the second ring's north slot. A ring road circles the town, with third-party vendors outside it. The hub grows with the number of islands |
+| Islands on a ring round the hub, a few further out | Pillars, in the order of `islands` in `town.yaml`. `ringCapacity` (default 12, 6 to 18) fit on the first ring, the rest stand in a staggered second ring with their bridges passing between first-ring islands. Two rings only, so at most (ringCapacity x 2) - 1 pillars. The airport takes the second ring's north slot. A ring road circles the town, with third-party vendors outside it. The hub grows with the number of islands |
 | Island with a heap of boxes and bins by the gate | Lost & found: systems that carry no pillar tag and no `pillar.code` |
 | Pier with crates, only on an island with messaging | Where messaging boats dock, for an island that publishes a topic or has a worker that subscribes to one. The board reads PIER, the topics it publishes and the subscriptions it reads. Messages waiting pile up as crates on the quay with a "waiting N, oldest" sign. Dead letters sit in a pen of broken crates with a "DLQ N" badge and a sweeping red light. An amber pennant on the pier means a worker still reads the hub's egress topic (the old route) |
 | Service Bus port on the hub | The broker's one billboard shows its name and health, and a last line with the town's topics, subscriptions and piers (only when something is configured). The top bar's DLQ chip shows the town-wide dead-letter total; each island shows its own pen |
@@ -149,7 +149,7 @@ frontend/                          Vite + TypeScript + three.js browser app (see
   src/                               app code
   tests/unit/                        Vitest unit tests
   tests/e2e/                         Playwright browser tests
-config/galactic-credit/            registry (YAML): town, defaults, hub, layout, pillars, schemas, fake-data baselines
+config/galactic-credit/            registry (YAML): town, defaults, hub, pillars, schemas, fake-data baselines
 contracts/openapi.json             generated from the C# records
 shared-test-data/                  fixtures used by both sides: registries, golden snapshots, layout golden
 docs/                              plan, decision log, previews, connect-your-company runbook, config reference (every key of every config file), write-an-adapter guide
@@ -196,14 +196,14 @@ To refresh the golden fixtures (calm town, a bad day across several islands, and
 | Rule | Severity |
 | --- | --- |
 | Format, ids, roles, calls and layout entries that point nowhere, aliases | error |
-| Every pillar has a `layout.yaml` entry (Lost & found excepted) | error |
+| Every pillar is in the `islands` list of `town.yaml` (Lost & found excepted); a leftover `layout.yaml` is refused with the fix | error |
 | In a hub-and-spoke town, a pillar does not call another pillar directly; it goes through the hub | error |
 | Outside callers reach only systems marked `external` | error |
 | Thresholds make sense: ranges, and amber below red, also after the defaults are applied | error |
 | Colours are hex, pillars have a display name, the hub has one gateway, broker, egress and database at most | error |
 | `fake.yaml` names real systems and its numbers make sense | error |
 | A town with `fake.yaml` or a `stories/` folder says `mode: demo` in `town.yaml`, and `mode` is `demo` or `live` | error |
-| A worker has a database, a system has a caller, no `layout.yaml`, an empty pillar, an island that stands alone (no API, messaging or call links) | warning |
+| A worker has a database, a system has a caller, no `islands` list in `town.yaml`, a database with no `engine` once the town lists its `databaseEngines`, an empty pillar, an island that stands alone (no API, messaging or call links) | warning |
 | Messaging: topics are services of the pillar, subscriptions name an existing topic and a worker of the same pillar, no duplicates, `legacy` exactly for the hub's egress topic | error |
 
 On a pull request the check writes annotations on the files and posts one comment listing every finding with file and line (the same comment is updated on each push).
@@ -220,14 +220,23 @@ One folder describes a town. The sample is `config/galactic-credit/`:
 
 | File | What it holds |
 | --- | --- |
-| `town.yaml` | Name, what an island is called, topology, and `mode` (`demo` or `live`; left out means `live`) |
+| `town.yaml` | Name, what an island is called, topology, `mode` (`demo` or `live`; left out means `live`), `islands` (the order of the islands round the hub: unlisted pillars follow, Lost & found is always last), `ringCapacity`, and `databaseEngines` (the engines your databases run on, each one of the fixed database types, see below) |
 | `defaults.yaml` | App-wide defaults per role (SLA, error, resource, throttle and backlog thresholds) |
 | `hub.yaml` | The hub's shared resources (gateway, broker, egress, database), its `messaging` topics (`egress`), and the outside callers (`externalCallers`, each lists the external systems it reaches) |
-| `layout.yaml` | The order of the islands round the hub. Unlisted pillars follow, Lost & found is always last |
 | `pillars/<code>.yaml` | One island: its systems, `calls` links, per-role `defaults`, and its `messaging` (topics it publishes, topics its workers consume) |
 | `pillars/lost-found.yaml` | The island for systems nobody owns |
 | `environments/<id>.yaml` | One file per environment (`dev`, `staging`, `prod`): its tenants, its sources and what it leaves out. Optional: a town without them has one environment, `demo` |
 | `fake.yaml` | Baseline numbers for the fake source only |
+
+**Database engines.** A town lists the engines its databases run on in `town.yaml`, each one of eight fixed types (relational, document, key-value, wide-column, graph, time-series, analytical, vector):
+
+```yaml
+databaseEngines:
+  cosmos:    { name: Cosmos DB,  type: document }
+  sqlserver: { name: SQL Server, type: relational }
+```
+
+A database (`role: db`) then says `engine: cosmos` and shows "Cosmos DB" with its type, Document, as a badge in the inspector, in the tooltip, on the service card and next to its type in the dashboard. An engine outside the list is an error with a "did you mean", so teams cannot spell one engine two ways. A database with no `engine` shows no label.
 
 Settings cascade: system, then the pillar's `defaults`, then `defaults.yaml`, then built-in values.
 
@@ -250,9 +259,9 @@ messaging:
 
 Reading the hub's egress topic from a pillar must say `legacy: true`; the egress topic is otherwise for external destinations such as Snowflake, which are third-party calls.
 
-The loader checks everything and reports all problems at once, each with its file name. Ids must be `pillar.system` (the prefix matches the file, lowercase kebab-case, unique in the town). A misspelt key, role, call target or layout entry gets a suggestion, for example `'aa.ledger-api' calls 'aa.ledger-dbb', which is not in this town. Did you mean 'aa.ledger-db'?`. When a system is renamed, keep its old id under `aliases: [old.id]` and files that still use it keep working.
+The loader checks everything and reports all problems at once, each with its file name. Ids must be `pillar.system` (the prefix matches the file, lowercase kebab-case, unique in the town). A misspelt key, role, call target, island or database engine gets a suggestion, for example `'aa.ledger-api' calls 'aa.ledger-dbb', which is not in this town. Did you mean 'aa.ledger-db'?`. When a system is renamed, keep its old id under `aliases: [old.id]` and files that still use it keep working.
 
-**Editor help.** Each YAML file starts with a `# yaml-language-server: $schema=...` line, so an editor with the YAML extension (VS Code: Red Hat YAML) completes keys and roles and checks them as you type. `calls` and `layout.yaml` complete from the town's real ids, which live in `schema/system-ids.schema.json`. After adding systems, refresh it:
+**Editor help.** Each YAML file starts with a `# yaml-language-server: $schema=...` line, so an editor with the YAML extension (VS Code: Red Hat YAML) completes keys and roles and checks them as you type. `calls` and the `islands` list complete from the town's real ids, which live in `schema/system-ids.schema.json`. After adding systems, refresh it:
 
 ```
 dotnet run --project backend/src/ObservabilityCity.Host -- --write-schema

@@ -187,7 +187,8 @@ export class Inspector {
     const html = `
       <div class="head">
         <div><b>${escapeHtml(n.name)}</b> <span class="${stateTone(n.state)}">· ${n.state}</span>
-          <div class="where">${escapeHtml(n.kind)} · ${escapeHtml(group?.displayName ?? vendorWhere(vendor))}${this.detail?.service ? ` · service ${escapeHtml(this.detail.service)}` : ''}</div></div>
+          <div class="where">${escapeHtml(n.kind)} · ${escapeHtml(group?.displayName ?? vendorWhere(vendor))}${this.detail?.service ? ` · service ${escapeHtml(this.detail.service)}` : ''}</div>
+          ${n.engine ? `<div class="engine" title="Database engine and type, from the town's databaseEngines"><b>${escapeHtml(n.engine.name)}</b><span>${escapeHtml(n.engine.typeName)}</span></div>` : ''}</div>
         <button id="inspector-close" title="Close (Esc)">✕</button>
       </div>
       <div class="tabs" role="tablist">${TABS.map((t) => `<button role="tab" data-tab="${t.id}" class="${t.id === this.tab ? 'on' : ''}">${t.label}</button>`).join('')}</div>

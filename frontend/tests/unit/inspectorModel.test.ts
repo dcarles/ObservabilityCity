@@ -1,13 +1,38 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { sourceRows, ago, clockTime, configOrder, groupDetail, incidentSummary, linkSections, logSectionEmpty, logSectionTitle, originLabel, isWebAddress, overviewLinks, overviewRows, reasons, repeatLabel, resourceLinks, scopeView, logLinkLabel, logTabLabel, pickLogSection, sectionLinks, stateTone } from '../../src/inspectorModel'
+import { engineText, sourceRows, ago, clockTime, configOrder, groupDetail, incidentSummary, linkSections, logSectionEmpty, logSectionTitle, originLabel, isWebAddress, overviewLinks, overviewRows, reasons, repeatLabel, resourceLinks, scopeView, logLinkLabel, logTabLabel, pickLogSection, sectionLinks, stateTone } from '../../src/inspectorModel'
 import type { ConfigValue, LogGroup, LogSection, ScopeInfo, ScopeResource, SystemDetail, NodeSnapshot, Snapshot } from '../../src/types'
 
 const bad = JSON.parse(readFileSync(resolve(__dirname, '../../../shared-test-data/snapshots/bad-day.json'), 'utf8')) as Snapshot
 const all = bad.groups.flatMap((g) => g.nodes)
 const healthy = (): NodeSnapshot => ({ ...all.find((n) => n.state === 'Healthy' && n.kind === 'Api')! })
 const node = (patch: Partial<NodeSnapshot>): NodeSnapshot => ({ ...healthy(), ...patch })
+
+describe('what a database runs on', () => {
+  const engine = { id: 'cosmos', name: 'Cosmos DB', type: 'document', typeName: 'Document' }
+
+  it('reads the engine and its type together', () => {
+    expect(engineText(node({ engine }))).toBe('Cosmos DB · Document')
+  })
+
+  it('says nothing for a system that names no engine', () => {
+    expect(engineText(node({ engine: undefined }))).toBeNull()
+    expect(overviewRows(node({ engine: undefined })).some((r) => r.label === 'Engine')).toBe(false)
+  })
+
+  it('puts the engine first in the overview, even when the database has no fresh numbers', () => {
+    expect(overviewRows(node({ engine }))[0]).toEqual({ label: 'Engine', value: 'Cosmos DB · Document', tone: '' })
+    expect(overviewRows(node({ engine, state: 'Stale' }))[0]!.label).toBe('Engine')
+  })
+
+  it('is in the sample towns: every database of the golden town has one', () => {
+    const dbs = all.filter((n) => n.kind === 'Database')
+    expect(dbs.length).toBeGreaterThan(0)
+    expect(dbs.every((n) => engineText(n) !== null)).toBe(true)
+    expect(all.filter((n) => n.kind !== 'Database').every((n) => !n.engine)).toBe(true)
+  })
+})
 
 describe('why a system is not healthy', () => {
   it('says nothing about a healthy one', () => {

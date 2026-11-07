@@ -66,10 +66,9 @@ One folder per town under `config/`; every folder with a `town.yaml` is a town a
 
 ```
 config/<company>/
-  town.yaml          id, name, groupLabel, topology (hub-and-spoke | direct)
+  town.yaml          id, name, groupLabel, topology (hub-and-spoke | direct), islands (their order), ringCapacity, databaseEngines
   defaults.yaml      thresholds that every pillar and system inherits
   hub.yaml           shared resources: gateway, message broker, egress, shared databases
-  layout.yaml        where the islands sit
   third-parties.yaml outside vendors
   pillars/<id>.yaml  one island per pillar: its systems, calls and messaging
   environments/<id>.yaml  what differs per environment: sources, tenants, excluded systems

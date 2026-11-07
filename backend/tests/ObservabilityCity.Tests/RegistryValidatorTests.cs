@@ -11,6 +11,7 @@ public class RegistryValidatorTests
 
     [Theory]
     [InlineData("config/galactic-credit")]
+    [InlineData("config/droid-shop")]
     [InlineData("shared-test-data/registries/mini-town")]
     [InlineData("shared-test-data/registries/tenants-town")]
     [InlineData("shared-test-data/registries/live-town")]

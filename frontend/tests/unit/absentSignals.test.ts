@@ -193,4 +193,12 @@ describe('a service', () => {
     expect(systemNumbers({ ...base, absent: ['errors', 'latency'] })).toBe('Api · 12/s')
     expect(systemNumbers({ ...base, unmonitored: true, absent: ALL })).toBe('Api · no source configured')
   })
+
+  it('names the engine of a database next to its kind', () => {
+    const db = { kind: 'Database' as const, unmonitored: false, requestsPerSecond: 0, errorRate: 0, p99Ms: 0, tenants: null, absent: ['requests', 'errors', 'latency'], engine: 'Cosmos DB, Document' }
+
+    expect(systemNumbers(db)).toBe('Database (Cosmos DB, Document)')
+    expect(systemNumbers({ ...db, unmonitored: true })).toBe('Database (Cosmos DB, Document) · no source configured')
+    expect(systemNumbers({ ...db, engine: null })).toBe('Database')
+  })
 })

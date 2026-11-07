@@ -27,6 +27,8 @@ export interface ServiceSystem {
   slaP99Ms: number
   /** Only a data store with a database for each tenant: how many tenants it has and how many are turning requests away. */
   tenants: { total: number; throttled: number } | null
+  /** Only a database that says what it runs on: "Cosmos DB, Document". */
+  engine?: string | null
 }
 
 export interface ServiceSummary {
@@ -47,16 +49,18 @@ export function summariseService(pad: Pick<Pad, 'key' | 'name' | 'nodes'>, group
   const systems = pad.nodes.map((p) => nodes.get(p.id)).filter((n): n is NodeSnapshot => !!n).map<ServiceSystem>((n) => ({
     id: n.id, name: n.name, kind: n.kind, state: n.state, unmonitored: isUnmonitored(n), absent: n.absent ?? [], quiet: n.quiet === true, requestsPerSecond: n.requestsPerSecond, errorRate: n.errorRate, p99Ms: n.p99Ms, slaP99Ms: n.slaP99Ms,
     tenants: n.tenants ? { total: n.tenants.length, throttled: n.tenants.filter((u) => (u.throttled ?? 0) >= n.throttleAmber && (u.throttled ?? 0) > 0).length } : null,
+    engine: n.engine ? `${n.engine.name}, ${n.engine.typeName}` : null,
   }))
   return { key: pad.key, name: pad.name, group, groupName, state: worstState(systems.filter((s) => !s.unmonitored).map((s) => s.state)), monitored: systems.some((s) => !s.unmonitored), systems }
 }
 
 /** What a service card says about one system: its kind and the numbers a source supplies. Absent signals are left out, never printed as zero. */
-export function systemNumbers(m: Pick<ServiceSystem, 'kind' | 'unmonitored' | 'absent' | 'requestsPerSecond' | 'errorRate' | 'p99Ms' | 'tenants'> & Partial<Pick<ServiceSystem, 'quiet'>>): string {
-  if (m.unmonitored) return `${m.kind} · no source configured`
+export function systemNumbers(m: Pick<ServiceSystem, 'kind' | 'unmonitored' | 'absent' | 'requestsPerSecond' | 'errorRate' | 'p99Ms' | 'tenants'> & Partial<Pick<ServiceSystem, 'quiet' | 'engine'>>): string {
+  const kind = m.engine ? `${m.kind} (${m.engine})` : m.kind
+  if (m.unmonitored) return `${kind} · no source configured`
   const has = (signal: Signal) => !m.absent.includes(signal)
   return [
-    m.kind,
+    kind,
     has('requests') ? `${formatRate(m.requestsPerSecond)}/s` : null,
     m.quiet === true ? 'quiet' : null,
     has('errors') && m.quiet !== true ? `${(m.errorRate * 100).toFixed(2)}% errors` : null,
