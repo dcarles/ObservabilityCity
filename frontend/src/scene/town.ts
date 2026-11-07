@@ -1,3 +1,4 @@
+import type { ArenaSource, Block } from '../events/arena'
 import * as THREE from 'three'
 import { trafficSplit } from '../trafficSplit'
 import { Building, type BuildingStatus } from '../buildings/building'
@@ -126,6 +127,13 @@ interface VendorLink {
  * only updates it. Layout is deterministic: the same registry gives the same town every time.
  */
 /** An island by name, for the signs seen from the air and the label under the pointer. */
+/** An island as a place for a scripted event to play on, and where it stands in the world. */
+export interface EventSite {
+  source: ArenaSource
+  origin: THREE.Vector3
+  yaw: number
+}
+
 export interface IslandLabel { id: string; name: string; color: string; vendor: boolean; x: number; z: number }
 
 export class Town {
@@ -1446,6 +1454,56 @@ export class Town {
     if (!b) return null
     b.root.updateWorldMatrix(true, false)
     return { target: b.root.getWorldPosition(new THREE.Vector3()).setY(2), distance: 46 }
+  }
+
+  /**
+   * Every pillar's island as a place for a scripted event to play: the coast, the buildings standing on it as boxes, which way is out to sea, and
+   * where the island sits in the world. Read-only: nothing here changes the town.
+   */
+  eventSites(): EventSite[] {
+    const out: EventSite[] = []
+    const up = new THREE.Vector3(0, 1, 0)
+    for (const isl of this.islands) {
+      isl.root.updateWorldMatrix(true, true)
+      const inv = new THREE.Matrix4().copy(isl.root.matrixWorld).invert()
+      const blocks: Block[] = []
+      const take = (id: string, o: THREE.Object3D, max: number): void => {
+        const box = new THREE.Box3()
+        const part = new THREE.Box3()
+        o.traverse((c) => {
+          const m = c as THREE.Mesh
+          if (!m.isMesh || !m.visible || (m.material as THREE.Material | undefined)?.visible === false) return
+          m.updateWorldMatrix(true, false)
+          if (!m.geometry.boundingBox) m.geometry.computeBoundingBox()
+          part.copy(m.geometry.boundingBox!).applyMatrix4(m.matrixWorld).applyMatrix4(inv)
+          box.union(part)
+        })
+        if (box.isEmpty()) return
+        const cx = (box.min.x + box.max.x) / 2
+        const cz = (box.min.z + box.max.z) / 2
+        const hw = Math.min(max, Math.max(1.4, (box.max.x - box.min.x) / 2))
+        const hd = Math.min(max, Math.max(1.4, (box.max.z - box.min.z) / 2))
+        blocks.push({ id, x0: cx - hw, x1: cx + hw, z0: cz - hd, z1: cz + hd, h: Math.min(18, Math.max(2.5, box.max.y - GROUND)) })
+      }
+      for (const [id, b] of isl.buildings) take(id, b.root, 4.2)
+      for (const [id, a] of isl.assets) take(id, a.root, 2.4)
+      const world = isl.root.getWorldPosition(new THREE.Vector3())
+      const away = new THREE.Vector3(world.x, 0, world.z).applyAxisAngle(up, -isl.root.rotation.y)
+      const maxZ = isl.outline.points.reduce((m, p) => Math.max(m, p.y), -Infinity)
+      out.push({
+        source: {
+          id: isl.group.id,
+          name: isl.group.displayName,
+          outline: isl.outline.points.map((p) => ({ x: p.x, z: p.y })),
+          blocks,
+          seaward: Math.atan2(away.x, away.z),
+          gate: { x: 0, z: maxZ - 0.7 },
+        },
+        origin: new THREE.Vector3(world.x, world.y + GROUND, world.z),
+        yaw: isl.root.rotation.y,
+      })
+    }
+    return out
   }
 
   /** The round footprint of everything that stands in the sea (the pillars' islands, the third parties', the hub and the airport), for placing things beside the town. */

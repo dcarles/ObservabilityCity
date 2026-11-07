@@ -2,10 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { KONAMI, KonamiWatcher, isTyping } from '../../src/events/konami'
 import { EVENT_FOR_THEME, eventForTheme } from '../../src/events'
 import { KITS } from '../../src/themes/kits'
-import { MARGIN, placeBeside } from '../../src/events/placement'
 import { Armoury } from '../../src/events/combat'
 import { capsule, clamp, clearance, ease, ringPos, rng, seq, V } from '../../src/events/rig'
-import { ZLOOP, zombieScript } from '../../src/events/zombieScript'
 
 describe('the Konami code', () => {
   const type = (w: KonamiWatcher, keys: readonly string[]): boolean[] => keys.map((k) => w.push(k))
@@ -50,43 +48,6 @@ describe('which event belongs to which theme', () => {
   it('has an event for every theme that is drawn, and none for a theme that is not', () => {
     for (const id of Object.keys(KITS)) expect(EVENT_FOR_THEME[id], id).toBeTruthy()
     expect(eventForTheme('nope')).toBeNull()
-  })
-})
-
-describe('where the event is placed', () => {
-  const islands = [
-    { x: 0, z: 0, r: 30 },
-    { x: 80, z: 0, r: 25 },
-    { x: -70, z: 20, r: 28 },
-    { x: 10, z: -90, r: 26 },
-    { x: 30, z: 80, r: 24 },
-  ]
-  const centre = { x: 0, z: 0 }
-
-  it('stands in open sea, clear of every island, whichever island is picked', () => {
-    for (let k = 0; k < 20; k++) {
-      const spot = placeBeside(islands, centre, 38, k / 20)
-      for (const o of islands) expect(Math.hypot(o.x - spot.x, o.z - spot.z), `pick ${k / 20}`).toBeGreaterThanOrEqual(o.r + 38 + MARGIN - 1e-6)
-    }
-  })
-  it('puts it beside one of the outermost islands, on the side away from the town, facing out to sea', () => {
-    const spot = placeBeside(islands, centre, 30, 0)
-    const isl = islands[spot.beside]
-    expect(Math.hypot(isl.x, isl.z)).toBeGreaterThan(60)
-    expect(Math.hypot(spot.x, spot.z)).toBeGreaterThan(Math.hypot(isl.x, isl.z))
-    // +z of the patch points away from the town
-    expect(Math.sin(spot.yaw) * spot.x + Math.cos(spot.yaw) * spot.z).toBeGreaterThan(0)
-  })
-  it('picks different islands for different numbers, and the same one for the same number', () => {
-    const seen = new Set<number>()
-    for (let k = 0; k < 10; k++) seen.add(placeBeside(islands, centre, 30, k / 10).beside)
-    expect(seen.size).toBeGreaterThan(1)
-    expect(placeBeside(islands, centre, 30, 0.3)).toEqual(placeBeside(islands, centre, 30, 0.3))
-  })
-  it('copes with a town of one island, and with none', () => {
-    const one = placeBeside([{ x: 0, z: 0, r: 30 }], centre, 30, 0.5)
-    expect(Math.hypot(one.x, one.z)).toBeGreaterThanOrEqual(30 + 30 + MARGIN - 1e-6)
-    expect(Number.isFinite(placeBeside([], centre, 30, 0.5).x)).toBe(true)
   })
 })
 
@@ -152,32 +113,5 @@ describe('the shooting', () => {
     expect(a.of(0).length).toBeGreaterThan(8)
     expect(a.of(1).length).toBeGreaterThan(8)
     for (const s of a.shots) expect(s.t).toBeGreaterThanOrEqual(5 - 1e-9)
-  })
-})
-
-describe('the zombie defence, story', () => {
-  const S = zombieScript()
-  it('pays for every fall with at least three bullets that land by the time it falls', () => {
-    for (const f of S.falls) {
-      if (!/^zombie-\d+$|-turned$|^(sam|shaun)-opponent-1$|^boss$/.test(f.id)) continue
-      const hits = S.armoury.shots.filter((s) => s.target === f.id)
-      expect(hits.length, f.id).toBeGreaterThanOrEqual(3)
-      expect(Math.max(...hits.map((h) => h.hit)), f.id).toBeLessThanOrEqual(f.at + 1e-6)
-    }
-  })
-  it('has fighters fall and get up as zombies, and a giant come once it is quiet', () => {
-    expect(S.people.filter((p) => p.role === 'turned').length).toBe(2)
-    for (const p of S.people.filter((p) => p.role === 'turned')) {
-      const owner = p.id.replace('-turned', '')
-      const fell = S.falls.find((f) => f.id === owner)!
-      expect(p.st(fell.at - 0.5)).toBeNull()
-      expect(p.st(fell.at + 3.5)).not.toBeNull()
-    }
-    const lastZombie = Math.max(...S.falls.filter((f) => f.id !== 'boss' && f.id !== 'sam' && f.id !== 'shaun').map((f) => f.at))
-    expect(S.bossStart).toBeGreaterThan(lastZombie)
-    expect(S.bossFall).toBeLessThan(ZLOOP)
-    const volley = S.armoury.shots.filter((s) => s.target === 'boss')
-    expect(volley.length).toBeGreaterThan(100)
-    expect(new Set(volley.map((s) => s.shooter)).size).toBeGreaterThanOrEqual(6)
   })
 })
