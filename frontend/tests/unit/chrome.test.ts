@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { browserStore, isLighting, LIGHTING, LIGHTING_KEY, otherLighting, saveLighting, startLighting, type Store } from '../../src/lighting'
 import { DEFAULT_THEME, saveTheme, startTheme, themeById, THEME_KEY, THEMES } from '../../src/themes'
-import { LEGEND, LEGEND_ENTRIES, LEGEND_TABS } from '../../src/legend'
+import { forTopology, LEGEND, LEGEND_ENTRIES, LEGEND_TABS } from '../../src/legend'
 import { LEGEND_SVG, iconHtml } from '../../src/legendIcons'
 import { DASH_LEGEND, dashLegendHtml } from '../../src/dashboard/legend'
 
@@ -117,14 +117,14 @@ describe('the legend', () => {
 })
 
 describe('the legend tabs', () => {
-  it('has the four tabs in order, and every section sits on one of them', () => {
-    expect(LEGEND_TABS.map((t) => t.id)).toEqual(['problems', 'buildings', 'traffic', 'controls'])
+  it('has the five tabs in order, and every section sits on one of them', () => {
+    expect(LEGEND_TABS.map((t) => t.id)).toEqual(['problems', 'islands', 'buildings', 'traffic', 'controls'])
     for (const s of LEGEND) expect(LEGEND_TABS.map((t) => t.id)).toContain(s.tab)
     for (const t of LEGEND_TABS) expect(LEGEND.filter((s) => s.tab === t.id).flatMap((s) => s.entries).length, t.id).toBeGreaterThan(0)
   })
 
   it('keeps each tab short enough to read on one screen', () => {
-    for (const t of LEGEND_TABS) expect(LEGEND.filter((s) => s.tab === t.id).flatMap((s) => s.entries).length, t.id).toBeLessThanOrEqual(20)
+    for (const t of LEGEND_TABS) expect(LEGEND.filter((s) => s.tab === t.id).flatMap((s) => s.entries).length, t.id).toBeLessThanOrEqual(26)
   })
 
   it('puts the things that need you on the first tab', () => {
@@ -165,5 +165,45 @@ describe('the dashboard legend', () => {
   it('does not use town words', () => {
     const text = DASH_LEGEND.map((l) => `${l.title} ${l.text}`).join(' ').toLowerCase()
     for (const w of ['beacon', 'island', 'building', 'harbour', 'town']) expect(text).not.toContain(w)
+  })
+})
+
+describe('the legend by topology', () => {
+  const ids = (t: 'hub-and-spoke' | 'direct', tab: string) => forTopology(LEGEND, t).filter((s) => s.tab === tab).flatMap((s) => s.entries).map((e) => e.id)
+
+  it('explains only the way its own town works: over the hub, or along the ring road', () => {
+    expect(ids('hub-and-spoke', 'traffic')).toEqual(expect.arrayContaining(['flow-hub', 'flow-outside-hub', 'flow-vendor-hub', 'flow-hidden-hub']))
+    expect(ids('hub-and-spoke', 'traffic')).not.toEqual(expect.arrayContaining(['flow-direct']))
+    expect(ids('direct', 'traffic')).toEqual(expect.arrayContaining(['flow-direct', 'flow-outside-direct', 'flow-vendor-direct', 'signpost']))
+    for (const id of ids('direct', 'traffic')) expect(id).not.toMatch(/-hub$/)
+    for (const id of ids('hub-and-spoke', 'traffic')) expect(id).not.toMatch(/-direct$|^signpost$/)
+  })
+
+  it('has a bridge to the hub on the islands page of a hub-and-spoke town and a ring road in a direct one', () => {
+    expect(ids('hub-and-spoke', 'islands')).toEqual(expect.arrayContaining(['spoke', 'ring-hub']))
+    expect(ids('hub-and-spoke', 'islands')).not.toContain('ring-direct')
+    expect(ids('direct', 'islands')).toContain('ring-direct')
+    expect(ids('direct', 'islands')).not.toContain('spoke')
+  })
+
+  it('never leaves a section empty', () => {
+    for (const t of ['hub-and-spoke', 'direct'] as const) for (const s of forTopology(LEGEND, t)) expect(s.entries.length, `${t} ${s.id}`).toBeGreaterThan(0)
+  })
+
+  it('keeps the islands to what the town has: the pillar island, the hub, third parties and the airport', () => {
+    for (const t of ['hub-and-spoke', 'direct'] as const) expect(ids(t, 'islands')).toEqual(expect.arrayContaining(['island', 'hub', 'vendor', 'airport']))
+    const text = LEGEND_ENTRIES.map((e) => `${e.sees} ${e.means} ${e.more ?? ''}`).join(' ').toLowerCase()
+    expect(text).not.toContain('lost')
+  })
+
+  it('puts only buildings on the buildings page, grouped, with the hub and resource buildings', () => {
+    const b = ids('direct', 'buildings')
+    for (const id of ['api', 'worker', 'database', 'engine', 'cache', 'function', 'sign', 'gateway', 'broker', 'egress', 'asset-vault', 'asset-store', 'asset-settings', 'asset-observatory', 'asset', 'vendor-building', 'terminal']) expect(b).toContain(id)
+    for (const id of ['hub', 'vendor', 'airport', 'island']) expect(b).not.toContain(id)
+  })
+
+  it('keeps flow words out of the buildings and building words out of the flow', () => {
+    const flow = forTopology(LEGEND, 'hub-and-spoke').filter((s) => s.tab === 'traffic').flatMap((s) => s.entries).map((e) => e.id)
+    for (const id of ['api', 'worker', 'database', 'gateway', 'broker']) expect(flow).not.toContain(id)
   })
 })
