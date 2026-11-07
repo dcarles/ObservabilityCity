@@ -11,6 +11,10 @@ on:
     - cron: '17 3 * * *'
   workflow_dispatch:
 
+# The checks only read the code.
+permissions:
+  contents: read
+
 env:
   DOTNET_NOLOGO: true
   DOTNET_CLI_TELEMETRY_OPTOUT: true
