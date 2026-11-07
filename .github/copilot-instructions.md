@@ -5,6 +5,7 @@ Read [AGENTS.md](../AGENTS.md) first: it has the architecture, the commands and 
 - **Never edit core in a company fork.** A fork adds only `config/<company>/` and `extensions/`. Generic fixes go upstream as a pull request ([runbook](../docs/connect-your-company.md#send-a-generic-fix-upstream)).
 - **Tests on both sides.** Backend behaviour gets an xUnit test (`dotnet test --solution backend/ObservabilityCity.slnx -c Release`). Browser behaviour gets a Vitest unit test (`cd frontend && npm test`) and, when it shows in the town, a Playwright test (`npm run e2e`). If a change touches one side only, say so in the pull request.
 - **Branches and pull requests.** Never push to `main`; never force-push `main`.
+- **No new third-party dependencies without approval.** Do not add a library, package, tool or GitHub Action (runtime, dev or test; anything not from Microsoft, GitHub or three.js) until the maintainer has explicitly approved that package. Ask first: what it is, who owns it, its licence, and why built-in or in-house code will not do.
 - **No secrets or company identifiers in the repo.** Use `az login`, user secrets or Key Vault. Docs and tests use generic example names.
 - **Tests use fakes and recorded fixtures, never live Azure, Grafana or Prometheus.** Probes and adapters sit behind interfaces (`ISourceProbe`, `ITokenProvider`, `IMetricSource`).
 - **A signal that is not configured is absent, not grey.** Missing or stale data is never shown as healthy.
