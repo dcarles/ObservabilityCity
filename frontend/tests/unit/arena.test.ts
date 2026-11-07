@@ -13,7 +13,7 @@ for (const src of ISLANDS) {
     })
     it('walks round buildings: a path never goes through one', () => {
       const a = arena.shore
-      const b = arena.inland(8, 0, src.seaward + Math.PI)
+      const b = arena.inland(8, 0, src.seaward + Math.PI)!!
       const way = arena.path(a, b)!
       expect(way.length).toBeGreaterThan(1)
       for (let i = 0; i < way.length - 1; i++)
@@ -27,7 +27,7 @@ for (const src of ISLANDS) {
     it('goes round an obstacle added later', () => {
       const a = new Arena(src)
       const from = a.shore
-      const to = a.inland(8, 0, src.seaward + Math.PI)
+      const to = a.inland(8, 0, src.seaward + Math.PI)!
       const mid = { x: (from.x + to.x) / 2, z: (from.z + to.z) / 2 }
       a.addObstacle({ x: mid.x, z: mid.z, r: 1 })
       for (const p of a.path(from, to)!) expect(Math.hypot(p.x - mid.x, p.z - mid.z)).toBeGreaterThan(0.9)

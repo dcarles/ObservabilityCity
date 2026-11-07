@@ -73,6 +73,7 @@ for (const { theme, event, caption, key } of THEMES) {
       expect(Object.keys(hits).length).toBeGreaterThan(0)
       expect(Object.values(hits).some((h) => h < 1e8)).toBe(true)
       await city(page, 'c => c.event.setTime(1e6)')
+      await town.step(2)
       await expect.poll(() => city<boolean>(page, 'c => c.event.playing()')).toBe(false)
       expect(await city<string>(page, 'c => JSON.stringify([c.stage.scene.children.length, c.town.eventSites().map((e) => [e.source.id, e.source.blocks.length])])')).toBe(before)
     })
