@@ -20,6 +20,7 @@ import { fileURLToPath } from 'node:url'
 //   npm run e2e:dashboard the plain dashboard view: switch, summary, pillar cards, service table, tenant rows, shared filters, no horizontal scroll, on the tenants town
 //   npm run e2e:towns    the town switcher and the second sample town (Droid Shop, on Kafka), on the server's own config folder with both sample towns
 //   npm run e2e:wide     islands of 2, 10, 15 and 27 services: how many pads a row, every building on land, nothing overlapping, on a town of four islands
+//   npm run e2e:themes   the themes suite for all three themes (a pull request runs it for the harbour theme only), including a bad day shown in the town and on the dashboard. Runs nightly.
 //   npm run e2e:slow     the slow set: the 23-island and 35-island stress towns and the full sample town, with screenshots. Runs on merge to main and nightly.
 // Set E2E_NO_BUILD=1 when the backend is already built in Release (CI does this).
 

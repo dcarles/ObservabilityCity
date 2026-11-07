@@ -1,7 +1,7 @@
 name: Slow checks
 
 # The checks that take too long to wait for on every pull request: the 23- and 35-island stress towns in a browser (draw calls,
-# frame time, build time) and the full sample town with screenshots. They run when something is merged to main and every
+# frame time, build time) the full sample town with screenshots, and all three themes drawing both sample towns and playing a bad day (the pull request checks run the harbour theme only). They run when something is merged to main and every
 # night, and can be started by hand from the Actions tab.
 
 on:
@@ -67,6 +67,12 @@ jobs:
       - name: Full sample town, with screenshots
         if: success() || failure()
         run: npm run e2e:town
+        working-directory: frontend
+        env:
+          E2E_NO_BUILD: '1'
+      - name: All three themes on a bad day, in the town and on the dashboard
+        if: success() || failure()
+        run: npm run e2e:themes
         working-directory: frontend
         env:
           E2E_NO_BUILD: '1'
