@@ -374,3 +374,8 @@ body.wall .island-label { font-size: 16px; }
 #state-list .hit.stacked { display: block; }
 #state-list .hit.stacked b, #state-list .hit.stacked span { display: block; overflow-wrap: anywhere; }
 #state-list .hit.stacked .dismiss { display: inline-block; margin: 6px 0 0; }
+
+/* the scripted event (Konami code): the town steps aside and a line at the bottom says what is happening */
+body.event-playing #island-labels { display: none; }
+#event-caption { position: fixed; left: 0; right: 0; bottom: 18px; z-index: 6; text-align: center; font-weight: 700; font-size: 18px; color: #fff; text-shadow: 0 2px 6px rgba(0, 0, 0, 0.7); pointer-events: none; }
+#event-caption[hidden] { display: none; }
