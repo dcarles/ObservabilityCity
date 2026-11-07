@@ -3,22 +3,20 @@
 // The story is worked out in alienScript.ts; this file draws it.
 
 import * as THREE from 'three'
-import { palette } from '../themes/active'
 import { Actor, Beam, glowMat, loadModel, loadModels, Puffs, staticModel } from './models'
 import { Gunfire } from './gunfire'
 import { alienScript, ALOOP, standing } from './alienScript'
 import { clamp, V } from './rig'
 import { EVENT_COLOURS as C } from './colours'
-import { island, miniTown } from './world'
+import { Ruin } from './ruin'
 import type { BuildContext, EventScene } from './types'
 
 const SPACE = ['EnemyLarge', 'EnemyFlying', 'EnemySmall', 'MechBee', 'Spaceship1', 'Spaceship2', 'Spaceship3', 'AstroA', 'AstroC'] as const
 const MUZZLE = { Rifle: 1.0, Smg: 0.8 }
 
-export async function buildAliens({ root }: BuildContext): Promise<EventScene> {
-  island(root, 48, 34, palette.island.grass)
-  const town = miniTown(root, { cols: 3, rows: 2, seed: 21 })
-  const S = alienScript(town.buildings.map((b) => ({ x: b.x, z: b.z, w: b.w, d: b.d })))
+export async function buildAliens({ root, arena }: BuildContext): Promise<EventScene> {
+  const S = alienScript(arena)
+  const ruin = new Ruin(root, S.targets, 0.7)
   const m = await loadModels('aliens', SPACE)
   const human = await loadModels('zombies', ['Matt', 'Sam', 'Rifle', 'Smg'] as const)
   void loadModel
@@ -66,16 +64,17 @@ export async function buildAliens({ root }: BuildContext): Promise<EventScene> {
   // the mech stands on the road to the north and fires at the saucers
   const mech = new Actor(m.MechBee, { h: 4.8 })
   root.add(mech.root)
-  const mp = V(-2, 0, -13)
+  const mp = S.mech
   const mechBeam = new Beam(root, C.laserGreen)
 
   // stars
   const sp: number[] = []
-  for (let i = 0; i < 160; i++) sp.push(Math.sin(i * 12.9) * 120, 40 + ((i * 37) % 60), Math.cos(i * 7.3) * 120)
+  for (let i = 0; i < 160; i++) sp.push(arena.centre.x + Math.sin(i * 12.9) * 120, 40 + ((i * 37) % 60), arena.centre.z + Math.cos(i * 7.3) * 120)
   const sg = new THREE.BufferGeometry()
   sg.setAttribute('position', new THREE.Float32BufferAttribute(sp, 3))
 
   const update = (t: number): void => {
+    ruin.update(t, (i) => S.hit[i])
     ships.forEach(({ s, g, laser, tractor, flash, smoke }, i) => {
       const p = s.pos(t)
       g.position.copy(p)
@@ -85,7 +84,7 @@ export async function buildAliens({ root }: BuildContext): Promise<EventScene> {
       const per = 1.6
       const n = Math.floor((t + i * 0.5) / per)
       const fr = (t + i * 0.5) / per - n
-      const tg = V(Math.sin(n * 7 + i * 13) * 16, 0.4, Math.cos(n * 5 + i * 3) * 10)
+      const tg = V(arena.centre.x + Math.sin(n * 7 + i * 13) * arena.reach * 0.5, 0.4, arena.centre.z + Math.cos(n * 5 + i * 3) * arena.reach * 0.4)
       if (on && fr < 0.3) {
         laser.aim(p.clone().add(V(0, -0.6, 0)), tg, 0.09, 0.95)
         P.set(flash, tg, 0.4 + fr * 5, 1 - fr / 0.3)
@@ -143,16 +142,17 @@ export async function buildAliens({ root }: BuildContext): Promise<EventScene> {
   return {
     id: 'aliens',
     title: 'Alien invasion',
-    radius: 32,
     loop: ALOOP,
     update: (t) => update(clamp(t, 0, ALOOP)),
-    camera: { pos: V(10, 26, 58), target: V(0, 7, 2) },
+    camera: { pos: V(arena.centre.x + Math.sin(arena.src.seaward) * arena.reach * 1.5, 26, arena.centre.z + Math.cos(arena.src.seaward) * arena.reach * 1.5), target: V(arena.centre.x, 6, arena.centre.z) },
     caption: (t) => (t < 6 ? 'Saucers arrive and open fire' : t < 16 ? 'Tractor beams drop the invaders' : t < 36 ? 'Astronauts and survivors fire back' : t < 50 ? 'One saucer is hit and limps away' : 'The invaders retreat'),
     inspect: (t) => ({
       aliens: S.walkers.filter((w) => w.role === 'alien' && standing(w, t)).length,
       defenders: S.walkers.filter((w) => w.role === 'defender' && standing(w, t)).length,
       saucers: S.saucers.filter((s) => s.pos(t).y < 30).length,
       shotsFired: S.armoury.shots.filter((s) => s.t <= t).length,
+      damaged: S.hit.filter((h) => t > h).length,
     }),
+    hits: () => Object.fromEntries(S.targets.map((b, i) => [b.id, S.hit[i]])),
   }
 }

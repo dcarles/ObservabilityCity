@@ -72,8 +72,8 @@ export async function startTown(): Promise<void> {
   stage.setLighting(lighting, true)
   document.documentElement.dataset.theme = theme.id
 
-  // the Konami code (or ?event in the address) plays the theme's scripted event on a patch of sea beside a random island; Escape ends it
-  const events = new EventDirector(stage, theme.id, { footprints: () => town.footprints(), pick: testMode ? () => 0.5 : Math.random })
+  // the Konami code (or ?event in the address) plays the theme's scripted event on a random island, using its real buildings; Escape ends it
+  const events = new EventDirector(stage, theme.id, { sites: () => town.eventSites(), pick: testMode ? () => 0.5 : Math.random })
   const konami = new KonamiWatcher()
   window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') events.stop()
@@ -465,6 +465,8 @@ export async function startTown(): Promise<void> {
       inspect: () => events.current?.inspect(events.time) ?? null,
       caption: () => { const el = document.getElementById('event-caption'); return el && !el.hidden ? el.textContent ?? '' : '' },
       placement: () => events.lastPlacement,
+      hits: () => events.current?.hits() ?? {},
+      islands: () => town.eventSites().map((e) => e.source.id),
     },
     /** Hand the page a snapshot as if the server had sent it. */
     feed: (raw: unknown) => onSnapshot(raw),

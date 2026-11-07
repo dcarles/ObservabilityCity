@@ -1,16 +1,17 @@
-// Plays an event beside the town: a patch of ground rises from the sea next to a random island, the camera glides over to it, the scene plays
-// out with the town still there behind it, and when it is over the patch goes and the camera returns.
+// Plays an event on one of the town's own islands: the camera glides over to a random island, the scene plays out on its real buildings with the
+// rest of the town still there, and when it is over everything the event added is taken away and the camera returns. The event lays effects over
+// the buildings (fire, scorch) in a group of its own; nothing of the town is changed, so removing that group puts the town back exactly.
 
 import * as THREE from 'three'
 import type { Stage } from '../scene/stage'
+import type { EventSite } from '../scene/town'
+import { Arena } from './arena'
 import { buildEvent, eventForTheme, type EventId } from './index'
-import { placeBeside } from './placement'
-import type { Disc } from './rig'
 import type { EventScene } from './types'
 
 export interface EventOptions {
-  /** The round footprints of the islands, so the patch can be set clear of them. */
-  footprints: () => Disc[]
+  /** The islands an event can play on. */
+  sites: () => EventSite[]
   /** A number from 0 up to 1 that picks the island; random by default, fixed in tests. */
   pick?: () => number
 }
@@ -18,7 +19,6 @@ export interface EventOptions {
 export class EventDirector {
   private scene: EventScene | null = null
   private root: THREE.Group | null = null
-  private readonly built = new Map<EventId, { scene: EventScene; root: THREE.Group }>()
   private t = 0
   private on = false
   private starting = false
@@ -26,8 +26,8 @@ export class EventDirector {
   private cancelled = false
   private saved: { pos: THREE.Vector3; target: THREE.Vector3; pan: number } | null = null
   private readonly caption: HTMLElement
-  /** Where the patch stood the last time, for tests. */
-  lastPlacement: { x: number; z: number; yaw: number; beside: number } | null = null
+  /** Which island the event is playing on, for tests. */
+  lastPlacement: { island: string; x: number; z: number } | null = null
 
   constructor(private readonly stage: Stage, private readonly themeId: string, private readonly opts: EventOptions, host: HTMLElement = document.body) {
     this.caption = document.createElement('div')
@@ -54,31 +54,28 @@ export class EventDirector {
   /** Starts the theme's event from the beginning. Does nothing while one is already playing. */
   async play(): Promise<boolean> {
     const id = this.eventId
-    if (!id || this.playing) return false
+    const sites = this.opts.sites().filter((s) => s.source.blocks.length > 0)
+    if (!id || this.playing || sites.length === 0) return false
     this.starting = true
     this.cancelled = false
     try {
-      let b = this.built.get(id)
-      if (!b) {
-        const root = new THREE.Group()
-        const scene = await buildEvent(id, { root })
-        b = { scene, root }
-        this.built.set(id, b)
-      }
+      const site = sites[Math.min(sites.length - 1, Math.floor((this.opts.pick ?? Math.random)() * sites.length))]
+      const arena = new Arena(site.source)
+      const root = new THREE.Group()
+      const scene = await buildEvent(id, { root, arena })
       if (this.cancelled) return false
-      this.scene = b.scene
-      this.root = b.root
-      const centre = this.stage.homeAt
-      const spot = placeBeside(this.opts.footprints(), { x: centre.x, z: centre.z }, b.scene.radius, (this.opts.pick ?? Math.random)())
-      this.lastPlacement = spot
-      this.root.position.set(spot.x, 0.5, spot.z)
-      this.root.rotation.y = spot.yaw
-      this.root.updateMatrixWorld(true)
-      this.stage.scene.add(this.root)
+      this.scene = scene
+      this.root = root
+      this.lastPlacement = { island: site.source.id, x: site.origin.x, z: site.origin.z }
+      root.position.copy(site.origin)
+      root.rotation.y = site.yaw
+      root.updateMatrixWorld(true)
+      this.stage.scene.add(root)
       document.body.classList.add('event-playing')
-      this.saved = { pos: this.stage.camera.position.clone(), target: this.stage.controls.target.clone(), pan: this.stage.widenPan(Math.hypot(spot.x - centre.x, spot.z - centre.z) + b.scene.radius) }
-      const to = (v: THREE.Vector3): THREE.Vector3 => this.root!.localToWorld(v.clone())
-      this.stage.glideTo(to(b.scene.camera.target).setY(0), to(b.scene.camera.pos))
+      const centre = this.stage.homeAt
+      this.saved = { pos: this.stage.camera.position.clone(), target: this.stage.controls.target.clone(), pan: this.stage.widenPan(Math.hypot(site.origin.x - centre.x, site.origin.z - centre.z) + arena.reach + 40) }
+      const to = (v: THREE.Vector3): THREE.Vector3 => root.localToWorld(v.clone())
+      this.stage.glideTo(to(scene.camera.target).setY(0), to(scene.camera.pos))
       this.t = 0
       this.on = true
       this.setTime(0)
@@ -103,12 +100,13 @@ export class EventDirector {
     if (this.t >= this.scene.loop - 1e-6) this.stop()
   }
 
-  /** Ends the event: the patch goes and the camera returns to where it was. */
+  /** Ends the event: everything it added goes and the camera returns to where it was. */
   stop(): void {
     if (this.starting) this.cancelled = true
     if (!this.on) return
     this.on = false
     if (this.root) this.stage.scene.remove(this.root)
+    this.root = null
     document.body.classList.remove('event-playing')
     this.caption.hidden = true
     if (this.saved) {
