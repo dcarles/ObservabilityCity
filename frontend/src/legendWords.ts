@@ -3,23 +3,23 @@
 
 import { LEGEND, type LegendEntry, type LegendSection } from './legend'
 
-type Words = Record<string, Partial<Pick<LegendEntry, 'sees' | 'means'>>>
+type Words = Record<string, Partial<Pick<LegendEntry, 'sees' | 'means' | 'icon'>>>
 
 export const THEME_WORDS: Record<string, Words> = {
   space: {
-    api: { sees: 'Habitat module' },
-    worker: { sees: 'Fabricator with stacks', means: 'A worker: it reads messages. Its plasma plume thickens with CPU' },
-    database: { sees: 'Data vault', means: 'A database. One storage unit for each tenant where each has its own' },
-    cache: { sees: 'Fusion sphere' },
-    function: { sees: 'Chrono spire with spinning rings' },
-    hub: { sees: 'The platform in the middle', means: 'The platform hub: API gateway, message broker spaceport (Service Bus, Kafka), central egress, shared database' },
-    car: { sees: 'Hover pod with a cyan canopy' },
-    taxi: { sees: 'Amber hover pod' },
-    bridge: { sees: 'Light bridge' },
-    boat: { sees: 'Cargo shuttles from the spaceport to a docking gantry' },
+    api: { sees: 'Habitat module', icon: '🛰️' },
+    worker: { sees: 'Fabricator with stacks', icon: '⚙️', means: 'A worker: it reads messages. Its plasma plume thickens with CPU' },
+    database: { sees: 'Data vault', icon: '🗄️', means: 'A database. One storage unit for each tenant where each has its own' },
+    cache: { sees: 'Fusion sphere', icon: '🔮' },
+    function: { sees: 'Chrono spire with spinning rings', icon: '⏳' },
+    hub: { sees: 'The platform in the middle', icon: '🛸', means: 'The platform hub: API gateway, message broker spaceport (Service Bus, Kafka), central egress, shared database' },
+    car: { sees: 'Hover pod with a cyan canopy', icon: '🚀' },
+    taxi: { sees: 'Amber hover pod', icon: '🛩️' },
+    bridge: { sees: 'Light bridge', icon: '🌈' },
+    boat: { sees: 'Cargo shuttles from the spaceport to a docking gantry', icon: '🚀' },
     crates: { sees: 'Crates piling up on a docking gantry' },
-    vendor: { sees: 'Small platform out in the void' },
-    airport: { sees: 'Spaceport', means: 'Callers from outside. Flying saucers follow the inbound traffic' },
+    vendor: { sees: 'Small platform out in the void', icon: '🪐' },
+    airport: { sees: 'Spaceport', icon: '🛸', means: 'Callers from outside. Flying saucers follow the inbound traffic' },
   },
   factory: {
     api: { sees: 'Office block' },
@@ -28,10 +28,10 @@ export const THEME_WORDS: Record<string, Words> = {
     cache: { sees: 'Pressure tank' },
     function: { sees: 'Tower with a clock and a siren' },
     hub: { sees: 'The yard in the middle', means: 'The platform hub: API gateway, message broker depot (Service Bus, Kafka), central egress, shared database' },
-    car: { sees: 'Blue-cab van' },
-    taxi: { sees: 'Yellow-cab van' },
-    bridge: { sees: 'Steel truss bridge' },
-    boat: { sees: 'Container barges from the depot to a loading dock' },
+    car: { sees: 'Blue-cab van', icon: '🚐' },
+    taxi: { sees: 'Yellow-cab van', icon: '🚚' },
+    bridge: { sees: 'Steel truss bridge', icon: '🏗️' },
+    boat: { sees: 'Container barges from the depot to a loading dock', icon: '🚢' },
     crates: { sees: 'Containers piling up on a loading dock' },
     vendor: { sees: 'Small yard out on the canal' },
     airport: { sees: 'Air freight field', means: 'Callers from outside. Cargo planes follow the inbound traffic' },
