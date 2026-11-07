@@ -6,7 +6,7 @@ import { Stage } from './scene/stage'
 import { Town } from './scene/town'
 import { rng } from './scene/random'
 import { loadKit } from './assets/kit'
-import { Connection } from './connection'
+import { Connection, markFeed } from './connection'
 import { addressForTown, fetchTowns, requestedScope, type TownChoice } from './scope'
 import { saveQuality, startQuality, type Quality } from './quality'
 import { parseWall } from './wall/params'
@@ -343,7 +343,7 @@ export async function startTown(): Promise<void> {
   }
 
   let held = false // for tests: while true, the snapshots from the server are ignored, so one fed by hand stays on screen
-  const connection = new Connection((raw) => { if (!held) onSnapshot(raw) }, (st) => { topbar.setStatus(st); wall?.setConnection(st) }, scope, (e) => {
+  const connection = new Connection((raw) => { if (!held) onSnapshot(raw) }, (st) => { topbar.setStatus(st); wall?.setConnection(st); markFeed(st) }, scope, (e) => {
     banner.textContent = e.environments.length === 0 && e.towns
       ? `There is no town "${e.requestedTown ?? ''}". Available: ${e.towns.join(', ') || 'none'}.`
       : `There is no environment "${e.requested ?? ''}". Available: ${e.environments.join(', ') || 'none'}.`
@@ -520,6 +520,7 @@ export async function startTown(): Promise<void> {
     /** Opens the live socket again counts: how many times it was opened. */
     connectionOpened: () => connection.opened,
     dropConnection: () => connection.drop(),
+    muteFeed: (muted: boolean, silentAfterMs?: number) => connection.mute(muted, silentAfterMs),
     /** How strongly lit windows glow right now (Dusk makes them glow more). */
     windowGlow: () => WINDOW_GLOW.value,
     towns: () => towns,

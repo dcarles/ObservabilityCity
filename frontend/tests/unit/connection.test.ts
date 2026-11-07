@@ -66,3 +66,27 @@ describe('a connection that has lost the live socket', () => {
     expect(starts).toHaveLength(4)
   })
 })
+
+describe('a live feed that goes quiet', () => {
+  it('turns silent after the limit with no snapshot, and live again when one arrives', async () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('window', { setTimeout, clearTimeout, setInterval, clearInterval, location: { search: '' } })
+    let ok = true
+    vi.stubGlobal('fetch', () => (ok ? Promise.resolve({ ok: true, json: () => Promise.resolve({}) }) : new Promise(() => {})))
+    const states: string[] = []
+    const c = new Connection(() => {}, (s) => states.push(s), { town: null, env: null }, () => {}, [], { silentAfterMs: 10_000 })
+    c.start()
+    await vi.advanceTimersByTimeAsync(3000) // the socket failed, so the polling answers
+    expect(c.state).toBe('live')
+    ok = false // the polling now hangs: nothing arrives
+    await vi.advanceTimersByTimeAsync(9000)
+    expect(c.state).toBe('live')
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(c.state).toBe('silent')
+    ok = true
+    await vi.advanceTimersByTimeAsync(0)
+    expect(states).toContain('silent')
+    vi.useRealTimers()
+    vi.unstubAllGlobals()
+  })
+})

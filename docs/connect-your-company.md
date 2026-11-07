@@ -456,4 +456,5 @@ Rules for the upstream pull request: no company names, tenant ids, hostnames or 
 - **No Azure login** (`no permission` with "run az login"): `az login`, then `az account show` to confirm the subscription.
 - **Everything unreachable:** try the address in a browser or with `curl`; a corporate proxy or VPN is the usual cause.
 - **The town is empty or grey:** grey means configured but no fresh data; run `--sources` and fix whatever is not *connected*.
+- **The status says "No update for over 45 s" and the page is grey:** the browser has received no snapshot for 45 seconds, though the server sends one at least every 15. The connection may look open, but the town's data cannot be trusted. The page recovers by itself when snapshots arrive again; if not, look at the Aspire log for the host.
 - **Registry errors:** the message names the file, line and rule. The README lists every rule.

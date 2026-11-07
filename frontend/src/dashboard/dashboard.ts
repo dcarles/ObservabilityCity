@@ -1,7 +1,7 @@
 import { fitHeads } from './sticky'
 import '../style.css'
 import '../dashboard.css'
-import { Connection, type ConnectionState } from '../connection'
+import { Connection, markFeed, SILENT_WORDS, type ConnectionState } from '../connection'
 import { checkSnapshot } from '../snapshotGuard'
 import { Inspector } from '../inspector'
 import { dismissEvent } from '../healthEvents'
@@ -196,11 +196,12 @@ export function startDashboard(): void {
   drawMarker()
 
   function setStatus(st: ConnectionState): void {
-    connected = st === 'live' || st === 'badData'
+    connected = st === 'live' || st === 'badData' // silent counts as not connected
     drawMarker()
-    const label = { connecting: 'Connecting…', live: last?.mode === 'demo' ? 'Live (demo data)' : 'Live', reconnecting: 'Reconnecting…', offline: 'Backend offline', badData: 'Bad data, showing the last good data' }[st]
+    const label = { connecting: 'Connecting…', live: last?.mode === 'demo' ? 'Live (demo data)' : 'Live', reconnecting: 'Reconnecting…', offline: 'Backend offline', badData: 'Bad data, showing the last good data', silent: SILENT_WORDS }[st]
+    markFeed(st)
     const el = $('dash-status')
-    el.className = `livepill ${st === 'live' ? '' : st === 'offline' || st === 'badData' ? 'off' : 'wait'}`
+    el.className = `livepill ${st === 'live' ? '' : st === 'offline' || st === 'badData' || st === 'silent' ? 'off' : 'wait'}`
     el.lastElementChild!.textContent = label
   }
 
@@ -262,6 +263,7 @@ export function startDashboard(): void {
 
   ;(window as unknown as { dash: unknown }).dash = {
     seen,
+    muteFeed: (muted: boolean, silentAfterMs?: number) => connection.mute(muted, silentAfterMs),
     feed: (raw: unknown) => onSnapshot(raw),
     /** For tests: stop (or resume) showing the server's snapshots; `feed` still works. */
     hold: (on: boolean) => { held = on },

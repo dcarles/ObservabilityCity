@@ -379,3 +379,6 @@ body.wall .island-label { font-size: 16px; }
 body.event-playing #island-labels { display: none; }
 #event-caption { position: fixed; left: 0; right: 0; bottom: 18px; z-index: 6; text-align: center; font-weight: 700; font-size: 18px; color: #fff; text-shadow: 0 2px 6px rgba(0, 0, 0, 0.7); pointer-events: none; }
 #event-caption[hidden] { display: none; }
+
+/* The feed has gone quiet: grey everything, so numbers that may be old are never read as current. */
+body.feed-silent #town, body.feed-silent #dash-sum, body.feed-silent #dash-pillars, body.feed-silent #dash-sections { filter: grayscale(1) brightness(0.85); transition: filter 0.6s; }

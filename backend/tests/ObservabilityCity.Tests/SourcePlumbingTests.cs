@@ -470,6 +470,90 @@ public class SourcePlumbingTests
         Assert.NotNull(log.Errors[j]);
     }
 
+    [Fact]
+    public void A_failing_source_is_asked_twice_as_slowly_from_the_second_failed_round_and_four_times_from_the_third_up_to_five_minutes()
+    {
+        var thirty = TimeSpan.FromSeconds(30);
+        Assert.Equal(thirty, SourcePoller.Pause(thirty, 1));
+        Assert.Equal(TimeSpan.FromSeconds(60), SourcePoller.Pause(thirty, 2));
+        Assert.Equal(TimeSpan.FromSeconds(120), SourcePoller.Pause(thirty, 3));
+        Assert.Equal(TimeSpan.FromSeconds(120), SourcePoller.Pause(thirty, 40));
+        Assert.Equal(TimeSpan.FromMinutes(5), SourcePoller.Pause(TimeSpan.FromMinutes(2), 5));
+        Assert.Equal(TimeSpan.FromMinutes(10), SourcePoller.Pause(TimeSpan.FromMinutes(10), 5)); // a long interval is never shortened
+    }
+
+    [Fact]
+    public async Task A_source_that_fails_is_backed_off_logged_once_and_goes_back_to_its_interval_with_one_line_when_it_works()
+    {
+        var clock = new FakeTimeProvider(new DateTimeOffset(2026, 11, 7, 12, 0, 0, TimeSpan.Zero));
+        var source = new FailsThenWorks(failures: 3, interval: TimeSpan.FromSeconds(30));
+        var log = new ListLogger();
+        var poller = new SourcePoller([source], new RegistryHolder(RegistryLoader.Load(TestPaths.LiveTown)), new LatestState(), log, null, clock);
+        var ct = TestContext.Current.CancellationToken;
+
+        await poller.StartAsync(ct);
+        await PollsReach(source, 1, ct);
+        await Advance(clock, 29, source, 1, ct);
+        await Advance(clock, 1, source, 2, ct);   // t=30: second failed round
+        await Advance(clock, 59, source, 2, ct);  // asked twice as slowly: not at t=60
+        await Advance(clock, 1, source, 3, ct);   // t=90: third failed round
+        await Advance(clock, 119, source, 3, ct); // four times as slowly: not before t=210
+        Assert.Single(log.Lines, l => l.Contains("Source flaky") && l.Contains("values will go stale"));
+        await Advance(clock, 1, source, 4, ct);   // t=210: works
+        Assert.Single(log.Lines, l => l.Contains("Source flaky is back after") && l.Contains("3 failed rounds"));
+        await Advance(clock, 29, source, 4, ct);  // back to its own interval
+        await Advance(clock, 1, source, 5, ct);
+        await poller.StopAsync(ct);
+    }
+
+    [Fact]
+    public async Task A_source_that_stays_down_is_mentioned_again_in_the_log_only_every_few_minutes()
+    {
+        var clock = new FakeTimeProvider(new DateTimeOffset(2026, 11, 7, 12, 0, 0, TimeSpan.Zero));
+        var source = new FailsThenWorks(failures: int.MaxValue, interval: TimeSpan.FromSeconds(30));
+        var log = new ListLogger();
+        var poller = new SourcePoller([source], new RegistryHolder(RegistryLoader.Load(TestPaths.LiveTown)), new LatestState(), log, null, clock);
+        var ct = TestContext.Current.CancellationToken;
+
+        await poller.StartAsync(ct);
+        for (var i = 0; i < 40; i++) { clock.Advance(TimeSpan.FromSeconds(15)); await Task.Delay(5, ct); }  // ten minutes
+        await poller.StopAsync(ct);
+
+        lock (log.Lines)
+        {
+            Assert.Single(log.Lines, l => l.Contains("values will go stale"));
+            var reminders = log.Lines.Count(l => l.Contains("has been failing for"));
+            Assert.InRange(reminders, 1, 2);
+        }
+    }
+
+    private static async Task PollsReach(FailsThenWorks source, int polls, CancellationToken ct)
+    {
+        for (var i = 0; i < 200 && source.Polls < polls; i++) await Task.Delay(5, ct);
+        await Task.Delay(30, ct);
+        Assert.Equal(polls, source.Polls);
+    }
+
+    private static async Task Advance(FakeTimeProvider clock, int seconds, FailsThenWorks source, int expectedPolls, CancellationToken ct)
+    {
+        clock.Advance(TimeSpan.FromSeconds(seconds));
+        for (var i = 0; i < 200 && source.Polls < expectedPolls; i++) await Task.Delay(5, ct);
+        await Task.Delay(30, ct); // long enough for a poll that should not have happened to show itself
+        Assert.Equal(expectedPolls, source.Polls);
+    }
+
+    private sealed class FailsThenWorks(int failures, TimeSpan interval) : IMetricSource
+    {
+        public int Polls;
+        public string Name => "flaky";
+        public TimeSpan PollInterval => interval;
+        public Task<IReadOnlyDictionary<string, NodeReading>> PollAsync(Registry registry, CancellationToken ct)
+        {
+            if (Interlocked.Increment(ref Polls) <= failures) throw new IOException("the connection dropped");
+            return Task.FromResult<IReadOnlyDictionary<string, NodeReading>>(new Dictionary<string, NodeReading>());
+        }
+    }
+
     private sealed class ThrowsOnPoll(string name, Exception error) : IMetricSource
     {
         public string Name => name;
