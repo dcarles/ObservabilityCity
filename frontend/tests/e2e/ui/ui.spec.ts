@@ -480,6 +480,19 @@ test.describe('the legend', () => {
     await expect(page.locator('#legend [data-id="ring-direct"]')).toHaveCount(0)
   })
 
+  test('in a demo town shows the Break things row, and never shows the weather or the legacy pennant, which are not in use yet', async ({ town, page }) => {
+    await town.open('&legend=1')
+    await page.locator('#legend-tab-controls').click()
+    await expect(page.locator('#legend [data-id="break"]')).toBeVisible()
+    await page.locator('#legend-tab-problems').click()
+    await expect(page.locator('#legend [data-id="weather"]')).toHaveCount(0)
+    await expect(page.locator('#legend [data-id="pennant"]')).toHaveCount(0)
+    await expect(page.locator('#legend [data-id="hazard"]')).toContainText('on a car')
+    await expect(page.locator('#legend [data-id="bubble"]')).toContainText('+N waiting')
+    await expect(page.locator('#legend [data-id="health-sign"]')).toContainText('cloud provider')
+    expect(await page.locator('#legend').innerText()).not.toMatch(/azure/i)
+  })
+
   test('opens by itself on a first visit and not on the next', async ({ town, page }) => {
     await town.open('&legend=first')
     await expect(page.locator('#legend')).toBeVisible()

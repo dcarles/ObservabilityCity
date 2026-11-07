@@ -1,4 +1,4 @@
-import { forTopology, LEGEND_TABS, type LegendEntry, type TabId, type Topology } from './legend'
+import { forTown, LEGEND_TABS, type LegendEntry, type TabId, type Topology } from './legend'
 import { iconHtml } from './legendIcons'
 import { legendFor } from './legendWords'
 import { escapeHtml } from './picker'
@@ -18,6 +18,7 @@ export class LegendCard {
   private readonly el = document.getElementById('legend') as HTMLElement
   private tab: TabId = 'problems'
   private topology: Topology = 'direct'
+  private demo = false
 
   constructor(private readonly onChange: (open: boolean) => void = () => {}, private readonly themeId = 'harbour-town') {
     this.el.innerHTML = `
@@ -44,7 +45,7 @@ export class LegendCard {
 
   /** Writes the entries of every tab for this town's topology. */
   private fill(): void {
-    const sections = forTopology(legendFor(this.themeId), this.topology)
+    const sections = forTown(legendFor(this.themeId), { topology: this.topology, demo: this.demo })
     for (const t of LEGEND_TABS) {
       this.el.querySelector<HTMLElement>(`[data-panel="${t.id}"]`)!.innerHTML = `
           <p class="blurb">${escapeHtml(t.blurb)}</p>
@@ -58,6 +59,13 @@ export class LegendCard {
   setTopology(topology: Topology): void {
     if (topology === this.topology) return
     this.topology = topology
+    this.fill()
+  }
+
+  /** Whether the town runs on demo data, known from its first snapshot: the demo-only rows (the Break things panel) show only then. */
+  setDemo(demo: boolean): void {
+    if (demo === this.demo) return
+    this.demo = demo
     this.fill()
   }
 
