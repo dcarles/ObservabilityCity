@@ -154,6 +154,15 @@ describe.each(ids)('the %s theme', (id) => {
     expect(typeof yard.tenantStatus).toBe('function')
   })
 
+  it('writes the engine and its type on a database building\'s sign, and keeps the generic word without one', () => {
+    const engine = { name: 'Cosmos DB', typeName: 'Document' }
+    expect(kit.buildModel('Database', '#fff', { engine }).signText).toBe('COSMOS DB · Document')
+    expect(kit.buildModel('Database', '#fff', { engine, tenanted: true }).signText).toBe('COSMOS DB · Document')
+    expect(kit.buildModel('Database', '#fff', {}).signText).toBeUndefined()
+    expect(kit.buildModel('Database', '#fff', { engine: null }).signText).toBeUndefined()
+    expect(kit.buildModel('Api', '#fff', { engine }).signText).toBeUndefined()
+  })
+
   it('smokes, spins or swings: the animated buildings keep moving', () => {
     for (const kind of ['Worker', 'Function', 'Broker', 'Egress'] as const) expect(typeof build(kit, kind).animate).toBe('function')
     expect(typeof build(kit, 'Worker').setActivity).toBe('function')

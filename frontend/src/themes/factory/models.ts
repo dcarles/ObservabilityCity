@@ -6,6 +6,7 @@ import { makeWindowMaterial } from '../../buildings/windowMaterial'
 import { palette } from '../active'
 import { storageYard } from '../harbour-town/yard'
 import { portSignText } from '../../portSign'
+import { databaseSignText, paintDatabaseSign, type EngineLabel, type ModelOptions } from '../../engineSign'
 import { CELL, glow, mast, v } from '../common'
 
 const P = palette.building
@@ -14,12 +15,12 @@ const YELLOW = '#f2c230'
 const BLACK = '#23272d'
 
 /** Builds the model for a building kind. The accent is the owning island's flag colour. */
-export function factoryModel(kind: NodeKind, accent: string, opts: { tenanted?: boolean; name?: string } = {}): BuildingModel {
-  if (kind === 'Database' && opts.tenanted) return storageYard(accent)
+export function factoryModel(kind: NodeKind, accent: string, opts: ModelOptions = {}): BuildingModel {
+  if (kind === 'Database' && opts.tenanted) return storageYard(accent, opts.engine)
   switch (kind) {
     case 'Api': return officeBlock(accent)
     case 'Worker': return productionHall(accent)
-    case 'Database': return warehouse(accent)
+    case 'Database': return warehouse(accent, opts.engine)
     case 'Cache': return pressureTank()
     case 'Function': return timerTower()
     case 'Gateway': return gatehouse(accent)
@@ -130,13 +131,9 @@ function productionHall(accent: string): BuildingModel {
   }
 }
 
-function warehouse(accent: string): BuildingModel {
+function warehouse(accent: string, engine?: EngineLabel | null): BuildingModel {
   const W = 5 * CELL, D = 4 * CELL, FH = 1.95
-  const sign = canvasTexture(512, 128, (ctx) => {
-    ctx.fillStyle = accent; ctx.fillRect(0, 0, 512, 128)
-    ctx.fillStyle = '#ffffff'; ctx.font = '800 72px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-    ctx.fillText('WAREHOUSE', 256, 68)
-  })
+  const sign = canvasTexture(512, 128, (ctx) => paintDatabaseSign(ctx, accent, 'WAREHOUSE', 72, engine))
   const base = group(
     box(W + 0.2, 0.5, D + 0.2, flat('#5f7a94')),
     ...[-1.9, -0.6, 0.7].map((x) => rollerDoor(1.1, 1.1, x, D / 2 + 0.1, '#cfd5db')),
@@ -169,6 +166,7 @@ function warehouse(accent: string): BuildingModel {
     door: v(0, 0, D / 2 + 1.9),
     doorDir: v(0, 0, 1),
     plaque: { position: v(-W / 2 + 0.9, 0.5, D / 2 + 0.25), width: 1.5 },
+    signText: databaseSignText(engine),
     radius: 3.7,
   }
 }

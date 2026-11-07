@@ -4,6 +4,7 @@
 import { LIGHTING } from '../lighting'
 import type { NodeKind } from '../types'
 import type { BuildingModel } from '../buildings/model'
+import type { ModelOptions } from '../engineSign'
 import { harbourPalette } from './harbour-town/palette'
 import type { BridgeStyle, Palette, ThemeKit, VehicleKit } from './types'
 
@@ -37,6 +38,6 @@ export function activeKit(): ThemeKit {
 
 export const activeThemeId = (): string | null => current?.id ?? null
 
-export const buildModel = (kind: NodeKind, accent: string, opts: { tenanted?: boolean; name?: string } = {}): BuildingModel => activeKit().buildModel(kind, accent, opts)
+export const buildModel = (kind: NodeKind, accent: string, opts: ModelOptions = {}): BuildingModel => activeKit().buildModel(kind, accent, opts)
 export const vehicles = (): VehicleKit => activeKit().vehicles
 export const bridgeStyle = (): BridgeStyle => activeKit().bridge

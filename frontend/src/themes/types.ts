@@ -1,6 +1,7 @@
 import type * as THREE from 'three'
 import type { NodeKind } from '../types'
 import type { BuildingModel } from '../buildings/model'
+import type { ModelOptions } from '../engineSign'
 import type { Lighting, LightingPreset } from '../lighting'
 import type { Rect } from '../scene/island'
 import type { harbourPalette } from './harbour-town/palette'
@@ -71,7 +72,7 @@ export interface ThemeKit {
   id: string
   palette: Palette
   lighting: Record<Lighting, LightingPreset>
-  buildModel(kind: NodeKind, accent: string, opts: { tenanted?: boolean; name?: string }): BuildingModel
+  buildModel(kind: NodeKind, accent: string, opts: ModelOptions): BuildingModel
   vehicles: VehicleKit
   bridge: BridgeStyle
   /** The jetty a sea lane ends on, running along +z. */

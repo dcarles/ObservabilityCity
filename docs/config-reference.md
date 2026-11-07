@@ -49,7 +49,7 @@ databaseEngines:
   sqlserver: { name: SQL Server, type: relational }
 ```
 
-A database (`role: db`) in a pillar file or the hub then writes `engine: cosmos` and shows "Cosmos DB" with its type, Document, in the inspector, the tooltip and on its name board. An engine that is not in the list is an error with a "did you mean" hint, so two teams cannot spell one engine two ways. A database without `engine` shows nothing, and the validator warns about it once the town lists engines.
+A database (`role: db`) in a pillar file or the hub then writes `engine: cosmos` and shows "Cosmos DB" with its type, Document, in the inspector, the tooltip and on the sign of its building in the 3D town. An engine that is not in the list is an error with a "did you mean" hint, so two teams cannot spell one engine two ways. A database without `engine` keeps the generic sign of its building and shows no label, and the validator warns about it once the town lists engines.
 
 <!-- file: ExpectedWarningFile -->
 | Key | Required | Default | Meaning |

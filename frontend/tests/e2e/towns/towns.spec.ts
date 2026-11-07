@@ -307,6 +307,20 @@ test.describe('what a database runs on', () => {
     await expect(page.locator('#inspector .rows')).toContainText(`${db.engine.name} · ${db.engine.typeName}`)
   })
 
+  test('every database building wears its own engine and type on its sign, and two databases can differ', async ({ town, page }) => {
+    for (const id of ['galactic-credit', SHOP]) {
+      town.townId = id
+      await town.open()
+      const dbs = await page.evaluate(() => {
+        const c = (window as any).city
+        return c.seen.last.groups.flatMap((g: any) => g.nodes).filter((n: any) => n.kind === 'Database').map((n: any) => ({ id: n.id, engine: n.engine, sign: c.inspect(n.id)?.sign ?? null }))
+      })
+      expect(dbs.length).toBeGreaterThan(0)
+      for (const db of dbs) expect(db.sign, db.id).toBe(`${db.engine.name.toUpperCase()} · ${db.engine.typeName}`)
+      expect(new Set(dbs.map((d: any) => d.sign)).size).toBeGreaterThan(1)
+    }
+  })
+
   test('the dashboard names the engine next to the type under each database', async ({ page }) => {
     await page.goto('/?view=dashboard')
     await page.waitForFunction(() => document.querySelectorAll('[data-pillar]').length > 0, null, { timeout: 55_000 })
