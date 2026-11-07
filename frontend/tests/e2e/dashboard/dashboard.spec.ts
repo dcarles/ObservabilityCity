@@ -82,6 +82,8 @@ test.describe('the dashboard view', () => {
 
   test('a database with a tenant database each expands to one line per tenant, with the test tenants tagged and hideable', async ({ town, page }) => {
     await open(town, page)
+    // hold back the server's snapshots: a redraw while the test clicks on the rows detached them and timed the click out
+    await page.evaluate(() => (window as any).dash.hold(true))
     const card = page.locator('[data-pillar="aa"]')
     await card.locator('[data-toggle]').click()
     await openGroup(page, 'aa', 'orders')
@@ -449,26 +451,29 @@ test.describe('the dashboard view', () => {
       return (r + g + b) / 3
     })
 
+  /** Waits for an element's background to settle on dark or light: the drawer redraws when its logs load and a new control takes its colour a moment later. */
+  const expectScheme = (page: Page, selector: string, dark: boolean) =>
+    expect.poll(async () => { const b = await brightness(page, selector); return b >= 0 && b < 128 === dark }, { message: `${selector} should be ${dark ? 'dark' : 'light'}` }).toBe(true)
+
   test('in dark mode the drawer and the tenant list are dark, in light mode they are light', async ({ town, page }) => {
     for (const [scheme, dark] of [['dark', true], ['light', false]] as const) {
       await page.emulateMedia({ colorScheme: scheme })
       await open(town, page)
       await page.locator('#tenant-button').click()
       await expect(page.locator('#tenant-list')).toBeVisible()
-      expect((await brightness(page, '#tenant-list')) < 128).toBe(dark)
-      expect((await brightness(page, '#tenant-query')) < 128).toBe(dark)
-      expect((await brightness(page, '#tenant-button')) < 128).toBe(dark)
+      await expectScheme(page, '#tenant-list', dark)
+      await expectScheme(page, '#tenant-query', dark)
+      await expectScheme(page, '#tenant-button', dark)
       await page.keyboard.press('Escape')
       const card = page.locator('[data-pillar="aa"]')
       await card.locator('[data-toggle]').click()
       await openGroup(page, 'aa', 'orders')
       await card.locator('tr.row[data-system="aa.orders-api"] td').first().click()
       await expect(page.locator('#inspector')).toBeVisible()
-      expect((await brightness(page, '#inspector')) < 128).toBe(dark)
+      await expectScheme(page, '#inspector', dark)
       await page.locator('#inspector [data-tab="logs"]').click()
       await expect(page.locator('#inspector [data-refresh-logs]')).toBeVisible()
-      await expect.poll(() => brightness(page, '#inspector [data-refresh-logs]')).toBeGreaterThanOrEqual(0)
-      expect((await brightness(page, '#inspector [data-refresh-logs]')) < 128).toBe(dark)
+      await expectScheme(page, '#inspector [data-refresh-logs]', dark)
     }
   })
 
