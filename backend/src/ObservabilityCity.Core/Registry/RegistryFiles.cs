@@ -88,6 +88,8 @@ internal sealed class SystemFile
     public Dictionary<string, string> Signals { get; set; } = new();
     /// <summary>The name this system's resources carry for its service, matched against the service group of the environment's resource patterns. Without it, the service name.</summary>
     public string? ServiceCode { get; set; }
+    /// <summary>The environments (ids of the files in environments/) this system is deployed in. Without it, every environment.</summary>
+    public List<string> Environments { get; set; } = [];
     /// <summary>What the telemetry says about this system.</summary>
     public TelemetryFile? Telemetry { get; set; }
     /// <summary>Ids of the systems this one calls directly. Cars drive only along declared links.</summary>

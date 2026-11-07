@@ -13,7 +13,8 @@ public sealed partial record Registry
     {
         var env = Environments.FirstOrDefault(e => e.Id == id);
         if (env is null) return this;
-        var gone = env.Excluded;
+        // left out by the environment's exclude list, or by a system that names the environments it is deployed in and not this one
+        var gone = Groups.SelectMany(g => g.Nodes).Where(n => n.Environments.Count > 0 && !n.Environments.Contains(id)).Select(n => n.Id).Concat(env.Excluded).ToHashSet();
         var groups = new List<RegistryGroup>();
         foreach (var g in Groups)
         {

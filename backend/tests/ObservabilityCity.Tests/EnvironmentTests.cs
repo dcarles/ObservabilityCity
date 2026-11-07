@@ -155,6 +155,32 @@ public class EnvironmentTests
     }
 
     [Fact]
+    public void A_system_that_names_its_environments_is_left_out_of_the_others()
+    {
+        using var copy = new RegistryCopy(TestPaths.TenantsTown);
+        copy.Replace("pillars/aa.yaml", "{ id: aa.audit-cache, name: Audit cache, role: cache }", "{ id: aa.audit-cache, name: Audit cache, role: cache, environments: [staging, prod] }");
+
+        var full = RegistryLoader.Load(copy.Path);
+        var dev = full.ForEnvironment("dev");
+        var staging = full.ForEnvironment("staging");
+
+        Assert.DoesNotContain(dev.AllNodes, n => n.Id == "aa.audit-cache");
+        Assert.DoesNotContain("aa.audit-cache", dev.AllNodes.Single(n => n.Id == "aa.orders-api").Calls);
+        Assert.Contains(staging.AllNodes, n => n.Id == "aa.audit-cache");
+        Assert.Contains("aa.audit-cache", staging.AllNodes.Single(n => n.Id == "aa.orders-api").Calls);
+        // a system that names no environments is in all of them
+        Assert.Contains(dev.AllNodes, n => n.Id == "aa.orders-api");
+        Assert.Contains(full.ForEnvironment("prod").AllNodes, n => n.Id == "aa.audit-cache");
+    }
+
+    [Fact]
+    public void A_system_that_names_an_environment_the_town_does_not_have_is_an_error()
+    {
+        Assert.Contains("aa.yaml: 'aa.audit-cache' says it is deployed in environment 'stagin', which is not in environments/. Did you mean 'staging'?",
+            FailWith(c => c.Replace("pillars/aa.yaml", "{ id: aa.audit-cache, name: Audit cache, role: cache }", "{ id: aa.audit-cache, name: Audit cache, role: cache, environments: [stagin] }")));
+    }
+
+    [Fact]
     public void A_source_must_have_a_kebab_case_name_and_kind()
     {
         Assert.Contains("environments/staging.yaml: source name 'Metrics' must be lowercase kebab-case",
