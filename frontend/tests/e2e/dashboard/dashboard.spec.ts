@@ -191,12 +191,13 @@ test.describe('the dashboard view', () => {
     await expect(page.locator('[data-pillar="aa"] .cx')).toHaveCount(0)
   })
 
-  /** Feeds the page a snapshot made from the live one and reads the table in the same breath, so a newer snapshot cannot undo it. */
+  /** Feeds the page a snapshot made from the live one and reads the table in the same breath, and holds back the server's own snapshots so a newer one cannot undo it before the test clicks on what it fed (that race made the dead-letter tests fail on a slow runner). */
   async function withSnapshot<T>(page: Page, edit: string, read: string): Promise<T> {
     return page.evaluate(async ([editCode, readCode]) => {
       const s = await (await fetch('/api/snapshot/latest')).json()
       const node = (id: string) => s.groups.flatMap((g: any) => g.nodes).find((n: any) => n.id === id)
       new Function('s', 'node', editCode)(s, node)
+      ;(window as any).dash.hold(true)
       ;(window as any).dash.feed(s)
       return new Function('document', readCode)(document)
     }, [edit, read]) as Promise<T>
@@ -257,6 +258,17 @@ test.describe('the dashboard view', () => {
     await expect(links).toHaveCount(2)
     await expect(links.nth(0)).toHaveAttribute('href', 'https://north.example.test/q')
     await expect(links.nth(1)).toHaveAttribute('href', 'https://west.example.test/q')
+  })
+
+  test('a snapshot fed by hand stays on screen while the server sends its own', async ({ town, page }) => {
+    await open(town, page)
+    const edit = `for (const m of s.groups.flatMap(g => g.nodes)) { m.deadLetters = 0; m.queues = [] }
+      const a = node('aa.orders-api'); a.absent = a.absent.filter(x => x !== 'deadLetters'); a.state = 'Healthy'; a.deadLetters = 4; s.totals.deadLetters = 4
+      a.queues = [{ name: 'q-held', backlog: 0, deadLetters: 4 }]`
+    await withSnapshot<string[]>(page, edit, `return [...document.querySelectorAll('#kpi-dlq .dl')].map(r => r.textContent)`)
+    await page.waitForTimeout(3000) // long enough for the server to have sent several of its own
+    await expect(page.locator('#kpi-dlq .dl')).toHaveCount(1)
+    await expect(page.locator('#kpi-dlq .dl')).toContainText('q-held')
   })
 
   test('the Dead letters card says so when no queue has dead letters', async ({ town, page }) => {
