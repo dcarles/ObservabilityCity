@@ -1,19 +1,21 @@
 # Credits for the event models
 
 The scripted events (pirates in the harbour town, zombies in the factory, aliens in space) use 3D models by
-**Quaternius** (https://quaternius.com), which the author lists as **CC0 1.0** (public domain), distributed through Poly Pizza
-(https://poly.pizza). CC0 asks for no credit; it is given here because the work deserves it. The zip files carried no licence text, so
-the licence is taken from the author's pages: confirm it on each model's page before redistributing.
+**Quaternius** (https://quaternius.com), distributed through Poly Pizza (https://poly.pizza).
 
-| Folder | Pack | Author | Licence |
-| --- | --- | --- | --- |
-| `pirates/` | Pirate Kit | Quaternius | CC0 1.0 |
-| `zombies/` | Post Apocalypse Pack | Quaternius | CC0 1.0 |
-| `aliens/` | Ultimate Space Kit (enemies, mechs, spaceships, astronauts) | Quaternius | CC0 1.0 |
+| Folder | Pack | Licence, as shown on its Poly Pizza download dialog |
+| --- | --- | --- |
+| `zombies/` | [Post Apocalypse Pack](https://poly.pizza/bundle/Post-Apocalypse-Pack) by [Quaternius](https://poly.pizza/u/Quaternius) | **CC-BY** (attribution required). The dialog says "CC-BY or CC0", with the credit text below. |
+| `aliens/` | [Ultimate Space Kit](https://poly.pizza/bundle/Ultimate-Space-Kit-YWh743lqGX) by [Quaternius](https://poly.pizza/u/Quaternius) | Public domain (CC0). Credit is optional and given here. |
+| `pirates/` | Pirate Kit by Quaternius | Not yet confirmed from the download dialog. Treated as requiring credit until it is. |
 
-The survivors from the Post Apocalypse Pack also appear in the alien event, loaded from `zombies/`.
+## Attribution text
+
+- Post Apocalypse Pack by Quaternius [CC-BY] via Poly Pizza
+- Ultimate Space Kit by Quaternius via Poly Pizza
+- Pirate Kit by Quaternius via Poly Pizza
+
+The survivors from the Post Apocalypse Pack also appear in the alien event, loaded from `zombies/`, so that credit covers them too.
 
 Files were converted to binary glTF (`.glb`) and renamed; the models themselves are unchanged. The armoured cars in the zombie
 event are built from boxes in code, not from a model.
-
-Before shipping a build outside this repository, check each model's own page on Poly Pizza to confirm the licence shown there.
