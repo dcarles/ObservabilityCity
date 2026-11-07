@@ -13,8 +13,10 @@ export const palette: Palette = structuredClone(harbourPalette)
 let current: ThemeKit | null = null
 
 /** Copies `from` into `into` without replacing any object `into` already holds, so a module that kept `palette.building` still sees the new colours. */
-function assign(into: any, from: any): void {
+export function assign(into: any, from: any): void {
   for (const key of Object.keys(from)) {
+    // Never write these: they would change every object on the page, not just the palette.
+    if (key === '__proto__' || key === 'constructor' || key === 'prototype') continue
     const v = from[key]
     if (v && typeof v === 'object' && !Array.isArray(v) && into[key] && typeof into[key] === 'object') assign(into[key], v)
     else into[key] = Array.isArray(v) ? [...v] : v
