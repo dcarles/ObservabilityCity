@@ -409,19 +409,23 @@ test.describe('the legend', () => {
     await expect(page.locator('#legend')).toBeHidden()
   })
 
-  test('has four tabs, opens on Problems, shows one tab at a time and starts on Problems again', async ({ town, page }) => {
+  test('has five tabs, opens on Problems, shows one tab at a time and starts on Problems again', async ({ town, page }) => {
     await town.open('&legend=1')
     const tabs = page.locator('#legend [role="tab"]')
-    expect(await tabs.allTextContents()).toEqual([expect.stringContaining('Problems'), expect.stringContaining('Buildings'), expect.stringContaining('Traffic'), expect.stringContaining('Top bar and controls')])
+    expect(await tabs.allTextContents()).toEqual([expect.stringContaining('Problems'), expect.stringContaining('Islands'), expect.stringContaining('Buildings'), expect.stringContaining('Traffic'), expect.stringContaining('Controls')])
     await expect(page.locator('#legend-tab-problems')).toHaveAttribute('aria-selected', 'true')
     await expect(page.locator('#legend-panel-problems')).toBeVisible()
     await expect(page.locator('#legend-panel-buildings')).toBeHidden()
     await expect(page.locator('#legend [data-id="health-sign"]')).toBeVisible()
     await expect(page.locator('#legend [data-id="frozen"]')).toBeVisible()
+    await page.locator('#legend-tab-islands').click()
+    await expect(page.locator('#legend-panel-islands')).toBeVisible()
+    await expect(page.locator('#legend-panel-problems')).toBeHidden()
+    for (const id of ['island', 'hub', 'vendor', 'airport']) await expect(page.locator(`#legend [data-id="${id}"]`)).toBeVisible()
     await page.locator('#legend-tab-buildings').click()
     await expect(page.locator('#legend-panel-buildings')).toBeVisible()
-    await expect(page.locator('#legend-panel-problems')).toBeHidden()
-    await expect(page.locator('#legend [data-id="api"]')).toBeVisible()
+    for (const id of ['api', 'gateway', 'broker', 'egress', 'asset-vault', 'vendor-building', 'terminal']) await expect(page.locator(`#legend [data-id="${id}"]`)).toBeVisible()
+    await expect(page.locator('#legend-panel-buildings [data-id="hub"]')).toHaveCount(0)
     await page.locator('#legend-tab-traffic').click()
     await expect(page.locator('#legend [data-id="car"]')).toBeVisible()
     await page.locator('#legend-tab-controls').click()
@@ -437,12 +441,12 @@ test.describe('the legend', () => {
     await town.open('&legend=1')
     await page.locator('#legend-tab-problems').focus()
     await page.keyboard.press('ArrowRight')
-    await expect(page.locator('#legend-tab-buildings')).toHaveAttribute('aria-selected', 'true')
+    await expect(page.locator('#legend-tab-islands')).toHaveAttribute('aria-selected', 'true')
     await page.keyboard.press('End')
     await expect(page.locator('#legend-tab-controls')).toHaveAttribute('aria-selected', 'true')
     await page.keyboard.press('ArrowRight')
     await expect(page.locator('#legend-tab-problems')).toHaveAttribute('aria-selected', 'true')
-    for (const id of ['problems', 'buildings', 'traffic', 'controls']) {
+    for (const id of ['problems', 'islands', 'buildings', 'traffic', 'controls']) {
       await page.locator(`#legend-tab-${id}`).click()
       const fit = await page.locator(`#legend-panel-${id}`).evaluate((el) => ({ scroll: el.scrollHeight, client: el.clientHeight }))
       expect(fit.scroll, id).toBeLessThanOrEqual(fit.client + 1)
@@ -451,7 +455,7 @@ test.describe('the legend', () => {
 
   test('shows a picture for every entry, and the "more" fold opens', async ({ town, page }) => {
     await town.open('&legend=1')
-    for (const id of ['problems', 'buildings', 'traffic', 'controls']) {
+    for (const id of ['problems', 'islands', 'buildings', 'traffic', 'controls']) {
       await page.locator(`#legend-tab-${id}`).click()
       const entries = page.locator(`#legend-panel-${id} .entry`)
       const n = await entries.count()
@@ -463,6 +467,30 @@ test.describe('the legend', () => {
     await expect(row).not.toHaveAttribute('open', '')
     await row.locator('summary').click()
     await expect(row).toContainText('45 seconds')
+  })
+
+  test('explains how traffic flows in a hub-and-spoke town: over the hub, never in the direct way', async ({ town, page }) => {
+    await town.open('&legend=1')
+    await page.locator('#legend-tab-traffic').click()
+    for (const id of ['flow-hub', 'flow-outside-hub', 'flow-vendor-hub', 'flow-hidden-hub']) await expect(page.locator(`#legend [data-id="${id}"]`)).toBeVisible()
+    await expect(page.locator('#legend [data-id="flow-direct"]')).toHaveCount(0)
+    await expect(page.locator('#legend [data-id="signpost"]')).toHaveCount(0)
+    await page.locator('#legend-tab-islands').click()
+    await expect(page.locator('#legend [data-id="spoke"]')).toBeVisible()
+    await expect(page.locator('#legend [data-id="ring-direct"]')).toHaveCount(0)
+  })
+
+  test('in a demo town shows the Break things row, and never shows the weather or the legacy pennant, which are not in use yet', async ({ town, page }) => {
+    await town.open('&legend=1')
+    await page.locator('#legend-tab-controls').click()
+    await expect(page.locator('#legend [data-id="break"]')).toBeVisible()
+    await page.locator('#legend-tab-problems').click()
+    await expect(page.locator('#legend [data-id="weather"]')).toHaveCount(0)
+    await expect(page.locator('#legend [data-id="pennant"]')).toHaveCount(0)
+    await expect(page.locator('#legend [data-id="hazard"]')).toContainText('on a car')
+    await expect(page.locator('#legend [data-id="bubble"]')).toContainText('+N waiting')
+    await expect(page.locator('#legend [data-id="health-sign"]')).toContainText('cloud provider')
+    expect(await page.locator('#legend').innerText()).not.toMatch(/azure/i)
   })
 
   test('opens by itself on a first visit and not on the next', async ({ town, page }) => {
@@ -477,7 +505,7 @@ test.describe('the legend', () => {
   test('uses red only for failures', async ({ town, page }) => {
     await town.open('&legend=1')
     const red: string[] = []
-    for (const id of ['problems', 'buildings', 'traffic', 'controls']) {
+    for (const id of ['problems', 'islands', 'buildings', 'traffic', 'controls']) {
       await page.locator(`#legend-tab-${id}`).click()
       red.push(...(await page.locator(`#legend-panel-${id} .swatch.red`).locator('xpath=..').locator('b').allTextContents()))
     }

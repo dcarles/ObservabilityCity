@@ -85,4 +85,12 @@ test.describe('a live town', () => {
     await expect(page.locator('#inspector .rows')).not.toContainText('Requests')
     await expect(page.locator('#inspector .why')).toHaveCount(0)
   })
+
+  test('the legend has no Break things row, since there is no panel', async ({ page }) => {
+    await open(page)
+    await page.locator('#legend-button').click()
+    await page.locator('#legend-tab-controls').click()
+    await expect(page.locator('#legend [data-id="wall"]')).toBeVisible()
+    await expect(page.locator('#legend [data-id="break"]')).toHaveCount(0)
+  })
 })

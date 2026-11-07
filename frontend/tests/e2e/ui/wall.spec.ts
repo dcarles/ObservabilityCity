@@ -17,6 +17,17 @@ interface WallStatus {
 
 const wall = (page: Page) => page.evaluate(() => (window as any).city.wall() as WallStatus)
 
+/**
+ * Opens the wall on a calm town with no note up. The page's first snapshot can still be the Down one an earlier test left behind, and the next one,
+ * already healthy, would put up a "resolved" note for it; stepping the clock past the note takes that note down before the test makes its own trouble.
+ */
+async function openCalm(town: { open(q: string): Promise<void> }, page: Page): Promise<void> {
+  await town.open(WALL)
+  await page.waitForFunction(() => (window as any).city.wall().mode === 'calm')
+  await page.evaluate(() => (window as any).city.step(11))
+  expect((await wall(page)).note).toBeNull()
+}
+
 /** How far (in metres on the ground) the camera is looking from a building or island. */
 const lookingAway = (page: Page, kind: 'building' | 'island', id: string) =>
   page.evaluate(([k, i]) => {
@@ -228,7 +239,7 @@ test.describe('trouble', () => {
 
 test.describe('trouble that ends', () => {
   test('puts up a green resolved note, goes back to the showcase loop and says all is well again', async ({ town, page }) => {
-    await town.open(WALL)
+    await openCalm(town, page)
     await town.effect('aa.orders-api', 'Down')
     await page.waitForFunction(() => (window as any).city.wall().stop?.kind === 'down')
 
@@ -247,7 +258,7 @@ test.describe('trouble that ends', () => {
   })
 
   test('takes the note down by itself after a while', async ({ town, page }) => {
-    await town.open(WALL)
+    await openCalm(town, page)
     await town.effect('aa.orders-api', 'Down')
     await page.waitForFunction(() => (window as any).city.wall().stop?.kind === 'down')
     await town.removeEffects()
@@ -260,7 +271,7 @@ test.describe('trouble that ends', () => {
   })
 
   test('a note for an incident that is over names the island', async ({ town, page }) => {
-    await town.open(WALL)
+    await openCalm(town, page)
     await town.effect('cc', 'Incident', 0.9)
     await page.waitForFunction(() => (window as any).city.wall().stop?.kind === 'incident')
     await town.removeEffects()

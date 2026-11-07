@@ -338,6 +338,8 @@ export async function startTown(): Promise<void> {
     wall?.setConnection('live')
     wall?.onSnapshot(s, nowSeconds())
     topbar.setSnapshot(s)
+    legend.setTopology(s.topology === 'hub-and-spoke' ? 'hub-and-spoke' : 'direct')
+    legend.setDemo(s.mode === 'demo')
     stateList.refresh()
     notices.show(s.notices, s.notes ?? [])
   }
