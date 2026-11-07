@@ -34,7 +34,7 @@ jobs:
       - uses: actions/cache@v6
         with:
           path: ~/.nuget/packages
-          key: nuget-${{ runner.os }}-${{ hashFiles('backend/**/*.csproj', 'backend/Directory.Packages.props', 'backend/.config/dotnet-tools.json') }}
+          key: nuget-${{ runner.os }}-${{ hashFiles('backend/**/*.csproj', 'backend/Directory.Packages.props') }}
           restore-keys: nuget-${{ runner.os }}-
       - run: dotnet build backend/ObservabilityCity.slnx -c Release
       - run: dotnet test --solution backend/ObservabilityCity.slnx -c Release --no-build
@@ -56,7 +56,7 @@ jobs:
       - uses: actions/cache/restore@v6
         with:
           path: ~/.nuget/packages
-          key: nuget-${{ runner.os }}-${{ hashFiles('backend/**/*.csproj', 'backend/Directory.Packages.props', 'backend/.config/dotnet-tools.json') }}
+          key: nuget-${{ runner.os }}-${{ hashFiles('backend/**/*.csproj', 'backend/Directory.Packages.props') }}
           restore-keys: nuget-${{ runner.os }}-
       - run: npm ci
         working-directory: frontend
@@ -101,7 +101,7 @@ jobs:
       - uses: actions/cache/restore@v6
         with:
           path: ~/.nuget/packages
-          key: nuget-${{ runner.os }}-${{ hashFiles('backend/**/*.csproj', 'backend/Directory.Packages.props', 'backend/.config/dotnet-tools.json') }}
+          key: nuget-${{ runner.os }}-${{ hashFiles('backend/**/*.csproj', 'backend/Directory.Packages.props') }}
           restore-keys: nuget-${{ runner.os }}-
       - run: npm ci
         working-directory: frontend
@@ -157,7 +157,7 @@ jobs:
       - uses: actions/cache/restore@v6
         with:
           path: ~/.nuget/packages
-          key: nuget-${{ runner.os }}-${{ hashFiles('backend/**/*.csproj', 'backend/Directory.Packages.props', 'backend/.config/dotnet-tools.json') }}
+          key: nuget-${{ runner.os }}-${{ hashFiles('backend/**/*.csproj', 'backend/Directory.Packages.props') }}
           restore-keys: nuget-${{ runner.os }}-
       - name: Check every registry folder in the repo
         id: validate

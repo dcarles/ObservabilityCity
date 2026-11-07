@@ -1,6 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <!-- The OpenAPI document is only written when frontend/scripts/gen-contracts.mjs asks for it (it starts the app, so not on every build). -->
+    <OpenApiGenerateDocumentsOnBuild Condition="'$(OpenApiGenerateDocumentsOnBuild)' == ''">false</OpenApiGenerateDocumentsOnBuild>
+    <OpenApiDocumentNames>v1</OpenApiDocumentNames>
+    <OpenApiGenerateDocumentsOptions>--file-name openapi --openapi-version OpenApi3_0</OpenApiGenerateDocumentsOptions>
+  </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Swashbuckle.AspNetCore" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="Microsoft.Extensions.ApiDescription.Server" PrivateAssets="all" IncludeAssets="runtime; build; native; contentfiles; analyzers; buildtransitive" />
     <ProjectReference Include="..\ObservabilityCity.Core\ObservabilityCity.Core.csproj" />
     <ProjectReference Include="..\ObservabilityCity.Adapters.Fake\ObservabilityCity.Adapters.Fake.csproj" />
   </ItemGroup>

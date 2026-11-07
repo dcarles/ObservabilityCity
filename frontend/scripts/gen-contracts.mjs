@@ -1,30 +1,33 @@
-// Regenerates contracts/openapi.json (from the C# records) and src/contracts.ts (from the OpenAPI file).
+// Regenerates contracts/openapi.json (from the C# records, by the built-in ASP.NET Core OpenAPI generator) and src/contracts.ts (from the OpenAPI file, by scripts/openapi-to-ts.mjs).
 // With --check it regenerates into a temp folder and fails if the committed files differ, so contract drift is a build error.
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, readFileSync, copyFileSync, existsSync } from 'node:fs'
+import { mkdtempSync, readFileSync, existsSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { generate } from './openapi-to-ts.mjs'
 
 const webDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const repoRoot = resolve(webDir, '..')
 const check = process.argv.includes('--check')
 const run = (cmd, args, cwd) => execFileSync(cmd, args, { cwd, stdio: 'inherit', shell: process.platform === 'win32' })
 
-const backendDir = join(repoRoot, 'backend')
-const hostProject = join(backendDir, 'src', 'ObservabilityCity.Host')
-run('dotnet', ['build', hostProject, '-c', 'Debug', '--nologo', '-v', 'q'], repoRoot)
-run('dotnet', ['tool', 'restore'], backendDir)
+const hostProject = join(repoRoot, 'backend', 'src', 'ObservabilityCity.Host')
 
 const out = check ? mkdtempSync(join(tmpdir(), 'oc-contracts-')) : null
 const openapi = check ? join(out, 'openapi.json') : join(repoRoot, 'contracts', 'openapi.json')
 const contracts = check ? join(out, 'contracts.ts') : join(webDir, 'src', 'contracts.ts')
 
-const dll = join(hostProject, 'bin', 'Debug', 'net10.0', 'ObservabilityCity.Host.dll')
-run('dotnet', ['swagger', 'tofile', '--output', openapi, dll, 'v1'], backendDir)
-// openapi-typescript drives the TypeScript 5 compiler API, which TypeScript 7 no longer has, so it runs in its own
-// throwaway install next to TypeScript 5 while the app itself builds with TypeScript 7.
-run('npx', ['--yes', '-p', 'typescript@5.9.3', '-p', 'openapi-typescript@7.13.0', 'openapi-typescript', openapi, '-o', contracts], webDir)
+// The generator skips itself when the build is up to date, and remembers the folder it wrote to, so its marker is cleared first.
+rmSync(join(hostProject, 'obj', 'ObservabilityCity.Host.OpenApiFiles.cache'), { force: true })
+// The built-in OpenAPI generator writes the document while the Host builds (it starts the app once to read its endpoints).
+run('dotnet', ['build', hostProject, '-c', 'Debug', '--nologo', '-v', 'q', '-p:OpenApiGenerateDocumentsOnBuild=true', `-p:OpenApiDocumentsDirectory=${dirname(openapi)}`], repoRoot)
+// Fixed order and layout, so the file is the same on every run and every machine.
+const doc = JSON.parse(readFileSync(openapi, 'utf8'))
+const schemas = doc.components?.schemas ?? {}
+doc.components.schemas = Object.fromEntries(Object.keys(schemas).sort().map((k) => [k, schemas[k]]))
+writeFileSync(openapi, JSON.stringify(doc, null, 2) + '\n')
+writeFileSync(contracts, generate(doc))
 
 if (check) {
   const same = (a, b) => readFileSync(a, 'utf8').replace(/\r\n/g, '\n') === readFileSync(b, 'utf8').replace(/\r\n/g, '\n')

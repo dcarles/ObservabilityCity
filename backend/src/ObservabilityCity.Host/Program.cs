@@ -141,11 +141,11 @@ foreach (var (town, runtimes) in hostedByTown)
 }
 builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter()));
 builder.Services.AddSignalR();
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(c =>
+builder.Services.AddOpenApi("v1", o =>
 {
-    c.SupportNonNullableReferenceTypes();
-    c.SchemaFilter<RequireAllPropertiesFilter>();
+    o.OpenApiVersion = Microsoft.OpenApi.OpenApiSpecVersion.OpenApi3_0;
+    o.AddSchemaTransformer<RequireAllPropertiesTransformer>();
+    o.AddDocumentTransformer<TidyDocumentTransformer>();
 });
 
 var app = builder.Build();
@@ -364,7 +364,7 @@ app.MapHub<TownHub>("/hubs/town");
 
 if (app.Environment.IsDevelopment())
 {
-    app.UseSwagger();
+    app.MapOpenApi();
 }
 
 app.Run();
