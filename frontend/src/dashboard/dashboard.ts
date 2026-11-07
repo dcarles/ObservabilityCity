@@ -16,6 +16,7 @@ import { loadTenantView, saveTenantView, viewSwitchAddress } from '../viewMode'
 import type { Snapshot } from '../types'
 import { buildDashboard, pillarSelection, type Dashboard } from './model'
 import { freshnessHtml, hiddenHtml, pillarMenuHtml, pillarsHtml, sectionsHtml, summaryHtml, type UiState } from './render'
+import { dashLegendHtml } from './legend'
 import { feedLateAfter, marker, popupLeft, sourceLines } from './freshness'
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T
@@ -194,6 +195,24 @@ export function startDashboard(): void {
   window.addEventListener('resize', () => { if (!freshPop.hidden) drawFreshness() })
   window.setInterval(drawMarker, 1000)
   drawMarker()
+
+  // the small legend: a "?" in the menu that opens a short list of what the colours mean
+  const legendButton = $('dash-legend-button')
+  const legendPop = $('dash-legend')
+  legendPop.innerHTML = dashLegendHtml()
+  const closeLegend = (): void => { legendPop.hidden = true; legendButton.setAttribute('aria-expanded', 'false') }
+  legendButton.addEventListener('click', () => {
+    legendPop.hidden = !legendPop.hidden
+    legendButton.setAttribute('aria-expanded', String(!legendPop.hidden))
+    if (!legendPop.hidden) {
+      const r = legendButton.getBoundingClientRect()
+      legendPop.style.top = `${r.bottom + 6}px`
+      legendPop.style.left = `${popupLeft(r.left, legendPop.offsetWidth, window.innerWidth)}px`
+    }
+  })
+  document.addEventListener('pointerdown', (e) => { if (!legendPop.hidden && !(e.target as HTMLElement).closest('.dl')) closeLegend() })
+  window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !legendPop.hidden) closeLegend() })
+  window.addEventListener('resize', closeLegend)
 
   function setStatus(st: ConnectionState): void {
     connected = st === 'live' || st === 'badData' // silent counts as not connected

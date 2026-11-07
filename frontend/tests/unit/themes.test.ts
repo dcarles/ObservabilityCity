@@ -302,7 +302,7 @@ describe('the legend in each theme', () => {
   it('never changes what a colour means: red words stay the failure entries', () => {
     for (const id of ids) {
       const red = legendFor(id).flatMap((s) => s.entries).filter((e) => e.tone === 'red').map((e) => e.id).sort()
-      expect(red).toEqual(['beacon-red', 'flag', 'pen'])
+      expect(red).toEqual(['beacon-red', 'flag', 'health-sign', 'pen'])
     }
   })
 })
