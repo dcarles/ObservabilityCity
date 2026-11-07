@@ -1,14 +1,14 @@
 {
   "openapi": "3.0.4",
   "info": {
-    "title": "ObservabilityCity.Host, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null",
-    "version": "1.0"
+    "title": "ObservabilityCity.Host | v1",
+    "version": "1.0.0"
   },
   "paths": {
     "/api/towns": {
       "get": {
         "tags": [
-          "ObservabilityCity.Host, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+          "ObservabilityCity.Host"
         ],
         "operationId": "GetTowns",
         "responses": {
@@ -31,7 +31,7 @@
     "/api/environments": {
       "get": {
         "tags": [
-          "ObservabilityCity.Host, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+          "ObservabilityCity.Host"
         ],
         "operationId": "GetEnvironments",
         "responses": {
@@ -54,7 +54,7 @@
     "/api/snapshot/latest": {
       "get": {
         "tags": [
-          "ObservabilityCity.Host, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+          "ObservabilityCity.Host"
         ],
         "operationId": "GetLatestSnapshot",
         "parameters": [
@@ -90,7 +90,7 @@
     "/api/systems/{id}": {
       "get": {
         "tags": [
-          "ObservabilityCity.Host, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+          "ObservabilityCity.Host"
         ],
         "operationId": "GetSystem",
         "parameters": [
@@ -127,7 +127,7 @@
     "/api/unknown-hosts": {
       "get": {
         "tags": [
-          "ObservabilityCity.Host, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+          "ObservabilityCity.Host"
         ],
         "operationId": "GetUnknownHosts",
         "parameters": [
@@ -159,7 +159,7 @@
     "/api/added-hosts": {
       "get": {
         "tags": [
-          "ObservabilityCity.Host, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+          "ObservabilityCity.Host"
         ],
         "operationId": "GetAddedHosts",
         "responses": {
@@ -180,7 +180,7 @@
       },
       "post": {
         "tags": [
-          "ObservabilityCity.Host, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+          "ObservabilityCity.Host"
         ],
         "operationId": "AddHost",
         "parameters": [
@@ -220,7 +220,7 @@
       },
       "delete": {
         "tags": [
-          "ObservabilityCity.Host, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+          "ObservabilityCity.Host"
         ],
         "operationId": "RemoveAddedHost",
         "parameters": [
@@ -253,7 +253,7 @@
     "/api/health-events/dismiss": {
       "post": {
         "tags": [
-          "ObservabilityCity.Host, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+          "ObservabilityCity.Host"
         ],
         "operationId": "DismissHealthEvent",
         "parameters": [
@@ -285,7 +285,7 @@
     "/api/added-rules": {
       "post": {
         "tags": [
-          "ObservabilityCity.Host, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+          "ObservabilityCity.Host"
         ],
         "operationId": "AddRule",
         "parameters": [
@@ -327,7 +327,7 @@
     "/api/systems/{id}/logs": {
       "get": {
         "tags": [
-          "ObservabilityCity.Host, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+          "ObservabilityCity.Host"
         ],
         "operationId": "GetSystemLogs",
         "parameters": [
@@ -377,8 +377,7 @@
           "kind": {
             "type": "string"
           }
-        },
-        "additionalProperties": false
+        }
       },
       "AddRuleRequest": {
         "required": [
@@ -397,16 +396,15 @@
           "target": {
             "type": "string"
           }
-        },
-        "additionalProperties": false
+        }
       },
       "AddedHostSnapshot": {
         "required": [
-          "calledBy",
-          "host",
           "id",
+          "name",
+          "host",
           "kind",
-          "name"
+          "calledBy"
         ],
         "type": "object",
         "properties": {
@@ -428,8 +426,7 @@
               "type": "string"
             }
           }
-        },
-        "additionalProperties": false
+        }
       },
       "AppState": {
         "enum": [
@@ -442,8 +439,8 @@
       "AssetSnapshot": {
         "required": [
           "id",
-          "label",
           "name",
+          "label",
           "shape"
         ],
         "type": "object",
@@ -479,15 +476,14 @@
             "type": "string",
             "nullable": true
           }
-        },
-        "additionalProperties": false
+        }
       },
       "ConfigValue": {
         "required": [
           "key",
+          "value",
           "layer",
-          "source",
-          "value"
+          "source"
         ],
         "type": "object",
         "properties": {
@@ -503,13 +499,12 @@
           "source": {
             "type": "string"
           }
-        },
-        "additionalProperties": false
+        }
       },
       "DeadLetterRegionSnapshot": {
         "required": [
-          "count",
-          "region"
+          "region",
+          "count"
         ],
         "type": "object",
         "properties": {
@@ -523,14 +518,13 @@
           "link": {
             "$ref": "#/components/schemas/ResourceLink"
           }
-        },
-        "additionalProperties": false
+        }
       },
       "DependencySnapshot": {
         "required": [
           "from",
-          "requestsPerSecond",
-          "to"
+          "to",
+          "requestsPerSecond"
         ],
         "type": "object",
         "properties": {
@@ -544,8 +538,7 @@
             "type": "number",
             "format": "double"
           }
-        },
-        "additionalProperties": false
+        }
       },
       "DismissHealthEventRequest": {
         "required": [
@@ -556,14 +549,13 @@
           "id": {
             "type": "string"
           }
-        },
-        "additionalProperties": false
+        }
       },
       "EnvironmentInfo": {
         "required": [
           "id",
-          "isDefault",
-          "name"
+          "name",
+          "isDefault"
         ],
         "type": "object",
         "properties": {
@@ -576,15 +568,14 @@
           "isDefault": {
             "type": "boolean"
           }
-        },
-        "additionalProperties": false
+        }
       },
       "ExternalCallerSnapshot": {
         "required": [
-          "calls",
           "id",
           "name",
-          "requestsPerSecond"
+          "requestsPerSecond",
+          "calls"
         ],
         "type": "object",
         "properties": {
@@ -604,19 +595,18 @@
               "type": "string"
             }
           }
-        },
-        "additionalProperties": false
+        }
       },
       "GroupSnapshot": {
         "required": [
-          "color",
-          "displayName",
-          "hasBridge",
-          "hasRingBridge",
           "id",
-          "incidents",
+          "displayName",
+          "color",
           "isHub",
           "isLostFound",
+          "incidents",
+          "hasBridge",
+          "hasRingBridge",
           "messaging",
           "nodes"
         ],
@@ -669,15 +659,14 @@
             },
             "nullable": true
           }
-        },
-        "additionalProperties": false
+        }
       },
       "HealthEventSnapshot": {
         "required": [
           "id",
           "resource",
-          "since",
-          "state"
+          "state",
+          "since"
         ],
         "type": "object",
         "properties": {
@@ -723,8 +712,7 @@
             "type": "string",
             "nullable": true
           }
-        },
-        "additionalProperties": false
+        }
       },
       "HealthState": {
         "enum": [
@@ -737,8 +725,8 @@
       },
       "HiddenIsland": {
         "required": [
-          "displayName",
           "id",
+          "displayName",
           "vendor"
         ],
         "type": "object",
@@ -752,8 +740,7 @@
           "vendor": {
             "type": "boolean"
           }
-        },
-        "additionalProperties": false
+        }
       },
       "InboundLinkSnapshot": {
         "required": [
@@ -769,15 +756,14 @@
             "type": "number",
             "format": "double"
           }
-        },
-        "additionalProperties": false
+        }
       },
       "IncidentSnapshot": {
         "required": [
           "id",
+          "title",
           "severity",
-          "startedAt",
-          "title"
+          "startedAt"
         ],
         "type": "object",
         "properties": {
@@ -795,8 +781,7 @@
             "type": "string",
             "format": "date-time"
           }
-        },
-        "additionalProperties": false
+        }
       },
       "JobSnapshot": {
         "required": [
@@ -825,8 +810,7 @@
             "format": "date-time",
             "nullable": true
           }
-        },
-        "additionalProperties": false
+        }
       },
       "JobStatus": {
         "enum": [
@@ -845,12 +829,12 @@
       },
       "LinkRef": {
         "required": [
-          "found",
           "id",
+          "name",
+          "kind",
           "islandId",
           "islandName",
-          "kind",
-          "name"
+          "found"
         ],
         "type": "object",
         "properties": {
@@ -876,14 +860,13 @@
             "type": "string",
             "nullable": true
           }
-        },
-        "additionalProperties": false
+        }
       },
       "LogGroup": {
         "required": [
           "at",
-          "count",
-          "text"
+          "text",
+          "count"
         ],
         "type": "object",
         "properties": {
@@ -910,8 +893,7 @@
             "type": "string",
             "nullable": true
           }
-        },
-        "additionalProperties": false
+        }
       },
       "LogLevel": {
         "enum": [
@@ -923,8 +905,8 @@
       },
       "LogSection": {
         "required": [
-          "groups",
-          "id"
+          "id",
+          "groups"
         ],
         "type": "object",
         "properties": {
@@ -944,13 +926,12 @@
             },
             "nullable": true
           }
-        },
-        "additionalProperties": false
+        }
       },
       "MessageTypeSnapshot": {
         "required": [
-          "perSecond",
-          "type"
+          "type",
+          "perSecond"
         ],
         "type": "object",
         "properties": {
@@ -961,13 +942,12 @@
             "type": "number",
             "format": "double"
           }
-        },
-        "additionalProperties": false
+        }
       },
       "MessagingSnapshot": {
         "required": [
-          "subscriptions",
-          "topics"
+          "topics",
+          "subscriptions"
         ],
         "type": "object",
         "properties": {
@@ -990,8 +970,7 @@
             },
             "nullable": true
           }
-        },
-        "additionalProperties": false
+        }
       },
       "NodeKind": {
         "enum": [
@@ -1008,31 +987,31 @@
       },
       "NodeSnapshot": {
         "required": [
-          "absent",
+          "id",
+          "name",
+          "kind",
+          "external",
+          "state",
+          "instancesTotal",
+          "instancesHealthy",
+          "load",
+          "requestsPerSecond",
+          "errorRate",
+          "p99Ms",
+          "slaP99Ms",
+          "errorAmber",
+          "errorRed",
+          "resourceAmber",
+          "resourceRed",
+          "throttleAmber",
+          "throttleRed",
           "backlogAmber",
           "backlogRed",
           "calls",
-          "errorAmber",
-          "errorRate",
-          "errorRed",
-          "external",
           "gatewayCalls",
-          "id",
-          "inboundEstimated",
-          "instancesHealthy",
-          "instancesTotal",
-          "kind",
-          "load",
-          "name",
-          "p99Ms",
+          "absent",
           "quiet",
-          "requestsPerSecond",
-          "resourceAmber",
-          "resourceRed",
-          "slaP99Ms",
-          "state",
-          "throttleAmber",
-          "throttleRed"
+          "inboundEstimated"
         ],
         "type": "object",
         "properties": {
@@ -1233,15 +1212,14 @@
             },
             "nullable": true
           }
-        },
-        "additionalProperties": false
+        }
       },
       "OffscreenLink": {
         "required": [
-          "incoming",
+          "nodeId",
           "islandId",
           "islandName",
-          "nodeId",
+          "incoming",
           "requestsPerSecond"
         ],
         "type": "object",
@@ -1262,8 +1240,7 @@
             "type": "number",
             "format": "double"
           }
-        },
-        "additionalProperties": false
+        }
       },
       "QueueSnapshot": {
         "required": [
@@ -1311,13 +1288,12 @@
             },
             "nullable": true
           }
-        },
-        "additionalProperties": false
+        }
       },
       "RegionSnapshot": {
         "required": [
-          "label",
           "region",
+          "label",
           "skewed"
         ],
         "type": "object",
@@ -1351,8 +1327,7 @@
           "skewed": {
             "type": "boolean"
           }
-        },
-        "additionalProperties": false
+        }
       },
       "ResourceLink": {
         "required": [
@@ -1367,14 +1342,13 @@
           "url": {
             "type": "string"
           }
-        },
-        "additionalProperties": false
+        }
       },
       "ScheduleSnapshot": {
         "required": [
+          "system",
           "job",
-          "services",
-          "system"
+          "services"
         ],
         "type": "object",
         "properties": {
@@ -1390,14 +1364,13 @@
               "type": "string"
             }
           }
-        },
-        "additionalProperties": false
+        }
       },
       "ScopeInfo": {
         "required": [
-          "inventoryState",
+          "resources",
           "problems",
-          "resources"
+          "inventoryState"
         ],
         "type": "object",
         "properties": {
@@ -1449,8 +1422,7 @@
           "inventoryState": {
             "type": "string"
           }
-        },
-        "additionalProperties": false
+        }
       },
       "ScopeResource": {
         "required": [
@@ -1485,8 +1457,7 @@
             },
             "nullable": true
           }
-        },
-        "additionalProperties": false
+        }
       },
       "SettingLayer": {
         "enum": [
@@ -1499,27 +1470,27 @@
       },
       "Snapshot": {
         "required": [
-          "dayFraction",
-          "dependencies",
-          "environment",
-          "environmentName",
-          "environments",
-          "externalCallers",
-          "generatedAt",
-          "groupLabel",
-          "groups",
-          "incidentsSeen",
-          "mode",
-          "notices",
-          "ringCapacity",
-          "tenants",
-          "topology",
-          "totals",
           "townId",
           "townName",
-          "trafficDensity",
+          "groupLabel",
+          "environment",
+          "generatedAt",
+          "dayFraction",
+          "totals",
+          "notices",
+          "groups",
           "vendors",
-          "view"
+          "externalCallers",
+          "dependencies",
+          "ringCapacity",
+          "environmentName",
+          "environments",
+          "tenants",
+          "topology",
+          "mode",
+          "view",
+          "incidentsSeen",
+          "trafficDensity"
         ],
         "type": "object",
         "properties": {
@@ -1646,15 +1617,14 @@
             },
             "nullable": true
           }
-        },
-        "additionalProperties": false
+        }
       },
       "SourceAgeSnapshot": {
         "required": [
+          "source",
           "ageSeconds",
           "fresh",
-          "signals",
-          "source"
+          "signals"
         ],
         "type": "object",
         "properties": {
@@ -1674,13 +1644,12 @@
               "type": "string"
             }
           }
-        },
-        "additionalProperties": false
+        }
       },
       "SourceFreshnessSnapshot": {
         "required": [
-          "intervalSeconds",
           "name",
+          "intervalSeconds",
           "overdue"
         ],
         "type": "object",
@@ -1700,15 +1669,14 @@
           "overdue": {
             "type": "boolean"
           }
-        },
-        "additionalProperties": false
+        }
       },
       "SubscriptionSnapshot": {
         "required": [
-          "consumer",
-          "legacy",
+          "topic",
           "publisher",
-          "topic"
+          "consumer",
+          "legacy"
         ],
         "type": "object",
         "properties": {
@@ -1724,22 +1692,21 @@
           "legacy": {
             "type": "boolean"
           }
-        },
-        "additionalProperties": false
+        }
       },
       "SystemDetail": {
         "required": [
-          "calledBy",
-          "calls",
-          "config",
-          "file",
-          "gatewayCalledBy",
-          "gatewayCalls",
           "id",
+          "name",
+          "kind",
           "islandId",
           "islandName",
-          "kind",
-          "name",
+          "file",
+          "config",
+          "calls",
+          "calledBy",
+          "gatewayCalls",
+          "gatewayCalledBy",
           "outsideCallers",
           "serviceTopics",
           "subscriptions"
@@ -1819,16 +1786,15 @@
           "scope": {
             "$ref": "#/components/schemas/ScopeInfo"
           }
-        },
-        "additionalProperties": false
+        }
       },
       "SystemLogs": {
         "required": [
           "at",
           "configured",
-          "sections",
+          "window",
           "slowOverMs",
-          "window"
+          "sections"
         ],
         "type": "object",
         "properties": {
@@ -1852,16 +1818,15 @@
               "$ref": "#/components/schemas/LogSection"
             }
           }
-        },
-        "additionalProperties": false
+        }
       },
       "TenantInfo": {
         "required": [
           "id",
-          "kind",
           "name",
-          "notFound",
-          "share"
+          "kind",
+          "share",
+          "notFound"
         ],
         "type": "object",
         "properties": {
@@ -1881,8 +1846,7 @@
           "notFound": {
             "type": "boolean"
           }
-        },
-        "additionalProperties": false
+        }
       },
       "TenantKind": {
         "enum": [
@@ -1894,12 +1858,12 @@
       },
       "TenantUnitSnapshot": {
         "required": [
-          "database",
           "id",
-          "kind",
           "name",
-          "requestsPerSecond",
-          "state"
+          "kind",
+          "database",
+          "state",
+          "requestsPerSecond"
         ],
         "type": "object",
         "properties": {
@@ -1941,8 +1905,7 @@
             "type": "boolean",
             "nullable": true
           }
-        },
-        "additionalProperties": false
+        }
       },
       "TopicSnapshot": {
         "required": [
@@ -1957,14 +1920,13 @@
           "service": {
             "type": "string"
           }
-        },
-        "additionalProperties": false
+        }
       },
       "TownSummary": {
         "required": [
           "id",
-          "isDefault",
-          "name"
+          "name",
+          "isDefault"
         ],
         "type": "object",
         "properties": {
@@ -1977,18 +1939,17 @@
           "isDefault": {
             "type": "boolean"
           }
-        },
-        "additionalProperties": false
+        }
       },
       "TownTotals": {
         "required": [
-          "deadLetters",
+          "requestsPerSecond",
+          "errorRate",
+          "p99Ms",
           "degraded",
           "down",
-          "errorRate",
           "incidents",
-          "p99Ms",
-          "requestsPerSecond"
+          "deadLetters"
         ],
         "type": "object",
         "properties": {
@@ -2020,16 +1981,15 @@
             "type": "number",
             "format": "double"
           }
-        },
-        "additionalProperties": false
+        }
       },
       "UnknownHostSnapshot": {
         "required": [
-          "callers",
+          "host",
           "calls",
+          "callers",
           "days",
           "gateway",
-          "host",
           "vendorsOnly"
         ],
         "type": "object",
@@ -2064,13 +2024,12 @@
           "vendorsOnly": {
             "type": "boolean"
           }
-        },
-        "additionalProperties": false
+        }
       },
       "UnknownPathSnapshot": {
         "required": [
-          "calls",
           "path",
+          "calls",
           "vendorsOnly"
         ],
         "type": "object",
@@ -2085,14 +2044,13 @@
           "vendorsOnly": {
             "type": "boolean"
           }
-        },
-        "additionalProperties": false
+        }
       },
       "VendorSnapshot": {
         "required": [
+          "node",
           "calledBy",
-          "internal",
-          "node"
+          "internal"
         ],
         "type": "object",
         "properties": {
@@ -2123,15 +2081,14 @@
             },
             "nullable": true
           }
-        },
-        "additionalProperties": false
+        }
       },
       "ViewInfo": {
         "required": [
-          "hidden",
           "islands",
-          "links",
-          "unknown"
+          "unknown",
+          "hidden",
+          "links"
         ],
         "type": "object",
         "properties": {
@@ -2159,14 +2116,13 @@
               "$ref": "#/components/schemas/OffscreenLink"
             }
           }
-        },
-        "additionalProperties": false
+        }
       }
     }
   },
   "tags": [
     {
-      "name": "ObservabilityCity.Host, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+      "name": "ObservabilityCity.Host"
     }
   ]
 }

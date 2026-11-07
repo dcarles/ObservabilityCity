@@ -74,7 +74,7 @@ The registry tells the backend what to watch. Each adapter polls on its own time
 | --- | --- |
 | Solution | .NET Aspire AppHost starts everything with one F5: the Host (API + SignalR), Core (registry, rules, snapshot builder), one Adapters project per source, Contracts, and the `frontend/` Vite + TypeScript + Three.js frontend. `azd up` to Azure Container Apps later |
 | Live push | SignalR: groups (per-pillar filtering, live log tail for an open drawer), two-way on one connection, Azure SignalR for scale-out. The snapshot builder doesn't know the transport |
-| Contract | C# `Snapshot` records are the source of truth. The build emits OpenAPI for `/api/snapshot/latest`, and openapi-typescript generates `contracts.ts`, so drift is a build error. Golden snapshot fixtures per scenario are tested in both C# and TypeScript |
+| Contract | C# `Snapshot` records are the source of truth. The build emits OpenAPI with ASP.NET Core's built-in generator, and a small script in the repo (`frontend/scripts/openapi-to-ts.mjs`) generates `contracts.ts`, so drift is a build error. Golden snapshot fixtures per scenario are tested in both C# and TypeScript |
 | Adapters | Poll per source: each source has its own background loop, interval, timeout and retry, with one batched query for all systems. A failing source greys out only its own values. No webhooks while it runs on a dev PC |
 | Fake source | A generator adapter (healthy noisy baseline, with scenario effects layered on top) plus a replay mode that plays fixture timelines for tests and scripted demos |
 | Azure auth | `DefaultAzureCredential`: your own az / Visual Studio login locally, managed identity once hosted. Grafana and IRM tokens in dotnet user-secrets, Key Vault when hosted, never in YAML |

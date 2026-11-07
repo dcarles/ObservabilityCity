@@ -162,7 +162,7 @@ Data flows one way: a source writes readings, the snapshot builder joins them wi
 
 ### The contract
 
-`contracts/openapi.json` and `frontend/src/contracts.ts` are generated from the C# `Snapshot` records. After changing a record:
+`contracts/openapi.json` (ASP.NET Core's built-in OpenAPI generator) and `frontend/src/contracts.ts` (`frontend/scripts/openapi-to-ts.mjs`) are generated from the C# `Snapshot` records. After changing a record:
 
 ```
 cd frontend && npm run gen:contracts
