@@ -37,6 +37,7 @@
             "properties": { "role": { "type": "string", "minLength": 1, "description": "The name the telemetry gives this system (its role name). Without it, the environment's scope.telemetryRole template, if it has one." } }
           },
           "tenantPattern": { "type": "string", "pattern": "^[^{}]*\\{tenant\\}[^{}]*$", "description": "For a database (role: db) that keeps one database per tenant: its name with {tenant} where the tenant id goes, for example merchant-{tenant}-db. The store then stands as a yard with one unit for each tenant of the environment." },
+          "engine": { "$ref": "defs.schema.json#/$defs/kebabName", "description": "For a database (role: db): the engine it runs on, an id from databaseEngines in town.yaml (for example cosmos). It is shown as a label on the database. Leave it out and no label shows." },
           "signals": { "$ref": "defs.schema.json#/$defs/signals" },
           "external": { "type": "boolean", "description": "Reached by callers outside the town." },
           "slaP99Ms": { "type": "number" },

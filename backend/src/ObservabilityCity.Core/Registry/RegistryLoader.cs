@@ -7,7 +7,7 @@ using YamlDotNet.Serialization.NamingConventions;
 namespace ObservabilityCity.Core.Registry;
 
 /// <summary>
-/// Loads a registry folder: town.yaml, defaults.yaml, hub.yaml, an optional layout.yaml and pillars/*.yaml.
+/// Loads a registry folder: town.yaml (which also sets the island order and ring size), defaults.yaml, hub.yaml and pillars/*.yaml.
 /// Settings resolve through defaults.yaml, then the pillar's defaults, then the system's own values.
 /// Every problem found in the files is collected and reported together, each naming its file, with a
 /// "did you mean" for names that are close to a real one.
@@ -27,7 +27,7 @@ public static partial class RegistryLoader
     // Every key a registry file may use, for suggesting the right one when a key is misspelt.
     private static readonly string[] KnownKeys =
     [
-        "id", "name", "groupLabel", "topology", "expectedWarnings", "rule", "file", "pillar", "displayName", "color", "external", "defaults", "systems", "resources",
+        "id", "name", "groupLabel", "topology", "expectedWarnings", "ringCapacity", "databaseEngines", "engine", "type", "rule", "file", "pillar", "displayName", "color", "external", "defaults", "systems", "resources",
         "externalCallers", "islands", "role", "service", "slaP99Ms", "errors", "resources", "throttle", "backlog", "calls", "aliases",
         "amber", "red", "vendors", "calledBy", "gatewayCalls", "messaging", "topics", "subscriptions", "topic", "consumer", "legacy",
         "tenantPattern", "order", "default", "sources", "kind", "connection", "tenants", "exclude", "fake", "undeclaredTenants",
@@ -83,8 +83,9 @@ public static partial class RegistryLoader
             : new DefaultsFile();
         CheckRoleKeys(defaults, "defaults.yaml", errors);
         var hub = Read<HubFile>(Path.Combine(folder, "hub.yaml"));
-        var layoutPath = Path.Combine(folder, "layout.yaml");
-        var layout = File.Exists(layoutPath) ? Read<LayoutFile>(layoutPath) : new LayoutFile();
+        var engines = CheckEngines(town, errors);
+        if (File.Exists(Path.Combine(folder, "layout.yaml")))
+            throw new RegistryException("town.yaml: this file is no longer read. Move its 'islands' and 'ringCapacity' keys into town.yaml and delete layout.yaml");
 
         var thirdPartiesPath = Path.Combine(folder, "third-parties.yaml");
         var thirdParties = File.Exists(thirdPartiesPath) ? Read<ThirdPartiesFile>(thirdPartiesPath) : new ThirdPartiesFile();
@@ -98,7 +99,7 @@ public static partial class RegistryLoader
         var aliases = new Dictionary<string, string>(); // old id to current id
 
         var hubNodes = hub.Resources
-            .Select(r => ToNode(r, "hub", "hub.yaml", "hub", defaults, new DefaultsFile(), false, new Dictionary<string, string>(), ids, aliases, errors))
+            .Select(r => ToNode(r, "hub", "hub.yaml", "hub", defaults, new DefaultsFile(), false, new Dictionary<string, string>(), ids, aliases, errors, engines))
             .OfType<RegistryNode>()
             .ToList();
         var hubGroup = new RegistryGroup("hub", hub.DisplayName, hub.Color, true, hubNodes) { TopicServices = hub.Messaging?.Topics ?? [] };
@@ -120,7 +121,7 @@ public static partial class RegistryLoader
                 RegistryGroup? group = null;
                 try
                 {
-                    group = LoadPillar(file, name, defaults, resilient ? new HashSet<string>(ids) : ids, resilient ? new Dictionary<string, string>(aliases) : aliases, own, out var pillarIds, out var pillarAliases);
+                    group = LoadPillar(file, name, defaults, resilient ? new HashSet<string>(ids) : ids, resilient ? new Dictionary<string, string>(aliases) : aliases, own, engines, out var pillarIds, out var pillarAliases);
                     if (resilient && own.Count == 0)
                     {
                         ids = pillarIds;
@@ -155,8 +156,8 @@ public static partial class RegistryLoader
         }
 
         var groups = new List<RegistryGroup> { hubGroup };
-        groups.AddRange(Order(pillars, layout, Problem));
-        var ringCapacity = CheckRingCapacity(layout, pillars.Count, errors);
+        groups.AddRange(Order(pillars, town, Problem));
+        var ringCapacity = CheckRingCapacity(town, pillars.Count, errors);
 
         // every declared call must point at a system in this town (by id or by an old alias), and not at itself
         var resolved = new Dictionary<string, IReadOnlyList<string>>();
@@ -301,7 +302,7 @@ public static partial class RegistryLoader
         var final = groups.Select(g => g with { Nodes = g.Nodes.Select(n => n with { Calls = resolved[n.Id], GatewayCalls = resolvedGateway[n.Id] }).ToList() }).ToList();
         var registry = new Registry(new TownInfo(town.Id, town.Name, town.GroupLabel, town.Topology, town.Mode, town.TrafficDensity), final, callers)
         {
-            Notices = notices, Problems = problems, Vendors = vendors, RingCapacity = ringCapacity, Topics = topics, Subscriptions = subscriptions, Environments = environments,
+            Notices = notices, Problems = problems, Vendors = vendors, RingCapacity = ringCapacity, Topics = topics, Subscriptions = subscriptions, Environments = environments, DatabaseEngines = engines.Values.ToList(),
         };
         return registry with { Warnings = TownLinks.Warnings(registry).ToList() };
     }
@@ -573,7 +574,7 @@ public static partial class RegistryLoader
 
     /// <summary>Reads one pillar file. Problems found in it go to <paramref name="errors"/>; the ids and aliases it would add are returned, so a caller can drop them with the file.</summary>
     private static RegistryGroup LoadPillar(
-        string file, string name, DefaultsFile defaults, HashSet<string> ids, Dictionary<string, string> aliases, List<string> errors,
+        string file, string name, DefaultsFile defaults, HashSet<string> ids, Dictionary<string, string> aliases, List<string> errors, IReadOnlyDictionary<string, DatabaseEngine> engines,
         out HashSet<string> pillarIds, out Dictionary<string, string> pillarAliases)
     {
         pillarIds = ids;
@@ -587,7 +588,7 @@ public static partial class RegistryLoader
             errors.Add($"{name}: pillar '{p.Pillar}' must match the file name");
 
         var nodes = p.Systems
-            .Select(s => ToNode(s, p.Pillar, name, p.Pillar, defaults, p.Defaults, p.External, p.Signals, ids, aliases, errors))
+            .Select(s => ToNode(s, p.Pillar, name, p.Pillar, defaults, p.Defaults, p.External, p.Signals, ids, aliases, errors, engines))
             .OfType<RegistryNode>()
             .ToList();
         if (p.Scope?.Code is { } scopeCode && scopeCode.Trim().Length == 0)
@@ -656,18 +657,18 @@ public static partial class RegistryLoader
         }
     }
 
-    /// <summary>Pillars in layout.yaml order, then any that it does not list in file order. Lost &amp; found is always last.</summary>
-    private static IEnumerable<RegistryGroup> Order(List<RegistryGroup> pillars, LayoutFile layout, Action<string> problem)
+    /// <summary>Pillars in town.yaml islands order, then any that it does not list in file order. Lost &amp; found is always last.</summary>
+    private static IEnumerable<RegistryGroup> Order(List<RegistryGroup> pillars, TownFile town, Action<string> problem)
     {
         var byId = pillars.ToDictionary(p => p.Id, p => p);
         var seen = new HashSet<string>();
         var ordered = new List<RegistryGroup>();
-        foreach (var id in layout.Islands)
+        foreach (var id in town.Islands)
         {
             if (!byId.TryGetValue(id, out var g))
-                problem($"layout.yaml: island '{id}' has no pillar file.{DidYouMean.Hint(id, byId.Keys)}");
+                problem($"town.yaml: island '{id}' has no pillar file.{DidYouMean.Hint(id, byId.Keys)}");
             else if (!seen.Add(id))
-                problem($"layout.yaml: island '{id}' is listed twice");
+                problem($"town.yaml: island '{id}' is listed twice");
             else
                 ordered.Add(g);
         }
@@ -676,15 +677,15 @@ public static partial class RegistryLoader
     }
 
     /// <summary>
-    /// The ring capacity from layout.yaml, within its limits, and the pillar count it allows. These are errors even in a resilient load:
+    /// The ring capacity from town.yaml, within its limits, and the pillar count it allows. These are errors even in a resilient load:
     /// a town that does not fit on two rings cannot be drawn at all.
     /// </summary>
-    private static int CheckRingCapacity(LayoutFile layout, int pillarCount, List<string> errors)
+    private static int CheckRingCapacity(TownFile town, int pillarCount, List<string> errors)
     {
-        var capacity = layout.RingCapacity ?? Registry.DefaultRingCapacity;
+        var capacity = town.RingCapacity ?? Registry.DefaultRingCapacity;
         if (capacity is < Registry.MinRingCapacity or > Registry.MaxRingCapacity)
         {
-            errors.Add($"layout.yaml: ringCapacity must be between {Registry.MinRingCapacity} and {Registry.MaxRingCapacity}, not {capacity}");
+            errors.Add($"town.yaml: ringCapacity must be between {Registry.MinRingCapacity} and {Registry.MaxRingCapacity}, not {capacity}");
             return Registry.DefaultRingCapacity;
         }
         var max = Registry.MaxPillars(capacity);
@@ -692,11 +693,29 @@ public static partial class RegistryLoader
         {
             var needed = (pillarCount + 2) / 2;
             var hint = needed <= Registry.MaxRingCapacity
-                ? $"set ringCapacity to {needed} or more in layout.yaml"
+                ? $"set ringCapacity to {needed} or more in town.yaml"
                 : $"{Registry.MaxPillars(Registry.MaxRingCapacity)} is the most a town can hold (ringCapacity {Registry.MaxRingCapacity})";
-            errors.Add($"layout.yaml: {pillarCount} pillars do not fit on two rings of {capacity}: at most {max}. {hint}. Lost & found counts as a pillar");
+            errors.Add($"town.yaml: {pillarCount} pillars do not fit on two rings of {capacity}: at most {max}. {hint}. Lost & found counts as a pillar");
         }
         return capacity;
+    }
+
+    /// <summary>The company's databaseEngines: each needs a kebab-case id, a name, and one of the fixed types. Problems go to <paramref name="errors"/>.</summary>
+    private static Dictionary<string, DatabaseEngine> CheckEngines(TownFile town, List<string> errors)
+    {
+        var engines = new Dictionary<string, DatabaseEngine>();
+        foreach (var (id, e) in town.DatabaseEngines)
+        {
+            if (!KebabId.IsMatch(id)) { errors.Add($"town.yaml: databaseEngines id '{id}' must be lowercase kebab-case"); continue; }
+            if (string.IsNullOrWhiteSpace(e.Name)) { errors.Add($"town.yaml: databaseEngines '{id}' needs a name, the engine as it should be shown (for example Cosmos DB)"); continue; }
+            if (!DatabaseTypes.Names.ContainsKey(e.Type))
+            {
+                errors.Add($"town.yaml: databaseEngines '{id}' has type '{e.Type}', which is not a database type. Use {string.Join(", ", DatabaseTypes.All)}.{DidYouMean.Hint(e.Type, DatabaseTypes.All)}");
+                continue;
+            }
+            engines[id] = new DatabaseEngine(id, e.Name.Trim(), e.Type);
+        }
+        return engines;
     }
 
     private static void CheckRoleKeys(DefaultsFile defaults, string fileName, List<string> errors)
@@ -711,7 +730,7 @@ public static partial class RegistryLoader
     private static RegistryNode? ToNode(
         SystemFile s, string groupId, string fileName, string prefix,
         DefaultsFile appDefaults, DefaultsFile pillarDefaults, bool pillarExternal, Dictionary<string, string> pillarSignals,
-        HashSet<string> ids, Dictionary<string, string> aliases, List<string> errors)
+        HashSet<string> ids, Dictionary<string, string> aliases, List<string> errors, IReadOnlyDictionary<string, DatabaseEngine>? engines = null)
     {
         var dot = s.Id.IndexOf('.');
         if (dot <= 0 || s.Id[..dot] != prefix || !KebabId.IsMatch(s.Id[(dot + 1)..]))
@@ -741,6 +760,15 @@ public static partial class RegistryLoader
                 errors.Add($"{fileName}: '{s.Id}' has a tenantPattern, but only a database (role: db) keeps one database per tenant");
             else if (s.TenantPattern.Split(RegistryEnvironment.TenantToken).Length != 2)
                 errors.Add($"{fileName}: tenantPattern '{s.TenantPattern}' of '{s.Id}' must contain {RegistryEnvironment.TenantToken} exactly once, where the tenant id goes (for example merchant-{{tenant}}-db)");
+        }
+        if (s.Engine is { } engineId)
+        {
+            if (kind != NodeKind.Database)
+                errors.Add($"{fileName}: '{s.Id}' has an engine, but only a database (role: db) runs on one");
+            else if (engines is null || engines.Count == 0)
+                errors.Add($"{fileName}: '{s.Id}' says engine '{engineId}', but town.yaml defines no databaseEngines. List the engines there first");
+            else if (!engines.ContainsKey(engineId))
+                errors.Add($"{fileName}: engine '{engineId}' of '{s.Id}' is not in town.yaml databaseEngines.{DidYouMean.Hint(engineId, engines.Keys)} Known engines: {string.Join(", ", engines.Keys)}");
         }
         var role = kind == NodeKind.Database ? "db" : kind.ToString().ToLowerInvariant(); // the YAML spelling
         RoleDefaultsFile? app = null, pillar = null;
@@ -802,6 +830,7 @@ public static partial class RegistryLoader
             ServiceCode = s.ServiceCode,
             TelemetryRole = s.Telemetry?.Role,
             TenantPattern = s.TenantPattern,
+            Engine = s.Engine,
             Signals = Merge(pillarSignals, s.Signals),
             SourceFile = fileName,
             Origins = origins,

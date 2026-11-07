@@ -4,3 +4,14 @@ name: Galactic Credit
 groupLabel: Pillar        # what an island is called in this town
 topology: hub-and-spoke   # cross-group calls go through the hub gateway
 mode: demo                # fake data, with the Break things panel and the story bar. Leave it out (live) for real sources
+# Islands in the order they stand round the hub. Pillars not listed follow in file order, and
+# Lost & found always comes last. ringCapacity (6 to 18, default 12) is how many islands stand on the first ring; the rest stand in a staggered second ring.
+islands: [cl, acc, pay, frd, cus, acq, dec, bil, col, dsp, rwd, obk, ntf, dat, rcn, reg]
+
+# The database engines this town uses. A database says engine: <id>; the name and the type shown come from here. Every engine belongs to one of the fixed types:
+# relational, document, key-value, wide-column, graph, time-series, analytical, vector.
+databaseEngines:
+  cosmos:    { name: Cosmos DB,  type: document }
+  sqlserver: { name: SQL Server, type: relational }
+  postgres:  { name: PostgreSQL, type: relational }
+  mongodb:   { name: MongoDB,    type: document }

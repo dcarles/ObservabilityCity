@@ -10,12 +10,11 @@ public class RegistryValidationTests
     {
         public string Path { get; } = Directory.CreateTempSubdirectory().FullName;
 
-        public Folder(IDictionary<string, string> pillars, string hub = "resources: []\n", string? layout = null)
+        public Folder(IDictionary<string, string> pillars, string hub = "resources: []\n", string layout = "")
         {
             Directory.CreateDirectory(System.IO.Path.Combine(Path, "pillars"));
-            File.WriteAllText(System.IO.Path.Combine(Path, "town.yaml"), "id: t\nname: T\n");
+            File.WriteAllText(System.IO.Path.Combine(Path, "town.yaml"), "id: t\nname: T\n" + layout);
             File.WriteAllText(System.IO.Path.Combine(Path, "hub.yaml"), hub);
-            if (layout is not null) File.WriteAllText(System.IO.Path.Combine(Path, "layout.yaml"), layout);
             foreach (var (name, text) in pillars)
                 File.WriteAllText(System.IO.Path.Combine(Path, "pillars", name + ".yaml"), text);
         }
@@ -36,7 +35,7 @@ public class RegistryValidationTests
         Assert.Equal(17, pillars.Count);
         Assert.Equal(16, pillars.Count(p => !p.IsLostFound));
         Assert.True(pillars[^1].IsLostFound);
-        Assert.Equal("cl", pillars[0].Id); // layout.yaml order, not file-name order
+        Assert.Equal("cl", pillars[0].Id); // town.yaml islands order, not file-name order
         Assert.True(registry.AllNodes.Count() >= 100);
     }
 
@@ -75,7 +74,7 @@ public class RegistryValidationTests
         using var f = new Folder(new Dictionary<string, string> { ["billing"] = Pillar("billing", "{ id: billing.x, role: api }") }, layout: "islands: [biling]\n");
         var e = Assert.Throws<RegistryException>(f.Load);
 
-        Assert.Contains("layout.yaml", e.Message);
+        Assert.Contains("town.yaml", e.Message);
         Assert.Contains("Did you mean 'billing'?", e.Message);
     }
 
@@ -236,7 +235,7 @@ public class RegistryValidationTests
         {
             var e = Assert.Throws<RegistryException>(f.Load);
             Assert.Contains($"{pillars} pillars do not fit on two rings of {capacity}: at most {capacity * 2 - 1}", e.Message);
-            Assert.Contains("layout.yaml", e.Message);
+            Assert.Contains("town.yaml", e.Message);
         }
     }
 
@@ -260,7 +259,7 @@ public class RegistryValidationTests
 
         var e = Assert.Throws<RegistryException>(f.Load);
 
-        Assert.Contains($"layout.yaml: ringCapacity must be between 6 and 18, not {capacity}", e.Message);
+        Assert.Contains($"town.yaml: ringCapacity must be between 6 and 18, not {capacity}", e.Message);
     }
 
     [Fact]

@@ -7,9 +7,9 @@ defaults:
 systems:
   - { id: dec.decision-api, service: decision, name: Decision API, role: api, external: true, calls: [dec.decision-db, dec.features-cache, dec.scorecards-api], gatewayCalls: [frd.screening-api, cus.profile-api] }
   - { id: dec.decision-worker, service: decision, name: Decision worker, role: worker, calls: [dec.decision-db, dec.scorecards-api] }
-  - { id: dec.decision-db, service: decision, name: Decision DB, role: db }
+  - { id: dec.decision-db, service: decision, name: Decision DB, role: db, engine: sqlserver }
   - { id: dec.scorecards-api, service: scorecards, name: Scorecards API, role: api, calls: [dec.scorecards-db] }
-  - { id: dec.scorecards-db, service: scorecards, name: Scorecards DB, role: db }
+  - { id: dec.scorecards-db, service: scorecards, name: Scorecards DB, role: db, engine: postgres }
   - { id: dec.features-cache, name: Features cache, role: cache }
 
 # Messaging: the outboxes this pillar publishes (dec-<service>-outbox) and the topics its workers consume.

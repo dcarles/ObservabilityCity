@@ -5,9 +5,9 @@ color: "#ff9f1c"
 systems:
   - { id: ntf.dispatch-api, service: dispatch, name: Dispatch API, role: api, calls: [ntf.dispatch-db, ntf.templates-api] }
   - { id: ntf.dispatch-worker, service: dispatch, name: Dispatch worker, role: worker, calls: [ntf.dispatch-db] }
-  - { id: ntf.dispatch-db, service: dispatch, name: Dispatch DB, role: db }
+  - { id: ntf.dispatch-db, service: dispatch, name: Dispatch DB, role: db, engine: sqlserver }
   - { id: ntf.templates-api, service: templates, name: Templates API, role: api, calls: [ntf.templates-db] }
-  - { id: ntf.templates-db, service: templates, name: Templates DB, role: db }
+  - { id: ntf.templates-db, service: templates, name: Templates DB, role: db, engine: postgres }
   - { id: ntf.digest-cron, name: Digest run, role: function, calls: [ntf.dispatch-api] }
 
 # Messaging: the outboxes this pillar publishes (ntf-<service>-outbox) and the topics its workers consume.

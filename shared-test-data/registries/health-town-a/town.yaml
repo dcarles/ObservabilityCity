@@ -2,3 +2,4 @@ id: health-town-a
 name: Health Town A
 groupLabel: Pillar
 topology: hub-and-spoke
+islands: [aa, bb, cc]

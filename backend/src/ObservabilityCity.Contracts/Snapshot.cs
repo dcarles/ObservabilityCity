@@ -129,7 +129,14 @@ public sealed record NodeSnapshot(
     IReadOnlyList<RegionSnapshot>? Regions = null,
     IReadOnlyList<QueueSnapshot>? Queues = null,
     string? Reason = null,
-    IReadOnlyList<SourceAgeSnapshot>? Sources = null);
+    IReadOnlyList<SourceAgeSnapshot>? Sources = null,
+    DatabaseEngineSnapshot? Engine = null);
+
+/// <summary>
+/// What a database runs on, from town.yaml databaseEngines: Id as pillar files write it, Name as shown (Cosmos DB), Type the id of its family (document)
+/// and TypeName the family as shown (Document).
+/// </summary>
+public sealed record DatabaseEngineSnapshot(string Id, string Name, string Type, string TypeName);
 
 /// <summary>
 /// A source that feeds a system: its name, how many seconds ago it last answered, whether that is fresh enough to show, and the signals it supplies. A source that is
@@ -331,7 +338,7 @@ public sealed record TownTotals(
 /// The whole town at one moment. This is what is pushed to the browser.
 /// Notices are problems with the configuration that did not stop the town: a reload that failed (the last good registry is still shown),
 /// a call link that points nowhere and was dropped. The renderer lists them in the top bar.
-/// RingCapacity is how many islands stand on the first ring (layout.yaml), which the renderer lays the two rings out from.
+/// RingCapacity is how many islands stand on the first ring (town.yaml), which the renderer lays the two rings out from.
 /// Vendors are the third parties, ExternalCallers feed the airport, and Dependencies are the cross-group traffic the overlay draws.
 /// Environment is the id of the environment this snapshot shows (EnvironmentName its display name); Environments lists every environment the server
 /// serves. Tenants are the tenants of this environment, the unknown ones the data shows included; it is empty for an environment without tenants.

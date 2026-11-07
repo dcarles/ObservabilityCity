@@ -3,7 +3,7 @@ displayName: Platform
 color: "#7bd88f"
 resources:
   - { id: hub.kafka, name: Kafka, role: broker }
-  - { id: hub.accounts-db, name: Shared accounts DB, role: db }
+  - { id: hub.accounts-db, name: Shared accounts DB, role: db, engine: postgres }
 # Outside callers of the shop: shoppers in a browser, the mobile app and the courier's tracking webhooks.
 externalCallers:
   - { id: shoppers, name: Shoppers, calls: [web.storefront-api] }

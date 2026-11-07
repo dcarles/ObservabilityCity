@@ -5,9 +5,9 @@ color: "#e5b13a"
 systems:
   - { id: bil.invoices-api, service: invoices, name: Invoices API, role: api, external: true, calls: [bil.invoices-db, bil.rating-api], gatewayCalls: [pay.payments-api, acc.accounts-api] }
   - { id: bil.invoices-worker, service: invoices, name: Invoices worker, role: worker, calls: [bil.invoices-db] }
-  - { id: bil.invoices-db, service: invoices, name: Invoices DB, role: db }
+  - { id: bil.invoices-db, service: invoices, name: Invoices DB, role: db, engine: sqlserver }
   - { id: bil.rating-api, service: rating, name: Rating API, role: api, calls: [bil.rating-db] }
-  - { id: bil.rating-db, service: rating, name: Rating DB, role: db }
+  - { id: bil.rating-db, service: rating, name: Rating DB, role: db, engine: postgres }
   - { id: bil.billing-cron, name: Billing run, role: function, calls: [bil.invoices-api] }
 
 # Messaging: the outboxes this pillar publishes (bil-<service>-outbox) and the topics its workers consume.

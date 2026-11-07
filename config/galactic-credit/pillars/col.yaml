@@ -7,13 +7,13 @@ defaults:
 systems:
   - { id: col.cases-api, service: cases, name: Cases API, role: api, calls: [col.cases-db, col.queue-cache, col.dunning-api], gatewayCalls: [bil.invoices-api, cus.profile-api] }
   - { id: col.cases-worker, service: cases, name: Cases worker, role: worker, calls: [col.cases-db] }
-  - { id: col.cases-db, service: cases, name: Cases DB, role: db }
+  - { id: col.cases-db, service: cases, name: Cases DB, role: db, engine: sqlserver }
   - { id: col.dunning-api, service: dunning, name: Dunning API, role: api, calls: [col.dunning-db, col.queue-cache, col.agency-api], gatewayCalls: [ntf.dispatch-api] }
   - { id: col.dunning-worker, service: dunning, name: Dunning worker, role: worker, calls: [col.dunning-db] }
-  - { id: col.dunning-db, service: dunning, name: Dunning DB, role: db }
+  - { id: col.dunning-db, service: dunning, name: Dunning DB, role: db, engine: postgres }
   - { id: col.agency-api, service: agency, name: Agency API, role: api, external: true, calls: [col.agency-db] }
   - { id: col.agency-worker, service: agency, name: Agency worker, role: worker, calls: [col.agency-db, col.queue-cache] }
-  - { id: col.agency-db, service: agency, name: Agency DB, role: db }
+  - { id: col.agency-db, service: agency, name: Agency DB, role: db, engine: mongodb }
   - { id: col.letters-cron, name: Letter run, role: function, calls: [col.dunning-api, col.cases-api] }
   - { id: col.queue-cache, name: Work queue cache, role: cache }
 

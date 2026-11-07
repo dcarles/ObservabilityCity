@@ -138,10 +138,10 @@ public class RegistryValidatorTests
     }
 
     [Fact]
-    public void A_pillar_missing_from_the_layout_is_an_error_on_its_file()
+    public void A_pillar_missing_from_the_islands_list_is_an_error_on_its_file()
     {
         using var f = new RegistryCopy(TestPaths.MiniTown);
-        f.Replace("layout.yaml", "[aa, bb, cc]", "[aa, bb]");
+        f.Replace("town.yaml", "[aa, bb, cc]", "[aa, bb]");
 
         var hit = Single(Check(f), "layout");
 
@@ -151,7 +151,7 @@ public class RegistryValidatorTests
     }
 
     [Fact]
-    public void Lost_and_found_needs_no_layout_entry()
+    public void Lost_and_found_needs_no_islands_entry()
     {
         using var f = new RegistryCopy(TestPaths.MiniTown);
         f.Write("pillars/lost-found.yaml", "pillar: lost-found\ndisplayName: Lost & found\ncolor: \"#9aa3ad\"\nsystems:\n  - { id: lost-found.thing, name: Thing, role: api, external: true }\n");
@@ -160,10 +160,10 @@ public class RegistryValidatorTests
     }
 
     [Fact]
-    public void A_missing_layout_file_is_only_a_warning()
+    public void A_town_with_no_islands_list_is_only_a_warning()
     {
         using var f = new RegistryCopy(TestPaths.MiniTown);
-        File.Delete(f.FilePath("layout.yaml"));
+        f.Replace("town.yaml", "islands: [aa, bb, cc]", "");
 
         var hit = Single(Check(f), "layout");
 
@@ -392,7 +392,7 @@ public class RegistryValidatorTests
     {
         using var f = new RegistryCopy(TestPaths.Stress23);
         f.Write("pillars/p24.yaml", "pillar: p24\ndisplayName: One more\ncolor: \"#5aa9ff\"\nsystems:\n  - { id: p24.api, name: API, role: api, external: true }\n");
-        f.Replace("layout.yaml", "p23]", "p23, p24]");
+        f.Replace("town.yaml", "p23]", "p23, p24]");
 
         var r = Check(f);
 

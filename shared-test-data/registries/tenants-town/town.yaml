@@ -3,3 +3,4 @@ name: Tenants Town
 groupLabel: Team
 topology: hub-and-spoke
 mode: demo
+islands: [aa, bb]
