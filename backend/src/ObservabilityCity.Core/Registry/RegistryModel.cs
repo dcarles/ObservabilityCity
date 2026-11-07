@@ -186,6 +186,9 @@ public sealed record RegistryNode(
     /// <summary>For a data store with one database per tenant: its name with {tenant} where the tenant id goes. Null for everything else.</summary>
     public string? TenantPattern { get; init; }
 
+    /// <summary>The environments this system is deployed in (<c>environments</c> in its file). Empty: every environment.</summary>
+    public IReadOnlyList<string> Environments { get; init; } = [];
+
     /// <summary>For a database: the id of the engine it runs on (a key of town.yaml databaseEngines). Null when it says none.</summary>
     public string? Engine { get; init; }
 

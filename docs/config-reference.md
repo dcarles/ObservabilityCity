@@ -121,6 +121,7 @@ One island. The file name is the pillar id.
 | `discoverLinks` | no | pillar or role default | See above. Set `false` on a system whose calls should only be the declared ones. |
 | `signals` | no | none | Signal → source name (or `none`) for this system alone. |
 | `serviceCode` | no | the service | The name its cloud resources carry for the service. |
+| `environments` | no | all | Ids of the environments (the file names in `environments/`) this system is deployed in, for a service that exists only in some of them, such as a test simulator. In any other environment it is left out, with the calls that lead to it. Without it, the system is in every environment. |
 | `telemetry` | no | none | What the telemetry calls it. |
 | `calls` | no | none | Ids of the systems this one calls. Cars drive only along declared links. |
 | `gatewayCalls` | no | none | Systems on other islands reached through the gateway (hub-and-spoke towns). |

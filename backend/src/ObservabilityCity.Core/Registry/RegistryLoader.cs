@@ -30,7 +30,7 @@ public static partial class RegistryLoader
         "id", "name", "groupLabel", "topology", "expectedWarnings", "ringCapacity", "databaseEngines", "engine", "type", "rule", "file", "pillar", "displayName", "color", "external", "defaults", "systems", "resources",
         "externalCallers", "islands", "role", "service", "slaP99Ms", "errors", "resources", "throttle", "backlog", "calls", "aliases",
         "amber", "red", "vendors", "calledBy", "gatewayCalls", "messaging", "topics", "subscriptions", "topic", "consumer", "legacy",
-        "tenantPattern", "order", "default", "sources", "kind", "connection", "tenants", "exclude", "fake", "undeclaredTenants",
+        "tenantPattern", "order", "default", "sources", "kind", "connection", "tenants", "exclude", "environments", "fake", "undeclaredTenants",
         "signals", "credentials", "credential", "providers", "keepResolvedFor", "pollSeconds", "timeoutSeconds", "lateAfterSeconds", "tenantId", "clientId", "clientSecretEnv",
         "scope", "inventory", "workspace", "variables", "subscription", "pillars", "types", "pattern", "roles", "serviceTag", "tenantNameTag",
         "telemetryRole", "queries", "links", "url", "nameLike", "tag", "key", "value", "code", "serviceCode", "telemetry", "minCalls", "query", "window", "discoverLinks", "regions", "tag", "names", "skew", "state", "running", "minDays", "keepFor", "firstRead", "interval", "ignoreHosts", "rules", "host", "path", "target", "gateway", "domains", "services", "internal", "match", "traffic", "shareWindow", "logs", "section", "resources",
@@ -272,6 +272,14 @@ public static partial class RegistryLoader
 
         var (topics, subscriptions) = ResolveMessaging(groups, brokenPillars, resilient, Problem);
         var environments = LoadEnvironments(folder, ids, aliases, resilient, Problem);
+        // a system that names the environments it is deployed in must name environments the town has
+        if (environments.Count > 0)
+        {
+            var envIds = environments.Select(e => e.Id).ToList();
+            foreach (var node in final0(groups).Where(n => n.Environments.Count > 0))
+                foreach (var env in node.Environments.Where(e => !envIds.Contains(e)))
+                    errors.Add($"{node.SourceFile}: '{node.Id}' says it is deployed in environment '{env}', which is not in environments/.{DidYouMean.Hint(env, envIds)}");
+        }
         // hosts ignored from the panel are platform noise in every environment that finds links
         var ignored = new List<string>();
         foreach (var pattern in AddedHosts.IgnorePatterns(folder))
@@ -725,6 +733,8 @@ public static partial class RegistryLoader
                 errors.Add($"{fileName}: defaults for unknown role '{role}'. Use {RoleList}.{DidYouMean.Hint(role, Roles)}");
     }
 
+    private static IEnumerable<RegistryNode> final0(List<RegistryGroup> groups) => groups.SelectMany(g => g.Nodes);
+
     private static string RoleList => "api, worker, db, cache, function (or cron), gateway, broker or egress";
 
     private static RegistryNode? ToNode(
@@ -831,6 +841,7 @@ public static partial class RegistryLoader
             TelemetryRole = s.Telemetry?.Role,
             TenantPattern = s.TenantPattern,
             Engine = s.Engine,
+            Environments = s.Environments,
             Signals = Merge(pillarSignals, s.Signals),
             SourceFile = fileName,
             Origins = origins,

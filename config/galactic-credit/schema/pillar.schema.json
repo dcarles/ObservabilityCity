@@ -30,6 +30,7 @@
           "role": { "$ref": "defs.schema.json#/$defs/role" },
           "service": { "type": "string", "description": "Systems that share a service are drawn side by side on one pad (an API, its worker and its database)." },
           "serviceCode": { "type": "string", "minLength": 1, "description": "The name this system's resources carry for its service: matched with the service group of the patterns under scope.resources in the environment files. Without it, the service name." },
+          "environments": { "type": "array", "items": { "type": "string" }, "description": "Ids of the environments (file names in environments/) this system is deployed in. Without it, every environment." },
           "telemetry": {
             "type": "object",
             "additionalProperties": false,
