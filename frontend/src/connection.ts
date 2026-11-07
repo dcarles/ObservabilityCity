@@ -11,13 +11,26 @@ export interface EnvironmentUnknown {
   towns?: string[]
 }
 
-export type ConnectionState = 'connecting' | 'live' | 'reconnecting' | 'offline' | 'badData'
+export type ConnectionState = 'connecting' | 'live' | 'reconnecting' | 'offline' | 'badData' | 'silent'
+
+/** The server sends a snapshot at least every 15 s (Snapshot:KeepAliveSeconds), so this long without one means the feed is stuck, whatever the socket says. */
+export const SILENT_AFTER_MS = 45_000
+
+/** The words for a feed that has gone quiet. */
+export const SILENT_WORDS = `No update for over ${SILENT_AFTER_MS / 1000} s`
+
+/** Greys the whole page while the feed is silent, so old numbers are never read as current. */
+export function markFeed(state: ConnectionState): void {
+  if (typeof document !== 'undefined') document.body.classList.toggle('feed-silent', state === 'silent')
+}
 
 export interface ConnectionOptions {
   /** Never give up on the live socket: after it was lost for good, keep trying to open it again. For a screen nobody is there to refresh. */
   persistent?: boolean
   /** Milliseconds between two tries of a persistent connection. */
   retryMs?: number
+  /** Milliseconds without any snapshot before the state turns to 'silent'. Default {@link SILENT_AFTER_MS}. */
+  silentAfterMs?: number
 }
 
 /**
@@ -32,6 +45,9 @@ export class Connection {
   private poll: number | undefined
   private retry: number | undefined
   private unknown = false
+  private lastSeen = Date.now()
+  private muted = false
+  private watchdog: number | undefined
   private hub: signalR.HubConnection | undefined
 
   constructor(
@@ -67,11 +83,15 @@ export class Connection {
       .configureLogging(signalR.LogLevel.Warning)
       .build()
 
+    this.watch()
     hub.on('snapshot', (s: unknown) => {
+      if (this.muted) return
+      this.heard()
       this.set('live')
       this.onSnapshot(s)
     })
     hub.on('environmentUnknown', (e: EnvironmentUnknown) => {
+      this.heard()
       this.unknown = true
       this.set('live')
       this.onUnknown(e)
@@ -104,6 +124,12 @@ export class Connection {
     })
   }
 
+  /** For tests: while muted, snapshots are thrown away before anything else sees them, which is what a feed that carries nothing looks like. */
+  mute(muted: boolean, silentAfterMs?: number): void {
+    this.muted = muted
+    if (silentAfterMs !== undefined) (this.options as { silentAfterMs?: number }).silentAfterMs = silentAfterMs
+  }
+
   /** For tests: closes the socket the way a lost connection would, so the fallback and the retrying can be watched. */
   async drop(): Promise<void> {
     await this.hub?.stop()
@@ -133,7 +159,8 @@ export class Connection {
   private async pollOnce(): Promise<void> {
     try {
       const r = await fetch(`/api/snapshot/latest${this.query()}`)
-      if (r.ok) {
+      if (r.ok && !this.muted) {
+        this.heard()
         this.set('live')
         this.onSnapshot(await r.json())
       } else if (r.status === 404 && !this.unknown) {
@@ -144,6 +171,19 @@ export class Connection {
     } catch {
       this.set('offline')
     }
+  }
+
+  private heard(): void {
+    this.lastSeen = Date.now()
+  }
+
+  /** Once a second: a live feed that has said nothing for too long is 'silent'. A snapshot, from the socket or the polling, brings it back. */
+  private watch(): void {
+    if (this.watchdog !== undefined) return
+    this.lastSeen = Date.now()
+    this.watchdog = window.setInterval(() => {
+      if (this.state === 'live' && Date.now() - this.lastSeen > (this.options.silentAfterMs ?? SILENT_AFTER_MS)) this.set('silent')
+    }, 1000)
   }
 
   private set(s: ConnectionState): void {

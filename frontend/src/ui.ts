@@ -1,6 +1,6 @@
 import { absentEverywhere, isAbsent, isUnmonitored, QUIET_TEXT, type Signal } from './signals'
 import type { Snapshot, NodeSnapshot } from './types'
-import type { ConnectionState } from './connection'
+import { SILENT_WORDS, type ConnectionState } from './connection'
 import { formatCount, formatMs, formatRate } from './visuals'
 import { messagesPerSecond } from './inspectorModel'
 import { escapeHtml, Picker, type PickItem } from './picker'
@@ -50,8 +50,8 @@ export class TopBar {
   private render(): void {
     const s = this.snap
     const t = s ? viewTotals(s, this.view()) : null
-    const label = { connecting: 'Connecting…', live: s?.mode === 'demo' ? 'Live (demo data)' : 'Live', reconnecting: 'Reconnecting…', offline: 'Backend offline', badData: 'Bad data, showing the last good town' }[this.status]
-    const dot = this.status === 'live' ? 'live' : this.status === 'offline' || this.status === 'badData' ? '' : 'wait'
+    const label = { connecting: 'Connecting…', live: s?.mode === 'demo' ? 'Live (demo data)' : 'Live', reconnecting: 'Reconnecting…', offline: 'Backend offline', badData: 'Bad data, showing the last good town', silent: SILENT_WORDS }[this.status]
+    const dot = this.status === 'live' ? 'live' : this.status === 'offline' || this.status === 'badData' || this.status === 'silent' ? '' : 'wait'
     const day = s ? clock(s.dayFraction) : ''
     // what the numbers count, in words, for the tooltips
     const filtered = (s?.view?.islands.length ?? 0) > 0

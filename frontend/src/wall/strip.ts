@@ -2,7 +2,7 @@
 // connection is lost. Drawn from a StripModel; no state of its own beyond what is on screen.
 
 import { escapeHtml } from '../picker'
-import type { ConnectionState } from '../connection'
+import { SILENT_WORDS, type ConnectionState } from '../connection'
 import type { StripModel } from './stripModel'
 
 const CONNECTION_WORDS: Partial<Record<ConnectionState, string>> = {
@@ -10,6 +10,7 @@ const CONNECTION_WORDS: Partial<Record<ConnectionState, string>> = {
   reconnecting: 'Connection lost. Reconnecting…',
   offline: 'Backend offline. Trying again…',
   badData: 'Bad data from the backend. Showing the last good town.',
+  silent: `${SILENT_WORDS}. The town may be out of date.`,
 }
 
 export interface StripContent {
