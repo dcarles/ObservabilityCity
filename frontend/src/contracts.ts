@@ -100,6 +100,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/health-events/dismiss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["DismissHealthEvent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/added-rules": {
         parameters: {
             query?: never;
@@ -170,11 +186,20 @@ export interface components {
             layer: components["schemas"]["SettingLayer"];
             source: string;
         };
+        DeadLetterRegionSnapshot: {
+            region: string;
+            /** Format: double */
+            count: number;
+            link?: components["schemas"]["ResourceLink"];
+        };
         DependencySnapshot: {
             from: string;
             to: string;
             /** Format: double */
             requestsPerSecond: number;
+        };
+        DismissHealthEventRequest: {
+            id: string;
         };
         EnvironmentInfo: {
             id: string;
@@ -201,6 +226,21 @@ export interface components {
             messaging: components["schemas"]["MessagingSnapshot"];
             nodes: components["schemas"]["NodeSnapshot"][];
             assets?: components["schemas"]["AssetSnapshot"][] | null;
+        };
+        HealthEventSnapshot: {
+            id: string;
+            resource: string;
+            state: string;
+            previous?: string | null;
+            cause?: string | null;
+            /** Format: date-time */
+            since: string;
+            nodeId?: string | null;
+            groupId?: string | null;
+            summary?: string | null;
+            /** Format: date-time */
+            resolvedAt?: string | null;
+            tenant?: string | null;
         };
         /** @enum {string} */
         HealthState: "Healthy" | "Degraded" | "Down" | "Stale";
@@ -261,6 +301,11 @@ export interface components {
             id: string;
             groups: components["schemas"]["LogGroup"][];
             links?: components["schemas"]["ResourceLink"][] | null;
+        };
+        MessageTypeSnapshot: {
+            type: string;
+            /** Format: double */
+            perSecond: number;
         };
         MessagingSnapshot: {
             topics: components["schemas"]["TopicSnapshot"][];
@@ -336,6 +381,7 @@ export interface components {
             regions?: components["schemas"]["RegionSnapshot"][] | null;
             queues?: components["schemas"]["QueueSnapshot"][] | null;
             reason?: string | null;
+            sources?: components["schemas"]["SourceAgeSnapshot"][] | null;
         };
         OffscreenLink: {
             nodeId: string;
@@ -354,6 +400,10 @@ export interface components {
             link?: components["schemas"]["ResourceLink"];
             /** Format: double */
             perSecond?: number | null;
+            types?: components["schemas"]["MessageTypeSnapshot"][] | null;
+            /** Format: int32 */
+            typesCut?: number | null;
+            deadLetterRegions?: components["schemas"]["DeadLetterRegionSnapshot"][] | null;
         };
         RegionSnapshot: {
             region: string;
@@ -434,6 +484,23 @@ export interface components {
             /** Format: double */
             trafficDensity: number;
             notes?: string[] | null;
+            sources?: components["schemas"]["SourceFreshnessSnapshot"][] | null;
+            healthEvents?: components["schemas"]["HealthEventSnapshot"][] | null;
+        };
+        SourceAgeSnapshot: {
+            source: string;
+            /** Format: int32 */
+            ageSeconds: number;
+            fresh: boolean;
+            signals: string[];
+        };
+        SourceFreshnessSnapshot: {
+            name: string;
+            /** Format: date-time */
+            lastRead?: string | null;
+            /** Format: double */
+            intervalSeconds: number;
+            overdue: boolean;
         };
         SubscriptionSnapshot: {
             topic: string;
@@ -733,6 +800,30 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["AddedHostSnapshot"][];
                 };
+            };
+        };
+    };
+    DismissHealthEvent: {
+        parameters: {
+            query?: {
+                env?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DismissHealthEventRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

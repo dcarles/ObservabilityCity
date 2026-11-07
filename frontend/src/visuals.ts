@@ -37,12 +37,12 @@ export function resourceUse(n: Pick<NodeSnapshot, 'cpu' | 'memory' | 'utilisatio
 }
 
 type BeaconInput = Pick<NodeSnapshot, 'state' | 'errorRate' | 'errorAmber' | 'errorRed'> &
-  Partial<Pick<NodeSnapshot, 'cpu' | 'memory' | 'utilisation' | 'throttled' | 'resourceAmber' | 'throttleAmber' | 'throttleRed' | 'absent' | 'jobs'>>
+  Partial<Pick<NodeSnapshot, 'cpu' | 'memory' | 'utilisation' | 'throttled' | 'resourceAmber' | 'throttleAmber' | 'throttleRed' | 'absent' | 'jobs' | 'deadLetters'>>
 
 /**
  * Rooftop beacon colour. Red means requests are failing: a system that is down (the beacon then stays on, steady), errors
  * past the red threshold, or a data store turning requests away past its throttle threshold. Amber is the warning: errors, throttling or CPU,
- * memory or utilisation past their amber thresholds.
+ * memory or utilisation past their amber thresholds, and dead letters in a queue it reads.
  */
 export function beaconLevel(n: BeaconInput): BeaconLevel {
   if (!drivesBeacon(n)) return 'off' // nothing here is measured: not grey, there is no data to be missing
@@ -54,6 +54,8 @@ export function beaconLevel(n: BeaconInput): BeaconLevel {
   if (n.errorRate >= n.errorRed || (n.throttleRed !== undefined && throttled >= n.throttleRed)) return 'red'
   if (n.errorRate >= n.errorAmber || n.jobs?.some((j) => j.status === 'Overdue')) return 'amber'
   if (n.throttleAmber !== undefined && throttled >= n.throttleAmber) return 'amber'
+  // messages that could not be delivered sit in the queue this system reads: a warning on it, so the one to open is not green
+  if ((n.deadLetters ?? 0) > 0 && !isAbsent(n, 'deadLetters')) return 'amber'
   if (n.resourceAmber !== undefined && resourceUse(n) >= n.resourceAmber) return 'amber'
   return 'green'
 }
@@ -82,6 +84,21 @@ export function carRate(rps: number, share: number, scale: number, traffic: numb
   return Math.max(spawnRate(rps) * traffic * scale * share, MIN_CAR_RATE * scale)
 }
 
+/** The fewest boats a real route sends: one every 30 seconds, so a quiet route still shows a boat now and then. */
+export const MIN_BOAT_RATE = 1 / 30
+
+/** The most boats one route sends a second, however busy: more would only crowd the boat pool. */
+export const MAX_BOAT_RATE = 1.5
+
+/**
+ * Boats leaving per second on one sea lane: the messages a second that reach the island, scaled like the cars (gently, so a very busy broker stays readable),
+ * times the lane's share of them. A lane with messages on it never sends fewer than MIN_BOAT_RATE boats a second, however small its share. No messages: none.
+ */
+export function boatRate(messagesPerSecond: number, share: number): number {
+  if (!(messagesPerSecond > 0) || !(share > 0)) return 0
+  return Math.min(MAX_BOAT_RATE, Math.max(0.04 * Math.pow(messagesPerSecond, 0.6) * share, MIN_BOAT_RATE))
+}
+
 export function plaqueText(n: Pick<NodeSnapshot, 'state' | 'instancesTotal' | 'instancesHealthy'> & Partial<Pick<NodeSnapshot, 'absent' | 'app'>>): string {
   if (n.app === 'Missing') return 'not found'
   if (n.app === 'Stopped') return 'stopped'
@@ -102,6 +119,11 @@ export function lerp(a: number, b: number, t: number): number {
 
 export function formatRate(v: number): string {
   return v >= 1000 ? `${(v / 1000).toFixed(1)}k` : v >= 10 ? v.toFixed(0) : v.toFixed(1)
+}
+
+/** A count of messages (dead letters): a whole number, or thousands as 1.2k. Not for rates, which keep their decimals (see formatRate). */
+export function formatCount(v: number): string {
+  return v >= 1000 ? `${(v / 1000).toFixed(1)}k` : String(Math.round(v))
 }
 
 /** Age of the oldest waiting message: seconds, minutes or hours. */

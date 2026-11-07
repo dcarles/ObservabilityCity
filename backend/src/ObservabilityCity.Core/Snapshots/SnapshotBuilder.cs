@@ -67,6 +67,9 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
     /// <summary>Where open incidents come from. Without a source, the sky is clear.</summary>
     public IReadOnlyList<IIncidentSource> IncidentSources { get; init; } = [];
 
+    /// <summary>Where the cloud's own health reports come from (resources it calls Degraded or Unavailable). Without a source the snapshot has none, which is not the same as an empty list: nothing reads them.</summary>
+    public IReadOnlyList<IHealthEventSource> HealthSources { get; init; } = [];
+
     /// <summary>
     /// The whole town, or with <paramref name="islands"/> only those islands (and always the hub). What is left out is left out of everything: the
     /// totals count only what is on screen, and a third party shows only while one of the islands that call it does. The traffic that crosses the edge
@@ -75,9 +78,11 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
     public Snapshot Build(IReadOnlyCollection<string>? islands = null)
     {
         var now = clock.GetUtcNow();
-        var registry = registries.Current;
+        var registry = WithRoutes(registries.Current);
         var incidents = OpenIncidents(registry);
-        NoteIncidents(incidents.Where(kv => kv.Value.Count > 0).Select(kv => kv.Key), now);
+        var healthEvents = HealthSources.Count == 0 ? null : HealthEventsOf(registry);
+        // a cloud health event stands for an incident of the island that owns the resource, for "since the last incident" as for the count
+        NoteIncidents(incidents.Where(kv => kv.Value.Count > 0).Select(kv => kv.Key).Concat((healthEvents ?? []).Where(e => e.GroupId is not null && e.State != "Resolved").Select(e => e.GroupId!)), now);
         var links = TownLinks.Of(registry);
         var allGroups = registry.Groups
             .Select(g => new GroupSnapshot(g.Id, g.DisplayName, g.Color, g.IsHub, g.IsLostFound, g.ConfigError,
@@ -99,6 +104,8 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
                 .Select(v => v with { CalledBy = v.CalledBy.Where(shownIds.Contains).ToList(), Calls = (v.Calls ?? []).Where(shownIds.Contains).ToList() }).ToList();
         var visible = shownIds.Concat(vendors.Select(v => v.Node.Id)).ToHashSet();
         var groups = shown;
+        // what is not on screen is left out; an event no building owns has no island to be left out with, so it stays
+        var events = healthEvents?.Where(e => e.NodeId is null || shownIds.Contains(e.NodeId)).ToList();
 
         var nodes = groups.SelectMany(g => g.Nodes).ToList();
         var live = nodes.Where(n => n.State != HealthState.Stale).ToList();
@@ -111,7 +118,7 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
             RequestWeightedP99(live),
             live.Concat(liveVendors).Count(n => n.State == HealthState.Degraded),
             live.Concat(liveVendors).Count(n => n.State == HealthState.Down),
-            groups.Sum(g => g.Incidents.Count),
+            groups.Sum(g => g.Incidents.Count) + (events?.Count(e => e.State != "Resolved") ?? 0), // a resolved report is listed, not counted
             live.Where(n => registry.ConsumerIds.Contains(n.Id)).Sum(n => n.DeadLetters ?? 0));
 
         var env = registry.ActiveEnvironment;
@@ -141,12 +148,50 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
                 notices = [.. notices, .. unknown.Select(i => $"Island '{i}' is not in this town, so the island filter ignores it.")];
         }
 
-        var (incidentFreeSince, incidentsSeen) = IncidentHistory(groups.Select(g => g.Id), groups.Any(g => g.Incidents.Count > 0));
+        var (incidentFreeSince, incidentsSeen) = IncidentHistory(groups.Select(g => g.Id), groups.Any(g => g.Incidents.Count > 0) || events?.Any(e => e.State != "Resolved") == true);
 
         return new Snapshot(registry.Town.Id, registry.Town.Name, registry.Town.GroupLabel, env?.Id ?? Environment, now, DayFraction(), totals, notices, groups,
             vendors, callers, dependencies, registry.RingCapacity,
             env?.Name ?? Environment, environments, TenantsOf(env, allNodes), registry.Town.Topology, Mode ?? registry.Town.Mode, view, incidentFreeSince, incidentsSeen,
-            OutsideRate(onScreenNodes.Values), env?.Scope.Cloud, registry.Town.TrafficDensity, registries.Notes is { Count: > 0 } notes ? notes : null);
+            OutsideRate(onScreenNodes.Values), env?.Scope.Cloud, registry.Town.TrafficDensity, registries.Notes is { Count: > 0 } notes ? notes : null, SourceFreshness(now), events);
+    }
+
+    /// <summary>
+    /// The cloud's health events (open, then recently resolved), each tied to the building that owns the resource (by the resource's id, case aside, through the resources the scope rules found for each system)
+    /// and that building's island. A resource no system owns stays in the list without either. Worst first (Unavailable before Degraded), then the oldest.
+    /// </summary>
+    private List<HealthEventSnapshot> HealthEventsOf(Registry.Registry registry)
+    {
+        var resolution = ScopeSource?.Resolve(registry);
+        var owner = new Dictionary<string, (string SystemId, string Name, string? Tenant)>(StringComparer.OrdinalIgnoreCase);
+        var tenantNames = resolution?.TenantNames.ToDictionary(t => t.Id, t => t.Name, StringComparer.OrdinalIgnoreCase) ?? [];
+        if (resolution is not null)
+            foreach (var system in resolution.Systems)
+                foreach (var resource in system.Resources)
+                    owner.TryAdd(resource.Id, (system.SystemId, resource.Name, resource.Tenant is { } t ? tenantNames.GetValueOrDefault(t) ?? t : null));
+        var groupOf = registry.Groups.SelectMany(g => g.Nodes.Select(n => (Node: n.Id, Group: g.Id))).GroupBy(x => x.Node).ToDictionary(g => g.Key, g => g.First().Group);
+        var all = new List<HealthEventSnapshot>();
+        foreach (var source in HealthSources)
+            foreach (var e in source.Current())
+            {
+                var found = owner.TryGetValue(e.ResourceId, out var own);
+                var node = found && groupOf.ContainsKey(own.SystemId) ? own.SystemId : null;
+                all.Add(new HealthEventSnapshot(e.Id, found ? own.Name : e.ResourceName, e.State, e.Previous, e.Cause, e.Since, node, node is null ? null : groupOf[node], e.Summary, e.ResolvedAt, found ? own.Tenant : null));
+            }
+        // open ones first (Unavailable before Degraded, oldest first), then the resolved ones, the latest resolution first
+        return all.OrderBy(e => e.State == "Resolved" ? 2 : e.State == "Unavailable" ? 0 : 1).ThenBy(e => e.State == "Resolved" ? 0 : e.Since.Ticks).ThenByDescending(e => e.ResolvedAt).ThenBy(e => e.Id, StringComparer.Ordinal).ToList();
+    }
+
+    /// <summary>One line per configured source: when it last reported, how often it is asked, and whether it is overdue by the limit that greys a building.</summary>
+    private IReadOnlyList<SourceFreshnessSnapshot>? SourceFreshness(DateTimeOffset now)
+    {
+        if (SourceIntervals.Count == 0) return null;
+        return SourceIntervals.OrderBy(kv => kv.Key, StringComparer.Ordinal).Select(kv =>
+        {
+            var last = state.LastReadOf(kv.Key);
+            var overdue = now - (last ?? _startedAt) > FreshFor(kv.Key);
+            return new SourceFreshnessSnapshot(kv.Key, last, kv.Value.TotalSeconds, overdue);
+        }).ToList();
     }
 
     /// <summary>Remembers when each island last had an open incident. Every full build calls this, so the memory does not depend on who is looking.</summary>
@@ -245,6 +290,28 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
                     yield return $"Job not mapped: {n.Id} runs {string.Join(", ", missing)}, which the scheduler: list of {g.Id}.yaml does not say a service for, so it sends no boats.";
             }
         }
+    }
+
+    /// <summary>
+    /// The registry with the routes the broker's queue names add: a queue whose name says who publishes it (see the <c>producerPillar</c> and <c>producer</c> groups of an entity pattern)
+    /// is a topic of that publisher and a subscription of the worker that reads it. What the pillar files already say is kept; a route they already hold is not added twice.
+    /// </summary>
+    private Registry.Registry WithRoutes(Registry.Registry registry)
+    {
+        var topics = registry.Topics.ToList();
+        var subscriptions = registry.Subscriptions.ToList();
+        var added = false;
+        foreach (var n in registry.Groups.Where(g => !g.IsHub).SelectMany(g => g.Nodes))
+        {
+            if (registry.SourceFor(n, Signals.Backlog) is not { } source || !state.GetAll(n.Id).TryGetValue(source, out var reading)) continue;
+            foreach (var q in reading.Queues ?? [])
+            {
+                if (q.ProducerGroup is null || q.ProducerService is null) continue;
+                if (!topics.Any(t => t.Name == q.Name)) { topics.Add(new RegistryTopic(q.Name, q.ProducerGroup, q.ProducerService)); added = true; }
+                if (!subscriptions.Any(s => s.Topic == q.Name && s.ConsumerId == n.Id)) { subscriptions.Add(new RegistrySubscription(q.Name, q.ProducerGroup, n.Id, n.GroupId, false)); added = true; }
+            }
+        }
+        return added ? registry with { Topics = topics, Subscriptions = subscriptions } : registry;
     }
 
     private static MessagingSnapshot MessagingOf(Registry.Registry registry, RegistryGroup g) => new(
@@ -351,14 +418,23 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
     {
         var absent = registry.AbsentSignals(n);
         var bySource = state.GetAll(n.Id);
+        // A source that is late takes only its own signals out (they are left out and listed as absent) while a source of health signals is fresh; the building is grey when none is.
+        // Instance counts and the queue numbers do not say how a building is doing, so a source that supplies only those cannot keep one alive.
+        var ages = SourceAges(n, registry, bySource, now);
+        var late = ages.Where(a => !a.Fresh).Select(a => a.Source).ToHashSet(StringComparer.Ordinal);
+        if (late.Count > 0 && ages.Any(a => a.Fresh && a.Signals.Any(IsHealthSignal)))
+        {
+            bySource = bySource.Where(kv => !late.Contains(kv.Key)).ToDictionary(kv => kv.Key, kv => kv.Value);
+            absent = [.. absent, .. ages.Where(a => !a.Fresh).SelectMany(a => a.Signals).Where(s => !absent.Contains(s)).Distinct()];
+        }
         var r = ReadingMerge.Merge(bySource, signal => registry.SourceFor(n, signal));
         var env = registry.ActiveEnvironment;
         if (r is not null) r = WithoutAbsent(r, absent);
         // The inventory has been read and the app is not there: grey, and it says so. Nothing else about a missing app can be known.
         if (r?.App == AppState.Missing)
-            return Stale(n, r, absent, env) with { App = AppState.Missing };
+            return Stale(n, r, absent, env) with { App = AppState.Missing, Sources = ages.Count > 0 ? ages : null };
         if (r is null || absent.Count == Signals.For(n.Kind).Count || IsStale(n, registry, bySource, r, now))
-            return Stale(n, r, absent, env); // No fresh data: keep the last numbers out of it. Grey, never green.
+            return Stale(n, r, absent, env) with { Sources = ages.Count > 0 ? ages : null }; // No fresh data: keep the last numbers out of it. Grey, never green.
 
         // A count of 0 instances is no count: the source did not say (a plan the cloud gives no worker count for), so the signal is absent rather than 0 of 0.
         if (r.InstancesTotal == 0 && r.InstancesHealthy == 0 && !absent.Contains(Signals.Instances)) absent = [.. absent, Signals.Instances];
@@ -410,7 +486,9 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
             OutsideRequestsPerSecond = split?.Outside,
             Inbound = split?.Callers,
             InboundEstimated = split?.Estimated ?? false,
-            Queues = r.Queues?.Select(q => new QueueSnapshot(q.Name, q.Backlog, q.DeadLetters, DeadLetterLinks.For(registry, n, q.Name), q.PerSecond)).ToList(),
+            Sources = ages.Any(a => !a.Fresh) ? ages : null,
+            Queues = r.Queues?.Select(q => new QueueSnapshot(q.Name, q.Backlog, q.DeadLetters, DeadLetterLinks.For(registry, n, q.Name), q.PerSecond, q.Types?.Select(t => new MessageTypeSnapshot(t.Type, t.PerSecond)).ToList(), q.TypesCut > 0 ? q.TypesCut : null,
+                q.DeadLetterRegions?.Select(d => new DeadLetterRegionSnapshot(d.Region, d.Count, DeadLetterLinks.For(registry, n, q.Name, d.Region))).ToList())).ToList(),
             App = r.App,
             Jobs = jobs,
             Regions = regions?.Select(x => new RegionSnapshot(x.Region, Label(env, x.Region), x.Instances, x.Cpu, x.Memory, x.Share, Skewed(x, regions, env))).ToList(),
@@ -461,14 +539,26 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
         }).ToList();
     }
 
+    /// <summary>Whether a signal says how a building is doing, as opposed to how many instances it has or what waits in its queues.</summary>
+    private static bool IsHealthSignal(string signal) => signal is not (Signals.Instances or Signals.Backlog or Signals.DeadLetters);
+
+    /// <summary>The sources that have reported and that supply at least one signal of the system; a single source stands for everything.</summary>
+    private static List<string> UsedSources(RegistryNode n, Registry.Registry registry, IReadOnlyDictionary<string, NodeReading> bySource) =>
+        bySource.Count == 1 ? bySource.Keys.ToList()
+            : Signals.For(n.Kind).Select(s => registry.SourceFor(n, s)).OfType<string>().Where(bySource.ContainsKey).Distinct().ToList();
+
+    /// <summary>Each source that feeds the system, how old its last reading is, whether that is fresh, and the signals it supplies.</summary>
+    private List<SourceAgeSnapshot> SourceAges(RegistryNode n, Registry.Registry registry, IReadOnlyDictionary<string, NodeReading> bySource, DateTimeOffset now) =>
+        UsedSources(n, registry, bySource).Select(s => new SourceAgeSnapshot(s, (int)Math.Max(0, (now - bySource[s].At).TotalSeconds), now - bySource[s].At <= FreshFor(s),
+            bySource.Count == 1 ? [] : Signals.For(n.Kind).Where(sig => registry.SourceFor(n, sig) == s).ToList())).ToList();
+
     /// <summary>
     /// Whether the reading is too old to show. Each source that supplies a signal has its own limit (see <see cref="FreshFor"/>) and one stale source
     /// greys the building however fresh the others are. A single source's reading is judged by that source's limit.
     /// </summary>
     private bool IsStale(RegistryNode n, Registry.Registry registry, IReadOnlyDictionary<string, NodeReading> bySource, NodeReading merged, DateTimeOffset now)
     {
-        var used = bySource.Count == 1 ? bySource.Keys.ToList()
-            : Signals.For(n.Kind).Select(s => registry.SourceFor(n, s)).OfType<string>().Where(bySource.ContainsKey).Distinct().ToList();
+        var used = UsedSources(n, registry, bySource);
         return used.Count == 0 ? now - merged.At > StaleAfter : used.Any(s => now - bySource[s].At > FreshFor(s));
     }
 
@@ -496,7 +586,7 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
             OldestMessageSeconds = Gone(Signals.Backlog) ? null : r.OldestMessageSeconds,
             DeadLetters = Gone(Signals.DeadLetters) ? null : r.DeadLetters,
             Queues = Gone(Signals.Backlog) && Gone(Signals.DeadLetters) ? null
-                : r.Queues?.Select(q => q with { Backlog = Gone(Signals.Backlog) ? null : q.Backlog, DeadLetters = Gone(Signals.DeadLetters) ? null : q.DeadLetters }).ToList(),
+                : r.Queues?.Select(q => q with { Backlog = Gone(Signals.Backlog) ? null : q.Backlog, DeadLetters = Gone(Signals.DeadLetters) ? null : q.DeadLetters, DeadLetterRegions = Gone(Signals.DeadLetters) ? null : q.DeadLetterRegions }).ToList(),
         };
     }
 

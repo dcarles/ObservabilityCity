@@ -17,7 +17,7 @@ public sealed record MetricCall(string? Namespace, string Aggregation, string? F
 }
 
 /// <summary>The points one metric gave for one entity (the value of the dimension the answer was split by) over the window.</summary>
-public sealed record EntitySeries(string Entity, string Metric, string Aggregation, IReadOnlyList<double> Points);
+public sealed record EntitySeries(string Entity, string Metric, string Aggregation, IReadOnlyList<double> Points, string? Region = null);
 
 /// <summary>The points one metric gave over the window, as asked: this metric, added up this way, with this filter. No point is a gap the cloud left, not a zero.</summary>
 public sealed record MetricSeries(string Metric, string Aggregation, string? Filter, IReadOnlyList<double> Points);
@@ -26,8 +26,14 @@ public sealed record MetricSeries(string Metric, string Aggregation, string? Fil
 /// Reads platform metrics of single resources from the Azure Monitor metrics API. The adapter knows no metric: which ones to ask for, for which
 /// resources, and what they mean comes from the environment's <c>metrics</c> entries.
 /// </summary>
-public sealed class AzureMonitorReader(HttpClient http, ICredentialSource? credential)
+public sealed class AzureMonitorReader(HttpClient http, ICredentialSource? credential, TimeSpan? retryDelay = null)
 {
+    /// <summary>How many times a read is tried when Azure answers with a hiccup (busy, unavailable, a dropped connection) before it counts as failed.</summary>
+    public const int Attempts = 3;
+
+    /// <summary>How many series a read split by a dimension asks for: Azure answers with only 10 unless asked for more, and a broker holds hundreds of queues.</summary>
+    public const int MaxSeries = 1000;
+
     public const string TokenScope = "https://management.azure.com/.default";
     public const string Endpoint = "https://management.azure.com";
     public const string ApiVersion = "2018-01-01";
@@ -52,29 +58,50 @@ public sealed class AzureMonitorReader(HttpClient http, ICredentialSource? crede
 
     public async Task<IReadOnlyList<MetricSeries>> ReadAsync(string resourceId, MetricCall call, IReadOnlyList<string> metrics, DateTimeOffset end, TimeSpan window, CancellationToken ct)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Get, Url(resourceId, call, metrics, end, window));
-        if (credential is not null)
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await credential.GetTokenAsync(TokenScope, ct));
-        using var response = await http.SendAsync(request, ct);
-        var text = await response.Content.ReadAsStringAsync(ct);
-        if (!response.IsSuccessStatusCode)
-            throw new HttpRequestException($"Azure Monitor answered {(int)response.StatusCode} {response.ReasonPhrase} for {Last(resourceId)}: {Trim(text)}");
-        return Parse(text, call);
+        return Parse(await GetAsync(resourceId, Url(resourceId, call, metrics, end, window), ct), call);
     }
 
     /// <summary>Like <see cref="ReadAsync"/>, but split by a dimension (<c>$filter=Dimension eq '*'</c>): one series for each value of it, for example each queue of a namespace.</summary>
     public async Task<IReadOnlyList<EntitySeries>> ReadByDimensionAsync(string resourceId, MetricCall call, IReadOnlyList<string> metrics, string dimension, DateTimeOffset end, TimeSpan window, CancellationToken ct)
     {
         var split = call with { Filter = $"{dimension} eq '*'" };
-        using var request = new HttpRequestMessage(HttpMethod.Get, Url(resourceId, split, metrics, end, window));
-        if (credential is not null)
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await credential.GetTokenAsync(TokenScope, ct));
-        using var response = await http.SendAsync(request, ct);
-        var text = await response.Content.ReadAsStringAsync(ct);
-        if (!response.IsSuccessStatusCode)
-            throw new HttpRequestException($"Azure Monitor answered {(int)response.StatusCode} {response.ReasonPhrase} for {Last(resourceId)}: {Trim(text)}");
-        return ParseByDimension(text, call, dimension);
+        return ParseByDimension(await GetAsync(resourceId, Url(resourceId, split, metrics, end, window) + $"&top={MaxSeries}", ct), call, dimension);
     }
+
+    /// <summary>
+    /// The answer's text. A hiccup of Azure's (too many requests, busy, unavailable, a connection that drops) is tried again a couple of times a moment later, since it
+    /// nearly always passes; any other answer, such as a refusal, fails at once.
+    /// </summary>
+    public async Task<string> GetAsync(string resourceId, string url, CancellationToken ct, string service = "Azure Monitor")
+    {
+        var token = credential is null ? null : await credential.GetTokenAsync(TokenScope, ct);
+        for (var attempt = 1; ; attempt++)
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, url);
+            if (token is not null) request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            HttpResponseMessage? response = null;
+            string? text = null;
+            try
+            {
+                response = await http.SendAsync(request, ct);
+                text = await response.Content.ReadAsStringAsync(ct);
+            }
+            catch (Exception e) when ((e is HttpRequestException or IOException) && attempt < Attempts && !ct.IsCancellationRequested) { } // the connection dropped
+            if (response is not null && text is not null)
+            {
+                using (response)
+                {
+                    if (response.IsSuccessStatusCode) return text;
+                    if (attempt >= Attempts || !IsHiccup(response.StatusCode))
+                        throw new HttpRequestException($"{service} answered {(int)response.StatusCode} {response.ReasonPhrase} for {Last(resourceId)}: {Trim(text)}");
+                }
+            }
+            await Task.Delay((retryDelay ?? TimeSpan.FromMilliseconds(400)) * attempt, ct);
+        }
+    }
+
+    private static bool IsHiccup(System.Net.HttpStatusCode code) => code is System.Net.HttpStatusCode.TooManyRequests or System.Net.HttpStatusCode.InternalServerError
+        or System.Net.HttpStatusCode.BadGateway or System.Net.HttpStatusCode.ServiceUnavailable or System.Net.HttpStatusCode.GatewayTimeout;
 
     /// <summary>The series of an answer split by a dimension, each with the value of the dimension it is for. A series without that value is left out.</summary>
     public static IReadOnlyList<EntitySeries> ParseByDimension(string json, MetricCall call, string dimension)
@@ -136,7 +163,7 @@ public sealed class AzureMonitorReader(HttpClient http, ICredentialSource? crede
         return series;
     }
 
-    /// <summary>The points added up the way the aggregation says: the average of averages, the sum of totals and counts, the highest maximum, the lowest minimum. Null with no point.</summary>
+    /// <summary>The points added up the way the aggregation says: the average of averages, the sum of totals and counts, the highest maximum, the lowest minimum, the newest point for last (the points are in time order). Null with no point.</summary>
     public static double? Reduce(IReadOnlyList<double> points, string aggregation)
     {
         if (points.Count == 0) return null;
@@ -145,6 +172,7 @@ public sealed class AzureMonitorReader(HttpClient http, ICredentialSource? crede
             "total" or "count" => points.Sum(),
             "maximum" => points.Max(),
             "minimum" => points.Min(),
+            "last" => points[^1],
             _ => points.Average(),
         };
     }

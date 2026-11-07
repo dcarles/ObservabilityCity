@@ -420,12 +420,19 @@ internal sealed class SourceFile
     public string? Query { get; set; }
     /// <summary>Request sources only (loganalytics): the query that says how a service's requests divide between regions, a template like query. Returns one row per telemetry name and region with the columns role, region and calls (sampling-corrected counts do: only the proportions are used).</summary>
     public string? RegionQuery { get; set; }
+    /// <summary>Broker sources only (servicebus): the query that says which kinds of message each queue handled, a template like query. Returns one row per queue and message type with the columns queue, type and calls (counts over the window). Without it the types are not shown.</summary>
+    public string? TypesQuery { get; set; }
     /// <summary>Query sources only: how far back one answer looks, for example 5m. Default 5m.</summary>
     public string? Window { get; set; }
     /// <summary>Platform-metric sources only (azuremonitor): which metric of which resources fills which signal. Everything about the metrics is written here; the program knows none.</summary>
     public List<MetricGroupFile> Metrics { get; set; } = [];
     /// <summary>Message-broker sources only (servicebus): which namespaces to read, which metrics fill the backlog and the dead letters, and how an entity's name says whose it is.</summary>
     public EntitiesFile? Entities { get; set; }
+    /// <summary>Resource-health sources only (resourcehealth): the resource providers whose health reports are read, for example the data store's. The program lists none; a source without any does not start.</summary>
+    public List<string> Providers { get; set; } = [];
+
+    /// <summary>Resource-health sources: how long a resolved report stays listed after the resource recovered, like 4h. Default 4h.</summary>
+    public string? KeepResolvedFor { get; set; }
 }
 
 /// <summary>How a broker's queues and topics are read: the namespaces come from a scope.resources rule, the metrics are split by the entity's name, and patterns say which system an entity belongs to.</summary>
@@ -443,6 +450,8 @@ internal sealed class EntitiesFile
     public EntityMetricFile? DeadLetter { get; set; }
     /// <summary>An address that opens a consumer's dead letters in your support tool: a name and a URL template over {pillar}, {service}, {system} and {environment}. Without it, no link.</summary>
     public EntityLinkFile? DeadLetterLink { get; set; }
+    /// <summary>One support-tool address for each region, when the regions have their own tool: each is a name, a URL template and the region it is for. A queue's dead letters in a region open the entry of that region; a region with no entry uses deadLetterLink.</summary>
+    public List<EntityLinkFile> DeadLetterLinks { get; set; } = [];
     /// <summary>The messages that arrive in an entity, for example a metric of incoming messages added up by total. Their rate sets how many boats sail to the consumer.</summary>
     public EntityMetricFile? Throughput { get; set; }
     /// <summary>Entity name patterns, tried in order: the first that matches decides whose the entity is. An entity no pattern matches is left out.</summary>
@@ -453,6 +462,8 @@ internal sealed class EntityLinkFile
 {
     public string Name { get; set; } = "";
     public string Url { get; set; } = "";
+    /// <summary>Only in deadLetterLinks: the region the address is for, as the town names it (for example the region of the broker's namespace), matched ignoring case.</summary>
+    public string? Region { get; set; }
 }
 
 internal sealed class EntityMetricFile

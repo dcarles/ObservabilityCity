@@ -31,8 +31,15 @@ public sealed record NodeReading(
     IReadOnlyList<RegionReading>? Regions = null,
     IReadOnlyList<QueueReading>? Queues = null);
 
-/// <summary>One queue (or other broker entity) a consumer reads, with what waits in it and what is dead-lettered; a number the source cannot tell is null.</summary>
-public sealed record QueueReading(string Name, double? Backlog, double? DeadLetters, double? PerSecond = null);
+/// <summary>One queue (or other broker entity) a consumer reads, with what waits in it and what is dead-lettered; a number the source cannot tell is null. ProducerGroup and ProducerService say whose outbox it is, when the entity's name does: the island and the service that publish what the consumer reads.</summary>
+public sealed record QueueReading(string Name, double? Backlog, double? DeadLetters, double? PerSecond = null, string? ProducerGroup = null, string? ProducerService = null,
+    IReadOnlyList<MessageTypeReading>? Types = null, int TypesCut = 0, IReadOnlyList<DeadLetterRegionReading>? DeadLetterRegions = null);
+
+/// <summary>The dead letters of a queue in one region (the region of the broker's namespace that holds them). Only regions that hold some are listed, and only when the broker spans more than one region.</summary>
+public sealed record DeadLetterRegionReading(string Region, double Count);
+
+/// <summary>How many messages a second of one kind (the message type) a queue handled. Types is highest first; TypesCut counts the quietest kinds a queue had beyond the ceiling, which are left out.</summary>
+public sealed record MessageTypeReading(string Type, double PerSecond);
 
 /// <summary>
 /// What one region of a service reports: how many instances it runs, and how busy its plan is, and Share is the part of the service's requests it took (0 to 1, the regions add up to 1; null when nothing measures it). Region is the label the scope rules gave (see <c>scope.regions</c>).
@@ -76,4 +83,22 @@ public interface IMetricSource
 public interface IProgressiveMetricSource : IMetricSource
 {
     Task PollAsync(Registry.Registry registry, Action<IReadOnlyDictionary<string, NodeReading>> publish, CancellationToken ct);
+}
+
+/// <summary>
+/// A source that can say, in one line, what its last round did (how many reads, how many failed, what it found). The poller writes the line to the log after each round, so a
+/// slow or half-empty round can be seen without guessing. Null until the first round has finished.
+/// </summary>
+public interface IRoundNote
+{
+    string? RoundNote { get; }
+}
+
+/// <summary>
+/// A source whose last round could not run yet (what it needs to read was not there, say) can ask for the next round sooner than its interval. Null: the normal interval.
+/// The poller waits this long once, then goes back to the interval; a source that is still not ready asks again.
+/// </summary>
+public interface IRetrySoon
+{
+    TimeSpan? RetryIn { get; }
 }

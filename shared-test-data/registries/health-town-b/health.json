@@ -1,0 +1,178 @@
+{
+  "events": {
+    "value": [
+      {
+        "category": {
+          "value": "ResourceHealth",
+          "localizedValue": "ResourceHealth"
+        },
+        "eventTimestamp": "2026-01-01T00:50:15Z",
+        "operationName": {
+          "value": "Microsoft.Resourcehealth/healthevent/Activated/action"
+        },
+        "resourceId": "/subscriptions/00000000-0000-0000-0000-0000000000b1/resourceGroups/rg/providers/microsoft.documentdb/databaseaccounts/cosmos-orders-borealis",
+        "status": {
+          "value": "Active"
+        },
+        "properties": {
+          "currentHealthStatus": "Degraded",
+          "previousHealthStatus": "Available",
+          "cause": "Unknown"
+        }
+      },
+      {
+        "category": {
+          "value": "ResourceHealth",
+          "localizedValue": "ResourceHealth"
+        },
+        "eventTimestamp": "2026-01-01T00:20:00Z",
+        "operationName": {
+          "value": "Microsoft.Resourcehealth/healthevent/Activated/action"
+        },
+        "resourceId": "/subscriptions/00000000-0000-0000-0000-0000000000b1/resourceGroups/rg/providers/microsoft.documentdb/databaseaccounts/cosmos-orders-acmebank",
+        "status": {
+          "value": "Active"
+        },
+        "properties": {
+          "currentHealthStatus": "Degraded",
+          "previousHealthStatus": "Available",
+          "cause": "PlatformInitiated"
+        }
+      },
+      {
+        "category": {
+          "value": "ResourceHealth",
+          "localizedValue": "ResourceHealth"
+        },
+        "eventTimestamp": "2026-01-01T00:40:00Z",
+        "operationName": {
+          "value": "Microsoft.Resourcehealth/healthevent/Resolved/action"
+        },
+        "resourceId": "/subscriptions/00000000-0000-0000-0000-0000000000b1/resourceGroups/rg/providers/microsoft.documentdb/databaseaccounts/cosmos-orders-acmebank",
+        "status": {
+          "value": "Resolved"
+        },
+        "properties": {
+          "currentHealthStatus": "Available",
+          "previousHealthStatus": "Degraded",
+          "cause": "PlatformInitiated"
+        }
+      },
+      {
+        "category": {
+          "value": "ResourceHealth",
+          "localizedValue": "ResourceHealth"
+        },
+        "eventTimestamp": "2026-01-01T00:30:00Z",
+        "operationName": {
+          "value": "Microsoft.Resourcehealth/healthevent/Activated/action"
+        },
+        "resourceId": "/subscriptions/00000000-0000-0000-0000-0000000000b1/resourceGroups/rg/providers/microsoft.documentdb/databaseaccounts/cosmos-orders-cygnus",
+        "status": {
+          "value": "Active"
+        },
+        "properties": {
+          "currentHealthStatus": "Unavailable",
+          "previousHealthStatus": "Available",
+          "cause": "UserInitiated"
+        }
+      },
+      {
+        "category": {
+          "value": "ResourceHealth",
+          "localizedValue": "ResourceHealth"
+        },
+        "eventTimestamp": "2026-01-01T00:10:00Z",
+        "operationName": {
+          "value": "Microsoft.Resourcehealth/healthevent/Activated/action"
+        },
+        "resourceId": "/subscriptions/00000000-0000-0000-0000-0000000000b2/resourceGroups/rg/providers/microsoft.documentdb/databaseaccounts/cosmos-ledger-borealis",
+        "status": {
+          "value": "Active"
+        },
+        "properties": {
+          "currentHealthStatus": "Degraded",
+          "previousHealthStatus": "Available",
+          "cause": "Unknown"
+        }
+      },
+      {
+        "category": {
+          "value": "ResourceHealth",
+          "localizedValue": "ResourceHealth"
+        },
+        "eventTimestamp": "2026-01-01T00:45:00Z",
+        "operationName": {
+          "value": "Microsoft.Resourcehealth/healthevent/Updated/action"
+        },
+        "resourceId": "/subscriptions/00000000-0000-0000-0000-0000000000b2/resourceGroups/rg/providers/microsoft.documentdb/databaseaccounts/cosmos-ledger-borealis",
+        "status": {
+          "value": "Updated"
+        },
+        "properties": {
+          "currentHealthStatus": "Unavailable",
+          "previousHealthStatus": "Degraded",
+          "cause": "UserInitiated"
+        }
+      },
+      {
+        "category": {
+          "value": "ResourceHealth",
+          "localizedValue": "ResourceHealth"
+        },
+        "eventTimestamp": "2026-01-01T00:55:00Z",
+        "operationName": {
+          "value": "Microsoft.Resourcehealth/healthevent/Activated/action"
+        },
+        "resourceId": "/subscriptions/00000000-0000-0000-0000-0000000000b1/resourceGroups/rg/providers/microsoft.documentdb/databaseaccounts/cosmos-elsewhere-nobody",
+        "status": {
+          "value": "Active"
+        },
+        "properties": {
+          "currentHealthStatus": "Degraded",
+          "previousHealthStatus": "Available",
+          "cause": "Unknown"
+        }
+      },
+      {
+        "category": {
+          "value": "ResourceHealth",
+          "localizedValue": "ResourceHealth"
+        },
+        "eventTimestamp": "2026-01-01T00:56:00Z",
+        "operationName": {
+          "value": "Microsoft.Resourcehealth/healthevent/Activated/action"
+        },
+        "resourceId": "/subscriptions/00000000-0000-0000-0000-0000000000b2/resourceGroups/rg/providers/microsoft.documentdb/databaseaccounts/cosmos-ledger-acmebank",
+        "status": {
+          "value": "Active"
+        },
+        "properties": {
+          "currentHealthStatus": "Unknown",
+          "previousHealthStatus": "Available",
+          "cause": "Unknown"
+        }
+      },
+      {
+        "category": {
+          "value": "Administrative",
+          "localizedValue": "Administrative"
+        },
+        "eventTimestamp": "2026-01-01T00:57:00Z",
+        "operationName": {
+          "value": "Microsoft.DocumentDB/databaseAccounts/readonlykeys/action"
+        },
+        "resourceId": "/subscriptions/00000000-0000-0000-0000-0000000000b1/resourceGroups/rg/providers/microsoft.documentdb/databaseaccounts/cosmos-orders-acmebank",
+        "status": {
+          "value": "Succeeded"
+        },
+        "properties": {}
+      }
+    ]
+  },
+  "status": {
+    "cosmos-orders-borealis": "Degraded",
+    "cosmos-orders-cygnus": "Available",
+    "cosmos-ledger-borealis": "Unavailable"
+  }
+}

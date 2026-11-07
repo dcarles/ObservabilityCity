@@ -13,12 +13,14 @@ import { fileURLToPath } from 'node:url'
 //   npm run e2e:sources  a live town whose environment configures some signals and not others: absent signals are not shown, silent ones are grey
 //   npm run e2e:scope    two live towns with opposite scope conventions (names; tags): the inspector says where each system lives, from a recorded inventory
 //   npm run e2e:functions two live towns with opposite conventions (names; tags) whose functions have an app state and scheduled jobs, and whose services run in two regions
-//   npm run e2e:messaging two live towns with differently shaped queue names, patterns and dead-letter links: the broker's backlog and dead letters reach the consumers' buildings, drawers and boats
+//   npm run e2e:messaging two live towns with differently shaped queue names, patterns and dead-letter links: the broker's backlog and dead letters reach the consumers' buildings, drawers and boats; and a town whose pillar files say nothing about messaging, whose piers and boats come from the queue names alone
+//   npm run e2e:health   two live towns with differently shaped health sources (names; tags): the cloud's own health reports mark the buildings, fill the Incidents list (resolved ones green, dismissable), the drawer and the dashboard
 //   npm run e2e:discovery a live town whose environment finds links from dependency data: found links are drawn and tagged "Seen in calls", unresolved calls are notices
 //   npm run e2e:tenants  environments, tenant yards, tenant traffic and service groups, on a town with two pillars and three environments
 //   npm run e2e:dashboard the plain dashboard view: switch, summary, pillar cards, service table, tenant rows, shared filters, no horizontal scroll, on the tenants town
 //   npm run e2e:towns    the town switcher and the second sample town (Droid Shop, on Kafka), on the server's own config folder with both sample towns
 //   npm run e2e:wide     islands of 2, 10, 15 and 27 services: how many pads a row, every building on land, nothing overlapping, on a town of four islands
+//   npm run e2e:themes   the themes suite for all three themes (a pull request runs it for the harbour theme only), including a bad day shown in the town and on the dashboard. Runs nightly.
 //   npm run e2e:slow     the slow set: the 23-island and 35-island stress towns and the full sample town, with screenshots. Runs on merge to main and nightly.
 // Set E2E_NO_BUILD=1 when the backend is already built in Release (CI does this).
 
@@ -39,6 +41,9 @@ const registries: Record<string, string> = {
   functionsb: 'shared-test-data/registries/function-town-b',
   messaging: 'shared-test-data/registries/messaging-town-a',
   messagingb: 'shared-test-data/registries/messaging-town-b',
+  routes: 'shared-test-data/registries/routes-town',
+  health: 'shared-test-data/registries/health-town-a',
+  healthb: 'shared-test-data/registries/health-town-b',
   scope: 'shared-test-data/registries/scope-town-a',
   scopeb: 'shared-test-data/registries/scope-town-b',
   // no single folder: the server finds the towns in config/ itself
@@ -52,7 +57,7 @@ const fixture = registries[suite] ? resolve(repo, registries[suite]) : ''
 
 // The scenario tests edit registry files to check reloading, so they run against a copy. The main process makes the copy and
 // passes its path down in the environment, which the workers inherit, so there is only ever one.
-if (['scenarios', 'links', 'tenants', 'dashboard', 'ui', 'direct', 'live', 'sources', 'discovery', 'scope', 'scopeb', 'functions', 'functionsb', 'messaging', 'messagingb'].includes(suite) && !process.env.E2E_REGISTRY_COPY) {
+if (['scenarios', 'links', 'tenants', 'dashboard', 'ui', 'direct', 'live', 'sources', 'discovery', 'scope', 'scopeb', 'health', 'healthb', 'functions', 'functionsb', 'messaging', 'messagingb', 'routes'].includes(suite) && !process.env.E2E_REGISTRY_COPY) {
   const copy = mkdtempSync(join(tmpdir(), 'oc-e2e-registry-'))
   cpSync(fixture, copy, { recursive: true })
   process.env.E2E_REGISTRY_COPY = copy
@@ -66,12 +71,12 @@ const api = `http://127.0.0.1:${API_PORT}`
 
 export default defineConfig({
   testDir: './tests/e2e',
-  testMatch: suite === 'scenarios' ? 'scenarios/**/*.spec.ts' : `${suite.replace('stress35', 'stress').replace('scopeb', 'scope').replace('functionsb', 'functions').replace('messagingb', 'messaging')}/**/*.spec.ts`,
+  testMatch: suite === 'scenarios' ? 'scenarios/**/*.spec.ts' : `${suite.replace('stress35', 'stress').replace('scopeb', 'scope').replace('healthb', 'health').replace('functionsb', 'functions').replace('messagingb', 'messaging')}/**/*.spec.ts`,
   // one backend, one fake source: tests steer shared state, so they take turns
   workers: 1,
   fullyParallel: false,
   retries: process.env.CI ? 1 : 0,
-  timeout: ['scenarios', 'links', 'tenants', 'dashboard', 'ui', 'direct', 'live', 'sources', 'scope', 'scopeb', 'functions', 'functionsb', 'messaging', 'messagingb', 'towns', 'wide'].includes(suite) ? 60_000 : 240_000,
+  timeout: ['scenarios', 'links', 'tenants', 'dashboard', 'ui', 'direct', 'live', 'sources', 'scope', 'scopeb', 'health', 'healthb', 'functions', 'functionsb', 'messaging', 'messagingb', 'routes', 'towns', 'wide'].includes(suite) ? 60_000 : 240_000,
   expect: { timeout: 10_000 },
   reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
   outputDir: 'test-results',
@@ -99,6 +104,8 @@ export default defineConfig({
         // fast, steady numbers: a snapshot every half second, and a quiet source turns stale in 3 seconds
         Snapshot__IntervalSeconds: '0.5',
         Snapshot__StaleAfterSeconds: '3',
+        // every tick is sent, so tests do not wait for a keep-alive
+        Snapshot__KeepAliveSeconds: '0',
         Fake__PollInterval: process.env.E2E_FAKE_POLL ?? '00:00:00.5',
         Registry__WatchSeconds: '1',
       },

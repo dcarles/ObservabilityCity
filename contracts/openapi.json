@@ -250,6 +250,38 @@
         }
       }
     },
+    "/api/health-events/dismiss": {
+      "post": {
+        "tags": [
+          "ObservabilityCity.Host, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+        ],
+        "operationId": "DismissHealthEvent",
+        "parameters": [
+          {
+            "name": "env",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DismissHealthEventRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/api/added-rules": {
       "post": {
         "tags": [
@@ -474,6 +506,26 @@
         },
         "additionalProperties": false
       },
+      "DeadLetterRegionSnapshot": {
+        "required": [
+          "count",
+          "region"
+        ],
+        "type": "object",
+        "properties": {
+          "region": {
+            "type": "string"
+          },
+          "count": {
+            "type": "number",
+            "format": "double"
+          },
+          "link": {
+            "$ref": "#/components/schemas/ResourceLink"
+          }
+        },
+        "additionalProperties": false
+      },
       "DependencySnapshot": {
         "required": [
           "from",
@@ -491,6 +543,18 @@
           "requestsPerSecond": {
             "type": "number",
             "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
+      "DismissHealthEventRequest": {
+        "required": [
+          "id"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
           }
         },
         "additionalProperties": false
@@ -603,6 +667,60 @@
             "items": {
               "$ref": "#/components/schemas/AssetSnapshot"
             },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "HealthEventSnapshot": {
+        "required": [
+          "id",
+          "resource",
+          "since",
+          "state"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "resource": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "previous": {
+            "type": "string",
+            "nullable": true
+          },
+          "cause": {
+            "type": "string",
+            "nullable": true
+          },
+          "since": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "nodeId": {
+            "type": "string",
+            "nullable": true
+          },
+          "groupId": {
+            "type": "string",
+            "nullable": true
+          },
+          "summary": {
+            "type": "string",
+            "nullable": true
+          },
+          "resolvedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "tenant": {
+            "type": "string",
             "nullable": true
           }
         },
@@ -825,6 +943,23 @@
               "$ref": "#/components/schemas/ResourceLink"
             },
             "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "MessageTypeSnapshot": {
+        "required": [
+          "perSecond",
+          "type"
+        ],
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "perSecond": {
+            "type": "number",
+            "format": "double"
           }
         },
         "additionalProperties": false
@@ -1090,6 +1225,13 @@
           "reason": {
             "type": "string",
             "nullable": true
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SourceAgeSnapshot"
+            },
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -1148,6 +1290,25 @@
           "perSecond": {
             "type": "number",
             "format": "double",
+            "nullable": true
+          },
+          "types": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MessageTypeSnapshot"
+            },
+            "nullable": true
+          },
+          "typesCut": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "deadLetterRegions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DeadLetterRegionSnapshot"
+            },
             "nullable": true
           }
         },
@@ -1470,6 +1631,74 @@
               "type": "string"
             },
             "nullable": true
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SourceFreshnessSnapshot"
+            },
+            "nullable": true
+          },
+          "healthEvents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HealthEventSnapshot"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "SourceAgeSnapshot": {
+        "required": [
+          "ageSeconds",
+          "fresh",
+          "signals",
+          "source"
+        ],
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string"
+          },
+          "ageSeconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "fresh": {
+            "type": "boolean"
+          },
+          "signals": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "SourceFreshnessSnapshot": {
+        "required": [
+          "intervalSeconds",
+          "name",
+          "overdue"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "lastRead": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "intervalSeconds": {
+            "type": "number",
+            "format": "double"
+          },
+          "overdue": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false

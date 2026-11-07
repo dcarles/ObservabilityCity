@@ -180,7 +180,7 @@ cd frontend && npm run e2e:links # the link rules alone: pier, bridge and buildi
 cd frontend && npm run e2e:tenants # environments, tenant yards, tenant traffic and service groups, on a town with three environments
 cd frontend && npm run e2e:ui      # top bar, island filter, layers, inspector drawer, legend, Day/Dusk
 cd frontend && npm run e2e:direct  # signposts for hidden islands in a town without a hub
-cd frontend && npm run e2e:slow  # 23- and 35-island stress towns and the full sample town, with screenshots (a few minutes)
+cd frontend && npm run e2e:slow  # 23- and 35-island stress towns, the full sample town with screenshots, and all three themes on a bad day (a few minutes)
 dotnet run --project backend/tools/ObservabilityCity.Validate -- --all   # check every registry folder in the repo
 dotnet run --project backend/tools/ObservabilityCity.Validate -- --sources config/<town>   # probe each configured source with your Azure login (see docs/connect-your-company.md)
 ```
@@ -210,7 +210,7 @@ On a pull request the check writes annotations on the files and posts one commen
 
 **A broken pillar file does not stop the town.** The running app skips a pillar file with problems and draws its island as a *config error* island (a board saying what is wrong), drops call links that point nowhere, and lists everything it worked around in a small panel under the top bar. The registry folder is watched: a reload that fails keeps the last good registry and says so in the panel. If `town.yaml`, `defaults.yaml`, `hub.yaml` or `layout.yaml` is unreadable at start-up the app does not start, since there is nothing to show. The page also refuses a snapshot it cannot draw and keeps the last good town.
 
-**Pull request checks.** `.github/workflows/ci.yml` runs side by side the backend tests, the frontend tests and build, the registry checks and the UI scenarios (spread over five jobs, one per group of browser suites) and a final job called `PR checks` that passes only when all of them did. `.github/workflows/slow.yml` runs the stress town and the full sample town on merge to main and every night.
+**Pull request checks.** `.github/workflows/ci.yml` runs side by side the backend tests, the frontend tests and build, the registry checks and the UI scenarios (spread over five jobs, one per group of browser suites) and a final job called `PR checks` that passes only when all of them did. `.github/workflows/slow.yml` runs the stress towns, the full sample town and all three themes (a pull request runs only the harbour theme) on merge to main and every night.
 
 To make it required on `main`: GitHub, Settings, Branches, Add branch protection rule (or Rulesets, New branch ruleset), branch name pattern `main`, tick *Require a pull request before merging* and *Require status checks to pass before merging*, search for and add **PR checks**, save. Run CI once first, or the check name will not be offered in the search.
 
@@ -317,7 +317,8 @@ The sample town has 17 islands, about 110 buildings and up to 420 cars. Roads, l
 | `Registry:Towns:0` ... | every `config/*/town.yaml` | The folders of the towns to run |
 | `Registry:DefaultTown` | `galactic-credit` | The town a page gets when it asks for none |
 | `Fake:DayLengthSeconds` | `120` | Real seconds per simulated day |
-| `Snapshot:IntervalSeconds` | `2` | How often a snapshot is pushed |
+| `Snapshot:IntervalSeconds` | `2` | How often a snapshot is built (the newest is always at `/api/snapshot/latest`) |
+| `Snapshot:KeepAliveSeconds` | `15` | Viewers are sent a snapshot when something in it changed, and at least this often so the feed shows it is alive. `0` sends every build |
 | `Snapshot:StaleAfterSeconds` | `30` | Readings older than this are shown as stale |
 | `Registry:WatchSeconds` | `5` | How often the registry folder is checked for changes (0 turns reloading off) |
 

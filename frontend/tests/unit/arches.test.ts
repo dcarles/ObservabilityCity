@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { afterEach, describe, expect, it } from 'vitest'
 import { ARCH_MAX, ARCH_MIN, archCount, archHeight, archPeak, archSlope, clearArches, deckAt, registerArch } from '../../src/scene/arches'
-import { findLane, harbourLoop, type SeaMap } from '../../src/scene/sea'
+import { findLane, CIRCUIT_OFFSETS, harbourCircuit, harbourLoop, LOOP_LENGTHS, LOOP_OFFSET, OUTER_PAD, padLand, PIER_GAP, type SeaMap } from '../../src/scene/sea'
 
 afterEach(() => clearArches())
 
@@ -77,5 +77,97 @@ describe('boats under bridges', () => {
     expect(loop).not.toBeNull()
     expect(loop).toHaveLength(2)
     expect(loop![0].distanceTo(loop![1])).toBeGreaterThan(5)
+  })
+
+  it('sails as far out as the open water allows, so a busy loop shows several boats at once', () => {
+    const open: SeaMap = { land: [box(-80, -20, -20, 20)] }
+    const loop = harbourLoop(open, new THREE.Vector3(-15, 0, 0), new THREE.Vector3(-50, 0, 0))
+    expect(loop![0].distanceTo(loop![1])).toBeCloseTo(LOOP_LENGTHS[0], 5)
+    expect(LOOP_LENGTHS[0]).toBeGreaterThan(16) // longer than the old short hop
+  })
+
+  it('starts a loop a little along the coast from the harbour, a lane of its own beside the one to other islands', () => {
+    const water = new THREE.Vector3(-15, 0, 0)
+    const loop = harbourLoop(sea, water, new THREE.Vector3(-50, 0, 0))
+    expect(loop![0].distanceTo(water)).toBeCloseTo(LOOP_OFFSET, 5)
+    expect(Math.abs(loop![0].z)).toBeCloseTo(LOOP_OFFSET, 5) // sideways, along the coast
+  })
+
+  describe('the circuit round an island', () => {
+    const island = (cx: number, r: number) => Array.from({ length: 24 }, (_, k) => new THREE.Vector2(cx + Math.cos((k / 24) * Math.PI * 2) * r, Math.sin((k / 24) * Math.PI * 2) * r))
+    const open: SeaMap = { land: [island(0, 20)] }
+    const centre = new THREE.Vector3(0, 0, 0)
+    // a pier on the east coast: from on the island out to just past the coast
+    const pier = { from: new THREE.Vector3(13, 0, 0), to: new THREE.Vector3(24, 0, 0) }
+    const lineDist = (p: THREE.Vector3) => Math.abs(p.z) // the pier lies along z = 0
+
+    it('goes once all the way round the coast, off it, from one side of the pier to the other', () => {
+      const circuit = harbourCircuit(open, pier, centre)
+      expect(circuit).not.toBeNull()
+      const first = circuit![0], last = circuit![circuit!.length - 1]
+      expect(lineDist(first)).toBeGreaterThanOrEqual(PIER_GAP - 0.01)
+      expect(lineDist(last)).toBeGreaterThanOrEqual(PIER_GAP - 0.01)
+      expect(Math.sign(first.z)).toBe(-Math.sign(last.z)) // the two ends are on opposite sides of the pier
+      for (const p of circuit!) expect(Math.hypot(p.x, p.z)).toBeGreaterThan(20)
+      let turned = 0
+      for (let i = 1; i < circuit!.length; i++) {
+        let d = Math.atan2(circuit![i].z, circuit![i].x) - Math.atan2(circuit![i - 1].z, circuit![i - 1].x)
+        d = Math.atan2(Math.sin(d), Math.cos(d))
+        turned += d
+      }
+      expect(Math.abs(turned)).toBeGreaterThan(Math.PI * 1.7)
+    })
+
+    it('never comes within the gap of the pier, so no boat on it clashes with the pier', () => {
+      const circuit = harbourCircuit(open, pier, centre)!
+      for (let i = 1; i < circuit.length; i++) {
+        for (let k = 0; k <= 4; k++) {
+          const q = circuit[i - 1].clone().lerp(circuit[i], k / 4)
+          const crossesPier = q.x >= pier.from.x && q.x <= pier.to.x
+          if (crossesPier) expect(lineDist(q)).toBeGreaterThanOrEqual(PIER_GAP - 0.01)
+        }
+      }
+    })
+
+    it('runs on the inside lane, closer to the coast than the water off the pier tip where the boats from other islands dock', () => {
+      const circuit = harbourCircuit(open, pier, centre)!
+      for (const p of circuit) expect(Math.hypot(p.x, p.z)).toBeLessThan(Math.hypot(pier.to.x + 6, 0))
+    })
+
+    it('goes the same way round for an island whatever way its outline was drawn', () => {
+      const way = (poly: THREE.Vector2[]) => {
+        const c = harbourCircuit({ land: [poly] }, pier, centre)!
+        return Math.sign(c[2].x * c[3].z - c[2].z * c[3].x)
+      }
+      const outline = island(0, 20)
+      expect(way(outline)).toBe(way([...outline].reverse()))
+    })
+
+    it('is not made where another island leaves no open water round it', () => {
+      const crowded: SeaMap = { land: [island(0, 20), island(40, 20)] }
+      expect(harbourCircuit(crowded, pier, centre)).toBeNull()
+    })
+  })
+
+  describe('lanes between islands, planned over the islands made bigger', () => {
+    const island = (cx: number, r: number) => Array.from({ length: 24 }, (_, k) => new THREE.Vector2(cx + Math.cos((k / 24) * Math.PI * 2) * r, Math.sin((k / 24) * Math.PI * 2) * r))
+
+    it('keep further from every island\'s coast than the circuit round it runs', () => {
+      const sea: SeaMap = { land: [island(0, 20), island(120, 20)] }
+      const lane = findLane(padLand(sea, [0, 1], OUTER_PAD), new THREE.Vector3(36, 0, 0), new THREE.Vector3(84, 0, 0))!
+      expect(lane).not.toBeNull()
+      const farthestCircuit = 20 + Math.max(...CIRCUIT_OFFSETS)
+      for (const p of lane) {
+        expect(Math.hypot(p.x, p.z), 'first island').toBeGreaterThan(farthestCircuit + 1)
+        expect(Math.hypot(p.x - 120, p.z), 'second island').toBeGreaterThan(farthestCircuit + 1)
+      }
+    })
+
+    it('leave the polygons of other things as they were', () => {
+      const sea: SeaMap = { land: [island(0, 20), island(120, 20)] }
+      const padded = padLand(sea, [0], OUTER_PAD)
+      expect(padded.land[1]).toBe(sea.land[1])
+      expect(Math.hypot(padded.land[0][0].x, padded.land[0][0].y)).toBeCloseTo(20 + OUTER_PAD, 5)
+    })
   })
 })

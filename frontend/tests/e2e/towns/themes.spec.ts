@@ -13,6 +13,11 @@ const contract = JSON.parse(readFileSync(new URL('../../../../shared-test-data/t
 
 const SHOP = 'droid-shop'
 
+// Every pull request draws the harbour town in full; the other two themes get the same full set nightly (npm run e2e:themes, in slow.yml).
+// The theme picker below and the checks that the three themes exist run on every pull request.
+const ALL_THEMES = process.env.E2E_ALL_THEMES === '1'
+const themesUnderTest = ALL_THEMES ? contract.themes : ['harbour-town']
+
 const THEME_NAMES: Record<string, string> = { 'harbour-town': 'Harbour town', space: 'Space colony', factory: 'Works' }
 const OWN_WORDS: Record<string, string> = { 'harbour-town': 'Blue car', space: 'Hover pod', factory: 'Blue-cab van' }
 
@@ -24,7 +29,7 @@ async function kindsOf(town: Town): Promise<{ kinds: Set<string>; all: Status[] 
 // what lands at the airport in each theme
 const AIRPORT_LOOK: Record<string, string> = { 'harbour-town': 'airliner', factory: 'cargo plane', space: 'saucer' }
 
-for (const theme of contract.themes) {
+for (const theme of themesUnderTest) {
   test.describe(`the ${theme} theme`, () => {
     test('opens from the address, builds the town under its own colours, and logs no errors', async ({ town, page }) => {
       await town.open(`&theme=${theme}`)
@@ -116,6 +121,33 @@ for (const theme of contract.themes) {
       expect(services.length).toBeGreaterThan(0)
       expect(services.some((s) => s.state === 'Down' || s.state === 'Degraded')).toBe(true)
 
+      await town.removeEffects()
+    })
+
+    test('shows the same bad day on the dashboard, whatever theme the address names', async ({ town, page }) => {
+      await town.open(`&theme=${theme}`)
+      await town.step(5)
+      await town.effect('cl.ledger-api', 'Down')
+      await town.effect('cl.posting-worker', 'Poison')
+      await town.effect('pay.payments-worker', 'Backlog')
+      await town.effect('frd', 'Incident', 0.9)
+      await town.until('cl.ledger-api', (n) => n.state === 'Down')
+      await town.until('cl.posting-worker', (n) => (n.deadLetters ?? 0) >= 20)
+      await town.until('pay.payments-worker', (n) => (n.oldestMessageSeconds ?? 0) >= 60)
+      await page.waitForFunction(() => (window as any).city.seen.last.groups.find((g: any) => g.id === 'frd').incidents.length > 0, null, { timeout: 20_000 })
+
+      await page.goto(`/?view=dashboard&theme=${theme}`)
+      await page.waitForFunction(() => (window as any).dash?.seen.snapshots > 0)
+      await expect(page.locator('#dash-pillars .card').first()).toBeVisible()
+      expect(await page.evaluate(() => (window as any).city)).toBeUndefined() // the dashboard never loads the town
+      // a system is down, so the summary counts it and is not the all-healthy line
+      await expect(page.locator('#kpi-services')).not.toContainText('0 down')
+      await expect(page.locator('#kpi-services')).not.toContainText('All services are healthy')
+      // dead letters and the backlog
+      await expect(page.locator('#kpi-dlq b')).not.toHaveText('0')
+      await expect(page.locator('#kpi-dlq')).toContainText('Backlog')
+      // an incident is open
+      await expect(page.locator('#kpi-incidents b')).not.toHaveText('0')
       await town.removeEffects()
     })
 

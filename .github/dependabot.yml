@@ -1,24 +1,53 @@
-# Weekly pull requests for newer versions of the libraries and build actions the repo uses.
+# Weekly pull requests, on Mondays, for newer versions of the libraries and build actions the repo uses.
+# A dependency goes into the first group whose pattern matches it, so the families that must move together come first.
+# Everything else that is a minor or patch update shares one pull request per ecosystem; other major updates stay one pull request each.
 version: 2
 updates:
   - package-ecosystem: npm
     directory: /frontend
     schedule:
       interval: weekly
+      day: monday
     open-pull-requests-limit: 5
+    labels: [dependencies]
+    commit-message:
+      prefix: "deps"
     groups:
+      three:
+        patterns: [three, "@types/three"]
+      vite-and-vitest:
+        patterns: [vite, vitest]
       npm-minor-and-patch:
         update-types: [minor, patch]
+    ignore:
+      # Node 26 is the version the repo runs on: the type definitions follow it, not newer majors.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: nuget
     directory: /backend
     schedule:
       interval: weekly
+      day: monday
     open-pull-requests-limit: 5
+    labels: [dependencies]
+    commit-message:
+      prefix: "deps"
     groups:
+      aspire:
+        patterns: ["Aspire.*"]
+      dotnet-10:
+        patterns: ["Microsoft.AspNetCore.*", "Microsoft.Extensions.*"]
       nuget-minor-and-patch:
         update-types: [minor, patch]
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+      day: monday
     open-pull-requests-limit: 5
+    labels: [dependencies]
+    commit-message:
+      prefix: "deps"
+    groups:
+      github-actions:
+        patterns: ["*"]

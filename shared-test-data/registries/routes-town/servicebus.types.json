@@ -1,0 +1,63 @@
+{
+  "tables": [
+    {
+      "name": "PrimaryResult",
+      "columns": [
+        {
+          "name": "type",
+          "type": "string"
+        },
+        {
+          "name": "calls",
+          "type": "real"
+        },
+        {
+          "name": "queue",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "OrderPlaced",
+          600,
+          "bus.bb.ledger.orders.out"
+        ],
+        [
+          "OrderCancelled",
+          400,
+          "bus.bb.ledger.orders.out"
+        ],
+        [
+          "OrderShipped",
+          300,
+          "bus.bb.ledger.orders.out"
+        ],
+        [
+          "RefundIssued",
+          200,
+          "bus.bb.ledger.orders.out"
+        ],
+        [
+          "AddressChanged",
+          150,
+          "bus.bb.ledger.orders.out"
+        ],
+        [
+          "LimitRaised",
+          100,
+          "bus.bb.ledger.orders.out"
+        ],
+        [
+          "NoteAdded",
+          50,
+          "bus.bb.ledger.orders.out"
+        ],
+        [
+          "PingReceived",
+          90,
+          "bus.aa.orders.in"
+        ]
+      ]
+    }
+  ]
+}

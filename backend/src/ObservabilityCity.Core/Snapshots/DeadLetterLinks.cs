@@ -11,10 +11,13 @@ public static class DeadLetterLinks
     /// The link for a queue a consumer reads, or null: the environment names no tool, or the address needs a word the system has none of (a pillar or service
     /// code). The words are escaped, so a queue name can never change the shape of the address.
     /// </summary>
-    public static ResourceLink? For(Registry.Registry registry, RegistryNode node, string queue)
+    public static ResourceLink? For(Registry.Registry registry, RegistryNode node, string queue, string? region = null)
     {
         var env = registry.ActiveEnvironment;
-        var link = env?.Sources.Select(s => s.Entities?.DeadLetterLink).FirstOrDefault(l => l is not null);
+        var entities = env?.Sources.Select(s => s.Entities).Where(e => e is not null).ToList();
+        // the address of the region's own tool, else the one for all regions
+        var link = (region is null ? null : entities?.SelectMany(e => e!.DeadLetterLinks ?? []).FirstOrDefault(l => l.Region.Equals(region, StringComparison.OrdinalIgnoreCase))?.Link)
+            ?? entities?.Select(e => e!.DeadLetterLink).FirstOrDefault(l => l is not null);
         if (env is null || link is null) return null;
         var group = registry.Groups.FirstOrDefault(g => g.Id == node.GroupId);
         var words = new Dictionary<string, string?>

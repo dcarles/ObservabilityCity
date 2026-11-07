@@ -1,3 +1,4 @@
+import { fitTopBar } from './topbarFit'
 import type { EnvironmentInfo, Snapshot, TenantInfo } from './types'
 import { escapeHtml } from './picker'
 import { groupTenants, tenantLabel, tenantNote, tenantTrouble, toggleTenant, type TenantView } from './tenants'
@@ -150,14 +151,14 @@ export class ViewBar {
     const theme = this.host.theme()
     const towns = this.host.towns()
     const quality = this.host.quality()
-    const key = JSON.stringify([this.open, this.query, this.townId, towns, quality, this.current, this.environments, this.tenants.map((t) => t.id + t.kind), view, [...this.trouble], this.choices, this.focusChoices, this.host.focus(), islands, layers, theme.id])
+    const key = JSON.stringify([this.open, this.query, this.townId, this.townName, towns, quality, this.current, this.environments, this.tenants.map((t) => t.id + t.kind), view, [...this.trouble], this.choices, this.focusChoices, this.host.focus(), islands, layers, theme.id])
     if (key === this.key) return
     this.key = key
     const envName = this.environments.find((e) => e.id === this.current)?.name ?? this.current
     const button = (act: string, id: string, label: string, title: string, on: boolean) =>
       `<button data-act="${act}" id="${id}" class="vb-btn ${on ? 'on' : ''}" title="${title}">${escapeHtml(label)} <i>▾</i></button>`
     const townBtn = towns.length > 1
-      ? `<div class="vb">${button('open-town', 'town-button', this.townName || this.townId, 'Town', this.open === 'town')}
+      ? `<div class="vb">${button('open-town', 'town-button', this.townName || this.townId, `Town: ${escapeHtml(this.townName || this.townId)}`, this.open === 'town')}
           ${this.open === 'town' ? `<div class="vb-list" id="town-list">${towns.map((t) => `<div class="vb-row ${t.id === this.townId ? 'sel' : ''}" data-act="town" data-id="${escapeHtml(t.id)}"><span>${escapeHtml(t.name)}</span><small>${escapeHtml(t.id)}${t.isDefault ? ' · default' : ''}</small></div>`).join('')}</div>` : ''}</div>`
       : ''
     const envBtn = this.environments.length > 1
@@ -180,6 +181,9 @@ export class ViewBar {
           ${this.open === 'quality' ? `<div class="vb-list" id="quality-list">${QUALITIES.map((q) => `<div class="vb-row ${q.id === quality ? 'sel' : ''}" data-act="quality" data-id="${q.id}"><span>${escapeHtml(q.name)}<br /><small class="hint">${escapeHtml(q.hint)}</small></span></div>`).join('')}</div>` : ''}</div>`
     const has = (k: Exclude<Open, null>) => !this.only || this.only.includes(k)
     this.el.innerHTML = (has('town') ? townBtn : '') + (has('env') ? envBtn : '') + (has('tenant') ? tenantBtn : '') + (has('islands') ? islandBtn : '') + (has('layers') ? layerBtn : '') + (has('theme') ? themeBtn : '') + (has('quality') ? qualityBtn : '')
+    // the dropdowns just changed width: see whether the bar still fits on its line
+    const bar = document.getElementById('topbar')
+    if (bar) fitTopBar(bar)
     if (keepFocus) {
       const input = this.el.querySelector<HTMLInputElement>('.vb-list input[type=search]')
       if (input) { input.focus(); input.setSelectionRange(this.query.length, this.query.length) }

@@ -1,0 +1,48 @@
+{
+  "tables": [
+    {
+      "name": "PrimaryResult",
+      "columns": [
+        {
+          "name": "queue",
+          "type": "string"
+        },
+        {
+          "name": "type",
+          "type": "string"
+        },
+        {
+          "name": "calls",
+          "type": "real"
+        }
+      ],
+      "rows": [
+        [
+          "bus.aa.orders.in",
+          "OrderPlaced",
+          1500
+        ],
+        [
+          "bus.aa.orders.in",
+          "OrderCancelled",
+          300
+        ],
+        [
+          "bus.aa.orders.in",
+          "OrderPlaced",
+          300
+        ],
+        [
+          "bus.bb.ledger.in",
+          "LedgerPosted",
+          900
+        ],
+        [
+          "bus.zz.xyz.in",
+          "Stray",
+          30
+        ]
+      ]
+    }
+  ]
+}

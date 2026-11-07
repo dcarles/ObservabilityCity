@@ -128,13 +128,27 @@ public sealed record NodeSnapshot(
     IReadOnlyList<JobSnapshot>? Jobs = null,
     IReadOnlyList<RegionSnapshot>? Regions = null,
     IReadOnlyList<QueueSnapshot>? Queues = null,
-    string? Reason = null);
+    string? Reason = null,
+    IReadOnlyList<SourceAgeSnapshot>? Sources = null);
+
+/// <summary>
+/// A source that feeds a system: its name, how many seconds ago it last answered, whether that is fresh enough to show, and the signals it supplies. A source that is
+/// not fresh leaves its signals out of the system (they are listed in Absent) while the others carry on.
+/// </summary>
+public sealed record SourceAgeSnapshot(string Source, int AgeSeconds, bool Fresh, IReadOnlyList<string> Signals);
 
 /// <summary>
 /// One queue a consumer reads: what waits in it and what is dead-lettered (each null when nothing measures it), and Link, the address that opens its dead letters in the
-/// support tool the environment names (entities.deadLetterLink), null when it names none.
+/// support tool the environment names (entities.deadLetterLink), null when it names none. DeadLetterRegions says in which region the dead letters are, when the broker spans several.
 /// </summary>
-public sealed record QueueSnapshot(string Name, double? Backlog, double? DeadLetters, ResourceLink? Link = null, double? PerSecond = null);
+public sealed record QueueSnapshot(string Name, double? Backlog, double? DeadLetters, ResourceLink? Link = null, double? PerSecond = null,
+    IReadOnlyList<MessageTypeSnapshot>? Types = null, int? TypesCut = null, IReadOnlyList<DeadLetterRegionSnapshot>? DeadLetterRegions = null);
+
+/// <summary>The dead letters of a queue in one region, with Link, the address that opens them in that region's support tool (null when the environment names none). Listed only for a broker that spans more than one region, and only for the regions that hold some.</summary>
+public sealed record DeadLetterRegionSnapshot(string Region, double Count, ResourceLink? Link = null);
+
+/// <summary>The messages a second of one kind a queue handled, when the environment measures it (typesQuery). A queue's Types are highest first, up to a ceiling; TypesCut counts the quietest kinds beyond it that are left out.</summary>
+public sealed record MessageTypeSnapshot(string Type, double PerSecond);
 
 /// <summary>
 /// A resource that is not a system but stands in the town as a small building without health (a key vault, a storage account). Label is what it is
@@ -202,6 +216,25 @@ public sealed record IncidentSnapshot(
     string Title,
     int Severity,
     DateTimeOffset StartedAt);
+
+/// <summary>
+/// A resource the cloud itself reports as Degraded or Unavailable (an Azure incident): State is "Degraded" or "Unavailable", Previous what it was before and Cause why, as the cloud
+/// said (null when it gave none), Since when the event started. Resource is the resource's name. NodeId and GroupId say the building and the island that own the resource; both are null
+/// for a resource no system of the town owns, which the lists show without a place to go to. Summary is the cloud's own one-line title for the event, when it has one. Tenant is the tenant the resource belongs to (its friendly name when the scope has one), for a resource kept per tenant such as a database; null otherwise. Id stays the same
+/// for as long as the same event lasts.
+/// </summary>
+public sealed record HealthEventSnapshot(
+    string Id,
+    string Resource,
+    string State,
+    string? Previous,
+    string? Cause,
+    DateTimeOffset Since,
+    string? NodeId,
+    string? GroupId,
+    string? Summary = null,
+    DateTimeOffset? ResolvedAt = null,
+    string? Tenant = null);
 
 /// <summary>A Service Bus topic: Name is the full topic name, Service the service (or hub resource name) that publishes it.</summary>
 public sealed record TopicSnapshot(string Name, string Service);
@@ -313,6 +346,8 @@ public sealed record TownTotals(
 /// does not measure it (links.traffic), and the airport then adds up what the outside callers bring.
 /// Cloud is what the environment calls its cloud (scope.cloud), for the words "not found in ..."; null: the renderer says "the inventory".
 /// TrafficDensity is the town's trafficDensity setting: how many cars appear, as a multiple of the usual number (1).
+/// HealthEvents are the resources the cloud itself reports as Degraded or Unavailable right now, worst first (see <see cref="HealthEventSnapshot"/>); null when the environment reads none.
+/// With an island filter it holds the events of the islands on screen and those that belong to no building. They count in TownTotals.Incidents too.
 /// </summary>
 public sealed record Snapshot(
     string TownId,
@@ -339,7 +374,15 @@ public sealed record Snapshot(
     double? OutsideRequestsPerSecond = null,
     string? Cloud = null,
     double TrafficDensity = 1,
-    IReadOnlyList<string>? Notes = null);
+    IReadOnlyList<string>? Notes = null,
+    IReadOnlyList<SourceFreshnessSnapshot>? Sources = null,
+    IReadOnlyList<HealthEventSnapshot>? HealthEvents = null);
+
+/// <summary>
+/// How fresh one configured source is: Name is the source's name in the environment file, LastRead when it last reported anything (null: not yet since the server started),
+/// IntervalSeconds how often it is asked, and Overdue says it has not reported within the limit that greys a building (see StaleAfter). Null on the snapshot when no source is configured.
+/// </summary>
+public sealed record SourceFreshnessSnapshot(string Name, DateTimeOffset? LastRead, double IntervalSeconds, bool Overdue);
 
 /// <summary>An island the island filter left out. Vendor is true for a third party's island (the vendor id, or the shared island id of a group of its services).</summary>
 public sealed record HiddenIsland(string Id, string DisplayName, bool Vendor = false);
@@ -365,6 +408,8 @@ public sealed record AddRuleRequest(string Host, string Path, string Target);
 
 /// <summary>What the panel sends to add a host. The server works out who called it from what link discovery saw.</summary>
 public sealed record AddHostRequest(string Host, string Kind);
+/// <summary>Hides the Azure resource-health report with this id (see HealthEventSnapshot.Id).</summary>
+public sealed record DismissHealthEventRequest(string Id);
 
 /// <summary>
 /// One path on a gateway host that no rule explains, with its calls. VendorsOnly is true when only vendor buildings (such as Digital Services) made them.

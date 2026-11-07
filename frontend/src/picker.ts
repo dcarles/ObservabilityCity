@@ -6,6 +6,12 @@ export interface PickItem {
   /** The island's name, or the island a building stands on. */
   where: string
   state?: string
+  /** A second line under the name in a list, for example the dead-letter queue and its count. */
+  detail?: string
+  /** Listed but not clickable: it has nowhere to go (an Azure report for a resource the town does not show). */
+  inert?: boolean
+  /** The id of the Azure health report this line stands for: the line gets a Dismiss button. */
+  dismiss?: string
 }
 
 /**

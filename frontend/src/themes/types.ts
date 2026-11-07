@@ -25,7 +25,8 @@ export interface BoatLook {
 /** What carries the traffic: cars for requests (internal first, then outside callers) and boats for messages. */
 export interface VehicleKit {
   cars(): [VehicleParts, VehicleParts]
-  boat(seed: number): BoatLook
+  /** One boat; `internal` is for the boats that stay on their own island, which are painted differently from the boats sailing between islands. */
+  boat(seed: number, internal?: boolean): BoatLook
   /** How high a boat rides above the water (a shuttle hovers), and how much it bobs. */
   boatLift: number
   boatBob: number

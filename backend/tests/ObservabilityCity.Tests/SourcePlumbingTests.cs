@@ -3,6 +3,8 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Azure.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.Logging;
+using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 using ObservabilityCity.Adapters.Azure;
@@ -417,6 +419,92 @@ public class SourcePlumbingTests
         finally { if (Directory.Exists(folder)) Directory.Delete(folder, true); }
     }
 
+    [Fact]
+    public async Task A_source_that_asks_to_retry_soon_is_polled_again_soon_until_it_is_ready_then_waits_its_interval_and_its_round_note_is_logged()
+    {
+        var source = new NotReadyTwice();
+        var log = new ListLogger();
+        var poller = new SourcePoller([source], new RegistryHolder(RegistryLoader.Load(TestPaths.LiveTown)), new LatestState(), log);
+
+        await poller.StartAsync(TestContext.Current.CancellationToken);
+        await Task.WhenAny(source.Ready.Task, Task.Delay(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
+        await Task.Delay(300, TestContext.Current.CancellationToken);
+        await poller.StopAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(3, source.Polls); // two quick retries, then the ten-minute interval
+        Assert.Contains(log.Lines, l => l.Contains("Source soon: not ready, retrying"));
+        Assert.Contains(log.Lines, l => l.Contains("Source soon: read 3 things"));
+    }
+
+    [Fact]
+    public async Task A_round_that_runs_out_of_time_is_one_warning_line_without_a_stack_trace()
+    {
+        var log = new ListLogger();
+        var poller = new SourcePoller([new Stuck(TimeSpan.FromMilliseconds(60))], new RegistryHolder(RegistryLoader.Load(TestPaths.LiveTown)), new LatestState(), log);
+
+        await poller.StartAsync(TestContext.Current.CancellationToken);
+        await Task.Delay(500, TestContext.Current.CancellationToken);
+        await poller.StopAsync(TestContext.Current.CancellationToken);
+
+        Assert.Contains(log.Lines, l => l.Contains("Source stuck did not finish within") && l.Contains("values will go stale"));
+        Assert.All(log.Errors, e => Assert.Null(e));
+    }
+
+    [Fact]
+    public async Task A_dropped_connection_is_one_warning_line_and_a_refusal_keeps_its_stack_trace()
+    {
+        var dropped = new ThrowsOnPoll("dropped", new IOException("Unable to read data from the transport connection", new System.Net.Sockets.SocketException(995)));
+        var refused = new ThrowsOnPoll("refused", new HttpRequestException("answered 403", null, System.Net.HttpStatusCode.Forbidden));
+        var log = new ListLogger();
+        var poller = new SourcePoller([dropped, refused], new RegistryHolder(RegistryLoader.Load(TestPaths.LiveTown)), new LatestState(), log);
+
+        await poller.StartAsync(TestContext.Current.CancellationToken);
+        await Task.Delay(400, TestContext.Current.CancellationToken);
+        await poller.StopAsync(TestContext.Current.CancellationToken);
+
+        var i = log.Lines.FindIndex(l => l.Contains("Source dropped could not reach its service"));
+        Assert.True(i >= 0);
+        Assert.Null(log.Errors[i]);
+        var j = log.Lines.FindIndex(l => l.Contains("Source refused failed"));
+        Assert.True(j >= 0);
+        Assert.NotNull(log.Errors[j]);
+    }
+
+    private sealed class ThrowsOnPoll(string name, Exception error) : IMetricSource
+    {
+        public string Name => name;
+        public TimeSpan PollInterval => TimeSpan.FromMinutes(10);
+        public Task<IReadOnlyDictionary<string, NodeReading>> PollAsync(Registry registry, CancellationToken ct) => throw error;
+    }
+
+    private sealed class NotReadyTwice : IMetricSource, IRetrySoon, IRoundNote
+    {
+        public TaskCompletionSource Ready { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public int Polls;
+        public string Name => "soon";
+        public TimeSpan PollInterval => TimeSpan.FromMinutes(10);
+        public TimeSpan? RetryIn => Polls < 3 ? TimeSpan.FromMilliseconds(20) : null;
+        public string? RoundNote => Polls < 3 ? "not ready, retrying" : "read 3 things";
+
+        public Task<IReadOnlyDictionary<string, NodeReading>> PollAsync(Registry registry, CancellationToken ct)
+        {
+            if (Interlocked.Increment(ref Polls) == 3) Ready.TrySetResult();
+            return Task.FromResult<IReadOnlyDictionary<string, NodeReading>>(new Dictionary<string, NodeReading>());
+        }
+    }
+
+    private sealed class ListLogger : ILogger<SourcePoller>
+    {
+        public List<string> Lines { get; } = [];
+        public List<Exception?> Errors { get; } = [];
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(LogLevel logLevel) => true;
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+        {
+            lock (Lines) { Lines.Add(formatter(state, exception)); Errors.Add(exception); }
+        }
+    }
+
     private sealed class PublishThenFail : IProgressiveMetricSource
     {
         public TaskCompletionSource Done { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -598,7 +686,7 @@ public class SourcePlumbingTests
     }
 
     [Theory]
-    [InlineData("sources:\n  metrics: { kind: loganalytic }\n", "source 'metrics' has kind 'loganalytic', which is not a kind of source this build knows. Use fake, prometheus, grafana-irm, resourcegraph, loganalytics, azuremonitor, servicebus, functionjobs. Did you mean 'loganalytics'?")]
+    [InlineData("sources:\n  metrics: { kind: loganalytic }\n", "source 'metrics' has kind 'loganalytic', which is not a kind of source this build knows. Use fake, prometheus, grafana-irm, resourcegraph, loganalytics, azuremonitor, servicebus, functionjobs, resourcehealth. Did you mean 'loganalytics'?")]
     [InlineData("sources:\n  metrics: { kind: prometheus, credential: reader }\ncredentials:\n  reader: { kind: azure-cli }\n", "source 'metrics' names a credential, but a prometheus source does not sign in")]
     [InlineData("credentials:\n  reader: { kind: azure-clu }\n", "credential 'reader' has kind 'azure-clu'. Use azure-cli, default, managed-identity, service-principal. Did you mean 'azure-cli'?")]
     [InlineData("credentials:\n  reader: { kind: service-principal, tenantId: t }\n", "credential 'reader' is a service-principal, which needs clientId and clientSecretEnv")]

@@ -28,6 +28,8 @@ export interface Status {
   region: string
   /** How the requests divide between the regions ("⚠ North 95% · West 5%", the warning when one takes too much); empty when nothing measures it. */
   split: string
+  /** The state Azure Resource Health reports for the building's resource while its red exclamation mark is up; null otherwise. */
+  azure: string | null
 }
 
 export interface TenantYard {
@@ -158,7 +160,7 @@ export class Town {
   }
 
   /** The sea the boats sail: the harbours, the pairs of harbours with no water between them, the boat routes (publisher island, consumer island) and the arched bridges. */
-  async sea(): Promise<{ harbours: string[]; unreachable: string[]; routes: { from: string | null; to: string; scheduler: boolean; rate: number }[]; arches: number }> {
+  async sea(): Promise<{ harbours: string[]; unreachable: string[]; routes: { from: string | null; to: string; scheduler: boolean; circuit: boolean; rate: number }[]; arches: number }> {
     return await this.page.evaluate(() => (window as any).city.town.inspectSea())
   }
 

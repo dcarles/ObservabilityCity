@@ -45,6 +45,12 @@ public static partial class RegistryLoader
             var knownRegion = f.Scope?.Variables.Keys.Append(ScopeRules.EnvironmentVariable).Concat(SourceQuery.Variables) ?? [ScopeRules.EnvironmentVariable, .. SourceQuery.Variables];
             foreach (var problem in ScopeTemplate.Check(regionQuery, knownRegion)) errors.Add($"{name}: source '{source}' regionQuery: {problem}");
         }
+        if (def.TypesQuery is { } typesQuery)
+        {
+            if (typesQuery.Trim().Length == 0) errors.Add($"{name}: source '{source}' has an empty typesQuery; give the query that returns queue, type and calls, or leave it out");
+            var knownTypes = f.Scope?.Variables.Keys.Append(ScopeRules.EnvironmentVariable).Concat(SourceQuery.Variables) ?? [ScopeRules.EnvironmentVariable, .. SourceQuery.Variables];
+            foreach (var problem in ScopeTemplate.Check(typesQuery, knownTypes)) errors.Add($"{name}: source '{source}' typesQuery: {problem}");
+        }
         if (def.Query is not { } query) return;
         if (query.Trim().Length == 0) errors.Add($"{name}: source '{source}' has an empty query; give the query to send, or leave it out");
         var known = f.Scope?.Variables.Keys.Append(ScopeRules.EnvironmentVariable).Concat(SourceQuery.Variables) ?? [ScopeRules.EnvironmentVariable, .. SourceQuery.Variables];
@@ -67,11 +73,12 @@ public static partial class RegistryLoader
             f.Patterns.Select(p => new EntityPattern(p.Match, string.IsNullOrWhiteSpace(p.Consumer) ? "worker" : p.Consumer.Trim().ToLowerInvariant())).ToList(),
             string.IsNullOrWhiteSpace(f.Interval) ? null : SourceQuery.TryParseWindow(f.Interval, out var interval) ? interval : null,
             f.DeadLetterLink is { } l ? new EntityLink(l.Name.Trim(), l.Url.Trim()) : null,
-            ToEntityMetric(f.Throughput));
+            ToEntityMetric(f.Throughput),
+            f.DeadLetterLinks.Count == 0 ? null : f.DeadLetterLinks.Select(l => new EntityRegionLink((l.Region ?? "").Trim(), new EntityLink(l.Name.Trim(), l.Url.Trim()))).ToList());
 
     private static EntityMetric? ToEntityMetric(EntityMetricFile? f) => f is null ? null : new EntityMetric(f.Metric.Trim(), f.Aggregation.Trim().ToLowerInvariant());
 
-    /// <summary>A broker source's entities: the rule must exist, the metrics must be named, and each pattern must be a regular expression with the groups pillar and service.</summary>
+    /// <summary>A broker source's entities: the rule must exist, the metrics must be named, and each pattern must be a regular expression with the group service (and pillar, producerPillar and producer when the name says them).</summary>
     private static void CheckEntities(EnvironmentFile f, SourceFile def, string source, string name, List<string> errors)
     {
         var at = $"{name}: source '{source}' entities";
@@ -84,8 +91,9 @@ public static partial class RegistryLoader
         {
             if (metric is null) continue;
             if (string.IsNullOrWhiteSpace(metric.Metric)) errors.Add($"{at}.{label}: metric is empty; give the metric's name");
-            if (!MetricGroup.Aggregations.Contains(metric.Aggregation.Trim().ToLowerInvariant()))
-                errors.Add($"{at}.{label}: aggregation '{metric.Aggregation}'. Use {string.Join(", ", MetricGroup.Aggregations)}.{DidYouMean.Hint(metric.Aggregation, MetricGroup.Aggregations)}");
+            var allowed = label == "throughput" ? MetricGroup.Aggregations : MetricGroup.BrokerLevelAggregations; // last reads a level; a throughput is added up
+            if (!allowed.Contains(metric.Aggregation.Trim().ToLowerInvariant()))
+                errors.Add($"{at}.{label}: aggregation '{metric.Aggregation}'. Use {string.Join(", ", allowed)}.{DidYouMean.Hint(metric.Aggregation, allowed)}");
         }
         if (e.Interval is { } grain && (!SourceQuery.TryParseWindow(grain, out var parsed) || !MetricGroup.IntervalMinutes.Contains((int)Math.Round(parsed.TotalMinutes))))
             errors.Add($"{at}: interval '{grain}' is not a time grain the metrics API offers. Use one of {string.Join(", ", MetricGroup.IntervalMinutes.Select(m => m % 1440 == 0 ? $"{m / 1440}d" : m % 60 == 0 ? $"{m / 60}h" : $"{m}m"))}");
@@ -97,15 +105,30 @@ public static partial class RegistryLoader
                 if (!EntitiesConfig.LinkVariables.Contains(m.Groups[1].Value))
                     errors.Add($"{at}.deadLetterLink: {{{m.Groups[1].Value}}} is not a variable of the url. Use {string.Join(", ", EntitiesConfig.LinkVariables.Select(v => "{" + v + "}"))}.{DidYouMean.Hint(m.Groups[1].Value, EntitiesConfig.LinkVariables)}");
         }
-        if (e.Patterns.Count == 0) errors.Add($"{at}: patterns is empty. Give at least one pattern: a regular expression with the named groups pillar and service");
+        var seenRegions = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        for (var i = 0; i < e.DeadLetterLinks.Count; i++)
+        {
+            var l = e.DeadLetterLinks[i];
+            var where = $"{at}.deadLetterLinks[{i}]";
+            if (string.IsNullOrWhiteSpace(l.Region)) errors.Add($"{where}: region is empty; give the region the address is for");
+            else if (!seenRegions.Add(l.Region.Trim())) errors.Add($"{where}: region '{l.Region.Trim()}' is given twice");
+            if (string.IsNullOrWhiteSpace(l.Name)) errors.Add($"{where}: name is empty; give the words the link shows");
+            if (!Regex.IsMatch(l.Url ?? "", @"^https?://", RegexOptions.IgnoreCase)) errors.Add($"{where}: url must start with http:// or https://");
+            foreach (Match m in Regex.Matches(l.Url ?? "", @"\{([^{}]*)\}"))
+                if (!EntitiesConfig.LinkVariables.Contains(m.Groups[1].Value))
+                    errors.Add($"{where}: {{{m.Groups[1].Value}}} is not a variable of the url. Use {string.Join(", ", EntitiesConfig.LinkVariables.Select(v => "{" + v + "}"))}.{DidYouMean.Hint(m.Groups[1].Value, EntitiesConfig.LinkVariables)}");
+        }
+        if (e.Patterns.Count == 0) errors.Add($"{at}: patterns is empty. Give at least one pattern: a regular expression with the named group service (and pillar when the name says it)");
         for (var i = 0; i < e.Patterns.Count; i++)
         {
             try
             {
                 var regex = new Regex(e.Patterns[i].Match, RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
                 var names = regex.GetGroupNames();
-                foreach (var need in new[] { "pillar", "service" })
-                    if (!names.Contains(need)) errors.Add($"{at}.patterns[{i}]: the match has no group named '{need}'. Write it as (?<{need}>...)");
+                if (!names.Contains("service")) errors.Add($"{at}.patterns[{i}]: the match has no group named 'service'. Write it as (?<service>...)");
+                // the publisher is named by both groups or by neither
+                if (names.Contains("producer") != names.Contains("producerPillar"))
+                    errors.Add($"{at}.patterns[{i}]: a route needs both groups, (?<producerPillar>...) and (?<producer>...); this match has only {(names.Contains("producer") ? "producer" : "producerPillar")}");
             }
             catch (ArgumentException ex) { errors.Add($"{at}.patterns[{i}]: the match is not a valid regular expression: {ex.Message}"); }
         }

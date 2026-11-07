@@ -217,4 +217,54 @@ public class ResilientLoadingTests
             return Task.CompletedTask;
         }
     }
+
+    [Fact]
+    public async Task With_a_keep_alive_the_publisher_sends_only_what_changed_and_one_now_and_then()
+    {
+        var clock = new FakeTimeProvider();
+        var registry = RegistryLoader.LoadResilient(TestPaths.MiniTown);
+        var state = new LatestState();
+        var builder = new SnapshotBuilder(registry, state, clock) { StaleAfter = TimeSpan.FromHours(1), DayFraction = () => Random.Shared.NextDouble() };
+        var store = new SnapshotStore();
+        var notifier = new CountingNotifier();
+        using var publisher = new SnapshotPublisher(builder, store, notifier, TimeSpan.FromMilliseconds(20), null, TimeSpan.FromMilliseconds(600));
+
+        await publisher.StartAsync(TestContext.Current.CancellationToken);
+        await WaitFor(() => notifier.Published >= 1);
+        await Task.Delay(400, TestContext.Current.CancellationToken);
+        Assert.Equal(1, notifier.Published); // 20 builds went by, the clock fields moved, and nothing was worth sending
+        Assert.NotNull(store.Latest);
+
+        await WaitFor(() => notifier.Published >= 2); // the keep-alive
+        var before = notifier.Published;
+        var fake = new FakeSource(FakeProfiles.Load(TestPaths.MiniTown), new FakeOptions(), clock) { Calm = true };
+        clock.Advance(TimeSpan.FromSeconds(1));
+        state.Update(await fake.PollAsync(registry, TestContext.Current.CancellationToken));
+        await WaitFor(() => notifier.Published > before); // a change goes out at once, well inside the keep-alive
+        await publisher.StopAsync(TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
+    public async Task Without_a_keep_alive_every_tick_is_sent()
+    {
+        var clock = new FakeTimeProvider();
+        var builder = new SnapshotBuilder(RegistryLoader.LoadResilient(TestPaths.MiniTown), new LatestState(), clock);
+        var notifier = new CountingNotifier();
+        using var publisher = new SnapshotPublisher(builder, new SnapshotStore(), notifier, TimeSpan.FromMilliseconds(20));
+
+        await publisher.StartAsync(TestContext.Current.CancellationToken);
+        await WaitFor(() => notifier.Published >= 5);
+        await publisher.StopAsync(TestContext.Current.CancellationToken);
+    }
+
+    private sealed class CountingNotifier : ISnapshotNotifier
+    {
+        public int Published;
+
+        public Task PublishAsync(Snapshot snapshot, CancellationToken ct)
+        {
+            Interlocked.Increment(ref Published);
+            return Task.CompletedTask;
+        }
+    }
 }

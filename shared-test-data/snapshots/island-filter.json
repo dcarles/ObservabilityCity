@@ -74,7 +74,8 @@
           "jobs": null,
           "regions": null,
           "queues": null,
-          "reason": null
+          "reason": null,
+          "sources": null
         },
         {
           "id": "hub.service-bus",
@@ -118,7 +119,8 @@
           "jobs": null,
           "regions": null,
           "queues": null,
-          "reason": null
+          "reason": null,
+          "sources": null
         },
         {
           "id": "hub.egress",
@@ -162,7 +164,8 @@
           "jobs": null,
           "regions": null,
           "queues": null,
-          "reason": null
+          "reason": null,
+          "sources": null
         },
         {
           "id": "hub.customer-db",
@@ -206,7 +209,8 @@
           "jobs": null,
           "regions": null,
           "queues": null,
-          "reason": null
+          "reason": null,
+          "sources": null
         }
       ],
       "assets": []
@@ -283,7 +287,8 @@
           "jobs": null,
           "regions": null,
           "queues": null,
-          "reason": "error rate 18.2%"
+          "reason": "error rate 18.2%",
+          "sources": null
         },
         {
           "id": "aa.orders-worker",
@@ -329,7 +334,8 @@
           "jobs": null,
           "regions": null,
           "queues": null,
-          "reason": null
+          "reason": null,
+          "sources": null
         },
         {
           "id": "aa.orders-db",
@@ -373,7 +379,8 @@
           "jobs": null,
           "regions": null,
           "queues": null,
-          "reason": null
+          "reason": null,
+          "sources": null
         }
       ],
       "assets": []
@@ -459,7 +466,8 @@
           "jobs": null,
           "regions": null,
           "queues": null,
-          "reason": null
+          "reason": null,
+          "sources": null
         },
         {
           "id": "cc.notify-worker",
@@ -505,7 +513,8 @@
           "jobs": null,
           "regions": null,
           "queues": null,
-          "reason": null
+          "reason": null,
+          "sources": null
         },
         {
           "id": "cc.notify-db",
@@ -549,7 +558,8 @@
           "jobs": null,
           "regions": null,
           "queues": null,
-          "reason": null
+          "reason": null,
+          "sources": null
         }
       ],
       "assets": []
@@ -599,7 +609,8 @@
         "jobs": null,
         "regions": null,
         "queues": null,
-        "reason": null
+        "reason": null,
+        "sources": null
       },
       "calledBy": [
         "aa.orders-api"
@@ -652,7 +663,8 @@
         "jobs": null,
         "regions": null,
         "queues": null,
-        "reason": null
+        "reason": null,
+        "sources": null
       },
       "calledBy": [
         "cc.notify-worker"
@@ -738,5 +750,7 @@
   "outsideRequestsPerSecond": null,
   "cloud": null,
   "trafficDensity": 1,
-  "notes": null
+  "notes": null,
+  "sources": null,
+  "healthEvents": null
 }

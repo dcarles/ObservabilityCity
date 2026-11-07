@@ -6,7 +6,22 @@ export interface SeaMap {
 }
 
 const CELL = 2.5
+
+/** How far out into the open water a boat sails on a loop from its own harbour, longest first: the longest that is clear of land is used. A long loop keeps each boat in view longer, so busy traffic inside an island shows as several boats at once. */
+export const LOOP_LENGTHS = [44, 34, 26, 16, 11, 7]
+
+/** How far along the coast a loop starts from the harbour's own water, so its boats keep out of the way of the boats that sail to and from other islands. */
+export const LOOP_OFFSET = 4.5
 const LAND_MARGIN = 3.2
+
+/** Whether a spot is open water: not land, and not within the margin boats keep from a coast. */
+export function isOpenWater(map: SeaMap, x: number, z: number): boolean {
+  const pts = map.land.flat()
+  if (pts.length === 0) return true
+  const { minX, minZ, w, h, blocked } = gridOf(map, pts)
+  const i = Math.floor((x - minX) / CELL), j = Math.floor((z - minZ) / CELL)
+  return i >= 0 && j >= 0 && i < w && j < h && !blocked[j * w + i]
+}
 
 function distToSegment(p: THREE.Vector2, a: THREE.Vector2, b: THREE.Vector2): number {
   const abx = b.x - a.x, aby = b.y - a.y
@@ -207,14 +222,110 @@ export function harbourLoop(map: SeaMap, water: THREE.Vector3, centre: THREE.Vec
     return i >= 0 && j >= 0 && i < w && j < h && !blocked[j * w + i]
   }
   const out = Math.atan2(water.z - centre.z, water.x - centre.x)
-  for (const length of [16, 11, 7]) {
+  // a lane of its own: start a little along the coast from the water the other boats use, on whichever side is clear
+  let start = water
+  for (const side of [1, -1]) {
+    const s = new THREE.Vector3(water.x - Math.sin(out) * LOOP_OFFSET * side, 0, water.z + Math.cos(out) * LOOP_OFFSET * side)
+    if (free(s.x, s.z)) { start = s; break }
+  }
+  for (const length of LOOP_LENGTHS) {
     for (const turn of [0, 0.5, -0.5, 1, -1]) {
       const a = out + turn
-      const end = new THREE.Vector3(water.x + Math.cos(a) * length, 0, water.z + Math.sin(a) * length)
+      const end = new THREE.Vector3(start.x + Math.cos(a) * length, 0, start.z + Math.sin(a) * length)
       let clear = true
-      for (let k = 1; k <= 8 && clear; k++) clear = free(water.x + ((end.x - water.x) * k) / 8, water.z + ((end.z - water.z) * k) / 8)
-      if (clear) return [water.clone().setY(0), end]
+      for (let k = 1; k <= 8 && clear; k++) clear = free(start.x + ((end.x - start.x) * k) / 8, start.z + ((end.z - start.z) * k) / 8)
+      if (clear) return [start.clone().setY(0), end]
     }
+  }
+  return null
+}
+
+/**
+ * How far off the coast, nearest first, the circuit round an island runs: the nearest of these that is clear of every other island is used.
+ * It is the inside lane: closer to the coast than the water by the harbour where the boats from other islands arrive, so those never cross it.
+ */
+export const CIRCUIT_OFFSETS = [5, 4.2, 6]
+
+/** How far out from an island's coast the boats between islands keep, so they never share water with the boats that sail round the island itself. */
+export const OUTER_PAD = 9
+
+/** The same sea with the chosen islands bigger all round by `pad`: lanes planned over it keep that much further from their coasts. */
+export function padLand(map: SeaMap, which: number[], pad: number): SeaMap {
+  return {
+    land: map.land.map((poly, i) => {
+      if (!which.includes(i)) return poly
+      const mid = poly.reduce((a, q) => a.add(q), new THREE.Vector2()).divideScalar(poly.length)
+      return poly.map((q) => { const away = q.clone().sub(mid).normalize(); return new THREE.Vector2(q.x + away.x * pad, q.y + away.y * pad) })
+    }),
+  }
+}
+
+/** How far from the pier's middle line the circuit's two ends are: the boats start and finish on either side of the pier, never across it. */
+export const PIER_GAP = 3.4
+
+function distToLine(p: THREE.Vector3, a: THREE.Vector3, b: THREE.Vector3): number {
+  return distToSegment(new THREE.Vector2(p.x, p.z), new THREE.Vector2(a.x, a.z), new THREE.Vector2(b.x, b.z))
+}
+
+/**
+ * A circuit round the island: it starts at the water beside the pier on one side, goes once round the coast in the water just off it, one way only, and finishes at
+ * the water beside the pier on the other side, where the boats unload. It never crosses the pier (`pier` is the pier's middle line, from its root to its tip). Boats on it all
+ * go the same way, so they follow each other and never meet. Null where no ring of open water goes all the way round (a crowded sea); the straight loop is used then.
+ */
+export function harbourCircuit(map: SeaMap, pier: { from: THREE.Vector3; to: THREE.Vector3 }, centre: THREE.Vector3): THREE.Vector3[] | null {
+  const pts = map.land.flat()
+  if (pts.length === 0) return null
+  const { minX, minZ, w, h, blocked } = gridOf(map, pts)
+  const free = (x: number, z: number) => {
+    const i = Math.floor((x - minX) / CELL), j = Math.floor((z - minZ) / CELL)
+    return i >= 0 && j >= 0 && i < w && j < h && !blocked[j * w + i]
+  }
+  // this island's coast: the one whose middle is nearest its centre
+  let coast: THREE.Vector2[] | null = null
+  let best = Infinity
+  let mid = new THREE.Vector2()
+  for (const poly of map.land) {
+    const c = poly.reduce((a, q) => a.add(q), new THREE.Vector2()).divideScalar(poly.length)
+    const d = Math.hypot(c.x - centre.x, c.y - centre.z)
+    if (d < best) { best = d; coast = poly; mid = c }
+  }
+  if (!coast || coast.length < 6) return null
+  // one direction for every island: the way round that has the sea on its right-hand side, whatever way the outline was drawn
+  let area = 0
+  for (let i = 0, j = coast.length - 1; i < coast.length; j = i++) area += coast[j].x * coast[i].y - coast[i].x * coast[j].y
+  const ring = area >= 0 ? coast : [...coast].reverse()
+  for (const offset of CIRCUIT_OFFSETS) {
+    const loop = ring.map((q) => {
+      const away = new THREE.Vector2(q.x - mid.x, q.y - mid.y).normalize()
+      return new THREE.Vector3(q.x + away.x * offset, 0, q.y + away.y * offset)
+    })
+    let clear = true
+    for (let i = 0; i < loop.length && clear; i++) {
+      const a = loop[i], b = loop[(i + 1) % loop.length]
+      for (let k = 0; k <= 4 && clear; k++) clear = free(a.x + ((b.x - a.x) * k) / 4, a.z + ((b.z - a.z) * k) / 4)
+    }
+    if (!clear) continue
+    // a point every couple of units, so the ends can sit right beside the pier
+    const dense: THREE.Vector3[] = []
+    loop.forEach((a, i) => {
+      const b = loop[(i + 1) % loop.length]
+      const steps = Math.max(1, Math.ceil(a.distanceTo(b) / 2))
+      for (let k = 0; k < steps; k++) dense.push(a.clone().lerp(b, k / steps))
+    })
+    // the ring point nearest the pier, then the run of points within the gap round it is left out
+    let nearest = 0
+    let nearestD = Infinity
+    dense.forEach((q, i) => { const d = distToLine(q, pier.from, pier.to); if (d < nearestD) { nearestD = d; nearest = i } })
+    if (nearestD > PIER_GAP) continue // the pier is not near this ring
+    const n = dense.length
+    let after = nearest
+    while (distToLine(dense[after % n], pier.from, pier.to) < PIER_GAP && after < nearest + n) after++
+    let before = nearest
+    while (distToLine(dense[((before % n) + n) % n], pier.from, pier.to) < PIER_GAP && before > nearest - n) before--
+    if (after - before >= n) continue
+    const round: THREE.Vector3[] = []
+    for (let k = after; k <= before + n; k++) round.push(dense[k % n].clone().setY(0))
+    return round
   }
   return null
 }

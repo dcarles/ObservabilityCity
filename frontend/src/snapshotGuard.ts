@@ -100,6 +100,17 @@ export function checkSnapshot(raw: unknown): Checked {
     },
     notices: Array.isArray(raw.notices) ? raw.notices.filter((n): n is string => typeof n === 'string') : [],
     notes: Array.isArray(raw.notes) ? raw.notes.filter((n): n is string => typeof n === 'string') : null,
+    // how fresh each configured source is; one that cannot be read is left out
+    sources: Array.isArray(raw.sources)
+      ? raw.sources.filter(isObject).filter((x) => typeof x.name === 'string' && isFiniteNumber(x.intervalSeconds)).map((x) => ({ name: x.name as string, lastRead: typeof x.lastRead === 'string' ? x.lastRead : null, intervalSeconds: x.intervalSeconds as number, overdue: x.overdue === true }))
+      : null,
+    // the cloud's own health reports; one without an id, a resource or a state cannot be listed and is dropped
+    healthEvents: Array.isArray(raw.healthEvents)
+      ? raw.healthEvents.filter(isObject).filter((e) => typeof e.id === 'string' && e.id !== '' && typeof e.resource === 'string' && typeof e.state === 'string' && typeof e.since === 'string').map((e) => ({
+        id: e.id as string, resource: e.resource as string, state: e.state as string, previous: str(e.previous) || null, cause: str(e.cause) || null, since: e.since as string,
+        nodeId: str(e.nodeId) || null, groupId: str(e.groupId) || null, summary: str(e.summary) || null, resolvedAt: typeof e.resolvedAt === 'string' ? e.resolvedAt : null,
+      }))
+      : null,
     groups,
     vendors,
     externalCallers: (Array.isArray(raw.externalCallers) ? raw.externalCallers : []).filter(isObject).filter((c) => typeof c.id === 'string' && c.id !== '').map<ExternalCallerSnapshot>((c) => ({
@@ -236,6 +247,11 @@ function checkNode(n: unknown, groupId: string, ids: Set<string>, problems: stri
     absent: strings(n.absent).filter((s) => (KNOWN_SIGNALS as readonly string[]).includes(s)),
     // an older server that does not say has no quiet system
     quiet: n.quiet === true,
+    // which sources feed the system and how old each one's last answer is, only when one is late; an entry without a name cannot be shown
+    sources: Array.isArray(n.sources)
+      ? n.sources.filter(isObject).filter((s) => typeof s.source === 'string' && s.source !== '')
+        .map((s) => ({ source: s.source as string, ageSeconds: isFiniteNumber(s.ageSeconds) && s.ageSeconds >= 0 ? s.ageSeconds : 0, fresh: s.fresh === true, signals: strings(s.signals) }))
+      : null,
   }
   for (const key of REQUIRED_NUMBERS) {
     out[key] = isFiniteNumber(n[key]) ? n[key] : 0
@@ -263,6 +279,16 @@ function checkNode(n: unknown, groupId: string, ids: Set<string>, problems: stri
       .map((q) => ({
         name: q.name as string, backlog: optionalNumber(q.backlog), deadLetters: optionalNumber(q.deadLetters), perSecond: optionalNumber(q.perSecond),
         link: isObject(q.link) && typeof q.link.name === 'string' && q.link.name !== '' && typeof q.link.url === 'string' && /^https?:\/\//i.test(q.link.url) ? { name: q.link.name, url: q.link.url } : null,
+        // the kinds of message it handled: null when nothing measures them; one without a name or a rate cannot be shown
+        types: Array.isArray(q.types)
+          ? q.types.filter(isObject).filter((t) => typeof t.type === 'string' && t.type !== '' && isFiniteNumber(t.perSecond) && t.perSecond >= 0).map((t) => ({ type: t.type as string, perSecond: t.perSecond as number }))
+          : null,
+        typesCut: isFiniteNumber(q.typesCut) && q.typesCut > 0 ? Math.round(q.typesCut) : 0,
+        // where the dead letters are, when the broker spans regions: one without a region or a count cannot be shown; a link must be a web address
+        deadLetterRegions: Array.isArray(q.deadLetterRegions)
+          ? q.deadLetterRegions.filter(isObject).filter((r) => typeof r.region === 'string' && r.region !== '' && isFiniteNumber(r.count) && r.count > 0)
+            .map((r) => ({ region: r.region as string, count: r.count as number, link: isObject(r.link) && typeof r.link.name === 'string' && r.link.name !== '' && typeof r.link.url === 'string' && /^https?:\/\//i.test(r.link.url) ? { name: r.link.name, url: r.link.url } : null }))
+          : null,
       }))
     : null
   out.regions = Array.isArray(n.regions)

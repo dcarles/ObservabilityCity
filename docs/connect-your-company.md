@@ -356,6 +356,32 @@ sources:
   - **Where each region's share comes from.** Give the `loganalytics` source a `regionQuery` that returns one row per app role and region with the number of `calls`. Counts are enough, even sampled ones, since only their proportions are used. The sign and the drawer show the split ("North 90% · West 10%"), and a region over `skew` (0.9 by default; 1 never flags) gets a warning while another region still runs instances. Without a `regionQuery` there is no split and nothing is shown for it.
   - **The switch.** The building shows one region at a time: the worst one, or the one picked in the drawer. There is no combined view, since adding up two regions' instances and averaging their processors would hide the one that is in trouble. A region the cloud does not report an instance count for adds nothing and is never shown as "unknown".
 
+### The cloud's own word on a resource's health
+
+A `resourcehealth` source reads the cloud's health reports (on Azure, the activity log's ResourceHealth entries) for the resource providers you list, and shows them where the resource is found. The program names no provider; you do:
+
+```yaml
+sources:
+  health:
+    kind: resourcehealth
+    providers: [<Namespace.Service>]   # the providers whose reports to read, as the cloud names them
+    window: 3d                         # how far back the log is read (default 3d, so a problem that lasts days is still listed)
+    keepResolvedFor: 4h                # how long a resolved report stays listed, in green (default 4h)
+    pollSeconds: 300
+```
+
+The source fills no signal, so nothing else is wired. It asks each subscription the scope found, once for each provider that the inventory shows has resources in that subscription (a subscription with no resource of a provider is not asked for it), and ties a report to the building that owns the resource through `scope.resources` (the resource id, case aside). What it shows:
+
+- **Open reports** (Degraded or Unavailable) put a red exclamation mark above the building, a line in the Overview tab of its drawer (state, since when, what it was before, the cause), a red "Azure incident" label on its row of the dashboard (open reports only), and an entry in the top bar's **Incidents** list that goes to the building. They count in the incident number. A report no building owns is still listed, and goes nowhere.
+- **A report ends** when the log says it resolved or the resource is Available again, and also when the cloud's current status for the resource says Available even though no resolution reached the log. It then stays listed for `keepResolvedFor`, in green, with when it began and when it ended; the mark on the building goes away at once and it no longer counts as an incident.
+- **The dashboard's Incidents card** lists each report with the system's own name as the service table shows it (and the tenant, for a store kept per tenant), its state, the cause the cloud gave and when it began and ended.
+- **Dismiss** (a button in the list and in the drawer) hides one report, open or resolved, for everyone until the server restarts.
+- If the log cannot be read at all, the last good list stays and a notice says so. If only some reads fail (a slow subscription, a denied one), the reports from the reads that worked are shown, the reports of the failed subscription and provider are kept from the last good round, and the notice says how many reads failed, so the list may be incomplete. The notice goes away after the next round where every read works.
+- Each round writes one line to the server log, for example `health read: 12 reads, 0 failed, 3 reports (1 open)`, so a slow or half-empty round can be seen.
+- At startup the source needs the inventory to know where to look. Until the inventory is read, it tries again every 30 seconds instead of waiting a whole `pollSeconds`, so reports show soon after the inventory arrives. A round may take up to `timeoutSeconds` (60 by default); raise it if your subscriptions are many or slow.
+
+Needs the sign-in to be allowed to read the activity log of each subscription (Monitoring Reader or the like) and the resource's own health status.
+
 ### Basic buildings (key vaults, storage, App Configuration) and the cloud's name
 
 `scope.assets` lists rules for resources that have no health of their own but belong in the town. Each rule has a `name`, the `label` shown on its card, a `shape` (`vault`, `store`, `settings` or `box`), the resource `types` it matches and a `pattern` that names the pillar (and the service, when the resource belongs to one) with the same groups as the system rules. A resource tied to a service stands behind that service's pad; the others stand in the pillar's back yard. Clicking one opens a card with its name, type, owner and the portal links from `scope.links`. The inventory query includes the rules' types, so no other change is needed.

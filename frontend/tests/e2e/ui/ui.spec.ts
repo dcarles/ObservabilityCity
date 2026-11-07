@@ -259,6 +259,33 @@ test.describe('the inspector drawer', () => {
     await expect(page.locator('#inspector .rows')).toContainText('none fresh')
   })
 
+  test('says which source is late, with how long ago it answered, and keeps the numbers of the sources that are fresh', async ({ town, page }) => {
+    await town.open()
+    // the live town keeps sending its own snapshots, so the late source is fed again until the drawer shows it (a snapshot arriving between the feed and the read would otherwise wipe it)
+    const feedLate = () => page.evaluate(() => {
+      const c = (window as any).city
+      const s = structuredClone(c.seen.last)
+      const n = s.groups.flatMap((g: any) => g.nodes).find((x: any) => x.id === 'cc.notify-api')
+      n.sources = [
+        { source: 'platform', ageSeconds: 240, fresh: false, signals: ['cpu', 'memory'] },
+        { source: 'telemetry', ageSeconds: 8, fresh: true, signals: ['requests', 'errors', 'latency'] },
+      ]
+      n.absent = [...n.absent, 'cpu', 'memory']
+      c.feed(s)
+    })
+    await feedLate()
+    await openByName(page, 'Notify API')
+    const rows = page.locator('#inspector .rows')
+    await expect(async () => {
+      await feedLate()
+      await expect(rows).toContainText('From platform', { timeout: 1000 })
+    }).toPass({ timeout: 15000 })
+    await expect(rows).toContainText('4m ago, late: no cpu, memory')
+    await expect(rows).toContainText('From telemetry')
+    await expect(rows).toContainText('Requests') // what the fresh source says is still shown
+    await expect(rows).not.toContainText('none fresh')
+  })
+
   test('Links lists who it calls and who calls it, and a click opens that system', async ({ town, page }) => {
     await town.open()
     await openByName(page, 'Orders API')
@@ -477,4 +504,31 @@ test.describe('island names', () => {
     // the sea is no island
     expect(await page.evaluate(() => (window as any).city.town.islandAt(5000, 5000))).toBeNull()
   })
+})
+
+test.describe('the bar and the panels at Dusk', () => {
+  const lum = (css: string) => { const [r, g, b] = css.match(/[\d.]+/g)!.slice(0, 3).map(Number); return 0.2126 * r + 0.7152 * g + 0.0722 * b }
+  const paint = (page: any, sel: string) => page.evaluate((s: string) => { const c = getComputedStyle(document.querySelector(s)!); return { bg: c.backgroundColor, fg: c.color } }, sel)
+
+  test('the top bar, the drawer and the buttons are dark with light text', async ({ town, page }) => {
+    await town.open('&light=dusk')
+    for (const sel of ['#topbar', '#inspector', '#legend', '#search-input', '#home']) {
+      const p = await paint(page, sel)
+      expect(lum(p.bg), `${sel} background ${p.bg}`).toBeLessThan(90)
+      expect(lum(p.fg), `${sel} text ${p.fg}`).toBeGreaterThan(170)
+    }
+    await town.open('&light=day')
+    expect(lum((await paint(page, '#topbar')).bg)).toBeGreaterThan(200)
+  })
+
+  for (const width of [1440, 1920]) {
+    test(`the top bar stays on one row at ${width} px wide`, async ({ town, page }) => {
+      await page.setViewportSize({ width, height: 900 })
+      await town.open('&light=dusk')
+      const h = await page.evaluate(() => document.getElementById('topbar')!.getBoundingClientRect().height)
+      expect(h).toBeLessThan(60)
+      const rows = await page.evaluate(() => new Set([...document.querySelectorAll('#topbar button, #topbar input')].map((e) => Math.round(e.getBoundingClientRect().top / 10))).size)
+      expect(rows).toBe(1)
+    })
+  }
 })

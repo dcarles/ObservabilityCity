@@ -38,6 +38,8 @@ if (args.Contains("--write-schema"))
 
 var fakeOptions = builder.Configuration.GetSection("Fake").Get<FakeOptions>() ?? new FakeOptions();
 var snapshotInterval = TimeSpan.FromSeconds(builder.Configuration.GetValue("Snapshot:IntervalSeconds", 2.0));
+// viewers are sent a snapshot when something changed, and at least this often so the feed shows it is alive (0 sends every tick)
+var keepAliveSeconds = builder.Configuration.GetValue("Snapshot:KeepAliveSeconds", 15.0);
 var staleAfter = TimeSpan.FromSeconds(builder.Configuration.GetValue("Snapshot:StaleAfterSeconds", 30.0));
 
 // The adapters this build has: every module found in adapters/ beside the program (Adapters:Path moves the folder). A live environment starts
@@ -92,13 +94,14 @@ foreach (var (folder, registry) in loaded)
         var snapshots = new SnapshotBuilder(view, state, TimeProvider.System)
         {
             IncidentSources = fake is null ? [] : [fake],
+            HealthSources = set.Sources.OfType<IHealthEventSource>().ToList(),
             Environment = environmentId,
             Traffic = discovered?.Traffic,
             ScopeSource = set.Scope,
             FixedAssets = demo ? FakeAssets.Load(folder) : null,
             Mode = mode,
             StaleAfter = staleAfter,
-            SourceIntervals = set.Sources.GroupBy(s => s.Name).ToDictionary(g => g.Key, g => g.First().PollInterval),
+            SourceIntervals = set.Sources.Where(s => s is not IHealthEventSource).GroupBy(s => s.Name).ToDictionary(g => g.Key, g => g.First().PollInterval),
             SourceLateAfter = (registry.Environments.FirstOrDefault(e => e.Id == environmentId)?.Sources ?? []).Where(s => s.LateAfterSeconds is not null).ToDictionary(s => s.Name, s => TimeSpan.FromSeconds(s.LateAfterSeconds!.Value)),
             // a demo town has its own sped-up day; a live one shows the real time of day
             DayFraction = fake is null ? () => TimeProvider.System.GetLocalNow().TimeOfDay.TotalDays : () => fake.DayFraction,
@@ -133,7 +136,7 @@ foreach (var (town, runtimes) in hostedByTown)
             builder.Services.AddSingleton<IHostedService>(sp => new LinkTrafficRunner(trafficSource, rt.Scope, rt.Registry, rt.Discovered.Traffic, TimeProvider.System, sp.GetRequiredService<ILogger<LinkTrafficRunner>>(), trafficSource as IRateHistory));
         builder.Services.AddSingleton<IHostedService>(sp => new SnapshotPublisher(rt.Builder, rt.Store,
             new SignalRSnapshotNotifier(sp.GetRequiredService<IHubContext<TownHub>>(), town.Environments, sp.GetRequiredService<IslandViews>()),
-            snapshotInterval, sp.GetRequiredService<ILogger<SnapshotPublisher>>()));
+            snapshotInterval, sp.GetRequiredService<ILogger<SnapshotPublisher>>(), keepAliveSeconds > 0 ? TimeSpan.FromSeconds(keepAliveSeconds) : null));
     }
 }
 builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter()));
@@ -218,6 +221,15 @@ app.MapPost("/api/added-hosts", (AddHostRequest request, EnvironmentSet envs, To
     })
    .Produces<IReadOnlyList<AddedHostSnapshot>>()
    .WithName("AddHost");
+
+// Hides one Azure resource-health report (open or resolved) until the server restarts. The id is the one the snapshot gives; ids hold slashes, so it travels in the body.
+app.MapPost("/api/health-events/dismiss", (DismissHealthEventRequest request, EnvironmentSet envs, string? env) =>
+    {
+        if (envs.Find(env) is not { } rt) return EnvironmentNotFound(envs, env);
+        var found = rt.Builder.HealthSources.Any(h => h.Dismiss(request.Id ?? ""));
+        return found ? Results.Ok(new { dismissed = request.Id }) : Results.NotFound(new { error = "No such health report is listed." });
+    })
+   .WithName("DismissHealthEvent");
 
 // A rule for the paths of a gateway host that no rule explains: the system they belong to. The rule matches the first two parts of the path.
 app.MapPost("/api/added-rules", (AddRuleRequest request, EnvironmentSet envs, TownSet towns, string? env) =>

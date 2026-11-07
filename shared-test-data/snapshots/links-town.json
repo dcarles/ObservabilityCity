@@ -81,7 +81,8 @@
           "jobs": null,
           "regions": null,
           "queues": null,
-          "reason": null
+          "reason": null,
+          "sources": null
         },
         {
           "id": "hub.service-bus",
@@ -125,7 +126,8 @@
           "jobs": null,
           "regions": null,
           "queues": null,
-          "reason": null
+          "reason": null,
+          "sources": null
         },
         {
           "id": "hub.egress",
@@ -169,7 +171,8 @@
           "jobs": null,
           "regions": null,
           "queues": null,
-          "reason": null
+          "reason": null,
+          "sources": null
         },
         {
           "id": "hub.customer-db",
@@ -213,7 +216,8 @@
           "jobs": null,
           "regions": null,
           "queues": null,
-          "reason": null
+          "reason": null,
+          "sources": null
         }
       ],
       "assets": []
@@ -290,7 +294,8 @@
           "jobs": null,
           "regions": null,
           "queues": null,
-          "reason": null
+          "reason": null,
+          "sources": null
         },
         {
           "id": "ful.orders-worker",
@@ -336,7 +341,8 @@
           "jobs": null,
           "regions": null,
           "queues": null,
-          "reason": null
+          "reason": null,
+          "sources": null
         },
         {
           "id": "ful.orders-db",
@@ -380,7 +386,8 @@
           "jobs": null,
           "regions": null,
           "queues": null,
-          "reason": null
+          "reason": null,
+          "sources": null
         }
       ],
       "assets": []
@@ -457,7 +464,8 @@
           "jobs": null,
           "regions": null,
           "queues": null,
-          "reason": null
+          "reason": null,
+          "sources": null
         },
         {
           "id": "wrk.batch-db",
@@ -501,7 +509,8 @@
           "jobs": null,
           "regions": null,
           "queues": null,
-          "reason": null
+          "reason": null,
+          "sources": null
         }
       ],
       "assets": []
@@ -566,7 +575,8 @@
           "jobs": null,
           "regions": null,
           "queues": null,
-          "reason": null
+          "reason": null,
+          "sources": null
         },
         {
           "id": "nom.catalog-cache",
@@ -610,7 +620,8 @@
           "jobs": null,
           "regions": null,
           "queues": null,
-          "reason": null
+          "reason": null,
+          "sources": null
         }
       ],
       "assets": []
@@ -705,7 +716,8 @@
           ],
           "regions": null,
           "queues": null,
-          "reason": null
+          "reason": null,
+          "sources": null
         }
       ],
       "assets": []
@@ -777,7 +789,8 @@
           "jobs": null,
           "regions": null,
           "queues": null,
-          "reason": null
+          "reason": null,
+          "sources": null
         },
         {
           "id": "leg.feed-worker",
@@ -823,7 +836,8 @@
           "jobs": null,
           "regions": null,
           "queues": null,
-          "reason": null
+          "reason": null,
+          "sources": null
         },
         {
           "id": "leg.feed-db",
@@ -867,7 +881,8 @@
           "jobs": null,
           "regions": null,
           "queues": null,
-          "reason": null
+          "reason": null,
+          "sources": null
         }
       ],
       "assets": []
@@ -960,7 +975,8 @@
           ],
           "regions": null,
           "queues": null,
-          "reason": null
+          "reason": null,
+          "sources": null
         }
       ],
       "assets": []
@@ -1010,7 +1026,8 @@
         "jobs": null,
         "regions": null,
         "queues": null,
-        "reason": null
+        "reason": null,
+        "sources": null
       },
       "calledBy": [
         "ful.orders-api",
@@ -1064,7 +1081,8 @@
         "jobs": null,
         "regions": null,
         "queues": null,
-        "reason": null
+        "reason": null,
+        "sources": null
       },
       "calledBy": [
         "nom.catalog-api"
@@ -1117,7 +1135,8 @@
         "jobs": null,
         "regions": null,
         "queues": null,
-        "reason": null
+        "reason": null,
+        "sources": null
       },
       "calledBy": [
         "ful.orders-worker"
@@ -1190,5 +1209,7 @@
   "outsideRequestsPerSecond": null,
   "cloud": null,
   "trafficDensity": 1,
-  "notes": null
+  "notes": null,
+  "sources": null,
+  "healthEvents": null
 }

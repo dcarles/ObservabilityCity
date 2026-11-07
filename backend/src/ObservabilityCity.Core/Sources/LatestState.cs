@@ -25,6 +25,15 @@ public sealed class LatestState
     public IReadOnlyDictionary<string, NodeReading> Of(string source) =>
         _readings.Where(kv => kv.Value.ContainsKey(source)).ToDictionary(kv => kv.Key, kv => kv.Value[source]);
 
+    /// <summary>When the source last reported anything, or null when it has not.</summary>
+    public DateTimeOffset? LastReadOf(string source)
+    {
+        DateTimeOffset? last = null;
+        foreach (var bySource in _readings.Values)
+            if (bySource.TryGetValue(source, out var r) && (last is null || r.At > last)) last = r.At;
+        return last;
+    }
+
     /// <summary>The newest reading of the node from any source, or null.</summary>
     public NodeReading? Get(string id) =>
         _readings.TryGetValue(id, out var bySource) ? bySource.Values.MaxBy(r => r.At) : null;

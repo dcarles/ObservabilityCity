@@ -1,14 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { buildDashboard, pillarSelection, worstOf } from '../../src/dashboard/model'
-import { databaseIsOpen, groupIsOpen, hiddenHtml, pillarHtml, summaryHtml, type UiState } from '../../src/dashboard/render'
+import { buildDashboard, incidentName, pillarSelection, worstOf } from '../../src/dashboard/model'
+import { deadQueuesHtml, databaseIsOpen, groupIsOpen, hiddenHtml, pillarHtml, summaryHtml, type UiState } from '../../src/dashboard/render'
+import { trafficSplit } from '../../src/trafficSplit'
 import { ALL_TENANTS } from '../../src/tenants'
 import { checkSnapshot } from '../../src/snapshotGuard'
 import type { NodeSnapshot, Snapshot } from '../../src/types'
 
 const golden = (name: string) => JSON.parse(readFileSync(resolve(__dirname, `../../../shared-test-data/snapshots/${name}.json`), 'utf8')) as Snapshot
-const ui = (over: Partial<UiState> = {}): UiState => ({ openPillars: new Set(), groups: new Map(), databases: new Map(), ...over })
+const ui = (over: Partial<UiState> = {}): UiState => ({ openPillars: new Set(), groups: new Map(), databases: new Map(), connections: new Set(), sections: new Set(), ...over })
 const node = (s: Snapshot, id: string): NodeSnapshot => s.groups.flatMap((g) => g.nodes).find((n) => n.id === id)!
 
 describe('summary counts', () => {
@@ -37,6 +38,7 @@ describe('summary counts', () => {
     const d = buildDashboard(s, ALL_TENANTS)
     expect(d.summary.traffic!.total).toBeCloseTo(s.totals.requestsPerSecond)
     expect(d.summary.traffic!.external + d.summary.traffic!.internal).toBeCloseTo(d.summary.traffic!.total)
+    expect(d.summary.traffic).toEqual(trafficSplit(s, s.totals.requestsPerSecond)) // the airport board reads the same split
     for (const g of s.groups) for (const n of g.nodes) n.absent = [...n.absent, 'requests', 'deadLetters', 'backlog']
     const bare = buildDashboard(s, ALL_TENANTS)
     expect(bare.summary.traffic).toBeNull()
@@ -229,5 +231,98 @@ describe('worstOf', () => {
     expect(worstOf(['none'])).toBe('none')
     expect(worstOf(['ok', 'bad', 'warn'])).toBe('bad')
     expect(worstOf([])).toBe('none')
+  })
+})
+
+describe('the Dead letters card list', () => {
+  const withQueues = (): Snapshot => {
+    const s = golden('calm')
+    const nodes = s.groups.flatMap((g) => g.nodes)
+    for (const n of nodes) n.queues = []
+    nodes[0].absent = []
+    nodes[0].queues = [{ name: 'orders<small>', backlog: 0, deadLetters: 2 }, { name: 'orders-big', backlog: 0, deadLetters: 40 }, { name: 'clean', backlog: 3, deadLetters: 0 }]
+    return s
+  }
+
+  it('lists only queues with dead letters, worst first, with the service and its pillar, like the town list', () => {
+    const d = buildDashboard(withQueues(), ALL_TENANTS)
+    expect(d.summary.deadQueues.map((q) => [q.queue, q.count])).toEqual([['orders-big', 40], ['orders<small>', 2]])
+    const html = deadQueuesHtml(d.summary.deadQueues)
+    expect(html).toContain('2 queues with dead letters')
+    expect(html).toContain('orders-big · <i>40</i> dead')
+    expect(html).toContain('orders&lt;small&gt;') // escaped
+    expect(html).toContain(`data-system="${d.summary.deadQueues[0].nodeId}"`)
+  })
+
+  it('leaves out a service with no fresh data, and says so when nothing is left', () => {
+    const s = withQueues()
+    s.groups.flatMap((g) => g.nodes)[0].state = 'Stale'
+    const d = buildDashboard(s, ALL_TENANTS)
+    expect(d.summary.deadQueues).toEqual([])
+    expect(deadQueuesHtml(d.summary.deadQueues)).toContain('No queue has dead letters right now.')
+  })
+
+  it('uses a singular for one queue', () => {
+    expect(deadQueuesHtml([{ nodeId: 'a.b', nodeName: 'B', groupId: 'a', groupName: 'A', queue: 'q', count: 1, region: null }])).toContain('1 queue with dead letters')
+  })
+
+  it('card shows the region of each row and counts a queue in two regions once', () => {
+    const base = { nodeId: 'a.b', nodeName: 'B', groupId: 'a', groupName: 'A', queue: 'q' }
+    const html = deadQueuesHtml([{ ...base, count: 8, region: 'West' }, { ...base, count: 3, region: 'North' }])
+    expect(html).toContain('1 queue with dead letters')
+    expect(html).toContain('<span class="qreg">West</span> · <i>8</i> dead')
+    expect(html).toContain('<span class="qreg">North</span> · <i>3</i> dead')
+    expect(deadQueuesHtml([{ ...base, count: 1, region: null }])).not.toContain('class="qreg"')
+  })
+})
+
+describe('the Incidents card', () => {
+  const event = (o: object) => ({ id: 'e', resource: 'orders-db', state: 'Degraded', previous: null, cause: null, since: '2026-11-05T16:00:00Z', resolvedAt: null, nodeId: 'aa.orders-db', groupId: 'aa', summary: null, ...o })
+
+  it('is not there when no health source is configured and no incident is open', () => {
+    const d = buildDashboard(golden('calm'), ALL_TENANTS)
+    expect(d.summary.incidents).toBeNull()
+    expect(summaryHtml(d)).not.toContain('kpi-incidents')
+  })
+
+  it('counts the open reports in red, lists them first and the resolved ones in green, and says what and where', () => {
+    const s = { ...golden('calm'), healthEvents: [event({ id: 'r', state: 'Resolved', resolvedAt: '2026-11-05T17:00:00Z' }), event({ id: 'o', state: 'Unavailable', resource: 'ledger-db', nodeId: null })] }
+    const d = buildDashboard(s, ALL_TENANTS)
+    expect(d.summary.incidents?.open).toBe(1)
+    expect(d.summary.incidents?.rows.map((r) => [r.source, r.status, r.tone])).toEqual([['Azure', 'Unavailable', 'bad'], ['Azure', 'Resolved', 'ok']])
+    const html = summaryHtml(d)
+    expect(html).toContain('<b class="bad">1</b>')
+    expect(html).toContain('class="il bad"')
+    expect(html).toContain('class="il ok" data-system="aa.orders-db"')
+    expect(html).toContain('data-dismiss="r"')
+    expect(d.summary.incidents?.rows[1].times).toMatch(/^declared .* · resolved /)
+    expect(d.summary.incidents?.rows[0].times).not.toContain('resolved')
+  })
+
+  it('names a report by the system as the service table does, adds the tenant for a store kept per tenant, and says the cause', () => {
+    const calm = golden('calm')
+    const node = calm.groups.find((g) => !g.isHub)!.nodes[0]
+    const s = { ...calm, healthEvents: [event({ id: 'o', state: 'Degraded', resource: '2222-al-ord', nodeId: node.id, tenant: 'Acme Bank', cause: 'PlatformInitiated' })] }
+    const row = buildDashboard(s, ALL_TENANTS).summary.incidents!.rows[0]
+    expect(row.what).toBe(`${node.name} · Acme Bank`)
+    expect(row.cause).toBe('PlatformInitiated')
+    expect(summaryHtml(buildDashboard(s, ALL_TENANTS))).toContain('cause PlatformInitiated')
+    expect(incidentName({ resource: 'raw-name', nodeId: node.id }, new Map([[node.id, node.name]]))).toBe(node.name) // no tenant: the name alone
+    expect(incidentName({ resource: 'raw-name', nodeId: null, tenant: null }, new Map())).toBe('raw-name') // no system owns it: the cloud's name
+  })
+
+  it('marks a service row only while its report is open: a resolved one is left to the card', () => {
+    const calm = golden('calm')
+    const node = calm.groups.find((g) => !g.isHub)!.nodes[0]
+    const open = JSON.stringify(buildDashboard({ ...calm, healthEvents: [event({ nodeId: node.id })] as never }, ALL_TENANTS))
+    const resolved = JSON.stringify(buildDashboard({ ...calm, healthEvents: [event({ nodeId: node.id, state: 'Resolved', resolvedAt: '2026-11-05T17:00:00Z' })] as never }, ALL_TENANTS))
+    expect(open).toContain('"azure":{"state":"Degraded"')
+    expect(resolved).not.toContain('"azure":{')
+  })
+
+  it('turns the number green when everything listed is resolved, and shows the card with no reports at all', () => {
+    const resolved = buildDashboard({ ...golden('calm'), healthEvents: [event({ state: 'Resolved', resolvedAt: '2026-11-05T17:00:00Z' })] }, ALL_TENANTS)
+    expect(summaryHtml(resolved)).toContain('<b class="ok">0</b>')
+    expect(summaryHtml(buildDashboard({ ...golden('calm'), healthEvents: [] }, ALL_TENANTS))).toContain('No incidents')
   })
 })

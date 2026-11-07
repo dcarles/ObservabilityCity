@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { carRate, MIN_CAR_RATE, beaconLevel, darkFloorsFor, floorsFor, formatAge, litFraction, speedFactor, spawnRate } from '../../src/visuals'
+import { boatRate, MIN_BOAT_RATE, MAX_BOAT_RATE, carRate, MIN_CAR_RATE, beaconLevel, darkFloorsFor, floorsFor, formatAge, formatCount, formatRate, litFraction, speedFactor, spawnRate } from '../../src/visuals'
 import type { Snapshot } from '../../src/types'
 
 describe('floors', () => {
@@ -104,5 +104,38 @@ describe('cars leaving on a route', () => {
 
   it('shrink with the quality and town density settings, the floor too', () => {
     expect(carRate(300, 0.001, 0.5, 0.4)).toBeCloseTo(MIN_CAR_RATE * 0.5, 9)
+  })
+})
+
+describe('boat rate', () => {
+  it('sends no boats with no messages or no share', () => {
+    expect(boatRate(0, 1)).toBe(0)
+    expect(boatRate(10, 0)).toBe(0)
+  })
+  it('never sends fewer than one boat every 30 seconds on a lane with messages', () => {
+    expect(boatRate(0.5, 0.01)).toBe(MIN_BOAT_RATE)
+    expect(boatRate(300, 0.0001)).toBe(MIN_BOAT_RATE)
+  })
+  it('follows the messages above that, and is capped', () => {
+    expect(boatRate(7, 1)).toBeGreaterThan(boatRate(7, 0.5))
+    expect(boatRate(100, 1)).toBeGreaterThan(boatRate(10, 1))
+    expect(boatRate(7, 1)).toBeGreaterThan(0.016 * Math.sqrt(7))
+    expect(boatRate(100000, 1)).toBe(MAX_BOAT_RATE)
+  })
+})
+
+describe('a count of messages (dead letters) is a whole number, a rate keeps its decimals', () => {
+  it('shows 2 and not 2.0, and thousands as k', () => {
+    expect(formatCount(0)).toBe('0')
+    expect(formatCount(2)).toBe('2')
+    expect(formatCount(8)).toBe('8')
+    expect(formatCount(11)).toBe('11')
+    expect(formatCount(999)).toBe('999')
+    expect(formatCount(1200)).toBe('1.2k')
+  })
+
+  it('leaves the rate formatter as it was', () => {
+    expect(formatRate(2)).toBe('2.0')
+    expect(formatRate(12)).toBe('12')
   })
 })

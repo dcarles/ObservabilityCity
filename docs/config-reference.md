@@ -230,15 +230,18 @@ One file per environment. The pillar and system files are shared; this file says
 | Key | Required | Default | Meaning |
 |---|---|---|---|
 | `regionQuery` | no | none | `loganalytics`: the query that says how a service's requests divide between regions: one row per telemetry name and region with the columns `role`, `region` and `calls`. Sampled counts are fine, only the proportions are used. Same template holes as `query`. With it each region shows its share of the requests. |
-| `kind` | yes | | `fake`, `resourcegraph`, `loganalytics`, `azuremonitor`, `functionjobs`, `servicebus`, `prometheus` or `grafana-irm`. |
+| `typesQuery` | no | none | `servicebus`: a Log Analytics query that says which kinds of message each queue handled: one row per queue and message type with the columns `queue` (the entity's name, as the broker names it), `type` and `calls` (how many were handled over the window). Same template holes as `query`. With it each queue row of a reading system's drawer lists the kinds with their messages a second, highest first, up to 200 kinds per queue; the quietest beyond that are counted, not listed. The source needs the workspace the environment's scope gives (`scope.workspaceId`). Without it no kinds are shown. |
+| `kind` | yes | | `fake`, `resourcegraph`, `loganalytics`, `azuremonitor`, `functionjobs`, `servicebus`, `resourcehealth`, `prometheus` or `grafana-irm`. |
 | `connection` | no | from `scope` | How to reach it (a workspace id, an endpoint). Not used by `fake`. |
 | `credential` | no | Azure CLI login | A name from `credentials`. Azure sources only. |
-| `pollSeconds` | no | 30 | How often the source is asked. Above 0. |
-| `timeoutSeconds` | no | 10 | How long one ask may take. Above 0. |
+| `pollSeconds` | no | 30 (300 for `resourcehealth`) | How often the source is asked. Above 0. |
+| `timeoutSeconds` | no | 10 (60 for `resourcehealth`) | How long one ask may take. Above 0. |
 | `lateAfterSeconds` | no | twice `pollSeconds` | `functionjobs`: how long after its schedule says a job should run it may go without a newer run before it counts as late (amber). A value below the default is ignored, since a reading may lag that much anyway. Lets a log that arrives late stay quiet without polling slower. Above 0. |
 | `query` | no | none | `loganalytics`: the query to send, a template; `functionjobs`: the query that summarises the function apps' logs into one row per app and job (columns `resourceId`, `job`, `lastRun`, `succeeded`, `next`, `region`). `{window}`, `{windowSeconds}`, `{roles}`, scope variables and `{environment}` work. |
-| `window` | no | `5m` | `loganalytics` and `azuremonitor`: how far back one answer looks. |
+| `window` | no | `5m` (`3d` for `resourcehealth`) | `loganalytics`, `azuremonitor` and `resourcehealth`: how far back one answer looks. A unit is `s`, `m`, `h` or `d`. |
 | `metrics` | no | none | `azuremonitor`: which metric of which resources fills which signal. |
+| `providers` | no | none | `resourcehealth`: the resource providers whose health reports are read, as the cloud names them (`Namespace.Service`, for example the data store's). Required for a `resourcehealth` source. A subscription is asked for a provider only when the inventory has a resource of that provider in it. A resource's report is matched to the system that owns it by the resource's id, through `scope.resources`. |
+| `keepResolvedFor` | no | `4h` | `resourcehealth`: how long a report stays listed, in green, after the resource recovered (a number and a unit: `4h`, `90m`, `1d`). The marker on the building goes away at once; the list entry and the drawer lines say resolved. A report can be dismissed earlier (the Dismiss button); a dismissal lasts until the server restarts. |
 | `entities` | no | none | `servicebus`: which namespaces to read, which metrics are the backlog and the dead letters, and how an entity's name says whose it is. Required for a `servicebus` source. |
 
 ### metrics entries (`azuremonitor`)
@@ -298,11 +301,12 @@ sources:
     entities:
       resources: broker                       # a rule of scope.resources that finds the namespaces
       backlog: { metric: ActiveMessages, aggregation: average }
-      deadLetter: { metric: DeadletteredMessages, aggregation: maximum }
+      deadLetter: { metric: DeadletteredMessages, aggregation: last }   # last = the newest point: what is dead-lettered now, so a replayed queue clears at once. maximum would keep the peak of the whole window
       throughput: { metric: IncomingMessages, aggregation: total }
-      patterns:                               # the first that matches decides; (?<pillar>) and (?<service>) are the pillar and service codes
-        - { match: '^sbq-(?<pillar>[a-z]+)-(?<service>[a-z]+)-(?:inbox|changefeed)$' }
-        - { match: '^sbq-(?<pillar>[a-z]+)-[a-z]+-(?<service>[a-z]+)-outbox$' }
+      patterns:                               # the first that matches decides; (?<service>) is the service code of the reader, (?<pillar>) the pillar code of the reader (left out: any pillar)
+        - { match: '^sbq-(?<pillar>[a-z]+)-(?<service>[a-z]+)-(?:inbox|changefeed-worker)$' }
+        # the name also says who publishes it, so the town builds the topic and the subscription itself: no `messaging:` block in a pillar file
+        - { match: '^sbq-(?<producerPillar>[a-z]+)-(?<producer>[a-z]+)-(?<service>[a-z]+)-outbox$' }
 signals: { backlog: messaging, deadLetters: messaging }
 ```
 
@@ -316,19 +320,21 @@ signals: { backlog: messaging, deadLetters: messaging }
 | `deadLetter` | no | none | The metric of the dead-lettered messages of an entity. |
 | `throughput` | no | none | The metric of the messages that arrive in an entity, usually incoming messages added up by `total`. Their rate (per second over the window) sets how many boats sail to the consumer; without it the boats follow the consumer's request rate. |
 | `deadLetterLink` | no | none | `{ name, url }`: an address that opens one queue's dead letters in your support tool, shown for each queue in its consumer's drawer. The url is a template over `{queue}`, `{pillar}`, `{service}` (the codes of the scope rules), `{system}` and `{environment}`. Without it, no link. |
-| `patterns` | yes | | The shapes of entity names, tried in order. |
+| `deadLetterLinks` | no | none | A list of `{ region, name, url }`: one support-tool address for each region, for a broker whose namespaces are in more than one region and a tool for each. A queue's dead letters in a region open the entry of that region (the region is matched ignoring case against the region of the namespace that holds them, as `scope.regions` and the resource rule give it). A region with no entry uses `deadLetterLink`. Each region may be given once. |
+| `patterns` | yes | | The shapes of entity names, tried in order: a regular expression with the group `service` (the code of the system that reads the entity; it must belong to one system of the kind only, or the entity is left out), optionally `pillar` (the code or id of the reader's pillar; without it the reader may be in any pillar), and optionally both `producerPillar` and `producer` (the code of the pillar and of the service that publish it). An entity whose name says its publisher is a route: the town adds that service's topic and the reader's subscription to what the pillar files say, on every poll, so queues teams add later appear without a config change. A queue Azure sends nothing for in one poll keeps its place with no numbers. |
 
 <!-- file: EntityLinkFile -->
 | Key | Required | Default | Meaning |
 |---|---|---|---|
 | `name` | yes | | The words the link shows (for example `Support tool`). |
 | `url` | yes | | An `http://` or `https://` address, a template over `{queue}` (the queue's name), `{pillar}`, `{service}`, `{system}` and `{environment}`. A system with no code for a word it uses gets no link. |
+| `region` | no | | Only in `deadLetterLinks`: the region the address is for (required there, and not used in `deadLetterLink`). |
 
 <!-- file: EntityMetricFile -->
 | Key | Required | Default | Meaning |
 |---|---|---|---|
 | `metric` | yes | | The metric's name. |
-| `aggregation` | no | `average` | How its points over the window are added up: `average`, `total`, `count`, `maximum` or `minimum`. |
+| `aggregation` | no | `average` | How its points over the window are added up: `average`, `total`, `count`, `maximum` or `minimum`. `backlog` and `deadLetter` may also use `last`, the newest point of the window (what is there now, not the worst of the last minutes). Azure Monitor has no such aggregation, so the maximum of each grain is asked for and the newest grain is read. `throughput` cannot use `last`. |
 
 <!-- file: EntityPatternFile -->
 | Key | Required | Default | Meaning |

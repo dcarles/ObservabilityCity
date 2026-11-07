@@ -9,14 +9,14 @@ export interface BoatRoute {
   /** The island whose topic the boats carry out of (null for the hub's own), and the island they sail to. */
   from: string | null
   to: string
-  /** True for the boats of a scheduler's mapped jobs: a short loop out of the island's own harbour. */
+  /** True for the boats of a scheduler's mapped jobs: a loop out of the island's own harbour. */
   scheduler?: boolean
+  /** True when the path is a closed circuit round the island: sailed once, one way, instead of there and back. */
+  circuit?: boolean
   /** Boats leaving per second. Zero while the broker is down or has no data. */
   rate: () => number
   /** Sailing speed multiplier from the broker's latency against its SLA. */
   speed: () => number
-  /** How full the boats are, 0 to 1: the island's message rate on a log scale. */
-  load: () => number
 }
 
 interface Boat {
@@ -28,11 +28,42 @@ interface Boat {
   dist: number
   route: BoatRoute
   phase: number
+  /** Sideways offset from the lane now (to the boat's right), the one it is easing to, and how much it slows down for another boat: all set by the checks between boats. */
+  lateral: number
+  want: number
+  slow: number
+  /** The way it is heading, a unit vector on the water, from where it was last placed. */
+  hx: number
+  hz: number
+  /** Seconds spent unloading at the quay at the end of a circuit. */
+  hold: number
 }
 
 const BASE_SPEED = 4.4
 const SEA = 0.12
-const BOAT_SCALE = 0.7
+const BOAT_SCALE = 0.95
+/** The checks between boats that sail between islands: how close another boat must be to count, how near it may come at the most, and how slow a boat gives way. */
+export const AVOID_RADIUS = 3.4
+export const AVOID_GAP = 1.4
+const AVOID_SLOWEST = 0.2
+/** How far a boat steps to its right to pass another head on, at the most; the lanes keep clear of land by more than this and the lane's own side step together. */
+export const AVOID_STEP = 1.2
+const AVOID_EASE = 3
+/** How far a boat keeps to the right of the middle of its lane, so a boat going out and one coming back pass side by side. */
+export const LANE_SIDE = 1.3
+/** A boat at the end of its circuit lies at the quay and unloads one crate every UNLOAD_STEP seconds, then leaves. */
+export const UNLOAD_STEP = 0.15
+const UNLOAD_LEAVE = 0.7
+
+/** The same path moved sideways by `side` (positive: to the right of the way it runs), corners included. */
+export function sidestep(path: THREE.Vector3[], side: number): THREE.Vector3[] {
+  return path.map((p, i) => {
+    const a = path[Math.max(0, i - 1)], b = path[Math.min(path.length - 1, i + 1)]
+    const dx = b.x - a.x, dz = b.z - a.z
+    const len = Math.hypot(dx, dz) || 1
+    return new THREE.Vector3(p.x - (dz / len) * side, p.y, p.z + (dx / len) * side)
+  })
+}
 
 /**
  * Messages as boats. Each island has a sea lane from the hub's Service Bus port to its harbour. How many boats
@@ -44,7 +75,9 @@ export class BoatSystem {
   private readonly routes: BoatRoute[] = []
   private readonly acc = new Map<BoatRoute, number>()
   private readonly boats: Boat[] = []
+  /** Idle boats: the ones for lanes between islands, and the differently painted ones for loops out of an island's own harbour. */
   private readonly free: { object: THREE.Group; cargo: THREE.Group }[] = []
+  private readonly freeInternal: { object: THREE.Group; cargo: THREE.Group }[] = []
   private time = 0
   private enabled = true
 
@@ -53,16 +86,28 @@ export class BoatSystem {
     if (on === this.enabled) return
     this.enabled = on
     this.object.visible = on
-    if (!on) for (const b of this.boats.splice(0)) { b.object.visible = false; this.free.push({ object: b.object, cargo: b.cargo as THREE.Group }) }
+    if (!on) for (const b of this.boats.splice(0)) this.release(b)
   }
 
   constructor(max = 48) {
     for (let i = 0; i < max; i++) {
-      const b = vehicles().boat(i)
-      b.object.visible = false
-      this.object.add(b.object)
-      this.free.push(b)
+      for (const internal of [false, true]) {
+        const b = vehicles().boat(i, internal)
+        b.object.visible = false
+        this.object.add(b.object)
+        ;(internal ? this.freeInternal : this.free).push(b)
+      }
     }
+  }
+
+  /** Whether a lane is a loop out of an island's own harbour and back: its boats are the other colour. */
+  private static isInternal(r: BoatRoute): boolean {
+    return r.scheduler === true || (r.from !== null && r.from === r.to)
+  }
+
+  private release(b: Boat): void {
+    b.object.visible = false
+    ;(BoatSystem.isInternal(b.route) ? this.freeInternal : this.free).push({ object: b.object, cargo: b.cargo as THREE.Group })
   }
 
   /** The share of the usual number of boats that are sent out: 1 for all of them, less on a weak PC (see the quality presets). */
@@ -72,26 +117,35 @@ export class BoatSystem {
     this.routes.length = 0
     this.routes.push(...routes)
     this.acc.clear()
-    for (const b of this.boats.splice(0)) { b.object.visible = false; this.free.push({ object: b.object, cargo: b.cargo as THREE.Group }) }
+    for (const b of this.boats.splice(0)) this.release(b)
   }
 
   update(dt: number): void {
     if (!this.enabled) return
     this.time += dt
+    this.avoid(dt)
     for (const r of this.routes) {
       const rate = r.rate()
       if (rate <= 0) continue
       const a = (this.acc.get(r) ?? Math.random()) + rate * this.density * dt
       let whole = Math.floor(a)
       this.acc.set(r, a - whole)
-      while (whole-- > 0 && this.free.length > 0) this.spawn(r)
+      while (whole-- > 0 && (BoatSystem.isInternal(r) ? this.freeInternal : this.free).length > 0) this.spawn(r)
     }
     for (let i = this.boats.length - 1; i >= 0; i--) {
       const b = this.boats[i]
-      b.dist += BASE_SPEED * b.route.speed() * dt
+      b.dist += BASE_SPEED * b.route.speed() * b.slow * dt
       if (b.dist >= b.total) {
-        b.object.visible = false
-        this.free.push({ object: b.object, cargo: b.cargo as THREE.Group })
+        if (b.route.circuit === true) {
+          // lies at the quay and hands its crates over one by one, then leaves
+          b.dist = b.total
+          b.hold += dt
+          const crates = b.cargo.children
+          const gone = Math.min(crates.length, Math.floor(b.hold / UNLOAD_STEP))
+          crates.forEach((c, k) => { c.visible = k >= gone })
+          if (b.hold < crates.length * UNLOAD_STEP + UNLOAD_LEAVE) { this.place(b); continue }
+        }
+        this.release(b)
         this.boats.splice(i, 1)
         continue
       }
@@ -106,17 +160,58 @@ export class BoatSystem {
   private spawn(r: BoatRoute): void {
     const out = r.path
     if (out.length < 2) return
-    // there and back: the way back is the same lane in reverse, so boats pass each other
-    const points = [...out, ...[...out].reverse().slice(1)]
+    // there and back: the way back is the same lane in reverse, but each way keeps to its own side of it, like the cars, so boats going out and coming back pass side by side
+    const points = r.circuit ? [...out] : [...sidestep(out, LANE_SIDE), ...sidestep([...out].reverse(), LANE_SIDE).slice(1)]
     const lengths: number[] = []
     let total = 0
     for (let i = 1; i < points.length; i++) { const l = points[i].distanceTo(points[i - 1]); lengths.push(l); total += l }
-    const slot = this.free.pop()!
+    const slot = (BoatSystem.isInternal(r) ? this.freeInternal : this.free).pop()!
     slot.object.visible = true
-    // a fuller load for busier traffic: 1 to 6 crates on deck
-    const crates = 1 + Math.round(clamp(r.load(), 0, 1) * 5)
-    slot.cargo.children.forEach((c, i) => { c.visible = i < crates })
-    this.boats.push({ object: slot.object, cargo: slot.cargo, points, lengths, total, dist: 0, route: r, phase: Math.random() * 6 })
+    slot.cargo.children.forEach((c) => { c.visible = true }) // always the full load of crates
+    const boat: Boat = { object: slot.object, cargo: slot.cargo, points, lengths, total, dist: 0, route: r, phase: Math.random() * 6, lateral: 0, want: 0, slow: 1, hx: 0, hz: 1, hold: 0 }
+    this.boats.push(boat)
+    this.place(boat) // on the water from the start, so the checks between boats see it where it is
+  }
+
+  /**
+   * The checks between the boats that sail between islands (a loop round an island has its own lane and is left alone). For every pair that is close:
+   * following the same way, the one behind slows; crossing, the one with the other on its right gives way and slows; head on, both step to their right.
+   * Only a boat's own speed and its sideways step change, so a boat never leaves its lane by more than AVOID_STEP.
+   */
+  private avoid(dt: number): void {
+    const sail = this.boats.filter((b) => !BoatSystem.isInternal(b.route))
+    for (const b of this.boats) { b.slow = 1; b.want = 0 }
+    // boats on a circuit queue behind the one ahead on the same circuit, mostly the one lying at the quay unloading
+    const ring = this.boats.filter((b) => b.route.circuit === true)
+    for (const b of ring) {
+      for (const c of ring) {
+        if (c === b || c.route !== b.route || c.dist <= b.dist) continue
+        const d = b.object.position.distanceTo(c.object.position)
+        if (d < AVOID_RADIUS && c.dist - b.dist < AVOID_RADIUS * 3) b.slow = Math.min(b.slow, clamp((d - AVOID_GAP) / (AVOID_RADIUS - AVOID_GAP), AVOID_SLOWEST, 1))
+      }
+    }
+    const slowFor = (b: Boat, d: number) => { b.slow = Math.min(b.slow, clamp((d - AVOID_GAP) / (AVOID_RADIUS - AVOID_GAP), AVOID_SLOWEST, 1)) }
+    for (let i = 0; i < sail.length; i++) {
+      const a = sail[i]
+      for (let j = i + 1; j < sail.length; j++) {
+        const c = sail[j]
+        const dx = c.object.position.x - a.object.position.x, dz = c.object.position.z - a.object.position.z
+        const d = Math.hypot(dx, dz)
+        if (d > AVOID_RADIUS || d < 1e-6) continue
+        const along = a.hx * c.hx + a.hz * c.hz
+        const aheadOfA = (a.hx * dx + a.hz * dz) / d // how far in front of a the other boat is, -1 to 1
+        const aheadOfC = -(c.hx * dx + c.hz * dz) / d
+        if (along > 0.5) {
+          if (aheadOfA > 0.3) slowFor(a, d)
+          else if (aheadOfC > 0.3) slowFor(c, d)
+        } else if (along < -0.5) {
+          if (aheadOfA > 0.3 && aheadOfC > 0.3) { a.want = AVOID_STEP; c.want = AVOID_STEP }
+        } else if ((-a.hz * dx + a.hx * dz) / d > 0) slowFor(a, d) // the other boat is on a's right: a gives way
+        else slowFor(c, d)
+      }
+    }
+    const ease = Math.min(1, AVOID_EASE * dt)
+    for (const b of sail) b.lateral += (b.want - b.lateral) * ease
   }
 
   private place(b: Boat): void {
@@ -127,6 +222,10 @@ export class BoatSystem {
     const o = b.object
     o.position.lerpVectors(b.points[i], b.points[i + 1], t)
     const dx = b.points[i + 1].x - b.points[i].x, dz = b.points[i + 1].z - b.points[i].z
+    const len = Math.hypot(dx, dz)
+    if (len > 1e-6) { b.hx = dx / len; b.hz = dz / len }
+    o.position.x += -b.hz * b.lateral // to the boat's right
+    o.position.z += b.hx * b.lateral
     const target = Math.atan2(dx, dz)
     let d = target - o.rotation.y
     d = Math.atan2(Math.sin(d), Math.cos(d))
@@ -135,9 +234,12 @@ export class BoatSystem {
     const kit = vehicles()
     o.position.y = SEA + kit.boatLift + bob * kit.boatBob
     o.rotation.z = bob * kit.boatBob * 0.5
-    b.cargo.visible = b.dist < b.total / 2
+    // a boat on a circuit round its island is loaded all the way and unloads at the quay; there and back, it is loaded only on the way out
+    b.cargo.visible = b.route.circuit === true || b.dist < b.total / 2
     // ease in and out at the quays
-    const fade = clamp(Math.min(b.dist, b.total - b.dist) / 4, 0, 1)
+    const fade = b.route.circuit === true
+      ? Math.min(clamp(b.dist / 4, 0, 1), clamp(1 - (b.hold - (b.cargo.children.length * UNLOAD_STEP)) / UNLOAD_LEAVE, 0, 1)) // a circuit boat stays full size at the quay until its crates are off
+      : clamp(Math.min(b.dist, b.total - b.dist) / 4, 0, 1)
     o.scale.setScalar(BOAT_SCALE * (0.4 + 0.6 * fade))
   }
 }

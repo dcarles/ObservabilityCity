@@ -1,7 +1,7 @@
 name: CI
 
 # The checks that block a pull request. They run side by side, so the wait is the slowest job, not the sum.
-# The slow checks (23-island stress town, full sample town with screenshots) are in slow.yml: they run on merge to main and nightly.
+# The slow checks (23-island stress town, full sample town with screenshots, the space and factory themes) are in slow.yml: they run on merge to main and nightly.
 
 on:
   push:
@@ -83,7 +83,7 @@ jobs:
           - { group: ui, suites: 'ui' }
           - { group: towns, suites: 'towns' }
           - { group: links and tenants, suites: 'links tenants dashboard' }
-          - { group: other towns, suites: 'direct live sources discovery scope functions messaging wide' }
+          - { group: other towns, suites: 'direct live sources discovery scope health functions messaging wide' }
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-dotnet@v6

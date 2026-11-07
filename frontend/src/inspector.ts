@@ -3,7 +3,8 @@ import { escapeHtml } from './picker'
 import { scopeParams, type Scope } from './scope'
 import { tenantListOrder, tenantFigures, yardSummary, type TenantView } from './tenants'
 import { regionFigures, regionOptions, validChoice, WORST, type RegionChoice } from './regions'
-import { ago, clockTime, configOrder, queueRows, groupDetail, incidentSummary, jobRows, LAYER_WORD, linkSections, logLinkLabel, logSectionEmpty, logSectionTitle, logTabLabel, pickLogSection, originLabel, type LinkItem, overviewLinks, overviewRows, reasons, repeatLabel, resourceLinks, scopeView, SEVERITY_WORD, sectionLinks, stateTone, vendorWhere } from './inspectorModel'
+import { azureRows, dismissEvent, eventOfNode } from './healthEvents'
+import { ago, clockTime, configOrder, messagesPerSecond, messageRate, queueRows, groupDetail, incidentSummary, jobRows, LAYER_WORD, linkSections, logLinkLabel, logSectionEmpty, logSectionTitle, logTabLabel, pickLogSection, originLabel, type LinkItem, type QueueTypes, overviewLinks, overviewRows, reasons, repeatLabel, resourceLinks, scopeView, SEVERITY_WORD, sectionLinks, stateTone, vendorWhere } from './inspectorModel'
 
 export type InspectorTab = 'overview' | 'links' | 'logs' | 'config'
 const TABS: { id: InspectorTab; label: string }[] = [
@@ -45,6 +46,8 @@ export class Inspector {
   private logsState: 'loading' | 'ready' | 'failed' = 'loading'
   private logsError = ''
   private logSection = ''
+  /** The queues whose full list of kinds of message is open, by name; kept while the drawer redraws with new numbers. */
+  private readonly typesOpen = new Set<string>()
   private key = ''
   private seq = 0
   private logSeq = 0
@@ -165,6 +168,10 @@ export class Inspector {
     if (t.closest('[data-refresh-logs]')) { void this.loadLogs(); return }
     const logTab = t.closest<HTMLElement>('[data-log-tab]')
     if (logTab) { this.logSection = logTab.dataset.logTab!; this.render(); return }
+    const dismiss = t.closest<HTMLElement>('[data-azure-dismiss]')
+    if (dismiss) { void dismissEvent(dismiss.dataset.azureDismiss!); return }
+    const more = t.closest<HTMLElement>('[data-types-toggle]')
+    if (more) { const q = more.dataset.typesToggle!; if (!this.typesOpen.delete(q)) this.typesOpen.add(q); this.render(); return }
     const region = t.closest<HTMLElement>('[data-region]')
     if (region && this.id) { this.host.setRegion(this.id, region.dataset.region as RegionChoice); this.render(); return }
     const link = t.closest<HTMLElement>('[data-go]')
@@ -204,7 +211,8 @@ export class Inspector {
     const incidents = group?.incidents ?? []
     return `
       ${why.length === 0 ? '<p class="fine">Nothing to flag: every number is inside its lines.</p>' : `<ul class="why">${why.map((w) => `<li>${escapeHtml(w)}</li>`).join('')}</ul>`}
-      <div class="rows">${overviewRows(n, (id) => this.find(id)?.node.name ?? id, this.snap?.cloud).map((r) => `<div class="row"><span>${r.label}</span><span class="${r.tone}">${escapeHtml(r.value)}</span></div>`).join('')}</div>
+      <div class="rows">${overviewRows(n, (id) => this.find(id)?.node.name ?? id, this.snap?.cloud, this.snap ? messagesPerSecond(this.snap.groups.flatMap((g) => g.nodes)) : null).map((r) => `<div class="row"><span>${r.label}</span><span class="${r.tone}">${escapeHtml(r.value)}</span></div>`).join('')}</div>
+      ${this.azure(n)}
       ${this.jobs(n, group)}
       ${this.queues(n)}
       ${this.regions(n)}
@@ -214,11 +222,34 @@ export class Inspector {
         ${incidents.map((i) => `<div class="row"><span>${escapeHtml(i.title)}</span><span class="warn">sev ${i.severity}${SEVERITY_WORD[i.severity] ? ` · ${SEVERITY_WORD[i.severity]}` : ''} · since ${escapeHtml(clockTime(i.startedAt))}</span></div>`).join('')}`}`
   }
 
+  /** Azure Resource Health's open report for this building's resource. Nothing when Azure reports nothing. */
+  private azure(n: NodeSnapshot): string {
+    const e = eventOfNode(this.snap?.healthEvents, n.id)
+    if (!e) return ''
+    return `<h4>Azure resource health</h4><div class="azure" data-azure="${escapeHtml(e.state)}">${azureRows(e).map((r) => `<div class="row"><span>${r.label}</span><span class="${r.tone}">${escapeHtml(r.value)}</span></div>`).join('')}
+      <button class="azure-dismiss" data-azure-dismiss="${escapeHtml(e.id)}" title="Hide this report until the server restarts">Dismiss</button></div>`
+  }
+
   /** The queues a consumer reads: each with what waits and what is dead-lettered, and a link to its dead letters when the environment names a support tool. Nothing for a system that reads none. */
   private queues(n: NodeSnapshot): string {
     const rows = queueRows(n)
     if (rows.length === 0) return ''
-    return `<h4>Queues</h4><div class="queues">${rows.map((r) => `<div class="row queue" data-queue="${escapeHtml(r.name)}"><span>${escapeHtml(r.name)}</span><span class="${r.tone}">${escapeHtml(r.text)}${r.link ? ` · ${this.anchor(r.link.name, r.link.url)}` : ''}</span></div>`).join('')}</div>`
+    const total = messagesPerSecond([n])
+    const head = total == null ? 'Queues' : `Queues <small title="Each queue this system reads counts, so a message that crosses two queues is counted twice, once in each.">${escapeHtml(messageRate(total))} msg/s in total</small>`
+    return `<h4>${head}</h4><div class="queues">${rows.map((r) => `<div class="row queue" data-queue="${escapeHtml(r.name)}"><span>${escapeHtml(r.name)}</span><span class="${r.tone}">${escapeHtml(r.text)}${r.link ? ` · ${this.anchor(r.link.name, r.link.url)}` : ''}${r.regions.map((g) => ` · <span class="qreg">${escapeHtml(g.region)}</span> ${g.count} dead${g.link ? ` ${this.anchor(g.link.name, g.link.url)}` : ''}`).join('')}</span></div>${this.types(r)}`).join('')}</div>`
+  }
+
+  /** The kinds of message one queue handled: the busiest few, then a line that opens the full list (and closes it again). Nothing when the environment does not measure them. */
+  private types(r: { name: string; types: QueueTypes | null }): string {
+    const t = r.types
+    if (!t) return ''
+    const open = this.typesOpen.has(r.name)
+    const rows = (open ? t.all : t.top).map((x) => `<div class="row type" data-type="${escapeHtml(x.name)}"><span>${escapeHtml(x.name)}</span><span>${escapeHtml(x.text)}</span></div>`).join('')
+    const toggle = t.more
+      ? `<button class="types-toggle" data-types-toggle="${escapeHtml(r.name)}" aria-expanded="${open}">${open ? 'Show fewer kinds' : `${t.more.count} more kinds, ${escapeHtml(t.more.text)}`}</button>`
+      : ''
+    const cut = open && t.more && t.more.cut > 0 ? `<div class="fine">${t.more.cut} of the quietest kinds are not listed.</div>` : ''
+    return `<div class="types" data-types-for="${escapeHtml(r.name)}"><div class="row types-total"><span>Kinds of message</span><span>${escapeHtml(t.total)}</span></div>${rows}${cut}${toggle}</div>`
   }
 
   /** A function building's scheduled jobs, one row for each job in each region. Nothing for a building without jobs. */

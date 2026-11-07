@@ -31,7 +31,7 @@ public static partial class RegistryLoader
         "externalCallers", "islands", "role", "service", "slaP99Ms", "errors", "resources", "throttle", "backlog", "calls", "aliases",
         "amber", "red", "vendors", "calledBy", "gatewayCalls", "messaging", "topics", "subscriptions", "topic", "consumer", "legacy",
         "tenantPattern", "order", "default", "sources", "kind", "connection", "tenants", "exclude", "fake", "undeclaredTenants",
-        "signals", "credentials", "credential", "pollSeconds", "timeoutSeconds", "lateAfterSeconds", "tenantId", "clientId", "clientSecretEnv",
+        "signals", "credentials", "credential", "providers", "keepResolvedFor", "pollSeconds", "timeoutSeconds", "lateAfterSeconds", "tenantId", "clientId", "clientSecretEnv",
         "scope", "inventory", "workspace", "variables", "subscription", "pillars", "types", "pattern", "roles", "serviceTag", "tenantNameTag",
         "telemetryRole", "queries", "links", "url", "nameLike", "tag", "key", "value", "code", "serviceCode", "telemetry", "minCalls", "query", "window", "discoverLinks", "regions", "tag", "names", "skew", "state", "running", "minDays", "keepFor", "firstRead", "interval", "ignoreHosts", "rules", "host", "path", "target", "gateway", "domains", "services", "internal", "match", "traffic", "shareWindow", "logs", "section", "resources",
     ];
@@ -334,7 +334,7 @@ public static partial class RegistryLoader
             parsed.Add((new RegistryEnvironment(
                 stem, f.Name ?? stem, f.Default,
                 f.Sources.Select(kv => new RegistrySource(kv.Key, kv.Value.Kind.ToLowerInvariant(), kv.Value.Connection)
-                    { Credential = kv.Value.Credential, PollSeconds = kv.Value.PollSeconds, TimeoutSeconds = kv.Value.TimeoutSeconds, LateAfterSeconds = kv.Value.LateAfterSeconds, Query = kv.Value.Query, RegionQuery = kv.Value.RegionQuery, Window = kv.Value.Window, Metrics = ToMetrics(kv.Value.Metrics), Entities = ToEntities(kv.Value.Entities) }).ToList(),
+                    { Credential = kv.Value.Credential, PollSeconds = kv.Value.PollSeconds, TimeoutSeconds = kv.Value.TimeoutSeconds, LateAfterSeconds = kv.Value.LateAfterSeconds, Query = kv.Value.Query, RegionQuery = kv.Value.RegionQuery, TypesQuery = kv.Value.TypesQuery, Window = kv.Value.Window, Metrics = ToMetrics(kv.Value.Metrics), Entities = ToEntities(kv.Value.Entities), Providers = kv.Value.Providers.Select(p => p.Trim()).ToList(), KeepResolvedFor = kv.Value.KeepResolvedFor }).ToList(),
                 f.Tenants.Select(t => new RegistryTenant(t.Id, t.Name ?? t.Id, t.Kind.Equals("test", StringComparison.OrdinalIgnoreCase) ? TenantKind.Test : TenantKind.Customer)).ToList(),
                 excluded, f.Fake?.UndeclaredTenants ?? [])
             {
@@ -477,6 +477,11 @@ public static partial class RegistryLoader
             CheckQuery(f, def, source, name, errors);
             CheckMetrics(f, def, source, name, errors);
             CheckEntities(f, def, source, name, errors);
+            foreach (var provider in def.Providers)
+                if (!System.Text.RegularExpressions.Regex.IsMatch(provider.Trim(), @"^[A-Za-z0-9]+(\.[A-Za-z0-9]+)+$"))
+                    errors.Add($"{name}: source '{source}' has the provider '{provider}'. Write a resource provider the way the cloud names it, for example Namespace.Service");
+            if (def.KeepResolvedFor is { } keep && !SourceQuery.TryParseWindow(keep, out _))
+                errors.Add($"{name}: source '{source}' has keepResolvedFor '{keep}', which is not a number and a unit like 4h or 90m");
             if (def.Credential is not null && !f.Credentials.ContainsKey(def.Credential))
                 errors.Add($"{name}: source '{source}' uses credential '{def.Credential}', which this file does not define.{DidYouMean.Hint(def.Credential, f.Credentials.Keys)}");
         }

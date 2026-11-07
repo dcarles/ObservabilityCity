@@ -75,3 +75,47 @@ public class HealthReasonTests
             Assert.Equal(n.State != HealthState.Healthy, !string.IsNullOrEmpty(n.Reason));
     }
 }
+
+/// <summary>The snapshot's list of configured sources: when each last reported and whether it is overdue.</summary>
+public class SourceFreshnessTests
+{
+    [Fact]
+    public async Task Each_configured_source_reports_when_it_last_read_and_whether_it_is_overdue()
+    {
+        var clock = new FakeTimeProvider(new DateTimeOffset(2026, 10, 25, 12, 0, 0, TimeSpan.Zero));
+        var registry = RegistryLoader.Load(TestPaths.MiniTown);
+        var state = new LatestState();
+        var fake = new FakeSource(FakeProfiles.Load(TestPaths.MiniTown), new FakeOptions(), clock) { Calm = true };
+        var builder = new SnapshotBuilder(registry, state, clock)
+        {
+            StaleAfter = TimeSpan.FromSeconds(30),
+            SourceIntervals = new Dictionary<string, TimeSpan> { [fake.Name] = TimeSpan.FromSeconds(10), ["quiet"] = TimeSpan.FromSeconds(60) },
+        };
+        clock.Advance(TimeSpan.FromSeconds(1));
+        state.Update(fake.Name, await fake.PollAsync(registry, TestContext.Current.CancellationToken));
+
+        var fresh = builder.Build().Sources!;
+        Assert.Equal(new[] { "quiet", fake.Name }.Order(StringComparer.Ordinal), fresh.Select(s => s.Name));
+        Assert.Equal(10, fresh.Single(s => s.Name == fake.Name).IntervalSeconds);
+        Assert.NotNull(fresh.Single(s => s.Name == fake.Name).LastRead);
+        Assert.False(fresh.Single(s => s.Name == fake.Name).Overdue);
+        Assert.Null(fresh.Single(s => s.Name == "quiet").LastRead);
+
+        clock.Advance(TimeSpan.FromSeconds(31)); // past the limit for the 10 s source; the 60 s one is allowed 120 s
+        var late = builder.Build().Sources!;
+        Assert.True(late.Single(s => s.Name == fake.Name).Overdue);
+        Assert.False(late.Single(s => s.Name == "quiet").Overdue);
+
+        clock.Advance(TimeSpan.FromSeconds(100));
+        Assert.True(builder.Build().Sources!.Single(s => s.Name == "quiet").Overdue); // never read, and past its limit
+    }
+
+    [Fact]
+    public void A_town_with_no_configured_source_lists_none()
+    {
+        var clock = new FakeTimeProvider(new DateTimeOffset(2026, 10, 25, 12, 0, 0, TimeSpan.Zero));
+        var builder = new SnapshotBuilder(RegistryLoader.Load(TestPaths.MiniTown), new LatestState(), clock);
+
+        Assert.Null(builder.Build().Sources);
+    }
+}

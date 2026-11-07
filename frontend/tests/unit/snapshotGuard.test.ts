@@ -87,6 +87,16 @@ describe('a snapshot with something wrong in it is repaired where that is safe',
     expect(out.groups[1].nodes[0].calls).toEqual([])
   })
 
+  it('keeps the health reports a partial read still found next to the notice that says some reads failed', () => {
+    const raw = calm()
+    const notice = "Source 'health' could not read the cloud's health reports, so the list of resources it calls degraded may be out of date: 1 of 12 activity log reads failed, so the list may be incomplete"
+    raw.notices = [notice]
+    raw.healthEvents = [{ id: 'e', resource: 'orders-db', state: 'Degraded', previous: 'Available', cause: 'Unknown', summary: null, since: '2026-11-05T16:21:15Z', resolvedAt: null, nodeId: 'aa.orders-db', groupId: 'aa' }]
+    const out = checkSnapshot(structuredClone(raw)).snapshot!
+    expect(out.notices).toEqual([notice])
+    expect(out.healthEvents).toEqual(raw.healthEvents)
+  })
+
   it('keeps the notes, which are not problems, and drops anything that is not text', () => {
     const raw = calm() as unknown as Record<string, unknown>
     raw.notes = ["Pillar 'zz' is not in the town yet", 7, null]

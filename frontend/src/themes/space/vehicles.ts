@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import { box, cone, cyl, flat, group, sphere } from '../../buildings/mk'
 import type { BoatLook, VehicleKit, VehicleParts } from '../types'
+import { boatPaint } from '../boatColours'
 import { coloured, glow, paintedMaterial, slab } from '../common'
 
 /** A hover pod: a rounded canopy on a slim hull, riding a little above the road on a strip of light. */
@@ -19,9 +20,9 @@ function pod(hull: string, canopy: string, trim: string): VehicleParts {
 const CRATES = ['#ff7a59', '#59b0ff', '#ffd45e', '#59e3a0', '#b08cff']
 
 /** A cargo shuttle: a blunt hull with a nose cone, twin engines and a cradle of crates. It hovers above the lane. */
-function shuttle(seed: number): BoatLook {
-  const hull = flat('#e6eaf8', { metalness: 0.3, roughness: 0.4 })
-  const trim = flat('#59618f', { metalness: 0.4 })
+function shuttle(seed: number, internal = false): BoatLook {
+  const hull = flat(boatPaint(internal).body, { metalness: 0.3, roughness: 0.4 })
+  const trim = flat(boatPaint(internal).trim, { metalness: 0.4 })
   const object = group(
     box(2.0, 0.7, 4.6, hull, { y: 0.1, z: -0.2 }),
     cone(1.0, 1.7, hull, { y: 0.45, z: 2.1, rx: Math.PI / 2 }, 12),
@@ -34,7 +35,7 @@ function shuttle(seed: number): BoatLook {
     sphere(0.45, flat('#bfe9ff', { roughness: 0.15, metalness: 0.4 }), { y: 0.95, z: 1.2 }, 10),
   )
   const cargo = new THREE.Group()
-  for (let i = 0; i < 6; i++) cargo.add(box(0.7, 0.62, 0.7, flat(CRATES[(seed + i) % CRATES.length], { metalness: 0.2 }), { x: i % 2 ? 0.4 : -0.4, y: 0.9, z: 0.7 - Math.floor(i / 2) * 0.85 }))
+  for (let i = 0; i < 6; i++) cargo.add(box(0.8, 0.72, 0.8, flat(CRATES[(seed + i) % CRATES.length], { metalness: 0.2 }), { x: i % 2 ? 0.45 : -0.45, y: 0.95, z: 0.75 - Math.floor(i / 2) * 0.95 }))
   object.add(cargo)
   object.scale.setScalar(0.7)
   return { object, cargo }

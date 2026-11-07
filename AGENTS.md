@@ -40,6 +40,8 @@ source (fake now, Prometheus / Log Analytics / Service Bus / Grafana IRM later)
 
 The page opens as the 3D town or as a plain dashboard (`?view=dashboard`, remembered per browser, switch in the menu). Both read the same snapshot and live feed. `frontend/src/main.ts` only picks a view and loads it, so the dashboard (`frontend/src/dashboard/`) never loads three.js. The dashboard's rules live in `dashboard/model.ts` as pure functions; its markup in `dashboard/render.ts`. The "why is it amber or red" line comes from the backend (`NodeSnapshot.Reason`, built in `HealthReasons.cs` from the same thresholds that set the state). Pillar choice (`?islands=`), environment and tenant filter are shared by both views.
 
+The dashboard's service table has one line per service: traffic (with the share per region for a service in two or more regions), errors (green at 0, red above), p99 latency coloured against the service's SLA (green under it, amber from 90% of it, red over it), CPU and memory as one bar for each region, and two buttons: the callers and calls (opened under the row) and the detail drawer. Queues are never shown in the table; they stay in the drawer. A database row shows the worst tenant's %RU with that same tenant's provisioned throughput. The column titles stay under the menu and leave with the pillar's last service row (`dashboard/sticky.ts`; the table must never scroll sideways or sticky stops working, so narrow screens drop columns instead). `body.dash` must not set `overflow` itself: the page scrolls on `html`, or the menu stops sticking.
+
 ## Run and test
 
 Needs .NET SDK 10 and Node 26. No Docker.

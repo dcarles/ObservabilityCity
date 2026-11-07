@@ -49,8 +49,8 @@ sources:
       patterns:
         # sbq-<pillar code>-<service code>-<role>: read by that service's worker
         - { match: '^sbq-(?<pillar>[a-z]+)-(?<service>[a-z]+)-(?:inbox|changefeed)$' }
-        # sbq-<pillar code>-<from>-<to>-outbox: read by the service it is addressed to
-        - { match: '^sbq-(?<pillar>[a-z]+)-[a-z]+-(?<service>[a-z]+)-outbox$' }
+        # sbq-<pillar code>-<from>-<to>-outbox: read by the service it is addressed to, in whichever pillar it is
+        - { match: '^sbq-[a-z]+-[a-z]+-(?<service>[a-z]+)-outbox$' }
 scope:
   inventory: inventory
   variables: { env: prd, directory: example.test }

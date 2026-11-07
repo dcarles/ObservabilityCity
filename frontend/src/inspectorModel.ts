@@ -1,10 +1,11 @@
 // What the inspector drawer says, as pure functions: a system's numbers in, rows and sentences out.
 
+import { regionLabel } from './deadLetters'
 import type { ConfigValue, HealthState, ScheduleSnapshot, IncidentSnapshot, JobSnapshot, LinkRef, LogGroup, LogSection, NodeSnapshot, ResourceLink, ScopeInfo, ScopeResource, SettingLayer, SystemDetail } from './types'
 import { inboundSplitText } from './inbound'
 import { limitRange, throttleWho } from './tenants'
 import { isAbsent, isUnmonitored, QUIET_TEXT } from './signals'
-import { formatAge, formatMs, formatRate, plaqueText, resourceUse } from './visuals'
+import { formatAge, formatCount, formatMs, formatRate, plaqueText, resourceUse } from './visuals'
 
 export type Tone = 'ok' | 'warn' | 'bad' | 'stale' | ''
 
@@ -44,7 +45,7 @@ export function reasons(n: NodeSnapshot, cloud?: string | null): string[] {
   else if (use >= n.resourceAmber) out.push(`Resources are at ${pct(use)}, past the amber line of ${pct(n.resourceAmber)}.`)
   if (!isAbsent(n, 'throttled') && (n.throttled ?? 0) >= n.throttleAmber && (n.throttled ?? 0) > 0) out.push(`Turning away ${pct(n.throttled!, 1)} of requests (throttled).`)
   if (!isAbsent(n, 'backlog') && (n.oldestMessageSeconds ?? 0) >= n.backlogAmber && (n.oldestMessageSeconds ?? 0) > 0) out.push(`The oldest message has waited ${formatAge(n.oldestMessageSeconds!)}, past the ${formatAge(n.backlogAmber)} line.`)
-  if (!isAbsent(n, 'deadLetters') && (n.deadLetters ?? 0) > 0) out.push(`${formatRate(n.deadLetters!)} message${n.deadLetters === 1 ? ' is' : 's are'} in the dead-letter queue.`)
+  if (!isAbsent(n, 'deadLetters') && (n.deadLetters ?? 0) > 0) out.push(`${formatCount(n.deadLetters!)} message${n.deadLetters === 1 ? ' is' : 's are'} in the dead-letter queue.`)
   return out
 }
 
@@ -55,10 +56,16 @@ export interface Row {
 }
 
 /** The key numbers of a system, in reading order. Numbers a source does not give are left out, not shown as zero. */
-export function overviewRows(n: NodeSnapshot, nameOf: (id: string) => string = (id) => id, cloud?: string | null): Row[] {
+export function overviewRows(n: NodeSnapshot, nameOf: (id: string) => string = (id) => id, cloud?: string | null, townMessages?: number | null): Row[] {
+  const rows = ownRows(n, nameOf, cloud)
+  // the broker's own building: what all the queues of the town take in, each queue counted where it is read. It comes from the systems that read the queues, so it is shown even when the broker itself has no fresh numbers.
+  return n.kind === 'Broker' && townMessages != null ? [{ label: 'Messages', value: `${messageRate(townMessages)} msg/s through the queues`, tone: '' }, ...rows] : rows
+}
+
+function ownRows(n: NodeSnapshot, nameOf: (id: string) => string, cloud?: string | null): Row[] {
   if (isUnmonitored(n)) return [{ label: 'Data', value: 'no source configured', tone: '' }]
   if (n.app === 'Missing') return [{ label: 'App', value: notFoundText(cloud), tone: 'stale' }]
-  if (n.state === 'Stale') return [{ label: 'Data', value: 'none fresh', tone: 'stale' }]
+  if (n.state === 'Stale') return [{ label: 'Data', value: 'none fresh', tone: 'stale' }, ...sourceRows(n)]
   const rows: Row[] = []
   if (n.app === 'Running' || n.app === 'Stopped') rows.push({ label: 'App', value: n.app === 'Running' ? 'running' : 'stopped (under construction)', tone: n.app === 'Stopped' ? 'warn' : '' })
   if (!isAbsent(n, 'instances')) rows.push({ label: 'Instances', value: plaqueText(n), tone: n.instancesHealthy < n.instancesTotal ? 'warn' : '' })
@@ -77,8 +84,23 @@ export function overviewRows(n: NodeSnapshot, nameOf: (id: string) => string = (
   if (provisioned) rows.push({ label: 'Provisioned', value: provisioned, tone: '' })
   if (n.queueDepth != null && !isAbsent(n, 'backlog')) rows.push({ label: 'Waiting', value: `${formatRate(n.queueDepth)} messages`, tone: '' })
   if (n.oldestMessageSeconds != null && !isAbsent(n, 'backlog')) rows.push({ label: 'Oldest message', value: formatAge(n.oldestMessageSeconds), tone: n.oldestMessageSeconds >= n.backlogRed ? 'bad' : n.oldestMessageSeconds >= n.backlogAmber ? 'warn' : '' })
-  if (n.deadLetters != null && !isAbsent(n, 'deadLetters')) rows.push({ label: 'Dead letters', value: formatRate(n.deadLetters), tone: n.deadLetters > 0 ? 'bad' : '' })
+  if (n.deadLetters != null && !isAbsent(n, 'deadLetters')) rows.push({ label: 'Dead letters', value: formatCount(n.deadLetters), tone: n.deadLetters > 0 ? 'bad' : '' })
+  rows.push(...sourceRows(n))
   return rows
+}
+
+/**
+ * Where a system's numbers come from when one of the sources is late: a row for each source with how long ago it last answered, and for a late one the signals
+ * that are left out because of it. Nothing when every source is fresh (the server then says nothing about them).
+ */
+export function sourceRows(n: Pick<NodeSnapshot, 'sources'>): Row[] {
+  const sources = n.sources ?? []
+  if (!sources.some((s) => !s.fresh)) return []
+  return [...sources].sort((a, b) => Number(a.fresh) - Number(b.fresh) || a.source.localeCompare(b.source)).map((s) => ({
+    label: `From ${s.source}`,
+    value: s.fresh ? `${formatAge(s.ageSeconds)} ago` : `${formatAge(s.ageSeconds)} ago, late${s.signals.length > 0 ? `: no ${s.signals.join(', ')}` : ''}`,
+    tone: (s.fresh ? '' : 'stale') as Tone,
+  }))
 }
 
 const JOB_TONE: Record<JobSnapshot['status'], Tone> = { Ok: '', Failed: 'bad', Overdue: 'warn' }
@@ -343,8 +365,53 @@ export function overviewLinks(s: ScopeInfo | null | undefined): OverviewLinks | 
   return { items: own.slice(0, OVERVIEW_LINK_LIMIT), tenantResources, more: Math.max(0, own.length - OVERVIEW_LINK_LIMIT) }
 }
 
+/** Messages a second in as few digits as say something: 120, 3.4, 0.05. */
+export function messageRate(perSecond: number): string {
+  return perSecond >= 10 ? `${Math.round(perSecond)}` : perSecond >= 1 ? perSecond.toFixed(1) : perSecond.toFixed(2)
+}
+
+/** How many of a queue's busiest kinds of message the drawer lists before the rest go behind "more". */
+export const TYPES_SHOWN = 5
+
+/** Messages a second of one kind, in words: nothing under a hundredth of a message a second is written as zero. */
+export function typeRate(perSecond: number): string {
+  return perSecond > 0 && perSecond < 0.01 ? 'under 0.01 msg/s' : `${messageRate(perSecond)} msg/s`
+}
+
+/** The kinds of message one queue handled: the busiest few, and what is left behind them (how many kinds and their rates added up), plus all of them for the full list. */
+export interface QueueTypes {
+  top: { name: string; text: string }[]
+  all: { name: string; text: string }[]
+  /** Kinds past the busiest few, including the quietest ones the source left out; null when there are none. */
+  more: { count: number; text: string; cut: number } | null
+  total: string
+}
+
 /** One queue a consumer reads, as a row of the drawer: its name, what waits and what is dead-lettered in words, and the link to its dead letters. */
-export interface QueueRow { name: string; text: string; tone: Tone; link: ResourceLink | null }
+export interface QueueRegionLink { region: string; count: number; link: ResourceLink | null }
+export interface QueueRow { name: string; text: string; tone: Tone; link: ResourceLink | null; types: QueueTypes | null; regions: QueueRegionLink[] }
+
+/** A queue's kinds of message for the drawer. Null when the environment does not measure them (no list at all) or the queue handled none. */
+export function queueTypes(q: Pick<NonNullable<NodeSnapshot['queues']>[number], 'types' | 'typesCut'>): QueueTypes | null {
+  const listed = [...(q.types ?? [])].sort((a, b) => b.perSecond - a.perSecond || a.type.localeCompare(b.type))
+  if (listed.length === 0) return null
+  const all = listed.map((t) => ({ name: t.type, text: typeRate(t.perSecond) }))
+  const rest = listed.slice(TYPES_SHOWN)
+  const cut = q.typesCut ?? 0
+  const restRate = rest.reduce((a, t) => a + t.perSecond, 0)
+  return {
+    top: all.slice(0, TYPES_SHOWN),
+    all,
+    more: rest.length + cut > 0 ? { count: rest.length + cut, text: cut > 0 ? `${typeRate(restRate)} and more` : typeRate(restRate), cut } : null,
+    total: `${messageRate(listed.reduce((a, t) => a + t.perSecond, 0))} msg/s`,
+  }
+}
+
+/** The messages a second all the queues of the given systems take in, each queue counted where it is read (a message that crosses two queues is counted twice, as it is work for two). Null when no queue is measured. */
+export function messagesPerSecond(nodes: readonly Pick<NodeSnapshot, 'queues' | 'state'>[]): number | null {
+  const rates = nodes.filter((n) => n.state !== 'Stale').flatMap((n) => n.queues ?? []).map((q) => q.perSecond).filter((x): x is number => x != null)
+  return rates.length === 0 ? null : rates.reduce((a, b) => a + b, 0)
+}
 
 /**
  * The queues a consumer reads, worst first (most dead letters, then the biggest backlog), as rows. A number nothing measures is left out of the words, and a
@@ -352,9 +419,12 @@ export interface QueueRow { name: string; text: string; tone: Tone; link: Resour
  */
 export function queueRows(n: Pick<NodeSnapshot, 'queues'>): QueueRow[] {
   const rows = (n.queues ?? []).map((q) => {
-    const parts = [q.backlog != null ? `${Math.round(q.backlog)} waiting` : null, q.deadLetters != null ? `${Math.round(q.deadLetters)} dead` : null].filter((p): p is string => p !== null)
-    const link = q.link && q.link.name !== '' && /^https?:\/\//i.test(q.link.url) ? q.link : null
-    return { q, row: { name: q.name, text: parts.join(' · ') || 'no numbers', tone: ((q.deadLetters ?? 0) > 0 ? 'bad' : '') as Tone, link } }
+    const parts = [q.backlog != null ? `${Math.round(q.backlog)} waiting` : null, q.deadLetters != null ? `${Math.round(q.deadLetters)} dead` : null, q.perSecond != null ? `${messageRate(q.perSecond)} msg/s` : null].filter((p): p is string => p !== null)
+    const web = (l?: ResourceLink | null) => (l && l.name !== '' && /^https?:\/\//i.test(l.url) ? l : null)
+    // dead letters in several regions: each region has its own count and its own support tool, so the one link for all is not shown
+    const regions = (q.deadLetterRegions ?? []).filter((r) => r.count > 0).map((r) => ({ region: regionLabel(r.region), count: Math.round(r.count), link: web(r.link) }))
+    const link = regions.length > 0 ? null : web(q.link)
+    return { q, row: { name: q.name, text: parts.join(' · ') || 'no numbers', tone: ((q.deadLetters ?? 0) > 0 ? 'bad' : '') as Tone, link, types: queueTypes(q), regions } }
   })
   return rows.sort((a, b) => (b.q.deadLetters ?? 0) - (a.q.deadLetters ?? 0) || (b.q.backlog ?? 0) - (a.q.backlog ?? 0) || a.q.name.localeCompare(b.q.name)).map((r) => r.row)
 }
