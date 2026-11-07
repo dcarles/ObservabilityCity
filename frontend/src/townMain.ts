@@ -342,7 +342,8 @@ export async function startTown(): Promise<void> {
     notices.show(s.notices, s.notes ?? [])
   }
 
-  const connection = new Connection(onSnapshot, (st) => { topbar.setStatus(st); wall?.setConnection(st) }, scope, (e) => {
+  let held = false // for tests: while true, the snapshots from the server are ignored, so one fed by hand stays on screen
+  const connection = new Connection((raw) => { if (!held) onSnapshot(raw) }, (st) => { topbar.setStatus(st); wall?.setConnection(st) }, scope, (e) => {
     banner.textContent = e.environments.length === 0 && e.towns
       ? `There is no town "${e.requestedTown ?? ''}". Available: ${e.towns.join(', ') || 'none'}.`
       : `There is no environment "${e.requested ?? ''}". Available: ${e.environments.join(', ') || 'none'}.`
@@ -470,6 +471,8 @@ export async function startTown(): Promise<void> {
     },
     /** Hand the page a snapshot as if the server had sent it. */
     feed: (raw: unknown) => onSnapshot(raw),
+    /** For tests: while on, the server's own snapshots are ignored so a fed one cannot be undone by a newer one. */
+    hold: (on: boolean) => { held = on },
     unknownHosts,
     inspect: (id: string) => town.inspect(id),
     inspectIsland: (id: string) => town.inspectIsland(id),
