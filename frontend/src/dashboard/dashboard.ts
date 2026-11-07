@@ -204,7 +204,8 @@ export function startDashboard(): void {
     el.lastElementChild!.textContent = label
   }
 
-  const connection = new Connection(onSnapshot, setStatus, scope, (e) => {
+  let held = false // for tests: while true, the snapshots from the server are ignored, so one fed by hand stays on screen
+  const connection = new Connection((raw) => { if (!held) onSnapshot(raw) }, setStatus, scope, (e) => {
     const b = $('banner')
     b.textContent = `There is no environment "${e.requested ?? ''}". Available: ${e.environments.join(', ') || 'none'}.`
     b.hidden = false
@@ -262,6 +263,8 @@ export function startDashboard(): void {
   ;(window as unknown as { dash: unknown }).dash = {
     seen,
     feed: (raw: unknown) => onSnapshot(raw),
+    /** For tests: stop (or resume) showing the server's snapshots; `feed` still works. */
+    hold: (on: boolean) => { held = on },
     freshnessOpen: () => !freshPop.hidden,
     /** For tests: make the last snapshot look this many seconds older. */
     ageFeed: (seconds: number) => { if (arrivedAt !== null) arrivedAt -= seconds * 1000; drawMarker() },

@@ -133,7 +133,6 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
         var view = new ViewInfo([], [], [], []);
         var notices = registries.Notices;
         notices = [.. notices, .. UnmappedJobs(registry, onScreenNodes)];
-        notices = [.. notices, .. HealthSources.Where(h => h.Problem is not null).Select(h => $"Source '{h.Name}' could not read the cloud's health reports, so the list of resources it calls degraded may be out of date: {h.Problem}")];
         if (filter is not null)
         {
             var known = allGroups.Where(g => !g.IsHub).Select(g => g.Id).Concat(vendorIslands.Keys).ToHashSet();

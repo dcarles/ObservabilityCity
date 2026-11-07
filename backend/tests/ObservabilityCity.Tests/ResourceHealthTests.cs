@@ -375,7 +375,7 @@ public class ResourceHealthTests
         Assert.Single(source.Current()); // nothing was read, so the last good list stands
         Assert.Contains("403", source.Problem);
         var builder = new SnapshotBuilder(registry, new LatestState(), new FakeTimeProvider(T1)) { Environment = "prod", ScopeSource = set.Scope, HealthSources = [source] };
-        Assert.Contains(builder.Build().Notices, n => n.Contains("'health' could not read the cloud's health reports") && n.Contains("403"));
+        Assert.DoesNotContain(builder.Build().Notices, n => n.Contains("health reports")); // the log carries it, the town does not
 
         fail = false;
         await source.PollAsync(registry, CancellationToken.None);
@@ -455,10 +455,11 @@ public class ResourceHealthTests
         Assert.Equal(BeLedger, kept.ResourceId, ignoreCase: true); // kept: its read failed, so nothing says it ended
         Assert.Contains("1 of 2 activity log reads failed, so the list may be incomplete", source.Problem);
         Assert.Contains("403", source.Problem);
-        Assert.Equal("health read: 2 reads, 1 failed, 1 reports (1 open)", source.RoundNote);
+        Assert.StartsWith("health read: 2 reads, 1 failed, 1 reports (1 open); the first failure: ", source.RoundNote);
+        Assert.Contains("403", source.RoundNote); // the Aspire log line says why
         var builder = new SnapshotBuilder(registry, new LatestState(), new FakeTimeProvider(T1)) { Environment = "prod", ScopeSource = set.Scope, HealthSources = [source] };
         var snapshot = builder.Build();
-        Assert.Contains(snapshot.Notices, n => n.Contains("'health' could not read the cloud's health reports") && n.Contains("1 of 2"));
+        Assert.DoesNotContain(snapshot.Notices, n => n.Contains("health reports") || n.Contains("activity log reads")); // never in the UI
         Assert.Single(snapshot.HealthEvents!);
 
         failA2 = false;

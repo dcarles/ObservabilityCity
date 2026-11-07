@@ -436,6 +436,47 @@ public class SourcePlumbingTests
         Assert.Contains(log.Lines, l => l.Contains("Source soon: read 3 things"));
     }
 
+    [Fact]
+    public async Task A_round_that_runs_out_of_time_is_one_warning_line_without_a_stack_trace()
+    {
+        var log = new ListLogger();
+        var poller = new SourcePoller([new Stuck(TimeSpan.FromMilliseconds(60))], new RegistryHolder(RegistryLoader.Load(TestPaths.LiveTown)), new LatestState(), log);
+
+        await poller.StartAsync(TestContext.Current.CancellationToken);
+        await Task.Delay(500, TestContext.Current.CancellationToken);
+        await poller.StopAsync(TestContext.Current.CancellationToken);
+
+        Assert.Contains(log.Lines, l => l.Contains("Source stuck did not finish within") && l.Contains("values will go stale"));
+        Assert.All(log.Errors, e => Assert.Null(e));
+    }
+
+    [Fact]
+    public async Task A_dropped_connection_is_one_warning_line_and_a_refusal_keeps_its_stack_trace()
+    {
+        var dropped = new ThrowsOnPoll("dropped", new IOException("Unable to read data from the transport connection", new System.Net.Sockets.SocketException(995)));
+        var refused = new ThrowsOnPoll("refused", new HttpRequestException("answered 403", null, System.Net.HttpStatusCode.Forbidden));
+        var log = new ListLogger();
+        var poller = new SourcePoller([dropped, refused], new RegistryHolder(RegistryLoader.Load(TestPaths.LiveTown)), new LatestState(), log);
+
+        await poller.StartAsync(TestContext.Current.CancellationToken);
+        await Task.Delay(400, TestContext.Current.CancellationToken);
+        await poller.StopAsync(TestContext.Current.CancellationToken);
+
+        var i = log.Lines.FindIndex(l => l.Contains("Source dropped could not reach its service"));
+        Assert.True(i >= 0);
+        Assert.Null(log.Errors[i]);
+        var j = log.Lines.FindIndex(l => l.Contains("Source refused failed"));
+        Assert.True(j >= 0);
+        Assert.NotNull(log.Errors[j]);
+    }
+
+    private sealed class ThrowsOnPoll(string name, Exception error) : IMetricSource
+    {
+        public string Name => name;
+        public TimeSpan PollInterval => TimeSpan.FromMinutes(10);
+        public Task<IReadOnlyDictionary<string, NodeReading>> PollAsync(Registry registry, CancellationToken ct) => throw error;
+    }
+
     private sealed class NotReadyTwice : IMetricSource, IRetrySoon, IRoundNote
     {
         public TaskCompletionSource Ready { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -455,11 +496,12 @@ public class SourcePlumbingTests
     private sealed class ListLogger : ILogger<SourcePoller>
     {
         public List<string> Lines { get; } = [];
+        public List<Exception?> Errors { get; } = [];
         public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
         public bool IsEnabled(LogLevel logLevel) => true;
         public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
         {
-            lock (Lines) Lines.Add(formatter(state, exception));
+            lock (Lines) { Lines.Add(formatter(state, exception)); Errors.Add(exception); }
         }
     }
 
