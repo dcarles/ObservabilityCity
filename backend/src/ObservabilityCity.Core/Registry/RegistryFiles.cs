@@ -12,8 +12,22 @@ internal sealed class TownFile
     public string Mode { get; set; } = "live";
     /// <summary>How many cars appear, as a multiple of the usual number. 1 is the usual look.</summary>
     public double TrafficDensity { get; set; } = 1;
+    /// <summary>Pillar codes in the order the islands stand round the hub. Pillars not listed follow in file order.</summary>
+    public List<string> Islands { get; set; } = [];
+    /// <summary>Islands on the first ring. The second ring holds up to one fewer, since the airport takes a place there.</summary>
+    public int? RingCapacity { get; set; }
     /// <summary>Warnings the validator should expect in this registry (a test registry that shows a rule on purpose). Read by the validator only.</summary>
     public List<ExpectedWarningFile> ExpectedWarnings { get; set; } = [];
+    /// <summary>The database engines this company uses, by id. A database says <c>engine: &lt;id&gt;</c> and takes the name and the type from here.</summary>
+    public Dictionary<string, DatabaseEngineFile> DatabaseEngines { get; set; } = new();
+}
+
+internal sealed class DatabaseEngineFile
+{
+    /// <summary>The name shown, for example Cosmos DB.</summary>
+    public string Name { get; set; } = "";
+    /// <summary>One of the fixed database types (see <see cref="DatabaseTypes"/>).</summary>
+    public string Type { get; set; } = "";
 }
 
 internal sealed class ExpectedWarningFile
@@ -58,6 +72,8 @@ internal sealed class SystemFile
     public string? Service { get; set; }
     /// <summary>For a data store that keeps one database per tenant: the database name with {tenant} where the tenant id goes, for example merchant-{tenant}-db.</summary>
     public string? TenantPattern { get; set; }
+    /// <summary>For a database: which engine it runs on, an id from town.yaml databaseEngines.</summary>
+    public string? Engine { get; set; }
     public bool? External { get; set; }
     public double? SlaP99Ms { get; set; }
     public ErrorThresholdsFile? Errors { get; set; }
@@ -152,14 +168,6 @@ internal sealed class ExternalCallerFile
     public string Id { get; set; } = "";
     public string? Name { get; set; }
     public List<string> Calls { get; set; } = [];
-}
-
-/// <summary>layout.yaml: the order of the islands round the hub, and how many fit on a ring.</summary>
-internal sealed class LayoutFile
-{
-    public List<string> Islands { get; set; } = [];
-    /// <summary>Islands on the first ring. The second ring holds up to one fewer, since the airport takes a place there.</summary>
-    public int? RingCapacity { get; set; }
 }
 
 /// <summary>third-parties.yaml: the vendors outside the town and which of our systems call each one.</summary>

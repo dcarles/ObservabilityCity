@@ -6,6 +6,7 @@ import { makeWindowMaterial } from '../../buildings/windowMaterial'
 import { palette } from '../active'
 import { storageYard } from '../harbour-town/yard'
 import { portSignText } from '../../portSign'
+import { databaseSignText, paintDatabaseSign, type EngineLabel, type ModelOptions } from '../../engineSign'
 import { CELL, glow, mast, v } from '../common'
 
 const P = palette.building
@@ -15,12 +16,12 @@ const DARK = '#262b4a'
 const CYAN = '#6fe7ff'
 
 /** Builds the model for a building kind. The accent is the owning island's flag colour. */
-export function spaceModel(kind: NodeKind, accent: string, opts: { tenanted?: boolean; name?: string } = {}): BuildingModel {
-  if (kind === 'Database' && opts.tenanted) return storageYard(accent)
+export function spaceModel(kind: NodeKind, accent: string, opts: ModelOptions = {}): BuildingModel {
+  if (kind === 'Database' && opts.tenanted) return storageYard(accent, opts.engine)
   switch (kind) {
     case 'Api': return habitat(accent)
     case 'Worker': return fabricator(accent)
-    case 'Database': return vault(accent)
+    case 'Database': return vault(accent, opts.engine)
     case 'Cache': return fusionSphere()
     case 'Function': return chronoSpire()
     case 'Gateway': return dockingGate(accent)
@@ -132,13 +133,9 @@ function fabricator(accent: string): BuildingModel {
   }
 }
 
-function vault(accent: string): BuildingModel {
+function vault(accent: string, engine?: EngineLabel | null): BuildingModel {
   const W = 5 * CELL, D = 4 * CELL, FH = 1.95
-  const sign = canvasTexture(512, 128, (ctx) => {
-    ctx.fillStyle = accent; ctx.fillRect(0, 0, 512, 128)
-    ctx.fillStyle = '#ffffff'; ctx.font = '800 72px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-    ctx.fillText('DATA VAULT', 256, 68)
-  })
+  const sign = canvasTexture(512, 128, (ctx) => paintDatabaseSign(ctx, accent, 'DATA VAULT', 72, engine))
   const base = group(
     pad(4.3),
     box(W + 0.2, 0.5, D + 0.2, flat('#4a5385', { metalness: 0.3 }), { y: 0.26 }),
@@ -169,6 +166,7 @@ function vault(accent: string): BuildingModel {
     door: v(0, 0, D / 2 + 1.9),
     doorDir: v(0, 0, 1),
     plaque: { position: v(-W / 2 + 0.9, 0.55, D / 2 + 0.25), width: 1.5 },
+    signText: databaseSignText(engine),
     radius: 3.7,
   }
 }

@@ -50,7 +50,7 @@ public class DirectTopologyTests
     {
         using var copy = new RegistryCopy(TestPaths.DirectTown);
         copy.Write("pillars/zz.yaml", "pillar: zz\ndisplayName: Zed\ncolor: \"#aaaaaa\"\nsystems:\n  - { id: zz.db, name: Zed DB, role: db }\n");
-        copy.Write("layout.yaml", "islands: [aa, bb, cc, zz]\n");
+        copy.Replace("town.yaml", "[aa, bb, cc]", "[aa, bb, cc, zz]");
         var links = TownLinks.Of(RegistryLoader.Load(copy.Path));
 
         Assert.True(links["zz"].Standalone);

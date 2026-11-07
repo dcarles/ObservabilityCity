@@ -69,6 +69,7 @@ export const LEGEND: readonly LegendSection[] = [
       { id: 'api', sees: 'Office tower', means: 'An API', tone: 'neutral', icon: '🏢' },
       { id: 'worker', sees: 'Factory', means: 'A worker: it reads messages', tone: 'neutral', icon: '🏭' },
       { id: 'database', sees: 'Tanks', means: 'A database', more: 'One tank for each tenant where each has its own.', tone: 'neutral', icon: '🛢️' },
+      { id: 'engine', sees: 'Name on the front of a database', means: 'What the database runs on', more: 'The engine in capitals, such as COSMOS DB, with its type under it (Document, Relational). A database that names no engine shows its building\'s plain word instead.', tone: 'neutral', icon: '🏷️' },
       { id: 'cache', sees: 'Water tower', means: 'A cache', tone: 'neutral', icon: '🗼' },
       { id: 'function', sees: 'Clock tower', means: 'A scheduled function', tone: 'neutral', icon: '⏰' },
       { id: 'hub', sees: 'The island in the middle', means: 'The platform hub', more: 'API gateway, message broker port (Service Bus, Kafka), central egress, shared database.', tone: 'neutral', icon: '⚓' },

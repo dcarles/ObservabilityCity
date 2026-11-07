@@ -2,7 +2,7 @@ import type { VendorSnapshot } from '../types'
 /**
  * Where everything stands, worked out from sizes alone so it can be tested without a renderer.
  *
- * The hub is in the middle. Islands stand round it on a ring in registry order. A ring holds `capacity` islands (layout.yaml
+ * The hub is in the middle. Islands stand round it on a ring in registry order. A ring holds `capacity` islands (town.yaml
  * ringCapacity, 6 to 18); any more stand in a second, staggered ring: each one sits in the gap between two islands of the
  * first ring, further out, with its bridge passing between them. The airport takes the second ring's northernmost place, so a
  * town holds at most 2 x capacity - 1 pillars, and it gets a spoke to the hub like any island. There is no third ring: its

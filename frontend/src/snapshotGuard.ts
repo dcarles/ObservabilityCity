@@ -265,6 +265,10 @@ function checkNode(n: unknown, groupId: string, ids: Set<string>, problems: stri
   out.inboundEstimated = n.inboundEstimated === true
   // why the state is not healthy, in words; the backend leaves it out for a healthy system
   out.reason = typeof n.reason === 'string' && n.reason !== '' ? n.reason : null
+  // what a database runs on; an older server, or a database that names none, has null, and a half-filled one cannot be shown
+  out.engine = isObject(n.engine) && ['id', 'name', 'type', 'typeName'].every((k) => typeof (n.engine as Record<string, unknown>)[k] === 'string' && (n.engine as Record<string, unknown>)[k] !== '')
+    ? { id: n.engine.id, name: n.engine.name, type: n.engine.type, typeName: n.engine.typeName }
+    : null
   // null: nothing says whether the app runs; a job or region list is only there for a function or a service in two regions
   out.app = APP_STATES.includes(n.app as string) ? n.app : null
   const optionalNumber = (v: unknown) => (isFiniteNumber(v) ? v : null)

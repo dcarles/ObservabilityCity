@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import type { BuildingModel, TenantYardStatus } from '../../buildings/model'
 import type { TenantUnitSnapshot } from '../../types'
 import { at, box, canvasTexture, cyl, flat, group, roundRect } from '../../buildings/mk'
+import { databaseSignText, engineSignText, type EngineLabel } from '../../engineSign'
 import { isFollowed, isFollowing, isShown, isThrottled, fillOf, tenantLevel, yardLayout, yardSummary, type TenantLevel, type TenantView } from '../../tenants'
 
 const W = 7.0
@@ -68,7 +69,7 @@ interface Unit {
  * its capacity its database uses; its colour is its state (blue, amber, red, grey for no data). A test tenant's unit is paler and striped,
  * a tenant the environment does not list carries a question mark. A sign on a post says how many tenants there are and how many throttle.
  */
-export function storageYard(accent: string): BuildingModel {
+export function storageYard(accent: string, engine?: EngineLabel | null): BuildingModel {
   const slab = flat('#8b95a0'), gravel = flat('#b3bac2'), rail = flat('#d9dee3'), post = flat('#6b7682')
   const base = group(
     box(W, FLOOR - 0.04, D, slab),
@@ -98,10 +99,13 @@ export function storageYard(accent: string): BuildingModel {
   base.add(yard)
 
   // the sign: a board on a post at the front left, facing the road
-  const signTex = canvasTexture(512, 160, () => {})
+  // a yard that says what it runs on has a taller board: the engine and its type on top, the tenant count under them
+  const engineText = engineSignText(engine)
+  const signH = engineText ? 232 : 160
+  const signTex = canvasTexture(512, signH, () => {})
   const signCtx = (signTex.image as HTMLCanvasElement).getContext('2d')!
-  const board = new THREE.Mesh(new THREE.PlaneGeometry(3.6, 1.125), new THREE.MeshBasicMaterial({ map: signTex, transparent: true, toneMapped: false, side: THREE.DoubleSide }))
-  board.position.set(0, 2.55, 0)
+  const board = new THREE.Mesh(new THREE.PlaneGeometry(3.6, (3.6 * signH) / 512), new THREE.MeshBasicMaterial({ map: signTex, transparent: true, toneMapped: false, side: THREE.DoubleSide }))
+  board.position.set(0, engineText ? 2.9 : 2.55, 0)
   const signPost = cyl(0.07, 0.07, 2.2, post, { y: 0 }, 6)
   const sign = group(signPost, board)
   sign.position.set(-W / 2 + 1.3, FLOOR, D / 2 - 0.2)
@@ -111,13 +115,20 @@ export function storageYard(accent: string): BuildingModel {
     const key = `${text}|${note}|${hot}`
     if (key === signKey) return
     signKey = key
-    signCtx.clearRect(0, 0, 512, 160)
-    signCtx.fillStyle = 'rgba(20,28,40,0.92)'; roundRect(signCtx, 4, 4, 504, 152, 24); signCtx.fill()
+    signCtx.clearRect(0, 0, 512, signH)
+    signCtx.fillStyle = 'rgba(20,28,40,0.92)'; roundRect(signCtx, 4, 4, 504, signH - 8, 24); signCtx.fill()
     signCtx.strokeStyle = hot ? '#ffb830' : '#9fb4cc'; signCtx.lineWidth = 7; signCtx.stroke()
     signCtx.textAlign = 'center'; signCtx.textBaseline = 'middle'
+    let top = 0
+    if (engineText) {
+      signCtx.fillStyle = accent; signCtx.fillRect(14, 14, 484, 78)
+      signCtx.fillStyle = '#fff'; signCtx.font = '800 50px system-ui, sans-serif'; signCtx.fillText(engineText.title, 256, 44, 460)
+      signCtx.font = '700 28px system-ui, sans-serif'; signCtx.fillText(engineText.sub, 256, 74, 460)
+      top = 72
+    }
     signCtx.fillStyle = hot ? '#ffd27a' : '#fff'; signCtx.font = '800 50px system-ui, sans-serif'
-    signCtx.fillText(text, 256, note ? 62 : 80, 480)
-    if (note) { signCtx.fillStyle = '#b8c7da'; signCtx.font = '700 34px system-ui, sans-serif'; signCtx.fillText(note, 256, 116, 480) }
+    signCtx.fillText(text, 256, top + (note ? 62 : 80), 480)
+    if (note) { signCtx.fillStyle = '#b8c7da'; signCtx.font = '700 34px system-ui, sans-serif'; signCtx.fillText(note, 256, top + 116, 480) }
     signTex.needsUpdate = true
   }
   paintSign('no tenants', '', false)
@@ -212,6 +223,7 @@ export function storageYard(accent: string): BuildingModel {
     door: new THREE.Vector3(0, 0, D / 2 + 1.9),
     doorDir: new THREE.Vector3(0, 0, 1),
     plaque: { position: new THREE.Vector3(W / 2 - 1.25, 0.9, D / 2 + 0.2), width: 1.5 },
+    signText: databaseSignText(engine),
     radius: 4.2,
     setTenants(list, throttleAmber, v) {
       view = v

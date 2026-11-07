@@ -9,9 +9,8 @@ Your editor can check most of this as you type: each sample file starts with a `
 A town folder looks like this:
 
 ```
-town.yaml          required   the town's name and kind
+town.yaml          required   the town's name and kind, and where the islands stand
 defaults.yaml      optional   thresholds per role
-layout.yaml        optional   where the islands stand
 hub.yaml           optional   shared resources in the middle
 third-parties.yaml optional   vendors outside the town
 pillars/<id>.yaml  required   one island each (at least one)
@@ -31,7 +30,26 @@ Thresholds cascade: `defaults.yaml` (per role) → the pillar's `defaults` → t
 | `topology` | no | `direct` | `direct`: islands are linked by an outer ring road. `hub-and-spoke`: islands call each other through a gateway on the hub. |
 | `mode` | no | `live` | `demo` gives the town a fake source, the Break things panel and the story bar. `live` never does. |
 | `trafficDensity` | no | `1` | How many cars appear, as a multiple of the usual number: `1` is the usual look, `2` twice as many, `0.5` half. From `0.25` to `10`. A weak PC still lowers it with the quality setting, and the town never shows more than 420 cars at once. |
+| `islands` | no | file order | Pillar ids in the order the islands stand round the hub. Pillars not listed follow in file order, and Lost & found always comes last. |
+| `ringCapacity` | no | `12` | Islands on the first ring, from `6` to `18`. The second ring holds one fewer, since the airport takes a place there. |
+| `databaseEngines` | no | none | The database engines this company uses, by id (see below). A database writes `engine: <id>`. |
 | `expectedWarnings` | no | none | Warnings the validator should expect, for a test folder that shows a rule on purpose. |
+
+<!-- file: DatabaseEngineFile -->
+| Key | Required | Default | Meaning |
+|---|---|---|---|
+| `name` | yes | | The engine as it is shown, for example `Cosmos DB`. |
+| `type` | yes | | The kind of database it is: `relational`, `document`, `key-value`, `wide-column`, `graph`, `time-series`, `analytical` or `vector`. The list is fixed. Every engine belongs to exactly one type. |
+
+Each entry of `databaseEngines` is keyed by an id in lowercase kebab-case, for example `cosmos`:
+
+```yaml
+databaseEngines:
+  cosmos:    { name: Cosmos DB,  type: document }
+  sqlserver: { name: SQL Server, type: relational }
+```
+
+A database (`role: db`) in a pillar file or the hub then writes `engine: cosmos` and shows "Cosmos DB" with its type, Document, in the inspector, the tooltip and on the sign of its building in the 3D town. An engine that is not in the list is an error with a "did you mean" hint, so two teams cannot spell one engine two ways. A database without `engine` keeps the generic sign of its building and shows no label, and the validator warns about it once the town lists engines.
 
 <!-- file: ExpectedWarningFile -->
 | Key | Required | Default | Meaning |
@@ -91,6 +109,7 @@ One island. The file name is the pillar id.
 | `role` | yes | | `api`, `worker`, `db`, `cache`, `cron`, `gateway`, `broker`, `egress` or your own; picks the defaults and the building. |
 | `service` | no | none | Systems with the same service are drawn together as one block. |
 | `tenantPattern` | no | none | For a store with one database per tenant: its name with `{tenant}` where the tenant id goes. |
+| `engine` | no | none | For a database (`role: db`): the engine it runs on, an id from `databaseEngines` in `town.yaml`. |
 | `external` | no | `false` | The system belongs to someone outside the company. |
 | `slaP99Ms` | no | role default | Latency target for this system. |
 | `errors` | no | role default | Error thresholds. |
@@ -151,13 +170,6 @@ A function's jobs are found in its logs, and nothing in the logs says which serv
 | `id` | yes | | Id of the outside caller. |
 | `name` | no | the id | Name shown. |
 | `calls` | no | none | Ids of the systems it calls. |
-
-## layout.yaml
-<!-- file: LayoutFile -->
-| Key | Required | Default | Meaning |
-|---|---|---|---|
-| `islands` | no | file order | Island ids in the order round the hub. |
-| `ringCapacity` | no | built-in | Islands on the first ring. The second ring holds one fewer, since the airport takes a place there. |
 
 ## third-parties.yaml
 <!-- file: ThirdPartiesFile -->

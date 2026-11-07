@@ -4,3 +4,13 @@ name: Droid Shop
 groupLabel: Team          # what an island is called in this town
 topology: direct          # teams call each other's systems directly; there is no gateway between islands
 mode: demo                # runs on the fake source, with Break things and stories
+# Islands in the order they stand round the platform.
+islands: [web, mob, chk, inv, shp, ntf]
+
+# The database engines this town uses. A database says engine: <id>; the name and the type shown come from here.
+databaseEngines:
+  postgres:  { name: PostgreSQL, type: relational }
+  mongodb:   { name: MongoDB,    type: document }
+  firestore: { name: Firestore,  type: document }
+  dynamodb:  { name: DynamoDB,   type: key-value }
+  cassandra: { name: Cassandra,  type: wide-column }

@@ -22,6 +22,7 @@
           "resources": { "$ref": "defs.schema.json#/$defs/thresholds" },
           "throttle": { "$ref": "defs.schema.json#/$defs/thresholds" },
           "backlog": { "$ref": "defs.schema.json#/$defs/thresholds" },
+          "engine": { "$ref": "defs.schema.json#/$defs/kebabName", "description": "For a shared database (role: db): the engine it runs on, an id from databaseEngines in town.yaml." },
           "aliases": { "type": "array", "items": { "type": "string" } }
         }
       }

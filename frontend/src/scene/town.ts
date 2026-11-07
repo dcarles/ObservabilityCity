@@ -793,7 +793,7 @@ export class Town {
         continue
       }
       seen.add(n.kind)
-      const b = new Building(n.id, n.kind, hub?.color ?? palette.flagFallback, false, n.name)
+      const b = new Building(n.id, n.kind, hub?.color ?? palette.flagFallback, false, n.name, n.engine)
       b.root.position.set(spot.x, GROUND, spot.z)
       b.root.rotation.y = spot.yaw
       hubRoot.add(b.root)
@@ -1009,7 +1009,7 @@ export class Town {
       signSpans.push({ x: cx, zf })
     }
     for (const p of plan.placed) {
-      const b = new Building(p.node.id, p.node.kind, g.color, p.node.tenants != null)
+      const b = new Building(p.node.id, p.node.kind, g.color, p.node.tenants != null, undefined, p.node.engine)
       b.root.position.set(p.x, GROUND + 0.08, p.z)
       root.add(b.root)
       this.buildings.set(p.node.id, b)

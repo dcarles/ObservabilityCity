@@ -69,6 +69,8 @@ export interface Row {
   id: string
   name: string
   type: string
+  /** What a database runs on: its name and type as the town gives them. Null for anything else. */
+  engine: { name: string; type: string } | null
   level: Level
   reason: string | null
   rps: number | null
@@ -283,6 +285,7 @@ function rowOf(n: NodeSnapshot, s: Snapshot, view: TenantView, links: ReturnType
     id: n.id,
     name: n.name,
     type: TYPE[n.kind] ?? n.kind,
+    engine: n.engine ? { name: n.engine.name, type: n.engine.typeName } : null,
     level,
     reason: level === 'warn' || level === 'bad' ? n.reason ?? (dlqCount(n) > 0 ? dlqReason(n) : null) : null,
     rps: db || absent('requests') ? null : n.requestsPerSecond,

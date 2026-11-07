@@ -273,3 +273,63 @@ test.describe('the scheduler of Galactic Credit', () => {
     for (const text of await jobs.allTextContents()) expect(text).toContain('starts statements')
   })
 })
+
+// Each sample town lists its database engines in town.yaml, and its databases say which one they run on.
+test.describe('what a database runs on', () => {
+  const ledger = 'cl.ledger-db'
+  type Snap = { groups: { nodes: { kind: string; engine?: { name: string; typeName: string } }[] }[] }
+  const snapshot = async (request: any, q: string) => {
+    await expect.poll(async () => (await request.get(`${API}/api/snapshot/latest${q}`)).status(), { timeout: 30_000 }).toBe(200)
+    return (await (await request.get(`${API}/api/snapshot/latest${q}`)).json()) as Snap
+  }
+
+  test('the snapshot names the engine and type of every database, and of nothing else', async ({ request }) => {
+    for (const q of ['', `?town=${SHOP}`]) {
+      const s = await snapshot(request, q)
+      const nodes = s.groups.flatMap((g) => g.nodes)
+      const dbs = nodes.filter((n) => n.kind === 'Database')
+
+      expect(dbs.length).toBeGreaterThan(0)
+      expect(dbs.every((n) => n.engine && n.engine.name && n.engine.typeName)).toBe(true)
+      expect(nodes.filter((n) => n.kind !== 'Database').every((n) => !n.engine)).toBe(true)
+    }
+  })
+
+  test('the drawer of a database shows a clear engine badge with its type, and an Engine row', async ({ town, page }) => {
+    await town.open()
+    const db = await page.evaluate((id) => (window as any).city.seen.last.groups.flatMap((g: any) => g.nodes).find((n: any) => n.id === id), ledger)
+    await page.locator('#search-input').fill(db.name)
+    await page.locator('#search-results .hit').first().click()
+    await page.waitForFunction((id) => (window as any).city.inspector().id === id, ledger)
+
+    await expect(page.locator('#inspector .head .engine')).toContainText(db.engine.name)
+    await expect(page.locator('#inspector .head .engine')).toContainText(db.engine.typeName)
+    await expect(page.locator('#inspector .rows')).toContainText(`${db.engine.name} · ${db.engine.typeName}`)
+  })
+
+  test('every database building wears its own engine and type on its sign, and two databases can differ', async ({ town, page }) => {
+    for (const id of ['galactic-credit', SHOP]) {
+      town.townId = id
+      await town.open()
+      const dbs = await page.evaluate(() => {
+        const c = (window as any).city
+        return c.seen.last.groups.flatMap((g: any) => g.nodes).filter((n: any) => n.kind === 'Database').map((n: any) => ({ id: n.id, engine: n.engine, sign: c.inspect(n.id)?.sign ?? null }))
+      })
+      expect(dbs.length).toBeGreaterThan(0)
+      for (const db of dbs) expect(db.sign, db.id).toBe(`${db.engine.name.toUpperCase()} · ${db.engine.typeName}`)
+      expect(new Set(dbs.map((d: any) => d.sign)).size).toBeGreaterThan(1)
+    }
+  })
+
+  test('the dashboard names the engine next to the type under each database', async ({ page }) => {
+    await page.goto('/?view=dashboard')
+    await page.waitForFunction(() => document.querySelectorAll('[data-pillar]').length > 0, null, { timeout: 55_000 })
+    const cl = page.locator('section[data-pillar="cl"]')
+    await cl.locator('[data-toggle="cl"]').click()
+    const closed = cl.locator('tr.g[aria-expanded="false"]')
+    while ((await closed.count()) > 0) await closed.first().click() // each click redraws the table, so the first closed group is asked for again
+
+    await expect(cl.locator('b.engine').first()).toBeVisible()
+    await expect(cl.locator('b.engine').first()).toContainText('Cosmos DB')
+  })
+})

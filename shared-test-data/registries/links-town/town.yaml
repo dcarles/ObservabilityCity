@@ -6,3 +6,4 @@ mode: demo
 # the island 'sta' stands alone on purpose: it is what shows the standalone rule
 expectedWarnings:
   - { rule: standalone, file: pillars/sta.yaml }
+islands: [ful, wrk, nom, hbk, leg, sta]

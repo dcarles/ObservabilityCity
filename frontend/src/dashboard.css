@@ -143,6 +143,10 @@ body.dash #view-bar .vb-btn, body.dash #view-bar .vb-list input[type=search] { b
 .dl .what { font-weight: 600; } .dl .what em { font-style: normal; font-weight: 400; color: var(--muted); }
 .dl .q { color: var(--muted); } .dl .q .qreg { font-weight: 600; } .dl .q i { color: var(--bad); font-style: normal; font-weight: 600; }
 
+/* what a database runs on, next to its type under the name */
+.svc td.ind small b.engine { margin-left: 2px; padding: 1px 7px; border: 1px solid var(--line, currentColor); border-radius: 999px; font-weight: 600; font-size: 12.5px; color: var(--fg); }
+.svc td.ind small b.engine i { margin-left: 5px; font-style: normal; font-weight: 400; color: var(--muted); }
+
 #dash-legend { position: fixed; z-index: 20; background: var(--surface); border: 1px solid var(--dline); border-radius: 10px; padding: 12px 14px; width: min(400px, calc(100vw - 32px)); box-shadow: 0 8px 24px rgba(0,0,0,.18); font-size: 13px; }
 #dash-legend[hidden] { display: none; }
 #dash-legend .dl-head { margin-bottom: 6px; font-size: 14px; }

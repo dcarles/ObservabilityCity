@@ -105,6 +105,8 @@ public static class SystemDetails
         }
         if (n.TenantPattern is not null)
             rows.Add(new ConfigValue("tenantPattern", n.TenantPattern, SettingLayer.System, $"{PathOf(n.SourceFile)}, this system"));
+        if (n.Engine is not null)
+            rows.Add(new ConfigValue("engine", n.Engine, SettingLayer.System, $"{PathOf(n.SourceFile)}, this system"));
         if (n.Service is not null)
             rows.Add(new ConfigValue("service", n.Service, SettingLayer.System, $"{PathOf(n.SourceFile)}, this system"));
         return rows;

@@ -3,6 +3,7 @@ import type { HealthEventSnapshot, NodeSnapshot } from '../types'
 import { isAbsent, isUnmonitored } from '../signals'
 import { beaconLevel, clamp, darkFloorsFor, floorsFor, formatAge, formatCount, formatMs, formatRate, lerp, MAX_FLOORS, plaqueText, type BeaconLevel } from '../visuals'
 import { buildModel, palette } from '../themes/active'
+import type { EngineLabel } from '../engineSign'
 import { labelRise, type BuildingModel, type FloorModule, type TenantYardStatus } from './model'
 import { ALL_TENANTS, type TenantView } from '../tenants'
 import { canvasTexture, roundRect } from './mk'
@@ -22,6 +23,8 @@ export interface BuildingStatus {
   /** Only data stores have a barrier: down while they turn requests away. */
   barrierDown: boolean | null
   plaque: string
+  /** The words on the building's own sign when it says something worth testing: a database's engine and type, a broker's name. Null otherwise. */
+  sign: string | null
   /** Too few calls to judge errors and latency: the building stays as it is and says so. */
   quiet: boolean
   /** Only a data store with a database for each tenant: its units and sign. Null for every other building. */
@@ -116,9 +119,9 @@ export class Building {
   /** What the viewer chose to see of the tenants. Only a tenant yard looks at it. */
   private tenantView: TenantView = ALL_TENANTS
 
-  /** `name` is the system's own name; a broker's port sign reads it. */
-  constructor(readonly id: string, readonly kind: NodeSnapshot['kind'], accent: string, tenanted = false, name?: string) {
-    this.model = buildModel(kind, accent, { tenanted, name })
+  /** `name` is the system's own name; a broker's port sign reads it. `engine` is what a database runs on; its sign reads that. */
+  constructor(readonly id: string, readonly kind: NodeSnapshot['kind'], accent: string, tenanted = false, name?: string, engine?: EngineLabel | null) {
+    this.model = buildModel(kind, accent, { tenanted, name, engine })
     const m = this.model
     this.pivot.add(m.base)
     for (let i = 0; i < MAX_FLOORS; i++) {
@@ -293,6 +296,7 @@ export class Building {
       closedSign: this.closedSign.visible,
       barrierDown: this.gate ? this.gateAngle < 0.4 : null,
       plaque: plaqueText(n),
+      sign: this.model.signText ?? null,
       quiet: n.quiet === true,
       tenants: this.model.tenantStatus?.() ?? null,
       underConstruction: n.app === 'Stopped',

@@ -110,6 +110,24 @@ describe('groups and rows', () => {
     expect(rows.filter((x) => x.type === 'DB').every((x) => x.rps === null)).toBe(true)
   })
 
+  it('shows what a database runs on, and nothing for any other system', () => {
+    const s = golden('calm')
+    const rows = buildDashboard(s, ALL_TENANTS).pillars.flatMap((p) => p.groups.flatMap((g) => g.rows))
+    const dbs = rows.filter((x) => x.type === 'DB')
+
+    expect(dbs.length).toBeGreaterThan(0)
+    expect(dbs.every((x) => x.engine !== null && x.engine.name.length > 0 && x.engine.type.length > 0)).toBe(true)
+    expect(rows.filter((x) => x.type !== 'DB').every((x) => x.engine === null)).toBe(true)
+  })
+
+  it('draws the engine as a badge next to the type under the name', () => {
+    const s = golden('calm')
+    const withDb = buildDashboard(s, ALL_TENANTS).pillars.find((p) => p.groups.some((g) => g.rows.some((r) => r.type === 'DB')))!
+    const html = pillarHtml(withDb, ui({ openPillars: new Set([withDb.id]), groups: new Map(withDb.groups.map((g) => [g.key, true] as const)) }))
+
+    expect(html).toMatch(/<small>DB · <b class="engine"[^>]*>[^<]+<i>[^<]+<\/i><\/b>/)
+  })
+
   it('lists callers and callees from real links only, with the rate when it is measured', () => {
     const s = golden('calm')
     const d = buildDashboard(s, ALL_TENANTS)

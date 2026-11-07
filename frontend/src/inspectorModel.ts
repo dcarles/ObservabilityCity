@@ -56,8 +56,14 @@ export interface Row {
 }
 
 /** The key numbers of a system, in reading order. Numbers a source does not give are left out, not shown as zero. */
+/** What a database runs on, as the town names it: "Cosmos DB · Document". Null for any system that says no engine. */
+export function engineText(n: Pick<NodeSnapshot, 'engine'>): string | null {
+  return n.engine ? `${n.engine.name} · ${n.engine.typeName}` : null
+}
+
 export function overviewRows(n: NodeSnapshot, nameOf: (id: string) => string = (id) => id, cloud?: string | null, townMessages?: number | null): Row[] {
-  const rows = ownRows(n, nameOf, cloud)
+  const engine = engineText(n)
+  const rows = [...(engine ? [{ label: 'Engine', value: engine, tone: '' } as Row] : []), ...ownRows(n, nameOf, cloud)]
   // the broker's own building: what all the queues of the town take in, each queue counted where it is read. It comes from the systems that read the queues, so it is shown even when the broker itself has no fresh numbers.
   return n.kind === 'Broker' && townMessages != null ? [{ label: 'Messages', value: `${messageRate(townMessages)} msg/s through the queues`, tone: '' }, ...rows] : rows
 }

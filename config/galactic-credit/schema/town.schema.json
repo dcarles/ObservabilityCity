@@ -11,6 +11,32 @@
     "mode": { "enum": ["demo", "live"], "default": "live", "description": "demo: the town runs on fake data and has the Break things panel and the story bar. live (the default when this is left out): real sources only, nothing to break. Read when the server starts." },
     "trafficDensity": { "type": "number", "minimum": 0.25, "maximum": 10, "default": 1, "description": "How many cars appear, as a multiple of the usual number: 1 is the usual look, 2 twice as many, 0.5 half. A weak PC still lowers it with the quality setting, and the town never shows more than 420 cars at once." },
     "topology": { "enum": ["hub-and-spoke", "direct"], "description": "Whether calls between islands go through the hub." },
+    "islands": {
+      "type": "array",
+      "description": "Pillar codes in the order they stand round the hub: the first ringCapacity on the first ring, the rest on a staggered second ring. Pillars not listed follow in file order, and Lost & found always comes last.",
+      "items": { "$ref": "system-ids.schema.json#/$defs/pillarId" }
+    },
+    "ringCapacity": {
+      "type": "integer",
+      "minimum": 6,
+      "maximum": 18,
+      "default": 12,
+      "description": "Islands on the first ring. The second ring holds one fewer, because the airport takes a place there, so a town holds at most 2 x ringCapacity - 1 pillars (23 at 12, 35 at 18). Lost & found counts as a pillar."
+    },
+    "databaseEngines": {
+      "type": "object",
+      "description": "The database engines this company uses, by id. A database writes engine: <id> and shows the name and type from here, so every team spells an engine the same way.",
+      "propertyNames": { "$ref": "defs.schema.json#/$defs/kebabName" },
+      "additionalProperties": {
+        "type": "object",
+        "required": ["name", "type"],
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string", "description": "The engine as it is shown, for example Cosmos DB." },
+          "type": { "enum": ["relational", "document", "key-value", "wide-column", "graph", "time-series", "analytical", "vector"], "description": "The kind of database it is. The list is fixed; every engine belongs to exactly one." }
+        }
+      }
+    },
     "expectedWarnings": {
       "type": "array",
       "description": "Warnings the validator should expect here: a test registry that shows a rule on purpose. They are left out of the report; if one stops appearing, that is an error.",

@@ -432,9 +432,9 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
         if (r is not null) r = WithoutAbsent(r, absent);
         // The inventory has been read and the app is not there: grey, and it says so. Nothing else about a missing app can be known.
         if (r?.App == AppState.Missing)
-            return Stale(n, r, absent, env) with { App = AppState.Missing, Sources = ages.Count > 0 ? ages : null };
+            return Stale(n, r, absent, env) with { App = AppState.Missing, Sources = ages.Count > 0 ? ages : null, Engine = EngineOf(registry, n) };
         if (r is null || absent.Count == Signals.For(n.Kind).Count || IsStale(n, registry, bySource, r, now))
-            return Stale(n, r, absent, env) with { Sources = ages.Count > 0 ? ages : null }; // No fresh data: keep the last numbers out of it. Grey, never green.
+            return Stale(n, r, absent, env) with { Sources = ages.Count > 0 ? ages : null, Engine = EngineOf(registry, n) }; // No fresh data: keep the last numbers out of it. Grey, never green.
 
         // A count of 0 instances is no count: the source did not say (a plan the cloud gives no worker count for), so the signal is absent rather than 0 of 0.
         if (r.InstancesTotal == 0 && r.InstancesHealthy == 0 && !absent.Contains(Signals.Instances)) absent = [.. absent, Signals.Instances];
@@ -493,8 +493,13 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
             Jobs = jobs,
             Regions = regions?.Select(x => new RegionSnapshot(x.Region, Label(env, x.Region), x.Instances, x.Cpu, x.Memory, x.Share, Skewed(x, regions, env))).ToList(),
             Reason = health == HealthState.Healthy ? null : HealthReasons.For(n, r, health, jobs, utilisation, throttled, tenants),
+            Engine = EngineOf(registry, n),
         };
     }
+
+    /// <summary>The engine a database says it runs on, named from the town's list. Null for any other system, and for a database that says none.</summary>
+    private static DatabaseEngineSnapshot? EngineOf(Registry.Registry registry, RegistryNode n) =>
+        registry.EngineOf(n) is { } e ? new DatabaseEngineSnapshot(e.Id, e.Name, e.Type, DatabaseTypes.Names[e.Type]) : null;
 
     private static NodeSnapshot Stale(RegistryNode n, NodeReading? r, IReadOnlyList<string> absent, RegistryEnvironment? env) =>
         new(n.Id, n.Name, n.Kind, n.Service, n.External, HealthState.Stale, 0, 0, 0, null, null, null, null, null, null, null, 0, 0, 0,

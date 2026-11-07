@@ -88,10 +88,10 @@ public class ResilientLoadingTests
     }
 
     [Fact]
-    public void An_island_listed_in_layout_with_no_file_is_a_notice_not_a_failure()
+    public void An_island_listed_in_the_town_with_no_file_is_a_notice_not_a_failure()
     {
         using var f = new RegistryCopy(TestPaths.MiniTown);
-        f.Replace("layout.yaml", "[aa, bb, cc]", "[aa, bb, cc, dd]");
+        f.Replace("town.yaml", "[aa, bb, cc]", "[aa, bb, cc, dd]");
 
         var registry = RegistryLoader.LoadResilient(f.Path);
 
@@ -111,13 +111,24 @@ public class ResilientLoadingTests
     [Theory]
     [InlineData("town.yaml")]
     [InlineData("hub.yaml")]
-    [InlineData("layout.yaml")]
     public void The_files_every_pillar_depends_on_must_be_sound(string file)
     {
         using var f = new RegistryCopy(TestPaths.MiniTown);
         f.Write(file, "bogus: [unclosed\n");
 
         Assert.Throws<RegistryException>(() => RegistryLoader.LoadResilient(f.Path));
+    }
+
+    [Fact]
+    public void A_leftover_layout_file_is_refused_with_the_fix()
+    {
+        using var f = new RegistryCopy(TestPaths.MiniTown);
+        f.Write("layout.yaml", "islands: [aa, bb, cc]\n");
+
+        var e = Assert.Throws<RegistryException>(() => RegistryLoader.LoadResilient(f.Path));
+
+        Assert.Contains("layout.yaml", e.Message);
+        Assert.Contains("town.yaml", e.Message);
     }
 
     [Fact]

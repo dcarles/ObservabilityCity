@@ -18,7 +18,7 @@ public static class RegistryValidator
     private static readonly Regex Colour = new("^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$", RegexOptions.Compiled);
     private static readonly Regex Quoted = new("'([^']+)'", RegexOptions.Compiled);
     private static readonly Regex CallsMessage = new("^'([^']+)' calls '([^']+)'", RegexOptions.Compiled);
-    private static readonly string[] TopLevel = ["town.yaml", "defaults.yaml", "hub.yaml", "layout.yaml", "fake.yaml", "third-parties.yaml"];
+    private static readonly string[] TopLevel = ["town.yaml", "defaults.yaml", "hub.yaml", "fake.yaml", "third-parties.yaml"];
     private static readonly string[] Topologies = ["hub-and-spoke", "direct"];
     private static readonly string[] Blocks = ["errors", "resources", "throttle", "backlog"];
 
@@ -52,6 +52,7 @@ public static class RegistryValidator
         CheckHub(ctx, registry);
         CheckExternalCallers(ctx, registry);
         CheckWorkersHaveDatabases(ctx, registry);
+        CheckDatabaseEngines(ctx, registry);
         CheckUncalled(ctx, registry);
         CheckStandalone(ctx, registry);
         CheckServices(ctx, registry);
@@ -134,17 +135,18 @@ public static class RegistryValidator
     private static void CheckLayout(Context c, Registry registry)
     {
         var pillars = registry.Groups.Where(g => !g.IsHub).ToList();
-        var layout = c.Raw("layout.yaml");
-        if (layout.Root is null)
+        var layout = c.Raw("town.yaml");
+        if (layout.Root is null) return;
+        if (RawYaml.Get(layout.Root, "islands") is null)
         {
             if (pillars.Count > 1)
-                c.Warn("town.yaml", 1, "layout", "There is no layout.yaml, so islands stand round the hub in file-name order.");
+                c.Warn("town.yaml", 1, "layout", "town.yaml has no islands list, so islands stand round the hub in file-name order.");
         }
         else
         {
             var listed = RawYaml.Items(RawYaml.Get(layout.Root, "islands")).Select(RawYaml.Str).ToHashSet();
             foreach (var g in pillars.Where(g => !g.IsLostFound && !listed.Contains(g.Id)))
-                c.Error(c.PillarFile(g.Id), 1, "layout", $"Pillar '{g.Id}' has no entry in layout.yaml, so its place round the hub is an accident of file order. Add '{g.Id}' to islands.");
+                c.Error(c.PillarFile(g.Id), 1, "layout", $"Pillar '{g.Id}' is missing from the islands list in town.yaml, so its place round the hub is an accident of file order. Add '{g.Id}' to islands.");
         }
     }
 
@@ -280,6 +282,17 @@ public static class RegistryValidator
                 var at = c.Locate(w.Id);
                 c.Warn(at.File, at.Line, "worker-db", $"Worker '{w.Id}' has no database: none in its service and none under calls. Workers normally keep their state somewhere.");
             }
+        }
+    }
+
+    /// <summary>Once a town lists its database engines, a database that does not say which one it runs on is a gap in its labels.</summary>
+    private static void CheckDatabaseEngines(Context c, Registry registry)
+    {
+        if (registry.DatabaseEngines.Count == 0) return;
+        foreach (var n in registry.AllNodes.Where(n => n.Kind == NodeKind.Database && n.Engine is null && !n.Id.StartsWith(RegistryVendor.GroupId + ".")))
+        {
+            var at = c.Locate(n.Id);
+            c.Warn(at.File, at.Line, "db-engine", $"Database '{n.Id}' has no engine, so it shows no engine label. Add engine: with one of {string.Join(", ", registry.DatabaseEngines.Select(e => e.Id))}.");
         }
     }
 

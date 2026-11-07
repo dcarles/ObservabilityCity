@@ -186,6 +186,12 @@ export interface components {
             layer: components["schemas"]["SettingLayer"];
             source: string;
         };
+        DatabaseEngineSnapshot: {
+            id: string;
+            name: string;
+            type: string;
+            typeName: string;
+        };
         DeadLetterRegionSnapshot: {
             region: string;
             /** Format: double */
@@ -382,6 +388,7 @@ export interface components {
             queues?: components["schemas"]["QueueSnapshot"][] | null;
             reason?: string | null;
             sources?: components["schemas"]["SourceAgeSnapshot"][] | null;
+            engine?: components["schemas"]["DatabaseEngineSnapshot"];
         };
         OffscreenLink: {
             nodeId: string;

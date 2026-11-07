@@ -7,6 +7,7 @@ import { kit } from '../../assets/kit'
 import { palette } from '../active'
 import { storageYard } from './yard'
 import { portSignText } from '../../portSign'
+import { databaseSignText, paintDatabaseSign, type EngineLabel, type ModelOptions } from '../../engineSign'
 
 const P = palette.building
 const v = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z)
@@ -15,13 +16,13 @@ const v = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z)
 const CELL = 1.2
 
 /** Builds the model for a building kind. The accent is the owning island's flag colour. */
-export function harbourModel(kind: NodeKind, accent: string, opts: { tenanted?: boolean; name?: string } = {}): BuildingModel {
+export function harbourModel(kind: NodeKind, accent: string, opts: ModelOptions = {}): BuildingModel {
   // a data store with a database for each tenant stands as a yard of storage units
-  if (kind === 'Database' && opts.tenanted) return storageYard(accent)
+  if (kind === 'Database' && opts.tenanted) return storageYard(accent, opts.engine)
   switch (kind) {
     case 'Api': return townhouse(accent)
     case 'Worker': return factory(accent)
-    case 'Database': return storage(accent)
+    case 'Database': return storage(accent, opts.engine)
     case 'Cache': return waterTower()
     case 'Function': return clockTower()
     case 'Gateway': return gateway(accent)
@@ -221,14 +222,10 @@ function factory(accent: string): BuildingModel {
 
 // ── Database: storage units, each door a unit; lit doors are the share of capacity in use ─────
 
-function storage(accent: string): BuildingModel {
+function storage(accent: string, engine?: EngineLabel | null): BuildingModel {
   const W = 5 * CELL, D = 4 * CELL, FH = 1.95
   const trim = flat('#eef2f5')
-  const sign = canvasTexture(512, 128, (ctx) => {
-    ctx.fillStyle = accent; ctx.fillRect(0, 0, 512, 128)
-    ctx.fillStyle = '#ffffff'; ctx.font = '800 76px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-    ctx.fillText('STORAGE', 256, 68)
-  })
+  const sign = canvasTexture(512, 128, (ctx) => paintDatabaseSign(ctx, accent, 'STORAGE', 76, engine))
   const base = group(
     box(W + 0.2, 0.5, D + 0.2, flat('#7d8a97')),
     box(W + 1.6, 0.08, 1.8, flat('#cfc8b8'), { z: D / 2 + 1.0 }),
@@ -261,6 +258,7 @@ function storage(accent: string): BuildingModel {
     door: v(0, 0, D / 2 + 1.9),
     doorDir: v(0, 0, 1),
     plaque: { position: v(-W / 2 + 0.9, 0.5, D / 2 + 0.25), width: 1.5 },
+    signText: databaseSignText(engine),
     radius: 3.6,
   }
 }

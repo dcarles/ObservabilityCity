@@ -7,9 +7,9 @@ defaults:
 systems:
   - { id: dsp.disputes-api, service: disputes, name: Disputes API, role: api, external: true, calls: [dsp.disputes-db, dsp.evidence-api], gatewayCalls: [pay.payments-api, frd.cases-api] }
   - { id: dsp.disputes-worker, service: disputes, name: Disputes worker, role: worker, calls: [dsp.disputes-db] }
-  - { id: dsp.disputes-db, service: disputes, name: Disputes DB, role: db }
+  - { id: dsp.disputes-db, service: disputes, name: Disputes DB, role: db, engine: sqlserver }
   - { id: dsp.evidence-api, service: evidence, name: Evidence API, role: api, calls: [dsp.evidence-db] }
-  - { id: dsp.evidence-db, service: evidence, name: Evidence DB, role: db }
+  - { id: dsp.evidence-db, service: evidence, name: Evidence DB, role: db, engine: postgres }
 
 # Messaging: the outboxes this pillar publishes (dsp-<service>-outbox) and the topics its workers consume.
 messaging:

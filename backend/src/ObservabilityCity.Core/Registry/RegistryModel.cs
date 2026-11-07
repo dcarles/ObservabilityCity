@@ -10,8 +10,14 @@ public sealed partial record Registry(
 {
     public IEnumerable<RegistryNode> AllNodes => Groups.SelectMany(g => g.Nodes);
 
-    /// <summary>How many islands fit on the first ring (layout.yaml ringCapacity). The town holds up to <see cref="MaxPillars"/> pillars on two rings.</summary>
+    /// <summary>How many islands fit on the first ring (town.yaml ringCapacity). The town holds up to <see cref="MaxPillars"/> pillars on two rings.</summary>
     public int RingCapacity { get; init; } = DefaultRingCapacity;
+
+    /// <summary>The database engines the company defined in town.yaml (databaseEngines). Empty when it defined none.</summary>
+    public IReadOnlyList<DatabaseEngine> DatabaseEngines { get; init; } = [];
+
+    /// <summary>The engine a database says it runs on, or null when it says none.</summary>
+    public DatabaseEngine? EngineOf(RegistryNode node) => node.Engine is null ? null : DatabaseEngines.FirstOrDefault(e => e.Id == node.Engine);
 
     public const int DefaultRingCapacity = 12;
     public const int MinRingCapacity = 6;
@@ -55,6 +61,9 @@ public sealed partial record Registry(
     /// <summary>Every individual problem a resilient load worked around, in full (Notices keeps one line per skipped file). Empty exactly when a strict load would succeed.</summary>
     public IReadOnlyList<string> Problems { get; init; } = [];
 }
+
+/// <summary>A database engine of the company: Id is what pillar files write, Name is what is shown, Type is one of <see cref="DatabaseTypes"/>.</summary>
+public sealed record DatabaseEngine(string Id, string Name, string Type);
 
 /// <summary>A scheduled job of a function and the services (of the same pillar) it starts work for. SystemId is the function's full id.</summary>
 public sealed record RegistrySchedule(string SystemId, string Job, IReadOnlyList<string> Services);
@@ -176,6 +185,9 @@ public sealed record RegistryNode(
 
     /// <summary>For a data store with one database per tenant: its name with {tenant} where the tenant id goes. Null for everything else.</summary>
     public string? TenantPattern { get; init; }
+
+    /// <summary>For a database: the id of the engine it runs on (a key of town.yaml databaseEngines). Null when it says none.</summary>
+    public string? Engine { get; init; }
 
     /// <summary>Whether link discovery looks for the calls this system makes (<c>discoverLinks</c>, through the defaults cascade). Only an API or a worker makes calls worth finding.</summary>
     public bool DiscoverLinks { get; init; } = true;

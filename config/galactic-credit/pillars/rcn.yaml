@@ -5,7 +5,7 @@ displayName: Reconciliation
 color: "#b08968"
 systems:
   - { id: rcn.matching-worker, service: matching, name: Matching worker, role: worker, calls: [rcn.matching-db] }
-  - { id: rcn.matching-db, service: matching, name: Matching DB, role: db }
+  - { id: rcn.matching-db, service: matching, name: Matching DB, role: db, engine: sqlserver }
   - { id: rcn.settlement-cron, name: Nightly settlement, role: function, calls: [rcn.matching-db] }
 
 messaging:

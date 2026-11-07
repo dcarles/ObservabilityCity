@@ -6,7 +6,7 @@ namespace ObservabilityCity.Core.Registry;
 /// <summary>
 /// JSON schemas for the registry files, so an editor with a YAML language server completes and checks them.
 /// The structure schemas ship inside the app. system-ids.schema.json lists this registry's own ids, so `calls` and
-/// layout.yaml complete from what is really there. Regenerate after adding systems: `dotnet run --project src/ObservabilityCity.Host -- --write-schema`.
+/// town.yaml complete from what is really there. Regenerate after adding systems: `dotnet run --project src/ObservabilityCity.Host -- --write-schema`.
 /// </summary>
 public static class RegistrySchema
 {

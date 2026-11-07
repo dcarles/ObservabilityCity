@@ -3,3 +3,4 @@ name: Wide islands town
 groupLabel: Pillar
 topology: hub-and-spoke
 mode: demo
+islands: [sm, md, wd, xl]

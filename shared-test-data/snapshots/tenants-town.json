@@ -80,7 +80,8 @@
           "regions": null,
           "queues": null,
           "reason": null,
-          "sources": null
+          "sources": null,
+          "engine": null
         },
         {
           "id": "hub.service-bus",
@@ -125,7 +126,8 @@
           "regions": null,
           "queues": null,
           "reason": null,
-          "sources": null
+          "sources": null,
+          "engine": null
         },
         {
           "id": "hub.egress",
@@ -170,7 +172,8 @@
           "regions": null,
           "queues": null,
           "reason": null,
-          "sources": null
+          "sources": null,
+          "engine": null
         },
         {
           "id": "hub.customer-db",
@@ -215,7 +218,8 @@
           "regions": null,
           "queues": null,
           "reason": null,
-          "sources": null
+          "sources": null,
+          "engine": null
         }
       ],
       "assets": []
@@ -302,7 +306,8 @@
           "regions": null,
           "queues": null,
           "reason": null,
-          "sources": null
+          "sources": null,
+          "engine": null
         },
         {
           "id": "aa.audit-cache",
@@ -347,7 +352,8 @@
           "regions": null,
           "queues": null,
           "reason": null,
-          "sources": null
+          "sources": null,
+          "engine": null
         },
         {
           "id": "aa.orders-worker",
@@ -394,7 +400,8 @@
           "regions": null,
           "queues": null,
           "reason": null,
-          "sources": null
+          "sources": null,
+          "engine": null
         },
         {
           "id": "aa.tools-cron",
@@ -456,7 +463,8 @@
           "regions": null,
           "queues": null,
           "reason": null,
-          "sources": null
+          "sources": null,
+          "engine": null
         },
         {
           "id": "aa.orders-db",
@@ -562,7 +570,8 @@
           "regions": null,
           "queues": null,
           "reason": "error rate 6.4%, tenant Acme \u00B7 108% RU \u00B7 31.2% throttled",
-          "sources": null
+          "sources": null,
+          "engine": null
         }
       ],
       "assets": []
@@ -629,7 +638,8 @@
           "regions": null,
           "queues": null,
           "reason": null,
-          "sources": null
+          "sources": null,
+          "engine": null
         },
         {
           "id": "bb.billing-db",
@@ -735,7 +745,8 @@
           "regions": null,
           "queues": null,
           "reason": null,
-          "sources": null
+          "sources": null,
+          "engine": null
         },
         {
           "id": "bb.shared-db",
@@ -780,7 +791,8 @@
           "regions": null,
           "queues": null,
           "reason": null,
-          "sources": null
+          "sources": null,
+          "engine": null
         }
       ],
       "assets": []
