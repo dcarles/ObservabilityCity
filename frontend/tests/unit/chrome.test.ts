@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { browserStore, isLighting, LIGHTING, LIGHTING_KEY, otherLighting, saveLighting, startLighting, type Store } from '../../src/lighting'
 import { DEFAULT_THEME, saveTheme, startTheme, themeById, THEME_KEY, THEMES } from '../../src/themes'
-import { forTopology, LEGEND, LEGEND_ENTRIES, LEGEND_TABS } from '../../src/legend'
+import { forTown, LEGEND, LEGEND_ENTRIES, LEGEND_TABS } from '../../src/legend'
 import { LEGEND_SVG, iconHtml } from '../../src/legendIcons'
 import { DASH_LEGEND, dashLegendHtml } from '../../src/dashboard/legend'
 
@@ -169,7 +169,7 @@ describe('the dashboard legend', () => {
 })
 
 describe('the legend by topology', () => {
-  const ids = (t: 'hub-and-spoke' | 'direct', tab: string) => forTopology(LEGEND, t).filter((s) => s.tab === tab).flatMap((s) => s.entries).map((e) => e.id)
+  const ids = (t: 'hub-and-spoke' | 'direct', tab: string) => forTown(LEGEND, { topology: t, demo: true }).filter((s) => s.tab === tab).flatMap((s) => s.entries).map((e) => e.id)
 
   it('explains only the way its own town works: over the hub, or along the ring road', () => {
     expect(ids('hub-and-spoke', 'traffic')).toEqual(expect.arrayContaining(['flow-hub', 'flow-outside-hub', 'flow-vendor-hub', 'flow-hidden-hub']))
@@ -187,7 +187,7 @@ describe('the legend by topology', () => {
   })
 
   it('never leaves a section empty', () => {
-    for (const t of ['hub-and-spoke', 'direct'] as const) for (const s of forTopology(LEGEND, t)) expect(s.entries.length, `${t} ${s.id}`).toBeGreaterThan(0)
+    for (const t of ['hub-and-spoke', 'direct'] as const) for (const s of forTown(LEGEND, { topology: t, demo: true })) expect(s.entries.length, `${t} ${s.id}`).toBeGreaterThan(0)
   })
 
   it('keeps the islands to what the town has: the pillar island, the hub, third parties and the airport', () => {
@@ -203,7 +203,54 @@ describe('the legend by topology', () => {
   })
 
   it('keeps flow words out of the buildings and building words out of the flow', () => {
-    const flow = forTopology(LEGEND, 'hub-and-spoke').filter((s) => s.tab === 'traffic').flatMap((s) => s.entries).map((e) => e.id)
+    const flow = forTown(LEGEND, { topology: 'hub-and-spoke', demo: true }).filter((s) => s.tab === 'traffic').flatMap((s) => s.entries).map((e) => e.id)
     for (const id of ['api', 'worker', 'database', 'gateway', 'broker']) expect(flow).not.toContain(id)
+  })
+})
+
+describe('what the legend leaves out', () => {
+  const town = { topology: 'direct' as const, demo: false }
+  const shown = (t: { topology: 'direct' | 'hub-and-spoke'; demo: boolean }) => forTown(LEGEND, t).flatMap((s) => s.entries).map((e) => e.id)
+
+  it('shows the Break things panel only in a demo town', () => {
+    expect(shown({ ...town, demo: true })).toContain('break')
+    expect(shown(town)).not.toContain('break')
+    expect(LEGEND_ENTRIES.filter((e) => e.demoOnly).map((e) => e.id)).toEqual(['break'])
+  })
+
+  it('keeps the incident weather and the legacy pennant in the data but hidden, each with a reason', () => {
+    for (const id of ['weather', 'pennant']) {
+      const e = LEGEND_ENTRIES.find((x) => x.id === id)!
+      expect(e.hidden, id).toBeTruthy()
+      expect(shown({ ...town, demo: true }), id).not.toContain(id)
+    }
+    expect(LEGEND_ENTRIES.filter((e) => e.hidden).map((e) => e.id).sort()).toEqual(['pennant', 'weather'])
+  })
+
+  it('says nothing about the weather where it is shown', () => {
+    const text = forTown(LEGEND, { topology: 'direct', demo: true }).flatMap((s) => s.entries).map((e) => `${e.sees} ${e.means} ${e.more ?? ''}`).join(' ').toLowerCase()
+    expect(text).not.toMatch(/weather|storm|overcast|lightning/)
+  })
+
+  it('names no cloud vendor anywhere', () => {
+    const text = LEGEND_ENTRIES.map((e) => `${e.sees} ${e.means} ${e.more ?? ''}`).join(' ').toLowerCase()
+    for (const word of ['azure', 'aws', 'google cloud']) expect(text).not.toContain(word)
+    expect(LEGEND_ENTRIES.find((e) => e.id === 'health-sign')!.means).toMatch(/cloud provider/i)
+  })
+
+  it('keeps "queue" for messages: cars wait in a line of cars', () => {
+    for (const id of ['hazard', 'bubble', 'queue']) {
+      const e = LEGEND_ENTRIES.find((x) => x.id === id)!
+      expect(`${e.sees} ${e.means} ${e.more ?? ''}`.toLowerCase(), id).not.toContain('queue')
+      expect(`${e.sees} ${e.means} ${e.more ?? ''}`.toLowerCase(), id).toMatch(/line of cars|lined up/)
+    }
+  })
+
+  it('explains the hazard lights are on a car and the bubble has the "!" and the "+N waiting"', () => {
+    expect(LEGEND_ENTRIES.find((e) => e.id === 'hazard')!.sees).toMatch(/on a car/i)
+    const bubble = LEGEND_ENTRIES.find((e) => e.id === 'bubble')!
+    expect(`${bubble.means} ${bubble.more}`).toContain('!')
+    expect(`${bubble.means} ${bubble.more}`).toContain('+N waiting')
+    expect(bubble.tone).toBe('amber')
   })
 })

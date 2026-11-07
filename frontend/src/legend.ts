@@ -28,6 +28,10 @@ export interface LegendEntry {
   tone: Tone
   /** Shown only in a town with this topology. Without it, in every town. */
   topology?: Topology
+  /** Shown only when the town runs on demo data. */
+  demoOnly?: boolean
+  /** Kept in the data but not shown, with the reason: the thing is not built yet or not used yet. Remove it to show the entry again. */
+  hidden?: string
   /** The picture: an emoji, or `svg:<name>` for one drawn in legendIcons.ts. */
   icon: string
 }
@@ -54,7 +58,7 @@ export const LEGEND: readonly LegendSection[] = [
     tab: 'problems',
     entries: [
       { id: 'beacon-red', sees: 'Red beacon', means: 'Requests are failing', more: 'A steady red light and a closed sign mean it is down.', tone: 'red', icon: 'svg:beacon-red' },
-      { id: 'health-sign', sees: 'Red exclamation mark above a building', means: 'Azure reports a problem with its resource', more: 'It stays up while Azure Resource Health has the report open, and for a few hours after it is resolved. Open the building to read it or dismiss it.', tone: 'red', icon: 'svg:health-sign' },
+      { id: 'health-sign', sees: 'Red exclamation mark above a building', means: 'Your cloud provider reports a problem with its resource', more: 'It stays up while the provider\'s resource health report is open, and for a few hours after it is resolved. Open the building to read it or dismiss it.', tone: 'red', icon: 'svg:health-sign' },
       { id: 'flag', sees: 'Red flag on a car', means: 'A failed request, turned back at the door', tone: 'red', icon: 'svg:flag' },
       { id: 'pen', sees: 'Broken crates in a pen, a red beam and a count', means: 'Dead letters', more: 'Messages that could not be handled. The count is on the pen; the top bar DLQ number adds them all up.', tone: 'red', icon: 'svg:pen' },
       { id: 'dark', sees: 'Dark, cracked floors', means: 'Instances that are not healthy', more: 'The share of dark floors is the share of unhealthy instances, at least one floor if any is unhealthy.', tone: 'amber', icon: '🧱' },
@@ -66,10 +70,11 @@ export const LEGEND: readonly LegendSection[] = [
     tab: 'problems',
     entries: [
       { id: 'beacon-amber', sees: 'Amber beacon', means: 'A warning', more: 'Some errors, throttling, dead letters, or CPU, memory or storage running hot.', tone: 'amber', icon: 'svg:beacon-amber' },
-      { id: 'hazard', sees: 'Amber hazard lights', means: 'The queue is past the SLA', tone: 'amber', icon: '🚧' },
+      { id: 'hazard', sees: 'Amber hazard lights on a car', means: 'Stuck in a line of cars behind a slow service', more: 'The service\'s p99 is past its SLA.', tone: 'amber', icon: '🚧' },
+      { id: 'bubble', sees: 'Bubble over a line of cars', means: 'A "!" or a "+N waiting"', more: 'The "!" shows when p99 is well past the SLA and a car is stuck behind it. "+N waiting" counts the requests in flight that the lane has no room to draw.', tone: 'amber', icon: '💬' },
       { id: 'crates', sees: 'Crates piling up on a pier', means: 'A backlog: messages waiting for a worker', tone: 'amber', icon: '📦' },
-      { id: 'pennant', sees: 'Amber pennant', means: 'A legacy route to migrate', more: 'A worker still reads the old egress topic.', tone: 'amber', icon: '🚩' },
-      { id: 'weather', sees: 'Weather over an island', means: 'An open incident there', more: 'Clouds for severity 4, overcast for 3, rain for 2, a storm with lightning for 1. The worst one wins.', tone: 'amber', icon: '⛈️' },
+      { id: 'pennant', sees: 'Amber pennant', means: 'A legacy route to migrate', more: 'A worker still reads the old egress topic.', tone: 'amber', icon: '🚩', hidden: 'No company config uses a legacy route yet. Remove this to show it again.' },
+      { id: 'weather', sees: 'Weather over an island', means: 'An open incident there', more: 'Clouds for severity 4, overcast for 3, rain for 2, a storm with lightning for 1. The worst one wins.', tone: 'amber', icon: '⛈️', hidden: 'The incident work (Phase 5) is not built yet. Remove this when it is.' },
     ],
   },
   {
@@ -86,7 +91,7 @@ export const LEGEND: readonly LegendSection[] = [
     title: 'The places',
     tab: 'islands',
     entries: [
-      { id: 'island', sees: 'Island with its name floating over it', means: 'A pillar: one team\'s own services', more: 'Its services stand in rows. The name shows from the air and fades as you come close. Weather over it means an open incident there.', tone: 'neutral', icon: '🏘️' },
+      { id: 'island', sees: 'Island with its name floating over it', means: 'A pillar: one team\'s own services', more: 'Its services stand in rows. The name shows from the air and fades as you come close.', tone: 'neutral', icon: '🏘️' },
       { id: 'hub', sees: 'The island in the middle', means: 'The platform hub, shared by every island', more: 'The API gateway, the message broker (Service Bus, Kafka), central egress and the shared databases stand here, with clusters of platform resources such as Monitoring.', tone: 'neutral', icon: '⚓' },
       { id: 'vendor', sees: 'Small island out at sea', means: 'A third party, or a service outside the platform', more: 'A third party we call, or a service of the company outside the monitored platform (labelled internal). Several services of one vendor stand on one island. Health comes from our calls to it.', tone: 'neutral', icon: '🏝️' },
       { id: 'airport', sees: 'Airport', means: 'Callers from outside', more: 'It has an island of its own at the edge of the town. Arrivals follow the inbound traffic.', tone: 'neutral', icon: '✈️' },
@@ -181,7 +186,7 @@ export const LEGEND: readonly LegendSection[] = [
     entries: [
       { id: 'car', sees: 'Blue car', means: 'A request between our own systems', tone: 'blue', icon: '🚙' },
       { id: 'taxi', sees: 'Yellow taxi', means: 'A request from outside', more: 'It arrives from the airport or the gateway.', tone: 'amber', icon: '🚕' },
-      { id: 'queue', sees: 'Cars queuing at a door', means: 'Latency', more: 'The slower p99 is, the longer the queue.', tone: 'neutral', icon: '🚦' },
+      { id: 'queue', sees: 'Cars lined up at a door', means: 'Latency', more: 'The slower p99 is, the longer the line of cars.', tone: 'neutral', icon: '🚦' },
       { id: 'bridge', sees: 'Bridge', means: 'A synchronous call between islands', tone: 'neutral', icon: '🌉' },
       { id: 'boat', sees: 'Boats from the port to a pier', means: 'Messages: async traffic from the message broker', more: 'Messages never use a road. They travel from the broker to the island that reads them.', tone: 'neutral', icon: '⛵' },
       { id: 'arcs', sees: 'Dashed arcs between islands', means: 'Which islands call which', more: 'Thicker for more traffic. Off until you turn on Dependencies in Layers.', tone: 'neutral', icon: '🌈' },
@@ -222,7 +227,7 @@ export const LEGEND: readonly LegendSection[] = [
     tab: 'controls',
     entries: [
       { id: 'wall', sees: 'Wall mode', means: 'For a screen nobody touches', more: 'Add ?wall=1 to the address: Dusk light, a tour of the troubled islands and a status strip. ?wall=1&islands=… shows only some islands.', tone: 'neutral', icon: '🖥️' },
-      { id: 'break', sees: 'Break things panel', means: 'Try failures on demo data', more: 'Only when the town runs on demo data. Reset puts everything right.', tone: 'neutral', icon: '🧨' },
+      { id: 'break', sees: 'Break things panel', means: 'Try failures on demo data', more: 'Only when the town runs on demo data. Reset puts everything right.', tone: 'neutral', icon: '🧨', demoOnly: true },
     ],
   },
 ]
@@ -232,9 +237,9 @@ export const LEGEND_ENTRIES: readonly LegendEntry[] = LEGEND.flatMap((s) => s.en
 
 export const LEGEND_SEEN_KEY = 'oc.legendSeen'
 
-/** The legend for a town: the entries that belong to its topology, and no empty sections. */
-export function forTopology(sections: readonly LegendSection[], topology: Topology): LegendSection[] {
+/** What a town shows of the legend: the entries that belong to its topology and its mode (demo or live) and are not hidden, and no empty sections. */
+export function forTown(sections: readonly LegendSection[], town: { topology: Topology; demo: boolean }): LegendSection[] {
   return sections
-    .map((s) => ({ ...s, entries: s.entries.filter((e) => !e.topology || e.topology === topology) }))
+    .map((s) => ({ ...s, entries: s.entries.filter((e) => (!e.topology || e.topology === town.topology) && (!e.demoOnly || town.demo) && !e.hidden) }))
     .filter((s) => s.entries.length > 0)
 }
