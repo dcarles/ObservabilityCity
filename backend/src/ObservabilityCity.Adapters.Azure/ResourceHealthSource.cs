@@ -128,7 +128,7 @@ public static class ResourceHealthLog
 /// scope found, folded into the events that are open (see <see cref="ResourceHealthLog.Open"/>). For each open event the resource's current status is asked too, so a marker clears the moment
 /// the cloud says Available, whether or not a resolution ever reached the log; a status that cannot be read leaves the log's word standing. The source fills no signal and reports no readings.
 /// Only the subscription and provider pairs the inventory has resources for are read. A round where every read fails keeps the last good list; one where some fail keeps what the others found
-/// and the failed pairs' reports from the last good round. Either way <see cref="Problem"/> says why, which the town shows as a notice. Until the inventory is read the source asks to be
+/// and the failed pairs' reports from the last good round. Either way <see cref="Problem"/> says why, which goes to the log only, never to the town. Until the inventory is read the source asks to be
 /// polled again in 30 seconds (<see cref="RetryIn"/>). The program lists no provider: the environment does.
 /// <c>file:name.json</c> replays a recording: <c>{ "events": { "value": [ ...an activity log answer... ] }, "status": { "&lt;resource name&gt;": "Available" } }</c>.
 /// </summary>
@@ -253,7 +253,7 @@ public sealed class ResourceHealthSource(
         foreach (var old in _events.Where(e => !known.Contains(e.Id) && failedPairs.Any(f => Covers(f, e.ResourceId)))) found.Add(old);
         _problem = failedPairs.Count == 0 ? null : $"{failedPairs.Count} of {reads} activity log reads failed, so the list may be incomplete (reports from the failed reads are kept from the last good one); the first: {firstError}";
         _roundNote = recording is not null ? $"replayed a recording: {Count(found)}"
-            : $"health read: {reads} reads, {failedPairs.Count} failed, {Count(found)}";
+            : $"health read: {reads} reads, {failedPairs.Count} failed, {Count(found)}" + (failedPairs.Count == 0 ? "" : $"; the first failure: {firstError}");
         return found;
     }
 
