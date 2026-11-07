@@ -7,7 +7,7 @@ The scripted events (pirates in the harbour town, zombies in the factory, aliens
 | --- | --- | --- |
 | `zombies/` | [Post Apocalypse Pack](https://poly.pizza/bundle/Post-Apocalypse-Pack) by [Quaternius](https://poly.pizza/u/Quaternius) | **CC-BY** (attribution required). The dialog says "CC-BY or CC0", with the credit text below. |
 | `aliens/` | [Ultimate Space Kit](https://poly.pizza/bundle/Ultimate-Space-Kit-YWh743lqGX) by [Quaternius](https://poly.pizza/u/Quaternius) | Public domain (CC0). Credit is optional and given here. |
-| `pirates/` | Pirate Kit by Quaternius | Not yet confirmed from the download dialog. Treated as requiring credit until it is. |
+| `pirates/` | [Pirate Kit](https://poly.pizza/bundle/Pirate-kit-0q5ulmIYqQ) by [Quaternius](https://poly.pizza/u/Quaternius) | Public domain (CC0). Credit is optional and given here. |
 
 ## Attribution text
 
