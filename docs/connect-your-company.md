@@ -336,7 +336,7 @@ Repeats come back as one row with a `count`, and the tab shows them newest first
 A system with role `function` (`cron` still works as an alias) stands as a function building. Three things in the environment file make it say more:
 
 - **App state.** Give the resource rule a `state` expression (a query expression that reads the app's state as text) and `running` (the values that mean it runs). A running app is lit; a stopped one stands under construction; a system the inventory has no such app for is grey, "not found in the inventory". The core knows no state words.
-- **Jobs.** A `functionjobs` source runs a query that summarises the function apps' logs into one row per app and job, with the columns `resourceId`, `job`, `lastRun`, `succeeded` and `next` (and `region` where it matters). Point `signals: { jobs: <source> }` at it. Each job shows as succeeded, failed or overdue (now later than `next` plus the source's freshness), and the building's beacon follows. How your logs word a run is yours to say in the query:
+- **Jobs.** A `functionjobs` source runs a query that summarises the function apps' logs into one row per app and job, with the columns `resourceId`, `job`, `lastRun`, `succeeded` and `next` (and `region` where it matters). Point `signals: { jobs: <source> }` at it. Each job shows as succeeded, failed or overdue (now later than `next` plus the source's freshness), and the building's beacon follows: amber when a job failed or is late (the app runs and the other jobs may be fine), red only when every job failed. How your logs word a run is yours to say in the query:
 
 ```yaml
 sources:

@@ -49,10 +49,10 @@ export function beaconLevel(n: BeaconInput): BeaconLevel {
   if (n.state === 'Stale') return 'grey'
   if (n.state === 'Down') return 'red' // a system that is down is red whatever its error rate or silence says
   const throttled = n.throttled ?? 0
-  // a function's scheduled jobs: one that failed its last run is red, one that did not run when it should have is amber
-  if (n.jobs?.some((j) => j.status === 'Failed')) return 'red'
   if (n.errorRate >= n.errorRed || (n.throttleRed !== undefined && throttled >= n.throttleRed)) return 'red'
-  if (n.errorRate >= n.errorAmber || n.jobs?.some((j) => j.status === 'Overdue')) return 'amber'
+  if (n.errorRate >= n.errorAmber) return 'amber'
+  // a function's scheduled jobs: one that failed its last run or did not run when it should have is amber (the app runs); every job failed is Down, red above
+  if (n.jobs?.some((j) => j.status === 'Failed' || j.status === 'Overdue')) return 'amber'
   if (n.throttleAmber !== undefined && throttled >= n.throttleAmber) return 'amber'
   // messages that could not be delivered sit in the queue this system reads: a warning on it, so the one to open is not green
   if ((n.deadLetters ?? 0) > 0 && !isAbsent(n, 'deadLetters')) return 'amber'

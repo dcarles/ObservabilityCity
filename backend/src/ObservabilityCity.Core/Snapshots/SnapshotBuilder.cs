@@ -454,9 +454,12 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
             };
         }
 
-        // A function: its jobs, each in its region. A failed job is red, a job that did not run when its schedule said it would is amber. A stopped app runs nothing.
+        // A function: its jobs, each in its region. A failed job or one that did not run when its schedule said it would is amber: the app runs and the rest
+        // of its jobs may be fine. It is red only when every job failed. A stopped app runs nothing.
         var jobs = r.App == AppState.Stopped || r.Jobs is null ? null : Jobs(n, r.Jobs, registry, env, now);
-        var jobHealth = jobs?.Any(j => j.Status == JobStatus.Failed) == true ? HealthState.Down : jobs?.Any(j => j.Status == JobStatus.Overdue) == true ? HealthState.Degraded : HealthState.Healthy;
+        var jobHealth = jobs is { Count: > 0 } && jobs.All(j => j.Status == JobStatus.Failed) ? HealthState.Down
+            : jobs?.Any(j => j.Status is JobStatus.Failed or JobStatus.Overdue) == true ? HealthState.Degraded
+            : HealthState.Healthy;
 
         // Quiet: too few calls in the source's window for its error share and latency to mean anything. The numbers are left out (0 is no trouble to
         // any threshold), the rate stays, and nothing else about the building changes.

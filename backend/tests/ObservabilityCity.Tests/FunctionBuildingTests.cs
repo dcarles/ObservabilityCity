@@ -48,7 +48,7 @@ public class FunctionBuildingTests
         var scheduler = Node(snapshot, "aa.sched-fn");
         Assert.Equal(NodeKind.Function, scheduler.Kind);
         Assert.Equal(AppState.Running, scheduler.App);
-        Assert.Equal(HealthState.Down, scheduler.State); // one job failed its last run
+        Assert.Equal(HealthState.Degraded, scheduler.State); // one job failed its last run and one is late, but the app runs and a job is fine
         Assert.Equal(
             [("daily", north, JobStatus.Ok), ("hourly", west, JobStatus.Overdue), ("purge", west, JobStatus.Failed)],
             scheduler.Jobs!.Select(j => (j.Name, j.Region, j.Status)));
@@ -65,6 +65,30 @@ public class FunctionBuildingTests
 
         Assert.Equal(1440.0 / 300, scheduler.RequestsPerSecond, 6);
         Assert.DoesNotContain("requests", scheduler.Absent);
+    }
+
+    [Theory]
+    [InlineData("a")]
+    [InlineData("b")]
+    public async Task A_function_is_red_only_when_every_job_failed_its_last_run(string town)
+    {
+        var folder = Town(town);
+        var registry = Prod(folder);
+        var set = new AdapterCatalog([new AzureAdapters()]).Build(registry.ActiveEnvironment!, folder);
+        var state = new LatestState();
+        foreach (var source in set.Sources)
+        {
+            var readings = await source.PollAsync(registry, CancellationToken.None);
+            state.Update(source.Name, readings.ToDictionary(kv => kv.Key, kv => kv.Key == "aa.sched-fn" && kv.Value.Jobs is not null
+                ? kv.Value with { Jobs = kv.Value.Jobs.Select(j => j with { Succeeded = false }).ToList() }
+                : kv.Value));
+        }
+
+        var scheduler = Node(new SnapshotBuilder(registry, state, new FakeTimeProvider(T0)) { Environment = "prod" }.Build(), "aa.sched-fn");
+
+        Assert.All(scheduler.Jobs!, j => Assert.Equal(JobStatus.Failed, j.Status));
+        Assert.Equal(HealthState.Down, scheduler.State);
+        Assert.Contains("failed", scheduler.Reason);
     }
 
     [Theory]

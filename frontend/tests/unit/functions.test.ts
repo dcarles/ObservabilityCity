@@ -51,8 +51,9 @@ describe('a function building', () => {
     expect(reasons(n)).toEqual([])
   })
 
-  it('is red for a failed job and amber for a late one, whatever else is quiet', () => {
+  it('is amber for a failed job or a late one, and red only when the server says Down (every job failed), whatever else is quiet', () => {
     expect(beaconLevel({ ...fn({ state: 'Down', jobs: [job('a', 'Failed')] }) })).toBe('red')
+    expect(beaconLevel({ ...fn({ state: 'Degraded', jobs: [job('a', 'Failed'), job('b', 'Ok')] }) })).toBe('amber')
     expect(beaconLevel({ ...fn({ state: 'Degraded', jobs: [job('a', 'Overdue')] }) })).toBe('amber')
     expect(beaconLevel({ ...fn({ state: 'Healthy', jobs: [job('a', 'Ok')] }) })).toBe('green')
     expect(beaconLevel({ ...fn({ state: 'Healthy', jobs: null }) })).toBe('off') // nothing here is measured

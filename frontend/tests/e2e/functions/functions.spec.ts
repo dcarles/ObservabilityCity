@@ -38,7 +38,7 @@ test.describe(`functions and regions (${B ? 'tags, Started, a region tag' : 'nam
     const s = await (await request.get(`${API}/api/snapshot/latest`)).json()
     const by = (id: string) => s.groups.flatMap((g: any) => g.nodes).find((n: any) => n.id === id)
     expect(by('aa.sched-fn').jobs.map((j: any) => [j.name, j.region, j.status])).toEqual([['daily', town.calm, 'Ok'], ['hourly', town.hot, 'Overdue'], ['purge', town.hot, 'Failed']])
-    expect(by('aa.sched-fn').state).toBe('Down')
+    expect(by('aa.sched-fn').state).toBe('Degraded') // a failed and a late job, but the app runs and a job is fine
     expect(by('aa.report-fn').state).toBe('Degraded')
     expect(by('aa.idle-fn').app).toBe('Stopped')
     expect(by('aa.ghost-fn').app).toBe('Missing') // declared with the old role name, cron
@@ -69,9 +69,11 @@ test.describe(`functions and regions (${B ? 'tags, Started, a region tag' : 'nam
     await expect(page.locator('#inspector .why')).toContainText(`not found in ${town.cloud}`)
   })
 
-  test('the drawer lists each job in each region, and a failed one makes the building red', async ({ page }) => {
+  test('the drawer lists each job in each region, and a failed one makes the building amber, not closed', async ({ page }) => {
     await open(page)
-    expect((await inspect(page, 'aa.sched-fn')).closedSign).toBe(true) // down
+    const scheduler = await inspect(page, 'aa.sched-fn')
+    expect(scheduler.closedSign).toBe(false) // one failed job does not close the building
+    expect(scheduler.beacon).toBe('amber')
     await page.evaluate(() => (window as any).city.openSystem('aa.sched-fn'))
     const jobs = page.locator('#inspector .job')
     await expect(jobs).toHaveCount(3)
