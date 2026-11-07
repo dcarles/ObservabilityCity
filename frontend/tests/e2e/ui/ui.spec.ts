@@ -409,6 +409,62 @@ test.describe('the legend', () => {
     await expect(page.locator('#legend')).toBeHidden()
   })
 
+  test('has four tabs, opens on Problems, shows one tab at a time and starts on Problems again', async ({ town, page }) => {
+    await town.open('&legend=1')
+    const tabs = page.locator('#legend [role="tab"]')
+    expect(await tabs.allTextContents()).toEqual([expect.stringContaining('Problems'), expect.stringContaining('Buildings'), expect.stringContaining('Traffic'), expect.stringContaining('Top bar and controls')])
+    await expect(page.locator('#legend-tab-problems')).toHaveAttribute('aria-selected', 'true')
+    await expect(page.locator('#legend-panel-problems')).toBeVisible()
+    await expect(page.locator('#legend-panel-buildings')).toBeHidden()
+    await expect(page.locator('#legend [data-id="health-sign"]')).toBeVisible()
+    await expect(page.locator('#legend [data-id="frozen"]')).toBeVisible()
+    await page.locator('#legend-tab-buildings').click()
+    await expect(page.locator('#legend-panel-buildings')).toBeVisible()
+    await expect(page.locator('#legend-panel-problems')).toBeHidden()
+    await expect(page.locator('#legend [data-id="api"]')).toBeVisible()
+    await page.locator('#legend-tab-traffic').click()
+    await expect(page.locator('#legend [data-id="car"]')).toBeVisible()
+    await page.locator('#legend-tab-controls').click()
+    await expect(page.locator('#legend [data-id="wall"]')).toBeVisible()
+    await expect(page.locator('#legend [data-id="chip-dlq"]')).toBeVisible()
+    await page.locator('#legend-button').click()
+    await page.locator('#legend-button').click()
+    await expect(page.locator('#legend-tab-problems')).toHaveAttribute('aria-selected', 'true')
+  })
+
+  test('the arrow keys move between the tabs, and each tab fits the card without scrolling on a laptop screen', async ({ town, page }) => {
+    await page.setViewportSize({ width: 1366, height: 768 })
+    await town.open('&legend=1')
+    await page.locator('#legend-tab-problems').focus()
+    await page.keyboard.press('ArrowRight')
+    await expect(page.locator('#legend-tab-buildings')).toHaveAttribute('aria-selected', 'true')
+    await page.keyboard.press('End')
+    await expect(page.locator('#legend-tab-controls')).toHaveAttribute('aria-selected', 'true')
+    await page.keyboard.press('ArrowRight')
+    await expect(page.locator('#legend-tab-problems')).toHaveAttribute('aria-selected', 'true')
+    for (const id of ['problems', 'buildings', 'traffic', 'controls']) {
+      await page.locator(`#legend-tab-${id}`).click()
+      const fit = await page.locator(`#legend-panel-${id}`).evaluate((el) => ({ scroll: el.scrollHeight, client: el.clientHeight }))
+      expect(fit.scroll, id).toBeLessThanOrEqual(fit.client + 1)
+    }
+  })
+
+  test('shows a picture for every entry, and the "more" fold opens', async ({ town, page }) => {
+    await town.open('&legend=1')
+    for (const id of ['problems', 'buildings', 'traffic', 'controls']) {
+      await page.locator(`#legend-tab-${id}`).click()
+      const entries = page.locator(`#legend-panel-${id} .entry`)
+      const n = await entries.count()
+      expect(n, id).toBeGreaterThan(0)
+      expect(await page.locator(`#legend-panel-${id} .entry .swatch:not(:has(svg, .emoji))`).count(), id).toBe(0)
+    }
+    await page.locator('#legend-tab-problems').click()
+    const row = page.locator('#legend [data-id="frozen"] details')
+    await expect(row).not.toHaveAttribute('open', '')
+    await row.locator('summary').click()
+    await expect(row).toContainText('45 seconds')
+  })
+
   test('opens by itself on a first visit and not on the next', async ({ town, page }) => {
     await town.open('&legend=first')
     await expect(page.locator('#legend')).toBeVisible()
@@ -418,11 +474,14 @@ test.describe('the legend', () => {
     await expect(page.locator('#legend')).toBeHidden()
   })
 
-  test('uses red only for errors', async ({ town, page }) => {
-    await town.open()
-    await page.locator('#legend-button').click()
-    const red = await page.locator('#legend .swatch.red').locator('xpath=..').locator('b').allTextContents()
-    expect(red.sort()).toEqual(['Broken crates in a pen, a red beam and a count', 'Red beacon', 'Red flag on a car'])
+  test('uses red only for failures', async ({ town, page }) => {
+    await town.open('&legend=1')
+    const red: string[] = []
+    for (const id of ['problems', 'buildings', 'traffic', 'controls']) {
+      await page.locator(`#legend-tab-${id}`).click()
+      red.push(...(await page.locator(`#legend-panel-${id} .swatch.red`).locator('xpath=..').locator('b').allTextContents()))
+    }
+    expect(red.sort()).toEqual(['Broken crates in a pen, a red beam and a count', 'Red beacon', 'Red exclamation mark above a building', 'Red flag on a car'])
   })
 })
 

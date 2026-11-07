@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { browserStore, isLighting, LIGHTING, LIGHTING_KEY, otherLighting, saveLighting, startLighting, type Store } from '../../src/lighting'
 import { DEFAULT_THEME, saveTheme, startTheme, themeById, THEME_KEY, THEMES } from '../../src/themes'
-import { LEGEND, LEGEND_ENTRIES } from '../../src/legend'
+import { LEGEND, LEGEND_ENTRIES, LEGEND_TABS } from '../../src/legend'
+import { LEGEND_SVG, iconHtml } from '../../src/legendIcons'
+import { DASH_LEGEND, dashLegendHtml } from '../../src/dashboard/legend'
 
 const memory = (initial: Record<string, string> = {}): Store & { data: Record<string, string> } => {
   const data = { ...initial }
@@ -98,18 +100,70 @@ describe('the legend', () => {
     for (const e of LEGEND_ENTRIES) { expect(e.sees.trim()).not.toBe(''); expect(e.means.trim()).not.toBe('') }
   })
 
-  it('keeps red for failures: errors, a failed request, dead letters', () => {
+  it('keeps red for failures: errors, a failed request, dead letters, an Azure health report', () => {
     const red = LEGEND_ENTRIES.filter((e) => e.tone === 'red').map((e) => e.id).sort()
-    expect(red).toEqual(['beacon-red', 'flag', 'pen'])
+    expect(red).toEqual(['beacon-red', 'flag', 'health-sign', 'pen'])
   })
 
   it('keeps grey for no data', () => {
-    expect(LEGEND_ENTRIES.filter((e) => e.tone === 'grey').map((e) => e.id)).toEqual(['grey'])
+    expect(LEGEND_ENTRIES.filter((e) => e.tone === 'grey').map((e) => e.id).sort()).toEqual(['frozen', 'grey'])
     expect(LEGEND_ENTRIES.find((e) => e.id === 'grey')!.means).toMatch(/never read as healthy/i)
   })
 
   it('explains the things the plan says every signal has: floors, lights, beacon, cars, boats, crates, dead letters, weather, airport', () => {
     const text = LEGEND_ENTRIES.map((e) => `${e.sees} ${e.means}`).join(' ').toLowerCase()
     for (const word of ['floors', 'lit windows', 'beacon', 'car', 'taxi', 'boats', 'crates', 'dead letters', 'weather', 'airport', 'bridge', 'third party', 'signpost']) expect(text).toContain(word)
+  })
+})
+
+describe('the legend tabs', () => {
+  it('has the four tabs in order, and every section sits on one of them', () => {
+    expect(LEGEND_TABS.map((t) => t.id)).toEqual(['problems', 'buildings', 'traffic', 'controls'])
+    for (const s of LEGEND) expect(LEGEND_TABS.map((t) => t.id)).toContain(s.tab)
+    for (const t of LEGEND_TABS) expect(LEGEND.filter((s) => s.tab === t.id).flatMap((s) => s.entries).length, t.id).toBeGreaterThan(0)
+  })
+
+  it('keeps each tab short enough to read on one screen', () => {
+    for (const t of LEGEND_TABS) expect(LEGEND.filter((s) => s.tab === t.id).flatMap((s) => s.entries).length, t.id).toBeLessThanOrEqual(20)
+  })
+
+  it('puts the things that need you on the first tab', () => {
+    const problems = LEGEND.filter((s) => s.tab === 'problems').flatMap((s) => s.entries).map((e) => e.id)
+    for (const id of ['beacon-red', 'beacon-amber', 'health-sign', 'frozen', 'grey', 'dark', 'hazard', 'flag', 'crates', 'pen', 'weather']) expect(problems).toContain(id)
+  })
+
+  it('explains the top bar numbers, the buttons and wall mode', () => {
+    const controls = LEGEND.filter((s) => s.tab === 'controls').flatMap((s) => s.entries).map((e) => e.id)
+    for (const id of ['chip-requests', 'chip-messages', 'chip-errors', 'chip-p99', 'chip-dlq', 'chip-degraded', 'chip-incidents', 'chip-time', 'btn-layers', 'btn-theme', 'btn-quality', 'btn-search', 'btn-lighting', 'btn-dashboard', 'btn-home', 'wall', 'break']) expect(controls).toContain(id)
+  })
+
+  it('gives every entry a picture, and every drawn picture exists', () => {
+    for (const e of LEGEND_ENTRIES) {
+      expect(e.icon.trim(), e.id).not.toBe('')
+      if (e.icon.startsWith('svg:')) expect(LEGEND_SVG[e.icon.slice(4)], e.id).toBeTruthy()
+      expect(iconHtml(e.icon), e.id).not.toBe('')
+    }
+  })
+
+  it('keeps the one-line meanings short, with the long part behind "more"', () => {
+    for (const e of LEGEND_ENTRIES) expect(e.means.length, e.id).toBeLessThanOrEqual(90)
+  })
+})
+
+describe('the dashboard legend', () => {
+  it('is short and covers green, amber, red and grey', () => {
+    expect(DASH_LEGEND.length).toBeLessThanOrEqual(10)
+    expect(DASH_LEGEND.filter((l) => l.level).map((l) => l.level)).toEqual(['ok', 'warn', 'bad', 'none'])
+  })
+
+  it('says grey is never healthy, and draws every line', () => {
+    expect(DASH_LEGEND.find((l) => l.level === 'none')!.text).toMatch(/never read as healthy/i)
+    const html = dashLegendHtml()
+    for (const l of DASH_LEGEND) expect(html).toContain(`data-id="${l.id}"`)
+  })
+
+  it('does not use town words', () => {
+    const text = DASH_LEGEND.map((l) => `${l.title} ${l.text}`).join(' ').toLowerCase()
+    for (const w of ['beacon', 'island', 'building', 'harbour', 'town']) expect(text).not.toContain(w)
   })
 })

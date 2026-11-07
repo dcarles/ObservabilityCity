@@ -232,18 +232,41 @@ button.chip.clickable:focus-visible { outline: 2px solid var(--accent); }
 #inspector code { font-size: 11px; }
 body:has(#inspector:not([hidden])) #service-panel { display: none; }
 
-/* the legend card */
-#legend { position: fixed; z-index: 7; left: 50%; top: calc(var(--bar-h, 52px) + 28px); transform: translateX(-50%); width: 560px; max-width: calc(100vw - 24px); max-height: calc(100vh - var(--bar-h, 52px) - 48px); display: flex; flex-direction: column; font-size: 13px; background: var(--panel); backdrop-filter: blur(10px); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 10px 36px rgba(20, 40, 70, 0.26); }
-#legend .head { display: flex; justify-content: space-between; align-items: center; padding: 12px 12px 6px 16px; }
-#legend .head button { border: 0; background: none; padding: 2px 6px; }
-#legend .scroll { overflow-y: auto; padding: 0 16px 14px; columns: 2 240px; column-gap: 24px; }
-#legend h4 { margin: 12px 0 4px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; opacity: 0.7; break-after: avoid; }
-#legend .entry { display: flex; gap: 8px; padding: 3px 0; break-inside: avoid; }
-#legend .entry b { display: block; font-size: 12.5px; }
-#legend .entry span { opacity: 0.7; font-size: 12px; }
-#legend .swatch { flex: none; width: 10px; height: 10px; margin-top: 4px; border-radius: 3px; background: #8a97a8; }
-#legend .swatch.green { background: var(--green); } #legend .swatch.amber { background: var(--amber); } #legend .swatch.red { background: var(--red); }
-#legend .swatch.grey { background: #aab0b8; } #legend .swatch.blue { background: var(--accent); }
+/* the legend card: a title, four tabs, and one panel at a time (system fonts only) */
+#legend { position: fixed; z-index: 7; left: 50%; top: calc(var(--bar-h, 52px) + 28px); transform: translateX(-50%); width: 700px; max-width: calc(100vw - 24px); max-height: calc(100vh - var(--bar-h, 52px) - 48px); display: flex; flex-direction: column; font-size: 13px; background: var(--panel); backdrop-filter: blur(12px); border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 12px 40px rgba(20, 40, 70, 0.28); }
+#legend .head { display: flex; justify-content: space-between; align-items: center; padding: 14px 14px 8px 18px; }
+#legend .head b { font-size: 17px; font-weight: 700; letter-spacing: -0.01em; }
+#legend .head button { border: 0; background: none; padding: 2px 8px; font-size: 15px; opacity: 0.7; }
+#legend .tabs { display: flex; gap: 4px; margin: 0 14px; padding: 4px; background: var(--pill); border-radius: 12px; }
+#legend .tab { flex: 1 1 auto; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 7px 8px; border: 0; background: none; border-radius: 9px; font-size: 13px; font-weight: 600; opacity: 0.75; white-space: nowrap; }
+#legend .tab:hover { opacity: 1; background: var(--row-hover); }
+#legend .tab[aria-selected='true'] { opacity: 1; background: var(--field); box-shadow: 0 1px 4px var(--shadow); color: var(--ink); }
+#legend .tab .ti { font-size: 15px; }
+#legend .tab:focus-visible, #legend summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+#legend .scroll { overflow-y: auto; padding: 4px 18px 16px; height: min(520px, calc(100vh - var(--bar-h, 52px) - 175px)); }
+#legend .scroll[hidden] { display: none; }
+#legend .blurb { margin: 10px 0 2px; opacity: 0.7; font-size: 12.5px; }
+#legend .cols { columns: 2 250px; column-gap: 26px; }
+#legend section { break-inside: auto; }
+#legend h4 { margin: 12px 0 4px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; opacity: 0.7; break-after: avoid; }
+#legend .entry { display: flex; gap: 11px; padding: 4px 0; break-inside: avoid; align-items: flex-start; }
+#legend .entry b { display: block; font-size: 13px; font-weight: 650; line-height: 1.25; }
+#legend .entry .words span { display: block; opacity: 0.72; font-size: 12.5px; line-height: 1.35; margin-top: 1px; }
+#legend details { margin-top: 2px; }
+#legend summary { cursor: pointer; font-size: 11.5px; font-weight: 600; color: var(--link-ink); list-style: none; width: fit-content; }
+#legend summary::-webkit-details-marker { display: none; }
+#legend summary::after { content: ' ▾'; }
+#legend details[open] summary::after { content: ' ▴'; }
+#legend details p { margin: 3px 0 2px; font-size: 12px; line-height: 1.4; opacity: 0.8; }
+#legend .swatch { flex: none; display: grid; place-items: center; width: 38px; height: 38px; border-radius: 11px; background: var(--pill); border: 1px solid var(--soft-line); font-style: normal; }
+#legend .swatch .emoji { font-size: 22px; line-height: 1; font-family: 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', sans-serif; }
+#legend .swatch svg { display: block; }
+#legend .swatch.green { background: color-mix(in srgb, var(--green) 20%, transparent); border-color: color-mix(in srgb, var(--green) 45%, transparent); }
+#legend .swatch.amber { background: color-mix(in srgb, var(--amber) 22%, transparent); border-color: color-mix(in srgb, var(--amber) 50%, transparent); }
+#legend .swatch.red { background: color-mix(in srgb, var(--red) 18%, transparent); border-color: color-mix(in srgb, var(--red) 50%, transparent); }
+#legend .swatch.grey { background: rgba(140, 150, 162, 0.22); border-color: rgba(140, 150, 162, 0.5); }
+#legend .swatch.blue { background: color-mix(in srgb, var(--accent) 18%, transparent); border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
+@media (max-width: 560px) { #legend .tab .ti { display: none; } #legend .tab { font-size: 12px; padding: 7px 4px; white-space: normal; } }
 
 /* at night the page behind the canvas is dark, so the loose labels sit on panels */
 :root[data-lighting='dusk'] #banner { background: rgba(20, 30, 45, 0.96); }

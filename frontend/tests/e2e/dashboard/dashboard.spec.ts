@@ -419,6 +419,26 @@ test.describe('the dashboard view', () => {
     await expect(button).not.toHaveClass(/late/)
   })
 
+  test('the "?" in the menu opens a short legend inside the screen, and Escape or a click elsewhere closes it', async ({ town, page }) => {
+    await page.setViewportSize({ width: 390, height: 800 })
+    await open(town, page)
+    const pop = page.locator('#dash-legend')
+    await expect(pop).toBeHidden()
+    await page.locator('#dash-legend-button').click()
+    await expect(pop).toBeVisible()
+    await expect(pop).toContainText('What the colours mean')
+    await expect(pop).toContainText('Never read as healthy')
+    expect(await pop.locator('.dl-row').count()).toBeLessThanOrEqual(10)
+    const box = (await pop.boundingBox())!
+    expect(box.x).toBeGreaterThanOrEqual(0)
+    expect(box.x + box.width).toBeLessThanOrEqual(390)
+    await page.keyboard.press('Escape')
+    await expect(pop).toBeHidden()
+    await page.locator('#dash-legend-button').click()
+    await page.locator('#dash-brand').click()
+    await expect(pop).toBeHidden()
+  })
+
   /** The brightness (0 to 255) of an element's background, from its computed colour. */
   const brightness = (page: Page, selector: string) =>
     page.locator(selector).first().evaluate((el) => {

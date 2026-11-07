@@ -165,10 +165,11 @@ for (const theme of themesUnderTest) {
     test('words the legend for what it draws, and keeps the meaning of every colour', async ({ town, page }) => {
       await town.open(`&theme=${theme}&legend=1`)
       await expect(page.locator('#legend')).toBeVisible()
-      await expect(page.locator('#legend [data-id="car"]')).toContainText(OWN_WORDS[theme])
       await expect(page.locator('#legend [data-id="beacon-red"] .swatch')).toHaveClass(/red/)
       await expect(page.locator('#legend [data-id="grey"] .swatch')).toHaveClass(/grey/)
-      expect(await page.locator('#legend .entry').count()).toBeGreaterThanOrEqual(29)
+      await page.locator('#legend-tab-traffic').click()
+      await expect(page.locator('#legend [data-id="car"]')).toContainText(OWN_WORDS[theme])
+      expect(await page.locator('#legend .entry').count()).toBeGreaterThanOrEqual(40)
     })
 
     test('shows Day and Dusk, and Dusk lights the windows brighter', async ({ town, page }) => {
