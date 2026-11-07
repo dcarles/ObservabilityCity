@@ -21,8 +21,35 @@ env:
   DOTNET_CLI_TELEMETRY_OPTOUT: true
 
 jobs:
+  # Decides which of the jobs below a change needs (.github/scripts/changed-areas.mjs). A pull request that only touches documents runs no tests;
+  # a frontend-only change skips the backend tests. Pushes to main always run everything (and so does the nightly run in slow.yml).
+  changes:
+    name: What changed
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      backend: ${{ steps.areas.outputs.backend }}
+      frontend: ${{ steps.areas.outputs.frontend }}
+      ui: ${{ steps.areas.outputs.ui }}
+      registries: ${{ steps.areas.outputs.registries }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: areas
+        env:
+          CI_RUN_ALL: ${{ github.event_name != 'pull_request' }}
+        run: |
+          if [ "$CI_RUN_ALL" = "true" ]; then
+            node .github/scripts/changed-areas.mjs </dev/null | tee -a "$GITHUB_OUTPUT"
+          else
+            git diff --name-only "origin/${{ github.base_ref }}...HEAD" | node .github/scripts/changed-areas.mjs | tee -a "$GITHUB_OUTPUT"
+          fi
+
   backend:
     name: Backend tests
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -41,6 +68,8 @@ jobs:
 
   frontend:
     name: Frontend tests and build
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -77,6 +106,8 @@ jobs:
   # the wait is the slowest group, about three minutes. Every suite is in exactly one group (npm run e2e runs them all in a row).
   ui-scenarios:
     name: UI scenario tests (${{ matrix.group }})
+    needs: changes
+    if: needs.changes.outputs.ui == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 12
     strategy:
@@ -144,6 +175,8 @@ jobs:
 
   registries:
     name: Registry checks
+    needs: changes
+    if: needs.changes.outputs.registries == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 8
     permissions:
@@ -183,14 +216,14 @@ jobs:
         if: steps.validate.outcome == 'failure'
         run: exit 1
 
-  # One name for branch protection to require. It passes only when every check above passed.
+  # One name for branch protection to require. It passes when no check failed; a check the change did not need is skipped, which counts as passed.
   checks:
     name: PR checks
     if: always()
-    needs: [backend, frontend, ui-scenarios, registries]
+    needs: [changes, backend, frontend, ui-scenarios, registries]
     runs-on: ubuntu-latest
     steps:
       - name: All checks passed
         run: |
           echo '${{ toJSON(needs) }}'
-          if [ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped') }}" = "true" ]; then exit 1; fi
+          if [ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" = "true" ]; then exit 1; fi
