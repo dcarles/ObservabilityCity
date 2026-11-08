@@ -17,12 +17,10 @@ describe('the status strip', () => {
     expect(m.counts).toEqual({ incidents: 0, down: 0, degraded: 0, stale: 0 })
   })
 
-  it('counts a system with only dead letters as degraded, so the strip says what the dashboard says', () => {
+  it('does not count a system with only dead letters as degraded: the DLQ number says it', () => {
     const s = withState(healthyTown(), 'cl.ledger-api', 'Healthy', { deadLetters: 130 })
     const m = stripModel(s)
-    expect(m.counts.degraded).toBe(1)
-    expect(m.tone).toBe('warn')
-    expect(m.headline).toBe('1 DEGRADED')
+    expect(m.counts.degraded).toBe(0)
   })
 
   it('counts what is wrong, and turns amber for degraded', () => {

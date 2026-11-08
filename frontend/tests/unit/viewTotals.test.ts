@@ -133,25 +133,11 @@ describe('systems with only dead letters', () => {
     return out
   }
 
-  it('count as degraded, the way the dashboard counts them', () => {
+  it('do not count as degraded: dead letters have their own count and list', () => {
     const base = viewTotals(staging, ALL_TENANTS).degraded
     const s = withDead('aa.orders-api', 130)
-    expect(viewTotals(s, ALL_TENANTS).degraded).toBe(base + 1)
-  })
-
-  it('count under a tenant choice too, and not twice when the system is degraded already', () => {
-    const s = withDead('bb.billing-api', 4)
-    const chosen = view(['acme'])
-    expect(viewTotals(s, chosen).degraded).toBe(viewTotals(staging, chosen).degraded + 1)
-
-  })
-
-  it('are not counted twice when the system is degraded already', () => {
-    const degraded = structuredClone(staging)
-    Object.assign(degraded.groups.flatMap((g) => g.nodes).find((x) => x.id === 'bb.billing-api')!, { state: 'Degraded', deadLetters: 0 })
-    const withLetters = structuredClone(degraded)
-    withLetters.groups.flatMap((g) => g.nodes).find((x) => x.id === 'bb.billing-api')!.deadLetters = 40
-    expect(viewTotals(withLetters, ALL_TENANTS).degraded).toBe(viewTotals(degraded, ALL_TENANTS).degraded)
+    expect(viewTotals(s, ALL_TENANTS).degraded).toBe(base)
+    expect(viewTotals(s, view(['acme'])).degraded).toBe(viewTotals(staging, view(['acme'])).degraded)
   })
 
   it('give the same number of degraded systems as the dashboard lists', async () => {
@@ -161,10 +147,11 @@ describe('systems with only dead letters', () => {
     expect(buildDashboard(s, view(['acme'])).summary.degraded).toBe(viewTotals(s, view(['acme'])).degraded)
   })
 
-  it('are left out when nothing measures dead letters or the system has no fresh data', () => {
-    const base = viewTotals(staging, ALL_TENANTS).degraded
-    const absent = withDead('aa.orders-api', 9)
-    absent.groups.flatMap((g) => g.nodes).find((x) => x.id === 'aa.orders-api')!.absent = ['deadLetters']
-    expect(viewTotals(absent, ALL_TENANTS).degraded).toBe(base)
+  it('still make the dashboard row amber', async () => {
+    const { buildDashboard, levelWithDlq } = await import('../../src/dashboard/model')
+    const s = withDead('aa.orders-api', 130)
+    const n = s.groups.flatMap((g) => g.nodes).find((x) => x.id === 'aa.orders-api')!
+    expect(levelWithDlq(n, 'ok')).toBe('warn')
+    expect(buildDashboard(s, ALL_TENANTS).summary.deadLetters).not.toBeNull()
   })
 })

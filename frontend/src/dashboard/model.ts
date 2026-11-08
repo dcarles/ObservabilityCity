@@ -410,7 +410,8 @@ export function buildDashboard(s: Snapshot, view: TenantView): Dashboard {
   const links = linkIndex(s)
   const issues = (nodes: NodeSnapshot[], where: string): Issue[] =>
     nodes.flatMap((n) => {
-      const level = levelWithDlq(n, levelOf(n, stateFor(n, s.tenants ?? [], view)))
+      // dead letters keep a row amber but are not "degraded": they have their own count and list, so they are not an issue here
+      const level = levelOf(n, stateFor(n, s.tenants ?? [], view))
       return level === 'warn' || level === 'bad' ? [{ id: n.id, name: n.name, where, level, reason: n.reason ?? (dlqCount(n) > 0 ? dlqReason(n) : null) }] : []
     })
   const worstFirst = (a: Issue, b: Issue): number => (a.level === b.level ? a.name.localeCompare(b.name) : a.level === 'bad' ? -1 : 1)

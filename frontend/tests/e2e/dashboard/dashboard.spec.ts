@@ -595,7 +595,7 @@ test.describe('the dashboard view', () => {
       expect((await wall(page))!.note).toContain('healthy again')
     })
 
-    test('a system with dead letters is a stop of its own, named by queue, and counts as degraded like the dashboard counts it', async ({ town, page }) => {
+    test('a system with dead letters is a stop of its own, named by queue, and is not counted as degraded', async ({ town, page }) => {
       await open(town, page, '&wall=1&hold=2')
       await step(page, 11)
       const feed = (dead: number) => page.evaluate(async (n) => {
@@ -615,8 +615,8 @@ test.describe('the dashboard view', () => {
       expect(w.open).toEqual(['aa'])
       expect(w.focus).toBe('aa.orders-api')
       await expect(page.locator('#wall-caption')).toContainText('has 130 dead letters in q-orders')
-      await expect(page.locator('#wall-headline')).toHaveText('1 DEGRADED')
-      await expect(page.locator('#kpi-services')).toContainText('0 down · 1 degraded')
+      await expect(page.locator('#wall-headline')).not.toContainText('DEGRADED')
+      await expect(page.locator('#kpi-services')).toContainText('0 down · 0 degraded')
       await expect(page.locator('#dash-pillars tr.row.wall-focus')).toHaveAttribute('data-system', 'aa.orders-api')
     })
 
