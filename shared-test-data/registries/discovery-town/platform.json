@@ -1,5 +1,5 @@
 {
-  "plan-cf-acme-al-ord-northeurope1x": [
+  "plan-acme-al-ord-northeurope1x": [
     {
       "metric": "CpuPercentage",
       "aggregation": "average",
@@ -19,7 +19,7 @@
       ]
     }
   ],
-  "plan-cf-acme-al-ord-westeurope9z": [
+  "plan-acme-al-ord-westeurope9z": [
     {
       "metric": "CpuPercentage",
       "aggregation": "average",
@@ -39,7 +39,7 @@
       ]
     }
   ],
-  "plan-cf-acme-be-led-northeurope1x": [
+  "plan-acme-be-led-northeurope1x": [
     {
       "metric": "CpuPercentage",
       "aggregation": "average",
@@ -59,7 +59,7 @@
       ]
     }
   ],
-  "plan-cf-acme-be-led-westeurope9z": [
+  "plan-acme-be-led-westeurope9z": [
     {
       "metric": "CpuPercentage",
       "aggregation": "average",

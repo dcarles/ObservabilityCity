@@ -43,7 +43,7 @@ scope:
     # the hub is not a pillar: its gateway is in the platform subscription, and a second one in another subscription, each found by its rule's own subscription
     - { name: gateways, types: [microsoft.apimanagement/service], roles: [gateway], pattern: '^apim-(?<service>[a-z]+)$', subscription: { nameLike: "*-{env}-platform" } }
     - { name: edge-gateways, types: [microsoft.apimanagement/service], roles: [gateway], pattern: '^apimedge-(?<service>[a-z]+)$', subscription: { nameLike: "*-{env}-edge" } }
-    - { name: plans, types: [microsoft.web/serverfarms], roles: [api], pattern: '^plan-cf-[^-]+-(?<pillar>[^-]+)-(?<service>[^-]+)-(?<region>[a-z]+)', instances: "coalesce(toint(properties.numberOfWorkers), toint(sku.capacity))" }
+    - { name: plans, types: [microsoft.web/serverfarms], roles: [api], pattern: '^plan-[^-]+-(?<pillar>[^-]+)-(?<service>[^-]+)-(?<region>[a-z]+)', instances: "coalesce(toint(properties.numberOfWorkers), toint(sku.capacity))" }
     - { name: function-apps, types: [microsoft.web/sites], roles: [function], pattern: '^app-[^-]+-(?<pillar>[^-]+)-(?<service>[^-]+)-(?<region>[a-z]+)', state: "tostring(properties.state)", running: [Running] }
   assets:
     - { name: key-vaults, label: Key vault, shape: vault, types: [microsoft.keyvault/vaults], pattern: '^kv-[^-]+-(?<pillar>[^-]+)-(?<service>[^-]+)$' }

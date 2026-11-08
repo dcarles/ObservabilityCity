@@ -81,7 +81,7 @@ public class InstancesTests
     public void A_resource_the_cloud_gave_no_number_adds_nothing_but_does_not_make_the_count_unknown()
     {
         var inventory = Recorded(TownA);
-        var plans = inventory.Resources.Select(x => x.Name.StartsWith("plan-cf-acme-al-ord-westeurope") ? x with { Instances = null } : x).ToList();
+        var plans = inventory.Resources.Select(x => x.Name.StartsWith("plan-acme-al-ord-westeurope") ? x with { Instances = null } : x).ToList();
 
         var r = ScopeResolver.Resolve(Prod(TownA), inventory with { Resources = plans });
 
