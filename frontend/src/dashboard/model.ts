@@ -6,7 +6,7 @@ import { eventOfNode, healthEventsOf, isResolved } from '../healthEvents'
 import { absentEverywhere, isAbsent, isUnmonitored } from '../signals'
 import { isFollowed, isFollowing, isShown, isThrottled, tenantLevel, type TenantView } from '../tenants'
 import { islandChoices } from '../islands'
-import { deadLetterItems, type DeadLetterItem } from '../deadLetters'
+import { deadLetterItems, dlqCount, type DeadLetterItem } from '../deadLetters'
 import { stateFor, viewTotals } from '../viewTotals'
 import { trafficSplit } from '../trafficSplit'
 import type { GroupSnapshot, HealthState, JobSnapshot, NodeSnapshot, Snapshot } from '../types'
@@ -24,10 +24,8 @@ export function levelOf(n: Pick<NodeSnapshot, 'absent' | 'kind' | 'jobs'>, state
   return state === 'Down' ? 'bad' : state === 'Degraded' ? 'warn' : 'ok'
 }
 
+export { dlqCount }
 /** Dead letters make a service at least amber (never red): a message nobody could handle is waiting. */
-export function dlqCount(n: Pick<NodeSnapshot, 'absent' | 'kind' | 'jobs' | 'deadLetters'>): number {
-  return isAbsent(n as NodeSnapshot, 'deadLetters') ? 0 : n.deadLetters ?? 0
-}
 export function levelWithDlq(n: NodeSnapshot, level: Level): Level {
   return level === 'ok' && dlqCount(n) > 0 ? 'warn' : level
 }

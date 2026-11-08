@@ -63,6 +63,33 @@ describe('why a system is not healthy', () => {
     expect(text).toContain('3 messages are in the dead-letter queue')
   })
 
+  describe('a store with a database for each tenant', () => {
+    const unit = (id: string, name: string, utilisation: number, throttled = 0) =>
+      ({ id, name, kind: 'Customer', database: id, state: 'Healthy', utilisation, throttled, requestsPerSecond: 1 }) as never
+    const store = (tenants: never[], patch: Partial<NodeSnapshot> = {}) =>
+      node({ cpu: 0, memory: 0, utilisation: 0.97, resourceAmber: 0.8, resourceRed: 0.95, throttleAmber: 0.001, tenants, ...patch })
+
+    it('names the tenant that is over its limit, how far, and that it is turning requests away', () => {
+      const n = store([unit('acme', 'Acme', 0.97, 0.032), unit('qa', 'QA', 0.4)], { throttled: 0.032 })
+      expect(reasons(n)[0]).toBe('Acme is at 97% of its capacity (past the red line of 95%), turning away 3.2% of its requests.')
+    })
+
+    it('says how many more tenants are over the line, and the throttled ones by name', () => {
+      const n = store([unit('acme', 'Acme', 0.97, 0.032), unit('bore', 'Borealis', 0.9), unit('qa', 'QA', 0.85, 0.2)], { throttled: 0.2 })
+      expect(reasons(n)[0]).toBe('Acme is at 97% of its capacity (past the red line of 95%), turning away 3.2% of its requests; 2 more tenants are over the line.')
+      expect(reasons(n)[1]).toBe('Turning away requests (throttled): 20.0% · QA +1 more.')
+    })
+
+    it('does not blame a tenant that is under the line: the plain wording is used', () => {
+      const n = store([unit('acme', 'Acme', 0.5)], { utilisation: 0.9 })
+      expect(reasons(n)[0]).toBe('Resources are at 90%, past the amber line of 80%.')
+    })
+
+    it('keeps the plain wording for a store without tenants', () => {
+      expect(reasons(store([]))[0]).toBe('Resources are at 97%, past the red line of 95%.')
+    })
+  })
+
   it('explains a system that is down, and one with no data', () => {
     expect(reasons(node({ state: 'Down' }))).toEqual(['Down: the system is not answering.'])
     expect(reasons(node({ state: 'Stale' }))[0]).toMatch(/No fresh data/)

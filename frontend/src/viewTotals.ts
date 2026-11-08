@@ -3,6 +3,7 @@
 
 import type { HealthState, NodeSnapshot, Snapshot, TenantInfo, TownTotals } from './types'
 import { isUnmonitored } from './signals'
+import { dlqCount } from './deadLetters'
 import { isFollowing, isFollowed, type TenantView } from './tenants'
 
 export interface ViewTotals extends TownTotals {
@@ -53,19 +54,21 @@ export function staleCount(s: Pick<Snapshot, 'groups' | 'vendors'>): number {
 
 /**
  * What the top bar shows. With every tenant it is the snapshot's own totals. With a choice, requests per second are the chosen tenants' share and the
- * degraded and down counts follow their databases; errors, p99, dead letters and incidents are not split by tenant, so they stay as they are.
+ * degraded and down counts follow their databases (a system with only dead letters counts as degraded); errors, p99, dead letters and incidents are not split by tenant, so they stay as they are.
  */
 export function viewTotals(s: Snapshot, view: TenantView): ViewTotals {
   const base = s.totals
   const stale = staleCount(s)
   const share = tenantShare(s.tenants ?? [], view)
-  if (share === 1 && !isFollowing(view) && !view.hideTest) return { ...base, stale, tenantShare: 1 }
   const nodes = [...s.groups.flatMap((g) => g.nodes), ...s.vendors.map((v) => v.node)]
+  // a system with dead letters is amber even when its own state is healthy (the dashboard says so), so it is counted as degraded here too
+  const onlyDeadLetters = nodes.filter((n) => !isUnmonitored(n) && stateFor(n, s.tenants ?? [], view) === 'Healthy' && dlqCount(n) > 0).length
+  if (share === 1 && !isFollowing(view) && !view.hideTest) return { ...base, degraded: base.degraded + onlyDeadLetters, stale, tenantShare: 1 }
   const states = nodes.map((n) => stateFor(n, s.tenants ?? [], view))
   return {
     ...base,
     requestsPerSecond: base.requestsPerSecond * share,
-    degraded: states.filter((x) => x === 'Degraded').length,
+    degraded: states.filter((x) => x === 'Degraded').length + onlyDeadLetters,
     down: states.filter((x) => x === 'Down').length,
     stale,
     tenantShare: share,

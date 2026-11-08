@@ -2,7 +2,7 @@
 // (a green note). Pure.
 
 import type { Snapshot } from '../types'
-import { attentionOf, type Attention, type AttentionKind } from './attention'
+import { attentionOf, RANK, type Attention } from './attention'
 
 export interface Cue {
   kind: 'trouble' | 'resolved'
@@ -12,8 +12,6 @@ export interface Cue {
   /** For trouble: the stop to cut to. */
   attention?: Attention
 }
-
-const RANK: Record<AttentionKind, number> = { incident: 0, down: 1, degraded: 2, stale: 3 }
 
 const bySubject = (list: Attention[]): Map<string, Attention> => {
   const m = new Map<string, Attention>()

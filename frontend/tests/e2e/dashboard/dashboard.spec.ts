@@ -513,6 +513,23 @@ test.describe('the dashboard view', () => {
     expect(box!.height).toBeLessThan(40) // one line, the dot is not on a line of its own
   })
 
+  test('the environment and tenant lists sit side by side, and each opens under its own button', async ({ town, page }) => {
+    await open(town, page)
+    const boxes = await page.evaluate(() => [...document.querySelectorAll('#dash-filters .vb')].map((e) => { const b = e.getBoundingClientRect(); return { l: b.left, r: b.right, t: b.top, b: b.bottom } }))
+    expect(boxes.length).toBeGreaterThanOrEqual(2)
+    for (let i = 1; i < boxes.length; i++) {
+      expect(Math.abs(boxes[i].t - boxes[0].t), 'on one line').toBeLessThan(2)
+      expect(boxes[i].l, 'to the right of the one before').toBeGreaterThanOrEqual(boxes[i - 1].r)
+    }
+    await page.locator('#dash-filters .vb-btn').first().click()
+    const list = page.locator('#dash-filters .vb-list:visible').first()
+    await expect(list).toBeVisible()
+    const l = await list.boundingBox()
+    const first = await page.locator('#dash-filters .vb').first().boundingBox()
+    expect(Math.abs(l!.x - first!.x)).toBeLessThan(2) // under its own button
+    expect(l!.y).toBeGreaterThanOrEqual(first!.y + first!.height)
+  })
+
   test.describe('wall mode', () => {
     interface DashWall { mode: string; stop: { key: string; kind: string; cut: boolean } | null; open: string[]; focus: string | null; note: string | null; controls: { exitShown: boolean } | null }
     const wall = (page: Page) => page.evaluate(() => (window as any).dash.wall() as DashWall | null)
@@ -576,6 +593,31 @@ test.describe('the dashboard view', () => {
       await expect(page.locator('#wall-strip')).toHaveAttribute('data-tone', 'bad')
       await feed('Healthy')
       expect((await wall(page))!.note).toContain('healthy again')
+    })
+
+    test('a system with dead letters is a stop of its own, named by queue, and counts as degraded like the dashboard counts it', async ({ town, page }) => {
+      await open(town, page, '&wall=1&hold=2')
+      await step(page, 11)
+      const feed = (dead: number) => page.evaluate(async (n) => {
+        const s = await (await fetch('/api/snapshot/latest')).json()
+        for (const x of s.groups.flatMap((g: any) => g.nodes)) { x.state = 'Healthy'; x.deadLetters = 0; x.queues = [] }
+        const node = s.groups.flatMap((g: any) => g.nodes).find((x: any) => x.id === 'aa.orders-api')
+        node.absent = node.absent.filter((a: string) => a !== 'deadLetters')
+        node.deadLetters = n
+        node.queues = n ? [{ name: 'q-orders', backlog: 0, deadLetters: n }] : []
+        ;(window as any).dash.hold(true)
+        ;(window as any).dash.feed(s)
+      }, dead)
+      await feed(0)
+      await feed(130)
+      const w = (await wall(page))!
+      expect(w.stop).toMatchObject({ key: 'deadLetters:aa.orders-api', kind: 'deadLetters', cut: true })
+      expect(w.open).toEqual(['aa'])
+      expect(w.focus).toBe('aa.orders-api')
+      await expect(page.locator('#wall-caption')).toContainText('has 130 dead letters in q-orders')
+      await expect(page.locator('#wall-headline')).toHaveText('1 DEGRADED')
+      await expect(page.locator('#kpi-services')).toContainText('0 down · 1 degraded')
+      await expect(page.locator('#dash-pillars tr.row.wall-focus')).toHaveAttribute('data-system', 'aa.orders-api')
     })
 
     test('a frozen feed greys the wall and the strip says so', async ({ town, page }) => {

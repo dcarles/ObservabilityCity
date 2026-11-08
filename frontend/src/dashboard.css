@@ -15,6 +15,8 @@ body.dash #dash-root[hidden] { display: none; }
 .btn { background: var(--surface2); border: 1px solid var(--dline); border-radius: 6px; padding: 4px 10px; font: inherit; color: inherit; cursor: pointer; }
 .livepill { display: inline-flex; align-items: center; gap: 6px; border-radius: 99px; padding: 2px 10px; font-size: 12px; font-weight: 500; background: var(--okbg); color: var(--ok); }
 .livepill.wait { background: var(--warnbg); color: var(--warn); } .livepill.off { background: var(--badbg); color: var(--bad); }
+/* the environment and tenant lists sit side by side on one line (each opens under its own button); the menu wraps them together, never one over the other */
+#dash-menu #dash-filters { display: flex; flex-wrap: nowrap; align-items: center; gap: 8px; }
 #dash-menu #view-bar { display: contents; }
 #dash-menu .vb-btn, #dash-menu .vb-list { color: var(--fg); }
 .vb { position: relative; }

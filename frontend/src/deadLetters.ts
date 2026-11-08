@@ -1,5 +1,10 @@
-import type { GroupSnapshot } from './types'
+import type { GroupSnapshot, NodeSnapshot } from './types'
 import { isAbsent, isUnmonitored } from './signals'
+
+/** How many dead letters a service has; none when nothing measures them (never a made-up zero that reads as a measurement). */
+export function dlqCount(n: Pick<NodeSnapshot, 'absent' | 'kind' | 'jobs' | 'deadLetters'>): number {
+  return isAbsent(n as NodeSnapshot, 'deadLetters') ? 0 : n.deadLetters ?? 0
+}
 
 /** One queue with dead letters, and the service that reads it. */
 export interface DeadLetterItem {
