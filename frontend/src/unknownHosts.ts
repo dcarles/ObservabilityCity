@@ -50,7 +50,9 @@ export class UnknownHostsPanel {
   private readonly chosen = new Map<string, string>()
 
   /** `targets` gives the ids of the systems a gateway path can be sent to, from the town on screen. */
-  constructor(private readonly scope: Scope, private readonly targets: () => string[] = () => []) {}
+  constructor(private readonly scope: Scope, private readonly targets: () => string[] = () => [], private readonly internalLabelOf: () => string = () => 'Internal services') {}
+
+  private get internalLabel(): string { return this.internalLabelOf() }
 
   /** Reads now and then every half minute. */
   start(): void {
@@ -113,7 +115,7 @@ export class UnknownHostsPanel {
     this.el.hidden = this.hosts.length === 0 && this.added.length === 0
     this.el.innerHTML = `<button id="unknown-hosts-toggle">${panelLabel(shown.length, this.added.length, this.open)}</button>
       <div class="panel" ${this.open ? '' : 'hidden'}>
-        <label class="dim"><input type="checkbox" id="unknown-hosts-vendors" ${this.showVendors ? 'checked' : ''}> Include calls made by Digital Services and vendors${vendorHosts > 0 ? ` (${vendorHosts} more)` : ''}</label>
+        <label class="dim"><input type="checkbox" id="unknown-hosts-vendors" ${this.showVendors ? 'checked' : ''}> Include calls made by ${escapeHtml(this.internalLabel)} and vendors${vendorHosts > 0 ? ` (${vendorHosts} more)` : ''}</label>
         ${this.error ? `<div class="error" id="unknown-hosts-error">${escapeHtml(this.error)}</div>` : ''}
         <ul id="unknown-hosts-list">${shown.map((h, i) => unknownHostRow(h, i, this.showVendors, this.targets(), this.chosen)).join('')}</ul>
         ${this.added.length > 0 ? `<div class="dim">Added from this panel (saved in _discovered/third-parties.yaml, which you can edit)</div><ul id="added-hosts-list">${this.added.map(addedRow).join('')}</ul>` : ''}</div>`

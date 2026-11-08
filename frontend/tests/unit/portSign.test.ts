@@ -8,10 +8,10 @@ describe('the words on the broker port', () => {
     expect(portSignText('  rabbitmq ')).toBe('RABBITMQ')
   })
 
-  it('fall back to the Service Bus for a broker with no name', () => {
-    expect(portSignText(undefined)).toBe('SERVICE BUS')
-    expect(portSignText(null)).toBe('SERVICE BUS')
-    expect(portSignText('   ')).toBe('SERVICE BUS')
+  it('fall back to MESSAGING for a broker with no name', () => {
+    expect(portSignText(undefined)).toBe('MESSAGING')
+    expect(portSignText(null)).toBe('MESSAGING')
+    expect(portSignText('   ')).toBe('MESSAGING')
   })
 
   it('are cut short with an ellipsis when too long for the board', () => {

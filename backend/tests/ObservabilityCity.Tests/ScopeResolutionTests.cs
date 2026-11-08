@@ -73,8 +73,8 @@ public class ScopeResolutionTests
     {
         var r = Resolved(TownA);
 
-        Assert.Equal(["api-acme-al-ord-northeurope1x", "plan-cf-acme-al-ord-northeurope1x", "plan-cf-acme-al-ord-westeurope9z"], r.System("aa.orders-api")!.Resources.Select(x => x.Name));
-        Assert.Equal(["plan-cf-acme-al-ord-northeurope1x", "plan-cf-acme-al-ord-westeurope9z", "worker-acme-al-ord-northeurope1x"], r.System("aa.orders-worker")!.Resources.Select(x => x.Name));
+        Assert.Equal(["api-acme-al-ord-northeurope1x", "plan-acme-al-ord-northeurope1x", "plan-acme-al-ord-westeurope9z"], r.System("aa.orders-api")!.Resources.Select(x => x.Name));
+        Assert.Equal(["plan-acme-al-ord-northeurope1x", "plan-acme-al-ord-westeurope9z", "worker-acme-al-ord-northeurope1x"], r.System("aa.orders-worker")!.Resources.Select(x => x.Name));
         Assert.Equal(3, r.System("aa.orders-db")!.Resources.Count);
         // this convention says no region (and the recording gives the plans no location), so the town has no region view; the function towns have one
         Assert.All(r.System("aa.orders-api")!.Resources.Where(x => x.Rule == "plans"), x => Assert.Null(x.Region));

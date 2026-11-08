@@ -95,8 +95,8 @@ export interface Row {
   tenants: TenantRow[] | null
   /** The tenant lines show by themselves: a tenant is at its amber line or throttling. */
   tenantsOpenByDefault: boolean
-  /** Azure Resource Health's open report for this system's resource ("Degraded", "Unavailable"), with since when; null when Azure reports nothing. */
-  azure: { state: string; since: string } | null
+  /** The cloud's open health report for this system's resource ("Degraded", "Unavailable"), with since when and the cloud's name; null when the cloud reports nothing. */
+  azure: { state: string; since: string; cloud: string } | null
 }
 
 export interface Group {
@@ -125,7 +125,7 @@ export interface Pillar {
   configError: string | null
 }
 
-/** A line of the Hub, Vendors and Digital Services lists. Health is null where nothing says (a monitoring resource, a vendor we see no calls to). */
+/** A line of the Hub, Vendors and internal-services lists. Health is null where nothing says (a monitoring resource, a vendor we see no calls to). */
 export interface SideRow {
   id: string | null
   name: string
@@ -149,9 +149,9 @@ export interface Section {
   rows: SideRow[]
 }
 
-/** One line of the Incidents card: an Azure health report or an incident of the incident tool, with what it is about and its status. */
+/** One line of the Incidents card: an cloud health report or an incident of the incident tool, with what it is about and its status. */
 export interface IncidentRow {
-  source: 'Azure' | 'Incident'
+  source: string
   what: string
   status: string
   /** Red while unresolved, green once resolved. */
@@ -160,9 +160,9 @@ export interface IncidentRow {
   nodeId: string | null
   /** When it was declared and, once resolved, when it ended ("declared 16:21 · resolved 18:17"); empty when the source gives no times. */
   times: string
-  /** The id of the Azure report, for its Dismiss button; null for an incident of the incident tool. */
+  /** The id of the cloud report, for its Dismiss button; null for an incident of the incident tool. */
   dismiss: string | null
-  /** Why, as the cloud said it; null when it gave none or the line is not an Azure report. */
+  /** Why, as the cloud said it; null when it gave none or the line is not a cloud report. */
   cause: string | null
 }
 
@@ -311,7 +311,7 @@ function rowOf(n: NodeSnapshot, s: Snapshot, view: TenantView, links: ReturnType
 function incidentsOf(s: Snapshot): Dashboard['summary']['incidents'] {
   const tool: IncidentRow[] = s.groups.flatMap((g) => g.incidents.map<IncidentRow>((i) => ({ source: 'Incident', what: `${i.title} · ${g.displayName}`, status: `sev ${i.severity}`, tone: 'bad', nodeId: null, times: i.startedAt ? `declared ${dayTime(i.startedAt, Date.now())}` : '', dismiss: null, cause: null })))
   const nameOf = new Map(s.groups.flatMap((g) => g.nodes.map((n) => [n.id, n.name] as const)))
-  const azure = healthEventsOf(s.healthEvents).map<IncidentRow>((e) => ({ source: 'Azure', what: incidentName(e, nameOf), status: e.state, tone: isResolved(e) ? 'ok' : 'bad', nodeId: e.nodeId ?? null, times: [`declared ${dayTime(e.since, Date.now())}`, isResolved(e) && e.resolvedAt ? `resolved ${dayTime(e.resolvedAt, Date.now())}` : null].filter(Boolean).join(' · '), dismiss: e.id, cause: e.cause ?? null }))
+  const azure = healthEventsOf(s.healthEvents).map<IncidentRow>((e) => ({ source: s.cloud ?? 'Cloud', what: incidentName(e, nameOf), status: e.state, tone: isResolved(e) ? 'ok' : 'bad', nodeId: e.nodeId ?? null, times: [`declared ${dayTime(e.since, Date.now())}`, isResolved(e) && e.resolvedAt ? `resolved ${dayTime(e.resolvedAt, Date.now())}` : null].filter(Boolean).join(' · '), dismiss: e.id, cause: e.cause ?? null }))
   if (s.healthEvents == null && tool.length === 0) return null
   const rows = [...tool, ...azure].sort((a, b) => Number(a.tone === 'ok') - Number(b.tone === 'ok'))
   return { open: rows.filter((r) => r.tone === 'bad').length, rows }
@@ -326,7 +326,7 @@ export function incidentName(e: { resource: string; nodeId?: string | null; tena
 /** Only an open report marks a row: once resolved it is left to the Incidents card. */
 function azureOf(id: string, s: Snapshot): Row['azure'] {
   const e = eventOfNode(s.healthEvents, id)
-  return e && !isResolved(e) ? { state: e.state, since: e.since } : null
+  return e && !isResolved(e) ? { state: e.state, since: e.since, cloud: s.cloud ?? 'Cloud' } : null
 }
 
 function groupsOf(g: GroupSnapshot, rows: Row[], nodes: NodeSnapshot[]): Group[] {
@@ -401,7 +401,7 @@ function sectionsOf(s: Snapshot, view: TenantView, links: ReturnType<typeof link
   return [
     { id: 'hub' as const, title: 'Hub', summary: sectionSummary('resource', hubRows, hubExtra), rows: hubRows },
     { id: 'vendors' as const, title: 'Vendors', summary: sectionSummary('vendor', vendors), rows: vendors },
-    { id: 'digital' as const, title: 'Digital Services', summary: sectionSummary('service', digital), rows: digital },
+    { id: 'digital' as const, title: s.internalVendorsLabel, summary: sectionSummary('service', digital), rows: digital },
   ].filter((x) => x.rows.length > 0)
 }
 

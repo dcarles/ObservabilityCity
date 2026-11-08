@@ -28,6 +28,7 @@ sources:
   # a differently named source, a longer look back and another poll: nothing else changes
   azure-health: { kind: resourcehealth, connection: "file:health.json", providers: [Microsoft.DocumentDB], window: 7d, pollSeconds: 120 }
 scope:
+  cloud: Azure
   variables: { stage: live }
   # the workspace is written as a name for people, and its id is given outright, so nothing is looked up
   workspace: "law-{stage}-{environment}"

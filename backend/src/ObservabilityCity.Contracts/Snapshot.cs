@@ -151,8 +151,8 @@ public sealed record SourceAgeSnapshot(string Source, int AgeSeconds, bool Fresh
 public sealed record QueueSnapshot(string Name, double? Backlog, double? DeadLetters, ResourceLink? Link = null, double? PerSecond = null,
     IReadOnlyList<MessageTypeSnapshot>? Types = null, int? TypesCut = null, IReadOnlyList<DeadLetterRegionSnapshot>? DeadLetterRegions = null);
 
-/// <summary>The dead letters of a queue in one region, with Link, the address that opens them in that region's support tool (null when the environment names none). Listed only for a broker that spans more than one region, and only for the regions that hold some.</summary>
-public sealed record DeadLetterRegionSnapshot(string Region, double Count, ResourceLink? Link = null);
+/// <summary>The dead letters of a queue in one region, with Link, the address that opens them in that region's support tool (null when the environment names none). Listed only for a broker that spans more than one region, and only for the regions that hold some. Label is the region as the environment's scope.regions.names calls it (the raw name when it names none).</summary>
+public sealed record DeadLetterRegionSnapshot(string Region, double Count, ResourceLink? Link = null, string? Label = null);
 
 /// <summary>The messages a second of one kind a queue handled, when the environment measures it (typesQuery). A queue's Types are highest first, up to a ceiling; TypesCut counts the quietest kinds beyond it that are left out.</summary>
 public sealed record MessageTypeSnapshot(string Type, double PerSecond);
@@ -352,6 +352,7 @@ public sealed record TownTotals(
 /// OutsideRequestsPerSecond is the traffic no town system explains, summed over the APIs on screen: what reaches the airport. It is null while the environment
 /// does not measure it (links.traffic), and the airport then adds up what the outside callers bring.
 /// Cloud is what the environment calls its cloud (scope.cloud), for the words "not found in ..."; null: the renderer says "the inventory".
+/// InternalVendorsLabel is the town's labels.internalVendors: what its own services outside the monitored platform are called.
 /// TrafficDensity is the town's trafficDensity setting: how many cars appear, as a multiple of the usual number (1).
 /// HealthEvents are the resources the cloud itself reports as Degraded or Unavailable right now, worst first (see <see cref="HealthEventSnapshot"/>); null when the environment reads none.
 /// With an island filter it holds the events of the islands on screen and those that belong to no building. They count in TownTotals.Incidents too.
@@ -383,7 +384,8 @@ public sealed record Snapshot(
     double TrafficDensity = 1,
     IReadOnlyList<string>? Notes = null,
     IReadOnlyList<SourceFreshnessSnapshot>? Sources = null,
-    IReadOnlyList<HealthEventSnapshot>? HealthEvents = null);
+    IReadOnlyList<HealthEventSnapshot>? HealthEvents = null,
+    string InternalVendorsLabel = "Internal services");
 
 /// <summary>
 /// How fresh one configured source is: Name is the source's name in the environment file, LastRead when it last reported anything (null: not yet since the server started),
@@ -419,7 +421,7 @@ public sealed record AddHostRequest(string Host, string Kind);
 public sealed record DismissHealthEventRequest(string Id);
 
 /// <summary>
-/// One path on a gateway host that no rule explains, with its calls. VendorsOnly is true when only vendor buildings (such as Digital Services) made them.
+/// One path on a gateway host that no rule explains, with its calls. VendorsOnly is true when only vendor buildings (the town's internal services) made them.
 /// A gateway host is one a links rule reads the path of; it is not a service, so it is listed by these paths.
 /// </summary>
 public sealed record UnknownPathSnapshot(string Path, double Calls, bool VendorsOnly);

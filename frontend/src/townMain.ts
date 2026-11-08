@@ -127,7 +127,7 @@ export async function startTown(): Promise<void> {
       if (state === 'Incidents')
         return [
           ...groups.filter((g) => g.incidents.length > 0).map<PickItem>((g) => ({ kind: 'island', id: g.id, name: g.displayName, where: `sev ${g.incidents[0].severity}, ${g.incidents.length} open` })),
-          ...eventItems(seen.last?.healthEvents, (id) => groups.find((g) => g.nodes.some((n) => n.id === id))?.displayName ?? 'Platform hub'),
+          ...eventItems(seen.last?.healthEvents, (id) => groups.find((g) => g.nodes.some((n) => n.id === id))?.displayName ?? 'Platform hub', Date.now(), seen.last?.cloud ?? 'Cloud'),
         ]
       const inGroups = groups.flatMap((g) => g.nodes.filter((n) => stateFor(n, seen.last?.tenants ?? [], tenantView) === state && !isUnmonitored(n)).map<PickItem>((n) => ({ kind: 'building', id: n.id, name: n.name, where: g.displayName, state: n.state })))
       const vendors = (seen.last?.vendors ?? []).filter((v) => stateFor(v.node, seen.last?.tenants ?? [], tenantView) === state && !isUnmonitored(v.node)).map<PickItem>((v) => ({ kind: 'building', id: v.node.id, name: v.node.name, where: vendorWhere(v), state: v.node.state }))
@@ -144,7 +144,7 @@ export async function startTown(): Promise<void> {
   const wallControls = wallParams.on ? startWallControls(store, { offerFullscreen: !testMode }) : null
   document.getElementById('view-switch')?.addEventListener('click', () => { window.location.href = viewSwitchAddress(window.location, 'dashboard', store) })
   const notices = new NoticesPanel()
-  const unknownHosts = new UnknownHostsPanel(requestedScope(), () => (seen.last?.groups ?? []).flatMap((g) => g.nodes).filter((n) => n.kind === 'Api').map((n) => n.id).sort())
+  const unknownHosts = new UnknownHostsPanel(requestedScope(), () => (seen.last?.groups ?? []).flatMap((g) => g.nodes).filter((n) => n.kind === 'Api').map((n) => n.id).sort(), () => seen.last?.internalVendorsLabel ?? 'Internal services')
   unknownHosts.start()
   const buildingItems = (): SearchItem[] => {
     const items: SearchItem[] = []

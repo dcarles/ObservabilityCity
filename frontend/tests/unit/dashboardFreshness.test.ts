@@ -70,7 +70,7 @@ describe('the freshness popup', () => {
 })
 
 describe('the lists under the pillars', () => {
-  it('lists the hub, vendors and digital services, each only when it has something', () => {
+  it('lists the hub, vendors and internal services, each only when it has something', () => {
     const d = buildDashboard(golden('calm'), ALL_TENANTS)
     const s = golden('calm')
     expect(d.sections.map((x) => x.id)).toEqual([...(s.groups.some((g) => g.isHub && (g.nodes.length || g.assets?.length)) ? ['hub'] : []), ...(s.vendors.some((v) => !v.internal) ? ['vendors'] : []), ...(s.vendors.some((v) => v.internal) ? ['digital'] : [])])

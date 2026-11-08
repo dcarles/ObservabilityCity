@@ -223,11 +223,11 @@ export class Inspector {
         ${incidents.map((i) => `<div class="row"><span>${escapeHtml(i.title)}</span><span class="warn">sev ${i.severity}${SEVERITY_WORD[i.severity] ? ` · ${SEVERITY_WORD[i.severity]}` : ''} · since ${escapeHtml(clockTime(i.startedAt))}</span></div>`).join('')}`}`
   }
 
-  /** Azure Resource Health's open report for this building's resource. Nothing when Azure reports nothing. */
+  /** The cloud's open health report for this building's resource. Nothing when the cloud reports nothing. */
   private azure(n: NodeSnapshot): string {
     const e = eventOfNode(this.snap?.healthEvents, n.id)
     if (!e) return ''
-    return `<h4>Azure resource health</h4><div class="azure" data-azure="${escapeHtml(e.state)}">${azureRows(e).map((r) => `<div class="row"><span>${r.label}</span><span class="${r.tone}">${escapeHtml(r.value)}</span></div>`).join('')}
+    return `<h4>${escapeHtml(this.snap?.cloud ?? 'Cloud')} resource health</h4><div class="azure" data-azure="${escapeHtml(e.state)}">${azureRows(e).map((r) => `<div class="row"><span>${r.label}</span><span class="${r.tone}">${escapeHtml(r.value)}</span></div>`).join('')}
       <button class="azure-dismiss" data-azure-dismiss="${escapeHtml(e.id)}" title="Hide this report until the server restarts">Dismiss</button></div>`
   }
 

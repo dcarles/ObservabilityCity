@@ -75,9 +75,29 @@ public sealed record RegistryTopic(string Name, string GroupId, string Service);
 public sealed record RegistrySubscription(string Topic, string PublisherGroupId, string ConsumerId, string ConsumerGroupId, bool Legacy);
 
 /// <summary>Mode is <see cref="TownModes.Demo"/> or <see cref="TownModes.Live"/>; a town that does not say is live.</summary>
-public sealed record TownInfo(string Id, string Name, string GroupLabel, string Topology, string Mode = TownModes.Live, double TrafficDensity = TownTraffic.Usual)
+public sealed record TownInfo(string Id, string Name, string GroupLabel, string Topology, string Mode = TownModes.Live, double TrafficDensity = TownTraffic.Usual,
+    MessagingConvention? Messaging = null, string InternalVendorsLabel = TownLabels.DefaultInternalVendors)
 {
+    public MessagingConvention MessagingRules => Messaging ?? MessagingConvention.Default;
     public bool IsDemo => Mode == TownModes.Demo;
+}
+
+/// <summary>The words a town can change. The default is plain, so no town's wording is built in.</summary>
+public static class TownLabels
+{
+    public const string DefaultInternalVendors = "Internal services";
+}
+
+/// <summary>
+/// The town's messaging convention, from town.yaml: how a topic is named and which owners are an old route.
+/// The default names a topic after its service alone and has no legacy route.
+/// </summary>
+public sealed record MessagingConvention(string TopicTemplate, string HubTopicTemplate, IReadOnlyList<string> LegacyFrom)
+{
+    public static readonly MessagingConvention Default = new("{service}", "{service}", []);
+
+    public string TopicName(string pillar, string service) => TopicTemplate.Replace("{pillar}", pillar).Replace("{service}", service);
+    public string HubTopicName(string service) => HubTopicTemplate.Replace("{service}", service);
 }
 
 /// <summary>The range of the town.yaml trafficDensity setting: a multiple of the usual number of cars.</summary>

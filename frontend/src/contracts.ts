@@ -197,6 +197,7 @@ export interface components {
             /** Format: double */
             count: number;
             link?: components["schemas"]["ResourceLink"];
+            label?: string | null;
         };
         DependencySnapshot: {
             from: string;
@@ -493,6 +494,7 @@ export interface components {
             notes?: string[] | null;
             sources?: components["schemas"]["SourceFreshnessSnapshot"][] | null;
             healthEvents?: components["schemas"]["HealthEventSnapshot"][] | null;
+            internalVendorsLabel: string;
         };
         SourceAgeSnapshot: {
             source: string;

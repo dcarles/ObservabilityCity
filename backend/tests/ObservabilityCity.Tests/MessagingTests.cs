@@ -300,7 +300,7 @@ public class MessagingTests
 
     [Theory]
     [InlineData("topic: wrk-batch-outbox,", "topic: wrk-batch-outbxo,", "which no pillar publishes")]
-    [InlineData("topic: wrk-batch-outbox,", "topic: hub-egress,", "reads 'hub-egress' from the hub")]
+    [InlineData("topic: wrk-batch-outbox,", "topic: hub-egress,", "reads 'hub-egress' from 'hub'")]
     [InlineData("consumer: ful.orders-worker", "consumer: ful.orders-db", "only workers do")]
     [InlineData("consumer: ful.orders-worker", "consumer: ful.orders-wroker", "is not a system of this pillar")]
     [InlineData("consumer: ful.orders-worker", "consumer: wrk.batch-worker", "is not a system of this pillar")]
@@ -329,6 +329,47 @@ public class MessagingTests
     }
 
     [Fact]
+    public void A_town_names_its_topics_by_its_own_template()
+    {
+        using var copy = new RegistryCopy(TestPaths.LinksTown);
+        copy.Replace("town.yaml", "topicTemplate: \"{pillar}-{service}-outbox\"", "topicTemplate: \"events.{pillar}.{service}\"");
+        copy.Replace("town.yaml", "hubTopicTemplate: \"hub-{service}\"", "hubTopicTemplate: \"shared.{service}\"");
+        foreach (var file in Directory.GetFiles(copy.FilePath("pillars"), "*.yaml").Append(copy.FilePath("hub.yaml")))
+            File.WriteAllText(file, File.ReadAllText(file).Replace("wrk-batch-outbox", "events.wrk.batch").Replace("ful-orders-outbox", "events.ful.orders").Replace("hub-egress", "shared.egress"));
+
+        var registry = RegistryLoader.Load(copy.Path);
+
+        Assert.Equal(["events.ful.orders", "events.wrk.batch", "shared.egress"], registry.Topics.Select(t => t.Name).Order());
+        Assert.Contains(registry.Subscriptions, s => s.Topic == "shared.egress" && s.Legacy);
+    }
+
+    [Fact]
+    public void Without_a_messaging_block_topics_are_named_after_the_service_and_no_route_is_legacy()
+    {
+        using var copy = new RegistryCopy(TestPaths.LinksTown);
+        var town = copy.Read("town.yaml");
+        copy.Write("town.yaml", town[..town.IndexOf("messaging:", StringComparison.Ordinal)]);
+        foreach (var file in Directory.GetFiles(copy.FilePath("pillars"), "*.yaml").Append(copy.FilePath("hub.yaml")))
+            File.WriteAllText(file, File.ReadAllText(file).Replace("wrk-batch-outbox", "batch").Replace("ful-orders-outbox", "orders").Replace("hub-egress", "egress").Replace(", legacy: true", ""));
+
+        var registry = RegistryLoader.Load(copy.Path);
+
+        Assert.Equal(["batch", "egress", "orders"], registry.Topics.Select(t => t.Name).Order());
+        Assert.All(registry.Subscriptions, s => Assert.False(s.Legacy));
+    }
+
+    [Fact]
+    public void A_topic_template_without_the_service_is_refused()
+    {
+        using var copy = new RegistryCopy(TestPaths.LinksTown);
+        copy.Replace("town.yaml", "topicTemplate: \"{pillar}-{service}-outbox\"", "topicTemplate: \"{pillar}-outbox\"");
+
+        var e = Assert.Throws<RegistryException>(() => RegistryLoader.Load(copy.Path));
+
+        Assert.Contains("must contain {service}", e.Message);
+    }
+
+    [Fact]
     public void Legacy_is_only_for_the_hubs_egress_topic()
     {
         using var copy = new RegistryCopy(TestPaths.LinksTown);
@@ -336,7 +377,7 @@ public class MessagingTests
 
         var e = Assert.Throws<RegistryException>(() => RegistryLoader.Load(copy.Path));
 
-        Assert.Contains("marked legacy, but only the hub's egress topic is", e.Message);
+        Assert.Contains("is not listed in messaging.legacyFrom", e.Message);
     }
 
     [Fact]

@@ -18,16 +18,16 @@
   ],
   "resources": [
     {
-      "id": "/subscriptions/00000000-0000-0000-0000-0000000000a1/resourceGroups/rg/providers/microsoft.web/serverfarms/plan-cf-acme-al-ord-northeurope1x",
-      "name": "plan-cf-acme-al-ord-northeurope1x",
+      "id": "/subscriptions/00000000-0000-0000-0000-0000000000a1/resourceGroups/rg/providers/microsoft.web/serverfarms/plan-acme-al-ord-northeurope1x",
+      "name": "plan-acme-al-ord-northeurope1x",
       "type": "microsoft.web/serverfarms",
       "subscriptionId": "00000000-0000-0000-0000-0000000000a1",
       "tags": {},
       "instances": 2
     },
     {
-      "id": "/subscriptions/00000000-0000-0000-0000-0000000000a1/resourceGroups/rg/providers/microsoft.web/serverfarms/plan-cf-acme-al-ord-westeurope9z",
-      "name": "plan-cf-acme-al-ord-westeurope9z",
+      "id": "/subscriptions/00000000-0000-0000-0000-0000000000a1/resourceGroups/rg/providers/microsoft.web/serverfarms/plan-acme-al-ord-westeurope9z",
+      "name": "plan-acme-al-ord-westeurope9z",
       "type": "microsoft.web/serverfarms",
       "subscriptionId": "00000000-0000-0000-0000-0000000000a1",
       "tags": {},
@@ -80,16 +80,16 @@
       }
     },
     {
-      "id": "/subscriptions/00000000-0000-0000-0000-0000000000a2/resourceGroups/rg/providers/microsoft.web/serverfarms/plan-cf-acme-be-led-northeurope1x",
-      "name": "plan-cf-acme-be-led-northeurope1x",
+      "id": "/subscriptions/00000000-0000-0000-0000-0000000000a2/resourceGroups/rg/providers/microsoft.web/serverfarms/plan-acme-be-led-northeurope1x",
+      "name": "plan-acme-be-led-northeurope1x",
       "type": "microsoft.web/serverfarms",
       "subscriptionId": "00000000-0000-0000-0000-0000000000a2",
       "tags": {},
       "instances": 3
     },
     {
-      "id": "/subscriptions/00000000-0000-0000-0000-0000000000a2/resourceGroups/rg/providers/microsoft.web/serverfarms/plan-cf-acme-be-led-westeurope9z",
-      "name": "plan-cf-acme-be-led-westeurope9z",
+      "id": "/subscriptions/00000000-0000-0000-0000-0000000000a2/resourceGroups/rg/providers/microsoft.web/serverfarms/plan-acme-be-led-westeurope9z",
+      "name": "plan-acme-be-led-westeurope9z",
       "type": "microsoft.web/serverfarms",
       "subscriptionId": "00000000-0000-0000-0000-0000000000a2",
       "tags": {},
@@ -132,8 +132,8 @@
       }
     },
     {
-      "id": "/subscriptions/00000000-0000-0000-0000-0000000000a3/resourceGroups/rg/providers/microsoft.web/serverfarms/plan-cf-acme-al-ord-northeurope0s",
-      "name": "plan-cf-acme-al-ord-northeurope0s",
+      "id": "/subscriptions/00000000-0000-0000-0000-0000000000a3/resourceGroups/rg/providers/microsoft.web/serverfarms/plan-acme-al-ord-northeurope0s",
+      "name": "plan-acme-al-ord-northeurope0s",
       "type": "microsoft.web/serverfarms",
       "subscriptionId": "00000000-0000-0000-0000-0000000000a3",
       "tags": {},

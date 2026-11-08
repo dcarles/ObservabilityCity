@@ -15,14 +15,13 @@ export interface DeadLetterItem {
   groupName: string
   queue: string
   count: number
-  /** The region the dead letters are in (as North, West or the raw name), when the broker spans several; null otherwise. */
+  /** The region the dead letters are in (its label from scope.regions.names, or the raw name), when the broker spans several; null otherwise. */
   region: string | null
 }
 
-/** A region as a short word: North and West Europe become North and West; any other name is shown as it is. */
-export function regionLabel(region: string): string {
-  const r = region.toLowerCase()
-  return r.includes('north') ? 'North' : r.includes('west') ? 'West' : region
+/** A region as the town's scope.regions.names calls it (the backend sends it as label); the raw name when it sent none. */
+export function regionLabel(r: { region: string; label?: string | null }): string {
+  return r.label && r.label !== '' ? r.label : r.region
 }
 
 /**
@@ -41,7 +40,7 @@ export function deadLetterItems(groups: readonly Pick<GroupSnapshot, 'id' | 'dis
         // a broker in several regions says where each queue's dead letters are: one row for each region that holds some
         const regions = (q.deadLetterRegions ?? []).filter((r) => r.count > 0)
         if (regions.length === 0) items.push({ ...base, count: q.deadLetters as number, region: null })
-        else for (const r of regions) items.push({ ...base, count: r.count, region: regionLabel(r.region) })
+        else for (const r of regions) items.push({ ...base, count: r.count, region: regionLabel(r) })
       }
     }
   }

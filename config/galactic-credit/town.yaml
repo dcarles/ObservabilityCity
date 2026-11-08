@@ -8,6 +8,14 @@ mode: demo                # fake data, with the Break things panel and the story
 # Lost & found always comes last. ringCapacity (6 to 18, default 12) is how many islands stand on the first ring; the rest stand in a staggered second ring.
 islands: [cl, acc, pay, frd, cus, acq, dec, bil, col, dsp, rwd, obk, ntf, dat, rcn, reg]
 
+# How topics are named, and which are an old route: a pillar's service publishes <pillar>-<service>-outbox, the hub's topics are hub-<name>, and reading a hub topic is the old route.
+messaging:
+  topicTemplate: "{pillar}-{service}-outbox"
+  hubTopicTemplate: "hub-{service}"
+  legacyFrom: [hub]
+labels:
+  internalVendors: Internal services
+
 # The database engines this town uses. A database says engine: <id>; the name and the type shown come from here. Every engine belongs to one of the fixed types:
 # relational, document, key-value, wide-column, graph, time-series, analytical, vector.
 databaseEngines:

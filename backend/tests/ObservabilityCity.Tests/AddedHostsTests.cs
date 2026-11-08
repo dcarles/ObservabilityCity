@@ -186,7 +186,7 @@ public class AddedHostsTests : IDisposable
     // ---- rules for gateway paths ----
 
     [Theory]
-    [InlineData("/frd/fraud-transaction-analysis/orchestrations/id/authorise", "^/frd/fraud-transaction-analysis(/|$)")]
+    [InlineData("/xx/sample-service/orchestrations/id/run", "^/xx/sample-service(/|$)")]
     [InlineData("/aa/orders", "^/aa/orders(/|$)")]
     [InlineData("/aa", "^/aa(/|$)")]
     [InlineData("/", "^/")]

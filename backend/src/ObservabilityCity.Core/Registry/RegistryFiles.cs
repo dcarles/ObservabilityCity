@@ -20,6 +20,26 @@ internal sealed class TownFile
     public List<ExpectedWarningFile> ExpectedWarnings { get; set; } = [];
     /// <summary>The database engines this company uses, by id. A database says <c>engine: &lt;id&gt;</c> and takes the name and the type from here.</summary>
     public Dictionary<string, DatabaseEngineFile> DatabaseEngines { get; set; } = new();
+    /// <summary>How the town names its message topics, and which publishers are an old route. Without it: topics are named after the service and no route is legacy.</summary>
+    public TownMessagingFile Messaging { get; set; } = new();
+    /// <summary>The words the town uses for things the app has no fixed name for.</summary>
+    public LabelsFile Labels { get; set; } = new();
+}
+
+internal sealed class TownMessagingFile
+{
+    /// <summary>The name of the topic a pillar's service publishes: <c>{pillar}</c> and <c>{service}</c> are replaced.</summary>
+    public string TopicTemplate { get; set; } = MessagingConvention.Default.TopicTemplate;
+    /// <summary>The name of a topic of the hub: <c>{service}</c> is replaced by the hub's name for it.</summary>
+    public string HubTopicTemplate { get; set; } = MessagingConvention.Default.HubTopicTemplate;
+    /// <summary>The owners whose topics are an old route to read (only <c>hub</c> is known). A subscription to one of them must say <c>legacy: true</c>; no other may.</summary>
+    public List<string> LegacyFrom { get; set; } = [];
+}
+
+internal sealed class LabelsFile
+{
+    /// <summary>What the town's own services outside the monitored platform are called (a section of the dashboard, a note in the panels).</summary>
+    public string InternalVendors { get; set; } = TownLabels.DefaultInternalVendors;
 }
 
 internal sealed class DatabaseEngineFile

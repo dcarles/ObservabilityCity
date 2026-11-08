@@ -325,7 +325,7 @@ public class PlatformMetricsTests
     public async Task One_resource_with_no_number_makes_the_systems_number_unknown_instead_of_hiding_behind_the_others()
     {
         using var copy = new RegistryCopy(TownA);
-        EditRecording(copy, doc => doc["plan-cf-acme-al-ord-westeurope9z"]!.AsArray().Remove(doc["plan-cf-acme-al-ord-westeurope9z"]!.AsArray().First(s => (string?)s!["metric"] == "CpuPercentage")));
+        EditRecording(copy, doc => doc["plan-acme-al-ord-westeurope9z"]!.AsArray().Remove(doc["plan-acme-al-ord-westeurope9z"]!.AsArray().First(s => (string?)s!["metric"] == "CpuPercentage")));
 
         var snapshot = await TownSnapshot(copy.Path, new FakeTimeProvider(T0));
 
@@ -427,8 +427,8 @@ public class PlatformMetricsTests
         Assert.Equal(4 * 1 + 5 * 4, http.Sent.Count);
         Assert.All(http.Sent, r => Assert.Equal("Bearer secret-token", r.Headers["Authorization"]));
         Assert.Equal(["https://management.azure.com/.default"], login.Scopes.Distinct());
-        var plan = http.Sent.First(r => r.Uri!.AbsolutePath.Contains("/serverfarms/plan-cf-acme-al-ord-northeurope1x/"));
-        Assert.StartsWith("https://management.azure.com/subscriptions/00000000-0000-0000-0000-0000000000a1/resourceGroups/rg/providers/microsoft.web/serverfarms/plan-cf-acme-al-ord-northeurope1x/providers/Microsoft.Insights/metrics?api-version=2018-01-01", plan.Uri!.ToString());
+        var plan = http.Sent.First(r => r.Uri!.AbsolutePath.Contains("/serverfarms/plan-acme-al-ord-northeurope1x/"));
+        Assert.StartsWith("https://management.azure.com/subscriptions/00000000-0000-0000-0000-0000000000a1/resourceGroups/rg/providers/microsoft.web/serverfarms/plan-acme-al-ord-northeurope1x/providers/Microsoft.Insights/metrics?api-version=2018-01-01", plan.Uri!.ToString());
         var query = System.Web.HttpUtility.ParseQueryString(plan.Uri.Query);
         Assert.Equal("CpuPercentage,MemoryPercentage", query["metricnames"]);
         Assert.Equal("Average", query["aggregation"]);

@@ -87,6 +87,8 @@ export function checkSnapshot(raw: unknown): Checked {
     incidentsSeen: raw.incidentsSeen === true,
     outsideRequestsPerSecond: isFiniteNumber(raw.outsideRequestsPerSecond) ? raw.outsideRequestsPerSecond : null,
     // what the environment calls its cloud, for "not found in ..."; null says "the inventory"
+    // what the town calls its own services outside the monitored platform (labels.internalVendors)
+    internalVendorsLabel: str(raw.internalVendorsLabel).trim() || 'Internal services',
     cloud: typeof raw.cloud === 'string' && raw.cloud.trim() !== '' ? raw.cloud.trim() : null,
     dayFraction: isFiniteNumber(raw.dayFraction) ? raw.dayFraction : 0.5,
     totals: {
@@ -291,7 +293,7 @@ function checkNode(n: unknown, groupId: string, ids: Set<string>, problems: stri
         // where the dead letters are, when the broker spans regions: one without a region or a count cannot be shown; a link must be a web address
         deadLetterRegions: Array.isArray(q.deadLetterRegions)
           ? q.deadLetterRegions.filter(isObject).filter((r) => typeof r.region === 'string' && r.region !== '' && isFiniteNumber(r.count) && r.count > 0)
-            .map((r) => ({ region: r.region as string, count: r.count as number, link: isObject(r.link) && typeof r.link.name === 'string' && r.link.name !== '' && typeof r.link.url === 'string' && /^https?:\/\//i.test(r.link.url) ? { name: r.link.name, url: r.link.url } : null }))
+            .map((r) => ({ region: r.region as string, label: optionalText(r.label) ?? (r.region as string), count: r.count as number, link: isObject(r.link) && typeof r.link.name === 'string' && r.link.name !== '' && typeof r.link.url === 'string' && /^https?:\/\//i.test(r.link.url) ? { name: r.link.name, url: r.link.url } : null }))
           : null,
       }))
     : null

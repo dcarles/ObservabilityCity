@@ -4,3 +4,7 @@ groupLabel: Team
 topology: hub-and-spoke
 mode: demo
 islands: [aa, bb]
+messaging:
+  topicTemplate: "{pillar}-{service}-outbox"
+  hubTopicTemplate: "hub-{service}"
+  legacyFrom: [hub]

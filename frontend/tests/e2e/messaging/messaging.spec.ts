@@ -125,8 +125,8 @@ test.describe(`the broker's backlog and dead letters (${B ? 'ids, a total' : 'co
       const n = s.groups.flatMap((g: any) => g.nodes).find((x: any) => x.id === 'aa.orders-worker')
       n.deadLetters = 11
       n.queues = n.queues.map((q: any) => q.name !== queue ? q : { ...q, deadLetters: 11, deadLetterRegions: [
-        { region: 'northeurope', count: 3, link: { name: 'Support North', url: 'https://north.example.test/q' } },
-        { region: 'westeurope', count: 8, link: { name: 'Support West', url: 'https://west.example.test/q' } }] })
+        { region: 'northeurope', label: 'North', count: 3, link: { name: 'Support North', url: 'https://north.example.test/q' } },
+        { region: 'westeurope', label: 'West', count: 8, link: { name: 'Support West', url: 'https://west.example.test/q' } }] })
       c.hold(true)
       c.feed(s)
     }, inbox)

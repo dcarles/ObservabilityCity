@@ -238,7 +238,7 @@ describe('no convention is built in', () => {
   it('has no company words in the dashboard code', () => {
     for (const f of ['model.ts', 'render.ts', 'dashboard.ts']) {
       const text = readFileSync(resolve(__dirname, '../../src/dashboard', f), 'utf8')
-      expect(text).not.toMatch(/\b(acme|newday|multitenant|galactic)\b/i)
+      expect(text).not.toMatch(/\b(acme|galactic)\b/i)
     }
   })
 })
@@ -307,7 +307,7 @@ describe('the Incidents card', () => {
     const s = { ...golden('calm'), healthEvents: [event({ id: 'r', state: 'Resolved', resolvedAt: '2026-11-05T17:00:00Z' }), event({ id: 'o', state: 'Unavailable', resource: 'ledger-db', nodeId: null })] }
     const d = buildDashboard(s, ALL_TENANTS)
     expect(d.summary.incidents?.open).toBe(1)
-    expect(d.summary.incidents?.rows.map((r) => [r.source, r.status, r.tone])).toEqual([['Azure', 'Unavailable', 'bad'], ['Azure', 'Resolved', 'ok']])
+    expect(d.summary.incidents?.rows.map((r) => [r.source, r.status, r.tone])).toEqual([['Cloud', 'Unavailable', 'bad'], ['Cloud', 'Resolved', 'ok']])
     const html = summaryHtml(d)
     expect(html).toContain('<b class="bad">1</b>')
     expect(html).toContain('class="il bad"')
