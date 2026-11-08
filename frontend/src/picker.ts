@@ -8,9 +8,9 @@ export interface PickItem {
   state?: string
   /** A second line under the name in a list, for example the dead-letter queue and its count. */
   detail?: string
-  /** Listed but not clickable: it has nowhere to go (an Azure report for a resource the town does not show). */
+  /** Listed but not clickable: it has nowhere to go (a cloud health report for a resource the town does not show). */
   inert?: boolean
-  /** The id of the Azure health report this line stands for: the line gets a Dismiss button. */
+  /** The id of the cloud health report this line stands for: the line gets a Dismiss button. */
   dismiss?: string
 }
 

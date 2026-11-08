@@ -35,7 +35,7 @@ export interface BuildingStatus {
   region: string
   /** How the requests divide between the regions ("North 95% · West 5%"), with a warning sign in front when one region takes too much; empty when nothing measures it. */
   split: string
-  /** The state Azure Resource Health reports for this building's resource while its red exclamation mark is up; null when nothing is reported. */
+  /** The state The cloud's health report gives for this building's resource while its red exclamation mark is up; null when nothing is reported. */
   azure: string | null
 }
 
@@ -46,7 +46,7 @@ interface FloorState {
   dark: number
 }
 
-/** A red disc with a white exclamation mark: Azure reports the building's resource as degraded or unavailable. */
+/** A red disc with a white exclamation mark: the cloud reports the building's resource as degraded or unavailable. */
 const alertTexture = (() => {
   let t: THREE.CanvasTexture | null = null
   return () => (t ??= canvasTexture(128, 128, (ctx) => {
@@ -193,7 +193,7 @@ export class Building {
     if (this.node) this.model.setTenants?.(this.node.tenants ?? [], this.node.throttleAmber, view)
   }
 
-  /** Azure Resource Health's open report for this building's resource, or null: shows or hides the red exclamation mark above the beacon. */
+  /** The cloud's open health report for this building's resource, or null: shows or hides the red exclamation mark above the beacon. */
   setHealthEvent(e: HealthEventSnapshot | null): void {
     this.azure = e
     this.alert.visible = e !== null

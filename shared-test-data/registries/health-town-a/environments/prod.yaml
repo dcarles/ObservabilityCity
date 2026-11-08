@@ -37,6 +37,7 @@ sources:
   # the cloud's own word on the health of the data accounts (the activity log's resource-health entries); a recording stands in for it. It fills no signal
   health: { kind: resourcehealth, connection: "file:health.json", providers: [Microsoft.DocumentDB], pollSeconds: 60 }
 scope:
+  cloud: Azure
   inventory: inventory
   variables: { env: prd, directory: example.test }
   workspace: "ws-{env}-main"

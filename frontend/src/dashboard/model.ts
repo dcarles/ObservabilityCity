@@ -160,9 +160,9 @@ export interface IncidentRow {
   nodeId: string | null
   /** When it was declared and, once resolved, when it ended ("declared 16:21 · resolved 18:17"); empty when the source gives no times. */
   times: string
-  /** The id of the Azure report, for its Dismiss button; null for an incident of the incident tool. */
+  /** The id of the cloud report, for its Dismiss button; null for an incident of the incident tool. */
   dismiss: string | null
-  /** Why, as the cloud said it; null when it gave none or the line is not an Azure report. */
+  /** Why, as the cloud said it; null when it gave none or the line is not a cloud report. */
   cause: string | null
 }
 

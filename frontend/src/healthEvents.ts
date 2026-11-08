@@ -3,7 +3,7 @@ import type { PickItem } from './picker'
 import { dayTime } from './inspectorModel'
 import { requestedScope, scopeParams } from './scope'
 
-/** The events of a snapshot; a town with no Azure health source sends none. */
+/** The events of a snapshot; a town with no cloud health source sends none. */
 export function healthEventsOf(events: readonly HealthEventSnapshot[] | null | undefined): HealthEventSnapshot[] {
   return events ? [...events] : []
 }
@@ -24,7 +24,7 @@ export function eventsByNode(events: readonly HealthEventSnapshot[] | null | und
   return m
 }
 
-/** What a building says about Azure's word on it: its worst open event, or else the one that resolved last. Null when Azure said nothing of it. */
+/** What a building says about the cloud's word on it: its worst open event, or else the one that resolved last. Null when the cloud said nothing of it. */
 export function eventOfNode(events: readonly HealthEventSnapshot[] | null | undefined, nodeId: string): HealthEventSnapshot | null {
   const open = eventsByNode(events).get(nodeId)
   if (open) return open
@@ -39,10 +39,10 @@ export function eventLine(e: HealthEventSnapshot, now: number = Date.now()): str
 }
 
 /** Incidents-list lines for the events. One that matched no building is inert: it is listed, with nowhere to go. */
-export function eventItems(events: readonly HealthEventSnapshot[] | null | undefined, whereOf: (nodeId: string) => string, now: number = Date.now()): PickItem[] {
+export function eventItems(events: readonly HealthEventSnapshot[] | null | undefined, whereOf: (nodeId: string) => string, now: number = Date.now(), cloud: string = 'Cloud'): PickItem[] {
   return healthEventsOf(events).map<PickItem>((e) => e.nodeId
-    ? { kind: 'building', id: e.nodeId, name: e.resource, where: `Azure resource health · ${whereOf(e.nodeId)}`, detail: eventLine(e, now), state: e.state, dismiss: e.id }
-    : { kind: 'building', id: e.id, name: e.resource, where: 'Azure resource health · not in the town', detail: eventLine(e, now), state: e.state, dismiss: e.id, inert: true })
+    ? { kind: 'building', id: e.nodeId, name: e.resource, where: `${cloud} resource health · ${whereOf(e.nodeId)}`, detail: eventLine(e, now), state: e.state, dismiss: e.id }
+    : { kind: 'building', id: e.id, name: e.resource, where: `${cloud} resource health · not in the town`, detail: eventLine(e, now), state: e.state, dismiss: e.id, inert: true })
 }
 
 export interface AzureRow {
@@ -51,7 +51,7 @@ export interface AzureRow {
   tone: 'bad' | 'warn' | 'ok'
 }
 
-/** The drawer rows for a building's report: the state and since when, what it was before, the cause, and which resource Azure means. A resolved one says when it ended, in green. */
+/** The drawer rows for a building's report: the state and since when, what it was before, the cause, and which resource the cloud means. A resolved one says when it ended, in green. */
 export function azureRows(e: HealthEventSnapshot, now: number = Date.now()): AzureRow[] {
   const resolved = isResolved(e)
   const tone: AzureRow['tone'] = resolved ? 'ok' : e.state === 'Unavailable' ? 'bad' : 'warn'

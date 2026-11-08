@@ -11,6 +11,8 @@ describe('Azure resource health events', () => {
     expect(healthEventsOf(undefined)).toEqual([])
     expect(eventsByNode(undefined).size).toBe(0)
     expect(eventItems(null, () => 'x', NOW)).toEqual([])
+    expect(eventItems([ev({})], () => 'Borealis', NOW, 'Cumulus')[0]!.where).toBe('Cumulus resource health · Borealis')
+    expect(eventItems([ev({})], () => 'Borealis', NOW)[0]!.where).toBe('Cloud resource health · Borealis')
   })
 
   it('keeps the worst event of a building: unavailable first, then the one open longest', () => {
