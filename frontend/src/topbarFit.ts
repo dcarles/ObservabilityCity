@@ -5,7 +5,7 @@
  */
 
 /** The classes that leave things out, one more each step. style.css says what each one hides. */
-export const FIT_STEPS = ['fit-1', 'fit-2', 'fit-3', 'fit-4', 'fit-5', 'fit-6'] as const
+export const FIT_STEPS = ['fit-1', 'fit-2', 'fit-3', 'fit-4', 'fit-5', 'fit-6', 'fit-7'] as const
 
 /** True when something in the bar is wider than the room it was given. */
 export function barOverflows(bar: HTMLElement): boolean {

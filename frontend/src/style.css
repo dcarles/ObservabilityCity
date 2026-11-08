@@ -88,6 +88,8 @@ button.on { background: var(--accent); color: #fff; border-color: var(--accent);
 @media (max-width: 1100px) { #topbar .brand { display: none; } }
 /* what is left out, one step at a time, when the bar is still too full on one line (fitTopBar adds the classes) */
 #topbar.fit-1 .chip.time, #topbar.fit-2 .chip.p99, #topbar.fit-3 .status, #topbar.fit-5 .chip.msgs, #topbar.fit-6 .chip.dlq { display: none; }
+/* last: the Wall button goes (wall mode is also in the legend and the address), when even that is not enough room */
+#topbar.fit-7 #wall-button { display: none; }
 /* fourth: everything stays, drawn tighter, and the search may be narrower. Only then is the dead-letter count left out */
 #topbar.fit-4 { gap: 6px 4px; }
 #topbar.fit-4 #view-bar { gap: 4px; }
