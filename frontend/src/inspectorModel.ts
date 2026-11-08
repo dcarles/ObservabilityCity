@@ -3,7 +3,7 @@
 import { regionLabel } from './deadLetters'
 import type { ConfigValue, HealthState, ScheduleSnapshot, IncidentSnapshot, JobSnapshot, LinkRef, LogGroup, LogSection, NodeSnapshot, ResourceLink, ScopeInfo, ScopeResource, SettingLayer, SystemDetail } from './types'
 import { inboundSplitText } from './inbound'
-import { limitRange, throttleWho } from './tenants'
+import { isThrottled, limitRange, throttleWho } from './tenants'
 import { isAbsent, isUnmonitored, QUIET_TEXT } from './signals'
 import { formatAge, formatCount, formatMs, formatRate, plaqueText, resourceUse } from './visuals'
 
@@ -27,6 +27,21 @@ export function jobReasons(n: Pick<NodeSnapshot, 'jobs'>, now: number = Date.now
 }
 
 /** In words, why the system is not healthy. Empty for a healthy one. Each line names the number and the line it crossed. */
+/**
+ * For a store with a database for each tenant: which tenant is closest to its limit and how close (`past` says which line it is past), whether that tenant is
+ * turning requests away, and how many more are over the amber line. Null when the store has no tenants or its busiest tenant is under the line (the plain wording then says what is wrong).
+ */
+export function tenantHot(n: NodeSnapshot, past: string): string | null {
+  const live = (n.tenants ?? []).filter((u) => u.state !== 'Stale' && u.utilisation != null)
+  if (live.length === 0) return null
+  const sorted = [...live].sort((a, b) => b.utilisation! - a.utilisation!)
+  const top = sorted[0]
+  if (top.utilisation! < n.resourceAmber) return null
+  const throttling = isThrottled(top, n.throttleAmber) ? `, turning away ${pct(top.throttled!, 1)} of its requests` : ''
+  const others = sorted.slice(1).filter((u) => u.utilisation! >= n.resourceAmber).length
+  return `${top.name} is at ${pct(top.utilisation!)} of its capacity (${past})${throttling}${others > 0 ? `; ${others} more tenant${others === 1 ? ' is' : 's are'} over the line` : ''}.`
+}
+
 export function reasons(n: NodeSnapshot, cloud?: string | null): string[] {
   if (isUnmonitored(n)) return []
   if (n.app === 'Missing') return [`The app is ${notFoundText(cloud)}: the cloud has no resource of this name, so nothing here is shown as healthy.`]
@@ -41,9 +56,16 @@ export function reasons(n: NodeSnapshot, cloud?: string | null): string[] {
   if (!isAbsent(n, 'latency') && n.p99Ms > n.slaP99Ms) out.push(`p99 is ${formatMs(n.p99Ms)}, over the SLA of ${formatMs(n.slaP99Ms)}.`)
   if (!isAbsent(n, 'instances') && n.instancesHealthy < n.instancesTotal) out.push(`${n.instancesTotal - n.instancesHealthy} of ${n.instancesTotal} instances are unhealthy.`)
   const use = resourceUse(n)
-  if (use >= n.resourceRed) out.push(`Resources are at ${pct(use)}, past the red line of ${pct(n.resourceRed)}.`)
-  else if (use >= n.resourceAmber) out.push(`Resources are at ${pct(use)}, past the amber line of ${pct(n.resourceAmber)}.`)
-  if (!isAbsent(n, 'throttled') && (n.throttled ?? 0) >= n.throttleAmber && (n.throttled ?? 0) > 0) out.push(`Turning away ${pct(n.throttled!, 1)} of requests (throttled).`)
+  if (use >= n.resourceAmber) {
+    const line = use >= n.resourceRed ? 'red' : 'amber'
+    const past = `past the ${line} line of ${pct(line === 'red' ? n.resourceRed : n.resourceAmber)}`
+    // a store with a database for each tenant says which tenant is hot, and whether it is turning requests away
+    out.push(tenantHot(n, past) ?? `Resources are at ${pct(use)}, ${past}.`)
+  }
+  if (!isAbsent(n, 'throttled') && (n.throttled ?? 0) >= n.throttleAmber && (n.throttled ?? 0) > 0) {
+    const who = throttleWho(n.tenants ?? [], n.throttleAmber)
+    out.push(who ? `Turning away requests (throttled): ${who}.` : `Turning away ${pct(n.throttled!, 1)} of requests (throttled).`)
+  }
   if (!isAbsent(n, 'backlog') && (n.oldestMessageSeconds ?? 0) >= n.backlogAmber && (n.oldestMessageSeconds ?? 0) > 0) out.push(`The oldest message has waited ${formatAge(n.oldestMessageSeconds!)}, past the ${formatAge(n.backlogAmber)} line.`)
   if (!isAbsent(n, 'deadLetters') && (n.deadLetters ?? 0) > 0) out.push(`${formatCount(n.deadLetters!)} message${n.deadLetters === 1 ? ' is' : 's are'} in the dead-letter queue.`)
   return out

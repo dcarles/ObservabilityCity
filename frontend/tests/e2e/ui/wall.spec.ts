@@ -167,6 +167,19 @@ test.describe('trouble', () => {
     await expect(page.locator('#wall-pulse')).toHaveClass(/on/)
   })
 
+  test('cuts to a system with dead letters and counts it as degraded in the strip', async ({ town, page }) => {
+    await town.open(WALL)
+    await town.effect('aa.orders-worker', 'Poison')
+    await town.until('aa.orders-worker', (n) => (n.deadLetters ?? 0) >= 1)
+    await page.waitForFunction(() => /dead letters?/.test((window as any).city.wall().stop?.caption ?? ''))
+
+    const s = await wall(page)
+    expect(s.mode).toBe('alert')
+    expect(s.stop!.caption).toMatch(/^Orders worker \(Alpha\) .*has \d+ dead letters?/) // the demo town reads no queue names, so only the count is said
+    expect(s.strip.headline).toMatch(/DEGRADED/)
+    expect(s.strip.tone).toBe('warn')
+  })
+
   test('stops pulsing after a few seconds, and holds on the trouble for a full stop', async ({ town, page }) => {
     await town.open(WALL)
     await town.effect('aa.orders-api', 'Down')

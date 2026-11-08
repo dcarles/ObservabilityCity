@@ -124,3 +124,47 @@ describe('systems with no data', () => {
     })
   })
 })
+
+describe('systems with only dead letters', () => {
+  const withDead = (id: string, count: number): Snapshot => {
+    const out = structuredClone(staging)
+    const n = out.groups.flatMap((g) => g.nodes).find((x) => x.id === id)!
+    Object.assign(n, { deadLetters: count, state: 'Healthy' })
+    return out
+  }
+
+  it('count as degraded, the way the dashboard counts them', () => {
+    const base = viewTotals(staging, ALL_TENANTS).degraded
+    const s = withDead('aa.orders-api', 130)
+    expect(viewTotals(s, ALL_TENANTS).degraded).toBe(base + 1)
+  })
+
+  it('count under a tenant choice too, and not twice when the system is degraded already', () => {
+    const s = withDead('bb.billing-api', 4)
+    const chosen = view(['acme'])
+    expect(viewTotals(s, chosen).degraded).toBe(viewTotals(staging, chosen).degraded + 1)
+
+  })
+
+  it('are not counted twice when the system is degraded already', () => {
+    const degraded = structuredClone(staging)
+    Object.assign(degraded.groups.flatMap((g) => g.nodes).find((x) => x.id === 'bb.billing-api')!, { state: 'Degraded', deadLetters: 0 })
+    const withLetters = structuredClone(degraded)
+    withLetters.groups.flatMap((g) => g.nodes).find((x) => x.id === 'bb.billing-api')!.deadLetters = 40
+    expect(viewTotals(withLetters, ALL_TENANTS).degraded).toBe(viewTotals(degraded, ALL_TENANTS).degraded)
+  })
+
+  it('give the same number of degraded systems as the dashboard lists', async () => {
+    const { buildDashboard } = await import('../../src/dashboard/model')
+    const s = withDead('aa.orders-api', 130)
+    expect(buildDashboard(s, ALL_TENANTS).summary.degraded).toBe(viewTotals(s, ALL_TENANTS).degraded)
+    expect(buildDashboard(s, view(['acme'])).summary.degraded).toBe(viewTotals(s, view(['acme'])).degraded)
+  })
+
+  it('are left out when nothing measures dead letters or the system has no fresh data', () => {
+    const base = viewTotals(staging, ALL_TENANTS).degraded
+    const absent = withDead('aa.orders-api', 9)
+    absent.groups.flatMap((g) => g.nodes).find((x) => x.id === 'aa.orders-api')!.absent = ['deadLetters']
+    expect(viewTotals(absent, ALL_TENANTS).degraded).toBe(base)
+  })
+})

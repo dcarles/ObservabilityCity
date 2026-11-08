@@ -20,6 +20,16 @@ describe('what changed between two snapshots', () => {
     expect(cues[0].attention?.focus).toEqual({ kind: 'building', id: 'cl.ledger-api' })
   })
 
+  it('is new trouble when dead letters appear on a healthy system, and a resolved note when they are gone', () => {
+    const withDead = withState(healthyTown(), 'cl.ledger-api', 'Healthy', { deadLetters: 12, queues: [{ name: 'q-ledger', backlog: 0, deadLetters: 12 }] } as never)
+    const cues = diffCues(healthyTown(), withDead)
+    expect(cues).toHaveLength(1)
+    expect(cues[0]).toMatchObject({ kind: 'trouble', subject: 'cl.ledger-api', text: 'Ledger API (Core Ledger) has 12 dead letters in q-ledger' })
+
+    const back = diffCues(withDead, healthyTown())
+    expect(back).toEqual([{ kind: 'resolved', subject: 'cl.ledger-api', text: 'Resolved: Ledger API is healthy again' }])
+  })
+
   it('is new trouble for a new incident, aimed at its island', () => {
     const cues = diffCues(healthyTown(), withIncident(healthyTown(), 'pay', { id: 'i', severity: 1, title: 'Storm' }))
 

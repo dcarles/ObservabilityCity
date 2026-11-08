@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { attentionOf } from '../../src/wall/attention'
+import type { NodeSnapshot } from '../../src/types'
 import { healthyTown, withIncident, withState } from './wall.testutil'
 
 describe('what needs looking at', () => {
@@ -69,5 +70,54 @@ describe('what needs looking at', () => {
     expect(degraded.subject).toBe(down.subject)
     expect(degraded.key).not.toBe(down.key)
     expect(attentionOf(withState(healthyTown(), 'cl.ledger-api', 'Degraded'))[0].key).toBe(degraded.key)
+  })
+
+  describe('dead letters', () => {
+    const dead = (count: number, queues: { name: string; deadLetters: number }[] = [{ name: 'q-orders', deadLetters: count }]) =>
+      ({ deadLetters: count, queues: queues.map((q) => ({ name: q.name, backlog: 0, deadLetters: q.deadLetters })) }) as Partial<NodeSnapshot>
+
+    it('is a stop for a healthy system with dead letters, after what is down and before what is degraded', () => {
+      let s = healthyTown()
+      s = withState(s, 'cl.ledger-db', 'Degraded', { errorRate: 0.03 })
+      s = withState(s, 'cl.ledger-api', 'Healthy', dead(130))
+      s = withState(s, 'pay.payments-api', 'Down')
+
+      expect(attentionOf(s).map((a) => [a.kind, a.subject])).toEqual([['down', 'pay.payments-api'], ['deadLetters', 'cl.ledger-api'], ['degraded', 'cl.ledger-db']])
+    })
+
+    it('names the count and the queue with the most, and how many more queues have some', () => {
+      let s = withState(healthyTown(), 'cl.ledger-api', 'Healthy', dead(130, [{ name: 'q-small', deadLetters: 30 }, { name: 'q-orders', deadLetters: 100 }]))
+      expect(attentionOf(s)[0].caption).toMatch(/has 130 dead letters in q-orders and 1 more queue$/)
+
+      s = withState(healthyTown(), 'cl.ledger-api', 'Healthy', dead(1))
+      expect(attentionOf(s)[0].caption).toMatch(/has 1 dead letter in q-orders$/)
+    })
+
+    it('says the count even when the queues are not known', () => {
+      const s = withState(healthyTown(), 'cl.ledger-api', 'Healthy', { deadLetters: 7 })
+      expect(attentionOf(s)[0].caption).toMatch(/has 7 dead letters$/)
+    })
+
+    it('goes worst first, and sends the camera to the building', () => {
+      let s = withState(healthyTown(), 'cl.ledger-api', 'Healthy', dead(5))
+      s = withState(s, 'cl.statements-api', 'Healthy', dead(50))
+      const list = attentionOf(s)
+      expect(list.map((a) => a.subject)).toEqual(['cl.statements-api', 'cl.ledger-api'])
+      expect(list[0].focus).toEqual({ kind: 'building', id: 'cl.statements-api' })
+    })
+
+    it('is also said on a degraded system, so the queues are not lost behind another reason', () => {
+      const s = withState(healthyTown(), 'cl.ledger-api', 'Degraded', { errorRate: 0.03, ...dead(130) })
+      const [a] = attentionOf(s)
+      expect(a.kind).toBe('degraded')
+      expect(a.caption).toMatch(/130 dead letters in q-orders/)
+    })
+
+    it('leaves out a system whose dead letters nothing measures, and one with no fresh data', () => {
+      let s = withState(healthyTown(), 'cl.ledger-api', 'Healthy', { ...dead(9), absent: ['deadLetters'] } as never)
+      expect(attentionOf(s)).toEqual([])
+      s = withState(healthyTown(), 'cl.ledger-api', 'Stale', dead(9))
+      expect(attentionOf(s).map((a) => a.kind)).toEqual(['stale'])
+    })
   })
 })
