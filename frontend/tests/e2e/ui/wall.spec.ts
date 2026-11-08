@@ -167,7 +167,7 @@ test.describe('trouble', () => {
     await expect(page.locator('#wall-pulse')).toHaveClass(/on/)
   })
 
-  test('cuts to a system with dead letters and counts it as degraded in the strip', async ({ town, page }) => {
+  test('cuts to a system with dead letters, which the strip does not count as degraded', async ({ town, page }) => {
     await town.open(WALL)
     await town.effect('aa.orders-worker', 'Poison')
     await town.until('aa.orders-worker', (n) => (n.deadLetters ?? 0) >= 1)
@@ -176,8 +176,7 @@ test.describe('trouble', () => {
     const s = await wall(page)
     expect(s.mode).toBe('alert')
     expect(s.stop!.caption).toMatch(/^Orders worker \(Alpha\) .*has \d+ dead letters?/) // the demo town reads no queue names, so only the count is said
-    expect(s.strip.headline).toMatch(/DEGRADED/)
-    expect(s.strip.tone).toBe('warn')
+    expect(s.strip.headline).not.toMatch(/DEGRADED/)
   })
 
   test('stops pulsing after a few seconds, and holds on the trouble for a full stop', async ({ town, page }) => {

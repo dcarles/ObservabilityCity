@@ -3,7 +3,6 @@
 
 import type { HealthState, NodeSnapshot, Snapshot, TenantInfo, TownTotals } from './types'
 import { isUnmonitored } from './signals'
-import { dlqCount } from './deadLetters'
 import { isFollowing, isFollowed, type TenantView } from './tenants'
 
 export interface ViewTotals extends TownTotals {
@@ -61,14 +60,12 @@ export function viewTotals(s: Snapshot, view: TenantView): ViewTotals {
   const stale = staleCount(s)
   const share = tenantShare(s.tenants ?? [], view)
   const nodes = [...s.groups.flatMap((g) => g.nodes), ...s.vendors.map((v) => v.node)]
-  // a system with dead letters is amber even when its own state is healthy (the dashboard says so), so it is counted as degraded here too
-  const onlyDeadLetters = nodes.filter((n) => !isUnmonitored(n) && stateFor(n, s.tenants ?? [], view) === 'Healthy' && dlqCount(n) > 0).length
-  if (share === 1 && !isFollowing(view) && !view.hideTest) return { ...base, degraded: base.degraded + onlyDeadLetters, stale, tenantShare: 1 }
+  if (share === 1 && !isFollowing(view) && !view.hideTest) return { ...base, stale, tenantShare: 1 }
   const states = nodes.map((n) => stateFor(n, s.tenants ?? [], view))
   return {
     ...base,
     requestsPerSecond: base.requestsPerSecond * share,
-    degraded: states.filter((x) => x === 'Degraded').length + onlyDeadLetters,
+    degraded: states.filter((x) => x === 'Degraded').length,
     down: states.filter((x) => x === 'Down').length,
     stale,
     tenantShare: share,

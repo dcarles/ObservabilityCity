@@ -180,7 +180,7 @@ describe('sticky column titles', () => {
 })
 
 describe('dead letters on a service', () => {
-  it('shows red DLQ text on the service line, makes the service, its group and the pillar amber, and counts it as degraded', () => {
+  it('shows red DLQ text on the service line, makes the service, its group and the pillar amber, but does not count it as degraded', () => {
     const s = golden('calm')
     const n = node(s, 'pay.payments-api')
     n.deadLetters = 3; n.absent = n.absent.filter((a) => a !== 'deadLetters')
@@ -189,7 +189,7 @@ describe('dead letters on a service', () => {
     expect(r.reason).toBe('3 dead letters')
     const p = buildDashboard(s, ALL_TENANTS).pillars.find((x) => x.id === 'pay')!
     expect(p.level).toBe('warn')
-    expect(p.degraded).toBe(1)
+    expect(p.degraded).toBe(0)
     expect(p.groups.some((g) => g.level === 'warn' && g.dlq === 3)).toBe(true)
     const html = table(s, 'pay')
     expect(html).toContain('<b class="bad dlq">DLQ 3</b>')
