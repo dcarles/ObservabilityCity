@@ -268,13 +268,13 @@ describe('the order the inspector lists tenants in', () => {
 
 describe('saying which tenant throttles', () => {
   const named = (name: string, throttled: number | null) => ({ ...unit('Customer', 'Healthy', throttled), id: name, name })
-  const units = [named('Lloyds', 0.02), named('Boohoo', 0.032), named('Argos', 0), named('Next', 0.04)]
+  const units = [named('Globex', 0.02), named('Acme Retail', 0.032), named('Initech', 0), named('Umbrella', 0.04)]
   it('orders the throttled tenants worst first and skips the ones under the amber share', () => {
-    expect(throttledUnits(units, 0.03).map((u) => u.name)).toEqual(['Next', 'Boohoo'])
+    expect(throttledUnits(units, 0.03).map((u) => u.name)).toEqual(['Umbrella', 'Acme Retail'])
   })
   it('names the worst tenant and counts the others', () => {
-    expect(throttleWho(units, 0.03)).toBe('4.0% · Next +1 more')
-    expect(throttleWho([units[1]], 0.03)).toBe('3.2% · Boohoo')
+    expect(throttleWho(units, 0.03)).toBe('4.0% · Umbrella +1 more')
+    expect(throttleWho([units[1]], 0.03)).toBe('3.2% · Acme Retail')
     expect(throttleWho([units[2]], 0.03)).toBeNull()
   })
   it('shows a tenant its own figure, 0% included', () => {
@@ -283,7 +283,7 @@ describe('saying which tenant throttles', () => {
     expect(throttledText(named('a', 0.032))).toBe('3.2% throttled')
   })
   it('puts the throttled tenants on the yard sign when there are only a few', () => {
-    expect(yardSummary(units, ALL_TENANTS, 0.03).note).toBe('2 throttled: Next, Boohoo')
+    expect(yardSummary(units, ALL_TENANTS, 0.03).note).toBe('2 throttled: Umbrella, Acme Retail')
     const many = Array.from({ length: 5 }, (_, i) => named(`T${i}`, 0.2))
     expect(yardSummary(many, ALL_TENANTS, 0.03).note).toBe('')
     expect(yardSummary(many, ALL_TENANTS, 0.03).text).toBe('5 tenants, 5 throttled')

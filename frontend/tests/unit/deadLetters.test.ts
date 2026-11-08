@@ -52,7 +52,7 @@ describe('the queues with dead letters', () => {
   it('lists a queue with dead letters in two regions as two rows, each with its region, worst first', () => {
     const s = townWithDead()
     const reader = deadLetterItems(s.groups).find((i) => i.queue === 'q-big')!.nodeId
-    const split = withState(s, reader, 'Healthy', { deadLetters: 12, queues: [{ ...queue('q-big', 12), deadLetterRegions: [{ region: 'northeurope', count: 4 }, { region: 'westeurope', count: 8 }, { region: 'quiet', count: 0 }] }] })
+    const split = withState(s, reader, 'Healthy', { deadLetters: 12, queues: [{ ...queue('q-big', 12), deadLetterRegions: [{ region: 'northeurope', label: 'North', count: 4 }, { region: 'westeurope', label: 'West', count: 8 }, { region: 'quiet', count: 0 }] }] })
 
     const rows = deadLetterItems(split.groups).filter((i) => i.queue === 'q-big')
     expect(rows.map((r) => [r.region, r.count])).toEqual([['West', 8], ['North', 4]])
@@ -94,10 +94,15 @@ describe('the roof beacon of a system with dead letters', () => {
   })
 })
 
-describe('the region as a short word', () => {
-  it('turns North and West Europe into North and West and keeps any other name', () => {
-    expect(regionLabel('northeurope')).toBe('North')
-    expect(regionLabel('WestEurope')).toBe('West')
-    expect(regionLabel('eastus')).toBe('eastus')
+describe('the region label', () => {
+  it('is the label the town gives the region, and the raw name when it gives none', () => {
+    expect(regionLabel({ region: 'northeurope', label: 'Primary' })).toBe('Primary')
+    expect(regionLabel({ region: 'westus', label: 'Primary' })).toBe('Primary')
+    expect(regionLabel({ region: 'eastus', label: null })).toBe('eastus')
+    expect(regionLabel({ region: 'eastus' })).toBe('eastus')
+  })
+
+  it('does not guess from the name: two regions that both say north are told apart by their labels', () => {
+    expect(regionLabel({ region: 'northeurope', label: 'Dublin' })).not.toBe(regionLabel({ region: 'northcentralus', label: 'Chicago' }))
   })
 })

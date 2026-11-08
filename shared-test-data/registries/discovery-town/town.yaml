@@ -3,3 +3,7 @@ name: Discovery Town
 groupLabel: Pillar
 topology: hub-and-spoke
 islands: [aa, bb, cc]
+messaging:
+  topicTemplate: "{pillar}-{service}-outbox"
+  hubTopicTemplate: "hub-{service}"
+  legacyFrom: [hub]

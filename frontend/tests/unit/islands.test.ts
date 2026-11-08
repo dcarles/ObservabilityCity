@@ -95,25 +95,25 @@ describe('third parties among the islands', () => {
     const s = {
       ...golden,
       vendors: [
-        { ...golden.vendors[0], node: vendorNode('dsa', 'Search'), islandId: 'ext.ds', islandName: 'Digital Services' },
-        { ...golden.vendors[0], node: vendorNode('dsb', 'Credit'), islandId: 'ext.ds', islandName: 'Digital Services' },
+        { ...golden.vendors[0], node: vendorNode('dsa', 'Search'), islandId: 'ext.ds', islandName: 'Internal services' },
+        { ...golden.vendors[0], node: vendorNode('dsb', 'Credit'), islandId: 'ext.ds', islandName: 'Internal services' },
         { ...golden.vendors[0], node: vendorNode('ext.solo', 'Solo'), islandId: undefined, islandName: undefined },
       ],
     } as Snapshot
     const vendors = islandChoices(s).filter((c) => c.vendor)
     expect(vendors).toEqual([
-      { id: 'ext.ds', name: 'Digital Services', shown: true, vendor: true },
+      { id: 'ext.ds', name: 'Internal services', shown: true, vendor: true },
       { id: 'ext.solo', name: 'Solo', shown: true, vendor: true },
     ])
     expect(islandChoices(s).findIndex((c) => c.vendor)).toBe(3)
   })
 
   it('lists a third party the filter left out as hidden, and can search and label it', () => {
-    const s = { ...golden, vendors: [], view: { ...golden.view, hidden: [...golden.view.hidden, { id: 'ext.fiserv', displayName: 'Fiserv', vendor: true }] } } as Snapshot
+    const s = { ...golden, vendors: [], view: { ...golden.view, hidden: [...golden.view.hidden, { id: 'ext.payco', displayName: 'Payco', vendor: true }] } } as Snapshot
     const choices = islandChoices(s)
-    expect(choices.find((c) => c.id === 'ext.fiserv')).toEqual({ id: 'ext.fiserv', name: 'Fiserv', shown: false, vendor: true })
-    expect(searchIslands(choices, 'fis').map((c) => c.id)).toEqual(['ext.fiserv'])
-    expect(islandsLabel(['ext.fiserv'], choices)).toBe('Fiserv')
-    expect(pruneIslands(['ext.fiserv', 'zz'], choices)).toEqual(['ext.fiserv'])
+    expect(choices.find((c) => c.id === 'ext.payco')).toEqual({ id: 'ext.payco', name: 'Payco', shown: false, vendor: true })
+    expect(searchIslands(choices, 'pay').map((c) => c.id)).toEqual(['ext.payco'])
+    expect(islandsLabel(['ext.payco'], choices)).toBe('Payco')
+    expect(pruneIslands(['ext.payco', 'zz'], choices)).toEqual(['ext.payco'])
   })
 })

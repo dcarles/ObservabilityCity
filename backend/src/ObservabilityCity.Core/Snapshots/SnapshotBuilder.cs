@@ -153,7 +153,7 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
         return new Snapshot(registry.Town.Id, registry.Town.Name, registry.Town.GroupLabel, env?.Id ?? Environment, now, DayFraction(), totals, notices, groups,
             vendors, callers, dependencies, registry.RingCapacity,
             env?.Name ?? Environment, environments, TenantsOf(env, allNodes), registry.Town.Topology, Mode ?? registry.Town.Mode, view, incidentFreeSince, incidentsSeen,
-            OutsideRate(onScreenNodes.Values), env?.Scope.Cloud, registry.Town.TrafficDensity, registries.Notes is { Count: > 0 } notes ? notes : null, SourceFreshness(now), events);
+            OutsideRate(onScreenNodes.Values), env?.Scope.Cloud, registry.Town.TrafficDensity, registries.Notes is { Count: > 0 } notes ? notes : null, SourceFreshness(now), events, registry.Town.InternalVendorsLabel);
     }
 
     /// <summary>
@@ -491,7 +491,7 @@ public sealed class SnapshotBuilder(IRegistryProvider registries, LatestState st
             InboundEstimated = split?.Estimated ?? false,
             Sources = ages.Any(a => !a.Fresh) ? ages : null,
             Queues = r.Queues?.Select(q => new QueueSnapshot(q.Name, q.Backlog, q.DeadLetters, DeadLetterLinks.For(registry, n, q.Name), q.PerSecond, q.Types?.Select(t => new MessageTypeSnapshot(t.Type, t.PerSecond)).ToList(), q.TypesCut > 0 ? q.TypesCut : null,
-                q.DeadLetterRegions?.Select(d => new DeadLetterRegionSnapshot(d.Region, d.Count, DeadLetterLinks.For(registry, n, q.Name, d.Region))).ToList())).ToList(),
+                q.DeadLetterRegions?.Select(d => new DeadLetterRegionSnapshot(d.Region, d.Count, DeadLetterLinks.For(registry, n, q.Name, d.Region), Label(env, d.Region))).ToList())).ToList(),
             App = r.App,
             Jobs = jobs,
             Regions = regions?.Select(x => new RegionSnapshot(x.Region, Label(env, x.Region), x.Instances, x.Cpu, x.Memory, x.Share, Skewed(x, regions, env))).ToList(),

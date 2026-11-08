@@ -113,11 +113,11 @@ resources:                       # pillar-owned DBs and caches
     kind: sql
     sharedWith: [ams]            # intentional sharing, no warning
 systems:                         # buildings are laid out in this order
-  - id: cl.mgs                   # {pillar}.{service}; messaging is discovered from cl-mgs-* names
+  - id: cl.ledger-api            # {pillar}.{service}; messaging is discovered from names by the town's convention
     role: api                    # optional, inferred when omitted
     external: true
     slaP99Ms: 2000               # orchestrator with many internal calls
-  - id: cl.ss
+  - id: cl.posting-worker
   - id: cl.report-exporter       # single-tenant style: declare what names can't tell us
     publishesExternal: { via: kafka, target: ext.datahub }
 ```

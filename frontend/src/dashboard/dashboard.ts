@@ -91,7 +91,7 @@ export function startDashboard(): void {
     closed: () => {},
   })
   const notices = new NoticesPanel()
-  const unknownHosts = new UnknownHostsPanel(scope, () => (last?.groups ?? []).flatMap((g) => g.nodes).filter((n) => n.kind === 'Api').map((n) => n.id).sort())
+  const unknownHosts = new UnknownHostsPanel(scope, () => (last?.groups ?? []).flatMap((g) => g.nodes).filter((n) => n.kind === 'Api').map((n) => n.id).sort(), () => last?.internalVendorsLabel ?? 'Internal services')
   unknownHosts.start()
 
   const setTenantView = (v: TenantView): void => {

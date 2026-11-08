@@ -4,7 +4,7 @@ import { test, expect } from '../support/test'
 // The top bar with a very long town name: the name shows once (in the town dropdown), and nothing in the bar overlaps or is cut off by
 // another control, at the widths a window really has.
 
-const LONG = 'Example Multitenant Core Credit Platform Production'
+const LONG = 'Example Credit Platform With A Long Name Production'
 const TOWNS = [
   { id: 'mini-town', name: 'Mini Town', isDefault: true },
   { id: 'long-town', name: LONG, isDefault: false },

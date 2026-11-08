@@ -37,6 +37,24 @@
         }
       }
     },
+    "messaging": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "How this town names its message topics, and which topics are an old route.",
+      "properties": {
+        "topicTemplate": { "type": "string", "pattern": "\\{service\\}", "default": "{service}", "description": "The name of the topic a pillar's service publishes. {pillar} and {service} are replaced." },
+        "hubTopicTemplate": { "type": "string", "pattern": "\\{service\\}", "default": "{service}", "description": "The name of a topic of the hub. {service} is replaced by the hub's name for it." },
+        "legacyFrom": { "type": "array", "items": { "enum": ["hub"] }, "description": "The owners whose topics are an old route to read. A subscription to one of them must say legacy: true." }
+      }
+    },
+    "labels": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "The words this town uses for things the app has no fixed name for.",
+      "properties": {
+        "internalVendors": { "type": "string", "minLength": 1, "default": "Internal services", "description": "What the town calls its own services outside the monitored platform." }
+      }
+    },
     "expectedWarnings": {
       "type": "array",
       "description": "Warnings the validator should expect here: a test registry that shows a rule on purpose. They are left out of the report; if one stops appearing, that is an error.",

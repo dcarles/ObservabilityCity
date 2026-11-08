@@ -78,6 +78,13 @@ public static partial class RegistryLoader
             throw new RegistryException($"town.yaml: mode '{town.Mode}' is not known. Use {string.Join(" or ", TownModes.All)}.{DidYouMean.Hint(town.Mode, TownModes.All)}");
         if (double.IsNaN(town.TrafficDensity) || town.TrafficDensity < TownTraffic.Min || town.TrafficDensity > TownTraffic.Max)
             throw new RegistryException($"town.yaml: trafficDensity {town.TrafficDensity.ToString(System.Globalization.CultureInfo.InvariantCulture)} is out of range. Use a number from {TownTraffic.Min.ToString(System.Globalization.CultureInfo.InvariantCulture)} to {TownTraffic.Max.ToString(System.Globalization.CultureInfo.InvariantCulture)} (1 is the usual number of cars).");
+        var convention = new MessagingConvention(town.Messaging.TopicTemplate, town.Messaging.HubTopicTemplate, town.Messaging.LegacyFrom);
+        if (!convention.TopicTemplate.Contains("{service}") || !convention.HubTopicTemplate.Contains("{service}"))
+            throw new RegistryException("town.yaml: messaging.topicTemplate and messaging.hubTopicTemplate must contain {service}, which is replaced by the service's name");
+        foreach (var owner in convention.LegacyFrom.Where(o => o != "hub"))
+            throw new RegistryException($"town.yaml: messaging.legacyFrom lists '{owner}'. Only 'hub' is known: the topics of the hub are the one old route a town can mark");
+        if (string.IsNullOrWhiteSpace(town.Labels.InternalVendors))
+            throw new RegistryException("town.yaml: labels.internalVendors is empty. Leave it out to use the default, or give it a name");
         var defaults = File.Exists(Path.Combine(folder, "defaults.yaml"))
             ? Read<DefaultsFile>(Path.Combine(folder, "defaults.yaml"))
             : new DefaultsFile();
@@ -270,7 +277,7 @@ public static partial class RegistryLoader
             }
         }
 
-        var (topics, subscriptions) = ResolveMessaging(groups, brokenPillars, resilient, Problem);
+        var (topics, subscriptions) = ResolveMessaging(groups, brokenPillars, resilient, Problem, convention);
         var environments = LoadEnvironments(folder, ids, aliases, resilient, Problem);
         // a system that names the environments it is deployed in must name environments the town has
         if (environments.Count > 0)
@@ -308,7 +315,7 @@ public static partial class RegistryLoader
             throw new RegistryException($"The registry has {errors.Count} problems:\n" + string.Join("\n", errors.Select(e => "  - " + e)));
 
         var final = groups.Select(g => g with { Nodes = g.Nodes.Select(n => n with { Calls = resolved[n.Id], GatewayCalls = resolvedGateway[n.Id] }).ToList() }).ToList();
-        var registry = new Registry(new TownInfo(town.Id, town.Name, town.GroupLabel, town.Topology, town.Mode, town.TrafficDensity), final, callers)
+        var registry = new Registry(new TownInfo(town.Id, town.Name, town.GroupLabel, town.Topology, town.Mode, town.TrafficDensity, convention, town.Labels.InternalVendors), final, callers)
         {
             Notices = notices, Problems = problems, Vendors = vendors, RingCapacity = ringCapacity, Topics = topics, Subscriptions = subscriptions, Environments = environments, DatabaseEngines = engines.Values.ToList(),
         };
@@ -533,17 +540,27 @@ public static partial class RegistryLoader
 
     /// <summary>
     /// Turns the declared topics and subscriptions into the town's topic list and the subscriptions that point at a real topic.
-    /// A pillar publishes {pillar}-{service}-outbox for each service it lists. A subscription names the full topic and a worker of its own pillar.
-    /// Reading the hub's egress topic is the old way for a pillar to hear from another one, so it must say so with legacy: true.
+    /// A pillar publishes a topic named by the town's messaging.topicTemplate for each service it lists (the hub's by messaging.hubTopicTemplate).
+    /// A subscription names the full topic and a worker of its own pillar.
+    /// Reading a topic of an owner the town lists in messaging.legacyFrom is the old route, so it must say so with legacy: true.
     /// </summary>
-    private static (List<RegistryTopic>, List<RegistrySubscription>) ResolveMessaging(List<RegistryGroup> groups, HashSet<string> brokenPillars, bool resilient, Action<string> problem)
+    private static (List<RegistryTopic>, List<RegistrySubscription>) ResolveMessaging(List<RegistryGroup> groups, HashSet<string> brokenPillars, bool resilient, Action<string> problem, MessagingConvention convention)
     {
         var topics = new List<RegistryTopic>();
+        var byName = new Dictionary<string, RegistryTopic>();
         foreach (var g in groups)
             foreach (var service in g.TopicServices.Distinct())
-                topics.Add(new RegistryTopic(g.IsHub ? $"hub-{service}" : $"{g.Id}-{service}-outbox", g.Id, service));
+            {
+                var topic = new RegistryTopic(g.IsHub ? convention.HubTopicName(service) : convention.TopicName(g.Id, service), g.Id, service);
+                if (byName.TryGetValue(topic.Name, out var first))
+                {
+                    problem($"{g.Id}.yaml: the topic of '{service}' is called '{topic.Name}', which '{first.GroupId}' already publishes. Add {{pillar}} to messaging.topicTemplate in town.yaml");
+                    continue;
+                }
+                byName.Add(topic.Name, topic);
+                topics.Add(topic);
+            }
 
-        var byName = topics.ToDictionary(t => t.Name);
         var subscriptions = new List<RegistrySubscription>();
         var seen = new HashSet<(string, string)>();
         foreach (var g in groups.Where(g => !g.IsHub))
@@ -558,15 +575,15 @@ public static partial class RegistryLoader
                     problem($"{file}: '{consumer}' subscribes to topic '{topicName}', which no pillar publishes.{DidYouMean.Hint(topicName, byName.Keys)}");
                     continue;
                 }
-                var fromHub = topic.GroupId == "hub";
-                if (fromHub && !legacy)
+                var oldRoute = convention.LegacyFrom.Contains(topic.GroupId);
+                if (oldRoute && !legacy)
                 {
-                    problem($"{file}: '{consumer}' reads '{topicName}' from the hub. Pillars subscribe to each other's outboxes directly; if this is the old egress route, say so with legacy: true");
+                    problem($"{file}: '{consumer}' reads '{topicName}' from '{topic.GroupId}', which this town lists in messaging.legacyFrom. If this is the old route, say so with legacy: true");
                     continue;
                 }
-                if (!fromHub && legacy)
+                if (!oldRoute && legacy)
                 {
-                    problem($"{file}: the subscription of '{consumer}' to '{topicName}' is marked legacy, but only the hub's egress topic is");
+                    problem($"{file}: the subscription of '{consumer}' to '{topicName}' is marked legacy, but '{topic.GroupId}' is not listed in messaging.legacyFrom in town.yaml");
                     continue;
                 }
                 if (!seen.Add((topicName, consumer)))

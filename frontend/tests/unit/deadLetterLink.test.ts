@@ -35,9 +35,9 @@ describe('the queues of a consumer', () => {
 })
 
 describe('dead letters in more than one region', () => {
-  const north = { name: 'Support tool North', url: 'https://north.example.test/queues/a' }
-  const west = { name: 'Support tool West', url: 'https://west.example.test/queues/a' }
-  const split = (): QueueSnapshot => ({ name: 'a', backlog: 0, deadLetters: 11, link: tool, deadLetterRegions: [{ region: 'northeurope', count: 3, link: north }, { region: 'westeurope', count: 8, link: west }] })
+  const north = { name: 'Support tool East', url: 'https://north.example.test/queues/a' }
+  const west = { name: 'Support tool Far', url: 'https://west.example.test/queues/a' }
+  const split = (): QueueSnapshot => ({ name: 'a', backlog: 0, deadLetters: 11, link: tool, deadLetterRegions: [{ region: 'northeurope', label: 'North', count: 3, link: north }, { region: 'westeurope', label: 'West', count: 8, link: west }] })
 
   it('give the drawer row a tag, a count and its own link for each region, and not the one link for all', () => {
     const row = queueRows({ queues: [split()] })[0]!
@@ -47,14 +47,14 @@ describe('dead letters in more than one region', () => {
   })
 
   it('drop a regional link that is not a web address, and a region with no dead letters', () => {
-    const q2: QueueSnapshot = { ...split(), deadLetterRegions: [{ region: 'westeurope', count: 8, link: { name: 'x', url: 'javascript:1' } }, { region: 'northeurope', count: 0, link: north }] }
+    const q2: QueueSnapshot = { ...split(), deadLetterRegions: [{ region: 'westeurope', label: 'West', count: 8, link: { name: 'x', url: 'javascript:1' } }, { region: 'northeurope', label: 'North', count: 0, link: north }] }
     expect(queueRows({ queues: [q2] })[0]!.regions).toEqual([{ region: 'West', count: 8, link: null }])
   })
 
   it('pass the snapshot guard, which repairs a bad region entry', () => {
     const t = healthyTown() as any
     t.groups[0].nodes[0].queues = [{ ...split(), deadLetterRegions: [{ region: 'westeurope', count: 8, link: west }, { region: '', count: 2 }, { region: 'x', count: 'many' }, { region: 'northeurope', count: 3, link: { name: 'T', url: 'javascript:1' } }, 'junk'] }]
-    expect(checkSnapshot(t).snapshot!.groups[0].nodes[0].queues![0].deadLetterRegions).toEqual([{ region: 'westeurope', count: 8, link: west }, { region: 'northeurope', count: 3, link: null }])
+    expect(checkSnapshot(t).snapshot!.groups[0].nodes[0].queues![0].deadLetterRegions).toEqual([{ region: 'westeurope', label: 'westeurope', count: 8, link: west }, { region: 'northeurope', label: 'northeurope', count: 3, link: null }])
   })
 })
 

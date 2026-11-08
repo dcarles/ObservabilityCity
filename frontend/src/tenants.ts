@@ -62,7 +62,7 @@ export function throttledUnits(units: readonly TenantUnitSnapshot[], throttleAmb
   return units.filter((u) => isThrottled(u, throttleAmber)).sort((a, b) => (b.throttled ?? 0) - (a.throttled ?? 0))
 }
 
-/** The Overview's throttled figure naming the worst tenant: "3.2% · Boohoo", with "+N more" when others throttle too. Null when none does. */
+/** The Overview's throttled figure naming the worst tenant: "3.2% · Acme Retail", with "+N more" when others throttle too. Null when none does. */
 export function throttleWho(units: readonly TenantUnitSnapshot[], throttleAmber: number): string | null {
   const t = throttledUnits(units, throttleAmber)
   if (t.length === 0) return null

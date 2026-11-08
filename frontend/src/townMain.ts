@@ -144,7 +144,7 @@ export async function startTown(): Promise<void> {
   const wallControls = wallParams.on ? startWallControls(store, { offerFullscreen: !testMode }) : null
   document.getElementById('view-switch')?.addEventListener('click', () => { window.location.href = viewSwitchAddress(window.location, 'dashboard', store) })
   const notices = new NoticesPanel()
-  const unknownHosts = new UnknownHostsPanel(requestedScope(), () => (seen.last?.groups ?? []).flatMap((g) => g.nodes).filter((n) => n.kind === 'Api').map((n) => n.id).sort())
+  const unknownHosts = new UnknownHostsPanel(requestedScope(), () => (seen.last?.groups ?? []).flatMap((g) => g.nodes).filter((n) => n.kind === 'Api').map((n) => n.id).sort(), () => seen.last?.internalVendorsLabel ?? 'Internal services')
   unknownHosts.start()
   const buildingItems = (): SearchItem[] => {
     const items: SearchItem[] = []

@@ -4,3 +4,7 @@ groupLabel: Pillar
 topology: direct
 mode: demo
 islands: [aa, bb, cc]
+messaging:
+  topicTemplate: "{pillar}-{service}-outbox"
+  hubTopicTemplate: "hub-{service}"
+  legacyFrom: [hub]

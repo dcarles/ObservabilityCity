@@ -540,6 +540,10 @@
           },
           "link": {
             "$ref": "#/components/schemas/ResourceLink"
+          },
+          "label": {
+            "type": "string",
+            "nullable": true
           }
         }
       },
@@ -1516,7 +1520,8 @@
           "mode",
           "view",
           "incidentsSeen",
-          "trafficDensity"
+          "trafficDensity",
+          "internalVendorsLabel"
         ],
         "type": "object",
         "properties": {
@@ -1642,6 +1647,9 @@
               "$ref": "#/components/schemas/HealthEventSnapshot"
             },
             "nullable": true
+          },
+          "internalVendorsLabel": {
+            "type": "string"
           }
         }
       },

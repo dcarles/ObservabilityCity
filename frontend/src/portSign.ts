@@ -1,6 +1,6 @@
-// The words on the hub's message-broker port: the broker's own name (Service Bus, Kafka, ...), so a town on Kafka does not read "SERVICE BUS".
+// The words on the hub's message-broker port: the broker's own name (Service Bus, Kafka, ...), so a town on Kafka does not read "SERVICE BUS". A broker with no name reads "MESSAGING".
 
-const FALLBACK = 'SERVICE BUS'
+const FALLBACK = 'MESSAGING'
 const MAX = 16
 
 /** What the broker reports for the whole town, as the broker's sign counts it. */

@@ -108,8 +108,8 @@ describe('the overview rows', () => {
   it('names the worst throttled tenant on the Throttled row', () => {
     const t = (name: string, throttled: number) => ({ id: name, name, kind: 'Customer' as const, database: 'd', state: 'Healthy' as const, utilisation: 0.5, throttled, requestsPerSecond: 1 })
     const row = (tenants: ReturnType<typeof t>[]) => overviewRows(node({ throttled: 0.032, throttleAmber: 0.01, throttleRed: 0.1, tenants })).find((r) => r.label === 'Throttled')!.value
-    expect(row([t('Boohoo', 0.032), t('Lloyds', 0)])).toBe('3.2% · Boohoo')
-    expect(row([t('Boohoo', 0.032), t('Lloyds', 0.02)])).toBe('3.2% · Boohoo +1 more')
+    expect(row([t('Acme Retail', 0.032), t('Globex', 0)])).toBe('3.2% · Acme Retail')
+    expect(row([t('Acme Retail', 0.032), t('Globex', 0.02)])).toBe('3.2% · Acme Retail +1 more')
     expect(overviewRows(node({ throttled: 0.032 })).find((r) => r.label === 'Throttled')!.value).toBe('3.2%')
   })
 
@@ -246,12 +246,12 @@ describe('the links tab', () => {
   it('shows a third-party building what it calls through the gateway, as seen in the telemetry', () => {
     const vendor: SystemDetail = {
       ...detail, id: 'ext.pyd', name: 'Payment disbursement service', kind: 'Api', calls: [], gatewayCalledBy: [], outsideCallers: [], serviceTopics: [], subscriptions: [],
-      calledBy: [{ id: 'cl.settlement-api', name: 'Settlement API', kind: 'System', islandId: 'cl', islandName: 'Closed Loop', found: false, lastSeen: null }],
-      gatewayCalls: [{ id: 'tms.merchant-api', name: 'Merchant API', kind: 'System', islandId: 'tms', islandName: 'Tenancy', found: true, lastSeen: null }],
+      calledBy: [{ id: 'cl.ledger-api', name: 'Ledger API', kind: 'System', islandId: 'cl', islandName: 'Core Ledger', found: false, lastSeen: null }],
+      gatewayCalls: [{ id: 'shp.orders-api', name: 'Orders API', kind: 'System', islandId: 'shp', islandName: 'Shipping', found: true, lastSeen: null }],
     }
     const sections = linkSections(vendor)
     expect(sections.map((s) => s.id)).toEqual(['calledBy', 'gatewayCalls'])
-    expect(sections[1].items.map((i) => [i.id, i.where])).toEqual([['tms.merchant-api', 'Tenancy']])
+    expect(sections[1].items.map((i) => [i.id, i.where])).toEqual([['shp.orders-api', 'Shipping']])
     expect(originLabel(sections[1].items[0].origin!)).toEqual({ text: 'Seen in calls', title: 'Found in the telemetry' })
   })
 

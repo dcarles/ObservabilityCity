@@ -145,7 +145,7 @@ describe.each(ids)('the %s theme', (id) => {
 
   it('writes the broker\'s own name on the port, so a town on Kafka does not read Service Bus', () => {
     expect(build(kit, 'Broker').signText).toBe(portSignText('Kafka'))
-    expect(kit.buildModel('Broker', '#fff', {}).signText).toBe('SERVICE BUS')
+    expect(kit.buildModel('Broker', '#fff', {}).signText).toBe('MESSAGING')
   })
 
   it('stands a data store with a database for each tenant as a yard, and shows its tenants', () => {
