@@ -171,10 +171,10 @@ public static class AddedHosts
             // an old file is saved in the new shape at once, so it can be edited by hand right away
             var converted = file.Added is { Count: > 0 };
             file.Added = null;
-            if (converted) { try { Save(folder, file); } catch (IOException) { /* read-only folder: the converted entries still apply */ } }
+            if (converted) { try { Save(folder, file); } catch (Exception e) when (e is IOException or UnauthorizedAccessException) { /* read-only folder: the converted entries still apply */ } }
             return file;
         }
-        catch (Exception e) when (e is IOException or YamlDotNet.Core.YamlException) { return new Stored(); }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or YamlDotNet.Core.YamlException) { return new Stored(); }
     }
 
     private static void Save(string folder, Stored file)

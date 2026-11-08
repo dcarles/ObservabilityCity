@@ -33,17 +33,18 @@ jobs:
       ui: ${{ steps.areas.outputs.ui }}
       registries: ${{ steps.areas.outputs.registries }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           fetch-depth: 0
       - id: areas
         env:
           CI_RUN_ALL: ${{ github.event_name != 'pull_request' }}
+          BASE_REF: ${{ github.base_ref }}
         run: |
           if [ "$CI_RUN_ALL" = "true" ]; then
             node .github/scripts/changed-areas.mjs </dev/null | tee -a "$GITHUB_OUTPUT"
           else
-            git diff --name-only "origin/${{ github.base_ref }}...HEAD" | node .github/scripts/changed-areas.mjs | tee -a "$GITHUB_OUTPUT"
+            git diff --name-only "origin/${BASE_REF}...HEAD" | node .github/scripts/changed-areas.mjs | tee -a "$GITHUB_OUTPUT"
           fi
 
   backend:
@@ -53,12 +54,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-dotnet@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73  # v6.1.0
         with:
           dotnet-version: 10.0.x
       # Only this job saves the NuGet cache; the other jobs run side by side and only restore it (two jobs saving one key collide).
-      - uses: actions/cache@v6
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
         with:
           path: ~/.nuget/packages
           key: nuget-${{ runner.os }}-${{ hashFiles('backend/**/*.csproj', 'backend/Directory.Packages.props') }}
@@ -73,16 +74,16 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-dotnet@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73  # v6.1.0
         with:
           dotnet-version: 10.0.x
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1  # v7.1.0
         with:
           node-version: 26
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-      - uses: actions/cache/restore@v6
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
         with:
           path: ~/.nuget/packages
           key: nuget-${{ runner.os }}-${{ hashFiles('backend/**/*.csproj', 'backend/Directory.Packages.props') }}
@@ -120,16 +121,16 @@ jobs:
           - { group: links and tenants, suites: 'links tenants dashboard' }
           - { group: other towns, suites: 'direct live sources discovery scope health functions messaging wide' }
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-dotnet@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73  # v6.1.0
         with:
           dotnet-version: 10.0.x
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1  # v7.1.0
         with:
           node-version: 26
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-      - uses: actions/cache/restore@v6
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
         with:
           path: ~/.nuget/packages
           key: nuget-${{ runner.os }}-${{ hashFiles('backend/**/*.csproj', 'backend/Directory.Packages.props') }}
@@ -142,7 +143,7 @@ jobs:
         working-directory: frontend
       - name: Cache the browser
         id: browser
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
@@ -158,14 +159,15 @@ jobs:
         # every suite of the group runs, even when one fails, so a run shows all that is broken
         run: |
           fail=0
-          for suite in ${{ matrix.suites }}; do npm run "e2e:$suite" || fail=1; done
+          for suite in $SUITES; do npm run "e2e:$suite" || fail=1; done
           exit $fail
         working-directory: frontend
         env:
           E2E_NO_BUILD: '1'
+          SUITES: ${{ matrix.suites }}
       - name: Keep the report when something fails
         if: failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         with:
           name: ui-scenarios-report-${{ matrix.group }}
           path: |
@@ -183,11 +185,11 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-dotnet@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73  # v6.1.0
         with:
           dotnet-version: 10.0.x
-      - uses: actions/cache/restore@v6
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
         with:
           path: ~/.nuget/packages
           key: nuget-${{ runner.os }}-${{ hashFiles('backend/**/*.csproj', 'backend/Directory.Packages.props') }}
@@ -199,7 +201,7 @@ jobs:
       - name: Show the result on the pull request
         # Fork pull requests get a read-only token and cannot comment; the annotations on the files still appear.
         if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3  # v9.0.0
         with:
           script: |
             const fs = require('fs');
@@ -224,6 +226,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: All checks passed
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+          FAILED: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
         run: |
-          echo '${{ toJSON(needs) }}'
-          if [ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" = "true" ]; then exit 1; fi
+          echo "$NEEDS"
+          if [ "$FAILED" = "true" ]; then exit 1; fi

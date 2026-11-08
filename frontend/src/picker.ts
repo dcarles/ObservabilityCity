@@ -38,7 +38,7 @@ export function rankItems<T extends PickItem>(items: T[], query: string, limit: 
 }
 
 export function escapeHtml(s: string): string {
-  return s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!)
+  return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!)
 }
 
 export interface PickerOptions<T extends PickItem> {

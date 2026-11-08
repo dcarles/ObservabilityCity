@@ -51,6 +51,8 @@ public sealed class LogAnalyticsReader(HttpClient http, ICredentialSource? crede
     /// 2 is a warning and 3 and above an error), <c>durationMs</c> and <c>result</c> may be left out. A row without a section, a time or text
     /// says nothing and is skipped.
     /// </summary>
+    public const int MaxRows = 5000;
+
     public static IReadOnlyList<LogRow> ParseLogs(string json)
     {
         using var doc = JsonDocument.Parse(json);
@@ -72,6 +74,7 @@ public sealed class LogAnalyticsReader(HttpClient http, ICredentialSource? crede
         var rows = new List<LogRow>();
         foreach (var row in table.GetProperty("rows").EnumerateArray())
         {
+            if (rows.Count >= MaxRows) break; // a query that does not group could return tens of megabytes: the first rows it sent are enough for a tab
             if (Text(row[section]) is not { Length: > 0 } kind || Text(row[text]) is not { Length: > 0 } what) continue;
             if (Text(row[at]) is not { Length: > 0 } when || !DateTimeOffset.TryParse(when, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var time)) continue;
             var n = count < 0 ? 1 : Number(row, count) is { } c ? (int)Math.Clamp(Math.Round(c), 1, int.MaxValue) : 1;

@@ -539,7 +539,7 @@ public sealed record SystemLogs(DateTimeOffset At, bool Configured, string Windo
 /// in one never hides another. Groups are newest first; a repeat is one group with a count. Links open the telemetry store's own search for this section,
 /// already filtered to the system, from the environment's <c>logs.links</c> (one for each store); null when the environment has none for the section.
 /// </summary>
-public sealed record LogSection(string Id, IReadOnlyList<LogGroup> Groups, IReadOnlyList<ResourceLink>? Links = null);
+public sealed record LogSection(string Id, IReadOnlyList<LogGroup> Groups, IReadOnlyList<ResourceLink>? Links = null, int More = 0);
 
 /// <summary>Entries that say the same thing, grouped: Count of them, the newest at At. DurationMs and Result (a status code, say) are those of the newest entry, when the source has them.</summary>
 public sealed record LogGroup(DateTimeOffset At, LogLevel? Level, string Text, int Count, double? DurationMs, string? Result);

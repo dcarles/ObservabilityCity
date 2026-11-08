@@ -933,7 +933,8 @@
       "LogSection": {
         "required": [
           "id",
-          "groups"
+          "groups",
+          "more"
         ],
         "type": "object",
         "properties": {
@@ -952,6 +953,10 @@
               "$ref": "#/components/schemas/ResourceLink"
             },
             "nullable": true
+          },
+          "more": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },

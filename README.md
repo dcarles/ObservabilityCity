@@ -333,8 +333,9 @@ The sample town has 17 islands, about 110 buildings and up to 420 cars. Roads, l
 | `Snapshot:KeepAliveSeconds` | `15` | Viewers are sent a snapshot when something in it changed, and at least this often so the feed shows it is alive. `0` sends every build |
 | `Snapshot:StaleAfterSeconds` | `30` | Readings older than this are shown as stale |
 | `Registry:WatchSeconds` | `5` | How often the registry folder is checked for changes (0 turns reloading off) |
+| `Security:AllowedOrigins` | none | Web addresses (`https://city.example.test`) other than this machine's own that may talk to the server. A browser request from any other site is refused with 403, and only a request with the Host name localhost, 127.0.0.1 or [::1] is answered. A hosted deployment lists its own address here and in `AllowedHosts` |
 
-Set them with environment variables (`Registry__Path=...`) or in `appsettings.json` of the Host project.
+Set them with environment variables (`Registry__Path=...`) or in `appsettings.json` of the Host project. `appsettings.json` ships with `AllowedHosts` set to this machine only and the framework's request logging turned down to warnings.
 
 ## Using it at your own organisation
 

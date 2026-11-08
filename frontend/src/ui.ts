@@ -106,8 +106,8 @@ export function showTooltip(n: NodeSnapshot | null, x: number, y: number, view: 
   const none = isUnmonitored(n)
   const row = (signal: Signal, html: string) => (isAbsent(n, signal) ? '' : html)
   el.innerHTML = `
-    <b>${n.name}</b> <span class="${none ? '' : cls}">· ${none ? 'no source' : n.state}</span>
-    <div class="row"><span>id</span><span>${n.id}</span></div>
+    <b>${escapeHtml(n.name)}</b> <span class="${none ? '' : cls}">· ${none ? 'no source' : n.state}</span>
+    <div class="row"><span>id</span><span>${escapeHtml(n.id)}</span></div>
     ${n.engine ? `<div class="row engine"><span>engine</span><span>${escapeHtml(n.engine.name)} · ${escapeHtml(n.engine.typeName)}</span></div>` : ''}
     ${row('instances', `<div class="row"><span>instances</span><span>${n.instancesHealthy}/${n.instancesTotal} healthy</span></div>`)}
     ${row('requests', `<div class="row"><span>requests</span><span>${formatRate(n.requestsPerSecond)}/s</span></div>`)}

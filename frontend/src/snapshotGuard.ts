@@ -12,11 +12,19 @@ const TENANT_KINDS = ['Customer', 'Test', 'Unknown']
 const APP_STATES = ['Running', 'Stopped', 'Missing']
 const JOB_STATUSES = ['Ok', 'Failed', 'Overdue']
 
-/** Numbers every node has. Anything that is not a finite number becomes 0. */
+/** Numbers every node has. Anything that is not a finite number reads as 0, and the system is shown grey unless the number only shapes the drawing. */
 const REQUIRED_NUMBERS = [
   'instancesTotal', 'instancesHealthy', 'load', 'requestsPerSecond', 'errorRate', 'p99Ms', 'slaP99Ms',
   'errorAmber', 'errorRed', 'resourceAmber', 'resourceRed', 'throttleAmber', 'throttleRed', 'backlogAmber', 'backlogRed',
 ] as const
+
+/** Numbers that only shape the drawing. When one is missing it reads 0; any other missing number turns the system grey (Stale), never a healthy-looking 0. */
+const VISUAL_ONLY = new Set<string>(['load'])
+
+/** The signal that, when a system's source says it has none, makes its number legitimately absent. */
+const SIGNAL_OF: Record<string, string> = {
+  instancesTotal: 'instances', instancesHealthy: 'instances', requestsPerSecond: 'requests', errorRate: 'errors', p99Ms: 'latency',
+}
 
 /** Numbers a source may leave out. Anything that is not a finite number becomes null. */
 const OPTIONAL_NUMBERS = ['cpu', 'memory', 'utilisation', 'throttled', 'queueDepth', 'oldestMessageSeconds', 'deadLetters', 'outsideRequestsPerSecond'] as const
@@ -255,9 +263,18 @@ function checkNode(n: unknown, groupId: string, ids: Set<string>, problems: stri
         .map((s) => ({ source: s.source as string, ageSeconds: isFiniteNumber(s.ageSeconds) && s.ageSeconds >= 0 ? s.ageSeconds : 0, fresh: s.fresh === true, signals: strings(s.signals) }))
       : null,
   }
+  let unreadable = false
   for (const key of REQUIRED_NUMBERS) {
     out[key] = isFiniteNumber(n[key]) ? n[key] : 0
-    if (!isFiniteNumber(n[key])) problems.push(`'${n.id}' has no usable ${key}`)
+    if (!isFiniteNumber(n[key])) {
+      problems.push(`'${n.id}' has no usable ${key}`)
+      // a missing number that decides the colour must not read as 0 (zero errors, healthy): the building goes grey. A source that says it has no such signal is not "missing"
+      if (!VISUAL_ONLY.has(key) && !(out.absent as string[]).includes(SIGNAL_OF[key] ?? '')) unreadable = true
+    }
+  }
+  if (unreadable && out.state !== 'Stale') {
+    out.state = 'Stale'
+    problems.push(`'${n.id}' is missing a number its colour depends on, shown as Stale`)
   }
   for (const key of OPTIONAL_NUMBERS) out[key] = isFiniteNumber(n[key]) ? n[key] : null
   // null is traffic that is not measured; a list, even an empty one, is an API whose callers the town knows

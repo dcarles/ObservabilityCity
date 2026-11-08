@@ -165,7 +165,7 @@ describe('words for states and incidents', () => {
 
 describe('the Logs tab', () => {
   const group = (over: Partial<LogGroup> = {}): LogGroup => ({ at: '2026-11-01T12:00:00Z', text: 'GET /a', count: 1, ...over })
-  const section = (id: string, groups: LogGroup[] = []): LogSection => ({ id, groups })
+  const section = (id: string, groups: LogGroup[] = []): LogSection => ({ id, groups, more: 0 })
 
   it('names its four sections, and the slow one names the line it is measured against', () => {
     expect(logSectionTitle(section('failed'), 800)).toBe('5xx requests')
