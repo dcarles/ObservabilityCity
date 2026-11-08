@@ -17,11 +17,15 @@ describe('startView', () => {
     expect(startView('?view=town', s)).toBe('town') // the address wins
   })
 
-  it('ignores a view it does not know, and a wall is always the town', () => {
+  it('ignores a view it does not know, and a wall address with no view in it is the town', () => {
     expect(startView('?view=nonsense', memory())).toBe('town')
     const s = memory()
     saveView(s, 'dashboard')
     expect(startView('?wall=1', s)).toBe('town')
+  })
+
+  it('opens the wall dashboard when the address asks for the dashboard', () => {
+    expect(startView('?wall=1&view=dashboard', memory())).toBe('dashboard')
   })
 
   it('works when storage is blocked', () => {

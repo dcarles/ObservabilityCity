@@ -8,11 +8,15 @@ import { WallDirector, type Stop } from './director'
 import { stripModel } from './stripModel'
 import { WallStrip } from './strip'
 
-export interface WallCamera {
+/** Where the town's camera stands to look at something. */
+export interface TownPlace { target: THREE.Vector3; distance: number }
+
+/** What the wall moves: the town's camera, or the dashboard's scroll position. `P` says where it can go. */
+export interface WallCamera<P = TownPlace> {
   /** Where the camera should stand to look at this, or null when it is not on screen. */
-  focusOf(focus: Focus): { target: THREE.Vector3; distance: number } | null
+  focusOf(focus: Focus): P | null
   /** Moves the camera. `cut` jumps there at once; otherwise it glides. */
-  go(target: THREE.Vector3, distance: number, cut: boolean): void
+  go(place: P, cut: boolean): void
   home(cut: boolean): void
   /** Keeps a building's name board up while the camera is on it (null for none). */
   select(id: string | null): void
@@ -23,13 +27,13 @@ const clock = (fraction: number): string => {
   return `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`
 }
 
-export class WallMode {
+export class WallMode<P = TownPlace> {
   readonly director: WallDirector
   readonly strip = new WallStrip()
   private snap: Snapshot | null = null
   private connection: ConnectionState = 'connecting'
 
-  constructor(hold: number, private readonly camera: WallCamera) {
+  constructor(hold: number, private readonly camera: WallCamera<P>) {
     this.director = new WallDirector(hold)
   }
 
@@ -56,7 +60,7 @@ export class WallMode {
     if (stop.focus.kind === 'home') { this.camera.home(stop.cut); return }
     const f = this.camera.focusOf(stop.focus)
     // a place that is not on screen (an island the view left out) is skipped by going home, never left half-way
-    if (f) this.camera.go(f.target, f.distance, stop.cut)
+    if (f) this.camera.go(f, stop.cut)
     else this.camera.home(stop.cut)
   }
 

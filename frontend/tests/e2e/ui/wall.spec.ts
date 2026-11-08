@@ -360,3 +360,63 @@ test.describe('when the connection is lost', () => {
     errors.length = 0
   })
 })
+
+test.describe('the Wall button and the ways out', () => {
+  const remembered = (page: Page) => page.evaluate(() => localStorage.getItem('oc.wall'))
+  const isWall = (page: Page) => page.waitForFunction(() => document.body.classList.contains('wall') && (window as any).city?.seen.snapshots > 0)
+  const notWall = (page: Page) => page.waitForFunction(() => !document.body.classList.contains('wall') && (window as any).city?.seen.snapshots > 0)
+
+  test('the button opens the town as a wall, remembers it, and a reload stays a wall', async ({ town, page }) => {
+    await town.open()
+    await page.locator('#wall-button').click()
+    await isWall(page)
+    await expect(page.locator('#wall-strip')).toBeVisible()
+    expect(await remembered(page)).toBe('1')
+    expect(new URL(page.url()).searchParams.has('wall')).toBe(false)
+    await page.reload()
+    await isWall(page)
+  })
+
+  test('Esc leaves wall mode and forgets it', async ({ town, page }) => {
+    await town.open(WALL)
+    await page.keyboard.press('Escape')
+    await notWall(page)
+    await expect(page.locator('#topbar')).toBeVisible()
+    expect(await remembered(page)).toBe('0')
+  })
+
+  test('the Exit wall chip stays hidden until the mouse moves, then leaves wall mode', async ({ town, page }) => {
+    await town.open(WALL)
+    await expect(page.locator('#wall-exit')).toBeHidden()
+    await page.mouse.move(200, 200)
+    await page.mouse.move(260, 240)
+    await expect(page.locator('#wall-exit')).toBeVisible()
+    await page.locator('#wall-exit').click()
+    await notWall(page)
+    expect(await remembered(page)).toBe('0')
+  })
+
+  test('?wall=0 beats a remembered wall and forgets it', async ({ town, page }) => {
+    await page.addInitScript(() => { if (!sessionStorage.getItem('seeded')) { sessionStorage.setItem('seeded', '1'); localStorage.setItem('oc.wall', '1') } })
+    await town.open('&wall=0')
+    await expect(page.locator('#wall-strip')).toHaveCount(0)
+    expect(await remembered(page)).toBe('0')
+  })
+
+  test('a remembered wall opens as a wall with nothing in the address', async ({ town, page }) => {
+    await page.addInitScript(() => localStorage.setItem('oc.wall', '1'))
+    await town.open()
+    await expect(page.locator('#wall-strip')).toBeVisible()
+  })
+
+  test('a wall is offered full screen with one click, and leaving full screen leaves the wall', async ({ town, page }) => {
+    await town.reset()
+    await page.goto('/?quality=low&wall=1') // no ?test: that switches the offer off
+    await expect(page.locator('#wall-fullscreen')).toBeVisible()
+    await page.locator('#wall-fullscreen').click()
+    await page.waitForFunction(() => !!document.fullscreenElement)
+    // headless Chromium leaves full screen without telling the page, so the event a real browser sends is sent by hand
+    await page.evaluate(async () => { await document.exitFullscreen(); document.dispatchEvent(new Event('fullscreenchange')) })
+    await page.waitForFunction(() => !document.body.classList.contains('wall') && (window as any).city?.seen.snapshots > 0)
+  })
+})

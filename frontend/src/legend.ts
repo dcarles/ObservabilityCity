@@ -226,7 +226,7 @@ export const LEGEND: readonly LegendSection[] = [
     title: 'Ways to look',
     tab: 'controls',
     entries: [
-      { id: 'wall', sees: 'Wall mode', means: 'For a screen nobody touches', more: 'Add ?wall=1 to the address: Dusk light, a tour of the troubled islands and a status strip. ?wall=1&islands=… shows only some islands.', tone: 'neutral', icon: '🖥️' },
+      { id: 'wall', sees: 'Wall mode', means: 'For a screen nobody touches', more: 'The Wall button in the top bar (or ?wall=1 in the address): Dusk light, a tour of the troubled islands and a status strip. Esc leaves it. ?wall=1&islands=… shows only some islands.', tone: 'neutral', icon: '🖥️' },
       { id: 'break', sees: 'Break things panel', means: 'Try failures on demo data', more: 'Only when the town runs on demo data. Reset puts everything right.', tone: 'neutral', icon: '🧨', demoOnly: true },
     ],
   },

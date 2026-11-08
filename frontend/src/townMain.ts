@@ -10,6 +10,7 @@ import { Connection, markFeed } from './connection'
 import { addressForTown, fetchTowns, requestedScope, type TownChoice } from './scope'
 import { saveQuality, startQuality, type Quality } from './quality'
 import { parseWall } from './wall/params'
+import { enterWall, startWallControls } from './wall/controls'
 import { WallMode } from './wall/wall'
 import { UnknownHostsPanel } from './unknownHosts'
 import { NoticesPanel, Search, ServicePanel, showIslandTooltip, showTooltip, StateList, TopBar, type SearchItem } from './ui'
@@ -60,7 +61,7 @@ export async function startTown(): Promise<void> {
   // a test run repeats: which requests fail and when cars leave come from a seeded generator, not from Math.random
   if (testMode) town.cars.random = rng(1)
   const store = browserStore()
-  const wallParams = parseWall(query)
+  const wallParams = parseWall(query, store)
   let islands: readonly string[] = parseIslands(query)
   let layers = parseLayers(query)
   let focus = parseFocus(query)
@@ -137,6 +138,8 @@ export async function startTown(): Promise<void> {
   let tenantView: TenantView = loadTenantView(store)
   const topbar = new TopBar((state, anchor) => stateList.toggle(state, anchor), () => tenantView)
   document.getElementById('home')!.addEventListener('click', () => stage.home())
+  document.getElementById('wall-button')?.addEventListener('click', () => enterWall(store))
+  const wallControls = wallParams.on ? startWallControls(store, { offerFullscreen: !testMode }) : null
   document.getElementById('view-switch')?.addEventListener('click', () => { window.location.href = viewSwitchAddress(window.location, 'dashboard', store) })
   const notices = new NoticesPanel()
   const unknownHosts = new UnknownHostsPanel(requestedScope(), () => (seen.last?.groups ?? []).flatMap((g) => g.nodes).filter((n) => n.kind === 'Api').map((n) => n.id).sort())
@@ -359,7 +362,7 @@ export async function startTown(): Promise<void> {
   const wall = wallParams.on
     ? new WallMode(wallParams.hold, {
         focusOf: (f) => (f.kind === 'building' ? town.focusOf(f.id) : town.islandFocusOf(f.id)),
-        go: (target, distance, cut) => stage.focus(target, distance, cut),
+        go: (f, cut) => stage.focus(f.target, f.distance, cut),
         home: (cut) => stage.home(cut),
         select: (id) => town.select(id),
       })
@@ -517,7 +520,7 @@ export async function startTown(): Promise<void> {
     totals: () => (seen.last ? viewTotals(seen.last, tenantView) : null),
     lighting: () => lighting,
     /** What the wall is doing (mode, stop, caption, note, the strip's words); null when wall mode is off. */
-    wall: () => wall?.status() ?? null,
+    wall: () => (wall ? { ...wall.status(), controls: wallControls?.state() ?? null } : null),
     quality: () => quality,
     /** Opens the live socket again counts: how many times it was opened. */
     connectionOpened: () => connection.opened,

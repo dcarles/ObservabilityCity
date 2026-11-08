@@ -11,12 +11,12 @@ export const TENANT_VIEW_KEY = 'oc.tenantView'
 
 export const isViewMode = (v: unknown): v is ViewMode => v === 'town' || v === 'dashboard'
 
-/** The view the page opens with: the address, else this browser's last choice, else the town. A wall (a screen nobody touches) is always the town. */
+/** The view the page opens with: the address, else this browser's last choice, else the town. A wall address (?wall=1) with no view in it is the town; ?wall=1&view=dashboard is the wall dashboard. */
 export function startView(search: string, store: Store | null): ViewMode {
   const q = new URLSearchParams(search)
-  if (q.has('wall')) return 'town'
   const asked = q.get('view')
   if (isViewMode(asked)) return asked
+  if (q.has('wall')) return 'town'
   try {
     const saved = store?.getItem(VIEW_KEY)
     if (isViewMode(saved)) return saved

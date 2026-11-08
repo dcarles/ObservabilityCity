@@ -17,6 +17,10 @@ import type { Snapshot } from '../types'
 import { buildDashboard, pillarSelection, type Dashboard } from './model'
 import { freshnessHtml, hiddenHtml, pillarMenuHtml, pillarsHtml, sectionsHtml, summaryHtml, type UiState } from './render'
 import { dashLegendHtml } from './legend'
+import { parseWall } from '../wall/params'
+import { enterWall, startWallControls } from '../wall/controls'
+import { WallMode } from '../wall/wall'
+import { dashPlaceOf, type DashPlace } from './wallPlace'
 import { feedLateAfter, marker, popupLeft, sourceLines } from './freshness'
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T
@@ -141,6 +145,7 @@ export function startDashboard(): void {
     if (window.scrollY !== y) window.scrollTo(0, y)
     fit()
     if (key) document.querySelector<HTMLElement>(key)?.focus({ preventScroll: true })
+    markWallFocus()
   }
 
   function onSnapshot(raw: unknown): void {
@@ -152,6 +157,7 @@ export function startDashboard(): void {
     arrivedAt = now
     last = s
     seen.snapshots++
+    wallSnapshot = s
     const pruned = pruneTenants(tenantView, s.tenants ?? [])
     if (pruned !== tenantView) { tenantView = pruned; saveTenantView(store, pruned) }
     const kept = pruneIslands(islands, islandChoices(s))
@@ -160,6 +166,7 @@ export function startDashboard(): void {
     inspector.update(s)
     notices.show(s.notices, s.notes ?? [])
     draw()
+    wall?.onSnapshot(s, wallNow())
     if (!freshPop.hidden) drawFreshness()
     setStatus('live')
   }
@@ -222,7 +229,49 @@ export function startDashboard(): void {
     const el = $('dash-status')
     el.className = `livepill ${st === 'live' ? '' : st === 'offline' || st === 'badData' || st === 'silent' ? 'off' : 'wait'}`
     el.lastElementChild!.textContent = label
+    wall?.setConnection(st)
   }
+
+  // Wall mode: the same page for a screen nobody touches. Big text, no menu, a status strip, and a tour that opens one pillar at a time (what needs
+  // attention first) and brings the service to the middle. The director and strip are the town wall's own.
+  const wallParams = parseWall(window.location.search, store)
+  let wallSnapshot: Snapshot | null = null
+  let wallFocus: string | null = null
+  let skew = 0
+  const wallNow = (): number => performance.now() / 1000 + skew
+  function markWallFocus(): void {
+    document.querySelectorAll('.wall-focus').forEach((e) => e.classList.remove('wall-focus'))
+    if (wallFocus) document.querySelector(`#dash-pillars tr.row[data-system="${CSS.escape(wallFocus)}"]`)?.classList.add('wall-focus')
+  }
+  const wall = wallParams.on
+    ? new WallMode<DashPlace>(wallParams.hold, {
+        focusOf: (f) => dashPlaceOf(f, wallSnapshot?.groups ?? [], model?.pillars.map((p) => p.id) ?? []),
+        go: (place, cut) => {
+          wallFocus = place.system
+          ui.openPillars = new Set([place.pillar])
+          draw()
+          const target = (place.system ? document.querySelector(`#dash-pillars tr.row[data-system="${CSS.escape(place.system)}"]`) : null)
+            ?? document.querySelector(`#dash-pillars [data-pillar="${CSS.escape(place.pillar)}"]`)
+          target?.scrollIntoView({ block: 'center', behavior: cut ? 'auto' : 'smooth' })
+        },
+        home: (cut) => {
+          wallFocus = null
+          ui.openPillars = new Set()
+          draw()
+          window.scrollTo({ top: 0, behavior: cut ? 'auto' : 'smooth' })
+        },
+        select: () => {},
+      })
+    : null
+  if (wall) {
+    document.body.classList.add('wall')
+    const zoom = (): void => document.documentElement.style.setProperty('--wall-zoom', String(Math.min(2.6, Math.max(1.25, window.innerWidth / 1100))))
+    zoom()
+    window.addEventListener('resize', zoom)
+    window.setInterval(() => wall.tick(wallNow()), 1000)
+  }
+  const wallControls = wall ? startWallControls(store, { offerFullscreen: !new URLSearchParams(window.location.search).has('test') }) : null
+  $('wall-button-dash').addEventListener('click', () => enterWall(store))
 
   let held = false // for tests: while true, the snapshots from the server are ignored, so one fed by hand stays on screen
   const connection = new Connection((raw) => { if (!held) onSnapshot(raw) }, setStatus, scope, (e) => {
@@ -230,7 +279,7 @@ export function startDashboard(): void {
     b.textContent = `There is no environment "${e.requested ?? ''}". Available: ${e.environments.join(', ') || 'none'}.`
     b.hidden = false
     b.style.display = 'block'
-  }, islands)
+  }, islands, { persistent: wallParams.on, retryMs: wallParams.retry * 1000 })
   connection.start()
 
   // one listener for the whole page: the markup is redrawn with every snapshot
@@ -293,6 +342,9 @@ export function startDashboard(): void {
     ui,
     tenantView: () => tenantView,
     islands: () => islands,
+    /** For tests: what the wall is doing (null when wall mode is off), and a way to move its clock. */
+    wall: () => (wall ? { ...wall.status(), controls: wallControls?.state() ?? null, focus: wallFocus, open: [...ui.openPillars] } : null),
+    wallStep: (seconds: number) => { skew += seconds; wall?.tick(wallNow()) },
     threeLoaded: () => !!document.querySelector('script[src*="three"]') || 'THREE' in window,
   }
 }
