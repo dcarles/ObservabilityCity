@@ -157,8 +157,6 @@ jobs:
         run: dotnet build backend/src/ObservabilityCity.Host -c Release
       - name: UI scenarios
         # every suite of the group runs, even when one fails, so a run shows all that is broken
-        env:
-          SUITES: ${{ matrix.suites }}
         run: |
           fail=0
           for suite in $SUITES; do npm run "e2e:$suite" || fail=1; done
@@ -166,6 +164,7 @@ jobs:
         working-directory: frontend
         env:
           E2E_NO_BUILD: '1'
+          SUITES: ${{ matrix.suites }}
       - name: Keep the report when something fails
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
