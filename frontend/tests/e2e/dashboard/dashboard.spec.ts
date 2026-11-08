@@ -616,7 +616,7 @@ test.describe('the dashboard view', () => {
       expect(w.focus).toBe('aa.orders-api')
       await expect(page.locator('#wall-caption')).toContainText('has 130 dead letters in q-orders')
       await expect(page.locator('#wall-headline')).not.toContainText('DEGRADED')
-      await expect(page.locator('#kpi-services')).not.toContainText('degraded')
+      await expect(page.locator('#kpi-services')).toContainText('0 down · 0 degraded')
       await expect(page.locator('#dash-pillars tr.row.wall-focus')).toHaveAttribute('data-system', 'aa.orders-api')
     })
 
