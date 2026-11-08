@@ -512,4 +512,124 @@ test.describe('the dashboard view', () => {
     expect(Math.abs(dot!.y + dot!.height / 2 - (box!.y + box!.height / 2))).toBeLessThanOrEqual(3)
     expect(box!.height).toBeLessThan(40) // one line, the dot is not on a line of its own
   })
+
+  test.describe('wall mode', () => {
+    interface DashWall { mode: string; stop: { key: string; kind: string; cut: boolean } | null; open: string[]; focus: string | null; note: string | null; controls: { exitShown: boolean } | null }
+    const wall = (page: Page) => page.evaluate(() => (window as any).dash.wall() as DashWall | null)
+    const step = (page: Page, s: number) => page.evaluate((x) => (window as any).dash.wallStep(x), s)
+    const remembered = (page: Page) => page.evaluate(() => localStorage.getItem('oc.wall'))
+
+    test('the dashboard is not a wall unless asked for', async ({ town, page }) => {
+      await open(town, page)
+      expect(await wall(page)).toBeNull()
+      await expect(page.locator('#wall-strip')).toHaveCount(0)
+      await expect(page.locator('#dash-menu')).toBeVisible()
+      await expect(page.locator('#wall-button-dash')).toBeVisible()
+    })
+
+    test('?wall=1&view=dashboard is a wall: no menu, big type, a strip, and no 3D town', async ({ town, page }) => {
+      await open(town, page, '&wall=1&hold=2')
+      await expect(page.locator('#wall-strip')).toBeVisible()
+      await expect(page.locator('#wall-headline')).toHaveText('ALL SYSTEMS HEALTHY')
+      await expect(page.locator('#dash-menu')).toBeHidden()
+      expect(await page.evaluate(() => (window as any).city)).toBeUndefined()
+      const zoom = await page.locator('#dash-root').evaluate((el) => parseFloat(getComputedStyle(el).getPropertyValue('zoom')))
+      expect(zoom).toBeGreaterThan(1)
+      expect((await wall(page))?.mode).toBe('calm')
+    })
+
+    test('the tour opens one pillar at a time and picks the service out', async ({ town, page }) => {
+      await open(town, page, '&wall=1&hold=2')
+      const seen: string[] = []
+      for (let i = 0; i < 6; i++) {
+        await step(page, 2.05)
+        const w = (await wall(page))!
+        seen.push(w.stop!.key)
+        if (w.stop!.key.startsWith('island:')) {
+          const id = w.stop!.key.slice('island:'.length)
+          expect(w.open).toEqual([id])
+          await expect(page.locator(`[data-pillar="${id}"] table.svc`)).toBeVisible()
+          await expect(page.locator('#dash-pillars table.svc')).toHaveCount(1)
+        }
+      }
+      expect(seen.some((k) => k.startsWith('island:'))).toBe(true)
+    })
+
+    test('new trouble cuts to its service at once, picks it out, and a resolved note comes when it ends', async ({ town, page }) => {
+      await open(town, page, '&wall=1&hold=2')
+      await step(page, 11)
+      const feed = (state: string) => page.evaluate(async (st) => {
+        const s = await (await fetch('/api/snapshot/latest')).json()
+        for (const n of s.groups.flatMap((g: any) => g.nodes)) n.state = n.id === 'aa.orders-api' ? st : 'Healthy'
+        s.totals.down = st === 'Down' ? 1 : 0 // the strip counts from the snapshot's totals
+        ;(window as any).dash.hold(true)
+        ;(window as any).dash.feed(s)
+      }, state)
+      await feed('Healthy')
+      await feed('Down')
+      const w = (await wall(page))!
+      expect(w.mode).toBe('alert')
+      expect(w.stop).toMatchObject({ key: 'down:aa.orders-api', cut: true })
+      expect(w.open).toEqual(['aa'])
+      expect(w.focus).toBe('aa.orders-api')
+      await expect(page.locator('#dash-pillars tr.row.wall-focus')).toHaveAttribute('data-system', 'aa.orders-api')
+      await expect(page.locator('#wall-strip')).toHaveAttribute('data-tone', 'bad')
+      await feed('Healthy')
+      expect((await wall(page))!.note).toContain('healthy again')
+    })
+
+    test('a frozen feed greys the wall and the strip says so', async ({ town, page }) => {
+      await open(town, page, '&wall=1&hold=2')
+      await page.evaluate(() => (window as any).dash.muteFeed(true, 1000))
+      await expect(page.locator('#wall-connection')).toBeVisible({ timeout: 15_000 })
+      await expect(page.locator('#wall-connection')).toContainText('may be out of date')
+    })
+
+    test('the Wall button makes the page a wall, remembers it, and a reload stays a wall', async ({ town, page }) => {
+      await open(town, page)
+      await page.locator('#wall-button-dash').click()
+      await page.waitForFunction(() => (window as any).dash?.wall()?.mode)
+      await expect(page.locator('#wall-strip')).toBeVisible()
+      expect(await remembered(page)).toBe('1')
+      expect(new URL(page.url()).searchParams.has('wall')).toBe(false)
+      await page.reload()
+      await page.waitForFunction(() => (window as any).dash?.wall()?.mode)
+    })
+
+    test('Esc leaves wall mode and forgets it', async ({ town, page }) => {
+      await open(town, page, '&wall=1')
+      await page.keyboard.press('Escape')
+      await page.waitForFunction(() => (window as any).dash?.seen.snapshots > 0 && (window as any).dash.wall() === null)
+      await expect(page.locator('#dash-menu')).toBeVisible()
+      expect(await remembered(page)).toBe('0')
+    })
+
+    test('the Exit wall chip shows when the mouse moves, and leaves wall mode', async ({ town, page }) => {
+      await open(town, page, '&wall=1')
+      await expect(page.locator('#wall-exit')).toBeHidden()
+      await page.mouse.move(200, 200)
+      await page.mouse.move(260, 240)
+      await expect(page.locator('#wall-exit')).toBeVisible()
+      await page.locator('#wall-exit').click()
+      await page.waitForFunction(() => (window as any).dash?.seen.snapshots > 0 && (window as any).dash.wall() === null)
+      expect(await remembered(page)).toBe('0')
+    })
+
+    test('?wall=0 beats a remembered wall and forgets it', async ({ town, page }) => {
+      await town.reset()
+      await page.addInitScript(() => { if (!sessionStorage.getItem('seeded')) { sessionStorage.setItem('seeded', '1'); localStorage.setItem('oc.wall', '1') } })
+      await page.goto('/?view=dashboard&wall=0')
+      await page.waitForFunction(() => (window as any).dash?.seen.snapshots > 0)
+      expect(await wall(page)).toBeNull()
+      expect(await remembered(page)).toBe('0')
+    })
+
+    test('a remembered wall opens as a wall with nothing in the address', async ({ town, page }) => {
+      await town.reset()
+      await page.addInitScript(() => localStorage.setItem('oc.wall', '1'))
+      await page.goto('/?view=dashboard')
+      await page.waitForFunction(() => (window as any).dash?.wall()?.mode)
+      await expect(page.locator('#wall-strip')).toBeVisible()
+    })
+  })
 })

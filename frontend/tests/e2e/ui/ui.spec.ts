@@ -276,14 +276,15 @@ test.describe('the inspector drawer', () => {
     await feedLate()
     await openByName(page, 'Notify API')
     const rows = page.locator('#inspector .rows')
+    // everything is read inside the loop: a snapshot from the server between two reads would wipe the fed one, and the next try feeds it again
     await expect(async () => {
       await feedLate()
       await expect(rows).toContainText('From platform', { timeout: 1000 })
+      await expect(rows).toContainText('4m ago, late: no cpu, memory', { timeout: 1000 })
+      await expect(rows).toContainText('From telemetry', { timeout: 1000 })
+      await expect(rows).toContainText('Requests', { timeout: 1000 }) // what the fresh source says is still shown
+      await expect(rows).not.toContainText('none fresh', { timeout: 1000 })
     }).toPass({ timeout: 15000 })
-    await expect(rows).toContainText('4m ago, late: no cpu, memory')
-    await expect(rows).toContainText('From telemetry')
-    await expect(rows).toContainText('Requests') // what the fresh source says is still shown
-    await expect(rows).not.toContainText('none fresh')
   })
 
   test('Links lists who it calls and who calls it, and a click opens that system', async ({ town, page }) => {
@@ -614,7 +615,7 @@ test.describe('the bar and the panels at Dusk', () => {
       await town.open('&light=dusk')
       const h = await page.evaluate(() => document.getElementById('topbar')!.getBoundingClientRect().height)
       expect(h).toBeLessThan(60)
-      const rows = await page.evaluate(() => new Set([...document.querySelectorAll('#topbar button, #topbar input')].map((e) => Math.round(e.getBoundingClientRect().top / 10))).size)
+      const rows = await page.evaluate(() => new Set([...document.querySelectorAll<HTMLElement>('#topbar button, #topbar input')].filter((e) => e.offsetParent !== null).map((e) => Math.round(e.getBoundingClientRect().top / 10))).size)
       expect(rows).toBe(1)
     })
   }

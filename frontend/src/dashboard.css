@@ -156,3 +156,10 @@ body.dash #view-bar .vb-btn, body.dash #view-bar .vb-list input[type=search] { b
 #dash-legend .dl-mark { flex: none; width: 14px; padding-top: 4px; display: flex; justify-content: center; }
 #dash-legend .dl-bar { width: 12px; height: 5px; margin-top: 3px; border-radius: 3px; background: var(--muted); opacity: .6; }
 #dash-legend-button { font-weight: 700; min-width: 30px; }
+
+/* Wall mode on the dashboard (?wall=1&view=dashboard, or the Wall button): bigger text, no menu, room under the page for the status strip, and the service the tour is on picked out. */
+body.dash.wall #dash-menu, body.dash.wall #dash-root h2 { display: none; }
+body.dash.wall #dash-root { zoom: var(--wall-zoom, 1.5); }
+body.dash.wall { padding-bottom: 38vh; }
+body.dash.wall #dash-pillars .card .acts { display: none; }
+body.dash.wall tr.row.wall-focus > td { background: var(--warnbg); outline: 2px solid var(--daccent); outline-offset: -2px; }
