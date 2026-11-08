@@ -123,10 +123,18 @@ public sealed class RegistryReloader(RegistryHolder holder, string folder, TimeS
         {
             while (await timer.WaitForNextTickAsync(ct))
             {
-                var now = Fingerprint(folder);
-                if (now == seen) continue;
-                seen = now;
-                Reload();
+                // one bad tick (a file whose permissions changed, a path that vanished) is logged and skipped: it must not end the loop, and an unhandled error here stops the whole server
+                try
+                {
+                    var now = Fingerprint(folder);
+                    if (now == seen) continue;
+                    seen = now;
+                    Reload();
+                }
+                catch (Exception e) when (e is not OperationCanceledException)
+                {
+                    log.LogWarning(e, "Could not check the registry folder for changes; trying again in {Seconds} s", interval.TotalSeconds);
+                }
             }
         }
         catch (OperationCanceledException) { }
@@ -150,6 +158,6 @@ public sealed class RegistryReloader(RegistryHolder holder, string folder, TimeS
                 .OrderBy(f => f, StringComparer.Ordinal)
                 .Select(f => { var i = new FileInfo(f); return $"{f}:{i.Length}:{i.LastWriteTimeUtc.Ticks}"; }));
         }
-        catch (IOException) { return "unreadable"; }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { return "unreadable"; }
     }
 }

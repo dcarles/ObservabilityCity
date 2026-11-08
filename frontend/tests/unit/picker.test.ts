@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { rankItems, type PickItem } from '../../src/picker'
+import { escapeHtml, rankItems, type PickItem } from '../../src/picker'
 
 const items: PickItem[] = [
   { kind: 'town', id: '*', name: 'Whole town', where: '' },
@@ -26,5 +26,11 @@ describe('rankItems', () => {
     expect(rankItems(items, 'ledger', 8).map((i) => i.id)).toEqual(['cl.ledger-api', 'cl'])
     expect(rankItems(items, 'core', 8).map((i) => i.id)).toEqual(['cl', 'cl.ledger-api'])
     expect(rankItems(items, 'pay', 8)[0].id).toBe('pay.payments-api')
+  })
+})
+
+describe('escapeHtml', () => {
+  it('escapes every character that can open a tag or close an attribute, single quotes too', () => {
+    expect(escapeHtml(`<img src=x onerror='alert("1")'> & more`)).toBe('&lt;img src=x onerror=&#39;alert(&quot;1&quot;)&#39;&gt; &amp; more')
   })
 })

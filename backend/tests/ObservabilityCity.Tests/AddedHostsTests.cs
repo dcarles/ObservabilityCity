@@ -107,6 +107,32 @@ public class AddedHostsTests : IDisposable
         Assert.Equal(AddedHosts.IgnoreKind, Assert.Single(AddedHosts.Read(_folder)).Kind);
     }
 
+    private static bool CannotRemovePermissions => OperatingSystem.IsWindows() || Environment.UserName == "root";
+
+    [Fact]
+    [System.Runtime.Versioning.UnsupportedOSPlatform("windows")]
+    public void A_folder_the_server_may_not_read_is_unreadable_to_the_watch_and_empty_to_the_list_instead_of_an_error()
+    {
+        Assert.SkipWhen(CannotRemovePermissions, "file permissions do not stop this user (Windows, or root)");
+        AddedHosts.Add(_folder, Vendor("files.example.test", "aa.orders-api"));
+        var path = AddedHosts.PathIn(_folder);
+        var mode = File.GetUnixFileMode(path);
+        var folderMode = File.GetUnixFileMode(Path.GetDirectoryName(path)!);
+        try
+        {
+            File.SetUnixFileMode(path, UnixFileMode.None);
+            File.SetUnixFileMode(Path.GetDirectoryName(path)!, UnixFileMode.None);
+
+            Assert.Empty(AddedHosts.Read(_folder));
+            Assert.Equal("unreadable", RegistryReloader.Fingerprint(_folder));
+        }
+        finally
+        {
+            File.SetUnixFileMode(Path.GetDirectoryName(path)!, folderMode);
+            File.SetUnixFileMode(path, mode);
+        }
+    }
+
     [Fact]
     public void A_change_to_the_file_by_hand_is_noticed_by_the_folder_watch_but_other_files_in_the_discovered_folder_are_not()
     {

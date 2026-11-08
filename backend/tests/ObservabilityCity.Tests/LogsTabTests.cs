@@ -147,7 +147,8 @@ public class LogsTabTests
         var logs = await rig.Logs.RecentAsync(rig.Node(NodeKind.Api), TestContext.Current.CancellationToken);
 
         Assert.Equal(["failed", "slow", "logs", "exceptions"], logs.Sections.Select(s => s.Id));
-        Assert.Equal(300, logs.Sections[0].Groups.Count); // no row cap: every distinct entry is kept
+        Assert.Equal(QueryLogSource.MaxGroupsPerSection, logs.Sections[0].Groups.Count); // the flood is cut at the cap...
+        Assert.Equal(300 - QueryLogSource.MaxGroupsPerSection, logs.Sections[0].More); // ...and the tab says how many more there were
         Assert.Empty(logs.Sections[1].Groups);
         Assert.Single(logs.Sections[2].Groups);
         Assert.Single(logs.Sections[3].Groups);
@@ -221,6 +222,46 @@ public class LogsTabTests
             var environment = view.Current.ActiveEnvironment!;
             return QueryLogSource.Sections([], LogSections.All, environment.Logs!, environment, "Orders Api", assets, TimeSpan.FromHours(4), Now.AddHours(-4), Now);
         }
+    }
+
+    [Fact]
+    public void A_section_keeps_the_newest_lines_and_says_how_many_more_there_were()
+    {
+        var view = Env(TownA, LogsA, out var copy);
+        using (copy)
+        {
+            var environment = view.Current.ActiveEnvironment!;
+            var total = QueryLogSource.MaxGroupsPerSection + 25;
+            var rows = Enumerable.Range(0, total).Select(i => new LogRow("exceptions", Now.AddMinutes(-i), $"error {i}", 1, null, null, null)).ToList();
+
+            var section = QueryLogSource.Sections(rows, ["exceptions"], environment.Logs!, environment, "Orders Api", [], TimeSpan.FromHours(4), Now.AddHours(-4), Now).Single();
+
+            Assert.Equal(QueryLogSource.MaxGroupsPerSection, section.Groups.Count);
+            Assert.Equal(25, section.More);
+            Assert.Equal("error 0", section.Groups[0].Text);
+        }
+    }
+
+    [Fact]
+    public void A_section_within_the_cap_has_nothing_more()
+    {
+        var view = Env(TownA, LogsA, out var copy);
+        using (copy)
+        {
+            var environment = view.Current.ActiveEnvironment!;
+            var rows = new[] { new LogRow("exceptions", Now, "boom", 1, null, null, null) };
+
+            Assert.Equal(0, QueryLogSource.Sections(rows, ["exceptions"], environment.Logs!, environment, "Orders Api", [], TimeSpan.FromHours(4), Now.AddHours(-4), Now).Single().More);
+        }
+    }
+
+    [Fact]
+    public void An_answer_with_more_rows_than_the_cap_is_cut_at_the_cap()
+    {
+        var rows = string.Join(",", Enumerable.Range(0, LogAnalyticsReader.MaxRows + 50).Select(i => $"[\"exceptions\",\"2026-11-01T11:00:00Z\",\"error {i}\"]"));
+        var json = "{\"tables\":[{\"columns\":[{\"name\":\"section\"},{\"name\":\"at\"},{\"name\":\"text\"}],\"rows\":[" + rows + "]}]}";
+
+        Assert.Equal(LogAnalyticsReader.MaxRows, LogAnalyticsReader.ParseLogs(json).Count);
     }
 
     [Fact]

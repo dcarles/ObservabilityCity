@@ -53,6 +53,9 @@ foreach (var (_, registry) in loaded)
     foreach (var environment in registry.Environments)
         foreach (var problem in sourceCatalog.Check(environment)) Console.Error.WriteLine(problem);
 
+// The log for what happens before the host is built and by objects made outside it (the reading cache, which says when it cannot save), with the levels the Logging section sets.
+var startupLogs = LoggerFactory.Create(b => b.AddConfiguration(builder.Configuration.GetSection("Logging")).AddSimpleConsole());
+
 // One runtime for each environment of each town (a town without environments has the one, "demo"): its own source, readings and snapshots.
 var townRuntimes = new List<TownRuntime>();
 var hostedByTown = new List<(TownRuntime Town, List<EnvironmentRuntime> Runtimes)>();
@@ -87,7 +90,7 @@ foreach (var (folder, registry) in loaded)
         foreach (var problem in set.Problems) Console.Error.WriteLine($"Source notice ({registry.Town.Id}): {problem}");
         var state = new LatestState();
         // a live town carries on from the last readings after a restart (the town's freshness rule still decides whether they count); a demo town has none
-        var readings = fake is null ? new ReadingCache(Path.Combine(folder, RegistryReloader.DiscoveredFolder, "readings", environmentId)) : null;
+        var readings = fake is null ? new ReadingCache(Path.Combine(folder, RegistryReloader.DiscoveredFolder, "readings", environmentId), startupLogs.CreateLogger<ReadingCache>()) : null;
         if (readings is not null)
             foreach (var source in set.Sources) state.Update(source.Name, readings.Load(source.Name));
         var store = new SnapshotStore();
@@ -149,6 +152,9 @@ builder.Services.AddOpenApi("v1", o =>
 });
 
 var app = builder.Build();
+
+// Before every endpoint, the hub included: a request from a site that is not ours is refused (see OriginGuard). Hosting also filters the Host header through AllowedHosts in appsettings.json.
+app.UseMiddleware<OriginGuard>((IReadOnlyCollection<string>)(builder.Configuration.GetSection("Security:AllowedOrigins").Get<string[]>() ?? []));
 
 app.MapGet("/api/health", () => Results.Ok(new { status = "ok", town = towns.Default.Registry.Current.Town.Name }))
    .ExcludeFromDescription();
@@ -265,7 +271,14 @@ app.MapGet("/api/systems/{id}/logs", async (string id, EnvironmentSet envs, stri
         var registry = rt.Registry.Current;
         var node = registry.AllNodes.FirstOrDefault(n => n.Id == id) ?? registry.Vendors.FirstOrDefault(v => v.Node.Id == id)?.Node;
         if (node is null) return Results.NotFound(new { error = $"No system '{id}'." });
-        try { return Results.Ok(await rt.Logs.RecentAsync(node, ct)); }
+        // a slow workspace must not hold the request and its connection for the HTTP client's 100 seconds
+        using var limit = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        limit.CancelAfter(LogsTimeout);
+        try { return Results.Ok(await rt.Logs.RecentAsync(node, limit.Token)); }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            return Results.Json(new { error = $"The logs query took longer than {LogsTimeout.TotalSeconds:0} seconds and was stopped." }, statusCode: StatusCodes.Status502BadGateway);
+        }
         catch (Exception e) when (e is not OperationCanceledException)
         {
             return Results.Json(new { error = e.Message.ReplaceLineEndings(" ") }, statusCode: StatusCodes.Status502BadGateway);
@@ -380,4 +393,8 @@ record StorySummary(string Id, string Name, string? Description, double Duration
 record StoryStepSummary(int Index, double At, string? Caption, string? Camera);
 
 // Lets tests use WebApplicationFactory<Program>.
-public partial class Program;
+public partial class Program
+{
+    /// <summary>How long the on-demand logs query of one system may run.</summary>
+    internal static readonly TimeSpan LogsTimeout = TimeSpan.FromSeconds(30);
+}

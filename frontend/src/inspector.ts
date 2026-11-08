@@ -332,7 +332,7 @@ export class Inspector {
     const body = !shown ? '' : shown.groups.length === 0
       ? `<p class="none">${escapeHtml(logSectionEmpty(shown, logs.window))}</p>`
       : `<div class="logs">${shown.groups.map((g) => `<div class="log ${(g.level ?? 'Info').toLowerCase()}"><time>${escapeHtml(clockTime(g.at))}</time><span>${escapeHtml(g.text)}${groupDetail(g) ? ` <i class="detail">${escapeHtml(groupDetail(g))}</i>` : ''}${repeatLabel(g) ? ` <b class="count">${escapeHtml(repeatLabel(g))}</b>` : ''}</span></div>`).join('')}</div>`
-    return `${refresh}${tabs}${linkRow}<div data-section="${escapeHtml(shown?.id ?? '')}">${body}</div>
+    return `${refresh}${tabs}${linkRow}<div data-section="${escapeHtml(shown?.id ?? '')}">${body}${shown && (shown.more ?? 0) > 0 ? `<p class="note">and ${shown.more} more, older lines not shown</p>` : ''}</div>
       <p class="note">Read ${ago(logs.at, Date.now())} over the last ${escapeHtml(logs.window)}, newest first. Logs are read on demand and do not decide the colours.</p>`
   }
 

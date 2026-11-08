@@ -41,15 +41,23 @@ public sealed class QueryLogSource(IReadOnlyList<IMetricSource> sources, IRegist
     /// </summary>
     public static IReadOnlyList<LogSection> Sections(IReadOnlyList<LogRow> rows, IEnumerable<string> wanted, LogsConfig config, RegistryEnvironment environment, string role,
         IReadOnlyList<ResolvedAsset> assets, TimeSpan window, DateTimeOffset from, DateTimeOffset to) =>
-        wanted.Select(id => new LogSection(id, rows
-            .Where(r => r.Section.Equals(id, StringComparison.OrdinalIgnoreCase))
-            .GroupBy(r => (r.Text, r.Result))
-            .Select(g =>
-            {
-                var newest = g.OrderByDescending(r => r.At).First();
-                return new LogGroup(newest.At, newest.Level, newest.Text, g.Sum(r => r.Count), newest.DurationMs, newest.Result);
-            })
-            .OrderByDescending(g => g.At)
-            .ToList(),
-            LogQuery.Links(config.Links, id, assets, environment.Scope, environment.Id, role, window, from, to))).ToList();
+        wanted.Select(id =>
+        {
+            var groups = rows
+                .Where(r => r.Section.Equals(id, StringComparison.OrdinalIgnoreCase))
+                .GroupBy(r => (r.Text, r.Result))
+                .Select(g =>
+                {
+                    var newest = g.OrderByDescending(r => r.At).First();
+                    return new LogGroup(newest.At, newest.Level, newest.Text, g.Sum(r => r.Count), newest.DurationMs, newest.Result);
+                })
+                .OrderByDescending(g => g.At)
+                .ToList();
+            // a query that does not group could return thousands of lines: the newest are kept and the tab says how many more there were
+            return new LogSection(id, groups.Take(MaxGroupsPerSection).ToList(),
+                LogQuery.Links(config.Links, id, assets, environment.Scope, environment.Id, role, window, from, to), Math.Max(0, groups.Count - MaxGroupsPerSection));
+        }).ToList();
+
+    /// <summary>The most lines one section of the Logs tab shows.</summary>
+    public const int MaxGroupsPerSection = 200;
 }

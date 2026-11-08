@@ -308,6 +308,8 @@ export interface components {
             id: string;
             groups: components["schemas"]["LogGroup"][];
             links?: components["schemas"]["ResourceLink"][] | null;
+            /** Format: int32 */
+            more: number;
         };
         MessageTypeSnapshot: {
             type: string;

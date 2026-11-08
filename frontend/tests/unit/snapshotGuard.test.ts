@@ -54,7 +54,7 @@ describe('a snapshot with something wrong in it is repaired where that is safe',
     expect(problems.some((p) => p.includes('second system'))).toBe(true)
   })
 
-  it('turns numbers that are not numbers into 0, and optional ones into null', () => {
+  it('turns numbers that are not numbers into 0 (and greys the system), and optional ones into null', () => {
     const raw = calm()
     const n = raw.groups[1].nodes[0] as unknown as Record<string, unknown>
     n.errorRate = 'lots'
@@ -116,6 +116,34 @@ describe('a snapshot with something wrong in it is repaired where that is safe',
     const raw = calm()
     raw.groups[1].color = 'banana'
     expect(checkSnapshot(raw).snapshot!.groups[1].color).toMatch(/^#/)
+  })
+})
+
+describe('a number the colour depends on that is missing never reads as healthy', () => {
+  const first = (raw: Snapshot) => raw.groups[1].nodes[0]
+
+  it.each(['errorRate', 'p99Ms', 'requestsPerSecond', 'instancesTotal', 'instancesHealthy', 'slaP99Ms', 'errorRed'])('turns the system grey when %s is missing', (key) => {
+    const raw = calm()
+    const id = first(raw).id
+    raw.groups[1].nodes[0] = { ...first(raw), state: 'Healthy', absent: [], [key]: null } as never
+    const { snapshot, problems } = checkSnapshot(raw)
+    const node = snapshot!.groups[1].nodes.find((n) => n.id === id)!
+    expect(node.state).toBe('Stale')
+    expect(problems.some((p) => p.includes(id) && p.includes(key))).toBe(true)
+  })
+
+  it('leaves a system alone whose source says it has no such signal', () => {
+    const raw = calm()
+    raw.groups[1].nodes[0] = { ...first(raw), state: 'Healthy', absent: ['errors'], errorRate: null } as never
+    expect(checkSnapshot(raw).snapshot!.groups[1].nodes[0].state).toBe('Healthy')
+  })
+
+  it('reads a missing load as 0 without greying the system, since load only shapes the drawing', () => {
+    const raw = calm()
+    raw.groups[1].nodes[0] = { ...first(raw), state: 'Healthy', load: null } as never
+    const node = checkSnapshot(raw).snapshot!.groups[1].nodes[0]
+    expect(node.state).toBe('Healthy')
+    expect(node.load).toBe(0)
   })
 })
 
