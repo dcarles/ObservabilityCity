@@ -11,6 +11,7 @@ import { addressForTown, fetchTowns, requestedScope, type TownChoice } from './s
 import { saveQuality, startQuality, type Quality } from './quality'
 import { parseWall } from './wall/params'
 import { enterWall, startWallControls } from './wall/controls'
+import { startMoreMenu } from './topbarMore'
 import { WallMode } from './wall/wall'
 import { UnknownHostsPanel } from './unknownHosts'
 import { NoticesPanel, Search, ServicePanel, showIslandTooltip, showTooltip, StateList, TopBar, type SearchItem } from './ui'
@@ -139,6 +140,7 @@ export async function startTown(): Promise<void> {
   const topbar = new TopBar((state, anchor) => stateList.toggle(state, anchor), () => tenantView)
   document.getElementById('home')!.addEventListener('click', () => stage.home())
   document.getElementById('wall-button')?.addEventListener('click', () => enterWall(store))
+  startMoreMenu()
   const wallControls = wallParams.on ? startWallControls(store, { offerFullscreen: !testMode }) : null
   document.getElementById('view-switch')?.addEventListener('click', () => { window.location.href = viewSwitchAddress(window.location, 'dashboard', store) })
   const notices = new NoticesPanel()

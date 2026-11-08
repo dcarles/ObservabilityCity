@@ -68,6 +68,12 @@ test.describe('the top bar with a long town name', () => {
       }
       // the counters are all there, none clipped by the box they sit in
       for (const c of m.chips) expect(c.r).toBeLessThanOrEqual(m.right.r + 0.5)
+      // Wall mode stays reachable: its button, or (when the bar gave the buttons up) the "⋯" menu that holds it
+      const wallReachable = await page.evaluate(() => {
+        const shown = (id: string) => { const e = document.getElementById(id); return !!e && e.offsetParent !== null }
+        return shown('wall-button') || shown('more-button')
+      })
+      expect(wallReachable, 'neither the Wall button nor the ⋯ menu is on the bar').toBe(true)
       // the search keeps room to type in
       const search = m.items.find((i) => i.id === 'search-input')!
       expect(search.r - search.l).toBeGreaterThanOrEqual(80)
@@ -83,5 +89,40 @@ test.describe('the top bar with a long town name', () => {
     await expect(page.locator('#town-button')).toHaveCount(0)
     await expect(page.locator('#town-name')).toHaveText('Mini Town')
     expect(await page.locator('#topbar').getByText('Mini Town').count()).toBe(1)
+  })
+})
+
+test.describe('the ⋯ menu a full top bar keeps its buttons in', () => {
+  test('is not on the bar while the buttons fit', async ({ town, page }) => {
+    await town.open()
+    await expect(page.locator('#more-button')).toBeHidden()
+    await expect(page.locator('#wall-button')).toBeVisible()
+  })
+
+  test('takes Wall, Dashboard and Day/Dusk when the bar is at its last step, and each still works', async ({ town, page }) => {
+    // a long town name in the widest font at 1320px fills the bar to its last step
+    await page.route('**/api/towns', (route) => route.fulfill({ json: TOWNS }))
+    await page.setViewportSize({ width: 1320, height: 800 })
+    await town.open()
+    await page.addStyleTag({ content: "* { font-family: 'DejaVu Sans', sans-serif !important; }" })
+    await expect(page.locator('#topbar.fit-7')).toHaveCount(1)
+    await expect(page.locator('#more-button')).toBeVisible()
+    for (const id of ['wall-button', 'view-switch', 'lighting']) await expect(page.locator(`#${id}`)).toBeHidden()
+
+    await page.locator('#more-button').click()
+    await expect(page.locator('#more-menu button')).toHaveText(['Wall', 'Dashboard', /Day|Dusk/])
+    await page.keyboard.press('Escape')
+    await expect(page.locator('#more-menu')).toBeHidden()
+
+    await page.locator('#more-button').click()
+    const before = await page.evaluate(() => (window as any).city.lighting())
+    await page.locator('#more-menu button[data-for="lighting"]').click()
+    expect(await page.evaluate(() => (window as any).city.lighting())).not.toBe(before)
+    await expect(page.locator('#more-menu')).toBeHidden()
+
+    await page.locator('#more-button').click()
+    await page.locator('#more-menu button[data-for="wall-button"]').click()
+    await page.waitForFunction(() => document.body.classList.contains('wall') && (window as any).city?.seen.snapshots > 0)
+    expect(await page.evaluate(() => localStorage.getItem('oc.wall'))).toBe('1')
   })
 })
