@@ -342,6 +342,8 @@ body.wall #inspector, body.wall #legend, body.wall #notices, body.wall #unknown-
 #wall-strip .wall-headline { font-size: clamp(28px, 5.4vw, 88px); font-weight: 900; line-height: 1.05; letter-spacing: 0.01em; color: #5ee09a; }
 #wall-strip[data-tone='warn'] .wall-headline { color: #ffc24a; }
 #wall-strip[data-tone='bad'] .wall-headline { color: #ff6b61; }
+#wall-strip .wall-headline-row { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0 0.35em; }
+#wall-strip .wall-dlq { font-size: clamp(22px, 3.6vw, 60px); font-weight: 900; line-height: 1.05; color: #ff6b61; }
 #wall-strip .wall-counts { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 4px; font-size: clamp(14px, 1.7vw, 28px); }
 #wall-strip .wall-count b { font-variant-numeric: tabular-nums; }
 #wall-strip .wall-count.bad b { color: #ff6b61; }

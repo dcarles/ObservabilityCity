@@ -209,3 +209,77 @@ describe('a view of one team', () => {
     expect(d.mode).toBe('calm')
   })
 })
+
+describe('the overview of the whole town', () => {
+  const OVERVIEW = 12
+  const troubled = () => withState(withState(healthyTown(), 'cl.ledger-db', 'Degraded'), 'pay.payments-api', 'Down')
+
+  it('opens a tour of trouble, then visits each stop once, then comes round again', () => {
+    const d = new WallDirector(HOLD, 4, OVERVIEW)
+
+    const first = d.update(troubled(), 0)
+
+    expect(first).toMatchObject({ kind: 'overview', focus: { kind: 'home' }, cut: false })
+    expect(first?.caption).toBe('Overview: 2 systems need attention across 2 islands')
+    expect(d.tick(11.9)).toBeNull()
+    expect(d.tick(12)).toMatchObject({ kind: 'down' })
+    expect(d.tick(32)).toMatchObject({ kind: 'degraded' })
+    expect(d.tick(52)).toMatchObject({ kind: 'overview' })
+    expect(d.tick(64)).toMatchObject({ kind: 'down' })
+  })
+
+  it('holds the overview for its own seconds, not the hold', () => {
+    const d = new WallDirector(HOLD, 4, 5)
+    d.update(troubled(), 0)
+
+    expect(d.tick(4.9)).toBeNull()
+    expect(d.tick(5)).toMatchObject({ kind: 'down' })
+  })
+
+  it('has no overview when it is 0: the tour only loops through the trouble', () => {
+    const d = new WallDirector(HOLD, 4, 0)
+
+    expect(d.update(troubled(), 0)).toMatchObject({ kind: 'down' })
+    expect(d.tick(20)).toMatchObject({ kind: 'degraded' })
+    expect(d.tick(40)).toMatchObject({ kind: 'down' })
+  })
+
+  it('cuts to trouble that appears in a healthy town, then shows the overview after that stop', () => {
+    const d = new WallDirector(HOLD, 4, OVERVIEW)
+    d.update(healthyTown(), 0)
+
+    const stop = d.update(withState(healthyTown(), 'cl.ledger-api', 'Degraded'), 5)
+
+    expect(stop).toMatchObject({ kind: 'degraded', cut: true })
+    expect(d.tick(25)).toMatchObject({ kind: 'overview' })
+  })
+
+  it('still cuts to new trouble at once, and carries on from there', () => {
+    const d = new WallDirector(HOLD, 4, OVERVIEW)
+    d.update(withState(healthyTown(), 'cl.ledger-db', 'Degraded'), 0)
+
+    const cut = d.update(withState(withState(healthyTown(), 'cl.ledger-db', 'Degraded'), 'pay.payments-api', 'Down'), 3)
+
+    expect(cut).toMatchObject({ kind: 'down', cut: true })
+    expect(d.tick(23)).toMatchObject({ kind: 'degraded' })
+    expect(d.tick(43)).toMatchObject({ kind: 'overview' })
+  })
+
+  it('keeps the overview caption up to date and leaves it when the trouble ends', () => {
+    const d = new WallDirector(HOLD, 4, OVERVIEW)
+    d.update(troubled(), 0)
+
+    d.update(withState(healthyTown(), 'pay.payments-api', 'Down'), 2)
+    expect(d.current).toMatchObject({ kind: 'overview', caption: 'Overview: 1 system needs attention across 1 island' })
+
+    const stop = d.update(healthyTown(), 4)
+    expect(stop).toMatchObject({ kind: 'calm', key: 'town' })
+  })
+
+  it('does not change the healthy showcase loop', () => {
+    const d = new WallDirector(HOLD, 4, OVERVIEW)
+
+    expect(d.update(healthyTown(), 0)).toMatchObject({ key: 'town', kind: 'calm' })
+    expect(d.tick(20)?.key).toBe('hub')
+  })
+})

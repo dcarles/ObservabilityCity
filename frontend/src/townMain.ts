@@ -373,8 +373,9 @@ export async function startTown(): Promise<void> {
         focusOf: (f) => (f.kind === 'building' ? town.focusOf(f.id) : town.islandFocusOf(f.id)),
         go: (f, cut) => stage.focus(f.target, f.distance, cut),
         home: (cut) => stage.home(cut),
+        overview: (seconds, cut) => stage.orbit(seconds, cut),
         select: (id) => town.select(id),
-      })
+      }, wallParams.overview)
     : null
 
   // Quality: the preset the page opens with, and what depends on it. A level chosen on purpose is never stepped down from.
