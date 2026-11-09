@@ -5,12 +5,15 @@ import { GROUND } from './island'
 
 /** One thick post with a board on it, standing on the ground. */
 export function islandSign(name: string, color: string, x: number, z: number): THREE.Group {
-  const tex = canvasTexture(512, 128, (ctx) => {
+  const paint = (ctx: CanvasRenderingContext2D, line: string): void => {
+    ctx.clearRect(0, 0, 512, 128)
     ctx.fillStyle = '#f7f0df'; roundRect(ctx, 4, 4, 504, 120, 22); ctx.fill()
     ctx.fillStyle = color; ctx.fillRect(4, 4, 504, 22)
-    ctx.fillStyle = '#26364f'; ctx.font = '800 68px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-    ctx.fillText(name.toUpperCase(), 256, 74, 480)
-  })
+    ctx.fillStyle = '#26364f'; ctx.font = `800 ${line ? 54 : 68}px system-ui, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+    ctx.fillText(name.toUpperCase(), 256, line ? 58 : 74, 480)
+    if (line) { ctx.fillStyle = '#4b5d78'; ctx.font = '700 34px system-ui, sans-serif'; ctx.fillText(line, 256, 101, 480) }
+  }
+  const tex = canvasTexture(512, 128, (ctx) => paint(ctx, ''))
   const post = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.22, 4.4, 7), new THREE.MeshStandardMaterial({ color: palette.woodDark, flatShading: true }))
   post.position.y = 2.2
   post.castShadow = true
@@ -25,6 +28,15 @@ export function islandSign(name: string, color: string, x: number, z: number): T
   sign.add(post, board, face, cap)
   sign.position.set(x, GROUND, z)
   sign.rotation.y = 0.25
+  let shown = ''
+  /** A second line under the name (the pillar's traffic); nothing for no line. Redrawn only when the words change. */
+  sign.userData.setLine = (line: string): void => {
+    if (line === shown) return
+    shown = line
+    paint((tex.image as HTMLCanvasElement).getContext('2d')!, line)
+    tex.needsUpdate = true
+  }
+  sign.userData.line = () => shown
   sign.scale.setScalar(1.9) // big enough to read from the usual camera distance
   return sign
 }

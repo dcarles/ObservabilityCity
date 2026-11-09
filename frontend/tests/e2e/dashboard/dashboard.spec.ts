@@ -287,7 +287,7 @@ test.describe('the dashboard view', () => {
 
   test('the Message flow tile lists the pillars by what they send and receive, and the cards say the same', async ({ town, page }) => {
     await open(town, page)
-    const read = `const t = document.querySelector('#kpi-flow'); return { lines: [...t.querySelectorAll('.fl')].map(l => l.textContent), bar: t.querySelector('.fbar i').style.width, button: !!t.querySelector('[data-flows-all]'), window: t.querySelector('.fwin')?.textContent ?? null, alpha: document.querySelector('[data-pillar="aa"] .pflow')?.textContent ?? null, billing: document.querySelector('[data-pillar="bb"] .pflow')?.textContent ?? null }`
+    const read = `const t = document.querySelector('#kpi-flow'); return { lines: [...t.querySelectorAll('.fl')].map(l => l.textContent), bar: t.querySelector('.fbar i').style.width, button: !!t.querySelector('[data-flows-all]'), window: t.querySelector('.fwin')?.textContent ?? null, alpha: document.querySelector('[data-pillar="aa"] .pflow [data-flow]')?.textContent ?? null, billing: document.querySelector('[data-pillar="bb"] .pflow [data-flow]')?.textContent ?? null }`
     const got = await withSnapshot<{ lines: string[]; bar: string; button: boolean; window: string | null; alpha: string | null; billing: string | null }>(page, FLOW, read)
     expect(got.lines).toHaveLength(2)
     expect(got.lines[0]).toMatch(/sends ext3\.2k msg\/s/)

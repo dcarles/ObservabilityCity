@@ -111,7 +111,7 @@ describe('the flow on the pillar cards', () => {
     expect(pillarFlowHtml(card('rwd').flow, false)).toBe('') // measured, and nothing moves
     expect(pillarFlowHtml(card('frd').flow, false)).toBe('') // not measured
     const quiet = pillarHtml(card('rwd'), ui())
-    expect(quiet).not.toContain('pflow')
+    expect(quiet).not.toContain('data-flow')
     expect(quiet).not.toContain('Messages')
   })
 
@@ -175,7 +175,7 @@ describe('internal messages, the platform total and traffic by pillar', () => {
   })
 
   it('lists the pillars by requests a second, busiest first, leaving out the ones with none', () => {
-    expect(trafficByPillar([{ id: 'a', name: 'A', rps: 0 }, { id: 'b', name: 'B', rps: 3 }, { id: 'c', name: 'C', rps: 9 }]).map((r) => r.id)).toEqual(['c', 'b'])
+    expect(trafficByPillar([{ id: 'a', name: 'A', rps: 0, split: null }, { id: 'b', name: 'B', rps: 3, split: null }, { id: 'c', name: 'C', rps: 9, split: null }]).map((r) => r.id)).toEqual(['c', 'b'])
     const d = buildDashboard(golden('calm'), ALL_TENANTS)
     expect(d.summary.trafficPillars.length).toBeGreaterThan(0)
     expect(summaryHtml(d)).toContain('data-pillar-traffic')
