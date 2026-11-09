@@ -168,11 +168,15 @@ body.dash.wall tr.row.wall-focus > td { background: var(--warnbg); outline: 2px 
 
 /* the Message flow tile and the flows on a pillar card */
 .kpi .flist { margin-top: 8px; display: flex; flex-direction: column; gap: 7px; }
-.fl { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 8px; align-items: baseline; font-size: 12px; min-width: 0; }
+.fl { display: flex; flex-direction: column; gap: 3px; font-size: 12px; min-width: 0; }
 .fl .fn { overflow-wrap: anywhere; font-weight: 600; }
+.fl .fr { display: grid; grid-template-columns: 4.6em minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+.fl .fd { color: var(--muted); }
 .fl .fv { font-size: 12px; font-weight: 500; margin: 0; display: inline; font-variant-numeric: tabular-nums; }
-.fl .fbar { grid-column: 1 / -1; display: block; height: 5px; border-radius: 3px; overflow: hidden; background: var(--surface2); }
+.fl .fv.none { font-weight: 400; color: var(--muted); }
+.fl .fbar { display: block; height: 5px; border-radius: 3px; overflow: hidden; background: var(--surface2); }
 .fl .fbar i { display: block; height: 100%; background: var(--daccent); }
+.kpi .fwin { display: block; margin-top: 8px; color: var(--muted); }
 .kpi .fall { margin-top: 8px; }
 .pflow { padding: 0 14px 12px; font-size: 13px; }
 .pflow .ch i, .pflowx .ch i { font-style: normal; color: var(--muted); }

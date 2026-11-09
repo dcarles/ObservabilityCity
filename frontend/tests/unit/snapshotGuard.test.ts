@@ -68,6 +68,17 @@ describe('a snapshot with something wrong in it is repaired where that is safe',
     expect(out.queueDepth).toBeNull()
   })
 
+  it('keeps what a pillar sends and receives, and drops a rate or a window that is not a number', () => {
+    const raw = calm() as unknown as Record<string, any>
+    raw.groups[0].flow = { sentPerSecond: 12.5, receivedPerSecond: 'many', windowSeconds: 900 }
+    raw.groups[1].flow = { sentPerSecond: -3, receivedPerSecond: null, windowSeconds: 900 }
+    raw.groups[2].flow = { sentPerSecond: 0, receivedPerSecond: 0, windowSeconds: 'x' }
+    const { snapshot } = checkSnapshot(raw)
+    expect(snapshot!.groups[0].flow).toEqual({ sentPerSecond: 12.5, receivedPerSecond: null, windowSeconds: 900 })
+    expect(snapshot!.groups[1].flow).toBeNull() // nothing measured
+    expect(snapshot!.groups[2].flow).toEqual({ sentPerSecond: 0, receivedPerSecond: 0, windowSeconds: 0 })
+  })
+
   it('shows an unknown state as stale, never as healthy', () => {
     const raw = calm()
     ;(raw.groups[1].nodes[0] as unknown as Record<string, unknown>).state = 'Fine'

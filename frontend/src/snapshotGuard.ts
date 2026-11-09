@@ -189,7 +189,18 @@ function checkGroup(g: unknown, seen: Set<string>, problems: string[]): GroupSna
     messaging: checkMessaging(g.messaging),
     nodes,
     assets: checkAssets(g.assets),
+    flow: checkFlow(g.flow) as GroupSnapshot['flow'], // null, as the server writes it, when nothing measures the pillar
   }
+}
+
+/** What the pillar sends and receives. A rate that is not a finite number is not measured (null); no usable window or no object at all is no flow. */
+function checkFlow(f: unknown): NonNullable<GroupSnapshot['flow']> | null {
+  if (!isObject(f)) return null
+  const rate = (v: unknown): number | null => (isFiniteNumber(v) && v >= 0 ? v : null)
+  const sent = rate(f.sentPerSecond)
+  const received = rate(f.receivedPerSecond)
+  if (sent === null && received === null) return null
+  return { sentPerSecond: sent, receivedPerSecond: received, windowSeconds: isFiniteNumber(f.windowSeconds) && f.windowSeconds > 0 ? Math.round(f.windowSeconds) : 0 }
 }
 
 const ASSET_SHAPES = ['box', 'vault', 'store', 'settings', 'observatory']
