@@ -3,6 +3,8 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.DependencyInjection;
+using ObservabilityCity.Host;
 using Microsoft.Extensions.Time.Testing;
 using ObservabilityCity.Adapters.Azure;
 using ObservabilityCity.Contracts;
@@ -443,6 +445,8 @@ public class InstancesTests
             b.UseSetting("Snapshot:IntervalSeconds", "0.2");
         });
         var client = factory.CreateClient();
+        // a live environment reads its sources only while a browser looks at it: stand in for one
+        foreach (var runtime in factory.Services.GetRequiredService<TownSet>().All.SelectMany(t => t.Environments.All)) runtime.Demand.Join();
         for (var i = 0; i < 100; i++)
         {
             var snapshot = await client.GetFromJsonAsync<Snapshot>("/api/snapshot/latest", Wire, TestContext.Current.CancellationToken);

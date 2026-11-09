@@ -22,9 +22,12 @@ export default defineConfig({
     },
   },
   build: {
-    chunkSizeWarningLimit: 1200,
     // warnings are errors: a build that warns (a missing export, a circular import, an unresolved import) fails instead of scrolling past
-    rollupOptions: { onwarn: (warning) => { throw new Error(`${warning.code ?? 'warning'}: ${warning.message}`) } },
+    rollupOptions: {
+      onwarn: (warning) => { throw new Error(`${warning.code ?? 'warning'}: ${warning.message}`) },
+      // three.js in a chunk of its own: the town, wall and dashboard pages share it, and it stays cached when the app's own code changes
+      output: { manualChunks: (id) => (id.includes('/node_modules/three/') ? 'three' : undefined) },
+    },
   },
   // the browser tests in tests/e2e/ run under Playwright, not Vitest
   test: { include: ['tests/unit/**/*.test.ts'] },

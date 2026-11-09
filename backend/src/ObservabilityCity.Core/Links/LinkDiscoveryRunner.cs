@@ -12,16 +12,25 @@ namespace ObservabilityCity.Core.Links;
 /// leaves what was found before in place and is reported as a notice. Buildings never wait for it: the town draws the links already in the store.
 /// </summary>
 public sealed class LinkDiscoveryRunner(
-    IDependencySource source, ScopeStore scope, IRegistryProvider registries, DiscoveredLinks store, TimeProvider time, ILogger<LinkDiscoveryRunner> log) : BackgroundService
+    IDependencySource source, ScopeStore scope, IRegistryProvider registries, DiscoveredLinks store, TimeProvider time, ILogger<LinkDiscoveryRunner> log, Sources.Demand? demand = null) : BackgroundService
 {
     /// <summary>How long the first read waits for the inventory, which says what the telemetry calls each system.</summary>
     public static readonly TimeSpan InventoryWait = TimeSpan.FromSeconds(30);
 
+    /// <summary>
+    /// A rescan asked for by an edit (a vendor, rule or ignore added) waits this long for the next edit before it starts, so that three edits in a row cost one
+    /// full read of the history, not three.
+    /// </summary>
+    public static readonly TimeSpan RescanQuiet = TimeSpan.FromSeconds(30);
+
     protected override async Task ExecuteAsync(CancellationToken ct)
     {
+        if (!await Sources.Demand.WaitUntilWantedAsync(demand, ct)) return;
         if (scope.Inventory is null) await scope.WaitForReadAsync(InventoryWait, ct);
         while (!ct.IsCancellationRequested)
         {
+            // nobody looks at this environment: no reads until a browser connects
+            if (!await Sources.Demand.WaitUntilWantedAsync(demand, ct)) return;
             _ = store.TakeReadRequest(); // an ask made before this read is answered by it
             var interval = await CycleAsync(ct);
             var asked = store.TakeReadRequest();
@@ -30,12 +39,28 @@ public sealed class LinkDiscoveryRunner(
             {
                 // the next read comes at its turn, or at once when the rules changed while this one ran
                 var turn = Task.Delay(interval, time, wait.Token);
-                await Task.WhenAny(turn, asked);
+                if (await Task.WhenAny(turn, asked) == asked) await QuietAsync(ct);
                 wait.Cancel();
                 await turn.ContinueWith(_ => { }, TaskScheduler.Default);
                 ct.ThrowIfCancellationRequested();
             }
             catch (OperationCanceledException) { return; }
+        }
+    }
+
+    /// <summary>Waits until no further read was asked for during <see cref="RescanQuiet"/>.</summary>
+    public async Task QuietAsync(CancellationToken ct)
+    {
+        while (true)
+        {
+            var more = store.TakeReadRequest();
+            using var quiet = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            var pause = Task.Delay(RescanQuiet, time, quiet.Token);
+            var first = await Task.WhenAny(pause, more);
+            quiet.Cancel();
+            await pause.ContinueWith(_ => { }, TaskScheduler.Default);
+            ct.ThrowIfCancellationRequested();
+            if (first == pause) return;
         }
     }
 

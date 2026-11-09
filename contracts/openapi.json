@@ -2029,7 +2029,8 @@
           "callers",
           "days",
           "gateway",
-          "vendorsOnly"
+          "vendorsOnly",
+          "morePaths"
         ],
         "type": "object",
         "properties": {
@@ -2062,6 +2063,10 @@
           },
           "vendorsOnly": {
             "type": "boolean"
+          },
+          "morePaths": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },

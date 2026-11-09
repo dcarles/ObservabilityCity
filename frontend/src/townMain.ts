@@ -1,3 +1,4 @@
+import { disposeTree } from './scene/dispose'
 import './style.css'
 import { isUnmonitored } from './signals'
 import { deadLetterItems } from './deadLetters'
@@ -294,7 +295,12 @@ export async function startTown(): Promise<void> {
     try {
       if (!town.matches(s)) {
         const started = performance.now()
-        town.root.remove(...town.root.children.filter((c) => c !== town.cars.object && c !== town.boats.object && c !== town.overlay.object))
+        const before = town.islands.map((i) => i.group.id).join('|')
+        const gone = town.root.children.filter((c) => c !== town.cars.object && c !== town.boats.object && c !== town.overlay.object)
+        town.root.remove(...gone)
+        // removing from the scene frees no graphics memory: a wall running for days would fill it
+        for (const i of town.islands) i.weather.dispose()
+        disposeTree(gone)
         town.buildings.clear()
         town.islands.length = 0
         town.extent.length = 0
@@ -302,7 +308,8 @@ export async function startTown(): Promise<void> {
         town.build(s)
         seen.buildMs = performance.now() - started
         stage.frame(town.extent)
-        stage.home(true)
+        // the same islands as before (only a service came or went): the camera stays where the viewer put it
+        if (town.islands.map((i) => i.group.id).join('|') !== before) stage.home(true)
         breakPanel?.refresh()
         servicePanel.close()
       }

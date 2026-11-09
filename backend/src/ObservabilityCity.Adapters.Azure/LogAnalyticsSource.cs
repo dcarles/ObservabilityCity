@@ -20,7 +20,7 @@ namespace ObservabilityCity.Adapters.Azure;
 /// a system the answer has no row for made no calls in the window, which is reported as zero calls (quiet), not as unknown. Only systems that serve calls
 /// (api, worker, gateway, cron) are asked about: a database or a broker has no span metrics, and gets no reading instead of a quiet one. Every row is read: nothing is cut off.
 /// </summary>
-public sealed class LogAnalyticsReader(HttpClient http, ICredentialSource? credential)
+public sealed class LogAnalyticsReader(HttpClient http, ICredentialSource? credential, TimeSpan? retryDelay = null)
 {
     public const string TokenScope = "https://api.loganalytics.io/.default";
     public const string Endpoint = "https://api.loganalytics.io/v1";
@@ -146,14 +146,19 @@ public sealed class LogAnalyticsReader(HttpClient http, ICredentialSource? crede
     private async Task<string> SendAsync(string workspace, string query, string timespan, CancellationToken ct)
     {
         var body = JsonSerializer.Serialize(new { query, timespan });
-        using var request = new HttpRequestMessage(HttpMethod.Post, QueryUrl(workspace)) { Content = new StringContent(body, Encoding.UTF8, "application/json") };
-        if (credential is not null)
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await credential.GetTokenAsync(TokenScope, ct));
-        using var response = await http.SendAsync(request, ct);
-        var text = await response.Content.ReadAsStringAsync(ct);
-        if (!response.IsSuccessStatusCode)
-            throw new HttpRequestException($"Log Analytics answered {(int)response.StatusCode} {response.ReasonPhrase}: {Trim(text)}");
-        return text;
+        var token = credential is null ? null : await credential.GetTokenAsync(TokenScope, ct);
+        // throttled or busy: tried again after the wait Azure asks for (see RetryWait), the same few times as the metrics reads
+        for (var attempt = 1; ; attempt++)
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, QueryUrl(workspace)) { Content = new StringContent(body, Encoding.UTF8, "application/json") };
+            if (token is not null) request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            using var response = await http.SendAsync(request, ct);
+            var text = await response.Content.ReadAsStringAsync(ct);
+            if (response.IsSuccessStatusCode) return text;
+            if (attempt >= AzureMonitorReader.Attempts || !RetryWait.IsHiccup(response.StatusCode))
+                throw new HttpRequestException($"Log Analytics answered {(int)response.StatusCode} {response.ReasonPhrase}: {Trim(text)}");
+            await Task.Delay(RetryWait.For(response.Headers, attempt, retryDelay, DateTimeOffset.UtcNow, Random.Shared.NextDouble()), ct);
+        }
     }
 
     private static string Trim(string text) => text.Length <= 300 ? text : text[..300] + "...";

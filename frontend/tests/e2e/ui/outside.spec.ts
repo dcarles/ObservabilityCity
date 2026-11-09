@@ -269,7 +269,7 @@ test.describe('the Unknown hosts button', () => {
   test('lists a gateway by its unexplained paths, adds a rule for one once a system is picked, and shows calls made only by vendors behind the tick box', async ({ town, page }) => {
     await town.open()
     const list = [
-      { host: 'gw.example.test', calls: 440, callers: ['aa.orders-api', 'ext.partner-svc'], days: 3, gateway: true, vendorsOnly: false,
+      { host: 'gw.example.test', calls: 440, callers: ['aa.orders-api', 'ext.partner-svc'], days: 3, gateway: true, vendorsOnly: false, morePaths: 0,
         paths: [{ path: '/internal/x', calls: 400, vendorsOnly: false }, { path: '/odd/y', calls: 40, vendorsOnly: true }] },
       { host: 'theirs.example.test', calls: 500, callers: ['ext.partner-svc'], days: 2, vendorsOnly: true },
     ]

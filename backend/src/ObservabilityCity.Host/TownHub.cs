@@ -34,6 +34,7 @@ public sealed class TownHub(TownSet towns, IslandViews views) : Hub
             return;
         }
         Context.Items["env"] = rt.Key;
+        rt.Demand.Join();
         await Enter(rt, IslandViews.Parse(http?.Request.Query["islands"].ToArray()));
         await base.OnConnectedAsync();
     }
@@ -57,7 +58,11 @@ public sealed class TownHub(TownSet towns, IslandViews views) : Hub
 
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
-        if (Context.Items["env"] is string key && Context.Items[ViewKey] is IReadOnlyList<string> islands) views.Leave(key, islands);
+        if (Context.Items["env"] is string key)
+        {
+            if (Context.Items[ViewKey] is IReadOnlyList<string> islands) views.Leave(key, islands);
+            RuntimeOf(key)?.Demand.Leave();
+        }
         await base.OnDisconnectedAsync(exception);
     }
 

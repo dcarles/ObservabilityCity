@@ -27,6 +27,12 @@ public sealed class DiscoveredLinks
     /// <summary>Who sends how much to each API. Kept in memory only: it is a rolling measure, not history.</summary>
     public LinkTraffic Traffic { get; } = new();
 
+    /// <summary>The most unexplained and outside addresses remembered for one environment; further new ones are not kept (the ones kept still count).</summary>
+    public const int MaxAddresses = 5000;
+
+    /// <summary>The most paths one gateway host lists in the panel, busiest first.</summary>
+    public const int MaxPathsPerHost = 50;
+
     private readonly Dictionary<(string Caller, string Target, bool Gateway), SortedSet<DateOnly>> _links = [];
     private readonly Dictionary<(string Caller, string Host, string Path), (SortedSet<DateOnly> Days, double Calls)> _unresolved = [];
     private readonly Dictionary<(string Caller, string Host, string Path), (SortedSet<DateOnly> Days, double Calls, string Target)> _outside = [];
@@ -122,7 +128,8 @@ public sealed class DiscoveredLinks
     {
         lock (_gate)
         {
-            var key = (caller, host, path ?? "");
+            var key = (caller, host, Tidy(path));
+            if (!_unresolved.ContainsKey(key) && _unresolved.Count >= MaxAddresses) return;
             var (seen, total) = _unresolved.TryGetValue(key, out var old) ? old : ([], 0d);
             foreach (var day in days) seen.Add(day);
             _unresolved[key] = (seen, Math.Max(total, calls));
@@ -130,12 +137,28 @@ public sealed class DiscoveredLinks
         }
     }
 
+    /// <summary>
+    /// The path as it is remembered: a segment that is a number, a GUID or a long hex string is an id, and ids would make one entry for every request, so each is
+    /// written as <c>id</c> (what the telemetry queries already do for GUIDs). Done when the address is remembered, after the call was classified.
+    /// </summary>
+    public static string Tidy(string? path)
+    {
+        if (string.IsNullOrEmpty(path)) return "";
+        var parts = path.Split('/');
+        for (var i = 0; i < parts.Length; i++) if (IsId(parts[i])) parts[i] = "id";
+        return string.Join('/', parts);
+    }
+
+    private static bool IsId(string segment) =>
+        segment.Length > 0 && (segment.All(char.IsAsciiDigit) || Guid.TryParse(segment, out _) || segment.Length >= 16 && segment.All(char.IsAsciiHexDigit));
+
     /// <summary>A call a rule explains, to a system of a pillar the town does not have yet.</summary>
     public void RecordOutside(string caller, string host, string? path, string target, IEnumerable<DateOnly> days, double calls)
     {
         lock (_gate)
         {
-            var key = (caller, host, path ?? "");
+            var key = (caller, host, Tidy(path));
+            if (!_outside.ContainsKey(key) && _outside.Count >= MaxAddresses) return;
             var (seen, total, _) = _outside.TryGetValue(key, out var old) ? old : ([], 0d, target);
             foreach (var day in days) seen.Add(day);
             _outside[key] = (seen, Math.Max(total, calls), target);
@@ -256,12 +279,13 @@ public sealed class DiscoveredLinks
                 .Select(x =>
                 {
                     var gateway = _isGatewayHost(x.Host);
-                    var paths = gateway
+                    var all = gateway
                         ? x.Rows.GroupBy(kv => kv.Key.Path, StringComparer.Ordinal)
                             .Select(p => new UnknownPathSnapshot(p.Key, p.Sum(kv => kv.Value.Calls), p.All(kv => _isVendorCaller(kv.Key.Caller))))
                             .OrderByDescending(p => p.Calls).ThenBy(p => p.Path, StringComparer.Ordinal).ToList()
                         : null;
-                    return new UnknownHostSnapshot(x.Host, x.Calls, x.Callers, x.Days, gateway, paths, x.Callers.All(_isVendorCaller));
+                    var paths = all?.Take(MaxPathsPerHost).ToList();
+                    return new UnknownHostSnapshot(x.Host, x.Calls, x.Callers, x.Days, gateway, paths, x.Callers.All(_isVendorCaller), all is null ? 0 : Math.Max(0, all.Count - MaxPathsPerHost));
                 })
                 .ToList();
     }

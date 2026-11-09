@@ -177,4 +177,25 @@ public class HostEnvironmentTests : IDisposable
         Assert.Contains("prod", message.GetProperty("environments").EnumerateArray().Select(e => e.GetString()));
         Assert.Equal(0, snapshots); // never the default's town under another name
     }
+
+    [Fact]
+    public async Task A_connected_viewer_counts_as_looking_at_its_environment_only_until_it_leaves()
+    {
+        await Latest("dev");
+        var towns = _factory.Services.GetRequiredService<TownSet>();
+        var staging = towns.All.SelectMany(t => t.Environments.All).First(e => e.Id == "staging");
+        var prod = towns.All.SelectMany(t => t.Environments.All).First(e => e.Id == "prod");
+        var before = (staging.Demand.Viewers, prod.Demand.Viewers);
+
+        var viewer = Connect("staging");
+        await viewer.StartAsync(TestContext.Current.CancellationToken);
+        await Task.Delay(300, TestContext.Current.CancellationToken);
+        Assert.Equal(before.Item1 + 1, staging.Demand.Viewers);
+        Assert.Equal(before.Item2, prod.Demand.Viewers); // the other environments are not looked at
+
+        await viewer.StopAsync(TestContext.Current.CancellationToken);
+        await viewer.DisposeAsync();
+        for (var i = 0; i < 50 && staging.Demand.Viewers != before.Item1; i++) await Task.Delay(100, TestContext.Current.CancellationToken);
+        Assert.Equal(before.Item1, staging.Demand.Viewers);
+    }
 }
