@@ -72,7 +72,8 @@ export function startDashboard(): void {
 
   $('vs-town').addEventListener('click', () => { window.location.href = viewSwitchAddress(window.location, 'town', store) })
 
-  const ui = { openPillars: new Set<string>(), groups: new Map<string, boolean>(), databases: new Map<string, boolean>(), connections: new Set<string>(), sections: new Set<string>() }
+  const ui = { openPillars: new Set<string>(), groups: new Map<string, boolean>(), databases: new Map<string, boolean>(), connections: new Set<string>(), sections: new Set<string>(), flowsAll: false }
+  let flowOrder: string[] = []
   let tenantView: TenantView = loadTenantView(store)
   let islands: readonly string[] = parseIslands(window.location.search)
   let last: Snapshot | null = null
@@ -131,13 +132,14 @@ export function startDashboard(): void {
   /** Draws what changed. Open and closed things live in `ui`, so a new snapshot never undoes them, and the page keeps its scroll place. */
   function draw(): void {
     if (!last) return
-    model = buildDashboard(last, tenantView)
+    model = buildDashboard(last, tenantView, flowOrder)
+    flowOrder = model.summary.flows?.all.map((f) => f.id) ?? []
     const y = window.scrollY
     const active = (document.activeElement as HTMLElement | null)?.closest<HTMLElement>('[data-toggle],[data-hide],[data-show],[data-db],[data-group],[data-conn]')
     const key = active ? (['toggle', 'hide', 'show', 'db', 'group'] as const).map((k) => (active.dataset[k] !== undefined ? `[data-${k}="${CSS.escape(active.dataset[k]!)}"]` : '')).join('') : ''
     const put = (id: string, html: string, k: keyof typeof shown): void => { if (shown[k] !== html) { shown[k] = html; $(id).innerHTML = html } }
     if (shown.brand !== model.townName) { shown.brand = model.townName; $('dash-brand').textContent = model.townName }
-    put('dash-sum', summaryHtml(model), 'sum')
+    put('dash-sum', summaryHtml(model, ui), 'sum')
     put('dash-pillars', pillarsHtml(model, ui as UiState), 'pillars')
     put('hidden-pillars', hiddenHtml(model), 'hidden')
     put('pillar-menu', pillarMenuHtml(model), 'menu')
@@ -295,6 +297,7 @@ export function startDashboard(): void {
     const conn = attr('data-conn')
     const group = attr('data-group')
     const dismiss = attr('data-dismiss')
+    if (t.closest('[data-flows-all]')) { ui.flowsAll = !ui.flowsAll; draw(); return }
     if (dismiss !== undefined) { void dismissEvent(dismiss); return }
     const system = t.closest<HTMLElement>('[data-system]')?.dataset.system
     if (toggle !== undefined) { if (ui.openPillars.has(toggle)) ui.openPillars.delete(toggle); else ui.openPillars.add(toggle); draw(); return }

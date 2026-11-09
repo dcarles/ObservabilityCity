@@ -4,6 +4,8 @@
 import { escapeHtml as esc } from '../picker'
 import type { Chip, Dashboard, Group, IncidentRow, Issue, JobRow, Level, Pillar, Row, Section, SideRow, TenantRow } from './model'
 import type { SourceLine } from './freshness'
+import type { Flow, FlowTile, PillarFlows } from './flows'
+import { formatRate } from '../visuals'
 
 /** What the viewer has opened or closed. A group or a database that is not in the maps follows its own default. */
 export interface UiState {
@@ -14,6 +16,8 @@ export interface UiState {
   connections: ReadonlySet<string>
   /** The lists under the pillars the viewer has opened; all start closed. */
   sections: ReadonlySet<string>
+  /** The Message flow tile lists every pair, not only the biggest few. */
+  flowsAll?: boolean
 }
 
 const num = (v: number | null, digits = 0): string => (v == null ? '–' : v.toLocaleString('en-GB', { minimumFractionDigits: digits, maximumFractionDigits: digits }))
@@ -44,7 +48,7 @@ function issueChip(i: Issue, withWhere: boolean): string {
   return `<span class="chip ${i.level}" data-system="${esc(i.id)}"><b>${esc(i.name)}</b>${withWhere ? ` · ${esc(i.where)}` : ''} · ${i.level === 'bad' ? 'down' : 'degraded'}${i.reason ? ` · ${esc(i.reason)}` : ''}</span>`
 }
 
-export function summaryHtml(d: Dashboard): string {
+export function summaryHtml(d: Dashboard, ui: Pick<UiState, 'flowsAll'> = {}): string {
   const s = d.summary
   const services = `<div class="kpi" id="kpi-services"><span>Services</span><b>${countsText(s.down, s.degraded)}</b>
     <div class="lst">${s.affected.length ? s.affected.map((i) => `<span class="ch" data-system="${esc(i.id)}">${dot(i.level)} ${esc(i.name)} <i>${esc(i.where)} · ${i.level === 'bad' ? 'down' : 'degraded'}</i></span>`).join('') : '<small>All services are healthy</small>'}</div></div>`
@@ -56,7 +60,26 @@ export function summaryHtml(d: Dashboard): string {
   const inc = s.incidents
   const incidents = inc ? `<div class="kpi" id="kpi-incidents"><span>Incidents</span><b class="${inc.open > 0 ? 'bad' : 'ok'}">${num(inc.open)}</b>
     <div class="ilist">${inc.rows.length ? inc.rows.map(incidentLine).join('') : '<small>No incidents</small>'}</div></div>` : ''
-  return services + traffic + dlq + incidents
+  return services + traffic + flowTileHtml(s.flows, ui.flowsAll === true) + dlq + incidents
+}
+
+const rate = (v: number): string => `${formatRate(v)} msg/s`
+
+/** The Message flow tile: the biggest pillar-to-pillar flows with bars scaled to the busiest pair, and a button for all of them. Left out when no pair has messages. */
+export function flowTileHtml(f: FlowTile | null, all: boolean): string {
+  if (!f) return ''
+  const list = all ? f.all : f.top
+  const lines = list.map((x) => `<div class="fl" data-flow="${esc(x.id)}"><span class="fn">${esc(x.fromName)} → ${esc(x.toName)}</span><b class="fv">${rate(x.perSecond)}</b><span class="fbar"><i style="width:${f.max > 0 ? Math.max(2, (x.perSecond / f.max) * 100) : 0}%"></i></span></div>`).join('')
+  const more = f.all.length > f.top.length || all
+  return `<div class="kpi" id="kpi-flow"><span>Message flow</span><div class="flist">${lines || '<small>No pair of pillars sends 1 message a second or more.</small>'}</div>${more ? `<button class="btn fall" data-flows-all aria-expanded="${all}">${all ? 'Show fewer' : `Show all ${f.all.length}`}</button>` : ''}</div>`
+}
+
+/** A pillar's flows on its card. Closed: one chip with the biggest flow it sends, when it sends any. Open: everything it sends and reads. */
+export function pillarFlowsHtml(f: PillarFlows, open: boolean): string {
+  if (!open) return f.out.length ? `<div class="pflow"><span class="ch" data-flow="${esc(f.out[0].id)}">→ ${esc(f.out[0].toName)} <i>${rate(f.out[0].perSecond)}</i></span></div>` : ''
+  if (!f.out.length && !f.in.length) return ''
+  const list = (label: string, xs: readonly Flow[], name: (x: Flow) => string): string => (xs.length ? `<div><span class="lbl">${label}</span>${xs.map((x) => `<span class="ch" data-flow="${esc(x.id)}">${esc(name(x))} <i>${rate(x.perSecond)}</i></span>`).join('')}</div>` : '')
+  return `<div class="sub-title">Messages</div><div class="cx pflowx">${list('Sends to', f.out, (x) => x.toName)}${list('Reads from', f.in, (x) => x.fromName)}</div>`
 }
 
 /** The queues with dead letters, worst first: the service that reads each, its pillar, the queue and how many. */
@@ -165,7 +188,8 @@ export function pillarHtml(p: Pillar, ui: UiState): string {
     <div class="acts"><button class="btn" data-toggle="${esc(p.id)}" aria-expanded="${open}">${open ? 'Close' : 'Services'}</button><button class="btn" data-hide="${esc(p.id)}">Hide</button></div></div>
     ${p.configError ? `<div class="issues"><span class="chip bad">${esc(p.configError)}</span></div>` : ''}
     ${p.issues.length ? `<div class="issues">${p.issues.map((i) => issueChip(i, false)).join('')}</div>` : ''}
-    ${open ? `<div class="body"><div class="tw"><table class="svc">${HEAD}<tbody>${p.groups.map((g) => groupHtml(g, ui)).join('')}</tbody></table></div>${jobsHtml(p.jobs)}</div>` : ''}</section>`
+    ${open ? '' : pillarFlowsHtml(p.flows, false)}
+    ${open ? `<div class="body">${pillarFlowsHtml(p.flows, true)}<div class="tw"><table class="svc">${HEAD}<tbody>${p.groups.map((g) => groupHtml(g, ui)).join('')}</tbody></table></div>${jobsHtml(p.jobs)}</div>` : ''}</section>`
 }
 
 export function pillarsHtml(d: Dashboard, ui: UiState): string {
