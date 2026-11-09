@@ -214,6 +214,7 @@ export class Town {
 
   build(s: Snapshot): void {
     this.snapshotId = ''
+    this.hitCache = {}
     const hub = s.groups.find((g) => g.isHub)
     const pillars = s.groups.filter((g) => !g.isHub)
     const routes: Route[] = []
@@ -610,27 +611,39 @@ export class Town {
   }
 
   update(dt: number, time: number, camera: THREE.Camera): void {
-    for (const [id, b] of this.buildings) this.guard(`update ${id}`, () => b.update(dt, time, camera))
-    for (const isl of this.islands) this.guard(`harbour ${isl.group.id}`, () => isl.harbour?.update(isl.messaging, time, camera))
-    for (const isl of this.islands) this.guard(`weather ${isl.group.id}`, () => isl.weather.update(dt, time, camera))
-    this.guard('weather hub', () => this.hubWeather?.update(dt, time, camera))
-    this.guard('airport', () => this.airport?.update(dt, time, camera))
-    this.guard('overlay', () => this.overlay.update(dt))
-    this.guard('cars', () => this.cars.update(dt))
-    this.guard('boats', () => this.boats.update(dt))
+    // Run every frame: plain try/catch per item, so that no closure or label string is made for each one (a guard() call per building would make hundreds of short-lived objects a frame).
+    for (const [id, b] of this.buildings) {
+      try { b.update(dt, time, camera) } catch (e) { this.report(`update ${id}`, e) }
+    }
+    for (const isl of this.islands) {
+      try { isl.harbour?.update(isl.messaging, time, camera) } catch (e) { this.report(`harbour ${isl.group.id}`, e) }
+    }
+    for (const isl of this.islands) {
+      try { isl.weather.update(dt, time, camera) } catch (e) { this.report(`weather ${isl.group.id}`, e) }
+    }
+    try { this.hubWeather?.update(dt, time, camera) } catch (e) { this.report('weather hub', e) }
+    try { this.airport?.update(dt, time, camera) } catch (e) { this.report('airport', e) }
+    try { this.overlay.update(dt) } catch (e) { this.report('overlay', e) }
+    try { this.cars.update(dt) } catch (e) { this.report('cars', e) }
+    try { this.boats.update(dt) } catch (e) { this.report('boats', e) }
   }
 
   private readonly reported = new Set<string>()
 
-  /** Runs one piece of per-frame work. If it throws, the error is logged once and the rest of the town carries on. */
+  /** Runs one piece of work. If it throws, the error is logged once and the rest of the town carries on. */
   private guard(what: string, work: () => void): void {
     try {
       work()
     } catch (e) {
-      if (this.reported.has(what)) return
-      this.reported.add(what)
-      console.error(`Could not ${what}:`, e)
+      this.report(what, e)
     }
+  }
+
+  /** Logs a failed piece of work, once for each kind. */
+  private report(what: string, e: unknown): void {
+    if (this.reported.has(what)) return
+    this.reported.add(what)
+    console.error(`Could not ${what}:`, e)
   }
 
   /** What one building shows right now, as plain values. For tests. */
@@ -662,18 +675,21 @@ export class Town {
 
   /** Boxes over every service's sign and hedge, for picking with the pointer. Each carries `userData.serviceKey`. */
   serviceHits(): THREE.Object3D[] {
-    return this.islands.flatMap((i) => [...i.services.values()].flatMap((s) => s.hits))
+    return (this.hitCache.service ??= this.islands.flatMap((i) => [...i.services.values()].flatMap((s) => s.hits)))
   }
 
   /** Boxes over every island's pier, crate pile and dead-letter pen, for picking with the pointer. Each carries `userData.harbourIsland`. */
   harbourHits(): THREE.Object3D[] {
-    return this.islands.flatMap((i) => i.harbour?.hits ?? [])
+    return (this.hitCache.harbour ??= this.islands.flatMap((i) => i.harbour?.hits ?? []))
   }
 
   /** Boxes over every resource building, for picking with the pointer. Each carries `userData.assetId`. */
   assetHits(): THREE.Object3D[] {
-    return [...this.islands.flatMap((i) => [...i.assets.values()].map((a) => a.hit)), ...[...this.hubAssets.values()].map((a) => a.hit)]
+    return (this.hitCache.asset ??= [...this.islands.flatMap((i) => [...i.assets.values()].map((a) => a.hit)), ...[...this.hubAssets.values()].map((a) => a.hit)])
   }
+
+  /** The hit lists above, made on the first hover after a build and kept until the next one: they only change when the town is built. */
+  private hitCache: { service?: THREE.Object3D[]; harbour?: THREE.Object3D[]; asset?: THREE.Object3D[] } = {}
 
   /** What one resource building is, from the latest snapshot. Null when the snapshot no longer has it. */
   assetSummary(id: string, s: Snapshot): AssetSummary | null {

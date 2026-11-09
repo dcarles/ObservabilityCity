@@ -16,7 +16,8 @@ public sealed class SourcePoller(
     LatestState state,
     ILogger<SourcePoller> log,
     ReadingCache? cache = null,
-    TimeProvider? time = null) : BackgroundService
+    TimeProvider? time = null,
+    Demand? demand = null) : BackgroundService
 {
     /// <summary>How often a source that stays down is mentioned again in the log.</summary>
     public static readonly TimeSpan ReminderEvery = TimeSpan.FromMinutes(5);
@@ -48,6 +49,14 @@ public sealed class SourcePoller(
         {
             while (true)
             {
+                if (demand is { Wanted: false })
+                {
+                    // nobody looks at this environment: no cloud calls until a browser connects, then a round at once
+                    timer.Dispose();
+                    var open = await Demand.WaitUntilWantedAsync(demand, ct);
+                    timer = new PeriodicTimer(source.PollInterval, _time);
+                    if (!open) return;
+                }
                 using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
                 string? problem = null;
                 Exception? detail = null;

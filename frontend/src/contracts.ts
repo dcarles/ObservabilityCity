@@ -607,6 +607,8 @@ export interface components {
             gateway: boolean;
             paths?: components["schemas"]["UnknownPathSnapshot"][] | null;
             vendorsOnly: boolean;
+            /** Format: int32 */
+            morePaths: number;
         };
         UnknownPathSnapshot: {
             path: string;

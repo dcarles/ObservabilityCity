@@ -403,8 +403,9 @@ public sealed record HiddenIsland(string Id, string DisplayName, bool Vendor = f
 /// <summary>
 /// One host that calls from the town go to and no rule explains: how many calls over the days link discovery remembers, which town systems made them,
 /// and on how many different days it was seen. Hosts that are a third party's or on the ignore list are never listed. Calls are sampling-corrected estimates.
+/// A gateway lists its busiest paths only; MorePaths says how many more there are.
 /// </summary>
-public sealed record UnknownHostSnapshot(string Host, double Calls, IReadOnlyList<string> Callers, int Days, bool Gateway = false, IReadOnlyList<UnknownPathSnapshot>? Paths = null, bool VendorsOnly = false);
+public sealed record UnknownHostSnapshot(string Host, double Calls, IReadOnlyList<string> Callers, int Days, bool Gateway = false, IReadOnlyList<UnknownPathSnapshot>? Paths = null, bool VendorsOnly = false, int MorePaths = 0);
 
 /// <summary>
 /// An entry of the town's _discovered/third-parties.yaml: Kind is vendor (a third party), internal (the company's own service) or ignore. Id is what Remove

@@ -22,7 +22,9 @@ export function mergeStatic(root: THREE.Object3D): THREE.Object3D {
   root.traverse((o) => {
     const mesh = o as THREE.Mesh
     if (!mesh.isMesh || (mesh as THREE.InstancedMesh).isInstancedMesh || (mesh as THREE.SkinnedMesh).isSkinnedMesh) return
-    if (Array.isArray(mesh.material) || !mesh.visible || mesh.userData.keep) return
+    if (Array.isArray(mesh.material) || mesh.userData.keep) return
+    // hidden, or under a part that is hidden or kept (something the model moves): it stays as it is
+    for (let p: THREE.Object3D | null = mesh; p && p !== root.parent; p = p.parent) if (!p.visible || (p !== root && p.userData.keep)) return
     const geo = mesh.geometry
     if (!geo.attributes.position || geo.attributes.color || geo.morphAttributes.position) return
     const key = `${materialKey(mesh.material)}|${mesh.castShadow}|${mesh.receiveShadow}`

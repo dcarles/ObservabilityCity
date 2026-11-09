@@ -12,13 +12,16 @@ namespace ObservabilityCity.Core.Links;
 /// fails leaves the last numbers in place and is reported as a notice.
 /// </summary>
 public sealed class LinkTrafficRunner(
-    IDependencySource source, ScopeStore scope, IRegistryProvider registries, LinkTraffic traffic, TimeProvider time, ILogger<LinkTrafficRunner> log, IRateHistory? history = null) : BackgroundService
+    IDependencySource source, ScopeStore scope, IRegistryProvider registries, LinkTraffic traffic, TimeProvider time, ILogger<LinkTrafficRunner> log, IRateHistory? history = null, Sources.Demand? demand = null) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken ct)
     {
+        if (!await Sources.Demand.WaitUntilWantedAsync(demand, ct)) return;
         if (scope.Inventory is null) await scope.WaitForReadAsync(LinkDiscoveryRunner.InventoryWait, ct);
         while (!ct.IsCancellationRequested)
         {
+            // nobody looks at this environment: no reads until a browser connects
+            if (!await Sources.Demand.WaitUntilWantedAsync(demand, ct)) return;
             var interval = await CycleAsync(ct);
             try { await Task.Delay(interval, time, ct); }
             catch (OperationCanceledException) { return; }

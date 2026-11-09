@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import type { NodeKind } from '../../types'
 import type { BuildingModel } from '../../buildings/model'
-import { at, box, canvasTexture, cone, cyl, dome, flat, group, sphere } from '../../buildings/mk'
+import { animated, at, box, canvasTexture, cone, cyl, dome, flat, group, sphere } from '../../buildings/mk'
 import { makeWindowMaterial } from '../../buildings/windowMaterial'
 import { kit } from '../../assets/kit'
 import { palette } from '../active'
@@ -147,6 +147,7 @@ function factory(accent: string): BuildingModel {
   for (let i = 0; i < 8; i++) {
     smoke.push(new THREE.Mesh(new THREE.IcosahedronGeometry(0.3, 0), new THREE.MeshStandardMaterial({ color: '#f4f4f4', transparent: true, opacity: 0.8, roughness: 1, flatShading: true })))
   }
+  smoke.forEach(animated)
   const CHIMNEYS = [{ x: 1.9, h: 3.4 }, { x: 1.0, h: 2.6 }]
   const stack = (x: number, h: number) => group(
     cyl(0.34, 0.46, h, chim, { x, y: 0.14, z: -1.4 }, 10),
@@ -324,6 +325,7 @@ function clockTower(): BuildingModel {
   const hands = new THREE.Group()
   const hourHand = box(0.07, 0.34, 0.03, flat('#2b2622'))
   const minuteHand = box(0.05, 0.5, 0.03, flat('#2b2622'))
+  animated(hourHand); animated(minuteHand)
   hands.add(hourHand, minuteHand)
   const roof = group(box(2.8, 1.9, 2.8, stone))
   for (const [x, z, ry] of [[0, 1.41, 0], [0, -1.41, Math.PI], [1.41, 0, Math.PI / 2], [-1.41, 0, -Math.PI / 2]] as const) {
@@ -418,7 +420,7 @@ function port(name?: string): BuildingModel {
     box(0.1, 1.6, 0.1, flat('#333a44'), { y: 2.6, z: 3.5 }),
     box(0.7, 0.5, 0.9, flat('#f2b632'), { y: 2.2, z: 3.5 }),
   )
-  crane.position.set(0, 0.3, 9.5)
+  animated(crane).position.set(0, 0.3, 9.5)
   dock.position.y = 0.4
   const base = group(
     box(W + 1.0, 0.4, D + 0.6, flat('#b9b2a4')),
@@ -464,7 +466,7 @@ function egress(accent: string): BuildingModel {
     awning(1.7, 0.95, 2.4, accent),
     box(3.6, 0.08, 1.4, flat('#cfc8b8'), { z: 2.7 }),
   )
-  const dishPivot = new THREE.Group()
+  const dishPivot = animated(new THREE.Group())
   const dishBowl = dome(1.0, flat(P.egressDish, { roughness: 0.4 }))
   dishBowl.rotation.x = Math.PI * 0.72
   dishBowl.position.set(0, 1.35, 0)

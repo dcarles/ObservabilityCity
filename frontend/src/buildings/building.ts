@@ -7,6 +7,7 @@ import type { EngineLabel } from '../engineSign'
 import { labelRise, type BuildingModel, type FloorModule, type TenantYardStatus } from './model'
 import { ALL_TENANTS, type TenantView } from '../tenants'
 import { canvasTexture, roundRect } from './mk'
+import { mergeStatic } from '../scene/merge'
 
 /** What a building shows, for tests. See Building.status. */
 export interface BuildingStatus {
@@ -123,6 +124,9 @@ export class Building {
   constructor(readonly id: string, readonly kind: NodeSnapshot['kind'], accent: string, tenanted = false, name?: string, engine?: EngineLabel | null) {
     this.model = buildModel(kind, accent, { tenanted, name, engine })
     const m = this.model
+    // what the model never moves is merged into a few meshes for each look, before the floors, beacon and signs are added: a building was about 25 draw calls, mostly its props
+    mergeStatic(m.base)
+    mergeStatic(m.roof)
     this.pivot.add(m.base)
     for (let i = 0; i < MAX_FLOORS; i++) {
       const module = m.makeFloor(i)

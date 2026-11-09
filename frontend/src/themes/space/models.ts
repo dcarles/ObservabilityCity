@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import type { NodeKind } from '../../types'
 import type { BuildingModel } from '../../buildings/model'
-import { at, box, canvasTexture, cone, cyl, dome, flat, group, sphere } from '../../buildings/mk'
+import { animated, at, box, canvasTexture, cone, cyl, dome, flat, group, sphere } from '../../buildings/mk'
 import { makeWindowMaterial } from '../../buildings/windowMaterial'
 import { palette } from '../active'
 import { storageYard } from '../harbour-town/yard'
@@ -78,6 +78,7 @@ function fabricator(accent: string): BuildingModel {
   for (let i = 0; i < 8; i++) {
     plasma.push(new THREE.Mesh(new THREE.SphereGeometry(0.3, 8, 6), new THREE.MeshBasicMaterial({ color: '#7be3ff', transparent: true, opacity: 0.7, toneMapped: false, depthWrite: false })))
   }
+  plasma.forEach(animated)
   const STACKS = [{ x: 1.9, h: 3.0 }, { x: 1.0, h: 2.3 }]
   const stack = (x: number, h: number) => group(
     cyl(0.4, 0.5, h, flat('#4a5388', { metalness: 0.3 }), { x, y: 0.14, z: -1.4 }, 12),
@@ -211,7 +212,7 @@ function chronoSpire(): BuildingModel {
     ring.rotation.x = Math.PI / 2
     return ring
   })
-  const ringGroup = group(...rings)
+  const ringGroup = animated(group(...rings))
   ringGroup.position.set(0, 1.0, 0)
   const base = group(
     pad(1.9),
@@ -304,7 +305,7 @@ function spaceport(name?: string): BuildingModel {
     box(0.1, 1.6, 0.1, flat('#d6dcff'), { y: 2.6, z: 3.5 }),
     sphere(0.4, glow('#ffd45e'), { y: 2.2, z: 3.5 }, 10),
   )
-  arm.position.set(0, 0.3, 9.5)
+  animated(arm).position.set(0, 0.3, 9.5)
   dock.position.y = 0.4
   const base = group(
     box(W + 1.0, 0.4, D + 0.6, flat(PLATE, { metalness: 0.3 })),
@@ -352,7 +353,7 @@ function relayStation(accent: string): BuildingModel {
     box(1.7, 0.1, 0.8, flat(accent), { y: 1.0, z: 2.5 }),
     box(3.6, 0.06, 1.4, flat(PLATE), { y: 0.26, z: 2.7 }),
   )
-  const dishPivot = new THREE.Group()
+  const dishPivot = animated(new THREE.Group())
   const bowl = dome(1.1, flat(P.egressDish, { roughness: 0.35, metalness: 0.3 }))
   bowl.rotation.x = Math.PI * 0.72
   bowl.position.set(0, 1.35, 0)

@@ -564,6 +564,30 @@ public class LinkDiscoveryTests
     }
 
     [Fact]
+    public async Task A_rescan_asked_for_by_an_edit_waits_until_the_edits_stop_so_three_edits_cost_one_read()
+    {
+        var clock = new FakeTimeProvider(Now);
+        var (town, copy) = Make(TownA, true, clock, DeskVendors);
+        using var _ = copy;
+        var runner = town.Runner(new FakeDependencies(_ => []), clock);
+        var asked = town.Store.TakeReadRequest();
+        town.Store.RequestRead(); // the first edit
+        await asked;
+
+        var quiet = runner.QuietAsync(TestContext.Current.CancellationToken);
+        await Task.Delay(50, TestContext.Current.CancellationToken);
+        clock.Advance(LinkDiscoveryRunner.RescanQuiet - TimeSpan.FromSeconds(5));
+        town.Store.RequestRead(); // a second edit just before the quiet time is over starts it again
+        await Task.Delay(50, TestContext.Current.CancellationToken);
+        clock.Advance(LinkDiscoveryRunner.RescanQuiet - TimeSpan.FromSeconds(5));
+        await Task.Delay(50, TestContext.Current.CancellationToken);
+        Assert.False(quiet.IsCompleted);
+
+        clock.Advance(TimeSpan.FromSeconds(10));
+        await quiet.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
     public async Task The_names_already_read_are_remembered_across_a_restart_so_nothing_is_read_twice()
     {
         var clock = new FakeTimeProvider(Now);

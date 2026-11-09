@@ -14,7 +14,7 @@ export function unknownHostRow(h: UnknownHostSnapshot, index: number, showVendor
     <div class="dim">A gateway: no rule explains these paths. Pick the system a path belongs to and add a rule.</div>
     <ul class="paths">${paths.map((p, j) => `<li data-path="${escapeHtml(p.path)}"><span>${escapeHtml(p.path || '(no path)')}</span> <span class="dim">· about ${callsText(p.calls)} calls</span>
       <select data-target data-i="${index}" data-j="${j}"><option value="">system…</option>${targets.map((t) => `<option value="${escapeHtml(t)}"${chosen.get(`${h.host}|${p.path}`) === t ? ' selected' : ''}>${escapeHtml(t)}</option>`).join('')}</select>
-      <button data-rule data-i="${index}" data-j="${j}">Add rule</button></li>`).join('')}</ul></li>`
+      <button data-rule data-i="${index}" data-j="${j}">Add rule</button></li>`).join('')}</ul>${h.morePaths > 0 ? `<div class="dim">and ${h.morePaths} more path${h.morePaths === 1 ? '' : 's'}, the least called, not shown</div>` : ''}</li>`
   }
   return `<li data-host="${escapeHtml(h.host)}">${head}
     <div class="actions">${h.vendorsOnly ? '' : `<button data-add="vendor" data-i="${index}">Add vendor</button><button data-add="internal" data-i="${index}">Add internal</button>`}<button data-add="ignore" data-i="${index}">Ignore</button></div></li>`

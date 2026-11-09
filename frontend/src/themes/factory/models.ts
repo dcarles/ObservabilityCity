@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import type { NodeKind } from '../../types'
 import type { BuildingModel } from '../../buildings/model'
-import { at, box, canvasTexture, cone, cyl, dome, flat, group } from '../../buildings/mk'
+import { animated, at, box, canvasTexture, cone, cyl, dome, flat, group } from '../../buildings/mk'
 import { makeWindowMaterial } from '../../buildings/windowMaterial'
 import { palette } from '../active'
 import { storageYard } from '../harbour-town/yard'
@@ -78,6 +78,7 @@ function productionHall(accent: string): BuildingModel {
   let activity = 0.4
   const smoke: THREE.Mesh[] = []
   for (let i = 0; i < 8; i++) smoke.push(new THREE.Mesh(new THREE.IcosahedronGeometry(0.3, 0), new THREE.MeshStandardMaterial({ color: '#e9e9e6', transparent: true, opacity: 0.8, roughness: 1, flatShading: true })))
+  smoke.forEach(animated)
   const STACKS = [{ x: 1.9, h: 3.8 }, { x: 1.0, h: 2.9 }]
   const stack = (x: number, h: number) => group(
     cyl(0.34, 0.46, h, flat('#9a4a36'), { x, y: 0.14, z: -1.4 }, 10),
@@ -224,6 +225,7 @@ function timerTower(): BuildingModel {
   })
   const faceMat = new THREE.MeshBasicMaterial({ map: faceTex })
   const hourHand = box(0.07, 0.34, 0.03, flat(BLACK)), minuteHand = box(0.05, 0.5, 0.03, flat(BLACK))
+  animated(hourHand); animated(minuteHand)
   const hands = group(hourHand, minuteHand)
   const roof = group(box(2.8, 1.9, 2.8, concrete))
   for (const [x, z, ry] of [[0, 1.41, 0], [0, -1.41, Math.PI], [1.41, 0, Math.PI / 2], [-1.41, 0, -Math.PI / 2]] as const) {
@@ -311,7 +313,7 @@ function freightDepot(name?: string): BuildingModel {
     box(0.12, 1.6, 0.12, flat(BLACK), { y: 2.8, x: 0.6 }),
     box(0.7, 0.5, 0.9, flat('#d9573f'), { y: 2.3, x: 0.6 }),
   )
-  crane.position.set(0, 0.3, 9.5)
+  animated(crane).position.set(0, 0.3, 9.5)
   dock.position.y = 0.4
   const base = group(
     box(W + 1.0, 0.4, D + 0.6, flat('#a39f92')),
@@ -364,7 +366,7 @@ function radioMast(accent: string): BuildingModel {
     const y = 0.3 + i * 0.5
     lattice.add(box(0.95, 0.04, 0.04, leg, { y, z: 0.45 }), box(0.95, 0.04, 0.04, leg, { y, z: -0.45 }), box(0.04, 0.04, 0.95, leg, { y, x: 0.45 }), box(0.04, 0.04, 0.95, leg, { y, x: -0.45 }))
   }
-  const dishPivot = new THREE.Group()
+  const dishPivot = animated(new THREE.Group())
   const bowl = dome(0.8, flat(P.egressDish, { roughness: 0.4 }))
   bowl.rotation.x = Math.PI * 0.72
   dishPivot.add(bowl)

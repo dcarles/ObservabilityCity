@@ -81,6 +81,7 @@ public sealed class AzureMonitorReader(HttpClient http, ICredentialSource? crede
             if (token is not null) request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
             HttpResponseMessage? response = null;
             string? text = null;
+            TimeSpan? told = null;
             try
             {
                 response = await http.SendAsync(request, ct);
@@ -94,14 +95,14 @@ public sealed class AzureMonitorReader(HttpClient http, ICredentialSource? crede
                     if (response.IsSuccessStatusCode) return text;
                     if (attempt >= Attempts || !IsHiccup(response.StatusCode))
                         throw new HttpRequestException($"{service} answered {(int)response.StatusCode} {response.ReasonPhrase} for {Last(resourceId)}: {Trim(text)}");
+                    told = RetryWait.For(response.Headers, attempt, retryDelay, DateTimeOffset.UtcNow, Random.Shared.NextDouble());
                 }
             }
-            await Task.Delay((retryDelay ?? TimeSpan.FromMilliseconds(400)) * attempt, ct);
+            await Task.Delay(told ?? RetryWait.For(null, attempt, retryDelay, DateTimeOffset.UtcNow, Random.Shared.NextDouble()), ct);
         }
     }
 
-    private static bool IsHiccup(System.Net.HttpStatusCode code) => code is System.Net.HttpStatusCode.TooManyRequests or System.Net.HttpStatusCode.InternalServerError
-        or System.Net.HttpStatusCode.BadGateway or System.Net.HttpStatusCode.ServiceUnavailable or System.Net.HttpStatusCode.GatewayTimeout;
+    private static bool IsHiccup(System.Net.HttpStatusCode code) => RetryWait.IsHiccup(code);
 
     /// <summary>The series of an answer split by a dimension, each with the value of the dimension it is for. A series without that value is left out.</summary>
     public static IReadOnlyList<EntitySeries> ParseByDimension(string json, MetricCall call, string dimension)

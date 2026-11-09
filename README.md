@@ -319,7 +319,7 @@ fake: { undeclaredTenants: [zeta-trading] }   # fake source only: a tenant that 
 
 ### Performance
 
-The sample town has 17 islands, about 110 buildings and up to 420 cars. Roads, lamps, props, bridges and quays are merged into a few meshes per island (about 4,700 draw calls instead of 8,900). If a frame takes more than 33 ms on average, quality steps down by itself, once per step and never back up: first shadows refresh a few times a second and at a lower resolution, then they turn off, and a note says so. Add `?quality=high` (or `medium`, `low`) to the address to pin a level and turn the automatic step off.
+The sample town has 17 islands, about 110 buildings and up to 420 cars. Roads, lamps, props, bridges and quays are merged into a few meshes per island (about 4,700 draw calls instead of 8,900), and so are the fixed props of every building (the 15-island test town went from 771 to 615 draw calls); only what a model moves, such as smoke, clock hands, cranes and dishes, keeps its own mesh. If a frame takes more than 33 ms on average, quality steps down by itself, once per step and never back up: first shadows refresh a few times a second and at a lower resolution, then they turn off, and a note says so. Add `?quality=high` (or `medium`, `low`) to the address to pin a level and turn the automatic step off.
 
 ### Settings
 
@@ -329,6 +329,7 @@ The sample town has 17 islands, about 110 buildings and up to 420 cars. Roads, l
 | `Registry:Towns:0` ... | every `config/*/town.yaml` | The folders of the towns to run |
 | `Registry:DefaultTown` | `galactic-credit` | The town a page gets when it asks for none |
 | `Fake:DayLengthSeconds` | `120` | Real seconds per simulated day |
+| `Polling:AlwaysOn` | `false` | A live environment reads its sources only while a browser looks at it (and 2 minutes after). `true` keeps every environment polling all the time |
 | `Snapshot:IntervalSeconds` | `2` | How often a snapshot is built (the newest is always at `/api/snapshot/latest`) |
 | `Snapshot:KeepAliveSeconds` | `15` | Viewers are sent a snapshot when something in it changed, and at least this often so the feed shows it is alive. `0` sends every build |
 | `Snapshot:StaleAfterSeconds` | `30` | Readings older than this are shown as stale |

@@ -2,7 +2,16 @@ import { describe, expect, it } from 'vitest'
 import { addedRow, panelLabel, unknownHostRow } from '../../src/unknownHosts'
 import type { UnknownHostSnapshot } from '../../src/types'
 
-const host = (over: Partial<UnknownHostSnapshot> = {}): UnknownHostSnapshot => ({ host: 'api.partner.example', calls: 12345.6, callers: ['aa.orders-api', 'bb.ledger-worker'], days: 3, gateway: false, vendorsOnly: false, ...over })
+const host = (over: Partial<UnknownHostSnapshot> = {}): UnknownHostSnapshot => ({ host: 'api.partner.example', calls: 12345.6, callers: ['aa.orders-api', 'bb.ledger-worker'], days: 3, gateway: false, vendorsOnly: false, morePaths: 0, ...over })
+
+describe('a gateway row with more paths than are listed', () => {
+  it('says how many are not shown', () => {
+    const html = unknownHostRow(host({ gateway: true, paths: [{ path: '/a', calls: 5, vendorsOnly: false }], morePaths: 3 }), 0)
+    expect(html).toContain('and 3 more paths, the least called, not shown')
+    expect(unknownHostRow(host({ gateway: true, paths: [], morePaths: 1 }), 0)).toContain('and 1 more path,')
+    expect(unknownHostRow(host({ gateway: true, paths: [], morePaths: 0 }), 0)).not.toContain('more path')
+  })
+})
 
 describe('a row of the Unknown hosts panel', () => {
   it('says how many calls, how many days and who called, and escapes the host', () => {

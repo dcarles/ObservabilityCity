@@ -35,6 +35,10 @@ public sealed class EnvironmentRuntime(string townId, string id, EnvironmentRegi
     public ScopeStore Scope { get; } = scope ?? new ScopeStore();
     /// <summary>What link discovery has found for this environment; null when its file has no links block.</summary>
     public DiscoveredLinks? Discovered { get; } = discovered;
+    /// <summary>Whether any browser looks at this environment. A live environment polls its sources only while one does (see <see cref="ObservabilityCity.Core.Sources.Demand"/>); a demo one has no cloud to spare and always runs.</summary>
+    public ObservabilityCity.Core.Sources.Demand Demand { get; } = new();
+    /// <summary>The demand the background work waits on: null (never waits) in a demo environment.</summary>
+    public ObservabilityCity.Core.Sources.Demand? Gate => Fake is null ? Demand : null;
 }
 
 /// <summary>

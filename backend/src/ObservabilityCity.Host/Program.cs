@@ -123,20 +123,23 @@ var towns = new TownSet(townRuntimes, defaultTown);
 builder.Services.AddSingleton(towns);
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<IslandViews>();
+// Polling:AlwaysOn keeps every environment polling whether or not a browser looks at it (the way tests and a pre-warmed hosted server want it)
+var alwaysOn = builder.Configuration.GetValue("Polling:AlwaysOn", false);
 foreach (var (town, runtimes) in hostedByTown)
 {
+    foreach (var rt in runtimes) rt.Demand.AlwaysOn = alwaysOn;
     var holder = town.Registry;
     builder.Services.AddSingleton<IHostedService>(sp => new RegistryReloader(
         holder, town.Folder, TimeSpan.FromSeconds(builder.Configuration.GetValue("Registry:WatchSeconds", 5.0)), sp.GetRequiredService<ILogger<RegistryReloader>>()));
     foreach (var rt in runtimes)
     {
         // AddHostedService would keep only the first of each type, so these are added as plain services
-        builder.Services.AddSingleton<IHostedService>(sp => new SourcePoller(rt.Sources, rt.Registry, rt.State, sp.GetRequiredService<ILogger<SourcePoller>>(), rt.Readings));
+        builder.Services.AddSingleton<IHostedService>(sp => new SourcePoller(rt.Sources, rt.Registry, rt.State, sp.GetRequiredService<ILogger<SourcePoller>>(), rt.Readings, demand: rt.Gate));
         if (rt.Discovered is not null && rt.Sources.OfType<IDependencySource>().FirstOrDefault(s => s.CanReadDependencies && ((IMetricSource)s).Name == rt.Registry.Current.ActiveEnvironment?.Links?.Source) is { } dependencies)
-            builder.Services.AddSingleton<IHostedService>(sp => new LinkDiscoveryRunner(dependencies, rt.Scope, rt.Registry, rt.Discovered, TimeProvider.System, sp.GetRequiredService<ILogger<LinkDiscoveryRunner>>()));
+            builder.Services.AddSingleton<IHostedService>(sp => new LinkDiscoveryRunner(dependencies, rt.Scope, rt.Registry, rt.Discovered, TimeProvider.System, sp.GetRequiredService<ILogger<LinkDiscoveryRunner>>(), rt.Gate));
         if (rt.Discovered is not null && rt.Registry.Current.ActiveEnvironment?.Links?.Traffic is not null
             && rt.Sources.OfType<IDependencySource>().FirstOrDefault(s => s.CanReadDependencies && ((IMetricSource)s).Name == rt.Registry.Current.ActiveEnvironment.Links.Source) is { } trafficSource)
-            builder.Services.AddSingleton<IHostedService>(sp => new LinkTrafficRunner(trafficSource, rt.Scope, rt.Registry, rt.Discovered.Traffic, TimeProvider.System, sp.GetRequiredService<ILogger<LinkTrafficRunner>>(), trafficSource as IRateHistory));
+            builder.Services.AddSingleton<IHostedService>(sp => new LinkTrafficRunner(trafficSource, rt.Scope, rt.Registry, rt.Discovered.Traffic, TimeProvider.System, sp.GetRequiredService<ILogger<LinkTrafficRunner>>(), trafficSource as IRateHistory, rt.Gate));
         builder.Services.AddSingleton<IHostedService>(sp => new SnapshotPublisher(rt.Builder, rt.Store,
             new SignalRSnapshotNotifier(sp.GetRequiredService<IHubContext<TownHub>>(), town.Environments, sp.GetRequiredService<IslandViews>()),
             snapshotInterval, sp.GetRequiredService<ILogger<SnapshotPublisher>>(), keepAliveSeconds > 0 ? TimeSpan.FromSeconds(keepAliveSeconds) : null));

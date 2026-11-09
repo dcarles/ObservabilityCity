@@ -62,6 +62,15 @@ export function dome(r: number, mat: THREE.Material, p: Placement = {}): THREE.M
   return place(shadowed(new THREE.Mesh(g, mat)), p)
 }
 
+/**
+ * Marks a part that a model moves or recolours while it runs (smoke, clock hands, a crane, a dish): it keeps its own object and draw call,
+ * and so does everything under it. Everything else in a building is fixed and is merged into a few meshes (see mergeStatic).
+ */
+export function animated<T extends THREE.Object3D>(o: T): T {
+  o.userData.keep = true
+  return o
+}
+
 export function group(...children: THREE.Object3D[]): THREE.Group {
   const g = new THREE.Group()
   for (const c of children) g.add(c)
