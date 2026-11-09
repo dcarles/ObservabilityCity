@@ -902,7 +902,11 @@
         }
       ],
       "assets": [],
-      "flow": null
+      "flow": {
+        "sentPerSecond": 750.4,
+        "receivedPerSecond": 126.4,
+        "windowSeconds": 300
+      }
     },
     {
       "id": "acc",
@@ -1315,7 +1319,11 @@
         }
       ],
       "assets": [],
-      "flow": null
+      "flow": {
+        "sentPerSecond": 480,
+        "receivedPerSecond": 40,
+        "windowSeconds": 300
+      }
     },
     {
       "id": "pay",
@@ -1682,7 +1690,11 @@
         }
       ],
       "assets": [],
-      "flow": null
+      "flow": {
+        "sentPerSecond": 498.4,
+        "receivedPerSecond": 64.8,
+        "windowSeconds": 300
+      }
     },
     {
       "id": "frd",
@@ -2010,7 +2022,11 @@
         }
       ],
       "assets": [],
-      "flow": null
+      "flow": {
+        "sentPerSecond": 680,
+        "receivedPerSecond": 88,
+        "windowSeconds": 300
+      }
     },
     {
       "id": "cus",
@@ -2527,7 +2543,11 @@
         }
       ],
       "assets": [],
-      "flow": null
+      "flow": {
+        "sentPerSecond": 619.2,
+        "receivedPerSecond": 43.2,
+        "windowSeconds": 300
+      }
     },
     {
       "id": "acq",
@@ -2965,7 +2985,11 @@
         }
       ],
       "assets": [],
-      "flow": null
+      "flow": {
+        "sentPerSecond": 148,
+        "receivedPerSecond": 31.2,
+        "windowSeconds": 300
+      }
     },
     {
       "id": "dec",
@@ -3295,7 +3319,11 @@
         }
       ],
       "assets": [],
-      "flow": null
+      "flow": {
+        "sentPerSecond": 320,
+        "receivedPerSecond": 48,
+        "windowSeconds": 300
+      }
     },
     {
       "id": "bil",
@@ -3655,7 +3683,11 @@
         }
       ],
       "assets": [],
-      "flow": null
+      "flow": {
+        "sentPerSecond": 144,
+        "receivedPerSecond": 24,
+        "windowSeconds": 300
+      }
     },
     {
       "id": "col",
@@ -4279,7 +4311,11 @@
         }
       ],
       "assets": [],
-      "flow": null
+      "flow": {
+        "sentPerSecond": 196,
+        "receivedPerSecond": 48.8,
+        "windowSeconds": 300
+      }
     },
     {
       "id": "dsp",
@@ -4561,7 +4597,11 @@
         }
       ],
       "assets": [],
-      "flow": null
+      "flow": {
+        "sentPerSecond": 0,
+        "receivedPerSecond": 0,
+        "windowSeconds": 300
+      }
     },
     {
       "id": "rwd",
@@ -4889,7 +4929,11 @@
         }
       ],
       "assets": [],
-      "flow": null
+      "flow": {
+        "sentPerSecond": 296,
+        "receivedPerSecond": 56,
+        "windowSeconds": 300
+      }
     },
     {
       "id": "obk",
@@ -5219,7 +5263,11 @@
         }
       ],
       "assets": [],
-      "flow": null
+      "flow": {
+        "sentPerSecond": 161.6,
+        "receivedPerSecond": 17.6,
+        "windowSeconds": 300
+      }
     },
     {
       "id": "ntf",
@@ -5588,7 +5636,11 @@
         }
       ],
       "assets": [],
-      "flow": null
+      "flow": {
+        "sentPerSecond": 244,
+        "receivedPerSecond": 68,
+        "windowSeconds": 300
+      }
     },
     {
       "id": "dat",
@@ -6060,7 +6112,11 @@
         }
       ],
       "assets": [],
-      "flow": null
+      "flow": {
+        "sentPerSecond": 456,
+        "receivedPerSecond": 100.8,
+        "windowSeconds": 300
+      }
     },
     {
       "id": "rcn",
@@ -6275,7 +6331,11 @@
         }
       ],
       "assets": [],
-      "flow": null
+      "flow": {
+        "sentPerSecond": 84,
+        "receivedPerSecond": 36,
+        "windowSeconds": 300
+      }
     },
     {
       "id": "reg",
@@ -6610,7 +6670,11 @@
         }
       ],
       "assets": [],
-      "flow": null
+      "flow": {
+        "sentPerSecond": 0,
+        "receivedPerSecond": 3.2,
+        "windowSeconds": 300
+      }
     }
   ],
   "vendors": [

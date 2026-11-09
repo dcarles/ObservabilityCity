@@ -576,7 +576,11 @@
         }
       ],
       "assets": [],
-      "flow": null
+      "flow": {
+        "sentPerSecond": 128,
+        "receivedPerSecond": 0,
+        "windowSeconds": 300
+      }
     },
     {
       "id": "bb",

@@ -399,7 +399,11 @@
         }
       ],
       "assets": [],
-      "flow": null
+      "flow": {
+        "sentPerSecond": 128,
+        "receivedPerSecond": 16,
+        "windowSeconds": 300
+      }
     },
     {
       "id": "wrk",
@@ -525,7 +529,11 @@
         }
       ],
       "assets": [],
-      "flow": null
+      "flow": {
+        "sentPerSecond": 64,
+        "receivedPerSecond": 16,
+        "windowSeconds": 300
+      }
     },
     {
       "id": "nom",
@@ -906,7 +914,11 @@
         }
       ],
       "assets": [],
-      "flow": null
+      "flow": {
+        "sentPerSecond": 0,
+        "receivedPerSecond": 8,
+        "windowSeconds": 300
+      }
     },
     {
       "id": "sta",

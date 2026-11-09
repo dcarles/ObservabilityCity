@@ -392,7 +392,11 @@
         }
       ],
       "assets": [],
-      "flow": null
+      "flow": {
+        "sentPerSecond": 128,
+        "receivedPerSecond": 16,
+        "windowSeconds": 300
+      }
     },
     {
       "id": "cc",
@@ -575,7 +579,11 @@
         }
       ],
       "assets": [],
-      "flow": null
+      "flow": {
+        "sentPerSecond": 128,
+        "receivedPerSecond": 16,
+        "windowSeconds": 300
+      }
     }
   ],
   "vendors": [
