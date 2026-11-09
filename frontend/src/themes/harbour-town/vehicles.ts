@@ -24,7 +24,8 @@ function makeBoat(seed: number, internal = false): BoatLook {
   hull.castShadow = true
   hull.receiveShadow = true
   const stripe = box(W + 0.14, 0.14, L + 1.5, flat('#f4efe2'), { y: 0.5 })
-  const deck = box(W - 0.2, 0.06, L - 0.4, flat('#b58a58'), { y: 0.66, z: 0.1 })
+  // the deck plank clears the hull top (0.71) by a wide margin: sitting just under it made the two faces fight (flicker) on a boat with no crates
+  const deck = box(W - 0.2, 0.1, L - 0.4, flat('#b58a58'), { y: 0.75, z: 0.1 })
   const white = flat('#f6f2e8')
   const trim = flat(paint.trim)
   const sx = W / 2 - 0.08
