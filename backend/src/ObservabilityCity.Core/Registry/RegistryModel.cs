@@ -68,7 +68,7 @@ public sealed record DatabaseEngine(string Id, string Name, string Type);
 /// <summary>A scheduled job of a function and the services (of the same pillar) it starts work for. SystemId is the function's full id.</summary>
 public sealed record RegistrySchedule(string SystemId, string Job, IReadOnlyList<string> Services);
 
-/// <summary>A Service Bus topic. Name is {pillar}-{service}-outbox for a pillar and hub-{name} for the hub; Service is the service (or hub name) that publishes it.</summary>
+/// <summary>A Service Bus topic. Name comes from the town's messaging.topicTemplate for a pillar and messaging.hubTopicTemplate for the hub; Service is the service (or hub name) that publishes it.</summary>
 public sealed record RegistryTopic(string Name, string GroupId, string Service);
 
 /// <summary>A worker reading a topic. PublisherGroupId is the island that owns the topic. Legacy marks a read of the hub's egress topic by a pillar.</summary>

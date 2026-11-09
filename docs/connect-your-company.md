@@ -1,26 +1,46 @@
 # Connect your company
 
-How to take a fork of Observability City from the fake town to your own Azure and Grafana, one source at a time. Nothing in this runbook needs a secret in the repository.
+How to take a copy of Observability City from the fake town to your own Azure and Grafana, one source at a time. Nothing in this runbook needs a secret in the repository.
 
 Every key of every config file, with its default and whether it is required, is in the [config reference](config-reference.md).
 
 What works today: the town runs on fake data, and `validate --sources` tells you whether your Azure login can reach each source you configure. The adapters that turn real data into the town arrive phase by phase (real metrics, then messaging, then incidents); each one is added by the same steps, and a source you have not enabled yet stays out of the town.
 
-## The shape of a fork
+## Keep your company config out of any public repository
 
-A fork adds only two things and never edits core:
+**A GitHub fork of a public repository is always public, and it cannot be made private.** Your town files hold subscription and tenant ids, customer tenant names, workspace names, resource-name patterns and queries. Never commit them to a fork of this repository, or to this repository.
 
-- `config/<company>/`: your town (pillars, systems, environments).
+Use one of these two setups:
+
+1. **Config outside the clone (recommended).** Keep your town in its own folder, ideally its own *private* repository, anywhere on the machine, and point the app at it (step 3). The clone of this repository then holds nothing of yours, so `git add .` cannot publish it.
+2. **A private copy of the code.** Only if you also need to change code. Create an empty *private* repository, then:
+
+```
+git clone --bare https://github.com/dcarles/ObservabilityCity.git
+cd ObservabilityCity.git
+git push --mirror https://github.com/<you>/<your-private-repo>.git
+cd .. && rm -rf ObservabilityCity.git
+git clone https://github.com/<you>/<your-private-repo>.git
+cd <your-private-repo>
+git remote add upstream https://github.com/dcarles/ObservabilityCity.git
+```
+
+`origin` is your private copy. `upstream` is only a link you pull from (`git fetch upstream && git merge upstream/main`); you never push to it.
+
+## The shape of a company setup
+
+A company adds only two things and never edits core:
+
+- Your town folder (pillars, systems, environments), kept outside the clone or in `config/<company>/` of a private copy.
 - `extensions/`: your own code, when something is specific to your company.
 
 Anything generic goes back upstream ([below](#send-a-generic-fix-upstream)). This keeps pulling upstream updates conflict-free.
 
-## 1. Fork and clone
+## 1. Clone
 
 ```
-gh repo fork dcarles/ObservabilityCity --clone
+git clone https://github.com/dcarles/ObservabilityCity.git
 cd ObservabilityCity
-git remote add upstream https://github.com/dcarles/ObservabilityCity.git   # if the fork command did not
 dotnet run --project backend/src/ObservabilityCity.AppHost
 ```
 
@@ -46,14 +66,10 @@ Your login needs read access only: Monitoring Reader on the Prometheus / Log Ana
 
 ## 3. Create your town
 
-```
-mkdir config/<company>
-```
-
-Start from the sample (`config/galactic-credit`) and keep the same layout:
+Create the folder outside the clone (the examples below call it `<company-config>`, for example `C:\Config\acme` or `~/config/acme`) and start from the sample (`config/galactic-credit`), keeping the same layout:
 
 ```
-config/<company>/
+<company-config>/
   town.yaml                 the town, and the island order and database engines
   defaults.yaml
   hub.yaml                  shared resources (gateway, message broker, egress, shared databases)
@@ -67,10 +83,21 @@ Ids are `pillar.system`. Defaults cascade `defaults.yaml` -> pillar -> system. P
 Check the files as you go:
 
 ```
-dotnet run --project backend/tools/ObservabilityCity.Validate -- config/<company>
+dotnet run --project backend/tools/ObservabilityCity.Validate -- <company-config>
 ```
 
-Errors name the file and line. Every folder with a `town.yaml` under `config/` shows up in the town switcher with no setting.
+Errors name the file and line. Tell the app where the folder is with the `Registry:Towns` setting; each extra folder gets the next number, and every one shows up in the town switcher next to the sample town:
+
+```
+$env:Registry__Towns__0 = "C:\Config\acme"      # PowerShell
+export Registry__Towns__0=~/config/acme         # bash
+```
+
+Folders with a `town.yaml` under the clone's own `config/` also show up with no setting, which is how a private copy (setup 2) works. As a guard, add its name to `.git/info/exclude` (never committed) if you keep a company folder there in a clone that has a public remote:
+
+```
+echo config/<company>/ >> .git/info/exclude
+```
 
 ## 4. Add one source at a time
 
@@ -273,7 +300,7 @@ Declared `calls` and `gatewayCalls` are always drawn. An environment can also fi
 
 - It runs in the background and never holds up the town. The first read looks back `firstRead` (7 days); after that each start reads only the gap since the last read, then once every `interval` (1 hour). When the rules, the ignore list, the aliases, the third parties' domains and matches or the town's systems change (including a rule or vendor added from the Unknown hosts panel), the next read looks back the whole `firstRead` window again for every name, so a new rule shows its links at once instead of only for new calls. Edits made by hand to the files are picked up at the next scheduled read; the panel asks for the read straight away.
 - A link needs both ends to be systems of the town and `minDays` (2) different days in the data. A link not seen for `keepFor` (30 days) drops off.
-- Found links are saved under `_discovered/links/<environment>/` in the town's folder, one file for each pillar, with the days seen. Your pillar files are never edited. Keep the folder out of version control (a fork's `.gitignore` should list it).
+- Found links are saved under `_discovered/links/<environment>/` in the town's folder, one file for each pillar, with the days seen. Your pillar files are never edited. Keep the folder out of version control (your private repository's `.gitignore` should list it).
 - `discoverLinks: false` (in `defaults.yaml`, a pillar's `defaults` or a system) switches discovery off for the systems it covers. Only an API or a worker makes calls worth finding.
 - An address no rule explains, no `ignoreHosts` pattern covers and no third party `domains` entry names appears under Notices, so a missing rule shows up as something to add. A wrong link is fixed by tightening a rule or adding an ignore pattern, not link by link.
 - A call a rule explains but whose pillar is not in the town yet (a gateway path that starts with a pillar you have not added) is not a problem. It is listed as a note, one line for each pillar, apart from the problems and not counted among them, and it links up when that pillar joins the town. Remembered addresses are checked again on every read, so a rule or ignore pattern you add clears the notice at once, without waiting for it to age out. To make the same address one line instead of one for each id, replace the ids in the path in the query itself.
@@ -401,7 +428,7 @@ Each real adapter lands with its own section here, with the same four parts: the
 ## 5. Run the check
 
 ```
-dotnet run --project backend/tools/ObservabilityCity.Validate -- --sources config/<company>
+dotnet run --project backend/tools/ObservabilityCity.Validate -- --sources <company-config>
 ```
 
 For each environment and signal it makes one cheap read with your Azure login and says one of:
@@ -422,7 +449,7 @@ A `loganalytics` source with no `connection` is probed with the workspace its en
 
 The Azure login keeps each token until shortly before it expires, and asks for one at a time per scope, so a login that starts a process for every request (`az login`) is not started once per read.
 
-The normal registry check (`-- config/<company>`) validates the files, including source names, kinds, logins and signal choices, and warns about a signal pointed at a source the environment does not define. `--sources` reads the environment files directly and reports every source you defined, so you can verify connectivity before the adapter lands.
+The normal registry check (`-- <company-config>`) validates the files, including source names, kinds, logins and signal choices, and warns about a signal pointed at a source the environment does not define. `--sources` reads the environment files directly and reports every source you defined, so you can verify connectivity before the adapter lands.
 
 ## 6. Watch the town
 
@@ -434,7 +461,7 @@ Open http://localhost:5173, pick your town in the top bar, then the environment.
 
 ## 7. Then the next environment, the next signal
 
-Repeat steps 4 to 6 for the next signal, then copy the environment file for staging and prod. Commit `config/<company>/` on a branch and open a pull request in your fork; the registry check runs in CI and comments on the pull request.
+Repeat steps 4 to 6 for the next signal, then copy the environment file for staging and prod. Commit your town folder in its own private repository (or on a branch of your private copy), never in a public one.
 
 ## Send a generic fix upstream
 
@@ -444,11 +471,11 @@ If you found a bug or a missing capability that is not specific to your company:
 git fetch upstream
 git checkout -b fix/short-description upstream/main
 # make the change in core, with tests on both sides (backend xUnit, frontend Vitest / Playwright)
-git push -u origin fix/short-description
+git push -u <your-public-fork> fix/short-description
 gh pr create --repo dcarles/ObservabilityCity --base main
 ```
 
-Rules for the upstream pull request: no company names, tenant ids, hostnames or screenshots of your town; examples use generic names; tests use fakes and recorded fixtures, never live services. Once it is merged, `git fetch upstream && git merge upstream/main` brings it into your fork. A fix that only makes sense at your company stays in `config/<company>/` or `extensions/`.
+Rules for the upstream pull request: no company names, tenant ids, hostnames or screenshots of your town; examples use generic names; tests use fakes and recorded fixtures, never live services. Once it is merged, `git fetch upstream && git merge upstream/main` brings it into your copy. A fix that only makes sense at your company stays in your town folder or `extensions/`. For an upstream pull request, push the branch to a separate public fork that never holds company files, and open the pull request from it.
 
 ## When something goes wrong
 

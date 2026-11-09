@@ -2,7 +2,7 @@
 
 Read [AGENTS.md](../AGENTS.md) first: it has the architecture, the commands and the config layout. The rules below are the ones to keep in mind on every suggestion.
 
-- **Never edit core in a company fork.** A fork adds only `config/<company>/` and `extensions/`. Generic fixes go upstream as a pull request ([runbook](../docs/connect-your-company.md#send-a-generic-fix-upstream)).
+- **Never edit core in a company copy, and never put company files in a public repo** (a GitHub fork of a public repo is always public; keep the town folder outside the clone with `Registry:Towns`, or in a private repo). A company copy adds only its town folder and `extensions/`. Generic fixes go upstream as a pull request ([runbook](../docs/connect-your-company.md#send-a-generic-fix-upstream)).
 - **Tests on both sides.** Backend behaviour gets an xUnit test (`dotnet test --solution backend/ObservabilityCity.slnx -c Release`). Browser behaviour gets a Vitest unit test (`cd frontend && npm test`) and, when it shows in the town, a Playwright test (`npm run e2e`). If a change touches one side only, say so in the pull request.
 - **Branches and pull requests.** Never push to `main`; never force-push `main`.
 - **No new third-party dependencies without approval.** Do not add a library, package, tool or GitHub Action (runtime, dev or test; anything not from Microsoft, GitHub or three.js) until the maintainer has explicitly approved that package. Ask first: what it is, who owns it, its licence, and why built-in or in-house code will not do.

@@ -137,7 +137,7 @@ public static partial class RegistryLoader
         foreach (var service in g.TopicServices)
         {
             if (!services.Contains(service))
-                errors.Add($"{fileName}: topic '{service}' is not a service of this pillar, so there is nothing to publish it.{DidYouMean.Hint(service, services)} Topics are service names; the topic is {g.Id}-{service}-outbox");
+                errors.Add($"{fileName}: topic '{service}' is not a service of this pillar, so there is nothing to publish it.{DidYouMean.Hint(service, services)} Topics are named after services; the name comes from messaging.topicTemplate in town.yaml");
         }
         if (g.TopicServices.Count != g.TopicServices.Distinct().Count())
             errors.Add($"{fileName}: a topic is listed twice");

@@ -20,7 +20,7 @@
       "properties": {
         "topics": {
           "type": "array",
-          "description": "Services whose outbox this publishes. Each becomes the topic {pillar}-{service}-outbox (in hub.yaml, hub-{name}).",
+          "description": "Services whose outbox this publishes. Each becomes a topic named by messaging.topicTemplate in town.yaml (in hub.yaml, by messaging.hubTopicTemplate).",
           "items": { "type": "string" }
         },
         "subscriptions": {

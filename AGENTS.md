@@ -4,7 +4,7 @@ Observability City shows system health as a living 3D town in the browser. This 
 
 ## The rules that matter most
 
-1. **In a company fork, never edit core.** A fork adds only `config/<company>/` and `extensions/`. Everything else (`backend/`, `frontend/`, `config/galactic-credit`, `config/droid-shop`, `shared-test-data/`, `contracts/`, `.github/`) is upstream. A change that is generic goes back upstream as a pull request (see the runbook); a rule that exists only at one company lives in that company's `config/` or `extensions/`.
+1. **In a company copy, never edit core, and never put company files in a public repository.** A GitHub fork of a public repo is always public, so a company keeps its town folder outside the clone (`Registry:Towns`), in its own private repo, or uses a private mirror of this repo (see the runbook). A company copy adds only its town folder and `extensions/`. Everything else (`backend/`, `frontend/`, `config/galactic-credit`, `config/droid-shop`, `shared-test-data/`, `contracts/`, `.github/`) is upstream. A change that is generic goes back upstream as a pull request (see the runbook); a rule that exists only at one company lives in that company's `config/` or `extensions/`.
 2. **Every rule and behaviour is proven by tests on both sides**: .NET tests for the backend, and Vitest plus Playwright for the browser. A change that touches only one side says so in the pull request.
 3. **Branches and pull requests.** Work on a branch, open a pull request, never push to `main`, never force-push `main`.
 4. **No secrets, tenant ids, subscription ids, hostnames or company names in the repo.** Credentials come from the Azure login (`az login`), user secrets or Key Vault. Examples in docs and tests use generic names (`sb-example.servicebus.windows.net`, `prom.example.test`).
@@ -99,7 +99,7 @@ Edit YAML with the schemas in `schema/` for completion. `dotnet run --project ba
 
 - **A new source adapter**: start from `templates/adapter`, follow [docs/write-an-adapter.md](docs/write-an-adapter.md) and test it with the kit in `backend/src/ObservabilityCity.AdapterKit` (`CannedHttp`, `StaticLogin`, `TownFiles`, `AdapterContract`). In short: add it to a module (`IAdapterModule.Register`: `AddSourceKind`, `AddSource` for its `IMetricSourceFactory`, `AddCredentialKind` for a login) and implement `IMetricSource` (and `IIncidentSource` / `ILogSource` when it has them) in a new project under `extensions/<company>.<name>/` in a fork (the build copies every such project to `adapters/<name>/`, and the host loads it; no host code changes), or under `backend/src/ObservabilityCity.Adapters.<Name>` upstream when it is generic. Build it against recorded fixtures kept in `shared-test-data/`, never against live services in tests.
 - **A new connectivity probe**: implement `ISourceProbe` in `backend/tools/ObservabilityCity.Validate` (see `SourceProbes.cs`) and add it to `SourceProbes.Default`. Probes take an `HttpClient` and an `ITokenProvider` so tests use canned answers.
-- **Company rules** (naming conventions, tag-to-pillar mapping, special cases) belong in the fork's `config/<company>/` or `extensions/`, not in core.
+- **Company rules** (naming conventions, tag-to-pillar mapping, special cases) belong in the company's own town folder or `extensions/`, not in core.
 - **Themes**: `frontend/src/themes` and `shared-test-data/themes/theme-contract.json`.
 
 ## Style
