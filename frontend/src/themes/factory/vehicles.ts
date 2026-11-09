@@ -39,7 +39,8 @@ function barge(seed: number, internal = false): BoatLook {
   hull.receiveShadow = true
   const object = group(
     hull,
-    box(W + 0.04, 0.1, L + 1.3, flat('#2b3138'), { y: 0.3, z: 0.15 }),
+    // the deck plate sits well below the hull top (0.40): just under it the two faces fought (flicker) on a barge with no containers
+    box(W + 0.04, 0.1, L + 1.3, flat('#2b3138'), { y: 0.2, z: 0.15 }),
     box(1.3, 1.0, 1.1, flat('#e8e4d8'), { y: 0.4, z: -L / 2 + 0.7 }),
     box(1.4, 0.12, 1.2, flat(boatPaint(internal).trim), { y: 1.4, z: -L / 2 + 0.7 }),
     box(0.16, 0.7, 0.16, flat('#23272d'), { x: 0.4, y: 1.5, z: -L / 2 + 0.7 }),
