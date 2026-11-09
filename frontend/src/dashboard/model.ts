@@ -1,7 +1,7 @@
 // What the dashboard shows, worked out from a snapshot as plain data. Nothing here touches the page, so every rule is unit tested.
 // The numbers are the snapshot's own; the dashboard invents nothing, and a signal nobody measures is null (shown as a dash), never a zero.
 
-import { dayTime } from '../inspectorModel'
+import { dayTime, messagesPerSecond } from '../inspectorModel'
 import { eventOfNode, healthEventsOf, isResolved } from '../healthEvents'
 import { absentEverywhere, isAbsent, isUnmonitored } from '../signals'
 import { isFollowed, isFollowing, isShown, isThrottled, tenantLevel, type TenantView } from '../tenants'
@@ -9,7 +9,7 @@ import { islandChoices } from '../islands'
 import { deadLetterItems, dlqCount, type DeadLetterItem } from '../deadLetters'
 import { stateFor, viewTotals } from '../viewTotals'
 import { trafficSplit } from '../trafficSplit'
-import { flowsOf, flowTile, pillarFlow, type Flow, type FlowTile } from './flows'
+import { flowsOf, flowTile, pillarFlow, trafficByPillar, type Flow, type FlowTile, type TrafficRow } from './flows'
 import type { GroupSnapshot, HealthState, JobSnapshot, NodeSnapshot, Snapshot } from '../types'
 
 /** ok / warn / bad are the three colours; none is grey: no fresh data, or no source at all. */
@@ -126,6 +126,8 @@ export interface Pillar {
   configError: string | null
   /** The messages a second this pillar sends to other pillars and receives from them; null when the environment does not measure it. */
   flow: Flow | null
+  /** The requests a second all the pillar's services take in. */
+  traffic: number
 }
 
 /** A line of the Hub, Vendors and internal-services lists. Health is null where nothing says (a monitoring resource, a vendor we see no calls to). */
@@ -176,6 +178,8 @@ export interface Dashboard {
     degraded: number
     affected: Issue[]
     traffic: { total: number; external: number; internal: number } | null
+    /** The requests a second of each pillar, busiest first, for the Traffic card. Empty when nothing reports requests. */
+    trafficPillars: TrafficRow[]
     deadLetters: number | null
     backlog: number | null
     /** The queues with dead letters, worst first, for the Dead letters card. */
@@ -438,6 +442,7 @@ export function buildDashboard(s: Snapshot, view: TenantView, flowOrder: readonl
       jobs,
       configError: g.configError ?? null,
       flow: pillarFlow(flows, g.id),
+      traffic: rows.reduce((a, r) => a + (r.rps ?? 0), 0),
     }
   })
 
@@ -457,10 +462,11 @@ export function buildDashboard(s: Snapshot, view: TenantView, flowOrder: readonl
       degraded: affected.filter((i) => i.level === 'warn').length,
       affected,
       traffic: trafficSplit(s, totals.requestsPerSecond, totals.tenantShare),
+      trafficPillars: trafficByPillar(pillars.map((p) => ({ id: p.id, name: p.name, rps: p.traffic * totals.tenantShare }))),
       deadLetters: absentEverywhere(s, 'deadLetters') ? null : totals.deadLetters,
       backlog: absentEverywhere(s, 'backlog') ? null : queued.reduce((a, n) => a + (n.queueDepth ?? 0), 0),
       deadQueues: deadLetterItems(s.groups),
-      flows: flowTile(flows, flowOrder),
+      flows: flowTile(flows, flowOrder, messagesPerSecond(s.groups.flatMap((g) => g.nodes))),
       incidents: incidentsOf(s),
     },
     pillars,

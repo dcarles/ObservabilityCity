@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { flowsOf, flowTile, stableOrder, pillarFlow, windowText, FLOW_TOP, type Flow } from '../../src/dashboard/flows'
+import { flowsOf, flowTile, internalOf, trafficByPillar, stableOrder, pillarFlow, windowText, FLOW_TOP, type Flow } from '../../src/dashboard/flows'
 import { buildDashboard } from '../../src/dashboard/model'
 import { flowTileHtml, pillarFlowHtml, pillarHtml, summaryHtml, type UiState } from '../../src/dashboard/render'
 import { ALL_TENANTS } from '../../src/tenants'
@@ -13,11 +13,11 @@ const ui = (over: Partial<UiState> = {}): UiState => ({ openPillars: new Set(), 
 /** The calm town where each pillar of `flows` (id to [sent, received], null = not measured) carries what the broker reported, over a 15 minute window. */
 function withFlows(flows: Record<string, [number | null, number | null]>, windowSeconds = 900): Snapshot {
   const s = golden('calm')
-  for (const g of s.groups) g.flow = undefined
+  for (const g of s.groups) { g.flow = undefined; for (const n of g.nodes) n.queues = [] }
   for (const [id, [sent, received]] of Object.entries(flows)) s.groups.find((g) => g.id === id)!.flow = { sentPerSecond: sent, receivedPerSecond: received, windowSeconds }
   return s
 }
-const flow = (id: string, sent: number | null, received: number | null, windowSeconds = 900): Flow => ({ id, name: id.toUpperCase(), sent, received, windowSeconds })
+const flow = (id: string, sent: number | null, received: number | null, windowSeconds = 900): Flow => ({ id, name: id.toUpperCase(), sent, received, internal: null, windowSeconds })
 
 describe('pillar flows from the broker', () => {
   it('lists the pillars with a measured side, busiest first, with the name of each', () => {
@@ -43,10 +43,10 @@ describe('pillar flows from the broker', () => {
 })
 
 describe('the Message flow tile', () => {
-  it('lists the five busiest pillars of at least one message a second, and all of them behind the button', () => {
+  it('lists the four busiest pillars of at least one message a second, and all of them behind the button', () => {
     const flows = [flow('a', 900, 1), flow('b', 800, 1), flow('c', 1, 700), flow('d', 600, 0), flow('e', 0, 500), flow('f', 400, 0), flow('g', 0.5, 0)]
     const t = flowTile(flows, [])!
-    expect(t.top.map((f) => f.id)).toEqual(['a', 'b', 'c', 'd', 'e'])
+    expect(t.top.map((f) => f.id)).toEqual(['a', 'b', 'c', 'd'])
     expect(t.top).toHaveLength(FLOW_TOP)
     expect(t.all).toHaveLength(7)
     expect(t.max).toBe(900)
@@ -62,7 +62,7 @@ describe('the Message flow tile', () => {
     expect(html).toContain('width:25%')
     expect(html).toContain('width:2%') // one message a second beside a thousand: a visible sliver
     expect(html).toContain('1.0k msg/s')
-    expect(html).toContain('no messages sent')
+    expect(html).toContain('no external messages sent')
     expect(html).not.toContain('no messages received') // c's receiving side is not measured: nothing is said about it
     expect(html).toContain('sends')
     expect(html).toContain('receives')
@@ -105,7 +105,7 @@ describe('the flow on the pillar cards', () => {
   const card = (id: string) => d.pillars.find((p) => p.id === id)!
 
   it('a closed card shows what the pillar sends and receives, and nothing for a pillar that moves nothing or is not measured', () => {
-    expect(pillarFlowHtml(card('pay').flow, false)).toContain('sends <i>3.2k msg/s</i> · receives <i>40 msg/s</i>')
+    expect(pillarFlowHtml(card('pay').flow, false)).toContain('sends ext <i>3.2k msg/s</i> · receives <i>40 msg/s</i>')
     expect(pillarFlowHtml(card('cl').flow, false)).toContain('receives <i>15 msg/s</i>')
     expect(pillarFlowHtml(card('cl').flow, false)).not.toContain('sends')
     expect(pillarFlowHtml(card('rwd').flow, false)).toBe('') // measured, and nothing moves
@@ -122,7 +122,7 @@ describe('the flow on the pillar cards', () => {
     expect(open).toContain('Receives')
     expect(open).toContain('Average over the last 15 min')
     const quiet = pillarFlowHtml(card('rwd').flow, true)
-    expect(quiet).toContain('no messages sent')
+    expect(quiet).toContain('no external messages sent')
     expect(quiet).toContain('no messages received')
     expect(pillarFlowHtml(card('frd').flow, true)).toBe('')
     expect(pillarHtml(card('pay'), ui({ openPillars: new Set(['pay']) }))).toContain('Sends')
@@ -139,5 +139,45 @@ describe('the flow on the pillar cards', () => {
     const html = summaryHtml(d, { flowsAll: true }) + d.pillars.map((p) => pillarHtml(p, ui({ openPillars: new Set([p.id]) }))).join('')
     const flowParts = html.slice(html.indexOf('id="kpi-flow"'))
     expect(flowParts).not.toMatch(/\b(town|city|island|building|boat)s?\b/i)
+  })
+})
+
+describe('internal messages, the platform total and traffic by pillar', () => {
+  /** The calm town with queues read inside the pillar `pay` (rates 2 and 3, from its own services) and one from another pillar (rate 50, not counted). */
+  function withInternal(): Snapshot {
+    const s = withFlows({ pay: [10, 4] })
+    const aa = s.groups.find((g) => g.id === 'pay')!
+    const [one, two] = aa.nodes
+    one.queues = [{ name: 'pay-in-1', perSecond: 2 } as never, { name: 'cl-in', perSecond: 50 } as never]
+    two.queues = [{ name: 'pay-in-2', perSecond: 3 } as never]
+    aa.messaging = {
+      topics: [],
+      subscriptions: [
+        { topic: 'pay-in-1', publisher: 'pay', consumer: one.id, legacy: false },
+        { topic: 'pay-in-2', publisher: 'pay', consumer: two.id, legacy: false },
+        { topic: 'cl-in', publisher: 'cl', consumer: one.id, legacy: false },
+      ],
+    } as never
+    return s
+  }
+
+  it('adds up the queues a pillar reads from its own services, and not the ones another pillar publishes', () => {
+    expect(internalOf(withInternal()).get('pay')).toBe(5)
+    expect(flowsOf(withInternal()).find((f) => f.id === 'pay')).toMatchObject({ sent: 10, received: 4, internal: 5 })
+  })
+
+  it('says sends ext, sends int and receives on the card, and puts the platform total on the tile', () => {
+    const d = buildDashboard(withInternal(), ALL_TENANTS)
+    expect(pillarFlowHtml(d.pillars.find((p) => p.id === 'pay')!.flow, false)).toContain('sends ext <i>10 msg/s</i> · sends int <i>5.0 msg/s</i> · receives <i>4.0 msg/s</i>')
+    expect(pillarFlowHtml(d.pillars.find((p) => p.id === 'pay')!.flow, true)).toContain('Sends inside')
+    expect(d.summary.flows!.total).toBe(55)
+    expect(flowTileHtml(d.summary.flows, false)).toContain('<b>55 <u>msg/s</u></b>')
+  })
+
+  it('lists the pillars by requests a second, busiest first, leaving out the ones with none', () => {
+    expect(trafficByPillar([{ id: 'a', name: 'A', rps: 0 }, { id: 'b', name: 'B', rps: 3 }, { id: 'c', name: 'C', rps: 9 }]).map((r) => r.id)).toEqual(['c', 'b'])
+    const d = buildDashboard(golden('calm'), ALL_TENANTS)
+    expect(d.summary.trafficPillars.length).toBeGreaterThan(0)
+    expect(summaryHtml(d)).toContain('data-pillar-traffic')
   })
 })

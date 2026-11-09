@@ -53,8 +53,8 @@ export function summaryHtml(d: Dashboard, ui: Pick<UiState, 'flowsAll'> = {}): s
   const services = `<div class="kpi" id="kpi-services"><span>Services</span><b>${countsText(s.down, s.degraded)}</b>
     <div class="lst">${s.affected.length ? s.affected.map((i) => `<span class="ch" data-system="${esc(i.id)}">${dot(i.level)} ${esc(i.name)} <i>${esc(i.where)} · ${i.level === 'bad' ? 'down' : 'degraded'}</i></span>`).join('') : '<small>All services are healthy</small>'}</div></div>`
   const t = s.traffic
-  const traffic = t ? `<div class="kpi" id="kpi-traffic"><span>Total traffic</span><b>${num(t.total)} rps</b>
-    <div class="bar"><i style="width:${t.total > 0 ? (t.external / t.total) * 100 : 0}%"></i></div><small>External ${num(t.external)} · Internal ${num(t.internal)}</small></div>` : ''
+  const traffic = t ? `<div class="kpi" id="kpi-traffic"><span>Total traffic</span><b>${num(t.total)} <u>rps</u></b>
+    <div class="bar"><i style="width:${t.total > 0 ? (t.external / t.total) * 100 : 0}%"></i></div><small>External ${num(t.external)} · Internal ${num(t.internal)}</small>${trafficRowsHtml(s.trafficPillars)}</div>` : ''
   const dlq = s.deadLetters != null ? `<div class="kpi" id="kpi-dlq"><span>Dead letters</span><b>${num(s.deadLetters)}</b>${s.backlog != null ? `<small>Backlog ${num(s.backlog)} messages</small>` : ''}
     <div class="dlist">${deadQueuesHtml(s.deadQueues)}</div></div>` : ''
   const inc = s.incidents
@@ -65,10 +65,25 @@ export function summaryHtml(d: Dashboard, ui: Pick<UiState, 'flowsAll'> = {}): s
 
 const rate = (v: number): string => `${formatRate(v)} msg/s`
 
-/** What a pillar sends or receives, in words: the rate, or that there are no messages. Null when nothing measures that side. */
-function flowSide(v: number | null, verb: 'sends' | 'receives'): { label: string; value: string; none: boolean } | null {
+type Side = 'sends ext' | 'sends int' | 'receives'
+const NONE: Record<Side, string> = { 'sends ext': 'no external messages sent', 'sends int': 'no internal messages sent', receives: 'no messages received' }
+
+/** What a pillar sends (outside its walls or inside) or receives, in words: the rate, or that there are no messages. Null when nothing measures that side. */
+function flowSide(v: number | null, label: Side): { label: Side; value: string; none: boolean } | null {
   if (v == null) return null
-  return v > 0 ? { label: verb, value: rate(v), none: false } : { label: verb, value: verb === 'sends' ? 'no messages sent' : 'no messages received', none: true }
+  return v > 0 ? { label, value: rate(v), none: false } : { label, value: NONE[label], none: true }
+}
+
+const sidesOf = (f: Flow): { side: NonNullable<ReturnType<typeof flowSide>>; v: number | null }[] =>
+  ([[flowSide(f.sent, 'sends ext'), f.sent], [flowSide(f.internal, 'sends int'), f.internal], [flowSide(f.received, 'receives'), f.received]] as const)
+    .flatMap(([side, v]) => (side ? [{ side, v }] : []))
+
+/** The requests a second of each pillar, busiest first, with a bar scaled to the busiest. The few biggest only, so the card stays as tall as its neighbours. */
+function trafficRowsHtml(rows: readonly { id: string; name: string; rps: number }[]): string {
+  if (rows.length === 0) return ''
+  const top = rows.slice(0, 5), max = rows[0].rps
+  const more = rows.length - top.length
+  return `<div class="plist">${top.map((r) => `<div class="pl" data-pillar-traffic="${esc(r.id)}"><span class="fn">${esc(r.name)}</span><span class="fbar"><i style="width:${Math.max(2, (r.rps / max) * 100)}%"></i></span><b class="fv">${num(r.rps, r.rps < 10 ? 1 : 0)} rps</b></div>`).join('')}${more > 0 ? `<small class="dim">and ${more} more</small>` : ''}</div>`
 }
 
 /** The line under the tile's list and in an open card: the time the rates average over, from the source's window. Nothing when the window is not known. */
@@ -81,12 +96,12 @@ const windowNote = (seconds: number): string => (windowText(seconds) ? `<small c
 export function flowTileHtml(f: FlowTile | null, all: boolean): string {
   if (!f) return ''
   const list = all ? f.all : f.top
-  const row = (side: ReturnType<typeof flowSide>, v: number | null): string => (side
-    ? `<div class="fr"><span class="fd">${side.label}</span><span class="fbar"><i style="width:${side.none || f.max <= 0 ? 0 : Math.max(2, ((v ?? 0) / f.max) * 100)}%"></i></span><b class="fv${side.none ? ' none' : ''}">${side.value}</b></div>`
-    : '')
-  const lines = list.map((x) => `<div class="fl" data-flow="${esc(x.id)}"><span class="fn">${esc(x.name)}</span>${row(flowSide(x.sent, 'sends'), x.sent)}${row(flowSide(x.received, 'receives'), x.received)}</div>`).join('')
+  const row = (x: { side: NonNullable<ReturnType<typeof flowSide>>; v: number | null }): string =>
+    `<div class="fr"><span class="fd">${x.side.label}</span><span class="fbar"><i style="width:${x.side.none || f.max <= 0 ? 0 : Math.max(2, ((x.v ?? 0) / f.max) * 100)}%"></i></span><b class="fv${x.side.none ? ' none' : ''}">${x.side.value}</b></div>`
+  const lines = list.map((x) => `<div class="fl" data-flow="${esc(x.id)}"><span class="fn">${esc(x.name)}</span>${sidesOf(x).map(row).join('')}</div>`).join('')
   const more = f.all.length > f.top.length || all
-  return `<div class="kpi" id="kpi-flow"><span>Message flow</span><div class="flist">${lines || '<small>No pillar sends or receives 1 message a second or more.</small>'}</div>${windowNote(f.windowSeconds)}${more ? `<button class="btn fall" data-flows-all aria-expanded="${all}">${all ? 'Show fewer' : `Show all ${f.all.length}`}</button>` : ''}</div>`
+  const total = f.total != null ? `<b>${formatRate(f.total)} <u>msg/s</u></b><small>Taken in by all the queues of the platform</small>` : ''
+  return `<div class="kpi" id="kpi-flow"><span>Message flow</span>${total}<div class="flist">${lines || '<small>No pillar sends or receives 1 message a second or more.</small>'}</div>${windowNote(f.windowSeconds)}${more ? `<button class="btn fall" data-flows-all aria-expanded="${all}">${all ? 'Show fewer' : `Show all ${f.all.length}`}</button>` : ''}</div>`
 }
 
 /**
@@ -95,11 +110,12 @@ export function flowTileHtml(f: FlowTile | null, all: boolean): string {
  */
 export function pillarFlowHtml(f: Flow | null, open: boolean): string {
   if (!f) return ''
-  const sides = [flowSide(f.sent, 'sends'), flowSide(f.received, 'receives')].filter((x): x is NonNullable<typeof x> => x !== null)
+  const sides = sidesOf(f).map((x) => x.side)
   if (sides.length === 0) return ''
   const part = (x: (typeof sides)[number]): string => (x.none ? `<i>${x.value}</i>` : `${x.label} <i>${x.value}</i>`)
   if (!open) return busiest(f) > 0 ? `<div class="pflow"><span class="ch" data-flow="${esc(f.id)}">${sides.map(part).join(' · ')}</span></div>` : ''
-  return `<div class="sub-title">Messages</div><div class="pflowx">${sides.map((x) => `<div><span class="lbl">${x.label === 'sends' ? 'Sends' : 'Receives'}</span><span class="ch" data-flow="${esc(f.id)}"><i>${x.value}</i></span></div>`).join('')}${windowNote(f.windowSeconds)}</div>`
+  const title: Record<Side, string> = { 'sends ext': 'Sends outside', 'sends int': 'Sends inside', receives: 'Receives' }
+  return `<div class="sub-title">Messages</div><div class="pflowx">${sides.map((x) => `<div><span class="lbl">${title[x.label]}</span><span class="ch" data-flow="${esc(f.id)}"><i>${x.value}</i></span></div>`).join('')}${windowNote(f.windowSeconds)}</div>`
 }
 
 /** The queues with dead letters, worst first: the service that reads each, its pillar, the queue and how many. */
