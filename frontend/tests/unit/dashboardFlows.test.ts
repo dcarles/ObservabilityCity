@@ -27,7 +27,7 @@ describe('pillar flows from the broker', () => {
   })
 
   it('has no flows when the snapshot reports none, and never counts the hub', () => {
-    expect(flowsOf(golden('calm'))).toEqual([])
+    expect(flowsOf(withFlows({}))).toEqual([])
     const s = withFlows({ pay: [5, 5] })
     s.groups.find((g) => g.isHub)!.flow = { sentPerSecond: 99, receivedPerSecond: 99, windowSeconds: 900 }
     expect(flowsOf(s).map((f) => f.id)).toEqual(['pay'])
@@ -78,7 +78,7 @@ describe('the Message flow tile', () => {
     expect(flowTile([], [])).toBeNull()
     expect(flowTile([flow('a', 0, 0)], [])).toBeNull()
     expect(flowTileHtml(null, false)).toBe('')
-    expect(summaryHtml(buildDashboard(golden('calm'), ALL_TENANTS))).not.toContain('kpi-flow')
+    expect(summaryHtml(buildDashboard(withFlows({}), ALL_TENANTS))).not.toContain('kpi-flow')
     expect(flowTileHtml(flowTile([flow('a', 5, 0)], [])!, false)).not.toContain('data-flows-all')
   })
 
