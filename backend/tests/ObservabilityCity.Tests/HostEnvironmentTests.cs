@@ -131,6 +131,17 @@ public class HostEnvironmentTests : IDisposable
 
     // ── the live stream ───────────────────────────────────────────────────────
 
+    /// <summary>Waits until a condition holds, up to a deadline, instead of sleeping for a fixed time and hoping.</summary>
+    private static async Task WaitUntil(Func<bool> done, string what, int seconds = 15)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(seconds);
+        while (!done())
+        {
+            if (DateTime.UtcNow > deadline) throw new TimeoutException($"Gave up waiting until {what}");
+            await Task.Delay(20);
+        }
+    }
+
     private HubConnection Connect(string? env) => new HubConnectionBuilder()
         .WithUrl(new Uri(_factory.Server.BaseAddress, env is null ? "/hubs/town" : $"/hubs/town?env={env}"), o =>
         {
@@ -152,7 +163,7 @@ public class HostEnvironmentTests : IDisposable
 
         await staging.StartAsync(TestContext.Current.CancellationToken);
         await fallback.StartAsync(TestContext.Current.CancellationToken);
-        await Task.Delay(1500, TestContext.Current.CancellationToken);
+        await WaitUntil(() => seen.Count(x => x.Viewer == "staging") >= 2 && seen.Count(x => x.Viewer == "default") >= 2, "both viewers had been sent a few ticks");
 
         Assert.Contains(seen, x => x.Viewer == "staging");
         Assert.Contains(seen, x => x.Viewer == "default");
@@ -171,7 +182,12 @@ public class HostEnvironmentTests : IDisposable
 
         await viewer.StartAsync(TestContext.Current.CancellationToken);
         var message = await told.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
-        await Task.Delay(800, TestContext.Current.CancellationToken);
+        // nothing arrives for a wrong name, so wait for a viewer of a right one to be sent a few ticks: by then the wrong one would have been too
+        var proof = 0;
+        await using var watcher = Connect("staging");
+        watcher.On<Snapshot>(TownHub.SnapshotMethod, _ => Interlocked.Increment(ref proof));
+        await watcher.StartAsync(TestContext.Current.CancellationToken);
+        await WaitUntil(() => Volatile.Read(ref proof) >= 3, "another viewer had been sent a few ticks");
 
         Assert.Equal("prd", message.GetProperty("requested").GetString());
         Assert.Contains("prod", message.GetProperty("environments").EnumerateArray().Select(e => e.GetString()));
@@ -189,13 +205,13 @@ public class HostEnvironmentTests : IDisposable
 
         var viewer = Connect("staging");
         await viewer.StartAsync(TestContext.Current.CancellationToken);
-        await Task.Delay(300, TestContext.Current.CancellationToken);
+        await WaitUntil(() => staging.Demand.Viewers == before.Item1 + 1, "the server had counted the viewer");
         Assert.Equal(before.Item1 + 1, staging.Demand.Viewers);
         Assert.Equal(before.Item2, prod.Demand.Viewers); // the other environments are not looked at
 
         await viewer.StopAsync(TestContext.Current.CancellationToken);
         await viewer.DisposeAsync();
-        for (var i = 0; i < 50 && staging.Demand.Viewers != before.Item1; i++) await Task.Delay(100, TestContext.Current.CancellationToken);
+        await WaitUntil(() => staging.Demand.Viewers == before.Item1, "the server had counted the viewer out");
         Assert.Equal(before.Item1, staging.Demand.Viewers);
     }
 }
