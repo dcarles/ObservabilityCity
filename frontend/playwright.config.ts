@@ -108,6 +108,8 @@ export default defineConfig({
         Snapshot__KeepAliveSeconds: '0',
         Fake__PollInterval: process.env.E2E_FAKE_POLL ?? '00:00:00.5',
         Registry__WatchSeconds: '1',
+        // tests that ask the server's API directly have no browser looking: keep every environment reading
+        Polling__AlwaysOn: 'true',
       },
     },
     {

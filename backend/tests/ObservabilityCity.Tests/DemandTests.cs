@@ -40,6 +40,13 @@ public class DemandTests
     }
 
     [Fact]
+    public void Always_on_wants_the_work_with_nobody_looking()
+    {
+        var demand = new Demand(TimeSpan.Zero) { AlwaysOn = true };
+        Assert.True(demand.Wanted);
+    }
+
+    [Fact]
     public async Task Waiting_returns_at_once_when_wanted_and_when_a_browser_joins_and_gives_up_when_cancelled()
     {
         var demand = new Demand(TimeSpan.Zero);

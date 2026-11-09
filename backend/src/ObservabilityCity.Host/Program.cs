@@ -123,8 +123,11 @@ var towns = new TownSet(townRuntimes, defaultTown);
 builder.Services.AddSingleton(towns);
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<IslandViews>();
+// Polling:AlwaysOn keeps every environment polling whether or not a browser looks at it (the way tests and a pre-warmed hosted server want it)
+var alwaysOn = builder.Configuration.GetValue("Polling:AlwaysOn", false);
 foreach (var (town, runtimes) in hostedByTown)
 {
+    foreach (var rt in runtimes) rt.Demand.AlwaysOn = alwaysOn;
     var holder = town.Registry;
     builder.Services.AddSingleton<IHostedService>(sp => new RegistryReloader(
         holder, town.Folder, TimeSpan.FromSeconds(builder.Configuration.GetValue("Registry:WatchSeconds", 5.0)), sp.GetRequiredService<ILogger<RegistryReloader>>()));

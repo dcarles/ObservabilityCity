@@ -18,6 +18,9 @@ public sealed class Demand(TimeSpan? grace = null, TimeProvider? time = null)
 
     public TimeSpan Grace { get; } = grace ?? DefaultGrace;
 
+    /// <summary>True keeps the work going whether or not anyone looks (the setting <c>Polling:AlwaysOn</c>).</summary>
+    public bool AlwaysOn { get; set; }
+
     public int Viewers { get { lock (_gate) return _viewers; } }
 
     /// <summary>True while a browser is looking, or the last one left less than <see cref="Grace"/> ago.</summary>
@@ -25,7 +28,7 @@ public sealed class Demand(TimeSpan? grace = null, TimeProvider? time = null)
     {
         get
         {
-            lock (_gate) return _viewers > 0 || _lastLeft is { } left && _time.GetUtcNow() - left < Grace;
+            lock (_gate) return AlwaysOn || _viewers > 0 || _lastLeft is { } left && _time.GetUtcNow() - left < Grace;
         }
     }
 
