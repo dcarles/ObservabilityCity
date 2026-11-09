@@ -165,3 +165,14 @@ body.dash.wall #dash-root { zoom: var(--wall-zoom, 1.5); }
 body.dash.wall { padding-bottom: 38vh; }
 body.dash.wall #dash-pillars .card .acts { display: none; }
 body.dash.wall tr.row.wall-focus > td { background: var(--warnbg); outline: 2px solid var(--daccent); outline-offset: -2px; }
+
+/* the Message flow tile and the flows on a pillar card */
+.kpi .flist { margin-top: 8px; display: flex; flex-direction: column; gap: 7px; }
+.fl { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 8px; align-items: baseline; font-size: 12px; min-width: 0; }
+.fl .fn { overflow-wrap: anywhere; font-weight: 600; }
+.fl .fv { font-size: 12px; font-weight: 500; margin: 0; display: inline; font-variant-numeric: tabular-nums; }
+.fl .fbar { grid-column: 1 / -1; display: block; height: 5px; border-radius: 3px; overflow: hidden; background: var(--surface2); }
+.fl .fbar i { display: block; height: 100%; background: var(--daccent); }
+.kpi .fall { margin-top: 8px; }
+.pflow { padding: 0 14px 12px; font-size: 13px; }
+.pflow .ch i, .pflowx .ch i { font-style: normal; color: var(--muted); }

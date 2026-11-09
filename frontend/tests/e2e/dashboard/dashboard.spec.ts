@@ -280,6 +280,42 @@ test.describe('the dashboard view', () => {
     expect(text).toBe('No queue has dead letters right now.')
   })
 
+  const FLOW = `const bb = s.groups.find(g => g.id === 'bb'); const w = bb.nodes[0]
+      for (const m of s.groups.flatMap(g => g.nodes)) m.queues = []
+      bb.messaging.subscriptions = [{ topic: 'aa-orders-outbox', publisher: 'aa', consumer: w.id, legacy: false }]
+      w.queues = [{ name: 'aa-orders-outbox', backlog: 0, deadLetters: 0, perSecond: 3200 }]`
+
+  test('the Message flow tile lists the pillar pairs by messages a second, and the cards show who they send to', async ({ town, page }) => {
+    await open(town, page)
+    const read = `const t = document.querySelector('#kpi-flow'); return { lines: [...t.querySelectorAll('.fl')].map(l => l.textContent), bar: t.querySelector('.fbar i').style.width, button: !!t.querySelector('[data-flows-all]'), alpha: document.querySelector('[data-pillar="aa"] .pflow')?.textContent ?? null, billing: document.querySelector('[data-pillar="bb"] .pflow')?.textContent ?? null }`
+    const got = await withSnapshot<{ lines: string[]; bar: string; button: boolean; alpha: string | null; billing: string | null }>(page, FLOW, read)
+    expect(got.lines).toHaveLength(1)
+    expect(got.lines[0]).toMatch(/→ .*3\.2k msg\/s/)
+    expect(got.bar).toBe('100%')
+    expect(got.button).toBe(false)
+    expect(got.alpha).toMatch(/^→ .* 3\.2k msg\/s$/)
+    expect(got.billing).toBeNull() // reads only: a closed card has nothing to show
+    await page.locator('[data-pillar="aa"] [data-toggle]').click()
+    await expect(page.locator('[data-pillar="aa"] .pflowx')).toContainText('Sends to')
+    await expect(page.locator('[data-pillar="aa"] .pflowx')).toContainText('3.2k msg/s')
+    await page.locator('[data-pillar="bb"] [data-toggle]').click()
+    await expect(page.locator('[data-pillar="bb"] .pflowx')).toContainText('Reads from')
+  })
+
+  test('the Message flow tile is absent when no queue carries messages between pillars', async ({ town, page }) => {
+    await open(town, page)
+    const present = await withSnapshot<boolean>(page, `for (const m of s.groups.flatMap(g => g.nodes)) m.queues = []`, `return !!document.querySelector('#kpi-flow')`)
+    expect(present).toBe(false)
+  })
+
+  test('the Message flow tile fits a phone screen without sideways scrolling', async ({ town, page }) => {
+    await page.setViewportSize({ width: 390, height: 800 })
+    await open(town, page)
+    const over = await withSnapshot<number>(page, FLOW, `return document.documentElement.scrollWidth - document.documentElement.clientWidth`)
+    expect(over).toBeLessThanOrEqual(0)
+    await expect(page.locator('#kpi-flow')).toBeVisible()
+  })
+
   test('a queue whose dead letters were replayed leaves the Dead letters card on the next snapshot', async ({ town, page }) => {
     await open(town, page)
     const base = `for (const m of s.groups.flatMap(g => g.nodes)) { m.deadLetters = 0; m.queues = [] }

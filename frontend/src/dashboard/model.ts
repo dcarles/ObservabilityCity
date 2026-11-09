@@ -9,6 +9,7 @@ import { islandChoices } from '../islands'
 import { deadLetterItems, dlqCount, type DeadLetterItem } from '../deadLetters'
 import { stateFor, viewTotals } from '../viewTotals'
 import { trafficSplit } from '../trafficSplit'
+import { flowsOf, flowTile, pillarFlows, type FlowTile, type PillarFlows } from './flows'
 import type { GroupSnapshot, HealthState, JobSnapshot, NodeSnapshot, Snapshot } from '../types'
 
 /** ok / warn / bad are the three colours; none is grey: no fresh data, or no source at all. */
@@ -123,6 +124,8 @@ export interface Pillar {
   groups: Group[]
   jobs: JobRow[]
   configError: string | null
+  /** The messages a second this pillar sends to and reads from other pillars. */
+  flows: PillarFlows
 }
 
 /** A line of the Hub, Vendors and internal-services lists. Health is null where nothing says (a monitoring resource, a vendor we see no calls to). */
@@ -177,6 +180,8 @@ export interface Dashboard {
     backlog: number | null
     /** The queues with dead letters, worst first, for the Dead letters card. */
     deadQueues: DeadLetterItem[]
+    /** The Message flow tile: the biggest pillar-to-pillar flows. Null when no queue carries messages between pillars. */
+    flows: FlowTile | null
     /** The Incidents card: how many are open, and every line, open ones first. Null when nothing reports incidents (no health source, no incident tool with an incident). */
     incidents: { open: number; rows: IncidentRow[] } | null
   }
@@ -406,7 +411,7 @@ function sectionsOf(s: Snapshot, view: TenantView, links: ReturnType<typeof link
 }
 
 /** Everything the dashboard draws, for the tenants the viewer chose. */
-export function buildDashboard(s: Snapshot, view: TenantView): Dashboard {
+export function buildDashboard(s: Snapshot, view: TenantView, flowOrder: readonly string[] = []): Dashboard {
   const links = linkIndex(s)
   const issues = (nodes: NodeSnapshot[], where: string): Issue[] =>
     nodes.flatMap((n) => {
@@ -416,6 +421,7 @@ export function buildDashboard(s: Snapshot, view: TenantView): Dashboard {
     })
   const worstFirst = (a: Issue, b: Issue): number => (a.level === b.level ? a.name.localeCompare(b.name) : a.level === 'bad' ? -1 : 1)
 
+  const flows = flowsOf(s)
   const pillars: Pillar[] = s.groups.filter((g) => !g.isHub).map((g) => {
     const rows = g.nodes.map((n) => rowOf(n, s, view, links))
     const groupIssues = issues(g.nodes, g.displayName).sort(worstFirst)
@@ -431,6 +437,7 @@ export function buildDashboard(s: Snapshot, view: TenantView): Dashboard {
       groups: groupsOf(g, rows, g.nodes),
       jobs,
       configError: g.configError ?? null,
+      flows: pillarFlows(flows, g.id),
     }
   })
 
@@ -453,6 +460,7 @@ export function buildDashboard(s: Snapshot, view: TenantView): Dashboard {
       deadLetters: absentEverywhere(s, 'deadLetters') ? null : totals.deadLetters,
       backlog: absentEverywhere(s, 'backlog') ? null : queued.reduce((a, n) => a + (n.queueDepth ?? 0), 0),
       deadQueues: deadLetterItems(s.groups),
+      flows: flowTile(flows, flowOrder),
       incidents: incidentsOf(s),
     },
     pillars,
