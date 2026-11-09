@@ -1,69 +1,52 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { flowsOf, flowTile, stableOrder, pillarFlows, FLOW_TOP, type Flow } from '../../src/dashboard/flows'
+import { flowsOf, flowTile, stableOrder, pillarFlow, windowText, FLOW_TOP, type Flow } from '../../src/dashboard/flows'
 import { buildDashboard } from '../../src/dashboard/model'
-import { flowTileHtml, pillarFlowsHtml, pillarHtml, summaryHtml, type UiState } from '../../src/dashboard/render'
+import { flowTileHtml, pillarFlowHtml, pillarHtml, summaryHtml, type UiState } from '../../src/dashboard/render'
 import { ALL_TENANTS } from '../../src/tenants'
 import type { Snapshot } from '../../src/types'
 
 const golden = (name: string) => JSON.parse(readFileSync(resolve(__dirname, `../../../shared-test-data/snapshots/${name}.json`), 'utf8')) as Snapshot
 const ui = (over: Partial<UiState> = {}): UiState => ({ openPillars: new Set(), groups: new Map(), databases: new Map(), connections: new Set(), sections: new Set(), ...over })
 
-/** The calm town with a rate on every queue a worker reads: `rates` maps `topic@consumer` to msg/s; every other queue is zeroed. */
-function withRates(rates: Record<string, number>): Snapshot {
+/** The calm town where each pillar of `flows` (id to [sent, received], null = not measured) carries what the broker reported, over a 15 minute window. */
+function withFlows(flows: Record<string, [number | null, number | null]>, windowSeconds = 900): Snapshot {
   const s = golden('calm')
-  for (const g of s.groups) {
-    for (const n of g.nodes) n.queues = undefined
-    for (const sub of g.messaging.subscriptions) {
-      const reader = g.nodes.find((n) => n.id === sub.consumer)
-      if (!reader) continue
-      reader.queues = [...(reader.queues ?? []), { name: sub.topic, backlog: 0, deadLetters: 0, perSecond: rates[`${sub.topic}@${sub.consumer}`] ?? 0 }]
-    }
-  }
+  for (const g of s.groups) g.flow = undefined
+  for (const [id, [sent, received]] of Object.entries(flows)) s.groups.find((g) => g.id === id)!.flow = { sentPerSecond: sent, receivedPerSecond: received, windowSeconds }
   return s
 }
-const flow = (from: string, to: string, perSecond: number): Flow => ({ id: `${from}>${to}`, from, fromName: from, to, toName: to, perSecond })
+const flow = (id: string, sent: number | null, received: number | null, windowSeconds = 900): Flow => ({ id, name: id.toUpperCase(), sent, received, windowSeconds })
 
-describe('pillar to pillar flows', () => {
-  it('adds up the queues a pillar reads, by the pillar that publishes them', () => {
-    const s = withRates({ 'pay-payments-outbox@cl.ledger-worker': 3000, 'bil-invoices-outbox@cl.ledger-worker': 20, 'pay-payments-outbox@frd.screening-worker': 5 })
-    const flows = flowsOf(s)
-    expect(flows.map((f) => [f.id, f.perSecond])).toEqual([['pay>cl', 3000], ['bil>cl', 20], ['pay>frd', 5]])
-    expect(flows[0]).toMatchObject({ fromName: 'Payments', toName: 'Core Ledger' })
+describe('pillar flows from the broker', () => {
+  it('lists the pillars with a measured side, busiest first, with the name of each', () => {
+    const flows = flowsOf(withFlows({ pay: [3000, 20], cl: [null, 4000], bil: [null, null] }))
+    expect(flows.map((f) => [f.id, f.sent, f.received])).toEqual([['cl', null, 4000], ['pay', 3000, 20]])
+    expect(flows[0]).toMatchObject({ name: 'Core Ledger', windowSeconds: 900 })
   })
 
-  it('sums several queues of the same pair and keeps each direction apart', () => {
-    const s = withRates({ 'cl-ledger-outbox@acc.accounts-worker': 10, 'cl-ledger-outbox@dat.ingest-worker': 4, 'acq-applications-outbox@acc.accounts-worker': 7 })
-    expect(flowsOf(s).find((f) => f.id === 'cl>acc')!.perSecond).toBe(10)
-    const two = withRates({ 'pay-payments-outbox@cl.ledger-worker': 2 })
-    const cl = two.groups.find((g) => g.id === 'cl')!
-    const first = cl.nodes.find((n) => n.id === 'cl.ledger-worker')!
-    cl.nodes.push({ ...first, id: 'cl.extra-worker', queues: [{ name: 'pay-payments-outbox', backlog: 0, deadLetters: 0, perSecond: 3 }] }) // a second service of the pillar reads the same topic
-    cl.messaging.subscriptions.push({ topic: 'pay-payments-outbox', publisher: 'pay', consumer: 'cl.extra-worker', legacy: false })
-    expect(flowsOf(two).find((f) => f.id === 'pay>cl')!.perSecond).toBe(5)
-    expect(flowsOf(two).some((f) => f.id === 'cl>pay')).toBe(false)
+  it('has no flows when the snapshot reports none, and never counts the hub', () => {
+    expect(flowsOf(withFlows({}))).toEqual([])
+    const s = withFlows({ pay: [5, 5] })
+    s.groups.find((g) => g.isHub)!.flow = { sentPerSecond: 99, receivedPerSecond: 99, windowSeconds: 900 }
+    expect(flowsOf(s).map((f) => f.id)).toEqual(['pay'])
   })
 
-  it('leaves out legacy reads, the hub, queues of the same pillar, queues nobody measures and queues with no rate', () => {
-    const s = withRates({ 'hub-egress@lost-found.batch-gateway-worker': 500, 'col-cases-outbox@col.dunning-worker': 500, 'pay-payments-outbox@cl.ledger-worker': 0 })
-    expect(flowsOf(s)).toEqual([])
-    for (const g of s.groups) for (const n of g.nodes) for (const q of n.queues ?? []) q.perSecond = undefined
-    expect(flowsOf(s)).toEqual([])
-  })
-
-  it('leaves out a publisher that is not a pillar of the snapshot (a hidden pillar)', () => {
-    const s = withRates({ 'pay-payments-outbox@cl.ledger-worker': 50, 'bil-invoices-outbox@cl.ledger-worker': 9 })
-    s.groups = s.groups.filter((g) => g.id !== 'pay')
-    expect(flowsOf(s).map((f) => f.id)).toEqual(['bil>cl'])
+  it('says a window the way people say it', () => {
+    expect(windowText(900)).toBe('15 min')
+    expect(windowText(300)).toBe('5 min')
+    expect(windowText(45)).toBe('45 s')
+    expect(windowText(7200)).toBe('2 h')
+    expect(windowText(0)).toBe('')
   })
 })
 
 describe('the Message flow tile', () => {
-  it('lists the five biggest pairs of at least one message a second, and all of them behind the button', () => {
-    const flows = [flow('a', 'b', 900), flow('a', 'c', 800), flow('b', 'c', 700), flow('c', 'a', 600), flow('c', 'b', 500), flow('b', 'a', 400), flow('d', 'a', 0.5)]
+  it('lists the five busiest pillars of at least one message a second, and all of them behind the button', () => {
+    const flows = [flow('a', 900, 1), flow('b', 800, 1), flow('c', 1, 700), flow('d', 600, 0), flow('e', 0, 500), flow('f', 400, 0), flow('g', 0.5, 0)]
     const t = flowTile(flows, [])!
-    expect(t.top.map((f) => f.id)).toEqual(['a>b', 'a>c', 'b>c', 'c>a', 'c>b'])
+    expect(t.top.map((f) => f.id)).toEqual(['a', 'b', 'c', 'd', 'e'])
     expect(t.top).toHaveLength(FLOW_TOP)
     expect(t.all).toHaveLength(7)
     expect(t.max).toBe(900)
@@ -72,68 +55,84 @@ describe('the Message flow tile', () => {
     expect(flowTileHtml(t, true)).toContain('Show fewer')
   })
 
-  it('scales the bars to the busiest pair and gives a trickle a visible sliver', () => {
-    const html = flowTileHtml(flowTile([flow('a', 'b', 1000), flow('a', 'c', 500), flow('a', 'd', 1)], [])!, true)
+  it('shows what each pillar sends and receives, bars scaled to the busiest side, and says so when a side has no messages', () => {
+    const html = flowTileHtml(flowTile([flow('a', 1000, 500), flow('b', 0, 1), flow('c', 250, null)], [])!, true)
     expect(html).toContain('width:100%')
     expect(html).toContain('width:50%')
-    expect(html).toContain('width:2%')
+    expect(html).toContain('width:25%')
+    expect(html).toContain('width:2%') // one message a second beside a thousand: a visible sliver
     expect(html).toContain('1.0k msg/s')
-    expect(html).toContain('a → b')
+    expect(html).toContain('no messages sent')
+    expect(html).not.toContain('no messages received') // c's receiving side is not measured: nothing is said about it
+    expect(html).toContain('sends')
+    expect(html).toContain('receives')
   })
 
-  it('is left out when nothing flows, and has no button when the short list already holds every pair', () => {
+  it('takes the window it says from the source, never from the code', () => {
+    expect(flowTileHtml(flowTile([flow('a', 10, 0, 900)], [])!, false)).toContain('Average over the last 15 min')
+    expect(flowTileHtml(flowTile([flow('a', 10, 0, 300)], [])!, false)).toContain('Average over the last 5 min')
+    expect(flowTileHtml(flowTile([flow('a', 10, 0, 0)], [])!, false)).not.toContain('Average over')
+  })
+
+  it('is left out when nothing moves, and has no button when the short list already holds every pillar', () => {
     expect(flowTile([], [])).toBeNull()
+    expect(flowTile([flow('a', 0, 0)], [])).toBeNull()
     expect(flowTileHtml(null, false)).toBe('')
-    expect(summaryHtml(buildDashboard(golden('calm'), ALL_TENANTS))).not.toContain('kpi-flow')
-    expect(flowTileHtml(flowTile([flow('a', 'b', 5)], [])!, false)).not.toContain('data-flows-all')
+    expect(summaryHtml(buildDashboard(withFlows({}), ALL_TENANTS))).not.toContain('kpi-flow')
+    expect(flowTileHtml(flowTile([flow('a', 5, 0)], [])!, false)).not.toContain('data-flows-all')
   })
 
-  it('says so when every pair is below the minimum, with the button to see them', () => {
-    const html = flowTileHtml(flowTile([flow('a', 'b', 0.4)], [])!, false)
-    expect(html).toContain('No pair of pillars sends 1 message a second or more')
+  it('says so when every pillar is below the minimum, with the button to see them', () => {
+    const html = flowTileHtml(flowTile([flow('a', 0.4, 0)], [])!, false)
+    expect(html).toContain('No pillar sends or receives 1 message a second or more')
     expect(html).toContain('Show all 1')
   })
 
-  it('keeps the order of the last draw unless a pair is clearly bigger, and puts a new pair after the old ones', () => {
-    const before = [flow('a', 'b', 100), flow('a', 'c', 99)]
-    expect(stableOrder([flow('a', 'b', 98), flow('a', 'c', 100)], before.map((f) => f.id)).map((f) => f.id)).toEqual(['a>b', 'a>c']) // 2% bigger: stays
-    expect(stableOrder([flow('a', 'b', 80), flow('a', 'c', 100)], before.map((f) => f.id)).map((f) => f.id)).toEqual(['a>c', 'a>b']) // 25% bigger: moves up
-    expect(stableOrder([flow('a', 'b', 100), flow('a', 'c', 99), flow('x', 'y', 101)], before.map((f) => f.id)).map((f) => f.id)).toEqual(['a>b', 'a>c', 'x>y'])
-    expect(stableOrder([flow('a', 'b', 100), flow('a', 'c', 99), flow('x', 'y', 500)], before.map((f) => f.id)).map((f) => f.id)).toEqual(['x>y', 'a>b', 'a>c'])
+  it('keeps the order of the last draw unless a pillar is clearly busier, and puts a new pillar after the old ones', () => {
+    const before = [flow('a', 100, 0), flow('b', 99, 0)]
+    const ids = (xs: Flow[]) => xs.map((f) => f.id)
+    expect(ids(stableOrder([flow('a', 98, 0), flow('b', 100, 0)], ids(before)))).toEqual(['a', 'b']) // 2% busier: stays
+    expect(ids(stableOrder([flow('a', 80, 0), flow('b', 100, 0)], ids(before)))).toEqual(['b', 'a']) // 25% busier: moves up
+    expect(ids(stableOrder([flow('a', 100, 0), flow('b', 99, 0), flow('x', 101, 0)], ids(before)))).toEqual(['a', 'b', 'x'])
+    expect(ids(stableOrder([flow('a', 100, 0), flow('b', 99, 0), flow('x', 500, 0)], ids(before)))).toEqual(['x', 'a', 'b'])
+    expect(ids(stableOrder([flow('a', 0, 100), flow('b', 99, 0)], ids(before)))).toEqual(['a', 'b']) // the busier side counts, sending or receiving
   })
 })
 
-describe('flows on the pillar cards', () => {
-  const s = withRates({ 'pay-payments-outbox@cl.ledger-worker': 3200, 'pay-payments-outbox@frd.screening-worker': 40, 'cl-ledger-outbox@acc.accounts-worker': 15 })
+describe('the flow on the pillar cards', () => {
+  const s = withFlows({ pay: [3200, 40], cl: [null, 15], rwd: [0, 0] })
   const d = buildDashboard(s, ALL_TENANTS)
   const card = (id: string) => d.pillars.find((p) => p.id === id)!
 
-  it('a closed card shows only the biggest flow the pillar sends, and a pillar that sends nothing shows nothing', () => {
-    expect(pillarFlowsHtml(card('pay').flows, false)).toContain('→ Core Ledger <i>3.2k msg/s</i>')
-    expect(pillarFlowsHtml(card('pay').flows, false)).not.toContain('Fraud')
-    expect(pillarFlowsHtml(card('rwd').flows, false)).toBe('')
+  it('a closed card shows what the pillar sends and receives, and nothing for a pillar that moves nothing or is not measured', () => {
+    expect(pillarFlowHtml(card('pay').flow, false)).toContain('sends <i>3.2k msg/s</i> · receives <i>40 msg/s</i>')
+    expect(pillarFlowHtml(card('cl').flow, false)).toContain('receives <i>15 msg/s</i>')
+    expect(pillarFlowHtml(card('cl').flow, false)).not.toContain('sends')
+    expect(pillarFlowHtml(card('rwd').flow, false)).toBe('') // measured, and nothing moves
+    expect(pillarFlowHtml(card('frd').flow, false)).toBe('') // not measured
     const quiet = pillarHtml(card('rwd'), ui())
     expect(quiet).not.toContain('pflow')
     expect(quiet).not.toContain('Messages')
   })
 
-  it('an open card lists everything the pillar sends and reads, biggest first', () => {
-    const open = pillarFlowsHtml(card('cl').flows, true)
-    expect(open).toContain('Sends to')
-    expect(open).toContain('Accounts <i>15 msg/s</i>')
-    expect(open).toContain('Reads from')
-    expect(open).toContain('Payments <i>3.2k msg/s</i>')
-    const pay = pillarFlowsHtml(card('pay').flows, true)
-    expect(pay.indexOf('Core Ledger')).toBeLessThan(pay.indexOf('Fraud'))
-    expect(pay).not.toContain('Reads from')
-    expect(pillarHtml(card('pay'), ui({ openPillars: new Set(['pay']) }))).toContain('Sends to')
-    expect(pillarHtml(card('pay'), ui())).not.toContain('Sends to')
+  it('an open card gives both sides, says so when a side has no messages, and says the window', () => {
+    const open = pillarFlowHtml(card('pay').flow, true)
+    expect(open).toContain('Sends')
+    expect(open).toContain('3.2k msg/s')
+    expect(open).toContain('Receives')
+    expect(open).toContain('Average over the last 15 min')
+    const quiet = pillarFlowHtml(card('rwd').flow, true)
+    expect(quiet).toContain('no messages sent')
+    expect(quiet).toContain('no messages received')
+    expect(pillarFlowHtml(card('frd').flow, true)).toBe('')
+    expect(pillarHtml(card('pay'), ui({ openPillars: new Set(['pay']) }))).toContain('Sends')
+    expect(pillarHtml(card('pay'), ui())).not.toContain('Average over')
   })
 
-  it('splits what a pillar sends and reads from the same flows', () => {
+  it('finds a pillar flow among the flows', () => {
     const flows = flowsOf(s)
-    expect(pillarFlows(flows, 'cl').in.map((f) => f.id)).toEqual(['pay>cl'])
-    expect(pillarFlows(flows, 'cl').out.map((f) => f.id)).toEqual(['cl>acc'])
+    expect(pillarFlow(flows, 'pay')).toMatchObject({ sent: 3200, received: 40 })
+    expect(pillarFlow(flows, 'frd')).toBeNull()
   })
 
   it('never uses a word for towns, islands, buildings or boats', () => {

@@ -4,12 +4,12 @@ import { trafficSplit } from '../trafficSplit'
 import { Building, type BuildingStatus } from '../buildings/building'
 import { box, canvasTexture, cyl, flat, group, roundRect } from '../buildings/mk'
 import { kit } from '../assets/kit'
-import type { GroupSnapshot, NodeSnapshot, Snapshot } from '../types'
+import type { GroupSnapshot, NodeSnapshot, PillarFlowSnapshot, Snapshot } from '../types'
 import { palette } from '../themes/active'
 import { blockPad, bench, bridge, crates, fountain, junction, lamp, pier, prop, ring, roadBetween, ROAD_W, serviceLane, street, streetX } from './props'
 import { buildIslandBody, GROUND, makeOutline, scatterNature, type Outline, type Rect } from './island'
 import { layoutWithHubRoom } from './hubRoom'
-import { CURB, LANE_Z, PAD_D, PAD_W, coastScan, hubFree, laneStart, padX, placeHubClusters, planIsland, rowEdge, type HubCluster, type Placed, type Plan } from './plan'
+import { CURB, DOCK_X, LANE_Z, PAD_D, PAD_W, coastScan, coastScanZ, hubFree, laneStart, padX, placeHubClusters, planIsland, rowEdge, type HubCluster, type Placed, type Plan } from './plan'
 import { hashString } from './random'
 import { boatRate, clamp, speedFactor } from '../visuals'
 import { CarSystem, type Route } from './cars'
@@ -82,6 +82,8 @@ interface Island {
   /** Ids of the workers that consume a topic. */
   consumers: Set<string>
   messaging: Messaging
+  /** What the pillar sends to the other pillars and receives from them, as the broker reports it; null when nothing measures it. The boats of its hub lanes follow it. */
+  flow: PillarFlowSnapshot | null
   weather: Weather
   /** Island-local z of the back gate, where the road to a third party's bridge leaves. Null for an island with no third party to reach. */
   backGateZ: number | null
@@ -147,6 +149,7 @@ export class Town {
   private port: PortSummary = { topics: 0, subscriptions: 0, piers: 0, legacy: 0 }
   /** The islands that have a sea lane for boats, and how many car routes cross each one's bridge. */
   private readonly boatLanes = new Set<string>()
+  private readonly hubLanePaths: { id: string; path: THREE.Vector3[] }[] = []
   private seaMap: SeaMap = { land: [] }
   private harbourPoints = new Map<string, THREE.Vector3>()
   private internalDocks = new Map<string, { start: THREE.Vector3; end: THREE.Vector3 }>()
@@ -216,8 +219,10 @@ export class Town {
     this.vendorCallers = vendorCallersOf(s)
     const airport = new Airport(!direct && this.vendorCallers.size > 0)
     const plans = pillars.map((g) => planIsland(g))
+    // a town whose broker reports what each pillar sends and receives sails its boats between each island and the hub, one lane out and one lane in beside the bridge
+    const hubLanes = pillars.some((g) => g.flow != null)
     // the hub grows until the clusters of resource buildings it holds have a place of their own
-    const layout = layoutWithHubRoom(plans.map((p) => ({ rx: p.rx, rz: p.rz })), s.ringCapacity, { rx: airport.rx, rz: airport.rz }, hub?.assets ?? [], (hub?.nodes ?? []).map((n) => n.kind))
+    const layout = layoutWithHubRoom(plans.map((p) => ({ rx: p.rx, rz: p.rz })), s.ringCapacity, { rx: airport.rx, rz: airport.rz }, hub?.assets ?? [], (hub?.nodes ?? []).map((n) => n.kind), hubLanes)
     this.hubGeo = layout.hub
     const airportPlace = layout.airport!
     // pillars first, then the airport: one entry for everything that has a spoke to the hub
@@ -230,6 +235,7 @@ export class Town {
     this.vendors.clear()
     this.vendorBridges.clear()
     this.boatLanes.clear()
+    this.hubLanePaths.length = 0
     clearArches()
     this.ringMiddles = []
     this.crossings.clear()
@@ -434,9 +440,9 @@ export class Town {
       }
       return q
     }
-    const harbours = pillars.map((_g, index) => (connectors[index].pier ? this.harbourWater(this.islands[index], plans[index]) : null))
+    const harbours = pillars.map((_g, index) => (connectors[index].pier ? this.harbourWater(this.islands[index]) : null))
     // the pier's middle line in the world, from its root to its tip: the circuit round the island runs from one side of it to the other and never across it
-    const piers = pillars.map((_g, index) => (harbours[index] ? this.pierLine(this.islands[index], plans[index]) : null))
+    const piers = pillars.map((_g, index) => (harbours[index] ? this.pierLine(this.islands[index]) : null))
     const lanes = new Map<string, THREE.Vector3[] | null>()
     const laneBetween = (a: number, b: number): THREE.Vector3[] | null => {
       const key = `${a}>${b}`
@@ -461,7 +467,28 @@ export class Town {
       return best
     }
     const indexOfIsland = new Map(pillars.map((g, i) => [g.id, i]))
+    // hub lanes: each island with a measured flow has one lane to the hub beside its bridge, straight and parallel to it, boats going out on one side and coming in on the other.
+    // They carry what the broker says the pillar sends and receives, so they replace the lanes between islands, whose sender was only a guess from queue names.
+    if (hubLanes) {
+      const broker = hubBuildings.find((b) => b.kind === 'Broker')
+      const up = new THREE.Vector3(0, 1, 0)
+      pillars.forEach((g, index) => {
+        if (!harbours[index] || !connectors[index].bridge || g.flow == null) return
+        const island = this.islands[index]
+        const toIsland = gates[index].gate.clone().sub(gates[index].coast).setY(0).normalize()
+        const beside = new THREE.Vector3(1, 0, 0).applyAxisAngle(up, island.root.rotation.y).multiplyScalar(DOCK_X) // the island's dock is this far to the side of its bridge, and so is the hub's
+        const hubTip = this.hubDock(gates[index].coast.clone().setY(0).add(beside), toIsland)
+        const pathOut = [harbours[index]!.clone(), hubTip]
+        const rate = (pick: (f: PillarFlowSnapshot) => number | null | undefined) => () => (brokerRunning(broker?.node) && island.flow ? boatRate(pick(island.flow) ?? 0, 1) : 0)
+        const speed = () => (broker?.node ? speedFactor(broker.node.p99Ms, broker.node.slaP99Ms) : 1)
+        boatRoutes.push({ path: pathOut, from: g.id, to: 'hub', oneWay: true, rate: rate((f) => f.sentPerSecond), speed })
+        boatRoutes.push({ path: [...pathOut].reverse(), from: null, to: g.id, oneWay: true, rate: rate((f) => f.receivedPerSecond), speed })
+        this.boatLanes.add(g.id)
+        this.hubLanePaths.push({ id: g.id, path: pathOut })
+      })
+    }
     pillars.forEach((g, to) => {
+      if (hubLanes) return
       if (!harbours[to]) return // boats sail only to a pier
       const subs = (g.messaging?.subscriptions ?? [])
       if (subs.length === 0) return
@@ -571,7 +598,7 @@ export class Town {
     })
     for (const isl of this.islands) {
       const g = s.groups.find((x) => x.id === isl.group.id)
-      if (g) this.guard(`messaging ${g.id}`, () => { isl.messaging = messagingOf([...g.nodes], g.messaging) })
+      if (g) this.guard(`messaging ${g.id}`, () => { isl.messaging = messagingOf([...g.nodes], g.messaging); isl.flow = g.flow ?? null })
     }
     for (const isl of this.islands) {
       const g = s.groups.find((x) => x.id === isl.group.id)
@@ -748,6 +775,11 @@ export class Town {
     }
     const docks = Object.fromEntries(ids.map((id) => [id, { between: { x: this.harbourPoints.get(id)!.x, z: this.harbourPoints.get(id)!.z }, internalStart: { x: this.internalDocks.get(id)!.start.x, z: this.internalDocks.get(id)!.start.z }, quay: { x: this.internalDocks.get(id)!.end.x, z: this.internalDocks.get(id)!.end.z } }]))
     return { harbours: ids, docks, unreachable, routes: this.boatRouteEnds.map((r) => ({ from: r.from, to: r.to, scheduler: r.scheduler, circuit: r.circuit, rate: r.rate() })), arches: archCount() }
+  }
+
+  /** The hub lanes: for each island the path of its lane from the island dock to the hub dock (the way back is the same path reversed). For tests. */
+  inspectLanes(): { id: string; path: { x: number; z: number }[] }[] {
+    return this.hubLanePaths.map((l) => ({ id: l.id, path: l.path.map((p) => ({ x: p.x, z: p.z })) }))
   }
 
   inspectVendors(): { id: string; island: string; x: number; z: number; bx: number; bz: number; bridges: number }[] {
@@ -962,9 +994,6 @@ export class Town {
     const { rows, rowRoadZ } = plan
     const edge = rowEdge(plan.pads)
     const gateZ = coastScan(outline, 'z') - 0.6
-    const harbourRow = Math.floor((rows - 1) / 2)
-    const harbourZ = rowRoadZ[harbourRow]
-    const harbourCoast = coastScan(outline, 'x', harbourZ)
     const avoid: Rect[] = []
 
     // Roads: one spine from the gate, and a road in front of every row of pads, with a junction where they meet.
@@ -976,7 +1005,7 @@ export class Town {
       if (r < rows - 1) decor.add(street(0, rowRoadZ[r + 1] + half, z - half))
       // no pavement on the pad side: that edge is the service lane, where cars pull in
       decor.add(streetX(z, -edge, -half, [-1]))
-      decor.add(streetX(z, half, r === harbourRow && links.pier ? harbourCoast - 8.3 : edge, [-1]))
+      decor.add(streetX(z, half, edge, [-1]))
       avoid.push({ x: 0, z, w: 2 * edge + 2, d: 2 * CURB + 1 })
       // keep the lawn between rows clear of trees, so the front of every building stays in view
       if (r < rows - 1) {
@@ -1065,14 +1094,22 @@ export class Town {
       for (const [name, x, z, rot, scale] of pile) decor.add(prop(name, x, z, rot, scale))
       avoid.push({ x: 11, z: signZ, w: 10, d: 7 })
     }
-    // the island's pier on the east coast, at the end of a road: only for an island with messaging
+    // the island's pier on its hub-facing coast beside the gate, parallel to the bridge, at the end of a short road from the first row: only for an island with messaging.
+    // The harbour is built facing +x (the sea) and turned a quarter so that it faces the hub.
     let status: HarbourStatus | null = null
     if (links.pier) {
-      decor.add(this.harbour(harbourCoast, harbourZ))
-      status = new HarbourStatus(harbourCoast, harbourZ)
+      const dockZ = coastScanZ(outline, DOCK_X)
+      const turned = (): THREE.Group => { const f = new THREE.Group(); f.position.set(DOCK_X, 0, dockZ); f.rotation.y = -Math.PI / 2; return f }
+      const harbourFrame = turned()
+      harbourFrame.add(this.harbour(0, 0))
+      decor.add(harbourFrame)
+      if (dockZ - 8.4 > rowRoadZ[0] + half + 1) decor.add(street(DOCK_X, rowRoadZ[0] + half, dockZ - 8.4))
+      status = new HarbourStatus(0, 0)
       status.setIsland(g.id)
-      root.add(status.group)
-      avoid.push({ x: harbourCoast - 4, z: harbourZ - 2, w: 13, d: 16 })
+      const statusFrame = turned()
+      statusFrame.add(status.group)
+      root.add(statusFrame)
+      avoid.push({ x: DOCK_X, z: dockZ - 5, w: 15, d: 14 })
     }
 
     const trees = Math.min(110, Math.round(40 * (plan.rx * plan.rz) / (24 * 20)))
@@ -1081,7 +1118,7 @@ export class Town {
     root.updateMatrixWorld(true)
     const weather = new Weather(g.id, plan.rx, plan.rz)
     root.add(weather.object)
-    return { group: g, root, outline, buildings, harbour: status, links, consumers: consumersOf(g.messaging), messaging: messagingOf([], g.messaging), weather, backGateZ: backZ, services, signpost: post, assets, nodeIds: new Set(g.nodes.map((n) => n.id)) }
+    return { group: g, root, outline, buildings, harbour: status, links, consumers: consumersOf(g.messaging), messaging: messagingOf([], g.messaging), flow: g.flow ?? null, weather, backGateZ: backZ, services, signpost: post, assets, nodeIds: new Set(g.nodes.map((n) => n.id)) }
   }
 
   /** A quay with a pier house, a pier and crates: where the boats from the hub's Service Bus port land. */
@@ -1170,18 +1207,40 @@ export class Town {
     return coast.clone().addScaledVector(dir, QUAY + 3).setY(0)
   }
 
-  /** The open water off the tip of an island's harbour pier, in world coordinates, outside the circuit round the island: where the boats between islands dock, out and back on lanes side by side. */
-  private harbourWater(island: Island, plan: Plan): THREE.Vector3 {
-    const harbourZ = plan.rowRoadZ[Math.floor((plan.rows - 1) / 2)]
-    const coast = coastScan(island.outline, 'x', harbourZ)
-    return island.root.localToWorld(new THREE.Vector3(coast + 16, 0, harbourZ)).setY(0)
+  /**
+   * A wooden dock on the hub's coast for one island's lane: it starts on the coast near `from` (the hub end of the island's bridge moved to the side) and runs out along
+   * `dir` (from the hub toward the island), parallel to the bridge. Returns the water at its tip, where the boats of the lane start and finish.
+   */
+  private hubDock(from: THREE.Vector3, dir: THREE.Vector3): THREE.Vector3 {
+    // the hub's own coast along the line: from well inside to well outside, the last place that is still land
+    const at = (t: number) => from.clone().addScaledVector(dir, t)
+    let lo = -16, hi = 16
+    for (let i = 0; i < 24; i++) {
+      const mid = (lo + hi) / 2
+      const p = at(mid)
+      if (this.hubOutline.contains(p.x, p.z)) lo = mid
+      else hi = mid
+    }
+    const coast = at(lo).setY(0)
+    const p = pier(QUAY)
+    p.position.copy(coast)
+    p.rotation.y = Math.atan2(dir.x, dir.z)
+    const c = crates()
+    c.position.set(coast.x - dir.x * 1.2 - dir.z * 1.6, 0, coast.z - dir.z * 1.2 + dir.x * 1.6)
+    c.rotation.y = p.rotation.y
+    this.hubDecor.add(p, c)
+    return coast.clone().addScaledVector(dir, QUAY + 3).setY(0)
+  }
+
+  /** The open water off the tip of an island's harbour pier, in world coordinates, outside the circuit round the island: where the boats between islands, and the boats to and from the hub, dock. */
+  private harbourWater(island: Island): THREE.Vector3 {
+    return island.root.localToWorld(new THREE.Vector3(DOCK_X, 0, coastScanZ(island.outline, DOCK_X) + 16)).setY(0)
   }
 
   /** An island's pier as a line in world coordinates: from its root on the island to its tip. */
-  private pierLine(island: Island, plan: Plan): { from: THREE.Vector3; to: THREE.Vector3 } {
-    const harbourZ = plan.rowRoadZ[Math.floor((plan.rows - 1) / 2)]
-    const coast = coastScan(island.outline, 'x', harbourZ)
-    return { from: island.root.localToWorld(new THREE.Vector3(coast - 7, 0, harbourZ)).setY(0), to: island.root.localToWorld(new THREE.Vector3(coast + 4, 0, harbourZ)).setY(0) }
+  private pierLine(island: Island): { from: THREE.Vector3; to: THREE.Vector3 } {
+    const coast = coastScanZ(island.outline, DOCK_X)
+    return { from: island.root.localToWorld(new THREE.Vector3(DOCK_X, 0, coast - 7)).setY(0), to: island.root.localToWorld(new THREE.Vector3(DOCK_X, 0, coast + 4)).setY(0) }
   }
 
   /** A sea lane to an island's harbour, sailed there and back: its share (`weight`) of the island's messages is what these boats carry. */

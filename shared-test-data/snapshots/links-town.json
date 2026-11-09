@@ -224,7 +224,8 @@
           "engine": null
         }
       ],
-      "assets": []
+      "assets": [],
+      "flow": null
     },
     {
       "id": "ful",
@@ -397,7 +398,12 @@
           "engine": null
         }
       ],
-      "assets": []
+      "assets": [],
+      "flow": {
+        "sentPerSecond": 128,
+        "receivedPerSecond": 16,
+        "windowSeconds": 300
+      }
     },
     {
       "id": "wrk",
@@ -522,7 +528,12 @@
           "engine": null
         }
       ],
-      "assets": []
+      "assets": [],
+      "flow": {
+        "sentPerSecond": 64,
+        "receivedPerSecond": 16,
+        "windowSeconds": 300
+      }
     },
     {
       "id": "nom",
@@ -635,7 +646,8 @@
           "engine": null
         }
       ],
-      "assets": []
+      "assets": [],
+      "flow": null
     },
     {
       "id": "hbk",
@@ -732,7 +744,8 @@
           "engine": null
         }
       ],
-      "assets": []
+      "assets": [],
+      "flow": null
     },
     {
       "id": "leg",
@@ -900,7 +913,12 @@
           "engine": null
         }
       ],
-      "assets": []
+      "assets": [],
+      "flow": {
+        "sentPerSecond": 0,
+        "receivedPerSecond": 8,
+        "windowSeconds": 300
+      }
     },
     {
       "id": "sta",
@@ -995,7 +1013,8 @@
           "engine": null
         }
       ],
-      "assets": []
+      "assets": [],
+      "flow": null
     }
   ],
   "vendors": [

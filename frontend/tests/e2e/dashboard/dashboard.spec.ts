@@ -280,31 +280,35 @@ test.describe('the dashboard view', () => {
     expect(text).toBe('No queue has dead letters right now.')
   })
 
-  const FLOW = `const bb = s.groups.find(g => g.id === 'bb'); const w = bb.nodes[0]
-      for (const m of s.groups.flatMap(g => g.nodes)) m.queues = []
-      bb.messaging.subscriptions = [{ topic: 'aa-orders-outbox', publisher: 'aa', consumer: w.id, legacy: false }]
-      w.queues = [{ name: 'aa-orders-outbox', backlog: 0, deadLetters: 0, perSecond: 3200 }]`
+  const FLOW = `const aa = s.groups.find(g => g.id === 'aa'); const bb = s.groups.find(g => g.id === 'bb')
+      for (const g of s.groups) g.flow = undefined
+      aa.flow = { sentPerSecond: 3200, receivedPerSecond: 0, windowSeconds: 900 }
+      bb.flow = { sentPerSecond: null, receivedPerSecond: 40, windowSeconds: 900 }`
 
-  test('the Message flow tile lists the pillar pairs by messages a second, and the cards show who they send to', async ({ town, page }) => {
+  test('the Message flow tile lists the pillars by what they send and receive, and the cards say the same', async ({ town, page }) => {
     await open(town, page)
-    const read = `const t = document.querySelector('#kpi-flow'); return { lines: [...t.querySelectorAll('.fl')].map(l => l.textContent), bar: t.querySelector('.fbar i').style.width, button: !!t.querySelector('[data-flows-all]'), alpha: document.querySelector('[data-pillar="aa"] .pflow')?.textContent ?? null, billing: document.querySelector('[data-pillar="bb"] .pflow')?.textContent ?? null }`
-    const got = await withSnapshot<{ lines: string[]; bar: string; button: boolean; alpha: string | null; billing: string | null }>(page, FLOW, read)
-    expect(got.lines).toHaveLength(1)
-    expect(got.lines[0]).toMatch(/→ .*3\.2k msg\/s/)
+    const read = `const t = document.querySelector('#kpi-flow'); return { lines: [...t.querySelectorAll('.fl')].map(l => l.textContent), bar: t.querySelector('.fbar i').style.width, button: !!t.querySelector('[data-flows-all]'), window: t.querySelector('.fwin')?.textContent ?? null, alpha: document.querySelector('[data-pillar="aa"] .pflow')?.textContent ?? null, billing: document.querySelector('[data-pillar="bb"] .pflow')?.textContent ?? null }`
+    const got = await withSnapshot<{ lines: string[]; bar: string; button: boolean; window: string | null; alpha: string | null; billing: string | null }>(page, FLOW, read)
+    expect(got.lines).toHaveLength(2)
+    expect(got.lines[0]).toMatch(/sends3\.2k msg\/s/)
+    expect(got.lines[0]).toContain('no messages received')
+    expect(got.lines[1]).toContain('receives40 msg/s')
     expect(got.bar).toBe('100%')
     expect(got.button).toBe(false)
-    expect(got.alpha).toMatch(/^→ .* 3\.2k msg\/s$/)
-    expect(got.billing).toBeNull() // reads only: a closed card has nothing to show
+    expect(got.window).toBe('Average over the last 15 min')
+    expect(got.alpha).toMatch(/^sends 3\.2k msg\/s · no messages received$/)
+    expect(got.billing).toMatch(/^receives 40 msg\/s$/)
     await page.locator('[data-pillar="aa"] [data-toggle]').click()
-    await expect(page.locator('[data-pillar="aa"] .pflowx')).toContainText('Sends to')
+    await expect(page.locator('[data-pillar="aa"] .pflowx')).toContainText('Sends')
     await expect(page.locator('[data-pillar="aa"] .pflowx')).toContainText('3.2k msg/s')
+    await expect(page.locator('[data-pillar="aa"] .pflowx')).toContainText('no messages received')
     await page.locator('[data-pillar="bb"] [data-toggle]').click()
-    await expect(page.locator('[data-pillar="bb"] .pflowx')).toContainText('Reads from')
+    await expect(page.locator('[data-pillar="bb"] .pflowx')).toContainText('Receives')
   })
 
-  test('the Message flow tile is absent when no queue carries messages between pillars', async ({ town, page }) => {
+  test('the Message flow tile is absent when no pillar moves a message', async ({ town, page }) => {
     await open(town, page)
-    const present = await withSnapshot<boolean>(page, `for (const m of s.groups.flatMap(g => g.nodes)) m.queues = []`, `return !!document.querySelector('#kpi-flow')`)
+    const present = await withSnapshot<boolean>(page, `for (const g of s.groups) g.flow = g.isHub ? undefined : { sentPerSecond: 0, receivedPerSecond: 0, windowSeconds: 900 }`, `return !!document.querySelector('#kpi-flow')`)
     expect(present).toBe(false)
   })
 

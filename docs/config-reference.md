@@ -343,6 +343,9 @@ sources:
         - { match: '^sbq-(?<pillar>[a-z]+)-(?<service>[a-z]+)-(?:inbox|changefeed-worker)$' }
         # the name also says who publishes it, so the town builds the topic and the subscription itself: no `messaging:` block in a pillar file
         - { match: '^sbq-(?<producerPillar>[a-z]+)-(?<producer>[a-z]+)-(?<service>[a-z]+)-outbox$' }
+      flows:                                  # what a whole pillar sends and receives: its egress topic and the topic its ingress queues hang on
+        - { match: '^sbt-(?<pillar>[a-z]+)-egress$', direction: sent }
+        - { match: '^(?<pillar>[a-z]+)-igrs-outbox$', direction: received }
 signals: { backlog: messaging, deadLetters: messaging }
 ```
 
@@ -357,6 +360,7 @@ signals: { backlog: messaging, deadLetters: messaging }
 | `throughput` | no | none | The metric of the messages that arrive in an entity, usually incoming messages added up by `total`. Their rate (per second over the window) sets how many boats sail to the consumer; without it the boats follow the consumer's request rate. |
 | `deadLetterLink` | no | none | `{ name, url }`: an address that opens one queue's dead letters in your support tool, shown for each queue in its consumer's drawer. The url is a template over `{queue}`, `{pillar}`, `{service}` (the codes of the scope rules), `{system}` and `{environment}`. Without it, no link. |
 | `deadLetterLinks` | no | none | A list of `{ region, name, url }`: one support-tool address for each region, for a broker whose namespaces are in more than one region and a tool for each. A queue's dead letters in a region open the entry of that region (the region is matched ignoring case against the region of the namespace that holds them, as `scope.regions` and the resource rule give it). A region with no entry uses `deadLetterLink`. Each region may be given once. |
+| `flows` | no | none | Entities that carry a whole pillar's traffic, a list of `{ match, direction }`: the rate of their `throughput` (messages a second over the source's `window`) is what that pillar sends to other pillars (`sent`) or receives from them (`received`). Several entities of one pillar (the same name in each region) add up. The name says only the pillar, never the other end, so these are totals per pillar, not pairs. They need `throughput`. The dashboard and the town show them; without `flows` neither shows a flow. |
 | `patterns` | yes | | The shapes of entity names, tried in order: a regular expression with the group `service` (the code of the system that reads the entity; it must belong to one system of the kind only, or the entity is left out), optionally `pillar` (the code or id of the reader's pillar; without it the reader may be in any pillar), and optionally both `producerPillar` and `producer` (the code of the pillar and of the service that publish it). An entity whose name says its publisher is a route: the town adds that service's topic and the reader's subscription to what the pillar files say, on every poll, so queues teams add later appear without a config change. A queue Azure sends nothing for in one poll keeps its place with no numbers. |
 
 <!-- file: EntityLinkFile -->
@@ -377,6 +381,12 @@ signals: { backlog: messaging, deadLetters: messaging }
 |---|---|---|---|
 | `match` | yes | | A regular expression with the named groups `pillar` and `service`: the pillar's code (or id) and the service's code, which pick the system that reads the entity. |
 | `consumer` | no | `worker` | The role of the system that reads the entity (`worker`, `api`, ...). |
+
+<!-- file: EntityFlowFile -->
+| Key | Required | Default | Meaning |
+|---|---|---|---|
+| `match` | yes | | A regular expression with the named group `pillar`: the pillar's code (or id). |
+| `direction` | yes | | `sent` (what arrives in this entity is what the pillar sends to the other pillars) or `received` (what the other pillars send to it). |
 
 The thresholds that turn a waiting count amber and red are `backlogCount` in the defaults.
 

@@ -4,7 +4,7 @@
 import { escapeHtml as esc } from '../picker'
 import type { Chip, Dashboard, Group, IncidentRow, Issue, JobRow, Level, Pillar, Row, Section, SideRow, TenantRow } from './model'
 import type { SourceLine } from './freshness'
-import type { Flow, FlowTile, PillarFlows } from './flows'
+import { busiest, windowText, type Flow, type FlowTile } from './flows'
 import { formatRate } from '../visuals'
 
 /** What the viewer has opened or closed. A group or a database that is not in the maps follows its own default. */
@@ -65,21 +65,41 @@ export function summaryHtml(d: Dashboard, ui: Pick<UiState, 'flowsAll'> = {}): s
 
 const rate = (v: number): string => `${formatRate(v)} msg/s`
 
-/** The Message flow tile: the biggest pillar-to-pillar flows with bars scaled to the busiest pair, and a button for all of them. Left out when no pair has messages. */
+/** What a pillar sends or receives, in words: the rate, or that there are no messages. Null when nothing measures that side. */
+function flowSide(v: number | null, verb: 'sends' | 'receives'): { label: string; value: string; none: boolean } | null {
+  if (v == null) return null
+  return v > 0 ? { label: verb, value: rate(v), none: false } : { label: verb, value: verb === 'sends' ? 'no messages sent' : 'no messages received', none: true }
+}
+
+/** The line under the tile's list and in an open card: the time the rates average over, from the source's window. Nothing when the window is not known. */
+const windowNote = (seconds: number): string => (windowText(seconds) ? `<small class="fwin">Average over the last ${windowText(seconds)}</small>` : '')
+
+/**
+ * The Message flow tile: the busiest pillars, each with what it sends and what it receives (a bar for each, scaled to the busiest side of any pillar), and a button
+ * for all of them. A side with no messages says so. Left out when no pillar moves any message.
+ */
 export function flowTileHtml(f: FlowTile | null, all: boolean): string {
   if (!f) return ''
   const list = all ? f.all : f.top
-  const lines = list.map((x) => `<div class="fl" data-flow="${esc(x.id)}"><span class="fn">${esc(x.fromName)} → ${esc(x.toName)}</span><b class="fv">${rate(x.perSecond)}</b><span class="fbar"><i style="width:${f.max > 0 ? Math.max(2, (x.perSecond / f.max) * 100) : 0}%"></i></span></div>`).join('')
+  const row = (side: ReturnType<typeof flowSide>, v: number | null): string => (side
+    ? `<div class="fr"><span class="fd">${side.label}</span><span class="fbar"><i style="width:${side.none || f.max <= 0 ? 0 : Math.max(2, ((v ?? 0) / f.max) * 100)}%"></i></span><b class="fv${side.none ? ' none' : ''}">${side.value}</b></div>`
+    : '')
+  const lines = list.map((x) => `<div class="fl" data-flow="${esc(x.id)}"><span class="fn">${esc(x.name)}</span>${row(flowSide(x.sent, 'sends'), x.sent)}${row(flowSide(x.received, 'receives'), x.received)}</div>`).join('')
   const more = f.all.length > f.top.length || all
-  return `<div class="kpi" id="kpi-flow"><span>Message flow</span><div class="flist">${lines || '<small>No pair of pillars sends 1 message a second or more.</small>'}</div>${more ? `<button class="btn fall" data-flows-all aria-expanded="${all}">${all ? 'Show fewer' : `Show all ${f.all.length}`}</button>` : ''}</div>`
+  return `<div class="kpi" id="kpi-flow"><span>Message flow</span><div class="flist">${lines || '<small>No pillar sends or receives 1 message a second or more.</small>'}</div>${windowNote(f.windowSeconds)}${more ? `<button class="btn fall" data-flows-all aria-expanded="${all}">${all ? 'Show fewer' : `Show all ${f.all.length}`}</button>` : ''}</div>`
 }
 
-/** A pillar's flows on its card. Closed: one chip with the biggest flow it sends, when it sends any. Open: everything it sends and reads. */
-export function pillarFlowsHtml(f: PillarFlows, open: boolean): string {
-  if (!open) return f.out.length ? `<div class="pflow"><span class="ch" data-flow="${esc(f.out[0].id)}">→ ${esc(f.out[0].toName)} <i>${rate(f.out[0].perSecond)}</i></span></div>` : ''
-  if (!f.out.length && !f.in.length) return ''
-  const list = (label: string, xs: readonly Flow[], name: (x: Flow) => string): string => (xs.length ? `<div><span class="lbl">${label}</span>${xs.map((x) => `<span class="ch" data-flow="${esc(x.id)}">${esc(name(x))} <i>${rate(x.perSecond)}</i></span>`).join('')}</div>` : '')
-  return `<div class="sub-title">Messages</div><div class="cx pflowx">${list('Sends to', f.out, (x) => x.toName)}${list('Reads from', f.in, (x) => x.fromName)}</div>`
+/**
+ * A pillar's flow on its card. Closed: one chip with what it sends and receives, only when it moves any message. Open: both sides, also when one is none
+ * ("no messages sent"), and the window the rates average over. Nothing when the environment does not measure the pillar.
+ */
+export function pillarFlowHtml(f: Flow | null, open: boolean): string {
+  if (!f) return ''
+  const sides = [flowSide(f.sent, 'sends'), flowSide(f.received, 'receives')].filter((x): x is NonNullable<typeof x> => x !== null)
+  if (sides.length === 0) return ''
+  const part = (x: (typeof sides)[number]): string => (x.none ? `<i>${x.value}</i>` : `${x.label} <i>${x.value}</i>`)
+  if (!open) return busiest(f) > 0 ? `<div class="pflow"><span class="ch" data-flow="${esc(f.id)}">${sides.map(part).join(' · ')}</span></div>` : ''
+  return `<div class="sub-title">Messages</div><div class="pflowx">${sides.map((x) => `<div><span class="lbl">${x.label === 'sends' ? 'Sends' : 'Receives'}</span><span class="ch" data-flow="${esc(f.id)}"><i>${x.value}</i></span></div>`).join('')}${windowNote(f.windowSeconds)}</div>`
 }
 
 /** The queues with dead letters, worst first: the service that reads each, its pillar, the queue and how many. */
@@ -188,8 +208,8 @@ export function pillarHtml(p: Pillar, ui: UiState): string {
     <div class="acts"><button class="btn" data-toggle="${esc(p.id)}" aria-expanded="${open}">${open ? 'Close' : 'Services'}</button><button class="btn" data-hide="${esc(p.id)}">Hide</button></div></div>
     ${p.configError ? `<div class="issues"><span class="chip bad">${esc(p.configError)}</span></div>` : ''}
     ${p.issues.length ? `<div class="issues">${p.issues.map((i) => issueChip(i, false)).join('')}</div>` : ''}
-    ${open ? '' : pillarFlowsHtml(p.flows, false)}
-    ${open ? `<div class="body">${pillarFlowsHtml(p.flows, true)}<div class="tw"><table class="svc">${HEAD}<tbody>${p.groups.map((g) => groupHtml(g, ui)).join('')}</tbody></table></div>${jobsHtml(p.jobs)}</div>` : ''}</section>`
+    ${open ? '' : pillarFlowHtml(p.flow, false)}
+    ${open ? `<div class="body">${pillarFlowHtml(p.flow, true)}<div class="tw"><table class="svc">${HEAD}<tbody>${p.groups.map((g) => groupHtml(g, ui)).join('')}</tbody></table></div>${jobsHtml(p.jobs)}</div>` : ''}</section>`
 }
 
 export function pillarsHtml(d: Dashboard, ui: UiState): string {

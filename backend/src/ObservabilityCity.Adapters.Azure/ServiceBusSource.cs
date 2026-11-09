@@ -93,8 +93,38 @@ public sealed class ServiceBusSource(
                 deadByRegion is null || !deadByRegion.TryGetValue(entity, out var regions) ? null : regions.Where(r => Math.Round(r.Value) > 0).OrderBy(r => r.Key, StringComparer.OrdinalIgnoreCase).Select(r => new DeadLetterRegionReading(r.Key, Math.Round(r.Value))).ToList()));
         }
         Unclaimed = unclaimed;
-        return byNode.ToDictionary(kv => kv.Key, kv => new NodeReading(at, true, 0, 0, 0, 0, 0, 0,
+        var result = byNode.ToDictionary(kv => kv.Key, kv => new NodeReading(at, true, 0, 0, 0, 0, 0, 0,
             QueueDepth: kv.Value.HasWaiting ? Math.Round(kv.Value.Waiting) : null, DeadLetters: kv.Value.HasDead ? Math.Round(kv.Value.Dead) : null, Queues: queues[kv.Key]));
+        foreach (var (groupId, flow) in PillarFlows(registry, config.Flows, arrived, Window))
+            result[NodeReading.FlowKey(groupId)] = new NodeReading(at, true, 0, 0, 0, 0, 0, 0, Flow: flow);
+        return result;
+    }
+
+    /// <summary>
+    /// What each pillar sends and receives, from the entities the <c>flows</c> patterns pick out: the messages that arrived in them over the window, as a rate, added up
+    /// when several entities (the same name in every region, or several patterns) belong to one pillar. A pillar none of the entities names is not listed; a side no entity
+    /// was found for is null. The entity's name says only the pillar, never the other end, so these are totals, not pairs.
+    /// </summary>
+    public static IReadOnlyDictionary<string, PillarFlowReading> PillarFlows(TownRegistry registry, IReadOnlyList<EntityFlow>? flows, IReadOnlyDictionary<string, double> arrived, TimeSpan window)
+    {
+        var result = new Dictionary<string, PillarFlowReading>();
+        if (flows is null || flows.Count == 0) return result;
+        var seconds = (int)Math.Round(window.TotalSeconds);
+        foreach (var flow in flows)
+        {
+            var regex = new Regex(flow.Match, RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
+            foreach (var (entity, count) in arrived.OrderBy(kv => kv.Key, StringComparer.Ordinal))
+            {
+                var match = regex.Match(entity);
+                if (!match.Success || !match.Groups["pillar"].Success) continue;
+                var group = registry.Groups.FirstOrDefault(g => !g.IsHub && Is(g, match.Groups["pillar"].Value));
+                if (group is null) continue;
+                var rate = count / window.TotalSeconds;
+                var before = result.GetValueOrDefault(group.Id) ?? new PillarFlowReading(null, null, seconds);
+                result[group.Id] = flow.Direction == EntityFlow.Sent ? before with { Sent = (before.Sent ?? 0) + rate } : before with { Received = (before.Received ?? 0) + rate };
+            }
+        }
+        return result;
     }
 
     private async Task<IReadOnlyList<TypeRow>> ReadTypes(string query, Resolution resolution, CancellationToken ct)
