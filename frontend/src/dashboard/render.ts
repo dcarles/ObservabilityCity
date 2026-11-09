@@ -99,7 +99,7 @@ export function pillarFlowHtml(f: Flow | null, open: boolean): string {
   if (sides.length === 0) return ''
   const part = (x: (typeof sides)[number]): string => (x.none ? `<i>${x.value}</i>` : `${x.label} <i>${x.value}</i>`)
   if (!open) return busiest(f) > 0 ? `<div class="pflow"><span class="ch" data-flow="${esc(f.id)}">${sides.map(part).join(' · ')}</span></div>` : ''
-  return `<div class="sub-title">Messages</div><div class="cx pflowx">${sides.map((x) => `<div><span class="lbl">${x.label === 'sends' ? 'Sends' : 'Receives'}</span><span class="ch" data-flow="${esc(f.id)}"><i>${x.value}</i></span></div>`).join('')}${windowNote(f.windowSeconds)}</div>`
+  return `<div class="sub-title">Messages</div><div class="pflowx">${sides.map((x) => `<div><span class="lbl">${x.label === 'sends' ? 'Sends' : 'Receives'}</span><span class="ch" data-flow="${esc(f.id)}"><i>${x.value}</i></span></div>`).join('')}${windowNote(f.windowSeconds)}</div>`
 }
 
 /** The queues with dead letters, worst first: the service that reads each, its pillar, the queue and how many. */
