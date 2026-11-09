@@ -466,8 +466,8 @@ export async function startTown(): Promise<void> {
     updateIslandLabels()
   }
 
-  // Debug handle for automated tests, screenshots and poking from the console.
-  ;(window as unknown as { city: unknown }).city = {
+  // Debug handle for automated tests, screenshots and poking from the console. A production page does not publish it (it would be a public surface for other scripts to depend on) unless the address has ?test=1.
+  const handle = {
     stage, town, THREE, seen, step, islandLabels,
     /** The scripted event of the theme: start it, stop it, jump to a moment, or read what is going on. */
     event: {
@@ -567,6 +567,7 @@ export async function startTown(): Promise<void> {
       return { ms, calls: info.calls, triangles: info.triangles }
     },
   }
+  if (import.meta.env.DEV || testMode) (window as unknown as { city: unknown }).city = handle
 
   const clock = new THREE.Timer()
   clock.connect(document) // time stands still while the tab is hidden, so coming back does not jump

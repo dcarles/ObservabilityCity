@@ -120,6 +120,18 @@ public class HostViewTests : IDisposable
         .AddJsonProtocol(o => { o.PayloadSerializerOptions.Converters.Add(new JsonStringEnumConverter()); o.PayloadSerializerOptions.PropertyNameCaseInsensitive = true; })
         .Build();
 
+
+    /// <summary>Waits until a condition holds, up to a deadline, instead of sleeping for a fixed time and hoping.</summary>
+    private static async Task WaitUntil(Func<bool> done, string what, int seconds = 15)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(seconds);
+        while (!done())
+        {
+            if (DateTime.UtcNow > deadline) throw new TimeoutException($"Gave up waiting until {what}");
+            await Task.Delay(20);
+        }
+    }
+
     private static async Task<Snapshot> Next(System.Collections.Concurrent.ConcurrentQueue<Snapshot> seen, Func<Snapshot, bool> match)
     {
         for (var i = 0; i < 100; i++)
@@ -140,7 +152,7 @@ public class HostViewTests : IDisposable
 
         await viewer.StartAsync(TestContext.Current.CancellationToken);
         var first = await Next(seen, _ => true);
-        await Task.Delay(700, TestContext.Current.CancellationToken); // and it keeps getting them on every tick
+        await WaitUntil(() => seen.Count >= 3, "the viewer had been sent a few ticks"); // and it keeps getting them on every tick
 
         Assert.Equal(["hub", "bb"], first.Groups.Select(g => g.Id));
         Assert.Equal(["bb"], first.View.Islands);
@@ -165,7 +177,7 @@ public class HostViewTests : IDisposable
         await one.StartAsync(TestContext.Current.CancellationToken);
         await two.StartAsync(TestContext.Current.CancellationToken);
         await three.StartAsync(TestContext.Current.CancellationToken);
-        await Task.Delay(1000, TestContext.Current.CancellationToken);
+        await WaitUntil(() => a.Count >= 2 && b.Count >= 2 && all.Count >= 2, "each viewer had been sent a few ticks");
 
         Assert.NotEmpty(a); Assert.NotEmpty(b); Assert.NotEmpty(all);
         Assert.All(a, s => Assert.Equal(["hub", "aa"], s.Groups.Select(g => g.Id)));
@@ -187,8 +199,8 @@ public class HostViewTests : IDisposable
         var filtered = await Next(seen, s => s.Groups.Count == 2);
         Assert.Equal(["hub", "cc"], filtered.Groups.Select(g => g.Id));
         seen.Clear();
-        await Task.Delay(700, TestContext.Current.CancellationToken);
-        Assert.NotEmpty(seen);
+        await WaitUntil(() => seen.Count >= 2, "the filtered town had been sent a few ticks");
+
         Assert.All(seen, s => Assert.Equal(["hub", "cc"], s.Groups.Select(g => g.Id))); // and no more of the whole town
 
         await viewer.InvokeAsync("SetIslands", new[] { "aa", "bb" }, TestContext.Current.CancellationToken);
@@ -207,11 +219,55 @@ public class HostViewTests : IDisposable
         {
             await viewer.StartAsync(TestContext.Current.CancellationToken);
             // the server registers the view a moment after the socket opens
-            for (var i = 0; i < 50 && views.InUse("mini-town/demo").Count == 0; i++) await Task.Delay(100, TestContext.Current.CancellationToken);
+            await WaitUntil(() => views.InUse("mini-town/demo").Count > 0, "the server had counted the viewer");
             Assert.Single(views.InUse("mini-town/demo"));
         }
 
-        for (var i = 0; i < 50 && views.InUse("mini-town/demo").Count > 0; i++) await Task.Delay(100, TestContext.Current.CancellationToken);
+        await WaitUntil(() => views.InUse("mini-town/demo").Count == 0, "the server had counted the viewer out");
         Assert.Empty(views.InUse("mini-town/demo"));
+    }
+
+    [Fact]
+    public void An_island_filter_is_cleaned_up_before_use_blanks_and_repeats_go_and_the_order_is_fixed()
+    {
+        Assert.Equal(["aa", "bb", "cc"], ObservabilityCity.Host.IslandViews.Parse(["cc, bb", " aa ", "aa", ",,", "  "]));
+        Assert.Empty(ObservabilityCity.Host.IslandViews.Parse(null));
+        Assert.Empty(ObservabilityCity.Host.IslandViews.Parse([",", " "]));
+        // a thousand names are still just a list: nothing is built for the ones the town does not have
+        var many = ObservabilityCity.Host.IslandViews.Parse([string.Join(',', Enumerable.Range(0, 1000).Select(i => $"x{i}"))]);
+        Assert.Equal(1000, many.Count);
+    }
+
+    [Fact]
+    public async Task An_island_the_town_does_not_have_is_named_in_the_answer_and_left_out_and_the_rest_is_still_drawn()
+    {
+        await Get<Snapshot>("/api/snapshot/latest");
+
+        var filtered = await Get<Snapshot>("/api/snapshot/latest?islands=aa,nowhere,aa");
+
+        Assert.Equal(["hub", "aa"], filtered.Groups.Select(g => g.Id));
+        Assert.Equal(["nowhere"], filtered.View.Unknown);
+        Assert.Equal(["aa"], filtered.View.Islands);
+
+        // only unknown names: the hub alone (the decision log's rule), and the unknown names are still reported
+        var none = await Get<Snapshot>("/api/snapshot/latest?islands=nowhere");
+        Assert.Equal(["hub"], none.Groups.Select(g => g.Id));
+        Assert.Equal(["nowhere"], none.View.Unknown);
+    }
+
+    [Fact]
+    public async Task Dismissing_a_health_report_the_town_does_not_list_is_answered_not_found_whatever_the_body_says()
+    {
+        await Get<Snapshot>("/api/snapshot/latest");
+        var client = Client;
+
+        var unknown = await client.PostAsJsonAsync("/api/health-events/dismiss", new { id = "/subscriptions/x/none" }, TestContext.Current.CancellationToken);
+        var empty = await client.PostAsJsonAsync("/api/health-events/dismiss", new { }, TestContext.Current.CancellationToken);
+        var wrongEnvironment = await client.PostAsJsonAsync("/api/health-events/dismiss?env=nowhere", new { id = "x" }, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.NotFound, unknown.StatusCode);
+        Assert.Contains("No such health report", await unknown.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        Assert.Equal(HttpStatusCode.NotFound, empty.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, wrongEnvironment.StatusCode);
     }
 }
