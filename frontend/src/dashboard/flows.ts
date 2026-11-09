@@ -15,25 +15,48 @@ export interface Flow {
   sent: number | null
   /** Messages a second other pillars send to it; null when nothing measures it. */
   received: number | null
+  /** Messages a second the pillar's own services send each other, the sum of the queues they read from a service of the same pillar; null when none of those queues is measured. */
+  internal: number | null
   /** The time the rates are averaged over, as the source's window says. */
   windowSeconds: number
 }
 
 /** How many pillars the tile lists before "show all". */
-export const FLOW_TOP = 5
+export const FLOW_TOP = 4
 /** A pillar moving less than this (on its busier side) is left out of the tile's short list (still in "show all"). */
 export const FLOW_MIN = 1
 /** A pillar moves above the one before it only when it is this much busier, so the lines do not trade places on every update. */
 export const FLOW_SWAP = 1.15
 
 /** The rate of the pillar's busier side. */
-export const busiest = (f: Flow): number => Math.max(f.sent ?? 0, f.received ?? 0)
+export const busiest = (f: Flow): number => Math.max(f.sent ?? 0, f.received ?? 0, f.internal ?? 0)
 
-/** Every pillar with a measured flow, busiest first. */
+/**
+ * What each pillar's own services send each other: the rate of every queue a service reads from another service of its own pillar (the subscription says the
+ * publisher is the same pillar), added up. This is the number the town's boats inside an island use. Null for a pillar whose such queues are not measured.
+ */
+export function internalOf(s: Snapshot): Map<string, number> {
+  const out = new Map<string, number>()
+  for (const g of s.groups) {
+    if (g.isHub) continue
+    for (const sub of g.messaging?.subscriptions ?? []) {
+      if (sub.legacy || sub.publisher !== g.id) continue
+      const queue = g.nodes.find((n) => n.id === sub.consumer)?.queues?.find((q) => q.name === sub.topic)
+      if (queue?.perSecond != null) out.set(g.id, (out.get(g.id) ?? 0) + queue.perSecond)
+    }
+  }
+  return out
+}
+
+/** Every pillar with a measured flow (external either way, or internal), busiest first. */
 export function flowsOf(s: Snapshot): Flow[] {
+  const internal = internalOf(s)
   return s.groups
-    .filter((g) => !g.isHub && g.flow && (g.flow.sentPerSecond != null || g.flow.receivedPerSecond != null))
-    .map((g) => ({ id: g.id, name: g.displayName, sent: g.flow!.sentPerSecond ?? null, received: g.flow!.receivedPerSecond ?? null, windowSeconds: g.flow!.windowSeconds }))
+    .filter((g) => !g.isHub && ((g.flow && (g.flow.sentPerSecond != null || g.flow.receivedPerSecond != null)) || internal.has(g.id)))
+    .map((g) => ({
+      id: g.id, name: g.displayName, sent: g.flow?.sentPerSecond ?? null, received: g.flow?.receivedPerSecond ?? null,
+      internal: internal.get(g.id) ?? null, windowSeconds: g.flow?.windowSeconds ?? 0,
+    }))
     .sort((a, b) => busiest(b) - busiest(a) || a.name.localeCompare(b.name))
 }
 
@@ -62,14 +85,16 @@ export interface FlowTile {
   max: number
   /** The time the rates are averaged over (the source's window), for the line under the list. */
   windowSeconds: number
+  /** Messages a second the whole platform takes in through its queues, the number of the town's top bar; null when no queue is measured. */
+  total: number | null
 }
 
 /** The tile, or null when no pillar moves any message (then the tile is left out). */
-export function flowTile(flows: readonly Flow[], previous: readonly string[]): FlowTile | null {
+export function flowTile(flows: readonly Flow[], previous: readonly string[], total: number | null = null): FlowTile | null {
   const moving = flows.filter((f) => busiest(f) > 0)
   if (moving.length === 0) return null
   const all = stableOrder(moving, previous)
-  return { top: all.filter((f) => busiest(f) >= FLOW_MIN).slice(0, FLOW_TOP), all, max: Math.max(...moving.map(busiest)), windowSeconds: Math.max(...moving.map((f) => f.windowSeconds)) }
+  return { top: all.filter((f) => busiest(f) >= FLOW_MIN).slice(0, FLOW_TOP), all, max: Math.max(...moving.map(busiest)), windowSeconds: Math.max(...moving.map((f) => f.windowSeconds)), total }
 }
 
 /** The pillar's flow, or null when nothing measures it. */
@@ -83,4 +108,11 @@ export function windowText(seconds: number): string {
   if (seconds < 60) return `${Math.round(seconds)} s`
   if (seconds < 3600) return `${Math.round(seconds / 60)} min`
   return `${Math.round(seconds / 3600)} h`
+}
+
+export interface TrafficRow { id: string; name: string; rps: number }
+
+/** The requests a second each pillar takes in (its services added up, scaled to the tenants on view), busiest first; pillars with none are left out. */
+export function trafficByPillar(rows: readonly TrafficRow[]): TrafficRow[] {
+  return rows.filter((r) => r.rps > 0).sort((a, b) => b.rps - a.rps || a.name.localeCompare(b.name))
 }

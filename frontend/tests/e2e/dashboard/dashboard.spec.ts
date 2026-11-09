@@ -281,7 +281,7 @@ test.describe('the dashboard view', () => {
   })
 
   const FLOW = `const aa = s.groups.find(g => g.id === 'aa'); const bb = s.groups.find(g => g.id === 'bb')
-      for (const g of s.groups) g.flow = undefined
+      for (const g of s.groups) { g.flow = undefined; for (const n of g.nodes) n.queues = [] }
       aa.flow = { sentPerSecond: 3200, receivedPerSecond: 0, windowSeconds: 900 }
       bb.flow = { sentPerSecond: null, receivedPerSecond: 40, windowSeconds: 900 }`
 
@@ -290,16 +290,16 @@ test.describe('the dashboard view', () => {
     const read = `const t = document.querySelector('#kpi-flow'); return { lines: [...t.querySelectorAll('.fl')].map(l => l.textContent), bar: t.querySelector('.fbar i').style.width, button: !!t.querySelector('[data-flows-all]'), window: t.querySelector('.fwin')?.textContent ?? null, alpha: document.querySelector('[data-pillar="aa"] .pflow')?.textContent ?? null, billing: document.querySelector('[data-pillar="bb"] .pflow')?.textContent ?? null }`
     const got = await withSnapshot<{ lines: string[]; bar: string; button: boolean; window: string | null; alpha: string | null; billing: string | null }>(page, FLOW, read)
     expect(got.lines).toHaveLength(2)
-    expect(got.lines[0]).toMatch(/sends3\.2k msg\/s/)
+    expect(got.lines[0]).toMatch(/sends ext3\.2k msg\/s/)
     expect(got.lines[0]).toContain('no messages received')
     expect(got.lines[1]).toContain('receives40 msg/s')
     expect(got.bar).toBe('100%')
     expect(got.button).toBe(false)
     expect(got.window).toBe('Average over the last 15 min')
-    expect(got.alpha).toMatch(/^sends 3\.2k msg\/s · no messages received$/)
+    expect(got.alpha).toMatch(/^sends ext 3\.2k msg\/s · no messages received$/)
     expect(got.billing).toMatch(/^receives 40 msg\/s$/)
     await page.locator('[data-pillar="aa"] [data-toggle]').click()
-    await expect(page.locator('[data-pillar="aa"] .pflowx')).toContainText('Sends')
+    await expect(page.locator('[data-pillar="aa"] .pflowx')).toContainText('Sends outside')
     await expect(page.locator('[data-pillar="aa"] .pflowx')).toContainText('3.2k msg/s')
     await expect(page.locator('[data-pillar="aa"] .pflowx')).toContainText('no messages received')
     await page.locator('[data-pillar="bb"] [data-toggle]').click()
@@ -308,8 +308,18 @@ test.describe('the dashboard view', () => {
 
   test('the Message flow tile is absent when no pillar moves a message', async ({ town, page }) => {
     await open(town, page)
-    const present = await withSnapshot<boolean>(page, `for (const g of s.groups) g.flow = g.isHub ? undefined : { sentPerSecond: 0, receivedPerSecond: 0, windowSeconds: 900 }`, `return !!document.querySelector('#kpi-flow')`)
+    const present = await withSnapshot<boolean>(page, `for (const g of s.groups) { g.flow = g.isHub ? undefined : { sentPerSecond: 0, receivedPerSecond: 0, windowSeconds: 900 }; for (const n of g.nodes) n.queues = [] }`, `return !!document.querySelector('#kpi-flow')`)
     expect(present).toBe(false)
+  })
+
+  test('the summary cards share one row on a big screen and the Total traffic card lists the pillars', async ({ town, page }) => {
+    await page.setViewportSize({ width: 1920, height: 1000 })
+    await open(town, page)
+    const got = await withSnapshot<{ tops: number[]; rows: number; total: string | null; over: number }>(page, FLOW, `const k = [...document.querySelectorAll('#dash-root .sum .kpi')]; return { tops: k.map(x => Math.round(x.getBoundingClientRect().top)), rows: document.querySelectorAll('#kpi-traffic [data-pillar-traffic]').length, total: document.querySelector('#kpi-flow > b')?.textContent ?? null, over: document.documentElement.scrollWidth - document.documentElement.clientWidth }`)
+    expect(got.tops.length).toBeGreaterThanOrEqual(3)
+    expect(new Set(got.tops).size).toBe(1)
+    expect(got.rows).toBeGreaterThan(0)
+    expect(got.over).toBeLessThanOrEqual(0)
   })
 
   test('the Message flow tile fits a phone screen without sideways scrolling', async ({ town, page }) => {
