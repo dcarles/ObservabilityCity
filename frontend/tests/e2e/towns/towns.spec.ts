@@ -163,6 +163,44 @@ test.describe('Galactic Credit keeps its hub and spokes', () => {
     expect(r.hubBridges.length).toBeGreaterThanOrEqual(10)
     expect(r.routesThroughHub).toBeGreaterThan(0)
   })
+
+  test('carries what each pillar sends and receives on its own straight lane to the hub, lanes apart and never crossing', async ({ town, page }) => {
+    await town.open()
+    const lanes = (await page.evaluate(() => (window as any).city.town.inspectLanes())) as { id: string; path: { x: number; z: number }[] }[]
+    const routes = (await town.sea()).routes
+    expect(lanes.length).toBeGreaterThanOrEqual(8)
+    // one lane out and one lane in for each island, and no boat between two islands
+    for (const l of lanes) {
+      expect(routes.filter((r) => r.from === l.id && r.to === 'hub'), l.id).toHaveLength(1)
+      expect(routes.filter((r) => r.from === null && r.to === l.id), l.id).toHaveLength(1)
+    }
+    expect(routes.filter((r) => r.from !== null && r.to !== 'hub' && !r.scheduler && !r.circuit)).toEqual([])
+
+    type P = { x: number; z: number }
+    const cross = (o: P, a: P, b: P) => (a.x - o.x) * (b.z - o.z) - (a.z - o.z) * (b.x - o.x)
+    const crosses = (a: P, b: P, c: P, d: P) => cross(a, b, c) * cross(a, b, d) < 0 && cross(c, d, a) * cross(c, d, b) < 0
+    const toSegment = (p: P, a: P, b: P) => {
+      const l2 = (b.x - a.x) ** 2 + (b.z - a.z) ** 2
+      const u = l2 === 0 ? 0 : Math.max(0, Math.min(1, ((p.x - a.x) * (b.x - a.x) + (p.z - a.z) * (b.z - a.z)) / l2))
+      return Math.hypot(p.x - (a.x + u * (b.x - a.x)), p.z - (a.z + u * (b.z - a.z)))
+    }
+    const segs = (path: P[]) => path.slice(1).map((p, i) => [path[i], p] as const)
+    const BOAT_WIDTH = 1.6
+    for (let i = 0; i < lanes.length; i++) for (let j = i + 1; j < lanes.length; j++) {
+      for (const [a, b] of segs(lanes[i].path)) for (const [c, d] of segs(lanes[j].path)) {
+        expect(crosses(a, b, c, d), `${lanes[i].id} crosses ${lanes[j].id}`).toBe(false)
+        const gap = Math.min(toSegment(a, c, d), toSegment(b, c, d), toSegment(c, a, b), toSegment(d, a, b))
+        expect(gap, `${lanes[i].id} and ${lanes[j].id}`).toBeGreaterThan(BOAT_WIDTH)
+      }
+    }
+    // each lane is straight: its last stretch (the one beside the bridge) runs the same way as the lane as a whole
+    for (const l of lanes) {
+      const first = l.path[0], last = l.path[l.path.length - 1]
+      const total = Math.hypot(last.x - first.x, last.z - first.z)
+      const length = segs(l.path).reduce((n, [a, b]) => n + Math.hypot(b.x - a.x, b.z - a.z), 0)
+      expect(length / total, l.id).toBeLessThan(1.35)
+    }
+  })
 })
 
 test.describe('the town switcher', () => {

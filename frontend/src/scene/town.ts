@@ -149,6 +149,7 @@ export class Town {
   private port: PortSummary = { topics: 0, subscriptions: 0, piers: 0, legacy: 0 }
   /** The islands that have a sea lane for boats, and how many car routes cross each one's bridge. */
   private readonly boatLanes = new Set<string>()
+  private readonly hubLanePaths: { id: string; path: THREE.Vector3[] }[] = []
   private seaMap: SeaMap = { land: [] }
   private harbourPoints = new Map<string, THREE.Vector3>()
   private internalDocks = new Map<string, { start: THREE.Vector3; end: THREE.Vector3 }>()
@@ -234,6 +235,7 @@ export class Town {
     this.vendors.clear()
     this.vendorBridges.clear()
     this.boatLanes.clear()
+    this.hubLanePaths.length = 0
     clearArches()
     this.ringMiddles = []
     this.crossings.clear()
@@ -482,6 +484,7 @@ export class Town {
         boatRoutes.push({ path: pathOut, from: g.id, to: 'hub', oneWay: true, rate: rate((f) => f.sentPerSecond), speed })
         boatRoutes.push({ path: [...pathOut].reverse(), from: null, to: g.id, oneWay: true, rate: rate((f) => f.receivedPerSecond), speed })
         this.boatLanes.add(g.id)
+        this.hubLanePaths.push({ id: g.id, path: pathOut })
       })
     }
     pillars.forEach((g, to) => {
@@ -772,6 +775,11 @@ export class Town {
     }
     const docks = Object.fromEntries(ids.map((id) => [id, { between: { x: this.harbourPoints.get(id)!.x, z: this.harbourPoints.get(id)!.z }, internalStart: { x: this.internalDocks.get(id)!.start.x, z: this.internalDocks.get(id)!.start.z }, quay: { x: this.internalDocks.get(id)!.end.x, z: this.internalDocks.get(id)!.end.z } }]))
     return { harbours: ids, docks, unreachable, routes: this.boatRouteEnds.map((r) => ({ from: r.from, to: r.to, scheduler: r.scheduler, circuit: r.circuit, rate: r.rate() })), arches: archCount() }
+  }
+
+  /** The hub lanes: for each island the path of its lane from the island dock to the hub dock (the way back is the same path reversed). For tests. */
+  inspectLanes(): { id: string; path: { x: number; z: number }[] }[] {
+    return this.hubLanePaths.map((l) => ({ id: l.id, path: l.path.map((p) => ({ x: p.x, z: p.z })) }))
   }
 
   inspectVendors(): { id: string; island: string; x: number; z: number; bx: number; bz: number; bridges: number }[] {
