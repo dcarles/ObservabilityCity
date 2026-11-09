@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_HOLD_SECONDS, DEFAULT_RETRY_SECONDS, WALL_KEY, parseWall, rememberWall, wallRemembered, withoutWall } from '../../src/wall/params'
+import { DEFAULT_HOLD_SECONDS, DEFAULT_OVERVIEW_SECONDS, DEFAULT_RETRY_SECONDS, WALL_KEY, parseWall, rememberWall, wallRemembered, withoutWall } from '../../src/wall/params'
 import type { Store } from '../../src/lighting'
 
 const memory = (): Store & { data: Map<string, string> } => {
@@ -90,5 +90,20 @@ describe('wall mode this browser remembers', () => {
     expect(withoutWall({ pathname: '/', search: '?wall=1&view=dashboard&islands=a,b&hold=5', hash: '#x' })).toBe('/?view=dashboard&islands=a,b&hold=5#x')
     expect(withoutWall({ pathname: '/', search: '?wall=0', hash: '' })).toBe('/')
     expect(withoutWall({ pathname: '/', search: '', hash: '' })).toBe('/')
+  })
+})
+
+describe('the overview in the address', () => {
+  it('lasts 12 seconds unless told otherwise', () => {
+    expect(DEFAULT_OVERVIEW_SECONDS).toBe(12)
+    expect(parseWall('?wall=1').overview).toBe(12)
+    expect(parseWall('?wall=1&overview=30').overview).toBe(30)
+  })
+
+  it('is off with 0, and a bad value falls back to the default', () => {
+    expect(parseWall('?wall=1&overview=0').overview).toBe(0)
+    expect(parseWall('?wall=1&overview=-3').overview).toBe(12)
+    expect(parseWall('?wall=1&overview=soon').overview).toBe(12)
+    expect(parseWall('?wall=1&overview=').overview).toBe(12)
   })
 })

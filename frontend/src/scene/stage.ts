@@ -8,6 +8,8 @@ import { QUALITY_PRESETS, pixelRatioFor, stepDown, type Quality, type QualityPre
 export type { Quality }
 
 /** Average frame time (ms) over the sample window above which quality steps down one level. About 30 frames a second. */
+/** How long a glide to a new place takes. */
+const GLIDE_SECONDS = 1.2
 const SLOW_FRAME_MS = 33
 const SAMPLE_FRAMES = 90
 
@@ -196,6 +198,7 @@ export class Stage {
   }
 
   home(instant = false): void {
+    this.orbitRun = null
     const offset = new THREE.Vector3().setFromSphericalCoords(this.homeDistance, this.homePolar, this.homeAzimuth)
     const pos = this.homeTarget.clone().add(offset)
     if (instant) {
@@ -209,6 +212,7 @@ export class Stage {
 
   /** Glides to look at a point from the current side, standing `distance` away at a comfortable angle. */
   focus(target: THREE.Vector3, distance: number, instant = false): void {
+    this.orbitRun = null
     const offset = this.camera.position.clone().sub(this.controls.target)
     const sph = new THREE.Spherical().setFromVector3(offset)
     sph.radius = THREE.MathUtils.clamp(distance, this.controls.minDistance, this.controls.maxDistance)
@@ -221,6 +225,18 @@ export class Stage {
     this.controls.target.copy(target)
     this.controls.update()
   }
+
+  /**
+   * The aerial pass: back to the home view, then once round the whole town in the time left. It ends where it began, so the next stop glides from the
+   * home view. Any drag, a glide or a cut ends it.
+   */
+  orbit(seconds: number, instant = false): void {
+    this.home(instant)
+    const lap = Math.max(1, seconds - GLIDE_SECONDS)
+    this.orbitRun = { t: 0, lap }
+  }
+
+  private orbitRun: { t: number; lap: number } | null = null
 
   private glide: { fromPos: THREE.Vector3; toPos: THREE.Vector3; fromT: THREE.Vector3; toT: THREE.Vector3; t: number } | null = null
 
@@ -242,11 +258,19 @@ export class Stage {
     }
     if (this.glide) {
       const g = this.glide
-      g.t = Math.min(1, g.t + dt / 1.2)
+      g.t = Math.min(1, g.t + dt / GLIDE_SECONDS)
       const e = g.t * g.t * (3 - 2 * g.t)
       this.camera.position.lerpVectors(g.fromPos, g.toPos, e)
       this.controls.target.lerpVectors(g.fromT, g.toT, e)
       if (g.t >= 1) this.glide = null
+    } else if (this.orbitRun) {
+      const o = this.orbitRun
+      o.t = Math.min(o.lap, o.t + dt)
+      const azimuth = this.homeAzimuth + (o.t / o.lap) * Math.PI * 2
+      const offset = new THREE.Vector3().setFromSphericalCoords(this.homeDistance, this.homePolar, azimuth)
+      this.camera.position.copy(this.homeTarget).add(offset)
+      this.controls.target.copy(this.homeTarget)
+      if (o.t >= o.lap) this.orbitRun = null
     }
     this.controls.update()
   }
@@ -254,6 +278,7 @@ export class Stage {
   /** Any drag cancels a glide. */
   cancelGlide(): void {
     this.glide = null
+    this.orbitRun = null
   }
 
   private clampPan(): void {

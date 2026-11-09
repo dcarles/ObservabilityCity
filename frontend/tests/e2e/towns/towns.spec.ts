@@ -135,7 +135,7 @@ test.describe('Droid Shop', () => {
   })
 
   test('opens on a wall for one team, with its own islands only', async ({ town, page }) => {
-    await town.open('&wall=1&hold=2&islands=chk,shp')
+    await town.open('&wall=1&hold=2&overview=0&islands=chk,shp')
     await page.waitForFunction(() => (window as any).city.seen.last.view.islands.join() === 'chk,shp')
     await expect(page.locator('#wall-town')).toHaveText('Droid Shop')
     await expect(page.locator('#wall-headline')).toHaveText('ALL SYSTEMS HEALTHY')

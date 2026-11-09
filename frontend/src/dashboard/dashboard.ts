@@ -263,7 +263,7 @@ export function startDashboard(): void {
           window.scrollTo({ top: 0, behavior: cut ? 'auto' : 'smooth' })
         },
         select: () => {},
-      })
+      }, wallParams.overview)
     : null
   if (wall) {
     document.body.classList.add('wall')

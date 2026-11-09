@@ -581,7 +581,7 @@ test.describe('the dashboard view', () => {
     })
 
     test('?wall=1&view=dashboard is a wall: no menu, big type, a strip, and no 3D town', async ({ town, page }) => {
-      await open(town, page, '&wall=1&hold=2')
+      await open(town, page, '&wall=1&hold=2&overview=0')
       await expect(page.locator('#wall-strip')).toBeVisible()
       await expect(page.locator('#wall-headline')).toHaveText('ALL SYSTEMS HEALTHY')
       await expect(page.locator('#dash-menu')).toBeHidden()
@@ -592,7 +592,7 @@ test.describe('the dashboard view', () => {
     })
 
     test('the tour opens one pillar at a time and picks the service out', async ({ town, page }) => {
-      await open(town, page, '&wall=1&hold=2')
+      await open(town, page, '&wall=1&hold=2&overview=0')
       const seen: string[] = []
       for (let i = 0; i < 6; i++) {
         await step(page, 2.05)
@@ -608,8 +608,32 @@ test.describe('the dashboard view', () => {
       expect(seen.some((k) => k.startsWith('island:'))).toBe(true)
     })
 
+    test('with trouble, the tour opens with a pillar overview (all pillars closed, top of the page) and comes back to it after the last stop', async ({ town, page }) => {
+      await open(town, page, '&wall=1&hold=2&overview=4')
+      await step(page, 11)
+      const feed = (state: string) => page.evaluate(async (st) => {
+        const s = await (await fetch('/api/snapshot/latest')).json()
+        for (const n of s.groups.flatMap((g: any) => g.nodes)) n.state = n.id === 'aa.orders-api' ? st : 'Healthy'
+        s.totals.down = st === 'Down' ? 1 : 0
+        ;(window as any).dash.hold(true)
+        ;(window as any).dash.feed(s)
+      }, state)
+      await feed('Healthy')
+      await feed('Down')
+      expect((await wall(page))!.stop).toMatchObject({ key: 'down:aa.orders-api', cut: true })
+      await step(page, 2.05)
+      const w = (await wall(page))!
+      expect(w.stop).toMatchObject({ kind: 'overview', cut: false })
+      await expect(page.locator('#wall-caption')).toHaveText('Overview: 1 system needs attention across 1 island')
+      expect(w.open).toEqual([])
+      await expect(page.locator('#dash-pillars table.svc')).toHaveCount(0)
+      await expect.poll(() => page.evaluate(() => window.scrollY)).toBeLessThan(5) // the scroll back to the top glides
+      await step(page, 4)
+      expect((await wall(page))!.stop).toMatchObject({ key: 'down:aa.orders-api', cut: false })
+    })
+
     test('new trouble cuts to its service at once, picks it out, and a resolved note comes when it ends', async ({ town, page }) => {
-      await open(town, page, '&wall=1&hold=2')
+      await open(town, page, '&wall=1&hold=2&overview=0')
       await step(page, 11)
       const feed = (state: string) => page.evaluate(async (st) => {
         const s = await (await fetch('/api/snapshot/latest')).json()
@@ -632,7 +656,7 @@ test.describe('the dashboard view', () => {
     })
 
     test('a system with dead letters is a stop of its own, named by queue, and is not counted as degraded', async ({ town, page }) => {
-      await open(town, page, '&wall=1&hold=2')
+      await open(town, page, '&wall=1&hold=2&overview=0')
       await step(page, 11)
       const feed = (dead: number) => page.evaluate(async (n) => {
         const s = await (await fetch('/api/snapshot/latest')).json()
@@ -657,7 +681,7 @@ test.describe('the dashboard view', () => {
     })
 
     test('a frozen feed greys the wall and the strip says so', async ({ town, page }) => {
-      await open(town, page, '&wall=1&hold=2')
+      await open(town, page, '&wall=1&hold=2&overview=0')
       await page.evaluate(() => (window as any).dash.muteFeed(true, 1000))
       await expect(page.locator('#wall-connection')).toBeVisible({ timeout: 15_000 })
       await expect(page.locator('#wall-connection')).toContainText('may be out of date')

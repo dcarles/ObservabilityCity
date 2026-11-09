@@ -5,14 +5,14 @@ import { test, expect } from '../support/test'
 // (&hold=2) and time moves only when the test steps it, so every stop is reached on purpose.
 // mini-town: islands aa Alpha, bb Beta, cc Gamma; hub; vendors ext.bureau (called from aa) and ext.mailer.
 
-const WALL = '&wall=1&hold=2'
+const WALL = '&wall=1&hold=2&overview=0'
 
 interface WallStatus {
   mode: 'alert' | 'calm'
   stop: { key: string; kind: string; caption: string; cut: boolean } | null
   note: string | null
   cuts: number
-  strip: { headline: string; caption: string; note: string | null; tone: string; connection: string; pulsing: boolean }
+  strip: { headline: string; dlq: string; caption: string; note: string | null; tone: string; connection: string; pulsing: boolean }
 }
 
 const wall = (page: Page) => page.evaluate(() => (window as any).city.wall() as WallStatus)
@@ -125,7 +125,7 @@ test.describe('the showcase loop, while all is well', () => {
   })
 
   test('holds at a stop for the time asked for, and not a moment less', async ({ town, page }) => {
-    await town.open('&wall=1&hold=3')
+    await town.open('&wall=1&hold=3&overview=0')
     await town.step(2.9)
     expect((await wall(page)).stop?.key).toBe('town')
     await town.step(0.2)
@@ -430,5 +430,77 @@ test.describe('the Wall button and the ways out', () => {
     // headless Chromium leaves full screen without telling the page, so the event a real browser sends is sent by hand
     await page.evaluate(async () => { await document.exitFullscreen(); document.dispatchEvent(new Event('fullscreenchange')) })
     await page.waitForFunction(() => !document.body.classList.contains('wall') && (window as any).city?.seen.snapshots > 0)
+  })
+})
+
+test.describe('the overview of the whole town', () => {
+  const OVERVIEW = '&wall=1&hold=2&overview=4'
+  /** Where the camera stands round the town, as an angle. */
+  const azimuth = (page: Page) => page.evaluate(() => {
+    const c = (window as any).city.stage
+    return Math.atan2(c.camera.position.x - c.homeTarget.x, c.camera.position.z - c.homeTarget.z)
+  })
+
+  test('comes after the stop trouble cut to, pulls back to the whole town, goes once round the islands and then on to the next stop', async ({ town, page }) => {
+    await town.open(OVERVIEW)
+    await town.effect('aa.orders-api', 'Down')
+    await page.waitForFunction(() => (window as any).city.wall().stop?.kind === 'down')
+    await town.step(2.05)
+
+    const s = await wall(page)
+    expect(s.stop).toMatchObject({ kind: 'overview', cut: false })
+    expect(s.stop!.caption).toMatch(/^Overview: 1 system needs attention across 1 island$/)
+    // the glide home takes 1.2 s, then the camera goes round
+    await town.step(1.3)
+    const a = await azimuth(page)
+    await town.step(0.8)
+    expect(Math.abs((await azimuth(page)) - a)).toBeGreaterThan(0.3)
+
+    await town.step(2)
+    expect((await wall(page)).stop).toMatchObject({ key: 'down:aa.orders-api', cut: false })
+  })
+
+  test('opens a tour of several stops before the first one, and again after the last', async ({ town, page }) => {
+    await town.open(OVERVIEW)
+    await town.effect('aa.orders-api', 'Down')
+    await town.effect('cc', 'Incident', 0.9)
+    await page.waitForFunction(() => (window as any).city.wall().mode === 'alert')
+    await page.waitForFunction(() => (window as any).city.seen.last.totals.incidents >= 1)
+
+    // the overview holds 4 s and the others 2 s: sample every second and keep one entry for each stop
+    const kinds: string[] = []
+    for (let i = 0; i < 24; i++) {
+      await town.step(1)
+      const k = (await wall(page)).stop!.kind
+      if (kinds.at(-1) !== k) kinds.push(k)
+    }
+    expect(kinds).toContain('overview')
+    expect(kinds).toContain('down')
+    expect(kinds).toContain('incident')
+    // each pass goes: overview, then every stop once (incident first, then down), then the overview again
+    const first = kinds.indexOf('overview')
+    expect(kinds.slice(first, first + 3)).toEqual(['overview', 'incident', 'down'])
+  })
+
+  test('is left out with overview=0: the tour only goes through the trouble', async ({ town, page }) => {
+    await town.open('&wall=1&hold=2&overview=0')
+    await town.effect('aa.orders-api', 'Down')
+    await page.waitForFunction(() => (window as any).city.wall().stop?.kind === 'down')
+    const seen = await tour(page, 3)
+    expect(seen.every((k) => k.startsWith('down:'))).toBe(true)
+  })
+
+  test('puts the systems with dead letters in red next to the headline, or as the headline when nothing else is wrong', async ({ town, page }) => {
+    await town.open('&wall=1&hold=2&overview=0')
+    await town.effect('aa.orders-worker', 'Poison')
+    await town.until('aa.orders-worker', (n) => (n.deadLetters ?? 0) >= 1)
+    await expect(page.locator('#wall-headline')).toHaveText('1 WITH DLQ')
+    await expect(page.locator('#wall-dlq')).toHaveCount(0)
+
+    await town.effect('bb.ledger-api', 'Down')
+    await town.until('bb.ledger-api', (n) => n.state === 'Down')
+    await expect(page.locator('#wall-headline')).toHaveText('1 DOWN')
+    await expect(page.locator('#wall-dlq')).toHaveText('/ 1 with DLQ')
+    expect((await wall(page)).strip.dlq).toBe('/ 1 with DLQ')
   })
 })
