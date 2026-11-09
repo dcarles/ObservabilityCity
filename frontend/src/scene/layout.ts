@@ -56,6 +56,9 @@ const BASE_BUILDING_R = 14.5
 const BUILDING_HALF = 6 // half the width of a hub building's plot
 const ROAD_CLEARANCE = 3.4 // room kept between a spoke road and a hub building
 const MIN_COAST_SPACING = 9.6 // spoke roads must be at least this far apart where they meet the hub's coast
+/** With hub lanes (boats to and from the hub beside each bridge) the bridges are this far apart at the hub's coast, so each island's dock beside its bridge has room, and the sea left beside a passing bridge is this wide so the lane beside it is clear of the island next to it. */
+const LANES_COAST_SPACING = 25
+const LANES_BRIDGE_CLEARANCE = 26
 const ISLAND_GAP = 12 // open sea kept between two neighbouring islands
 const BRIDGE_CLEARANCE = 10 // open sea kept between a passing bridge and an island's coast
 const SEA_LANE = 22 // between the hub's coast and the nearest island, for the quays and the sea lane
@@ -70,11 +73,11 @@ function keepClear(buildingR: number): number {
 }
 
 /** The smallest hub that gives `n` spoke roads room: they share the arc the four hub buildings leave free. */
-export function hubGeometry(n: number, minScale = 0): HubGeometry {
+export function hubGeometry(n: number, minScale = 0, spacing = MIN_COAST_SPACING): HubGeometry {
   let scale = Math.max(1.25, minScale) // always room for the extra shared resources a town can have, and for the clusters of resource buildings the hub may hold
   for (; scale < 3.5; scale += 0.05) {
     const free = 2 * Math.PI - 8 * keepClear(BASE_BUILDING_R * scale)
-    if ((free * BASE_HUB_RX * scale * 0.9) / Math.max(1, n) >= MIN_COAST_SPACING) break
+    if ((free * BASE_HUB_RX * scale * 0.9) / Math.max(1, n) >= spacing) break
   }
   return {
     scale,
@@ -140,12 +143,12 @@ function secondRingGap(k: number, first: number, second: number): number {
   return Math.floor(((k + 0.5) * (first - 1)) / second)
 }
 
-export function layoutTown(sizes: IslandSize[], capacity = DEFAULT_RING_CAPACITY, airportSize: IslandSize | null = null, minHubScale = 0): TownLayout {
+export function layoutTown(sizes: IslandSize[], capacity = DEFAULT_RING_CAPACITY, airportSize: IslandSize | null = null, minHubScale = 0, lanes = false): TownLayout {
   const pillars = sizes.length
   const hasAirport = airportSize !== null
   if (capacity < MIN_RING_CAPACITY || capacity > MAX_RING_CAPACITY) throw new Error(`ring capacity ${capacity} is outside ${MIN_RING_CAPACITY} to ${MAX_RING_CAPACITY}`)
   if (pillars > maxPillars(capacity)) throw new Error(`${pillars} pillars do not fit on two rings of ${capacity} (at most ${maxPillars(capacity)})`)
-  const hub = hubGeometry(pillars + (hasAirport ? 1 : 0), minHubScale)
+  const hub = hubGeometry(pillars + (hasAirport ? 1 : 0), minHubScale, lanes ? LANES_COAST_SPACING : MIN_COAST_SPACING)
   if (pillars === 0) {
     // nothing but the hub (the island filter can leave only that): the airport, when there is one, stands alone on the first ring
     if (!hasAirport) return { hub, islands: [], airport: null }
@@ -175,7 +178,7 @@ export function layoutTown(sizes: IslandSize[], capacity = DEFAULT_RING_CAPACITY
       const j = (i + 1) % first
       r1 = Math.max(r1, (all[i].rx + all[j].rx + ISLAND_GAP) / (2 * Math.sin(step / 2)))
       if (outerCount > 0 && hasBridgeBetween.has(i))
-        r1 = Math.max(r1, (Math.max(all[i].rx, all[j].rx) + BRIDGE_CLEARANCE) / Math.sin(step / 2))
+        r1 = Math.max(r1, (Math.max(all[i].rx, all[j].rx) + (lanes ? LANES_BRIDGE_CLEARANCE : BRIDGE_CLEARANCE)) / Math.sin(step / 2))
     }
   }
 
