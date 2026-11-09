@@ -110,7 +110,14 @@ export function windowText(seconds: number): string {
   return `${Math.round(seconds / 3600)} h`
 }
 
-export interface TrafficRow { id: string; name: string; rps: number }
+export interface TrafficRow {
+  id: string
+  name: string
+  /** All the requests a second the pillar's services take in. */
+  rps: number
+  /** The part from outside the pillar, what it sends to other pillars, and what its services send each other; null when no service knows its callers. */
+  split: { in: number; out: number; internal: number } | null
+}
 
 /** The requests a second each pillar takes in (its services added up, scaled to the tenants on view), busiest first; pillars with none are left out. */
 export function trafficByPillar(rows: readonly TrafficRow[]): TrafficRow[] {

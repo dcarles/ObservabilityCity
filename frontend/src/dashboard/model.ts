@@ -9,6 +9,7 @@ import { islandChoices } from '../islands'
 import { deadLetterItems, dlqCount, type DeadLetterItem } from '../deadLetters'
 import { stateFor, viewTotals } from '../viewTotals'
 import { trafficSplit } from '../trafficSplit'
+import { pillarTraffic } from '../trafficFlow'
 import { flowsOf, flowTile, pillarFlow, trafficByPillar, type Flow, type FlowTile, type TrafficRow } from './flows'
 import type { GroupSnapshot, HealthState, JobSnapshot, NodeSnapshot, Snapshot } from '../types'
 
@@ -128,6 +129,8 @@ export interface Pillar {
   flow: Flow | null
   /** The requests a second all the pillar's services take in. */
   traffic: number
+  /** Of those, what comes from outside, what the pillar sends to other pillars and what stays inside; null when no service knows its callers. */
+  trafficSplit: { in: number; out: number; internal: number } | null
 }
 
 /** A line of the Hub, Vendors and internal-services lists. Health is null where nothing says (a monitoring resource, a vendor we see no calls to). */
@@ -426,6 +429,8 @@ export function buildDashboard(s: Snapshot, view: TenantView, flowOrder: readonl
   const worstFirst = (a: Issue, b: Issue): number => (a.level === b.level ? a.name.localeCompare(b.name) : a.level === 'bad' ? -1 : 1)
 
   const flows = flowsOf(s)
+  const splits = pillarTraffic(s)
+  const totals = viewTotals(s, view)
   const pillars: Pillar[] = s.groups.filter((g) => !g.isHub).map((g) => {
     const rows = g.nodes.map((n) => rowOf(n, s, view, links))
     const groupIssues = issues(g.nodes, g.displayName).sort(worstFirst)
@@ -443,6 +448,7 @@ export function buildDashboard(s: Snapshot, view: TenantView, flowOrder: readonl
       configError: g.configError ?? null,
       flow: pillarFlow(flows, g.id),
       traffic: rows.reduce((a, r) => a + (r.rps ?? 0), 0),
+      trafficSplit: splits.get(g.id) ? { in: splits.get(g.id)!.in * totals.tenantShare, out: splits.get(g.id)!.out * totals.tenantShare, internal: splits.get(g.id)!.internal * totals.tenantShare } : null,
     }
   })
 
@@ -451,7 +457,6 @@ export function buildDashboard(s: Snapshot, view: TenantView, flowOrder: readonl
     ...s.vendors.flatMap((v) => issues([v.node], v.islandName ?? v.node.name)),
   ].sort(worstFirst)
 
-  const totals = viewTotals(s, view)
   const queued = s.groups.flatMap((g) => g.nodes).filter((n) => n.state !== 'Stale' && !isAbsent(n, 'backlog'))
   const choices = islandChoices(s).filter((c) => !c.vendor)
 
@@ -462,7 +467,7 @@ export function buildDashboard(s: Snapshot, view: TenantView, flowOrder: readonl
       degraded: affected.filter((i) => i.level === 'warn').length,
       affected,
       traffic: trafficSplit(s, totals.requestsPerSecond, totals.tenantShare),
-      trafficPillars: trafficByPillar(pillars.map((p) => ({ id: p.id, name: p.name, rps: p.traffic * totals.tenantShare }))),
+      trafficPillars: trafficByPillar(pillars.map((p) => ({ id: p.id, name: p.name, rps: p.traffic * totals.tenantShare, split: p.trafficSplit }))),
       deadLetters: absentEverywhere(s, 'deadLetters') ? null : totals.deadLetters,
       backlog: absentEverywhere(s, 'backlog') ? null : queued.reduce((a, n) => a + (n.queueDepth ?? 0), 0),
       deadQueues: deadLetterItems(s.groups),

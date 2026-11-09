@@ -164,6 +164,19 @@ test.describe('Galactic Credit keeps its hub and spokes', () => {
     expect(r.routesThroughHub).toBeGreaterThan(0)
   })
 
+  test('says the pillar\'s traffic under the island\'s name and its messages on the pier board, the numbers the dashboard has', async ({ town, page }) => {
+    await town.open()
+    const signs = (await page.evaluate(() => (window as any).city.town.inspectSigns())) as { id: string; line: string; pier: { sent: number | null; internal: number | null; received: number | null; windowSeconds: number } | null }[]
+    expect(signs.filter((s) => /^in .+ · out .+ rps$/.test(s.line)).length).toBeGreaterThanOrEqual(3)
+    const withPier = signs.filter((s) => s.pier)
+    expect(withPier.length).toBeGreaterThanOrEqual(3)
+    // the same pillar says the same on the dashboard card
+    const first = withPier[0]
+    await page.goto(`/?town=galactic-credit&view=dashboard`)
+    await page.waitForFunction(() => (window as any).dash?.seen.snapshots > 0)
+    await expect(page.locator(`[data-pillar="${first.id}"] .pflow [data-flow]`)).toContainText(/sends ext|receives|sends int|no /)
+  })
+
   test('carries what each pillar sends and receives on its own straight lane to the hub, lanes apart and never crossing', async ({ town, page }) => {
     await town.open()
     const lanes = (await page.evaluate(() => (window as any).city.town.inspectLanes())) as { id: string; path: { x: number; z: number }[] }[]
