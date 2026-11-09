@@ -135,7 +135,7 @@ describe('what a pier reports', () => {
 describe('the snapshot guard and messaging', () => {
   it('keeps a bridge for a snapshot that does not say, and gives it no pier', () => {
     const raw = structuredClone(links) as unknown as { groups: Record<string, unknown>[] }
-    for (const g of raw.groups) { delete g.hasBridge; delete g.messaging }
+    for (const g of raw.groups) { delete g.hasBridge; delete g.messaging; delete g.flow }
 
     const { snapshot } = checkSnapshot(raw)
 

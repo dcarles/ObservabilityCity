@@ -20,7 +20,8 @@ export interface Connectors {
 export function connectorsOf(g: GroupSnapshot): Connectors {
   const bridge = !g.isHub && g.hasBridge !== false && !g.configError
   const ring = !g.isHub && g.hasRingBridge === true && !g.configError
-  const pier = !g.isHub && hasMessaging(g.messaging) && !g.configError
+  // a pillar the broker reports a flow for has messaging, even where no pillar file or queue name says what it publishes or reads
+  const pier = !g.isHub && (hasMessaging(g.messaging) || g.flow != null) && !g.configError
   return { id: g.id, bridge, ring, pier, standalone: !bridge && !ring && !pier }
 }
 

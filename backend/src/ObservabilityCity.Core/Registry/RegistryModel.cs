@@ -295,12 +295,19 @@ public sealed record RegistrySource(string Name, string Kind, string? Connection
 }
 
 /// <summary>How a broker's entities are read: the rule that finds its namespaces, the dimension that names an entity, the metrics for the backlog and the dead letters, and the patterns that say whose an entity is.</summary>
-public sealed record EntitiesConfig(string Resources, string Dimension, EntityMetric? Backlog, EntityMetric? DeadLetter, IReadOnlyList<EntityPattern> Patterns, TimeSpan? Interval = null, EntityLink? DeadLetterLink = null, EntityMetric? Throughput = null, IReadOnlyList<EntityRegionLink>? DeadLetterLinks = null)
+public sealed record EntitiesConfig(string Resources, string Dimension, EntityMetric? Backlog, EntityMetric? DeadLetter, IReadOnlyList<EntityPattern> Patterns, TimeSpan? Interval = null, EntityLink? DeadLetterLink = null, EntityMetric? Throughput = null, IReadOnlyList<EntityRegionLink>? DeadLetterLinks = null, IReadOnlyList<EntityFlow>? Flows = null)
 {
     /// <summary>The variables a dead-letter link's URL may use.</summary>
     public static readonly string[] LinkVariables = ["pillar", "service", "system", "environment", "queue"];
 
     public const string DefaultDimension = "EntityName";
+}
+
+/// <summary>An entity that carries a pillar's traffic: <see cref="Match"/> has the named group <c>pillar</c>; <see cref="Direction"/> is <c>sent</c> or <c>received</c>.</summary>
+public sealed record EntityFlow(string Match, string Direction)
+{
+    public const string Sent = "sent";
+    public const string Received = "received";
 }
 
 /// <summary>An address that opens a consumer's dead letters elsewhere (a support tool): its name and a URL template over <see cref="EntitiesConfig.LinkVariables"/>.</summary>

@@ -1,7 +1,7 @@
 // What the dashboard shows, worked out from a snapshot as plain data. Nothing here touches the page, so every rule is unit tested.
 // The numbers are the snapshot's own; the dashboard invents nothing, and a signal nobody measures is null (shown as a dash), never a zero.
 
-import { dayTime } from '../inspectorModel'
+import { dayTime, messagesPerSecond } from '../inspectorModel'
 import { eventOfNode, healthEventsOf, isResolved } from '../healthEvents'
 import { absentEverywhere, isAbsent, isUnmonitored } from '../signals'
 import { isFollowed, isFollowing, isShown, isThrottled, tenantLevel, type TenantView } from '../tenants'
@@ -9,7 +9,8 @@ import { islandChoices } from '../islands'
 import { deadLetterItems, dlqCount, type DeadLetterItem } from '../deadLetters'
 import { stateFor, viewTotals } from '../viewTotals'
 import { trafficSplit } from '../trafficSplit'
-import { flowsOf, flowTile, pillarFlows, type FlowTile, type PillarFlows } from './flows'
+import { pillarTraffic } from '../trafficFlow'
+import { flowsOf, flowTile, pillarFlow, trafficByPillar, type Flow, type FlowTile, type TrafficRow } from './flows'
 import type { GroupSnapshot, HealthState, JobSnapshot, NodeSnapshot, Snapshot } from '../types'
 
 /** ok / warn / bad are the three colours; none is grey: no fresh data, or no source at all. */
@@ -124,8 +125,12 @@ export interface Pillar {
   groups: Group[]
   jobs: JobRow[]
   configError: string | null
-  /** The messages a second this pillar sends to and reads from other pillars. */
-  flows: PillarFlows
+  /** The messages a second this pillar sends to other pillars and receives from them; null when the environment does not measure it. */
+  flow: Flow | null
+  /** The requests a second all the pillar's services take in. */
+  traffic: number
+  /** Of those, what comes from outside, what the pillar sends to other pillars and what stays inside; null when no service knows its callers. */
+  trafficSplit: { in: number; out: number; internal: number } | null
 }
 
 /** A line of the Hub, Vendors and internal-services lists. Health is null where nothing says (a monitoring resource, a vendor we see no calls to). */
@@ -176,11 +181,13 @@ export interface Dashboard {
     degraded: number
     affected: Issue[]
     traffic: { total: number; external: number; internal: number } | null
+    /** The requests a second of each pillar, busiest first, for the Traffic card. Empty when nothing reports requests. */
+    trafficPillars: TrafficRow[]
     deadLetters: number | null
     backlog: number | null
     /** The queues with dead letters, worst first, for the Dead letters card. */
     deadQueues: DeadLetterItem[]
-    /** The Message flow tile: the biggest pillar-to-pillar flows. Null when no queue carries messages between pillars. */
+    /** The Message flow tile: the busiest pillars by what they send and receive. Null when no pillar moves any message. */
     flows: FlowTile | null
     /** The Incidents card: how many are open, and every line, open ones first. Null when nothing reports incidents (no health source, no incident tool with an incident). */
     incidents: { open: number; rows: IncidentRow[] } | null
@@ -422,6 +429,8 @@ export function buildDashboard(s: Snapshot, view: TenantView, flowOrder: readonl
   const worstFirst = (a: Issue, b: Issue): number => (a.level === b.level ? a.name.localeCompare(b.name) : a.level === 'bad' ? -1 : 1)
 
   const flows = flowsOf(s)
+  const splits = pillarTraffic(s)
+  const totals = viewTotals(s, view)
   const pillars: Pillar[] = s.groups.filter((g) => !g.isHub).map((g) => {
     const rows = g.nodes.map((n) => rowOf(n, s, view, links))
     const groupIssues = issues(g.nodes, g.displayName).sort(worstFirst)
@@ -437,7 +446,9 @@ export function buildDashboard(s: Snapshot, view: TenantView, flowOrder: readonl
       groups: groupsOf(g, rows, g.nodes),
       jobs,
       configError: g.configError ?? null,
-      flows: pillarFlows(flows, g.id),
+      flow: pillarFlow(flows, g.id),
+      traffic: rows.reduce((a, r) => a + (r.rps ?? 0), 0),
+      trafficSplit: splits.get(g.id) ? { in: splits.get(g.id)!.in * totals.tenantShare, out: splits.get(g.id)!.out * totals.tenantShare, internal: splits.get(g.id)!.internal * totals.tenantShare } : null,
     }
   })
 
@@ -446,7 +457,6 @@ export function buildDashboard(s: Snapshot, view: TenantView, flowOrder: readonl
     ...s.vendors.flatMap((v) => issues([v.node], v.islandName ?? v.node.name)),
   ].sort(worstFirst)
 
-  const totals = viewTotals(s, view)
   const queued = s.groups.flatMap((g) => g.nodes).filter((n) => n.state !== 'Stale' && !isAbsent(n, 'backlog'))
   const choices = islandChoices(s).filter((c) => !c.vendor)
 
@@ -457,10 +467,11 @@ export function buildDashboard(s: Snapshot, view: TenantView, flowOrder: readonl
       degraded: affected.filter((i) => i.level === 'warn').length,
       affected,
       traffic: trafficSplit(s, totals.requestsPerSecond, totals.tenantShare),
+      trafficPillars: trafficByPillar(pillars.map((p) => ({ id: p.id, name: p.name, rps: p.traffic * totals.tenantShare, split: p.trafficSplit }))),
       deadLetters: absentEverywhere(s, 'deadLetters') ? null : totals.deadLetters,
       backlog: absentEverywhere(s, 'backlog') ? null : queued.reduce((a, n) => a + (n.queueDepth ?? 0), 0),
       deadQueues: deadLetterItems(s.groups),
-      flows: flowTile(flows, flowOrder),
+      flows: flowTile(flows, flowOrder, messagesPerSecond(s.groups.flatMap((g) => g.nodes))),
       incidents: incidentsOf(s),
     },
     pillars,

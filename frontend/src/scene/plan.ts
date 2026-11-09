@@ -287,7 +287,7 @@ export function planIsland(g: GroupSnapshot, perRow?: number): Plan {
   const southZ = roadZ0 + CURB
   const northZ = rowRoadZ[rows - 1] - CURB - PAD_D
   const harbourZ = rowRoadZ[Math.floor((rows - 1) / 2)]
-  const check: [number, number][] = [[-edge, southZ], [edge, southZ], [-edge, northZ], [edge, northZ], [edge + 11, harbourZ], [-edge - 2, harbourZ], [0, northZ - 4]]
+  const check: [number, number][] = [[-edge, southZ], [edge, southZ], [-edge, northZ], [edge, northZ], [-edge - 2, harbourZ], [0, northZ - 4]]
   // every resource building, with room round it, must stand on land
   for (const a of assets) check.push([a.x - 1.6, a.z - 1.6], [a.x + 1.6, a.z - 1.6])
   let k = 1
@@ -296,11 +296,20 @@ export function planIsland(g: GroupSnapshot, perRow?: number): Plan {
     rx = 24 * k
     rz = 20 * k
     const o = makeOutline(hashString(g.id), rx, rz, 0.06)
-    if (check.every(([x, z]) => o.contains(x, z, 2)) && coastScan(o, 'z') - 0.6 - southZ >= 9) break
+    if (check.every(([x, z]) => o.contains(x, z, 2)) && coastScan(o, 'z') - 0.6 - southZ >= 9 && DOCK_FOOTPRINT_X.every((x) => coastScanZ(o, x) - DOCK_DEPTH - southZ >= 0)) break
     k *= 1.02
   }
   return { pads, placed, assets, rows, rowRoadZ, rx, rz }
 }
+
+/**
+ * The island's harbour stands on its hub-facing coast beside the gate, so its pier runs straight out parallel to the bridge: the pier is at this island-local x (the
+ * bridge is at 0), on the side where the pen of dead letters faces the bridge. The boats that carry the island's messages to and from the hub sail the line the pier points along.
+ */
+export const DOCK_X = -11.5
+/** How far the harbour reaches inland from the coast (the quay, the pier house), and the island-local x range it covers: the coast must leave that much dry land in front of the first road. */
+export const DOCK_DEPTH = 9.6
+export const DOCK_FOOTPRINT_X = [DOCK_X - 4.8, DOCK_X, DOCK_X + 7.8]
 
 /** Island-local coast: the far +z edge at x=0 (for 'z'), the far -z edge at x=0 as a distance (for '-z'), or the +x edge at the given z (for 'x'). */
 export function coastScan(outline: Outline, axis: 'z' | '-z' | 'x', at = 0): number {
@@ -309,6 +318,17 @@ export function coastScan(outline: Outline, axis: 'z' | '-z' | 'x', at = 0): num
     const mid = (lo + hi) / 2
     const inside = axis === 'z' ? outline.contains(0, mid) : axis === '-z' ? outline.contains(0, -mid) : outline.contains(mid, at)
     if (inside) lo = mid
+    else hi = mid
+  }
+  return lo
+}
+
+/** The +z coast of an island at a given island-local x. */
+export function coastScanZ(outline: Outline, x: number): number {
+  let lo = 0, hi = 600
+  for (let i = 0; i < 30; i++) {
+    const mid = (lo + hi) / 2
+    if (outline.contains(x, mid)) lo = mid
     else hi = mid
   }
   return lo

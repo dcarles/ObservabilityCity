@@ -233,6 +233,7 @@ export interface components {
             messaging: components["schemas"]["MessagingSnapshot"];
             nodes: components["schemas"]["NodeSnapshot"][];
             assets?: components["schemas"]["AssetSnapshot"][] | null;
+            flow?: components["schemas"]["PillarFlowSnapshot"];
         };
         HealthEventSnapshot: {
             id: string;
@@ -400,6 +401,14 @@ export interface components {
             incoming: boolean;
             /** Format: double */
             requestsPerSecond: number;
+        };
+        PillarFlowSnapshot: {
+            /** Format: double */
+            sentPerSecond?: number | null;
+            /** Format: double */
+            receivedPerSecond?: number | null;
+            /** Format: int32 */
+            windowSeconds: number;
         };
         QueueSnapshot: {
             name: string;

@@ -29,7 +29,15 @@ public sealed record NodeReading(
     AppState? App = null,
     IReadOnlyList<JobReading>? Jobs = null,
     IReadOnlyList<RegionReading>? Regions = null,
-    IReadOnlyList<QueueReading>? Queues = null);
+    IReadOnlyList<QueueReading>? Queues = null,
+    PillarFlowReading? Flow = null)
+{
+    /// <summary>The key a pillar's flow is reported under: a reading with only <see cref="Flow"/> set, for a pillar and not for a node.</summary>
+    public static string FlowKey(string groupId) => "flow:" + groupId;
+}
+
+/// <summary>What a pillar sends to the other pillars and receives from them, in messages a second over <paramref name="WindowSeconds"/>. A side nobody measures is null.</summary>
+public sealed record PillarFlowReading(double? Sent, double? Received, int WindowSeconds);
 
 /// <summary>One queue (or other broker entity) a consumer reads, with what waits in it and what is dead-lettered; a number the source cannot tell is null. ProducerGroup and ProducerService say whose outbox it is, when the entity's name does: the island and the service that publish what the consumer reads.</summary>
 public sealed record QueueReading(string Name, double? Backlog, double? DeadLetters, double? PerSecond = null, string? ProducerGroup = null, string? ProducerService = null,

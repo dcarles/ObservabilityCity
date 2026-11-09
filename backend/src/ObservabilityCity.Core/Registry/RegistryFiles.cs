@@ -486,6 +486,16 @@ internal sealed class EntitiesFile
     public EntityMetricFile? Throughput { get; set; }
     /// <summary>Entity name patterns, tried in order: the first that matches decides whose the entity is. An entity no pattern matches is left out.</summary>
     public List<EntityPatternFile> Patterns { get; set; } = [];
+    /// <summary>Entities that stand for what a whole pillar sends to the others or receives from them (the pillar's egress topic, the topic its ingress queues hang on). Each is a name pattern with the group pillar and a direction; the rate of its throughput metric is the pillar's rate.</summary>
+    public List<EntityFlowFile> Flows { get; set; } = [];
+}
+
+/// <summary>One shape of entity name that carries a pillar's traffic: a regular expression with the named group pillar, and whether what arrives in it is sent by that pillar or received by it.</summary>
+internal sealed class EntityFlowFile
+{
+    public string Match { get; set; } = "";
+    /// <summary>sent (what the pillar sends to other pillars) or received (what other pillars send to it).</summary>
+    public string Direction { get; set; } = "";
 }
 
 internal sealed class EntityLinkFile

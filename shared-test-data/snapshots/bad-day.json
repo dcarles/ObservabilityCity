@@ -227,7 +227,8 @@
           }
         }
       ],
-      "assets": []
+      "assets": [],
+      "flow": null
     },
     {
       "id": "cl",
@@ -900,7 +901,12 @@
           "engine": null
         }
       ],
-      "assets": []
+      "assets": [],
+      "flow": {
+        "sentPerSecond": 750.4,
+        "receivedPerSecond": 126.4,
+        "windowSeconds": 300
+      }
     },
     {
       "id": "acc",
@@ -1312,7 +1318,12 @@
           "engine": null
         }
       ],
-      "assets": []
+      "assets": [],
+      "flow": {
+        "sentPerSecond": 480,
+        "receivedPerSecond": 40,
+        "windowSeconds": 300
+      }
     },
     {
       "id": "pay",
@@ -1678,7 +1689,12 @@
           }
         }
       ],
-      "assets": []
+      "assets": [],
+      "flow": {
+        "sentPerSecond": 498.4,
+        "receivedPerSecond": 64.8,
+        "windowSeconds": 300
+      }
     },
     {
       "id": "frd",
@@ -2005,7 +2021,12 @@
           "engine": null
         }
       ],
-      "assets": []
+      "assets": [],
+      "flow": {
+        "sentPerSecond": 680,
+        "receivedPerSecond": 88,
+        "windowSeconds": 300
+      }
     },
     {
       "id": "cus",
@@ -2521,7 +2542,12 @@
           "engine": null
         }
       ],
-      "assets": []
+      "assets": [],
+      "flow": {
+        "sentPerSecond": 619.2,
+        "receivedPerSecond": 43.2,
+        "windowSeconds": 300
+      }
     },
     {
       "id": "acq",
@@ -2958,7 +2984,12 @@
           }
         }
       ],
-      "assets": []
+      "assets": [],
+      "flow": {
+        "sentPerSecond": 148,
+        "receivedPerSecond": 31.2,
+        "windowSeconds": 300
+      }
     },
     {
       "id": "dec",
@@ -3287,7 +3318,12 @@
           "engine": null
         }
       ],
-      "assets": []
+      "assets": [],
+      "flow": {
+        "sentPerSecond": 320,
+        "receivedPerSecond": 48,
+        "windowSeconds": 300
+      }
     },
     {
       "id": "bil",
@@ -3646,7 +3682,12 @@
           "engine": null
         }
       ],
-      "assets": []
+      "assets": [],
+      "flow": {
+        "sentPerSecond": 144,
+        "receivedPerSecond": 24,
+        "windowSeconds": 300
+      }
     },
     {
       "id": "col",
@@ -4269,7 +4310,12 @@
           "engine": null
         }
       ],
-      "assets": []
+      "assets": [],
+      "flow": {
+        "sentPerSecond": 196,
+        "receivedPerSecond": 48.8,
+        "windowSeconds": 300
+      }
     },
     {
       "id": "dsp",
@@ -4550,7 +4596,12 @@
           }
         }
       ],
-      "assets": []
+      "assets": [],
+      "flow": {
+        "sentPerSecond": 0,
+        "receivedPerSecond": 0,
+        "windowSeconds": 300
+      }
     },
     {
       "id": "rwd",
@@ -4877,7 +4928,12 @@
           "engine": null
         }
       ],
-      "assets": []
+      "assets": [],
+      "flow": {
+        "sentPerSecond": 296,
+        "receivedPerSecond": 56,
+        "windowSeconds": 300
+      }
     },
     {
       "id": "obk",
@@ -5206,7 +5262,12 @@
           "engine": null
         }
       ],
-      "assets": []
+      "assets": [],
+      "flow": {
+        "sentPerSecond": 161.6,
+        "receivedPerSecond": 17.6,
+        "windowSeconds": 300
+      }
     },
     {
       "id": "ntf",
@@ -5574,7 +5635,12 @@
           "engine": null
         }
       ],
-      "assets": []
+      "assets": [],
+      "flow": {
+        "sentPerSecond": 244,
+        "receivedPerSecond": 68,
+        "windowSeconds": 300
+      }
     },
     {
       "id": "dat",
@@ -6045,7 +6111,12 @@
           "engine": null
         }
       ],
-      "assets": []
+      "assets": [],
+      "flow": {
+        "sentPerSecond": 456,
+        "receivedPerSecond": 100.8,
+        "windowSeconds": 300
+      }
     },
     {
       "id": "rcn",
@@ -6259,7 +6330,12 @@
           "engine": null
         }
       ],
-      "assets": []
+      "assets": [],
+      "flow": {
+        "sentPerSecond": 84,
+        "receivedPerSecond": 36,
+        "windowSeconds": 300
+      }
     },
     {
       "id": "reg",
@@ -6373,7 +6449,8 @@
           "engine": null
         }
       ],
-      "assets": []
+      "assets": [],
+      "flow": null
     },
     {
       "id": "lost-found",
@@ -6592,7 +6669,12 @@
           "engine": null
         }
       ],
-      "assets": []
+      "assets": [],
+      "flow": {
+        "sentPerSecond": 0,
+        "receivedPerSecond": 3.2,
+        "windowSeconds": 300
+      }
     }
   ],
   "vendors": [

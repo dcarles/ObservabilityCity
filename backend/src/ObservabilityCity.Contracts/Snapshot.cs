@@ -287,7 +287,14 @@ public sealed record GroupSnapshot(
     bool HasRingBridge,
     MessagingSnapshot Messaging,
     IReadOnlyList<NodeSnapshot> Nodes,
-    IReadOnlyList<AssetSnapshot>? Assets = null);
+    IReadOnlyList<AssetSnapshot>? Assets = null,
+    PillarFlowSnapshot? Flow = null);
+
+/// <summary>
+/// What a whole pillar sends to the other pillars and receives from them through the broker, in messages a second averaged over WindowSeconds (the window of the source that reads it).
+/// A side the environment does not measure is null; 0 means it was measured and nothing moved.
+/// </summary>
+public sealed record PillarFlowSnapshot(double? SentPerSecond, double? ReceivedPerSecond, int WindowSeconds);
 
 /// <summary>
 /// A third party outside the town (a credit bureau, a data warehouse). Node carries its health, worked out from our own calls to it:

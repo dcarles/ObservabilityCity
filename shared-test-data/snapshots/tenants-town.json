@@ -222,7 +222,8 @@
           "engine": null
         }
       ],
-      "assets": []
+      "assets": [],
+      "flow": null
     },
     {
       "id": "aa",
@@ -574,7 +575,12 @@
           "engine": null
         }
       ],
-      "assets": []
+      "assets": [],
+      "flow": {
+        "sentPerSecond": 128,
+        "receivedPerSecond": 0,
+        "windowSeconds": 300
+      }
     },
     {
       "id": "bb",
@@ -795,7 +801,8 @@
           "engine": null
         }
       ],
-      "assets": []
+      "assets": [],
+      "flow": null
     }
   ],
   "vendors": [],
