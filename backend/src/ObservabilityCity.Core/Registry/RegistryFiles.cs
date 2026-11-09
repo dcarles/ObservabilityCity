@@ -152,7 +152,7 @@ internal sealed class TelemetryFile
 /// <summary>The "messaging" block of a pillar file (or hub.yaml): the outboxes it publishes and the topics its workers consume.</summary>
 internal sealed class MessagingFile
 {
-    /// <summary>Pillar files: service names, each published as the topic {pillar}-{service}-outbox. hub.yaml: free names, each published as hub-{name}.</summary>
+    /// <summary>Pillar files: service names, each published as the topic that messaging.topicTemplate names. hub.yaml: free names, each named by messaging.hubTopicTemplate.</summary>
     public List<string> Topics { get; set; } = [];
     public List<SubscriptionFile> Subscriptions { get; set; } = [];
 }
