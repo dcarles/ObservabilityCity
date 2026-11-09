@@ -435,6 +435,12 @@ test.describe('the Wall button and the ways out', () => {
 
 test.describe('the overview of the whole town', () => {
   const OVERVIEW = '&wall=1&hold=2&overview=4'
+  /** Opens on a calm town (an earlier test may have left trouble in the first snapshot) with no note up, as openCalm does. */
+  async function openOn(town: { open(q: string): Promise<void> }, page: Page, query: string): Promise<void> {
+    await town.open(query)
+    await page.waitForFunction(() => (window as any).city.wall().mode === 'calm')
+    await page.evaluate(() => (window as any).city.step(11))
+  }
   /** Where the camera stands round the town, as an angle. */
   const azimuth = (page: Page) => page.evaluate(() => {
     const c = (window as any).city.stage
@@ -442,7 +448,7 @@ test.describe('the overview of the whole town', () => {
   })
 
   test('comes after the stop trouble cut to, pulls back to the whole town, goes once round the islands and then on to the next stop', async ({ town, page }) => {
-    await town.open(OVERVIEW)
+    await openOn(town, page, OVERVIEW)
     await town.effect('aa.orders-api', 'Down')
     await page.waitForFunction(() => (window as any).city.wall().stop?.kind === 'down')
     await town.step(2.05)
@@ -461,10 +467,10 @@ test.describe('the overview of the whole town', () => {
   })
 
   test('opens a tour of several stops before the first one, and again after the last', async ({ town, page }) => {
-    await town.open(OVERVIEW)
+    await openOn(town, page, OVERVIEW)
     await town.effect('aa.orders-api', 'Down')
     await town.effect('cc', 'Incident', 0.9)
-    await page.waitForFunction(() => (window as any).city.wall().mode === 'alert')
+    await town.until('aa.orders-api', (n) => n.state === 'Down') // both kinds of trouble must be in the snapshot before the tour is read
     await page.waitForFunction(() => (window as any).city.seen.last.totals.incidents >= 1)
 
     // the overview holds 4 s and the others 2 s: sample every second and keep one entry for each stop
@@ -483,7 +489,7 @@ test.describe('the overview of the whole town', () => {
   })
 
   test('is left out with overview=0: the tour only goes through the trouble', async ({ town, page }) => {
-    await town.open('&wall=1&hold=2&overview=0')
+    await openOn(town, page, '&wall=1&hold=2&overview=0')
     await town.effect('aa.orders-api', 'Down')
     await page.waitForFunction(() => (window as any).city.wall().stop?.kind === 'down')
     const seen = await tour(page, 3)
@@ -491,7 +497,7 @@ test.describe('the overview of the whole town', () => {
   })
 
   test('puts the systems with dead letters in red next to the headline, or as the headline when nothing else is wrong', async ({ town, page }) => {
-    await town.open('&wall=1&hold=2&overview=0')
+    await openOn(town, page, '&wall=1&hold=2&overview=0')
     await town.effect('aa.orders-worker', 'Poison')
     await town.until('aa.orders-worker', (n) => (n.deadLetters ?? 0) >= 1)
     await expect(page.locator('#wall-headline')).toHaveText('1 WITH DLQ')
