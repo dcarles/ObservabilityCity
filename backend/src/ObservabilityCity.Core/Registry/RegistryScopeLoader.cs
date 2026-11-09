@@ -74,7 +74,8 @@ public static partial class RegistryLoader
             string.IsNullOrWhiteSpace(f.Interval) ? null : SourceQuery.TryParseWindow(f.Interval, out var interval) ? interval : null,
             f.DeadLetterLink is { } l ? new EntityLink(l.Name.Trim(), l.Url.Trim()) : null,
             ToEntityMetric(f.Throughput),
-            f.DeadLetterLinks.Count == 0 ? null : f.DeadLetterLinks.Select(l => new EntityRegionLink((l.Region ?? "").Trim(), new EntityLink(l.Name.Trim(), l.Url.Trim()))).ToList());
+            f.DeadLetterLinks.Count == 0 ? null : f.DeadLetterLinks.Select(l => new EntityRegionLink((l.Region ?? "").Trim(), new EntityLink(l.Name.Trim(), l.Url.Trim()))).ToList(),
+            f.Flows.Count == 0 ? null : f.Flows.Select(x => new EntityFlow(x.Match, (x.Direction ?? "").Trim().ToLowerInvariant())).ToList());
 
     private static EntityMetric? ToEntityMetric(EntityMetricFile? f) => f is null ? null : new EntityMetric(f.Metric.Trim(), f.Aggregation.Trim().ToLowerInvariant());
 
@@ -118,6 +119,18 @@ public static partial class RegistryLoader
                 if (!EntitiesConfig.LinkVariables.Contains(m.Groups[1].Value))
                     errors.Add($"{where}: {{{m.Groups[1].Value}}} is not a variable of the url. Use {string.Join(", ", EntitiesConfig.LinkVariables.Select(v => "{" + v + "}"))}.{DidYouMean.Hint(m.Groups[1].Value, EntitiesConfig.LinkVariables)}");
         }
+        for (var i = 0; i < e.Flows.Count; i++)
+        {
+            var where = $"{at}.flows[{i}]";
+            var direction = (e.Flows[i].Direction ?? "").Trim().ToLowerInvariant();
+            if (direction is not (EntityFlow.Sent or EntityFlow.Received)) errors.Add($"{where}: direction '{e.Flows[i].Direction}'. Use sent or received.{DidYouMean.Hint(direction, [EntityFlow.Sent, EntityFlow.Received])}");
+            try
+            {
+                if (!new Regex(e.Flows[i].Match, RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1)).GetGroupNames().Contains("pillar")) errors.Add($"{where}: the match has no group named 'pillar'. Write it as (?<pillar>...)");
+            }
+            catch (ArgumentException ex) { errors.Add($"{where}: the match is not a valid regular expression: {ex.Message}"); }
+        }
+        if (e.Flows.Count > 0 && e.Throughput is null) errors.Add($"{at}: flows need a throughput metric to read the rate from. Give throughput");
         if (e.Patterns.Count == 0) errors.Add($"{at}: patterns is empty. Give at least one pattern: a regular expression with the named group service (and pillar when the name says it)");
         for (var i = 0; i < e.Patterns.Count; i++)
         {

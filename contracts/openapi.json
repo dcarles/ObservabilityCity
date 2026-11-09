@@ -685,6 +685,9 @@
               "$ref": "#/components/schemas/AssetSnapshot"
             },
             "nullable": true
+          },
+          "flow": {
+            "$ref": "#/components/schemas/PillarFlowSnapshot"
           }
         }
       },
@@ -1274,6 +1277,28 @@
           "requestsPerSecond": {
             "type": "number",
             "format": "double"
+          }
+        }
+      },
+      "PillarFlowSnapshot": {
+        "required": [
+          "windowSeconds"
+        ],
+        "type": "object",
+        "properties": {
+          "sentPerSecond": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "receivedPerSecond": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "windowSeconds": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },
