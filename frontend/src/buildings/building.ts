@@ -353,7 +353,7 @@ export class Building {
     if (!this.azure) return
     const world = this.beaconAnchor.getWorldPosition(new THREE.Vector3())
     const base = Math.max(2.2, camera.position.distanceTo(world) * 0.032)
-    this.alert.scale.setScalar(base * 0.6) // 40% smaller than the first cut, which Dan found too big
+    this.alert.scale.setScalar(base * 0.6)
     this.alert.position.y = base * 1.7 + 0.25 * Math.sin(time * 3 + this.pulsePhase)
   }
 

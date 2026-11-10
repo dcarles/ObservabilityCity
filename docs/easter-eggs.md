@@ -1,4 +1,4 @@
-# Scripted events (the Konami code)
+# Easter eggs (the Konami code)
 
 Type **up up down down left right left right B A** in the town (or open it with `?event` in the address) and the theme plays a short scripted
 event on a random island of the town, using that island's own buildings. Escape ends it early; otherwise it ends by itself and the camera goes back. It is for the 3D town only: the dashboard view never plays events.
