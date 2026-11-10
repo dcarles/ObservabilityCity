@@ -177,6 +177,14 @@ test.describe('Galactic Credit keeps its hub and spokes', () => {
     await expect(page.locator(`[data-pillar="${first.id}"] .pflow [data-flow]`)).toContainText(/sends ext|receives|sends int|no /)
   })
 
+  test('puts the island sign on the other side of the bridge from the pier board', async ({ town, page }) => {
+    await town.open()
+    const signs = (await page.evaluate(() => (window as any).city.town.inspectSigns())) as { id: string; signX: number; pierX: number | null }[]
+    const piers = signs.filter((s) => s.pierX != null && s.id !== 'lost-found')
+    expect(piers.length).toBeGreaterThanOrEqual(3)
+    for (const s of piers) expect(Math.sign(s.signX), s.id).toBe(-Math.sign(s.pierX!))
+  })
+
   test('carries what each pillar sends and receives on its own straight lane to the hub, lanes apart and never crossing', async ({ town, page }) => {
     await town.open()
     const lanes = (await page.evaluate(() => (window as any).city.town.inspectLanes())) as { id: string; path: { x: number; z: number }[] }[]

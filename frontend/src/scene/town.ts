@@ -795,8 +795,11 @@ export class Town {
   }
 
   /** What the signs say, for tests: each island's line under its name, and what the pier board gets for the pillar's messages. */
-  inspectSigns(): { id: string; line: string; pier: Messaging['pillar'] | null }[] {
-    return this.islands.map((i) => ({ id: i.group.id, line: i.nameSign.userData.line() as string, pier: i.messaging.pillar ?? null }))
+  inspectSigns(): { id: string; line: string; pier: Messaging['pillar'] | null; signX: number; pierX: number | null }[] {
+    return this.islands.map((i) => ({
+      id: i.group.id, line: i.nameSign.userData.line() as string, pier: i.messaging.pillar ?? null,
+      signX: i.nameSign.position.x, pierX: i.harbour ? i.root.worldToLocal(i.harbour.boardPosition()).x : null,
+    }))
   }
 
   inspectVendors(): { id: string; island: string; x: number; z: number; bx: number; bz: number; bridges: number }[] {
@@ -1089,17 +1092,22 @@ export class Town {
       avoid.push({ x: padX(spare), z: zf - PAD_D / 2, w: PAD_W + 1, d: PAD_D + 1 })
     }
 
-    // the island's sign: one post, standing on land beside the gate
+    // the island's sign: one post, standing on land beside the gate, on the side of the bridge away from the pier (the pier and its board are on the -x side).
+    // Lost & found keeps its heap of boxes on the +x side, so its sign stays on the -x side.
     const signZ = gateZ - 2.4
-    const nameSign = this.islandSign(g, -8.5, signZ)
+    const signX = g.isLostFound ? -8.5 : 8.5
+    const nameSign = this.islandSign(g, signX, signZ)
     decor.add(nameSign)
-    avoid.push({ x: -8.5, z: signZ, w: 12, d: 5 })
+    avoid.push({ x: signX, z: signZ, w: 12, d: 5 })
     // a town whose islands call each other directly: a signpost opposite the island's own sign, for the traffic to and from hidden islands
     let post: Signpost | null = null
     if (signpost && (links.bridge || links.ring)) {
-      post = new Signpost(8.5, signZ)
+      // beside the island's sign on the far side from the pier when the island is wide enough for both, else on the pier side
+      const wide = plan.rx - 4
+      const postX = g.isLostFound ? 8.5 : wide >= 17 ? Math.min(18.5, wide) : -8.5
+      post = new Signpost(postX, signZ)
       root.add(post.object)
-      avoid.push({ x: 8.5, z: signZ, w: 12, d: 5 })
+      avoid.push({ x: postX, z: signZ, w: 12, d: 5 })
     }
     // A pillar whose registry file is broken: the island stays on the map, empty, with the problem written on a board
     if (g.configError) decor.add(this.configErrorBoard(g.configError))
