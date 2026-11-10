@@ -209,13 +209,19 @@ export class Stage {
     }
   }
 
-  /** Glides to look at a point, standing `distance` away at a comfortable angle: from the side the camera is on, or from `azimuth` (radians round the point; an island's front) when given. */
-  focus(target: THREE.Vector3, distance: number, instant = false, azimuth?: number): void {
+  /** Glides to look at a point (with `lift`, a fraction of the screen height, it ends up that much higher on the screen), standing `distance` away at a comfortable angle: from the side the camera is on, or from `azimuth` (radians round the point; an island's front) when given. */
+  focus(target: THREE.Vector3, distance: number, instant = false, azimuth?: number, lift = 0): void {
     const offset = this.camera.position.clone().sub(this.controls.target)
     const sph = new THREE.Spherical().setFromVector3(offset)
     sph.radius = THREE.MathUtils.clamp(distance, this.controls.minDistance, this.controls.maxDistance)
     sph.phi = THREE.MathUtils.clamp(sph.phi, THREE.MathUtils.degToRad(40), THREE.MathUtils.degToRad(62))
     if (azimuth !== undefined) sph.theta = azimuth
+    if (lift > 0) {
+      // `lift` is a fraction of the screen height to move the point up by: look at a spot nearer the camera, along the ground, so the point rises on the screen
+      const height = 2 * sph.radius * Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2))
+      const ahead = (lift * height) / Math.sin(Math.PI / 2 - sph.phi)
+      target = target.clone().add(new THREE.Vector3(Math.sin(sph.theta), 0, Math.cos(sph.theta)).multiplyScalar(ahead))
+    }
     const position = target.clone().add(new THREE.Vector3().setFromSpherical(sph))
     if (!instant) { this.glideTo(target, position); return }
     // a cut: no glide, the camera is there at once

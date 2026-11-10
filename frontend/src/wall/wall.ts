@@ -46,14 +46,14 @@ export class WallMode<P = TownPlace> {
   onSnapshot(s: Snapshot, now: number): void {
     this.snap = s
     const stop = this.director.update(s, now)
+    this.draw(now) // before the camera moves: where an island fits on the screen depends on how tall the strip is with this caption
     if (stop) this.show(stop)
-    this.draw(now)
   }
 
   tick(now: number): void {
     const stop = this.director.tick(now)
-    if (stop) this.show(stop)
     this.draw(now)
+    if (stop) this.show(stop)
   }
 
   setConnection(state: ConnectionState): void {

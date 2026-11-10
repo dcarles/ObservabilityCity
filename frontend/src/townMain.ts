@@ -14,6 +14,7 @@ import { parseWall, wallTimings } from './wall/params'
 import { enterWall, startWallControls } from './wall/controls'
 import { startMoreMenu } from './topbarMore'
 import { WallMode } from './wall/wall'
+import { wallFraming } from './wall/framing'
 import { UnknownHostsPanel } from './unknownHosts'
 import { NoticesPanel, Search, ServicePanel, showIslandTooltip, showTooltip, StateList, TopBar, type SearchItem } from './ui'
 import { pruneTenants, type TenantView } from './tenants'
@@ -382,7 +383,12 @@ export async function startTown(): Promise<void> {
   const wall = wallParams.on
     ? new WallMode(wallParams.hold, {
         focusOf: (f) => (f.kind === 'building' ? town.focusOf(f.id) : town.islandFocusOf(f.id)),
-        go: (f, cut) => stage.focus(f.target, f.distance, cut, f.azimuth),
+        go: (f, cut) => {
+          // an island on the wall is stood further back and lifted above the status strip, which covers the bottom of the screen
+          const strip = f.azimuth !== undefined ? document.getElementById('wall-strip') : null
+          const fit = strip && !strip.hidden ? wallFraming(strip.getBoundingClientRect().height + 16, window.innerHeight) : { zoom: 1, lift: 0 }
+          stage.focus(f.target, f.distance * fit.zoom, cut, f.azimuth, fit.lift)
+        },
         home: (cut) => stage.home(cut),
         select: (id) => town.select(id),
       }, wallParams.overview, wallParams.overviewIsland)

@@ -3,6 +3,7 @@
 import type { NodeSnapshot, Snapshot } from '../types'
 import { formatRate } from '../visuals'
 import type { Focus } from './attention'
+import { servicesText } from './servicesText'
 import { sinceIncidentText } from './since'
 
 export interface Scene {
@@ -42,7 +43,7 @@ export function calmScenes(s: Snapshot, busiestCount = 3): Scene[] {
     const rate = g.nodes.reduce((a, n) => a + n.requestsPerSecond, 0)
     scenes.push({
       key: `island:${g.id}`, focus: { kind: 'island', id: g.id },
-      caption: `${g.displayName}: ${g.nodes.length} system${g.nodes.length === 1 ? '' : 's'}, ${formatRate(rate)} req/s, all healthy`,
+      caption: `${g.displayName}: ${servicesText(g.nodes)}, ${formatRate(rate)} req/s, all healthy`,
     })
     if ((i + 1) % 3 === 0 && next < visits.length) {
       const n = visits[next++]
