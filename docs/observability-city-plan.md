@@ -1,184 +1,134 @@
-# Observability City: phased build plan
+# Observability City: the plan
 
-## Summary and decisions
+This is the overview of what the app is, how it works and what comes next. The full tour of features is in [README.md](../README.md), every config key is in [config-reference.md](config-reference.md), and the steps for a real environment are in [connect-your-company.md](connect-your-company.md).
 
-Observability City is a locally run browser app that shows our Azure estate as a living 3D town. Phase 1 is a demo driven entirely by a fake data adapter and a scenario switcher, so we can show what every failure mode looks like before wiring any real source. It builds on the original Observability Town brief, with the changes below.
+## Summary
 
-| Topic | Decision |
+Observability City is a browser app that shows system health as a living, animated 3D town. Each group of systems (a pillar, a team, a domain: the town chooses the word) is an island, each system is a building, and what is going on shows in the town itself: floors for instances, lit windows for load, rooftop beacons for errors, cars for requests and boats for messages. The same data is also available as a plain dashboard.
+
+It is for the people who run the systems: a team looking at its own islands, someone on call during an incident, and a wall screen in the office that nobody touches.
+
+| Topic | How it is today |
 | --- | --- |
-| Rendering | 3D low-poly with Three.js directly (no React), using free CC0 model kits through swappable themes. Day lighting by default with a Dusk toggle |
-| Layout | An island per pillar on a ring around a central hub island (Service Bus port, APIM, shared infra). An airport at the edge for outside callers, and third parties on offshore islands |
-| Incidents | From Grafana IRM, shown as weather over the assigned team's island only |
-| Messaging | Async = boats from the Service Bus port to team piers. Sync = walkers over bridges. DLQs are a quarantine pen with a count on the subscriber team's pier |
-| Cross-team calls | Hub and spoke through APIM, with team-coloured walkers and a dependency overlay |
-| Backend | .NET (ASP.NET Core + SignalR). Frontend TypeScript, because it runs in the browser |
-| Running | Locally on a developer PC, read-only, no SSO. Azure hosting later |
-| Sources | Pluggable adapters: Fake first, then Prometheus/Grafana, Log Analytics, Service Bus, Grafana IRM. Kafka later |
+| Backend | .NET 10 (ASP.NET Core and SignalR), started together with the frontend by a .NET Aspire app host. No Docker |
+| Frontend | TypeScript, Vite and Three.js, with no UI framework (see [frontend-stack.md](frontend-stack.md)) |
+| Demo mode | A town with `mode: demo` in `town.yaml` runs on the fake source: gentle noise, a daily traffic cycle and autoscaling, with the Break things panel and stories to show every failure on purpose |
+| Live mode | A town with no `mode`, or `mode: live`, reads real sources through adapters and has no fake source, Break things panel or story bar |
+| Where it runs | Locally on a developer's machine. It only reads from the sources. It writes only to the town's own `_discovered/` folder (found links, hosts added from the Unknown hosts panel, the last readings). It answers only this machine unless `Security:AllowedOrigins` lists other addresses. There is no sign-in yet |
+| Open source | The repo holds only generic code and two sample towns. A company adds its own town folder, kept outside the clone or in a private mirror, and optional adapters under `extensions/`, and never edits core |
 
 ## Visual language
 
-Each signal gets exactly one visual meaning. Colour rules: red only ever means errors, amber means warning or SLA breach, and grey means stale data, which is never shown as healthy.
+Each signal has exactly one visual meaning, and it reads the same in every theme. The words below are the harbour-town theme's; the other themes change the look, not the meaning.
 
-| Signal | Visual |
+**Colours.** Red means something is failing: errors or throttling past the red threshold, a system that is down, dead letters in a pen, or a health report from the cloud provider. Amber is a warning. Grey means a signal is configured but has no fresh data, and is never shown as healthy. A signal with no source configured is absent (its beacon is off), which is not the same as grey.
+
+| Signal | What you see |
 | --- | --- |
-| System | Building shaped by role: API = office tower, worker = factory, database = tanks, cache = water tower, cron = clock tower. Role is optional in YAML (fixed list) and inferred from links and telemetry when left out. A system that consumes messages also gets a pier |
-| Pillar | Pillar: its own island on a ring around the hub. The central hub island (platform) holds the Service Bus port, the APIM gateway, and shared databases and caches |
-| Capacity | Floors = instance count on a doubling scale (1, 2, 3–4, 5–8, 9–16, 17–32, 33–64, 65+ = 8 floors max), with the exact count on a plaque |
-| Load | Lit windows: more light up as req/s rises |
-| Instance health | The share of dark, cracked floors matches the share of unhealthy instances (at least one floor if any are unhealthy). The plaque reads "5/10 healthy" |
-| Down | Blackout, barriers on its bridge, a "Closed for repairs" sign and repair van. Walkers turn back |
-| Errors | Rooftop beacon: a bulb on a mast, green, amber or red, and red pulses. Defaults are 1% and 5%, overridable per system |
-| Traffic | Number of walkers and boats |
-| Latency | Walker and boat speed. A queue forms at the door or pier when p99 is over threshold |
-| Over SLA | The queued crowd turns angry: stamping, with an amber "!" bubble (`slaP99Ms`, default 1 s) |
-| Failed calls | Red walkers |
-| Messaging | Service Bus = port on the hub. Cargo boats sail to each subscriber team's pier, and backlog = crates stacking on the pier. Water = async, bridges = sync |
-| Dead letters | A red quarantine pen on the pier fills with broken crates, a red lighthouse beam flashes when above 0, and a floating count badge shows the number ("DLQ 37"). The top bar shows the town-wide total |
-| Incident | Weather over the assigned team's island only: sev4 light cloud, sev3 overcast, sev2 rain, sev1 storm with lightning. The worst wins, the island sign shows a count, and the rest of the town stays sunny |
-| Outside callers | An airport at the map edge (plane rate = inbound traffic, with an arrivals board). Passengers walk over main bridges to islands with external systems |
-| Cross-team calls | Hub and spoke, as in reality: one bridge per island to the hub, through the APIM gateway building. Walkers carry their team's flag colour. A dependency overlay draws dashed arcs from team to team, sized by volume. Calls that bypass APIM get their own direct bridge |
-| Third parties | Small offshore islands with a direct bridge from each calling island. Same beacon, queue and closed rules, inferred from our outbound calls |
-| Stale data | Greyed out |
+| Pillar | An island on a ring round the central hub, in the order of `islands` in `town.yaml`. Up to `ringCapacity` islands (default 12) on the first ring, the rest on a staggered second ring |
+| Hub | The island in the middle with the shared resources: the API gateway, the message broker's port, central egress and shared databases |
+| System | A building shaped by its role: an office for an API, a factory for a worker, a storage unit for a database (a storage yard for one database per tenant), a water tower for a cache, a clock tower for a function, a gate house for the gateway, a port for the broker and a tower with a dish for egress |
+| Service | Systems that share a `service` stand together on one pad, with a low sign naming it and showing its worst state |
+| Database engine | A database's sign names its engine (from `databaseEngines` in `town.yaml`), with its type underneath |
+| Basic resources | Key vaults, storage, settings stores and other resources with no health of their own stand as simple buildings behind their service or in the island's back yard |
+| Instances | Floors on a doubling scale (1, 2, 3-4, 5-8 ... 65+ gives 1 to 8 floors), with the count on the name board |
+| Instance health | Dark, cracked floors for the share of unhealthy instances, and "5/10 healthy" on the plaque |
+| Load | Lit windows, floor by floor from the ground: CPU for apps and workers, capacity used for a database. Chimney smoke thickens with CPU |
+| Errors | The rooftop beacon: green, amber or red against the system's own thresholds (red pulses). High CPU, memory or database utilisation, a failed or overdue scheduled job and dead letters in a queue it reads make it amber |
+| Throttling | A lowered barrier gate at a database. Throttling past the red threshold turns the beacon red |
+| Down | A blackout, a "Closed for repairs" sign and a steady red beacon |
+| Requests | Cars, as a sample and not a count. Blue sedans are internal calls, yellow taxis are calls from outside. The town shows at most 420 cars |
+| Latency | Each building has a service lane of five cars, and the time at the door is the latency, so a slow system builds a queue. Over the SLA the queued cars blink amber hazard lights and a "!" bubble shows over the lane. A full lane shows "+N waiting" for the requests it has no room to draw |
+| Failed request | A car with a red flag on its roof, turned away at the door. It is the only car that turns round |
+| Sync calls | Bridges. In a hub-and-spoke town each island has one bridge to the hub, and calls between islands go through it. In a direct town (`topology: direct`) islands reach each other over an outer ring road |
+| Messaging | Boats from the broker's port to an island's pier. Messages waiting pile up as crates on the quay. Bridges are sync, water is async |
+| Dead letters | A pen of broken crates on the pier with a "DLQ N" badge and a sweeping red light. The top bar shows the town-wide total. Clicking a pier, a pen or the DLQ count lists the queues with dead letters |
+| Legacy route | An amber pennant on a pier whose worker still reads an old route (`legacyFrom` in `town.yaml`) |
+| Scheduled jobs | A function's jobs send boats to the services the pillar file maps them to. An unmapped job shows "Job not mapped" |
+| Regions | A service in two or more regions shows its worst region, with the split of requests under its name |
+| Tenants | A store with one database per tenant is a yard with a unit for each tenant. Test tenants are paler and striped and never go past amber; an undeclared tenant is a purple unit marked "?" |
+| Incident | Weather over the island it belongs to: light cloud for sev 4, overcast for sev 3, rain for sev 2, a storm with lightning for sev 1. The rest of the town stays sunny |
+| Cloud health report | A red "!" above a building whose resource the cloud provider reports as degraded or unavailable |
+| Outside callers | An airport whose planes land at the rate of outside traffic, with an arrivals board. Taxis carry the requests from the terminal into the town |
+| Third parties | Vendor islands outside the ring road. A call leaves the island's back gate, goes round the ring road and down the vendor's own road |
+| Who calls whom | The dependency overlay: dashed arcs between islands, as thick as the traffic between them (a layer, off until shown) |
+| Lost & found | An island with boxes and bins by its gate, always last in the order, for systems no pillar owns |
+| Config error | A pillar file with problems is drawn as an island with a board saying what is wrong, and the rest of the town carries on |
+| Stale data | A grey building. If the live feed itself goes quiet, the whole page goes grey |
+
+## Views
+
+**The town.** The 3D view: orbit, zoom, pan, Home, and search (`/`) for a system or island. Clicking a building opens the inspector drawer with Overview, Links, Logs and Config tabs. The top bar has the town, environment, tenant, island, layer, theme and quality choices, the totals, the connection state, Day/Dusk, the legend, Home, and the Wall and Dashboard buttons (in a "⋯" menu when the bar is full). Notices (config problems, failed reloads, unmapped jobs) and the Unknown hosts panel sit under it. The island filter (`?islands=`) is applied by the backend, so totals count only what is on screen; layers (`?hide=`, `?show=dependencies`) only hide things in the page.
+
+**The dashboard.** `?view=dashboard`, remembered per browser. It reads the same snapshot and never loads Three.js. It has a service table (traffic with the share per region, errors, p99 against the SLA, CPU and memory per region, and the reason a service is amber or red), a Message flow tile, a Total traffic card, an Incidents card and a freshness marker for each source.
+
+**Wall mode.** `?wall=1`, or the Wall button, which remembers "wall on" in the browser. It hides the bar and panels, uses Dusk and Medium quality, and shows a status strip with the headline, the totals and a caption. The camera tours by itself: an overview, then incidents, then what is down, then what is degraded, with `&hold=` and `&overview=` to set the timings, and a showcase loop when all is well. Esc, the Exit wall chip or leaving full screen ends it. `?wall=1&view=dashboard` is the wall dashboard: the same strip and tour, opening one pillar at a time.
+
+**Themes.** Harbour town (the default), space colony and works. A theme changes the buildings, ground, water, bridges, vehicles, sky and the wording of the legend; the data, the layout and every signal stay the same. Picking another theme reloads the page.
+
+**Easter eggs.** The Konami code (or `?event`) plays a short scripted event for the theme in the town view: pirates, zombies or aliens. Nothing in the town is changed by it. See [easter-eggs.md](easter-eggs.md).
 
 ## Architecture
 
-The renderer never knows where data came from. Every source is an adapter behind one .NET interface, so the Fake source in Phase 1 is later swapped for real ones without touching the town.
-
-```mermaid
-flowchart LR
-  subgraph Sources
-    R[Registry YAML files]
-    F[Fake source - Phase 1]
-    P[Prometheus / Grafana]
-    L[Log Analytics]
-    S[Azure Service Bus]
-    I[Grafana IRM]
-  end
-  subgraph Backend[".NET backend (ASP.NET Core)"]
-    RL[Registry loader + validation] -->|what to watch| AD[Adapters, one per source]
-    AD --> ST[Latest-state table] --> SB[Snapshot builder + rules] --> HUB[SignalR hub]
-  end
-  subgraph Browser["Browser (TypeScript)"]
-    LS[Live snapshot] --> ME[Motion engine] --> TW[Three.js town] -->|click| RP[HTML panels]
-  end
-  R --> RL
-  F & P & L & S & I --> AD
-  HUB -->|push| LS
+```
+config/<town>/*.yaml -> registry loader -> sources poll -> latest state -> snapshot builder (rules) -> SignalR /hubs/town -> browser (Three.js or dashboard)
 ```
 
-The registry tells the backend what to watch. Each adapter polls on its own timer into a latest-state table. Every 5 to 10 s the snapshot builder applies the rules (an incident overrides metrics, stale data is grey) and pushes one snapshot over SignalR. The browser invents all motion (walkers, boats, planes, crates) from the rates in the snapshot.
+[how-it-fits-together.md](how-it-fits-together.md) follows this path step by step.
 
-| Topic | Decision |
+| Part | What it does |
 | --- | --- |
-| Solution | .NET Aspire AppHost starts everything with one F5: the Host (API + SignalR), Core (registry, rules, snapshot builder), one Adapters project per source, Contracts, and the `frontend/` Vite + TypeScript + Three.js frontend. `azd up` to Azure Container Apps later |
-| Live push | SignalR: groups (per-pillar filtering, live log tail for an open drawer), two-way on one connection, Azure SignalR for scale-out. The snapshot builder doesn't know the transport |
-| Contract | C# `Snapshot` records are the source of truth. The build emits OpenAPI with ASP.NET Core's built-in generator, and a small script in the repo (`frontend/scripts/openapi-to-ts.mjs`) generates `contracts.ts`, so drift is a build error. Golden snapshot fixtures per scenario are tested in both C# and TypeScript |
-| Adapters | Poll per source: each source has its own background loop, interval, timeout and retry, with one batched query for all systems. A failing source greys out only its own values. No webhooks while it runs on a dev PC |
-| Fake source | A generator adapter (healthy noisy baseline, with scenario effects layered on top) plus a replay mode that plays fixture timelines for tests and scripted demos |
-| Azure auth | `DefaultAzureCredential`: your own az / Visual Studio login locally, managed identity once hosted. Grafana and IRM tokens in dotnet user-secrets, Key Vault when hosted, never in YAML |
-| History | Parked. Live data only for the first versions (see open questions) |
+| Contracts | The C# snapshot records are the wire format. `contracts/openapi.json` and `frontend/src/contracts.ts` are generated from them, and CI fails if they drift |
+| Core | The registry loader and checks, the source interfaces, the poller and the snapshot builder with the health rules |
+| Host | ASP.NET Core: one runtime per town and environment, the REST API (`/api/snapshot/latest`, `/api/systems/{id}`, its logs, towns, environments) and the SignalR hub |
+| Frontend | Draws the town or the dashboard from the snapshot and invents all motion (cars, boats, planes, weather) from the rates in it. It never knows which source produced a number |
+| Validate tool | The registry checks (`--all`) that CI runs, and `--sources`, which probes each configured source with your login |
 
-## Registry config
+**Adapters.** Sources are plug-in modules (`IAdapterModule`). The host loads every module it finds in its `adapters/` folder and does not reference any of them. The Azure module provides these source kinds:
 
-Islands are **pillars**, described in YAML files, one file per pillar. The repo holds the generic app plus sample towns in `config/` (the two fake towns), and the registry path is a setting (`Registry:Path`, default `config/galactic-credit`). A company forks it and adds only its own `config/` (real registry) and optional `extensions/` (company-only adapters), never editing core files, so `git pull upstream` merges cleanly. The demo loads the same files as production, and only the data source changes.
+| Kind | Reads |
+| --- | --- |
+| `resourcegraph` | The inventory: which resources belong to which system, through the environment's `scope` rules, and the instance counts |
+| `loganalytics` | Request rate, error share and latency from your own query template, the split by region, and link discovery from dependency data |
+| `azuremonitor` | Platform metrics (CPU, memory, capacity used, throttling) for the resources the scope found |
+| `servicebus` | Backlog and dead letters per queue from the namespaces' metrics, message flows per pillar, and the message types a queue handled |
+| `functionjobs` | Whether each scheduled job of a function app ran, failed or is overdue |
+| `resourcehealth` | The cloud's own health reports for resources, from the activity log |
+
+Logins are the Azure CLI by default, or a named `credentials:` entry (`default`, `managed-identity` or `service-principal`, whose secret is read from an environment variable). The core also knows `fake`, and accepts `prometheus` and `grafana-irm`, which have no adapter yet: such a source is reported at start-up and its signals have no data. Several sources can serve one building, each signal from the source `signals:` names. A company writes its own adapter in `extensions/`, starting from `templates/adapter` and testing it with the adapter kit (see [write-an-adapter.md](write-an-adapter.md)).
+
+**Running.**
+
+- A live environment polls its sources only while a browser is watching it, and for two minutes after. `Polling:AlwaysOn` keeps every environment polling.
+- Each source polls on its own timer. A failing source goes stale on its own, and one that keeps failing is asked less often until it works again.
+- A snapshot is built every 2 seconds (`Snapshot:IntervalSeconds`) and sent to viewers when something in it changed, and at least every 15 seconds (`Snapshot:KeepAliveSeconds`) so the feed shows it is alive.
+- One server runs every `config/*/town.yaml` as a town (`?town=`), each with its environments (`?env=`). A town without environment files has one, `demo`.
+- The town folder is watched (`Registry:WatchSeconds`). A good reload replaces the registry in use, a failed one keeps the last good registry and says so in the notices. Sources and the town's mode are read at start-up, so changing them needs a restart.
+- The page refuses a snapshot it cannot draw and keeps the last good town.
+
+## Registry config in brief
+
+One folder describes a town. Each file and key is in [config-reference.md](config-reference.md), and the order to set them up in is in [connect-your-company.md](connect-your-company.md).
 
 ```
-registry/
-  town.yaml           # ownership tag names, Service Bus naming patterns
-  defaults.yaml       # app-wide defaults per role
-  sources.yaml        # named connections per environment (prod, uat, dev)
-  hub.yaml            # hub resources: APIM, Service Bus, egress, shared DBs
-  third-parties.yaml  # vendors with host patterns (ext.snowflake)
-  pillars/cl.yaml     # one file per pillar
-  scenarios/*.yaml    # demo scenarios and story timelines
-  _discovered/        # drafts written by discover, never loaded
-themes/
-  harbour-town/theme.yaml  # building kinds -> models, anchors, Day/Dusk presets, wording
+config/<town>/
+  town.yaml               id, name, groupLabel, topology, mode, islands, ringCapacity, databaseEngines, messaging, labels
+  defaults.yaml           thresholds per role
+  hub.yaml                shared resources, the hub's topics, outside callers
+  third-parties.yaml      vendors, their domains and services
+  pillars/<id>.yaml       one island: systems, calls, service groups, messaging, scheduler
+  environments/<id>.yaml  what differs per environment: sources, credentials, signals, scope, tenants, exclude, links, logs
+  fake.yaml, fake-assets.yaml, stories/   demo towns only
+  schema/                 editor schemas, regenerated with `Host -- --write-schema`
+  _discovered/            written by the app: found links, added hosts, the last readings
 ```
 
-```yaml
-# pillars/cl.yaml
-pillar: cl                       # same code as Azure tag, pillar.code and Service Bus names
-displayName: CL pillar          # friendly name shown on the island sign
-irmTeams: [cl-oncall]            # incident weather
-external: false                  # default for its systems
-sources: { metrics: la-cl }      # override only the slots that differ
-defaults:
-  api:    { slaP99Ms: 300, errors: { amber: 0.01, red: 0.05 } }
-  worker: { slaP99Ms: 30000 }
-resources:                       # pillar-owned DBs and caches
-  - id: cl.customer-db
-    kind: sql
-    sharedWith: [ams]            # intentional sharing, no warning
-systems:                         # buildings are laid out in this order
-  - id: cl.ledger-api            # {pillar}.{service}; messaging is discovered from names by the town's convention
-    role: api                    # optional, inferred when omitted
-    external: true
-    slaP99Ms: 2000               # orchestrator with many internal calls
-  - id: cl.posting-worker
-  - id: cl.report-exporter       # single-tenant style: declare what names can't tell us
-    publishesExternal: { via: kafka, target: ext.datahub }
-```
+- **Ids** are `<pillar>.<system>`, and `aliases` keep old ids working. A system's `role` is required. A key, id, role or engine the loader does not know is an error with a "did you mean".
+- **Thresholds cascade** from `defaults.yaml` to the pillar's `defaults` to the system. The inspector's Config tab shows each value and where it came from.
+- **Links are declared** (`calls`, `gatewayCalls`, `messaging`) and can be added from dependency data by link discovery (`links:` in an environment file). Buildings, bridges and piers exist only for links and roles that are really there.
+- **Scope** in an environment file maps pillars and systems onto the cloud with rules and templates: subscriptions, the workspace, which resources belong to a service, and what the telemetry calls a system.
 
-| Topic | Decision |
-| --- | --- |
-| Ids | `<pillar>.<system>`. The prefix must match the file, ids are kebab-case and unique town-wide, and `aliases` keep old ids working after a rename |
-| Correct references | A generated JSON schema gives autocomplete and red underlines in VS Code / Rider. The loader and CI reject unknown ids with "did you mean", and only that file is affected |
-| Catalog | Generated from the registry on load, so it's always in sync. `dotnet run -- catalog` and a Registry page in the app |
-| Discovery (Phase 2) | Reads Log Analytics roles and dependencies, OTel service names, Service Bus entities and Azure Resource Graph tags. The Azure `pillar` tag and `pillar.code` attribute place systems on the right island. It writes drafts to `_discovered/` only |
-| Staying current | Unregistered services appear on a grey Lost & found island. A Registry health panel lists drift (no data for 7 days, undeclared or unseen calls, missing entities), each with the YAML line to fix it |
-| Metrics mapping | Convention + overrides: default queries per source type on standard OTel metrics and App Insights tables, joined by service name. A system adds custom PromQL/KQL only when it's non-standard |
-| Defaults | `defaults.yaml` per role (also baked into code as a last resort), then pillar `defaults` per role, then system override. The drawer shows each effective value and where it came from |
-| Layout | Deterministic, no dragging. `islands` in `town.yaml` lists the island order (validated, and missing pillars are appended with a warning). One ring clockwise from the top with automatic radius. Above one ring, a staggered second ring (bridges pass between first-ring islands). `ringCapacity` (default 12, 6 to 18) sets the ring size; at most 2 rings, so at most (ringCapacity x 2) - 1 pillars. Fixed places: hub in the centre, airport in the second ring's north slot, a ring road around the town with vendors outside it, Lost & found in a corner |
-| Scenarios | `scenarios/*.yaml`: a caption plus effects (target, effect, intensity), optionally on a timeline. Validated like the registry. Custom mode's Save writes the same format, and the switcher buttons are generated from the files |
-
-**Sources, hub, messaging and third parties**
-
-| Topic | Decision |
-| --- | --- |
-| Environments | Switchable in the top bar, prod by default. `sources.yaml` has a section per environment, and the registry is shared |
-| Source binding | Per-signal slots (metrics, instances, calls) with town-wide defaults. Pillars or systems override only the slot that differs. Service Bus and IRM are bound globally |
-| Hub | Its own `hub.yaml` listing resources (APIM, Service Bus, central egress service, shared DBs) with Azure resource ids. Up/down for all from Azure Resource Health, plus richer signals where available (APIM gateway logs, Service Bus errors and throttling) |
-| Building kinds | Themes replace a buildings catalog: `themes/{name}/theme.yaml` maps each building kind to a model with anchors (beacon point, floor module height, pier attach point), plus Day/Dusk lighting presets and optional wording. A theme picker switches at runtime. The default harbour-town theme uses CC0 kits (Kenney, KayKit, Quaternius). Commercial packs stay in a private fork, never in the public repo |
-| Pillar-owned resources | Stay on the owner's island. `sharedWith` declares intentional sharing (pillar-colour flags). Undeclared cross-pillar use adds an amber marker and a Registry health suggestion |
-| Messaging | Discovered by naming convention for the multi-tenant platform: `{pillar}-{svc}-outbox` topics, `{consumerPillar}-{consumerSvc}-{source}-subscription`, forward chains from ForwardTo. Patterns live in `town.yaml`. Single-tenant systems declare exceptions. Message types aren't declared |
-| Cross-pillar messaging | The intended pattern is a direct subscription to the other pillar's outbox. Pillar-to-pillar via egress/ingress is legacy: drawn with an amber pennant and listed for migration. Egress to external parties (e.g. Snowflake) is normal |
-| Namespaces | Shared by several pillars = a port on the hub. Used by one pillar = a harbour on its island. Queues are direct boat routes |
-| Third parties | `third-parties.yaml` lists vendors with host patterns, matched against dependency targets. Unknown external hosts are suggested in Registry health. Kafka/external publishing can be declared until a Kafka adapter exists |
-
-**Staying company-neutral.** The core code knows only generic concepts: groups (islands), systems, resources, links (sync, async, external), brokers, vendors, and flags on links such as legacy or bypass. Everything company-specific is config or an adapter: the group label ("Pillar"), ownership tags, naming patterns, `topology: hub-and-spoke | direct`, and legacy rules. The Phase 1 demo ships two fake towns shaped differently (one hub-and-spoke, one with teams, direct calls, Kafka and no gateway), and both must render with no code changes.
-
-## Phase 1: demo town with fake sources
-
-Phase 1 is done when someone who has never seen it can watch you click through every scenario and say what is wrong without reading a number. It uses the real architecture end to end, with only the Fake adapter behind it.
-
-**Decisions**
-
-| Topic | Decision |
-| --- | --- |
-| Sample towns | **Galactic Credit:** 14 pillars (cl, acc, pay, frd, cus, acq, dec, bil, col, dsp, rwd, obk, ntf, dat) around a hub with APIM, the Service Bus port, central egress and a shared customer DB. Vendors: credit bureau, card network, SMS/email, Snowflake. About 40 systems, with deliberate legacy egress routes and an undeclared shared DB. **Droid Shop:** teams Web, Mobile, Inventory, Checkout, Shipping and Notifications, with Kafka, direct calls and no gateway. Switch towns in the top bar |
-| Fake data | Gentle noise plus a daily traffic cycle (a day can be sped up to about 2 minutes), with floors autoscaling at peak. A Calm toggle freezes it flat. Scenarios layer on top |
-| Scenarios and stories | Stackable: pick a scenario, then click a target in the town or search for one. Each active effect is a chip with an intensity slider, plus Reset all. Stories are YAML timelines of the same effects (time, caption, apply, clear, ramp), played from a story bar with play, pause, speed, scrub, captions and camera glides |
-| Lighting | Day by default, with a Day/Dusk toggle remembered per browser. Beacons get halos in Day. Automatic by local time later |
-| Models | Free CC0 kits (Kenney, KayKit, Quaternius) plus our own pieces (beacon, DLQ pen, signs), loaded through the theme system. Phase 1 ships the harbour-town theme. The bar is a polished, game-quality look |
-| Islands | Organic coastlines generated from the pillar id (the same on every visit) and sized by system count. Inside, a town centre of square plots and streets: one building per plot, a few spare lawn plots so new systems don't reshuffle the layout, with trees and a hill around it |
-| Camera | Free orbit with tilt kept between 25° and 75°, zoom and pan limits, never under the water. Click or search glides to a building and opens the inspector, and any drag cancels a glide. Home frames the whole town. Labels only on selected or troubled buildings. A wall-display mode tours troubled islands |
-| UI | Top bar: town and environment switchers, town totals, search, Day/Dusk, theme, legend and Home. Break things panel on the left (demo only; scenario then click a building, chips with a strength slider, Reset, Calm and a speedable day). Inspector drawer on the right with Overview, Links, Logs and Config tabs. Story bar at the bottom. The legend opens on the first visit |
-| Performance | Quality presets Low, Medium, High, Ultra and Wall (30 fps). Auto picks a starting preset from the device, then steps down or up based on measured frame time, with a manual override. Target: smooth at Medium on an ordinary office laptop. Budget of about 20 islands, 200 buildings and 600 moving walkers and boats |
-
-**Build order: a thin slice first, then widen.** Each slice ends in something demoable.
-
-1. **The bar.** Solution skeleton (Aspire, contract, SignalR), the fake generator, and the hub plus one Galactic Credit island at final art quality, with floors, beacons and walkers driven by live fake data. This proves the look and the pipeline together.
-2. **All islands.** Registry loader with validation, the full Galactic Credit registry, ring layout, organic islands with plots and streets, bridges and the camera.
-3. **Messaging.** Service Bus port, boats, piers, crates, the DLQ pen and count badge.
-4. **The other signals.** Down and instance health, latency queues and angry crowds, incident weather, the airport, vendor islands, the dependency overlay and stale grey.
-5. **UI.** Top bar, inspector drawer, legend and search.
-6. **Scenarios and stories.** Break things panel, chips, the story player, the daily cycle and the Calm toggle.
-7. **Generality and polish.** The Droid Shop town, the Dusk preset, theme picker, quality presets and wall-display mode.
-
-**Out of scope for Phase 1:** real sources, history and replay, recording stories by clicking, deployment crews, authentication, and themes other than harbour-town.
-
-**Review gate:** a demo to you and a few colleagues. We tune the visuals until every scenario reads at a glance before starting Phase 2.
+**Staying company-neutral.** Core knows only generic things: islands, systems, links, brokers and vendors. Every naming convention, tag and query is a rule or template in the town's own files, and core assumes none. The two sample towns are shaped differently to prove it: Galactic Credit is hub-and-spoke with a gateway, Service Bus and 16 pillars plus Lost & found; Droid Shop has six teams that call each other directly, Kafka and no gateway. Both render with no code changes, and the scope tests run two towns with opposite conventions.
 
 ## Rules and why
 
@@ -229,41 +179,47 @@ Why some rules are the way they are, where the reason is not obvious from the co
 - **A signal reads the same in every theme.** Beacon colours (green, amber, red, grey), floors and dark floors, lit windows, the dead-letter pen, crates, weather, tenant yards and service pads stay the same; only how a building looks changes. A new building kind or health state must be drawn by every theme: both sides' tests read `shared-test-data/themes/theme-contract.json` and fail if a theme falls behind.
 - **A model keeps the default theme's footprint, door, door direction and plaque place**, within a tolerance a unit test holds it to, so layout and traffic work unchanged.
 - **The theme is chosen once, when the page opens.** Picking another reloads the page, so nothing of the old theme is left behind.
-- **Red only ever means errors.** Amber is a warning, grey is no data. A unit test holds the legend to that.
+- **Red only ever means something is failing** (errors, throttling past the red threshold, or down). Amber is a warning, grey is no data. A unit test holds the legend to that.
 
 ### Performance
 
 - **Fixed scenery and the fixed parts of each building are merged into a few meshes per island.** Parts a model moves (smoke, clock hands, cranes, dishes) are marked `animated` and keep their own meshes, so a new moving part must be marked or it freezes.
 
-## Phases
+## Roadmap
 
-Each phase ends with something demoable and a review with you before the next starts. Real sources are added one adapter at a time behind the same town.
+Real sources are added one adapter at a time behind the same town, so the town itself does not change when one arrives.
 
-Each phase adds real sources behind the same town.
+**Built**
 
-1. **Phase 1 · Demo town with fake sources.** Fake adapter, sample registry, 3D town, scenario switcher, custom mode and detail drawer. Uses the real pipeline end to end, so later phases only add adapters. *Done when: every scenario reads at a glance in a live demo to colleagues.*
-2. **Phase 2 · Telemetry: Grafana/Prometheus and Log Analytics.** Adapters for OTel metrics via the Prometheus API and KQL on AppRequests / AppDependencies. Footpaths from observed calls, per-source name mapping, and the drift report. *Done when: a handful of real systems show real state, with fake ones still filling the rest.*
-3. **Phase 3 · Service Bus: depot, docks and DLQs.** Reads active and dead-letter counts per topic, queue and subscription with the admin client. Publish and consume rates from OTel messaging metrics drive the boats and pier crates. *Done when: a real dead letter fills the right team's pen.*
-4. **Phase 4 · Incidents and third parties.** Grafana IRM adapter drives the weather over the assigned pillar's island. Third-party health from errors and latency on our outbound calls (http.client metrics). *Done when: a real incident changes the sky over the right island.*
-5. **Phase 5 · Make it trustworthy.** Stale-data greying, hysteresis, healthcheck polling, snapshot history and replay (parked). Deployment crews from CI/CD events, performance budget checks. *Done when: the team would rely on it during a real incident.*
-6. **Phase 6 · Host and grow.** Host in Azure with Entra ID sign-in, and per-team filtering if needed. Kafka adapter, Kubernetes runtime adapters, more teams and sources. *Done when: decided when we get there.*
+1. **Demo town and themes.** The whole pipeline on the fake source: two sample towns, scenarios, stories, the daily cycle, the inspector, the legend, three themes, quality levels and resilient loading.
+2. **Real Azure sources.** The inventory and scope rules, Log Analytics (requests, errors, latency, regions, the Logs tab), Azure Monitor platform metrics, Service Bus backlog, dead letters and message flows from metrics, function jobs and the scheduler, link discovery and the Unknown hosts panel, and the `--sources` check.
+3. **Azure Resource Health.** The cloud's health reports as a mark on the building, in the drawer, the Incidents list and the dashboard, with Dismiss.
+4. **Dashboard and wall mode.** The dashboard view, the wall tour and status strip, the Wall button and the wall dashboard.
 
-Phases 2 to 4 can be reordered: if DLQs are the most painful today, Service Bus can come before telemetry, since the depot and docks are already built in Phase 1.
+**Next**
+
+5. **Incidents and third parties.** A `grafana-irm` adapter so real incidents drive the weather over the right island (today only the fake source makes weather, and Resource Health reports go to the Incidents list), and third-party health from our own outbound calls in live towns.
+6. **Hosting.** Sign-in, a hosted deployment, and what that needs from polling and security (`Polling:AlwaysOn`, `Security:AllowedOrigins` are already there).
+
+**Later, or ideas**
+
+- A Prometheus adapter (the kind is accepted but has no adapter).
+- A Kafka adapter, and runtime adapters for other platforms.
+- History and replay of the town.
+- Hysteresis, so a state that hovers at a threshold does not flicker.
+- Deployment crews from CI/CD events.
 
 ## Risks and open questions
 
-The biggest risk is the registry mapping, not the 3D. The same system has different names in OTel, Log Analytics, Service Bus and IRM, and the registry is what ties them together.
+The biggest risk is the mapping, not the 3D. The same system has different names in the inventory, the telemetry, the broker and the incident tool, and the town's scope rules and templates are what tie them together. A rule that is wrong shows a system as quiet or grey rather than as broken, so `validate --sources`, the Config tab and the notices are the way to find it.
 
-- **Visual noise.** Too many walkers and effects hide the signal. Walkers are sampled and capped, and states change with hysteresis so nothing flickers.
-- **False green.** Missing data must render grey, never healthy.
-- **Performance on ordinary laptops.** Instanced meshes for walkers and vans, game-style quality presets with automatic stepping, and a target of smooth Medium on an office laptop.
+- **Visual noise.** Too many cars and effects hide the signal. Cars and boats are sampled and capped at 420 cars, but without hysteresis a value near a threshold can still make a beacon flicker.
+- **False green.** Missing data must render grey, never healthy, and a signal that is not configured must stay absent rather than look measured.
+- **Performance on ordinary laptops.** Instanced cars, merged scenery and quality that steps down by itself on slow frames. Bigger towns than the sample (17 islands, about 110 buildings) are tested only in the stress towns.
 
-Open questions for later phases:
+Open questions:
 
-- [ ] Grafana IRM: which API or webhook gives open incidents, and how do they map to systems (labels, service tags)?
-- [ ] Which Log Analytics workspaces and Grafana/Prometheus instances, and what does the OTel naming look like today?
-- [ ] Service Bus: which namespaces, and is read access by Azure CLI login or managed identity acceptable locally?
-- [ ] Third parties: which vendors matter most, and do we want their status pages as a second signal?
-- [ ] Where should it live after Phase 5 (Azure App Service, Container Apps, internal only)?
-
-* [ ] History and replay (parked): snapshot frequency, store (Cosmos with native TTL via the Aspire emulator, or SQLite), and retention (e.g. 90 days with downsampling after 7 days, about 5 GB rather than 23 GB at full resolution).
+- [ ] Grafana IRM: which API gives open incidents, and how do they map to islands and systems (labels, service tags)?
+- [ ] Third parties: which vendors matter most, and are their status pages worth a second signal?
+- [ ] Hosting: where it should live, how people sign in, and whether it then needs per-team views beyond the island filter.
+- [ ] History and replay: how often to keep a snapshot, where to store it and for how long.

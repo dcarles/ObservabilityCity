@@ -1,10 +1,10 @@
 # Connect your company
 
-How to take a copy of Observability City from the fake town to your own Azure and Grafana, one source at a time. Nothing in this runbook needs a secret in the repository.
+How to take a copy of Observability City from the fake town to your own Azure, one source at a time. Nothing in this runbook needs a secret in the repository.
 
 Every key of every config file, with its default and whether it is required, is in the [config reference](config-reference.md).
 
-What works today: the town runs on fake data, and `validate --sources` tells you whether your Azure login can reach each source you configure. The adapters that turn real data into the town arrive phase by phase (real metrics, then messaging, then incidents); each one is added by the same steps, and a source you have not enabled yet stays out of the town.
+What works today: the sample towns run on fake data, and a live town reads Azure. The Azure module reads the kinds `resourcegraph` (the inventory and instance counts), `loganalytics` (request rate, errors, latency), `azuremonitor` (CPU, memory, capacity used, throttling), `servicebus` (backlog and dead letters), `functionjobs` (scheduled jobs) and `resourcehealth` (the cloud's own health reports, shown as incidents). `prometheus` and `grafana-irm` are only reserved kind names: nothing reads them yet, so a source of either kind shows no data. Grafana IRM incidents come in a later phase (see the [plan](observability-city-plan.md)). Each source is added by the same steps, and a source you have not enabled yet stays out of the town.
 
 ## Keep your company config out of any public repository
 
@@ -34,6 +34,8 @@ A company adds only two things and never edits core:
 - Your town folder (pillars, systems, environments), kept outside the clone or in `config/<company>/` of a private copy.
 - `extensions/`: your own code, when something is specific to your company.
 
+The build picks up only the projects under `extensions/` inside the clone, so your own code does not fit setup 1 as it stands. A company that needs its own adapter either uses setup 2 (a private copy, with the project in its `extensions/`), or builds the module elsewhere and loads it through `Adapters:Path`. That setting moves the whole folder the host loads modules from, so the folder must hold the upstream modules it still needs (such as `azure/`) beside yours. A town that needs only the adapters that ship upstream needs no `extensions/` at all.
+
 Anything generic goes back upstream ([below](#send-a-generic-fix-upstream)). This keeps pulling upstream updates conflict-free.
 
 ## 1. Clone
@@ -53,16 +55,22 @@ az login
 az account set --subscription "<subscription name or id>"
 ```
 
-The tool and the backend use `DefaultAzureCredential`: it finds your `az login` on a laptop and a managed identity when hosted. There is no password or key in the repo or in `config/`.
+The backend signs in with your `az login` (the `azure-cli` login) unless the environment file's `credentials:` says otherwise (see [Logins](#logins)). When hosted, it does not pick up a managed identity by itself: the environment file must define a login called `default` of kind `managed-identity` (or `default`). `validate --sources` is different: it uses the Azure SDK's `DefaultAzureCredential` (your `az login` on a laptop) and ignores the `credentials:` block. There is no password or key in the repo or in `config/`.
 
-Where a value must be kept (for example a Grafana service account token):
+Where a secret must be kept (for example a service principal's secret, or the Grafana token the `--sources` probe reads from `GRAFANA_TOKEN`), it must be a real environment variable of the process:
 
-- **On your machine:** an environment variable, or `dotnet user-secrets` for the host project.
-- **When hosted:** Azure Key Vault, read through the managed identity.
+- **On your machine:** an environment variable set in the shell that starts the app. `dotnet user-secrets` does not work for this: the host project has none, and the code reads the secret from the process environment, not from the app's settings.
+- **When hosted:** surface the secret as an environment variable of the app (for example through your platform's Key Vault reference). The app itself reads only environment variables; nothing in it reads Key Vault.
 
 `.gitignore` already excludes `.env` and `secrets.json`. Never commit a connection string with a key in it; use the namespace or workspace *name* or *id* and let the login do the rest.
 
-Your login needs read access only: Monitoring Reader on the Prometheus / Log Analytics workspace, and a role that can list topics on the Service Bus namespace.
+Your login needs read access only, for each kind you use:
+
+- `resourcegraph`: Reader on the subscriptions (or the management group above them).
+- `loganalytics` and `functionjobs`: Log Analytics Reader on the workspace.
+- `azuremonitor`: Monitoring Reader on the subscriptions of the resources.
+- `servicebus`: Monitoring Reader on the namespaces (it reads their platform metrics). Only the `--sources` probe lists topics, and that needs Manage on the namespace.
+- `resourcehealth`: read of the activity log of each subscription (Monitoring Reader or the like) and of the resources' health status.
 
 ## 3. Create your town
 
@@ -70,7 +78,8 @@ Create the folder outside the clone (the examples below call it `<company-config
 
 ```
 <company-config>/
-  town.yaml                 the town, and the island order and database engines
+  town.yaml                 the town: id, name, mode, topology, groupLabel, islands (their order), ringCapacity,
+                            trafficDensity, databaseEngines, messaging (topic naming) and labels
   defaults.yaml
   hub.yaml                  shared resources (gateway, message broker, egress, shared databases)
   third-parties.yaml
@@ -78,7 +87,20 @@ Create the folder outside the clone (the examples below call it `<company-config
   environments/<env>.yaml   dev, staging, prod...
 ```
 
-Ids are `pillar.system`. Defaults cascade `defaults.yaml` -> pillar -> system. Pillar and system files are shared by every environment, so an environment file only says what differs: its sources, its tenants and the systems that are not deployed there (`exclude`). Ownership comes from your Azure `pillar` tag; a resource with no pillar lands on the Lost & found island.
+The sample is a demo town, so a copy of it must be turned into a live one before it reads anything real:
+
+- **Give it a new `id` and `name` in town.yaml.** A second town with the same `id` as another (the sample's `galactic-credit`) is left out when the server starts.
+- **Remove `mode: demo`** (or write `mode: live`). A demo town runs only the fake source, whatever its environment files say. A town that does not say is live. The mode is read once, when the server starts: restart after changing it.
+- **Delete `fake.yaml`, `fake-assets.yaml` and `stories/`.** They belong to a demo town; in a live one `validate` reports them as an error.
+- **Replace the `kind: fake` sources** in the environment files with real ones (step 4). A live town refuses a `fake` source.
+- **Set `messaging` to your topic naming.** `topicTemplate` and `hubTopicTemplate` (each must contain `{service}`) are how a pillar's and the hub's topics are named, and `legacyFrom: [hub]` marks reading a hub topic as the old route. A pillar's `messaging.topics` and `subscriptions` only line up with the broker when these templates match your real topic names.
+- **`labels`** holds the town's own words, for now `internalVendors` (what the town calls your own services outside the monitored platform).
+
+Ids are `pillar.system`. Defaults cascade `defaults.yaml` -> pillar -> system. Pillar and system files are shared by every environment, so an environment file only says what differs: its sources, its tenants and the systems that are not deployed there (`exclude`). The other way round, a system can list the environments it is deployed in, `environments: [dev, prd]`; the names are checked against the files in `environments/`.
+
+An environment file's name is its id: `environments/prd.yaml` is the environment `prd`. That id is what `{environment}` stands for in templates, what `environments: [...]` lists and the name of its folders under `_discovered/`. It must be lowercase kebab-case.
+
+Ownership comes from your pillar files and the environment's scope rules, not from the cloud: only systems a pillar file (or `hub.yaml`) declares are in the town. The scope ties a pillar to its subscription (`scope.subscription`, by a name pattern or a tag you name, or `scope.pillars`) and a system to its resources (`scope.resources`); see [Scope](#scope-where-each-pillar-and-system-lives). Lost & found is an ordinary pillar file, with the id `lost-found`, whose systems you declare by hand; the town only places it last. Nothing sends unmatched resources there.
 
 Check the files as you go:
 
@@ -93,7 +115,9 @@ $env:Registry__Towns__0 = "C:\Config\acme"      # PowerShell
 export Registry__Towns__0=~/config/acme         # bash
 ```
 
-Folders with a `town.yaml` under the clone's own `config/` also show up with no setting, which is how a private copy (setup 2) works. As a guard, add its name to `.git/info/exclude` (never committed) if you keep a company folder there in a clone that has a public remote:
+`Registry:Towns` adds towns; the sample towns stay. `Registry:Path` is different: it names the one town to run in place of the sample and turns off the automatic pickup of the other `config/*` towns (described next), though `Registry:Towns` folders are still added. `Registry:DefaultTown` (`Registry__DefaultTown`) is the id of the town the page opens on; without it, the first one (the sample, or the `Registry:Path` town).
+
+Without `Registry:Path`, folders with a `town.yaml` under the clone's own `config/` also show up with no setting, which is how a private copy (setup 2) works. As a guard, add its name to `.git/info/exclude` (never committed) if you keep a company folder there in a clone that has a public remote:
 
 ```
 echo config/<company>/ >> .git/info/exclude
@@ -101,27 +125,43 @@ echo config/<company>/ >> .git/info/exclude
 
 ## 4. Add one source at a time
 
-Start with one environment (dev) and one signal (metrics). In `environments/dev.yaml`:
+Start with one environment (dev): the inventory, which finds where each system lives, and one source of health signals. In `environments/dev.yaml`:
 
 ```yaml
 name: Development
 order: 1
 sources:
-  metrics: { kind: prometheus, connection: "https://<your-prometheus-query-endpoint>" }
+  inventory: { kind: resourcegraph, connection: "", pollSeconds: 300, timeoutSeconds: 30 }
+  telemetry: { kind: loganalytics, connection: "<workspace id>", query: "<your query; see loganalytics below>" }
+scope:
+  inventory: inventory
+  resources: []               # your rules; see Scope below
+signals: { requests: telemetry, errors: telemetry, latency: telemetry }
 ```
 
-| Signal | Kinds | `connection` is |
+An `azuremonitor` source (CPU and memory) is an equally good first health source. These are the kinds read today:
+
+| Signals | Kind | `connection` is |
 | --- | --- | --- |
-| `metrics` | `prometheus`, `loganalytics`, `azuremonitor` | The Prometheus query endpoint URL, the Log Analytics workspace id, or (platform metrics) nothing: the resources come from the scope |
-| `messaging` | `servicebus` | The namespace host name, for example `sb-example.servicebus.windows.net` |
-| `incidents` | `grafana-irm` | The Grafana URL (token in the `GRAFANA_TOKEN` environment variable) |
-| any | `fake` | Nothing; keeps fake data for that signal |
+| `instances` (and the scope) | `resourcegraph` | Empty for every subscription the login can read, or subscription ids |
+| `requests`, `errors`, `latency` | `loganalytics` | The Log Analytics workspace id, or empty for the workspace the scope settles |
+| `cpu`, `memory`, `utilisation`, `throttled` | `azuremonitor` | Nothing: the resources come from the scope |
+| `backlog`, `deadLetters` | `servicebus` | Nothing: the namespaces come from the scope. Needs an `entities:` block ([below](#servicebus-backlog-and-dead-letters)) |
+| `jobs` | `functionjobs` | The Log Analytics workspace id |
+| none (incidents) | `resourcehealth` | Nothing: the subscriptions come from the scope |
+
+Every kind that reads Azure also takes `file:name.json`, a recording kept beside the town's files.
+
+Not read yet:
+
+- `prometheus` and `grafana-irm` are accepted names with no adapter: a source of either kind is left out with a notice when the server starts, and its signals have no data. There is no live incident source from Grafana yet; the incidents a live town shows come from `resourcehealth`. The `--sources` probe can still check that a Grafana URL answers (token in the `GRAFANA_TOKEN` environment variable), but nothing reaches the town.
+- `fake` runs only in a demo town (`mode: demo`), where it supplies every signal and every other source is ignored. A live town refuses it; it cannot be mixed in for one signal.
 
 A signal you leave out is absent from the town, not grey. Add the next one only when the last one reports `connected`.
 
 ### Name your sources, then point each signal at one
 
-`metrics`, `messaging` and `incidents` are the names a signal uses unless you say otherwise, but a source can have any lowercase kebab-case name, and each signal can be pointed at a different one. A company that reads request rate from one place and instance counts from another writes:
+`metrics`, `messaging` and `jobs` are the names a signal uses unless you say otherwise, but a source can have any lowercase kebab-case name (except `incidents`, which a live town keeps for incident adapters and does not run as a source), and each signal can be pointed at a different one. A company that reads request rate from one place and instance counts from another writes:
 
 ```yaml
 name: Production
@@ -135,22 +175,22 @@ signals:                      # signal: source name, or none
   instances: inventory
 ```
 
-The signals are `requests`, `errors`, `latency`, `instances`, `cpu`, `memory`, `utilisation`, `throttled`, `backlog` and `deadLetters`. A signal comes from, in order: the system's own `signals:`, its pillar's `signals:`, the environment's `signals:`, then the environment's source called `metrics` (`messaging` for `backlog` and `deadLetters`). `none` switches a signal off for that system or pillar. A signal that ends up with no source is absent, and the town shows nothing for it: no lamp, no row in the inspector, no total in the top bar. That is different from grey, which is a source that is configured but has nothing fresh to say.
+The signals are `requests`, `errors`, `latency`, `instances`, `cpu`, `memory`, `utilisation`, `throttled`, `backlog` and `deadLetters`, and for a function also `jobs`. A signal comes from, in order: the system's own `signals:`, its pillar's `signals:`, the environment's `signals:`, then the environment's source called `metrics` (`messaging` for `backlog` and `deadLetters`, `jobs` for `jobs`). `none` switches a signal off for that system or pillar. A signal that ends up with no source is absent, and the town shows nothing for it: no lamp, no row in the inspector, no total in the top bar. That is different from grey, which is a source that is configured but has nothing fresh to say.
 
 ```yaml
 # pillars/<pillar>.yaml or a system in it
 signals: { cpu: platform }    # every system of the pillar takes cpu from the source called platform
 ```
 
-Every source takes `pollSeconds` (default 30) and `timeoutSeconds` (default 10). Which kinds the build can already read is in the table of the phase you are on; a kind whose adapter is not loaded is an error in `validate` and, when the server starts, a notice; its signals then show no data (grey).
+Every source takes `pollSeconds` (default 30) and `timeoutSeconds` (default 10); a job source also takes `lateAfterSeconds` (see Jobs below). A kind that no loaded module knows is an error in `validate`. `prometheus` and `grafana-irm` are known kinds with no adapter: they pass `validate`, get a notice when the server starts, and read nothing, so their signals show no data (grey).
 
 ### Adapters are plug-ins
 
-The program knows no platform by name. Each platform's source kinds and logins come in an adapter module: a folder under `adapters/` beside the program, which the host loads when it starts (`Adapters:Path` moves the folder). The build puts every adapter project in `backend/src/` and every project in `extensions/` there. Azure is the `azure` module; a company on another cloud, or that reads metrics from somewhere else, adds a module for it and leaves Azure out (`dotnet build -p:ExcludeAdapters=true` builds without any). Sources do not have to share a platform: an environment can read metrics from Prometheus while its resources are read from Azure.
+The program knows no platform by name. Each platform's source kinds and logins come in an adapter module: a folder under `adapters/` beside the program, which the host loads when it starts (`Adapters:Path` moves the folder). The build puts every adapter project in `backend/src/` and every project in `extensions/` there. Azure is the `azure` module; a company on another cloud, or that reads metrics from somewhere else, adds a module for it and leaves Azure out (`dotnet build -p:ExcludeAdapters=true` builds without any). Sources do not have to share a platform: an environment can read metrics through another module while its resources are read from Azure. A module of your own lives in `extensions/` (see [The shape of a company setup](#the-shape-of-a-company-setup)).
 
 ### Logins
 
-Azure sources (`resourcegraph`, `loganalytics`, `azuremonitor`, `servicebus`) sign in with whoever ran `az login`, unless you say otherwise. Define logins in the environment file and name one on a source:
+Azure sources (`resourcegraph`, `loganalytics`, `azuremonitor`, `servicebus`, `functionjobs`, `resourcehealth`) sign in with whoever ran `az login`, unless you say otherwise. Define logins in the environment file and name one on a source:
 
 ```yaml
 credentials:
@@ -188,7 +228,7 @@ scope:
     - { name: accounts, types: [microsoft.documentdb/databaseaccounts], roles: [db], pattern: '^(?<tenant>[0-9a-f]{32})-(?<service>[a-z]+)$', tenantNameTag: customer }
 ```
 
-To let the inventory supply the floors of the buildings, count the instances in a rule (`instances: "toint(sku.capacity)"` on the rule that matches the plans) and point the signal at the inventory source (`signals: { instances: inventory }` in the environment file, or in a pillar or system). The other signals can come from other sources: each signal is read from its own source. A building turns grey when any source it reads is stale; a source asked every five minutes stays fresh for ten.
+To let the inventory supply the floors of the buildings, count the instances in a rule (`instances: "toint(sku.capacity)"` on the rule that matches the plans) and point the signal at the inventory source (`signals: { instances: inventory }` in the environment file, or in a pillar or system). The other signals can come from other sources: each signal is read from its own source. A late source takes out only its own signals, which are then listed as absent, while another source of a health signal for that building is fresh; the building greys only when no source of a health signal is fresh. A source that supplies only `instances`, `backlog` or `deadLetters` cannot keep a building lit on its own. A source asked every five minutes stays fresh for ten.
 
 - **Pillar to subscription.** `subscription` finds it by name (a wildcard, any case) or by a tag on the subscription; `{pillar}` is the pillar's `scope: { code: ... }` (else its id) and `{pillarId}` its id. `pillars:` names a subscription outright and wins. A pillar that no subscription, or more than one, matches is reported and not guessed.
 - **Service to resources.** A `pattern` is a regular expression over a resource's name (any case) with named groups: `service` (required) is compared with the system's `serviceCode:` (else its `service:`); `role`, `pillar`, `region` and `tenant` are optional and narrow the match. `roles:` limits a rule to systems of those roles. `serviceTag:` finds a resource whose name does not match by a tag, and `tenantNameTag:` reads a tenant's friendly name from a tag, so the town can show it.
@@ -289,18 +329,54 @@ A signal has the `metric` (as the cloud spells it), the `aggregation` that adds 
 - **A quiet account.** Some metrics (for a Cosmos account, the normalised consumption) are sent only when something happened, so a quiet account gives no number for hours, and with it the whole store would be unknown. Set `whenEmpty: idle` on that signal to read a successful but empty answer as 0. The tenant's row then says "no activity reported", because the 0 is an assumption and not a measurement. A read that fails (an error, a timeout, no permission) is never read as idle: the system is simply not reported.
 - **A filter that matches nothing.** No request answered with 429 gives no points at all. When the whole it is a share of has points, the share is 0: no throttling, not an unknown.
 - **Tenants.** A data account whose rule has a `tenant` group is read on its own, so the town can show whose is hot: the tenant list may spell an id with or without dashes. A tenant the environment does not list is shown as a customer under the name the `tenantNameTag` gives it; with no such tag it stays unknown (a purple ?) under its id. Only a tenant that should count as a test tenant needs an entry in the environment's `tenants:` list, with `kind: test`. A system's `tenantPattern` (for example `{tenant}-svc`) is what makes a data store stand as a yard with one unit for each tenant. In the inspector the tenants in trouble come first, each with its own share turned away. An entry that sets `limit` (the provisioned size as a plain number, read like any other signal) has each tenant row and the Overview's "Provisioned" row show it, as one size or the range; a database with no number (a serverless account, say) simply shows none.
-- **A read that fails** fails the poll, naming how many reads failed and what the cloud answered. Only the systems that use the failed resource go without numbers (a system is never shown from only some of its resources); the others are reported as soon as their own reads finish, so the town fills in while a big first read is still running. A building whose data goes stale greys.
-- **Restarts.** After every poll each source's newest readings are saved under `_discovered/readings/<environment>/` in the town's folder. When the server starts they are read back with the time they were taken, so a restart within a source's freshness window (twice its poll interval) carries on from the last picture; older readings come back stale and grey, as they would have. Keep the folder out of version control.
+- **A read that fails** fails the poll, naming how many reads failed and what the cloud answered. Only the systems that use the failed resource go without numbers (a system is never shown from only some of its resources); the others are reported as soon as their own reads finish, so the town fills in while a big first read is still running. The signals of a stale source drop out; the building greys only when none of its health sources is fresh.
+- **Restarts.** After every poll each source's newest readings are saved under `_discovered/readings/<environment>/` in the town's folder. When the server starts they are read back with the time they were taken, so a restart within a source's freshness window (twice its poll interval) carries on from the last picture; older readings come back stale, as they would have. Keep the folder out of version control.
 
 To try entries offline, keep recorded series in the town folder, `{ "<resource name>": [ { "metric": "...", "aggregation": "average", "filter": null, "points": [40, 44, 42] } ] }`, and point the source at it with `file:`. `scope-town-a` and `scope-town-b` do this with two differently shaped sets of entries (percentages and request units over provisioned throughput; cores and bytes over limits and a normalised consumption metric) and show the same town.
+
+#### `servicebus` (backlog and dead letters)
+
+| | |
+| --- | --- |
+| Permission | Monitoring Reader on the namespaces |
+| `connection` | Nothing: the namespaces are the resources a `scope.resources` rule finds. `file:name.json` replays recorded series kept beside the town's files |
+| `entities` | Required: without it the source refuses to start. Which rule finds the namespaces and which metrics are the backlog and the dead letters (below) |
+| `pollSeconds`, `timeoutSeconds` | 60 suits it, with a `window` of a few minutes (the example in the config reference uses `15m`) |
+| Fills | `backlog` and `deadLetters` of the systems that consume each entity (point `signals: { backlog: ..., deadLetters: ... }` at it, or call the source `messaging`) |
+
+The source reads the Azure Monitor platform metrics of each namespace, split by entity (queue or topic) name. The program knows no metric name and no naming convention; the `entities:` block says them:
+
+```yaml
+sources:
+  messaging:
+    kind: servicebus
+    pollSeconds: 60
+    window: 15m
+    entities:
+      resources: broker                       # a scope.resources rule that finds the namespaces
+      backlog: { metric: <active messages metric>, aggregation: average }
+      deadLetter: { metric: <dead-lettered messages metric>, aggregation: last }
+      patterns:                               # the first that matches decides
+        - { match: '^<prefix>-(?<pillar>[a-z]+)-(?<service>[a-z]+)$' }
+      deadLetterLink: { name: Support tool, url: "https://support.example.test/queues/{queue}?env={environment}" }
+signals: { backlog: messaging, deadLetters: messaging }
+```
+
+- **Entity to consumer.** Each pattern is a regular expression over the entity's name: `service` (required) is the service code of the system that reads it, `pillar` (optional) the code or id of its pillar, and `consumer` the role of the reader (`worker` by default). An entity no pattern claims, or no system consumes, is left out. A name that also says its publisher (`producerPillar` and `producer`) adds that topic and subscription to the town on every poll, with no `messaging:` block needed in the pillar file.
+- **Regions.** A system's backlog is what waits in all its entities, in every namespace the rule finds (one for each region), added up. A namespace that cannot be read fails the poll, so a number made from only some of them never shows.
+- **Optional keys.** `dimension` (the metric dimension that holds the entity's name, `EntityName` by default), `interval` (the time grain), `throughput` (incoming messages: sets how many boats sail to the consumer), `flows` (entities that carry a whole pillar's traffic, for the Message flow numbers) and, on the source, `typesQuery` (a Log Analytics query that lists the kinds of message each queue handled).
+- **Dead-letter links.** `deadLetterLink` (`{ name, url }`) puts a link to your support tool on each queue in its consumer's drawer. The url is a template over `{queue}`, `{pillar}`, `{service}`, `{system}` and `{environment}`. For a broker with namespaces in several regions and a tool for each, `deadLetterLinks` is a list of `{ region, name, url }`; a region with no entry uses `deadLetterLink`. Without either, no link.
+- **The check.** The `--sources` probe for `servicebus` does not test what this adapter reads: it lists topics on the namespace host named in `connection` (which needs Manage). A source set up as above has no connection, so it reports *not configured*, which is not a failure, and says nothing about whether the metrics read works. Watch the town and the server log instead.
+
+Every key, with its default, is under `entities` in the [config reference](config-reference.md).
 
 ### Links: find the calls your systems make
 
 Declared `calls` and `gatewayCalls` are always drawn. An environment can also find the rest from its dependency data: add a `links:` block to its file (see `links` in [config-reference.md](config-reference.md)). It names a `loganalytics` source of the file and a query template that returns one row for each caller and address, with the days it was seen on (`make_set(startofday(TimeGenerated))` in KQL), so Azure does the counting and no raw data comes back. Your own rules turn an address into a system: a regular expression over the host (and over the path, for a gateway that names the destination in it) with named groups, and a `target` template such as `{pillar}.{service}`. Nothing about names is built in.
 
-- It runs in the background and never holds up the town. The first read looks back `firstRead` (7 days); after that each start reads only the gap since the last read, then once every `interval` (1 hour). When the rules, the ignore list, the aliases, the third parties' domains and matches or the town's systems change (including a rule or vendor added from the Unknown hosts panel), the next read looks back the whole `firstRead` window again for every name, so a new rule shows its links at once instead of only for new calls. Edits made by hand to the files are picked up at the next scheduled read; the panel asks for the read straight away.
+- It runs in the background and never holds up the town, while someone views the environment (see [step 6](#6-watch-the-town)). The first read looks back `firstRead` (7 days); after that each start reads only the gap since the last read, then once every `interval` (1 hour). When the rules, the ignore list, the aliases, the third parties' domains and matches or the town's systems change (including a rule or vendor added from the Unknown hosts panel), the next read looks back the whole `firstRead` window again for every name, so a new rule shows its links at once instead of only for new calls. Edits made by hand to the files are picked up at the next scheduled read; the panel asks for the read straight away.
 - A link needs both ends to be systems of the town and `minDays` (2) different days in the data. A link not seen for `keepFor` (30 days) drops off.
-- Found links are saved under `_discovered/links/<environment>/` in the town's folder, one file for each pillar, with the days seen. Your pillar files are never edited. Keep the folder out of version control (your private repository's `.gitignore` should list it).
+- Found links are saved under `_discovered/links/<environment>/` in the town's folder, one file for each pillar, with the days seen. Your pillar files are never edited. Keep the folder out of version control: the upstream `.gitignore` covers only `config/**/_discovered/`, so a town kept outside the clone needs `_discovered/` in its own private repository's `.gitignore`.
 - `discoverLinks: false` (in `defaults.yaml`, a pillar's `defaults` or a system) switches discovery off for the systems it covers. Only an API or a worker makes calls worth finding.
 - An address no rule explains, no `ignoreHosts` pattern covers and no third party `domains` entry names appears under Notices, so a missing rule shows up as something to add. A wrong link is fixed by tightening a rule or adding an ignore pattern, not link by link.
 - A call a rule explains but whose pillar is not in the town yet (a gateway path that starts with a pillar you have not added) is not a problem. It is listed as a note, one line for each pillar, apart from the problems and not counted among them, and it links up when that pillar joins the town. Remembered addresses are checked again on every read, so a rule or ignore pattern you add clears the notice at once, without waiting for it to age out. To make the same address one line instead of one for each id, replace the ids in the path in the query itself.
@@ -330,7 +406,7 @@ Cars drive from the town to such a service at the rate the calls were measured (
       - { id: portal, name: Portal, match: [{ host: shared.example.test, path: '^/portal' }], roles: ["Portal.Instance.One", "Portal.Instance.Two"] }
 ```
 
-Link discovery and the traffic read then ask about those names as well as the town systems', and resolve the calls with the same `links.rules`. What follows needs no extra setting: the service is drawn calling the town system, its calls are counted as a known caller (so they leave the airport's outside traffic), the Dependencies layer gets an arc from its island, and cars drive from the island round the ring road, through the airport (which has a back gate and a side road for this), over its bridge to the hub and through the gateway to the system. The names are exact; list every instance. A hub-and-spoke town only: a direct town has no hub, so the cars drive round the ring road to the island. Hosts that calls go to and no rule explains are listed in the **Unknown hosts** panel (a button next to Notices), grouped by host with the calls, the systems that made them and the days seen, and each plain host has three buttons: **Add vendor** (a third party), **Add internal** (one of the company's own services, saved with `internal: true`) and **Ignore**. A click makes the server save the host in `_discovered/third-parties.yaml` (the app writes it, your config folder is never touched), load the town again and take the host off the list, with no restart. That file has the same shape as `third-parties.yaml`: a `vendors:` list with the same keys (a new vendor starts with its host as its name; edit the file to give it a proper name, an SLA, services and so on) and an `ignoreHosts:` list like the environment file's. A save keeps every key of every vendor, but not comments, and a change you make to the file by hand is loaded within a few seconds, with no restart. The town reads it next to `third-parties.yaml`; when both have the same id the config file wins, and the ignored hosts are added to the `links.ignoreHosts` of every environment. A host that a `links.rules` entry reads the path of (a shared gateway) is listed by the paths no rule explains; for each one pick the system it belongs to and press **Add rule**: the rule (the gateway host, the first two parts of the path, the system, `gateway: true`) is saved under `rules:` in the same file and tried after the environment's own rules, so the first two parts of the path explain every call under that service (widen or narrow the pattern in the file if your paths are not like that). What was added is listed under the hosts as **Added from this panel**, each with a **Remove** button (the button stays while that list has anything in it). A vendor needs a system of the town that was seen calling the host, and it is called by those systems; a host only vendor buildings called can only be ignored. Calls made only by vendor buildings are left out of the Notices and hidden in the panel until you tick *Include calls made by the town's internal services and vendors*. Nothing is added without a click.
+Link discovery and the traffic read then ask about those names as well as the town systems', and resolve the calls with the same `links.rules`. What follows needs no extra setting: the service is drawn calling the town system, its calls are counted as a known caller (so they leave the airport's outside traffic), the Dependencies layer gets an arc from its island, and cars drive from the island round the ring road, through the airport (which has a back gate and a side road for this), over its bridge to the hub and through the gateway to the system. The names are exact; list every instance. A hub-and-spoke town only: a direct town has no hub, so the cars drive round the ring road to the island. Hosts that calls go to and no rule explains are listed in the **Unknown hosts** panel (a button next to Notices), grouped by host with the calls, the systems that made them and the days seen, and each plain host has three buttons: **Add vendor** (a third party), **Add internal** (one of the company's own services, saved with `internal: true`) and **Ignore**. A click makes the server save the host in `_discovered/third-parties.yaml` (the app writes only under `_discovered/` in your town folder, never your own files; list `_discovered/` in your private repository's `.gitignore`), load the town again and take the host off the list, with no restart. That file has the same shape as `third-parties.yaml`: a `vendors:` list with the same keys (a new vendor starts with its host as its name; edit the file to give it a proper name, an SLA, services and so on) and an `ignoreHosts:` list like the environment file's. A save keeps every key of every vendor, but not comments, and a change you make to the file by hand is loaded within a few seconds, with no restart. The town reads it next to `third-parties.yaml`; when both have the same id the config file wins, and the ignored hosts are added to the `links.ignoreHosts` of every environment. A host that a `links.rules` entry reads the path of (a shared gateway) is listed by the paths no rule explains; for each one pick the system it belongs to and press **Add rule**: the rule (the gateway host, the first two parts of the path, the system, `gateway: true`) is saved under `rules:` in the same file and tried after the environment's own rules, so the first two parts of the path explain every call under that service (widen or narrow the pattern in the file if your paths are not like that). What was added is listed under the hosts as **Added from this panel**, each with a **Remove** button (the button stays while that list has anything in it). A vendor needs a system of the town that was seen calling the host, and it is called by those systems; a host only vendor buildings called can only be ignored. Calls made only by vendor buildings are left out of the Notices and hidden in the panel until you tick *Include calls made by the town's internal services and vendors*. Nothing is added without a click.
 
 #### Where an API's traffic comes from
 
@@ -363,7 +439,7 @@ Repeats come back as one row with a `count`, and the tab shows them newest first
 A system with role `function` (`cron` still works as an alias) stands as a function building. Three things in the environment file make it say more:
 
 - **App state.** Give the resource rule a `state` expression (a query expression that reads the app's state as text) and `running` (the values that mean it runs). A running app is lit; a stopped one stands under construction; a system the inventory has no such app for is grey, "not found in the inventory". The core knows no state words.
-- **Jobs.** A `functionjobs` source runs a query that summarises the function apps' logs into one row per app and job, with the columns `resourceId`, `job`, `lastRun`, `succeeded` and `next` (and `region` where it matters). Point `signals: { jobs: <source> }` at it. Each job shows as succeeded, failed or overdue (now later than `next` plus the source's freshness), and the building's beacon follows: amber when a job failed or is late (the app runs and the other jobs may be fine), red only when every job failed. How your logs word a run is yours to say in the query:
+- **Jobs.** A `functionjobs` source runs a query that summarises the function apps' logs into one row per app and job, with the columns `resourceId`, `job`, `lastRun`, `succeeded` and `next` (and `region` where it matters). Point `signals: { jobs: <source> }` at it. Each job shows as succeeded, failed or overdue (now later than `next` plus the source's `lateAfterSeconds`, which defaults to, and is never less than, the source's freshness of twice its poll interval), and the building's beacon follows: amber when a job failed or is late (the app runs and the other jobs may be fine), red only when every job failed. How your logs word a run is yours to say in the query:
 
 ```yaml
 sources:
@@ -377,6 +453,8 @@ sources:
       | summarize lastRun = max(TimeGenerated), succeeded = <your success test> by resourceId = <column>, job = <column>
       | extend next = <when the job should run next>
 ```
+
+  Which services each job starts work for is said in the pillar file, under `scheduler:`: an entry names a function system of that pillar and, for each job (as the logs name it), the services of the same pillar it feeds, for example `scheduler: [{ system: statement-cron, jobs: { nightly-run: [statements] } }]`. `validate` checks that the system is a function of the pillar and that the services are the pillar's. A job not listed sends no boats.
 
 - **Regions.** A service that runs in two or more regions shows its worst region (by processor and memory) on the building; the drawer can switch between the worst region and each region in turn. The `scope.regions` block names where a region is read from (`tag`), how it is labelled (`names`), and how lopsided a split of requests may be before it is flagged (`skew`).
   - **Where each region's share comes from.** Give the `loganalytics` source a `regionQuery` that returns one row per app role and region with the number of `calls`. Counts are enough, even sampled ones, since only their proportions are used. The sign and the drawer show the split ("North 90% · West 10%"), and a region over `skew` (0.9 by default; 1 never flags) gets a warning while another region still runs instances. Without a `regionQuery` there is no split and nothing is shown for it.
@@ -423,7 +501,7 @@ A demo town needs no cloud for any of this: `fake.yaml` takes `regions: { <name>
 
 ### What each adapter's runbook section contains
 
-Each real adapter lands with its own section here, with the same four parts: the permission the login needs, the `connection` value, the `pollSeconds` and `timeoutSeconds` that suit it, and what `--sources` reports for it. Until an adapter has its section, its kind is known to the module but nothing reads it yet.
+An adapter's section says the permission the login needs, the `connection` value, the `pollSeconds` and `timeoutSeconds` that suit it, and what it fills. `resourcegraph`, `loganalytics`, `azuremonitor` and `servicebus` have that table above; `functionjobs` and `resourcehealth` are described in prose, with their permissions in [step 2](#2-sign-in-to-azure). What `--sources` reports for each kind is in [step 5](#5-run-the-check). `prometheus` and `grafana-irm` have no section because nothing reads them yet: the core knows the names, and no module has an adapter for them.
 
 ## 5. Run the check
 
@@ -439,9 +517,9 @@ For each environment and signal it makes one cheap read with your Azure login an
 | no permission | Refused (401/403), or no login or token | `az login`, check the role, set `GRAFANA_TOKEN` |
 | query returned nothing | It answered but had no data | Wrong workspace or endpoint, or nothing is reporting yet. Not a failure unless you pass `--strict` |
 | unreachable | No answer, an error, or a timeout | Check the address, VPN, firewall |
-| not configured | The environment has no source for this signal | Fine; the town leaves the signal out |
+| not configured | The environment has no source for this signal, or (for `servicebus`) the source has no `connection` | Fine; the town leaves an unset signal out |
 | unknown kind | The kind is spelt wrong or has no probe | The message lists the kinds it knows |
-| no probe yet | A loaded adapter knows the kind but its probe arrives with the adapter | Nothing; not a failure |
+| no probe yet | A loaded module knows the kind but the check has no probe for it (`resourcegraph`, `azuremonitor`, `functionjobs`, `resourcehealth`) | Nothing; not a failure. Check it in the town |
 
 The exit code is 1 when anything is *no permission*, *unreachable* or *unknown kind* (and, with `--strict`, *empty*), so you can run it in a pipeline.
 
@@ -449,7 +527,7 @@ A `loganalytics` source with no `connection` is probed with the workspace its en
 
 The Azure login keeps each token until shortly before it expires, and asks for one at a time per scope, so a login that starts a process for every request (`az login`) is not started once per read.
 
-The normal registry check (`-- <company-config>`) validates the files, including source names, kinds, logins and signal choices, and warns about a signal pointed at a source the environment does not define. `--sources` reads the environment files directly and reports every source you defined, so you can verify connectivity before the adapter lands.
+The normal registry check (`-- <company-config>`) validates the files, including source names, kinds, logins and signal choices, and warns about a signal pointed at a source the environment does not define. `--sources` reads the environment files directly and reports every source you defined. Only `fake`, `prometheus`, `loganalytics`, `servicebus` and `grafana-irm` have a probe; `resourcegraph`, `azuremonitor`, `functionjobs` and `resourcehealth` report *no probe yet*. A `servicebus` source set up the way the adapter wants it (no `connection`) reports *not configured*. So a clean `--sources` does not prove that the inventory, `azuremonitor` or `servicebus` reads work: check those in the town and the server log.
 
 ## 6. Watch the town
 
@@ -458,6 +536,19 @@ dotnet run --project backend/src/ObservabilityCity.AppHost
 ```
 
 Open http://localhost:5173, pick your town in the top bar, then the environment. Check a few buildings against the tool you trust today. Use **Break things** on the fake sample town to learn what each light, floor and beacon means before you read your own.
+
+An environment polls its sources only while a browser views it, and for 2 minutes after the last one leaves; link discovery and the traffic read pause with it. So a town opened cold starts from the readings saved at the last poll (stale if they are older than the source's freshness) and fills in over the first poll. `Polling:AlwaysOn=true` (`Polling__AlwaysOn`) keeps every environment polling whether or not anyone looks.
+
+### Hosting
+
+Hosting with sign-in is a later phase (see the [plan](observability-city-plan.md)). Until then, if you run it anywhere but your own machine:
+
+- **No authentication.** No endpoint asks who you are, including the ones that write (the Unknown hosts panel saves into the town folder). Put the app behind your own sign-in and network rules.
+- **Host names.** `AllowedHosts` in the host's `appsettings.json` allows only `localhost`, `127.0.0.1` and `[::1]`; set `AllowedHosts` to the name the app is served on.
+- **Browser origins.** A request from a browser page whose origin is not this machine is refused unless that origin is listed in `Security:AllowedOrigins` (`Security__AllowedOrigins__0`).
+- **A writable `_discovered/`.** The process must be able to write `<town>/_discovered/` (saved readings, found links, `third-parties.yaml`).
+- **The login.** Define a `default` credential of kind `managed-identity` in each environment file, or the server tries the Azure CLI login (see [step 2](#2-sign-in-to-azure)).
+- **Polling.** Set `Polling:AlwaysOn=true` if the town should be warm when someone opens it.
 
 ## 7. Then the next environment, the next signal
 

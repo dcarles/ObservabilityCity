@@ -53,7 +53,7 @@ public static partial class RegistryLoader
     /// <summary>
     /// Resilient load, for a running app. A pillar file that cannot be read, or has problems of its own, is skipped and its island
     /// is returned empty with a ConfigError, so the rest of the town still renders. Call links that point nowhere are dropped.
-    /// Everything worked around is listed in Registry.Notices. The files every pillar depends on (town, defaults, hub, layout)
+    /// Everything worked around is listed in Registry.Notices. The files every pillar depends on (town, defaults, hub, third parties)
     /// still have to be sound: when they are not this throws, and the caller keeps the registry it already has.
     /// </summary>
     public static Registry LoadResilient(string folder) => Build(folder, resilient: true);

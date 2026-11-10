@@ -9,6 +9,6 @@ Read [AGENTS.md](../AGENTS.md) first: it has the architecture, the commands and 
 - **No secrets or company identifiers in the repo.** Use `az login`, user secrets or Key Vault. Docs and tests use generic example names.
 - **Tests use fakes and recorded fixtures, never live Azure, Grafana or Prometheus.** Probes and adapters sit behind interfaces (`ISourceProbe`, `ITokenProvider`, `IMetricSource`).
 - **A signal that is not configured is absent, not grey.** Missing or stale data is never shown as healthy.
-- **Config:** one YAML per pillar, ids are `pillar.system`, defaults cascade `defaults.yaml` -> pillar -> system, environments only say what differs. Check with `dotnet run --project backend/tools/ObservabilityCity.Validate -- --all` and, for connectivity, `-- --sources config/<company>`.
+- **Config:** one YAML per pillar, ids are `pillar.system`, defaults cascade `defaults.yaml` -> pillar -> system (built-in values when none sets one), environments only say what differs. Check with `dotnet run --project backend/tools/ObservabilityCity.Validate -- --all` and, for connectivity, `-- --sources config/<company>`.
 - **Style:** match the surrounding code; comments explain why; small pure functions that tests can call.
 - After changing a C# snapshot record, run `cd frontend && npm run gen:contracts`.

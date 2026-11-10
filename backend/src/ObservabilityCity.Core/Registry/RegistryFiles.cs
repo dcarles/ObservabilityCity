@@ -271,7 +271,7 @@ internal sealed class LogsFile
 {
     /// <summary>The name of a loganalytics source of this file. Its connection and login are used.</summary>
     public string Source { get; set; } = "";
-    /// <summary>The query to send, a template ({roles}, {from}, {to}, {window}, {windowSeconds}, {slaMs}, {kind}, scope variables, {environment}). One row for each kind of entry: section, at, text; count, level, operationId, durationMs and result optional.</summary>
+    /// <summary>The query to send, a template ({roles}, {from}, {to}, {window}, {windowSeconds}, {slaMs}, {kind}, scope variables, {environment}). One row for each kind of entry: section, at, text; count, level, durationMs and result optional.</summary>
     public string Query { get; set; } = "";
     /// <summary>How far back it looks. Default 4h.</summary>
     public string? Window { get; set; }
