@@ -436,3 +436,6 @@ body.feed-silent #town, body.feed-silent #dash-sum, body.feed-silent #dash-pilla
 #inspector .engine { display: inline-flex; align-items: baseline; gap: 6px; margin-top: 6px; padding: 3px 9px; border: 1px solid var(--line); border-radius: 999px; background: rgba(255, 255, 255, 0.08); }
 #inspector .engine b { font-size: 14px; }
 #inspector .engine span { font-size: 12px; opacity: 0.75; text-transform: uppercase; letter-spacing: 0.05em; }
+#state-list .pier-lines { padding: 2px 12px 8px; font-size: 13px; line-height: 1.5; }
+#state-list .subhead { display: flex; padding: 8px 12px 4px; border-top: 1px solid var(--line); margin-top: 2px; padding-top: 8px; font-size: 12px; opacity: 0.85; }
+#tooltip .pierline { font-size: 12px; opacity: 0.85; }

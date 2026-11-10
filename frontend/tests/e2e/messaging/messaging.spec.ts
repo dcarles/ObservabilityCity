@@ -94,6 +94,20 @@ test.describe(`the broker's backlog and dead letters (${B ? 'ids, a total' : 'co
     await expect(page.locator('#state-list')).toBeHidden()
   })
 
+  test('the pier panel and the tooltip over a pier say what the pier carries', async ({ page }) => {
+    await open(page)
+    await page.evaluate(() => (window as any).city.framePier('aa'))
+    await page.waitForTimeout(600)
+    const at = await page.evaluate(() => (window as any).city.screenOfPier('aa'))
+    await page.mouse.move(at.x, at.y)
+    await page.evaluate(() => (window as any).city.hover())
+    await expect(page.locator('#tooltip .pierline').first()).toContainText('msg/s taken in')
+    await page.mouse.click(at.x, at.y)
+    await expect(page.locator('#state-list .pier-lines')).toContainText('msg/s taken in by its queues')
+    await expect(page.locator('#state-list .pier-lines')).toContainText('topic')
+    await expect(page.locator('#state-list .hit')).toHaveCount(1) // the dead letters are still listed
+  })
+
   test('a click on an island\'s pier opens that island\'s queues with dead letters', async ({ page }) => {
     await open(page)
     await page.evaluate(() => (window as any).city.framePier('aa'))
@@ -165,7 +179,7 @@ test.describe(`the broker's backlog and dead letters (${B ? 'ids, a total' : 'co
     const list = page.locator('#state-list')
     await feedRegions(page)
     await expect(list.locator('.hit')).toHaveCount(2)
-    await expect(list.locator('.head')).toContainText('1 queue with dead letters')
+    await expect(list.locator('.subhead')).toContainText('1 queue with dead letters')
     await expect(list.locator('.hit').nth(0)).toContainText('West · 8 dead')
     await expect(list.locator('.hit').nth(1)).toContainText('North · 3 dead')
   })

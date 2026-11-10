@@ -8,6 +8,10 @@ import { GROUND } from './island'
 const CRATE_COLORS = ['#e0573f', '#3f8fd9', '#f2b632', '#4fb37a', '#8e6bd9']
 
 /** What an island's message consumers add up to. Every field is null when no consumer reports it. */
+/** The board is fully drawn up to this far from the camera and fades out by the second distance (world units): far enough to read it from where a whole island is in view. */
+const BOARD_NEAR = 130
+const BOARD_FAR = 210
+
 /** The height of the pier board's canvas: room for its rows and the three rows of what the pillar sends and receives. */
 const SIGN_H = 190 + 3 * 38
 
@@ -57,6 +61,17 @@ export function messagingOf(nodes: NodeSnapshot[], messaging?: MessagingSnapshot
     subscriptions: messaging?.subscriptions.length ?? 0,
     legacy: messaging?.subscriptions.some((x) => x.legacy) ?? false,
   }
+}
+
+/** What the pier says in words, for the panel a click opens and the tooltip over the pier: the messages its queues take in, what the pillar sends and receives, and the backlog. */
+export function pierLines(m: Messaging): string[] {
+  const lines = [`${formatRate(m.perSecond)} msg/s taken in by its queues`]
+  const p = m.pillar
+  const side = (label: string, v: number | null | undefined): void => { if (v != null) lines.push(v > 0 ? `${label} ${formatRate(v)} msg/s` : `${label}: none`) }
+  if (p) { side('Sends outside', p.sent); side('Sends inside', p.internal); side('Receives', p.received) }
+  if (m.waiting != null) lines.push(`Waiting ${formatRate(m.waiting)}${m.oldestSeconds != null ? ` · oldest ${formatAge(m.oldestSeconds)}` : ''}`)
+  lines.push(`${m.topics} topic${m.topics === 1 ? '' : 's'} · reads ${m.subscriptions}`)
+  return lines
 }
 
 export const halo = (() => {
@@ -205,7 +220,7 @@ export class HarbourStatus {
     this.draw(m)
     const trouble = alarm || (m.oldestSeconds ?? 0) >= m.amber
     const d = camera.position.distanceTo(this.label.getWorldPosition(new THREE.Vector3()))
-    const opacity = trouble ? 1 : 1 - clamp((d - 70) / 40, 0, 1)
+    const opacity = trouble ? 1 : 1 - clamp((d - BOARD_NEAR) / (BOARD_FAR - BOARD_NEAR), 0, 1)
     ;(this.label.material as THREE.SpriteMaterial).opacity = opacity
     this.label.visible = opacity > 0.02
   }
