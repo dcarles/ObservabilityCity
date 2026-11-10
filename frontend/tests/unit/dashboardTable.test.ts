@@ -115,7 +115,9 @@ describe('databases', () => {
     const r = row(s, 'aa.orders-db')
     expect(r.ruMax).toEqual({ limit: 4000, tenant: b.name })
     const html = table(s, 'aa')
-    expect(html).toContain('max 4,000 RU/s')
+    expect(html).toContain('max 4,000<')
+    expect(html).toContain('title="Capacity used">Cap<') // capacity in no engine's own unit
+    expect(html).not.toMatch(/\bRU\b/)
   })
 
   it('shows no max when the worst tenant has no limit, and each tenant line its own max', () => {
@@ -126,7 +128,7 @@ describe('databases', () => {
     const other = db.tenants![1]
     other.limit = 7777
     expect(row(s, 'aa.orders-db').tenants!.find((t) => t.id === other.id)!.limit).toBe(7777)
-    expect(table(s, 'aa')).toContain('max 7,777 RU/s') // on that tenant's own line
+    expect(table(s, 'aa')).toContain('max 7,777<') // on that tenant's own line
   })
 })
 

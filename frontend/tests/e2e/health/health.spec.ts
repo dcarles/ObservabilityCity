@@ -33,7 +33,7 @@ test.describe(`the cloud's own health reports (${B ? 'tags, azure-health' : 'nam
   test('a building with an open report shows the red exclamation mark, and a resolved report marks nothing', async ({ page }) => {
     await open(page)
 
-    const status = (id: string) => page.evaluate((i) => (window as any).city.inspect(i)?.azure ?? null, id)
+    const status = (id: string) => page.evaluate((i) => (window as any).city.inspect(i)?.cloudHealth ?? null, id)
 
     expect(await status('bb.ledger-db')).toBe('Unavailable')
     expect(await status('aa.orders-db')).toBe('Degraded') // its open report, not the resolved one
@@ -57,8 +57,8 @@ test.describe(`the cloud's own health reports (${B ? 'tags, azure-health' : 'nam
 
     await listed(page).filter({ hasText: 'Unavailable since' }).click()
     await expect(page.locator('#inspector')).toBeVisible()
-    await expect(page.locator('#inspector .azure')).toHaveAttribute('data-azure', 'Unavailable')
-    await expect(page.locator('#inspector .azure')).toContainText('UserInitiated')
+    await expect(page.locator('#inspector .cloud-health')).toHaveAttribute('data-cloud-health', 'Unavailable')
+    await expect(page.locator('#inspector .cloud-health')).toContainText('UserInitiated')
   })
 
   test('the Incidents list shows every entry in full: stacked lines, no sideways scroll and no inner scroll', async ({ page }) => {
@@ -93,16 +93,16 @@ test.describe(`the cloud's own health reports (${B ? 'tags, azure-health' : 'nam
 
     await page.locator('#search-input').fill('orders')
     await page.locator('#search-results .hit', { hasText: 'Orders DB' }).first().click()
-    await expect(page.locator('#inspector .azure')).toHaveAttribute('data-azure', 'Degraded')
+    await expect(page.locator('#inspector .cloud-health')).toHaveAttribute('data-cloud-health', 'Degraded')
 
     // the next snapshot holds only the resolved report (a restart of the incident feed is not needed to see the drawer follow)
     // the live feed may send its own snapshot (with the open report) between this one and the check, so the snapshot is fed again until the drawer follows
     await expect(async () => {
       await page.evaluate(() => { const c = (window as any).city; c.feed({ ...c.seen.last, healthEvents: c.seen.last.healthEvents.filter((e: any) => e.state === 'Resolved') }) })
-      await expect(page.locator('#inspector .azure')).toHaveAttribute('data-azure', 'Resolved', { timeout: 1_000 })
+      await expect(page.locator('#inspector .cloud-health')).toHaveAttribute('data-cloud-health', 'Resolved', { timeout: 1_000 })
     }).toPass({ timeout: 15_000 })
-    await expect(page.locator('#inspector .azure .ok').first()).toHaveText('Resolved')
-    expect(await page.evaluate(() => (window as any).city.inspect('aa.orders-db').azure)).toBeNull() // no mark on the building
+    await expect(page.locator('#inspector .cloud-health .ok').first()).toHaveText('Resolved')
+    expect(await page.evaluate(() => (window as any).city.inspect('aa.orders-db').cloudHealth)).toBeNull() // no mark on the building
   })
 
   test('the dashboard shows a chip on the service row, red for unavailable and amber for degraded, with the same lines under Details', async ({ page }) => {
@@ -118,16 +118,16 @@ test.describe(`the cloud's own health reports (${B ? 'tags, azure-health' : 'nam
       if ((await row.getAttribute('aria-expanded')) === 'false') await row.click()
     }
 
-    const ledger = page.locator('tr.row[data-system="bb.ledger-db"] .azure')
+    const ledger = page.locator('tr.row[data-system="bb.ledger-db"] .cloud-health')
     await expect(ledger).toContainText('Azure incident', { timeout: 30_000 }) // one plain words, in red, whatever the state; the state is in Details
     await expect(ledger).toHaveClass(/down/)
-    const orders = page.locator('tr.row[data-system="aa.orders-db"] .azure')
+    const orders = page.locator('tr.row[data-system="aa.orders-db"] .cloud-health')
     await expect(orders).toContainText('Azure incident')
     await expect(orders).toHaveClass(/bad/)
     expect(await orders.evaluate((e) => getComputedStyle(e).backgroundColor)).not.toBe('rgba(0, 0, 0, 0)') // a red label, not faint text
 
     await page.locator('tr.row[data-system="bb.ledger-db"] .det').click()
-    await expect(page.locator('#inspector .azure')).toHaveAttribute('data-azure', 'Unavailable')
+    await expect(page.locator('#inspector .cloud-health')).toHaveAttribute('data-cloud-health', 'Unavailable')
   })
 
   test('the dashboard has an Incidents card next to the dead letters, four cards in one row, red while unresolved with each report listed', async ({ page }) => {
@@ -156,7 +156,7 @@ test.describe(`the cloud's own health reports (${B ? 'tags, azure-health' : 'nam
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
 
     await card.locator('.il.bad[data-system]').first().click() // goes to the building's drawer
-    await expect(page.locator('#inspector .azure')).toBeVisible()
+    await expect(page.locator('#inspector .cloud-health')).toBeVisible()
   })
 
   test('Dismiss hides a report for everyone: the resolved one first, then an open one with its marker', async ({ page }) => {
@@ -170,7 +170,7 @@ test.describe(`the cloud's own health reports (${B ? 'tags, azure-health' : 'nam
     await listed(page).filter({ hasText: 'Unavailable since' }).locator('.dismiss').click()
     await expect(listed(page)).toHaveCount(2)
     await expect(incidents(page).locator('b')).toHaveText('2')
-    await expect.poll(() => page.evaluate(() => (window as any).city.inspect('bb.ledger-db')?.azure ?? null)).toBeNull()
+    await expect.poll(() => page.evaluate(() => (window as any).city.inspect('bb.ledger-db')?.cloudHealth ?? null)).toBeNull()
 
     await page.reload() // the server remembers, not the page
     await page.waitForFunction(() => (window as any).city?.seen.snapshots > 0)

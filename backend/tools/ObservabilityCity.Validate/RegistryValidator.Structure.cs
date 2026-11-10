@@ -77,7 +77,7 @@ public static partial class RegistryValidator
                     if (target.IsHub || target.Id == g.Id) continue;
                     var at = c.Locate(n.Id, callee);
                     c.Error(at.File, at.Line, "cross-pillar-call",
-                        $"'{n.Id}' calls '{callee}' in pillar '{target.Id}' directly. In a hub-and-spoke town calls between pillars go through the hub: call the hub's gateway or Service Bus instead, or set topology: direct.");
+                        $"'{n.Id}' calls '{callee}' in pillar '{target.Id}' directly. In a hub-and-spoke town calls between pillars go through the hub: call the hub's gateway or message broker instead, or set topology: direct.");
                 }
     }
 

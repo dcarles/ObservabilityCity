@@ -72,15 +72,18 @@ export function throttleWho(units: readonly TenantUnitSnapshot[], throttleAmber:
 /** A tenant's own throttled figure, always shown (0% included): "0% throttled". */
 export const throttledText = (u: Pick<TenantUnitSnapshot, 'throttled'>): string => `${((u.throttled ?? 0) * 100).toFixed(u.throttled != null && u.throttled > 0 && u.throttled < 0.1 ? 1 : 0)}% throttled`
 
-/** A provisioned size as the tenant rows show it: "20,000 RU/s". */
-export const limitText = (limit: number): string => `${Math.round(limit).toLocaleString('en-US')} RU/s`
+/** A provisioned size as a plain number in the store's own unit ("20,000"): the source sends no unit, so none is made up. */
+const sizeText = (limit: number): string => Math.round(limit).toLocaleString('en-US')
 
-/** What the units are provisioned at, for the Overview: one size ("20,000 RU/s") or the range of them ("4,000 to 20,000 RU/s"). Null when no unit reports one. */
+/** A provisioned size as the tenant rows show it: "max 20,000". */
+export const limitText = (limit: number): string => `max ${sizeText(limit)}`
+
+/** What the units are provisioned at, for the Overview: one size ("20,000") or the range of them ("4,000 to 20,000"). Null when no unit reports one. */
 export function limitRange(units: readonly Pick<TenantUnitSnapshot, 'limit'>[]): string | null {
   const limits = units.map((u) => u.limit).filter((l): l is number => l != null && l > 0)
   if (limits.length === 0) return null
   const low = Math.min(...limits), high = Math.max(...limits)
-  return low === high ? limitText(high) : `${Math.round(low).toLocaleString('en-US')} to ${limitText(high)}`
+  return low === high ? sizeText(high) : `${sizeText(low)} to ${sizeText(high)}`
 }
 
 /** The figures on a tenant's row, in order: what it is provisioned at, how much of that it uses, and how much it turns away. Each is left out when unknown, apart from the use, which shows a dash (or "no activity reported" for an idle one). */

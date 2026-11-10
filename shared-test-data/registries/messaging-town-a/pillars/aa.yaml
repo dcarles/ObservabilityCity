@@ -9,4 +9,4 @@ systems:
 messaging:
   topics: [orders]
   subscriptions:
-    - { topic: bb-ledger-outbox, consumer: aa.orders-worker }
+    - { topic: bb-ledger-events, consumer: aa.orders-worker }

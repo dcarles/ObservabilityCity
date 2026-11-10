@@ -30,6 +30,6 @@ systems:
 messaging:
   topics: [p18-s1]
   subscriptions:
-    - { topic: p17-p17-s1-outbox, consumer: p18.s1-worker }
-    - { topic: p17-p17-s1-outbox, consumer: p18.s2-worker }
-    - { topic: p17-p17-s1-outbox, consumer: p18.s3-worker }
+    - { topic: p17-p17-s1-events, consumer: p18.s1-worker }
+    - { topic: p17-p17-s1-events, consumer: p18.s2-worker }
+    - { topic: p17-p17-s1-events, consumer: p18.s3-worker }

@@ -10,5 +10,5 @@ systems:
 messaging:
   topics: [shipments]
   subscriptions:
-    - { topic: chk-orders-outbox, consumer: shp.shipments-worker }
-    - { topic: inv-stock-outbox, consumer: shp.shipments-worker }
+    - { topic: orders.events, consumer: shp.shipments-worker }
+    - { topic: stock.events, consumer: shp.shipments-worker }

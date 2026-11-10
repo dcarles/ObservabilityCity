@@ -8,5 +8,5 @@ systems:
   - { id: ntf.dispatch-db, service: dispatch, name: Dispatch DB, role: db, engine: cassandra }
 messaging:
   subscriptions:
-    - { topic: chk-orders-outbox, consumer: ntf.dispatch-worker }
-    - { topic: shp-shipments-outbox, consumer: ntf.dispatch-worker }
+    - { topic: orders.events, consumer: ntf.dispatch-worker }
+    - { topic: shipments.events, consumer: ntf.dispatch-worker }

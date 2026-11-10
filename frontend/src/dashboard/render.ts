@@ -4,8 +4,9 @@
 import { escapeHtml as esc } from '../picker'
 import type { Chip, Dashboard, Group, IncidentRow, Issue, JobRow, Level, Pillar, Row, Section, SideRow, TenantRow } from './model'
 import type { SourceLine } from './freshness'
-import type { Flow, FlowTile, PillarFlows } from './flows'
+import { busiest, windowText, type Flow, type FlowTile, type TrafficRow } from './flows'
 import { formatRate } from '../visuals'
+import { groupWords } from '../groupLabel'
 
 /** What the viewer has opened or closed. A group or a database that is not in the maps follows its own default. */
 export interface UiState {
@@ -27,7 +28,9 @@ const dot = (l: Level): string => `<span class="dot ${l}" title="${l === 'none' 
 const meter = (v: number | null, amber: number): string => (v == null
   ? '<span class="dim">–</span>'
   : `<span class="meter${v >= amber ? ' hot' : ''}"><i style="width:${Math.min(100, Math.max(0, v))}%"></i></span><span class="mv">${Math.round(v)}%</span>`)
-const loadRow = (label: string, bars: string): string => `<div class="lrow"><span class="lt">${label}</span>${bars}</div>`
+const loadRow = (label: string, bars: string, title = ''): string => `<div class="lrow"><span class="lt"${title ? ` title="${title}"` : ''}>${label}</span>${bars}</div>`
+/** A database's load: the share of its provisioned capacity it uses. No unit: the source sends none, and engines measure capacity differently. */
+const capacityRow = (bars: string): string => loadRow('Cap', bars, 'Capacity used')
 const plural = (n: number, word: string): string => `${n} ${word}${n === 1 ? '' : 's'}`
 
 export const countsText = (down: number, degraded: number): string => `${down} down · ${degraded} degraded`
@@ -53,33 +56,78 @@ export function summaryHtml(d: Dashboard, ui: Pick<UiState, 'flowsAll'> = {}): s
   const services = `<div class="kpi" id="kpi-services"><span>Services</span><b>${countsText(s.down, s.degraded)}</b>
     <div class="lst">${s.affected.length ? s.affected.map((i) => `<span class="ch" data-system="${esc(i.id)}">${dot(i.level)} ${esc(i.name)} <i>${esc(i.where)} · ${i.level === 'bad' ? 'down' : 'degraded'}</i></span>`).join('') : '<small>All services are healthy</small>'}</div></div>`
   const t = s.traffic
-  const traffic = t ? `<div class="kpi" id="kpi-traffic"><span>Total traffic</span><b>${num(t.total)} rps</b>
-    <div class="bar"><i style="width:${t.total > 0 ? (t.external / t.total) * 100 : 0}%"></i></div><small>External ${num(t.external)} · Internal ${num(t.internal)}</small></div>` : ''
+  const traffic = t ? `<div class="kpi" id="kpi-traffic"><span>Total traffic</span><b>${num(t.total)} <u>rps</u></b>
+    <div class="bar"><i style="width:${t.total > 0 ? (t.external / t.total) * 100 : 0}%"></i></div><small>External ${num(t.external)} · Internal ${num(t.internal)}</small>${trafficRowsHtml(s.trafficPillars)}</div>` : ''
   const dlq = s.deadLetters != null ? `<div class="kpi" id="kpi-dlq"><span>Dead letters</span><b>${num(s.deadLetters)}</b>${s.backlog != null ? `<small>Backlog ${num(s.backlog)} messages</small>` : ''}
     <div class="dlist">${deadQueuesHtml(s.deadQueues)}</div></div>` : ''
   const inc = s.incidents
   const incidents = inc ? `<div class="kpi" id="kpi-incidents"><span>Incidents</span><b class="${inc.open > 0 ? 'bad' : 'ok'}">${num(inc.open)}</b>
     <div class="ilist">${inc.rows.length ? inc.rows.map(incidentLine).join('') : '<small>No incidents</small>'}</div></div>` : ''
-  return services + traffic + flowTileHtml(s.flows, ui.flowsAll === true) + dlq + incidents
+  return services + traffic + flowTileHtml(s.flows, ui.flowsAll === true, d.groupLabel) + dlq + incidents
 }
 
 const rate = (v: number): string => `${formatRate(v)} msg/s`
 
-/** The Message flow tile: the biggest pillar-to-pillar flows with bars scaled to the busiest pair, and a button for all of them. Left out when no pair has messages. */
-export function flowTileHtml(f: FlowTile | null, all: boolean): string {
-  if (!f) return ''
-  const list = all ? f.all : f.top
-  const lines = list.map((x) => `<div class="fl" data-flow="${esc(x.id)}"><span class="fn">${esc(x.fromName)} → ${esc(x.toName)}</span><b class="fv">${rate(x.perSecond)}</b><span class="fbar"><i style="width:${f.max > 0 ? Math.max(2, (x.perSecond / f.max) * 100) : 0}%"></i></span></div>`).join('')
-  const more = f.all.length > f.top.length || all
-  return `<div class="kpi" id="kpi-flow"><span>Message flow</span><div class="flist">${lines || '<small>No pair of pillars sends 1 message a second or more.</small>'}</div>${more ? `<button class="btn fall" data-flows-all aria-expanded="${all}">${all ? 'Show fewer' : `Show all ${f.all.length}`}</button>` : ''}</div>`
+type Side = 'sends ext' | 'sends int' | 'receives'
+const NONE: Record<Side, string> = { 'sends ext': 'no external messages sent', 'sends int': 'no internal messages sent', receives: 'no messages received' }
+
+/** What a pillar sends (outside its walls or inside) or receives, in words: the rate, or that there are no messages. Null when nothing measures that side. */
+function flowSide(v: number | null, label: Side): { label: Side; value: string; none: boolean } | null {
+  if (v == null) return null
+  return v > 0 ? { label, value: rate(v), none: false } : { label, value: NONE[label], none: true }
 }
 
-/** A pillar's flows on its card. Closed: one chip with the biggest flow it sends, when it sends any. Open: everything it sends and reads. */
-export function pillarFlowsHtml(f: PillarFlows, open: boolean): string {
-  if (!open) return f.out.length ? `<div class="pflow"><span class="ch" data-flow="${esc(f.out[0].id)}">→ ${esc(f.out[0].toName)} <i>${rate(f.out[0].perSecond)}</i></span></div>` : ''
-  if (!f.out.length && !f.in.length) return ''
-  const list = (label: string, xs: readonly Flow[], name: (x: Flow) => string): string => (xs.length ? `<div><span class="lbl">${label}</span>${xs.map((x) => `<span class="ch" data-flow="${esc(x.id)}">${esc(name(x))} <i>${rate(x.perSecond)}</i></span>`).join('')}</div>` : '')
-  return `<div class="sub-title">Messages</div><div class="cx pflowx">${list('Sends to', f.out, (x) => x.toName)}${list('Reads from', f.in, (x) => x.fromName)}</div>`
+const sidesOf = (f: Flow): { side: NonNullable<ReturnType<typeof flowSide>>; v: number | null }[] =>
+  ([[flowSide(f.sent, 'sends ext'), f.sent], [flowSide(f.internal, 'sends int'), f.internal], [flowSide(f.received, 'receives'), f.received]] as const)
+    .flatMap(([side, v]) => (side ? [{ side, v }] : []))
+
+/** The requests a second of each pillar, busiest first, with a bar scaled to the busiest. The few biggest only, so the card stays as tall as its neighbours. */
+function trafficRowsHtml(rows: readonly TrafficRow[]): string {
+  if (rows.length === 0) return ''
+  const top = rows.slice(0, 5), max = rows[0].rps
+  const more = rows.length - top.length
+  return `<div class="plist">${top.map((r) => `<div class="pl" data-pillar-traffic="${esc(r.id)}"><span class="fn">${esc(r.name)}</span><span class="fbar"><i style="width:${Math.max(2, (r.rps / max) * 100)}%"></i></span><b class="fv">${r.split ? `${num(r.split.in, r.split.in < 10 ? 1 : 0)} in · ${num(r.split.out, r.split.out < 10 ? 1 : 0)} out` : `${num(r.rps, r.rps < 10 ? 1 : 0)} rps`}</b></div>`).join('')}${more > 0 ? `<small class="dim">and ${more} more</small>` : ''}</div>`
+}
+
+/** The line under the tile's list and in an open card: the time the rates average over, from the source's window. Nothing when the window is not known. */
+const windowNote = (seconds: number): string => (windowText(seconds) ? `<small class="fwin">Average over the last ${windowText(seconds)}</small>` : '')
+
+/**
+ * The Message flow tile: the busiest pillars, each with what it sends and what it receives (a bar for each, scaled to the busiest side of any pillar), and a button
+ * for all of them. A side with no messages says so. Left out when no pillar moves any message.
+ */
+export function flowTileHtml(f: FlowTile | null, all: boolean, groupLabel?: string | null): string {
+  if (!f) return ''
+  const list = all ? f.all : f.top
+  const row = (x: { side: NonNullable<ReturnType<typeof flowSide>>; v: number | null }): string =>
+    `<div class="fr"><span class="fd">${x.side.label}</span><span class="fbar"><i style="width:${x.side.none || f.max <= 0 ? 0 : Math.max(2, ((x.v ?? 0) / f.max) * 100)}%"></i></span><b class="fv${x.side.none ? ' none' : ''}">${x.side.value}</b></div>`
+  const lines = list.map((x) => `<div class="fl" data-flow="${esc(x.id)}"><span class="fn">${esc(x.name)}</span>${sidesOf(x).map(row).join('')}</div>`).join('')
+  const more = f.all.length > f.top.length || all
+  const total = f.total != null ? `<b>${formatRate(f.total)} <u>msg/s</u></b><small>Taken in by all the queues of the platform</small>` : ''
+  return `<div class="kpi" id="kpi-flow"><span>Message flow</span>${total}<div class="flist">${lines || `<small>No ${esc(groupWords(groupLabel).lower)} sends or receives 1 message a second or more.</small>`}</div>${windowNote(f.windowSeconds)}${more ? `<button class="btn fall" data-flows-all aria-expanded="${all}">${all ? 'Show fewer' : `Show all ${f.all.length}`}</button>` : ''}</div>`
+}
+
+/**
+ * A pillar's flow on its card. Closed: one chip with what it sends and receives, only when it moves any message. Open: both sides, also when one is none
+ * ("no messages sent"), and the window the rates average over. Nothing when the environment does not measure the pillar.
+ */
+export function pillarFlowHtml(f: Flow | null, open: boolean, traffic: Pick<Pillar, 'trafficSplit'>['trafficSplit'] = null): string {
+  const sides = f ? sidesOf(f).map((x) => x.side) : []
+  const busy = f ? busiest(f) > 0 : false
+  const tr = traffic && traffic.in + traffic.out + traffic.internal > 0 ? traffic : null
+  if (sides.length === 0 && !tr) return ''
+  const part = (x: (typeof sides)[number]): string => (x.none ? `<i>${x.value}</i>` : `${x.label} <i>${x.value}</i>`)
+  const rps = (v: number): string => `${num(v, v < 10 ? 1 : 0)} rps`
+  if (!open) {
+    const chips = [busy && f ? `<span class="ch" data-flow="${esc(f.id)}">${sides.map(part).join(' · ')}</span>` : '', tr ? `<span class="ch" data-traffic>traffic in <i>${rps(tr.in)}</i> · out <i>${rps(tr.out)}</i></span>` : ''].filter(Boolean)
+    return chips.length ? `<div class="pflow">${chips.join('')}</div>` : ''
+  }
+  const title: Record<Side, string> = { 'sends ext': 'Sends outside', 'sends int': 'Sends inside', receives: 'Receives' }
+  const blocks = [
+    ...(f ? sides.map((x) => `<div><span class="lbl">${title[x.label]}</span><span class="ch" data-flow="${esc(f.id)}"><i>${x.value}</i></span></div>`) : []),
+    ...(tr ? [['Requests in', tr.in], ['Requests out', tr.out], ['Requests inside', tr.internal]].map(([l, v]) => `<div><span class="lbl">${l}</span><span class="ch" data-traffic><i>${rps(v as number)}</i></span></div>`) : []),
+  ]
+  return `<div class="sub-title">Messages and traffic</div><div class="pflowx">${blocks.join('')}${f ? windowNote(f.windowSeconds) : ''}</div>`
 }
 
 /** The queues with dead letters, worst first: the service that reads each, its pillar, the queue and how many. */
@@ -97,12 +145,12 @@ function incidentLine(r: IncidentRow): string {
 
 const CPU_AMBER = 80
 const MEM_AMBER = 85
-const RU_AMBER = 85
+const CAPACITY_AMBER = 85
 
 function tenantLine(t: TenantRow): string {
   const throttled = (t.throttled ?? 0) > 0
   return `<tr class="sub" data-tenant="${esc(t.id)}"><td class="ind2">${dot(t.level)}<span class="tn">${esc(t.name)}</span>${t.test ? '<span class="test">test</span>' : ''}${t.unknown ? '<span class="test">unknown</span>' : ''}</td><td></td><td></td><td></td>
-    <td class="ld">${loadRow('RU', `${meter(t.ru, RU_AMBER)}${t.limit != null ? `<span class="mx">max ${num(t.limit)} RU/s</span>` : ''}`)}</td>
+    <td class="ld">${capacityRow(`${meter(t.ru, CAPACITY_AMBER)}${t.limit != null ? `<span class="mx">max ${num(t.limit)}</span>` : ''}`)}</td>
     <td colspan="2">${throttled ? `<span class="thr">${num(t.throttled, 1)}% throttled</span>` : '<span class="dim">no throttling</span>'}</td></tr>`
 }
 
@@ -128,8 +176,8 @@ function latencyCell(r: Row): string {
 function loadCell(r: Row): string {
   if (r.type === 'DB') {
     if (r.ru == null) return '<span class="dim">–</span>'
-    const max = r.ruMax ? `<span class="mx">max ${num(r.ruMax.limit)} RU/s<i>${esc(r.ruMax.tenant)}</i></span>` : ''
-    return loadRow('RU', `${meter(r.ru, RU_AMBER)}${max}`)
+    const max = r.ruMax ? `<span class="mx">max ${num(r.ruMax.limit)}<i>${esc(r.ruMax.tenant)}</i></span>` : ''
+    return capacityRow(`${meter(r.ru, CAPACITY_AMBER)}${max}`)
   }
   const per = (label: string, whole: number | null, key: 'cpu' | 'memory', amber: number): string => {
     if (r.regions && r.regions.length >= 2) {
@@ -154,7 +202,7 @@ function rowHtml(r: Row, ui: UiState): string {
   const conn = connectionsLabel(r)
   const showConn = ui.connections.has(r.id)
   const connCell = conn ? `<button class="conn" data-conn="${esc(r.id)}" aria-expanded="${showConn}">${conn}<span class="chev">${showConn ? '▴' : '▾'}</span></button>` : '<span class="dim">–</span>'
-  const main = `<tr class="row" data-system="${esc(r.id)}"><td class="ind">${dot(r.level)}<span class="nm">${label}${esc(r.name)}</span>${count}${r.dlq ? `<b class="bad dlq">DLQ ${num(r.dlq)}</b>` : ''}${r.azure ? `<b class="azure ${r.azure.state === 'Unavailable' ? 'down' : 'bad'}" title="${esc(r.azure.cloud)} reports this resource ${esc(r.azure.state.toLowerCase())}. Open Details for when and why.">! ${esc(r.azure.cloud)} incident</b>` : ''}<small>${esc(r.type)}${r.engine ? ` · <b class="engine" title="Database engine and type">${esc(r.engine.name)}<i>${esc(r.engine.type)}</i></b>` : ''}${r.instancesText ? ` · ${esc(r.instancesText)}` : ''}</small></td>
+  const main = `<tr class="row" data-system="${esc(r.id)}"><td class="ind">${dot(r.level)}<span class="nm">${label}${esc(r.name)}</span>${count}${r.dlq ? `<b class="bad dlq">DLQ ${num(r.dlq)}</b>` : ''}${r.cloudHealth ? `<b class="cloud-health ${r.cloudHealth.state === 'Unavailable' ? 'down' : 'bad'}" title="${esc(r.cloudHealth.cloud)} reports this resource ${esc(r.cloudHealth.state.toLowerCase())}. Open Details for when and why.">! ${esc(r.cloudHealth.cloud)} incident</b>` : ''}<small>${esc(r.type)}${r.engine ? ` · <b class="engine" title="Database engine and type">${esc(r.engine.name)}<i>${esc(r.engine.type)}</i></b>` : ''}${r.instancesText ? ` · ${esc(r.instancesText)}` : ''}</small></td>
     <td class="n">${trafficCell(r)}</td><td class="n">${errorCell(r)}</td><td class="n">${latencyCell(r)}</td><td class="ld">${loadCell(r)}</td>
     <td>${connCell}</td><td><button class="det" data-details="${esc(r.id)}">Details <b>›</b></button></td></tr>`
   const connRow = showConn && conn
@@ -188,8 +236,8 @@ export function pillarHtml(p: Pillar, ui: UiState): string {
     <div class="acts"><button class="btn" data-toggle="${esc(p.id)}" aria-expanded="${open}">${open ? 'Close' : 'Services'}</button><button class="btn" data-hide="${esc(p.id)}">Hide</button></div></div>
     ${p.configError ? `<div class="issues"><span class="chip bad">${esc(p.configError)}</span></div>` : ''}
     ${p.issues.length ? `<div class="issues">${p.issues.map((i) => issueChip(i, false)).join('')}</div>` : ''}
-    ${open ? '' : pillarFlowsHtml(p.flows, false)}
-    ${open ? `<div class="body">${pillarFlowsHtml(p.flows, true)}<div class="tw"><table class="svc">${HEAD}<tbody>${p.groups.map((g) => groupHtml(g, ui)).join('')}</tbody></table></div>${jobsHtml(p.jobs)}</div>` : ''}</section>`
+    ${open ? '' : pillarFlowHtml(p.flow, false, p.trafficSplit)}
+    ${open ? `<div class="body">${pillarFlowHtml(p.flow, true, p.trafficSplit)}<div class="tw"><table class="svc">${HEAD}<tbody>${p.groups.map((g) => groupHtml(g, ui)).join('')}</tbody></table></div>${jobsHtml(p.jobs)}</div>` : ''}</section>`
 }
 
 export function pillarsHtml(d: Dashboard, ui: UiState): string {

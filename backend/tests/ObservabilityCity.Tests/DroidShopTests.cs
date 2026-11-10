@@ -51,7 +51,7 @@ public class DroidShopTests
     [Fact]
     public void Checkout_publishes_orders_and_shipping_and_notifications_read_them()
     {
-        var subscribersToOrders = Shop.Subscriptions.Where(s => s.Topic == "chk-orders-outbox").Select(s => s.ConsumerGroupId).Order().ToList();
+        var subscribersToOrders = Shop.Subscriptions.Where(s => s.Topic == "orders.events").Select(s => s.ConsumerGroupId).Order().ToList();
 
         Assert.Equal(["inv", "ntf", "shp"], subscribersToOrders);
     }

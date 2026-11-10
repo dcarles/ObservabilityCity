@@ -63,4 +63,36 @@ describe('the status strip', () => {
     expect(m.numbers.find((n) => n.label === 'errors')).toMatchObject({ value: '6.0%', tone: 'bad' })
     expect(m.numbers.find((n) => n.label === 'DLQ')).toMatchObject({ value: '12', tone: 'bad' })
   })
+
+  it('puts the systems with dead letters in red next to the headline', () => {
+    let s = withState(withState(healthyTown(), 'cl.ledger-api', 'Degraded'), 'pay.payments-api', 'Healthy', { deadLetters: 5 })
+    s = withState(s, 'cl.ledger-db', 'Healthy', { deadLetters: 130 })
+
+    const m = stripModel(s)
+
+    expect(m.headline).toBe('1 DEGRADED')
+    expect(m.dlqSystems).toBe(2)
+    expect(m.dlqLabel).toBe('/ 2 with DLQ')
+  })
+
+  it('counts a degraded system with dead letters too, once', () => {
+    const m = stripModel(withState(healthyTown(), 'cl.ledger-api', 'Degraded', { deadLetters: 9 }))
+
+    expect(m.headline).toBe('1 DEGRADED')
+    expect(m.dlqLabel).toBe('/ 1 with DLQ')
+  })
+
+  it('makes dead letters the headline when nothing else is wrong, never "healthy"', () => {
+    const m = stripModel(withState(healthyTown(), 'cl.ledger-api', 'Healthy', { deadLetters: 130 }))
+
+    expect(m.headline).toBe('1 WITH DLQ')
+    expect(m.tone).toBe('warn')
+    expect(m.dlqLabel).toBe('')
+    expect(m.subline).toBe('')
+  })
+
+  it('says nothing about dead letters when there are none, or the system has no data', () => {
+    expect(stripModel(withState(healthyTown(), 'cl.ledger-api', 'Degraded')).dlqLabel).toBe('')
+    expect(stripModel(withState(healthyTown(), 'cl.ledger-api', 'Stale', { deadLetters: 40 })).dlqSystems).toBe(0)
+  })
 })

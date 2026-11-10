@@ -9,4 +9,4 @@ systems:
 messaging:
   topics: [p07-s1]
   subscriptions:
-    - { topic: p06-p06-s1-outbox, consumer: p07.s1-worker }
+    - { topic: p06-p06-s1-events, consumer: p07.s1-worker }

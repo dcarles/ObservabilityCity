@@ -20,6 +20,6 @@ systems:
 messaging:
   topics: [p12-s1]
   subscriptions:
-    - { topic: p11-p11-s1-outbox, consumer: p12.s1-worker }
-    - { topic: p11-p11-s1-outbox, consumer: p12.s2-worker }
-    - { topic: p11-p11-s1-outbox, consumer: p12.s3-worker }
+    - { topic: p11-p11-s1-events, consumer: p12.s1-worker }
+    - { topic: p11-p11-s1-events, consumer: p12.s2-worker }
+    - { topic: p11-p11-s1-events, consumer: p12.s3-worker }

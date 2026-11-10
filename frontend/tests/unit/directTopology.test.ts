@@ -9,7 +9,7 @@ import type { GroupSnapshot, Snapshot } from '../../src/types'
 // backend decides which islands have a bridge to it (hasRingBridge); these tests check what the renderer builds from that.
 const fixture = (name: string) => JSON.parse(readFileSync(resolve(__dirname, `../../../shared-test-data/snapshots/${name}`), 'utf8')) as Snapshot
 const sample = fixture('calm.json')
-const group = (over: Partial<GroupSnapshot>): GroupSnapshot => ({ ...sample.groups.find((g) => !g.isHub)!, configError: null, ...over })
+const group = (over: Partial<GroupSnapshot>): GroupSnapshot => ({ ...sample.groups.find((g) => !g.isHub)!, configError: null, flow: undefined, ...over })
 
 describe('the ring road connector', () => {
   it('is built for an island the backend says has one, with or without a bridge to the hub', () => {

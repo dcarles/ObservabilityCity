@@ -21,7 +21,7 @@ public enum NodeKind
 
 /// <summary>
 /// Whether the cloud runs a system's app: Running, Stopped (switched off on purpose, drawn as a building under construction) or Missing (the inventory was
-/// read and has no such app, drawn grey as "not found in Azure"). A system whose environment does not read an app state has none (null).
+/// read and has no such app, drawn grey as "not found in" and the cloud's name). A system whose environment does not read an app state has none (null).
 /// </summary>
 [JsonConverter(typeof(JsonStringEnumConverter))]
 public enum AppState
@@ -225,7 +225,7 @@ public sealed record IncidentSnapshot(
     DateTimeOffset StartedAt);
 
 /// <summary>
-/// A resource the cloud itself reports as Degraded or Unavailable (an Azure incident): State is "Degraded" or "Unavailable", Previous what it was before and Cause why, as the cloud
+/// A resource the cloud itself reports as Degraded or Unavailable (a cloud health report): State is "Degraded" or "Unavailable", Previous what it was before and Cause why, as the cloud
 /// said (null when it gave none), Since when the event started. Resource is the resource's name. NodeId and GroupId say the building and the island that own the resource; both are null
 /// for a resource no system of the town owns, which the lists show without a place to go to. Summary is the cloud's own one-line title for the event, when it has one. Tenant is the tenant the resource belongs to (its friendly name when the scope has one), for a resource kept per tenant such as a database; null otherwise. Id stays the same
 /// for as long as the same event lasts.
@@ -243,12 +243,12 @@ public sealed record HealthEventSnapshot(
     DateTimeOffset? ResolvedAt = null,
     string? Tenant = null);
 
-/// <summary>A Service Bus topic: Name is the full topic name, Service the service (or hub resource name) that publishes it.</summary>
+/// <summary>A message broker topic: Name is the full topic name, Service the service (or hub resource name) that publishes it.</summary>
 public sealed record TopicSnapshot(string Name, string Service);
 
 /// <summary>
 /// A worker reading a topic. Publisher is the id of the island that owns the topic, Consumer the id of the worker. Legacy marks a pillar reading
-/// the hub's egress topic, the old way, which the renderer flags with an amber pennant.
+/// a topic of the hub, the old way, which the renderer flags with an amber pennant.
 /// </summary>
 public sealed record SubscriptionSnapshot(string Topic, string Publisher, string Consumer, bool Legacy);
 
@@ -287,7 +287,14 @@ public sealed record GroupSnapshot(
     bool HasRingBridge,
     MessagingSnapshot Messaging,
     IReadOnlyList<NodeSnapshot> Nodes,
-    IReadOnlyList<AssetSnapshot>? Assets = null);
+    IReadOnlyList<AssetSnapshot>? Assets = null,
+    PillarFlowSnapshot? Flow = null);
+
+/// <summary>
+/// What a whole pillar sends to the other pillars and receives from them through the broker, in messages a second averaged over WindowSeconds (the window of the source that reads it).
+/// A side the environment does not measure is null; 0 means it was measured and nothing moved.
+/// </summary>
+public sealed record PillarFlowSnapshot(double? SentPerSecond, double? ReceivedPerSecond, int WindowSeconds);
 
 /// <summary>
 /// A third party outside the town (a credit bureau, a data warehouse). Node carries its health, worked out from our own calls to it:
@@ -353,6 +360,7 @@ public sealed record TownTotals(
 /// does not measure it (links.traffic), and the airport then adds up what the outside callers bring.
 /// Cloud is what the environment calls its cloud (scope.cloud), for the words "not found in ..."; null: the renderer says "the inventory".
 /// InternalVendorsLabel is the town's labels.internalVendors: what its own services outside the monitored platform are called.
+/// Wall is the town's wall defaults (town.yaml wall), or null when it sets none.
 /// TrafficDensity is the town's trafficDensity setting: how many cars appear, as a multiple of the usual number (1).
 /// HealthEvents are the resources the cloud itself reports as Degraded or Unavailable right now, worst first (see <see cref="HealthEventSnapshot"/>); null when the environment reads none.
 /// With an island filter it holds the events of the islands on screen and those that belong to no building. They count in TownTotals.Incidents too.
@@ -385,7 +393,14 @@ public sealed record Snapshot(
     IReadOnlyList<string>? Notes = null,
     IReadOnlyList<SourceFreshnessSnapshot>? Sources = null,
     IReadOnlyList<HealthEventSnapshot>? HealthEvents = null,
-    string InternalVendorsLabel = "Internal services");
+    string InternalVendorsLabel = "Internal services",
+    WallSettingsSnapshot? Wall = null);
+
+/// <summary>
+/// The town's defaults for wall mode (town.yaml wall); each is null when the town did not say, and the page then uses its own default. An address parameter on the page
+/// wins over these. Light is "dusk" or "day". The whole object is null when the town sets none.
+/// </summary>
+public sealed record WallSettingsSnapshot(double? HoldSeconds, double? OverviewSeconds, double? OverviewIslandSeconds, string? Light);
 
 /// <summary>
 /// How fresh one configured source is: Name is the source's name in the environment file, LastRead when it last reported anything (null: not yet since the server started),
@@ -413,12 +428,15 @@ public sealed record UnknownHostSnapshot(string Host, double Calls, IReadOnlyLis
 /// </summary>
 public sealed record AddedHostSnapshot(string Id, string Name, string Host, string Kind, IReadOnlyList<string> CalledBy);
 
-/// <summary>What the panel sends to add a rule for a path on a gateway host: the system that path belongs to.</summary>
-public sealed record AddRuleRequest(string Host, string Path, string Target);
+/// <summary>
+/// What the panel sends to add a rule for a path on a gateway host: the system that path belongs to. Depth is how many parts of the path the rule keeps (1 to 3; 2 when left out) and
+/// Gateway whether the calls go through the API gateway (true when left out).
+/// </summary>
+public sealed record AddRuleRequest(string Host, string Path, string Target, int? Depth = null, bool? Gateway = null);
 
 /// <summary>What the panel sends to add a host. The server works out who called it from what link discovery saw.</summary>
 public sealed record AddHostRequest(string Host, string Kind);
-/// <summary>Hides the Azure resource-health report with this id (see HealthEventSnapshot.Id).</summary>
+/// <summary>Hides the cloud health report with this id (see HealthEventSnapshot.Id).</summary>
 public sealed record DismissHealthEventRequest(string Id);
 
 /// <summary>

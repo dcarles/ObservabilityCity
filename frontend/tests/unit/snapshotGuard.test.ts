@@ -17,6 +17,20 @@ describe('a good snapshot', () => {
   })
 })
 
+describe("the town's wall defaults", () => {
+  it('pass through when they are usable', () => {
+    const raw = { ...calm(), wall: { holdSeconds: 30, overviewSeconds: 0, overviewIslandSeconds: 4, light: 'day' } }
+    expect(checkSnapshot(structuredClone(raw)).snapshot?.wall).toEqual({ holdSeconds: 30, overviewSeconds: 0, overviewIslandSeconds: 4, light: 'day' })
+  })
+
+  it('drop what is not usable, and all of it when nothing is', () => {
+    const odd = { ...calm(), wall: { holdSeconds: 0.1, overviewSeconds: -3, overviewIslandSeconds: -1, light: 'night' } }
+    expect(checkSnapshot(odd).snapshot?.wall).toBeNull()
+    const part = { ...calm(), wall: { holdSeconds: 40, overviewSeconds: 'x' } }
+    expect(checkSnapshot(part).snapshot?.wall).toEqual({ holdSeconds: 40 })
+  })
+})
+
 describe('a snapshot that cannot be drawn is refused', () => {
   it.each([
     ['null', null],
@@ -66,6 +80,17 @@ describe('a snapshot with something wrong in it is repaired where that is safe',
     expect(out.p99Ms).toBe(0)
     expect(out.cpu).toBeNull()
     expect(out.queueDepth).toBeNull()
+  })
+
+  it('keeps what a pillar sends and receives, and drops a rate or a window that is not a number', () => {
+    const raw = calm() as unknown as Record<string, any>
+    raw.groups[0].flow = { sentPerSecond: 12.5, receivedPerSecond: 'many', windowSeconds: 900 }
+    raw.groups[1].flow = { sentPerSecond: -3, receivedPerSecond: null, windowSeconds: 900 }
+    raw.groups[2].flow = { sentPerSecond: 0, receivedPerSecond: 0, windowSeconds: 'x' }
+    const { snapshot } = checkSnapshot(raw)
+    expect(snapshot!.groups[0].flow).toEqual({ sentPerSecond: 12.5, receivedPerSecond: null, windowSeconds: 900 })
+    expect(snapshot!.groups[1].flow).toBeNull() // nothing measured
+    expect(snapshot!.groups[2].flow).toEqual({ sentPerSecond: 0, receivedPerSecond: 0, windowSeconds: 0 })
   })
 
   it('shows an unknown state as stale, never as healthy', () => {

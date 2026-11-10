@@ -87,7 +87,7 @@ public sealed partial class SnapshotBuilder(IRegistryProvider registries, Latest
         var allGroups = registry.Groups
             .Select(g => new GroupSnapshot(g.Id, g.DisplayName, g.Color, g.IsHub, g.IsLostFound, g.ConfigError,
                 incidents.GetValueOrDefault(g.Id) ?? [], links[g.Id].HasBridge, links[g.Id].HasRingBridge, MessagingOf(registry, g),
-                g.Nodes.Select(n => ToNode(n, now, registry)).ToList(), AssetsOf(g.Id, registry)))
+                g.Nodes.Select(n => ToNode(n, now, registry)).ToList(), AssetsOf(g.Id, registry), g.IsHub ? null : FlowOf(g, now)))
             .ToList();
         var allVendors = registry.Vendors.Select(v => new VendorSnapshot(WithCallRate(ToNode(v.Node, now, registry)), v.CalledBy, v.IslandId ?? v.Node.Id, v.IslandName, v.Internal, v.Calls is { Count: > 0 } calls ? calls : null)).ToList();
         var allNodes = allGroups.SelectMany(g => g.Nodes).ToList();
@@ -153,7 +153,21 @@ public sealed partial class SnapshotBuilder(IRegistryProvider registries, Latest
         return new Snapshot(registry.Town.Id, registry.Town.Name, registry.Town.GroupLabel, env?.Id ?? Environment, now, DayFraction(), totals, notices, groups,
             vendors, callers, dependencies, registry.RingCapacity,
             env?.Name ?? Environment, environments, TenantsOf(env, allNodes), registry.Town.Topology, Mode ?? registry.Town.Mode, view, incidentFreeSince, incidentsSeen,
-            OutsideRate(onScreenNodes.Values), env?.Scope.Cloud, registry.Town.TrafficDensity, registries.Notes is { Count: > 0 } notes ? notes : null, SourceFreshness(now), events, registry.Town.InternalVendorsLabel);
+            OutsideRate(onScreenNodes.Values), env?.Scope.Cloud, registry.Town.TrafficDensity, registries.Notes is { Count: > 0 } notes ? notes : null, SourceFreshness(now), events, registry.Town.InternalVendorsLabel,
+            registry.Town.Wall is { } w ? new WallSettingsSnapshot(w.HoldSeconds, w.OverviewSeconds, w.OverviewIslandSeconds, w.Light) : null);
+    }
+
+    /// <summary>What the pillar sends and receives through the broker, from the source that reads it; absent when no source reports it or its reading is older than the source stands for.</summary>
+    private PillarFlowSnapshot? FlowOf(RegistryGroup g, DateTimeOffset now)
+    {
+        PillarFlowSnapshot? best = null;
+        DateTimeOffset? at = null;
+        foreach (var (source, reading) in state.GetAll(NodeReading.FlowKey(g.Id)))
+        {
+            if (reading.Flow is not { } f || now - reading.At > FreshFor(source) || (at is not null && reading.At <= at)) continue;
+            (best, at) = (new PillarFlowSnapshot(f.Sent is { } s ? Math.Round(s, 3) : null, f.Received is { } r ? Math.Round(r, 3) : null, f.WindowSeconds), reading.At);
+        }
+        return best;
     }
 
     /// <summary>

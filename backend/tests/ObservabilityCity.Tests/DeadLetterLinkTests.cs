@@ -9,7 +9,7 @@ using ObservabilityCity.Core.Sources;
 namespace ObservabilityCity.Tests;
 
 /// <summary>
-/// Phase 3, slice 5: a consumer's drawer links to its dead letters in the team's support tool, when the environment says where that is
+/// Phase 3, slice 5: a consumer's drawer links to its dead letters in the team's queue explorer, when the environment says where that is
 /// (<c>entities.deadLetterLink</c>). The program knows no tool: two towns write different addresses over different words and get their own links.
 /// </summary>
 public class DeadLetterLinkTests
@@ -35,11 +35,11 @@ public class DeadLetterLinkTests
     {
         var queues = Node(await TownSnapshot(Town("a")), "aa.orders-worker").Queues!;
 
-        Assert.Equal(["sbq-al-led-ord-outbox", "sbq-al-ord-changefeed", "sbq-al-ord-inbox"], queues.Select(q => q.Name));
-        var inbox = queues.Single(q => q.Name == "sbq-al-ord-inbox");
-        Assert.Equal(("Support tool", "https://support.example.test/queues/sbq-al-ord-inbox?team=al&service=ord"), (inbox.Link!.Name, inbox.Link.Url)); // the scope codes, not the ids
+        Assert.Equal(["q-al-led-to-ord", "q-al-ord-feed", "q-al-ord-in"], queues.Select(q => q.Name));
+        var inbox = queues.Single(q => q.Name == "q-al-ord-in");
+        Assert.Equal(("Open in queue explorer", "https://support.example.test/queues/q-al-ord-in?team=al&service=ord"), (inbox.Link!.Name, inbox.Link.Url)); // the scope codes, not the ids
         Assert.Equal(2, inbox.DeadLetters);
-        Assert.Equal(150, queues.Single(q => q.Name == "sbq-al-led-ord-outbox").Backlog);
+        Assert.Equal(150, queues.Single(q => q.Name == "q-al-led-to-ord").Backlog);
     }
 
     [Fact]

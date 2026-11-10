@@ -7,9 +7,9 @@ mode: demo                # runs on the fake source, with Break things and stori
 # Islands in the order they stand round the platform.
 islands: [web, mob, chk, inv, shp, ntf]
 
-# Topics are named <pillar>-<service>-outbox. This town has no hub topics and no old route.
+# Topics are named <service>.events (service names are unique across teams here). This town has no hub topics and no old route.
 messaging:
-  topicTemplate: "{pillar}-{service}-outbox"
+  topicTemplate: "{service}.events"
 
 # The database engines this town uses. A database says engine: <id>; the name and the type shown come from here.
 databaseEngines:

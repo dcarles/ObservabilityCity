@@ -11,7 +11,7 @@ using TownRegistry = ObservabilityCity.Core.Registry.Registry;
 namespace ObservabilityCity.Tests;
 
 /// <summary>
-/// A broker that spans regions (one namespace in each) says in which region a queue's dead letters are, and each region opens its own support tool
+/// A broker that spans regions (one namespace in each) says in which region a queue's dead letters are, and each region opens its own queue explorer
 /// (<c>entities.deadLetterLinks</c>). The totals stay the sum of the regions. A broker in one region says nothing about regions.
 /// </summary>
 public class DeadLetterRegionTests
@@ -44,7 +44,7 @@ public class DeadLetterRegionTests
 
     private static string Answer(double north, double west, string namespaceMarker) => $$"""
         { "value": [ { "name": { "value": "DeadletteredMessages" }, "timeseries": [
-            { "metadatavalues": [ { "name": { "value": "entityname" }, "value": "sbq-al-ord-inbox" } ], "data": [ { "maximum": {{(namespaceMarker == "north" ? north : west)}} } ] } ] } ] }
+            { "metadatavalues": [ { "name": { "value": "entityname" }, "value": "q-al-ord-in" } ], "data": [ { "maximum": {{(namespaceMarker == "north" ? north : west)}} } ] } ] } ] }
         """;
 
     private static async Task<Snapshot> Poll(string folder, double north, double west)
@@ -63,7 +63,7 @@ public class DeadLetterRegionTests
         return new SnapshotBuilder(registry, state, new FakeTimeProvider(T0)) { Environment = "prod" }.Build();
     }
 
-    private static QueueSnapshot Inbox(Snapshot s) => s.Groups.SelectMany(g => g.Nodes).First(n => n.Id == "aa.orders-worker").Queues!.Single(q => q.Name == "sbq-al-ord-inbox");
+    private static QueueSnapshot Inbox(Snapshot s) => s.Groups.SelectMany(g => g.Nodes).First(n => n.Id == "aa.orders-worker").Queues!.Single(q => q.Name == "q-al-ord-in");
 
     private static string WithLinks(string yaml) => yaml.Replace("deadLetterLink:", NorthTool + "deadLetterLink:");
 
@@ -78,7 +78,7 @@ public class DeadLetterRegionTests
             Assert.Equal(8, queue.DeadLetters);
             var west = Assert.Single(queue.DeadLetterRegions!);
             Assert.Equal(("westeurope", 8.0), (west.Region, west.Count));
-            Assert.Equal(("Support West", "https://west.example.test/queues/sbq-al-ord-inbox"), (west.Link!.Name, west.Link.Url));
+            Assert.Equal(("Support West", "https://west.example.test/queues/q-al-ord-in"), (west.Link!.Name, west.Link.Url));
         }
         finally { Directory.Delete(folder, true); }
     }
@@ -92,7 +92,7 @@ public class DeadLetterRegionTests
             var queue = Inbox(await Poll(folder, north: 3, west: 8));
 
             Assert.Equal(11, queue.DeadLetters);
-            Assert.Equal([("northeurope", 3.0, "https://north.example.test/queues/sbq-al-ord-inbox"), ("westeurope", 8.0, "https://west.example.test/queues/sbq-al-ord-inbox")],
+            Assert.Equal([("northeurope", 3.0, "https://north.example.test/queues/q-al-ord-in"), ("westeurope", 8.0, "https://west.example.test/queues/q-al-ord-in")],
                 queue.DeadLetterRegions!.Select(r => (r.Region, r.Count, r.Link!.Url)));
         }
         finally { Directory.Delete(folder, true); }
@@ -106,8 +106,8 @@ public class DeadLetterRegionTests
         {
             var queue = Inbox(await Poll(folder, north: 3, west: 8));
 
-            Assert.Equal("https://west.example.test/queues/sbq-al-ord-inbox", queue.DeadLetterRegions!.Single(r => r.Region == "westeurope").Link!.Url); // matched ignoring case
-            Assert.StartsWith("https://support.example.test/queues/sbq-al-ord-inbox", queue.DeadLetterRegions!.Single(r => r.Region == "northeurope").Link!.Url);
+            Assert.Equal("https://west.example.test/queues/q-al-ord-in", queue.DeadLetterRegions!.Single(r => r.Region == "westeurope").Link!.Url); // matched ignoring case
+            Assert.StartsWith("https://support.example.test/queues/q-al-ord-in", queue.DeadLetterRegions!.Single(r => r.Region == "northeurope").Link!.Url);
         }
         finally { Directory.Delete(folder, true); }
     }

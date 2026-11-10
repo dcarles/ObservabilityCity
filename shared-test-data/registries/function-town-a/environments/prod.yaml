@@ -37,12 +37,12 @@ scope:
   variables: { env: prd }
   cloud: Azure
   workspaceId: "00000000-0000-0000-0000-00000000c0de"
-  subscription: { nameLike: "*-{env}-{pillar}" }
+  subscription: { nameLike: "{pillar}-{env}-*" }
   regions: { names: { northeurope: North, westeurope: West } }
   resources:
     # the hub is not a pillar: its gateway is in the platform subscription, and a second one in another subscription, each found by its rule's own subscription
-    - { name: gateways, types: [microsoft.apimanagement/service], roles: [gateway], pattern: '^apim-(?<service>[a-z]+)$', subscription: { nameLike: "*-{env}-platform" } }
-    - { name: edge-gateways, types: [microsoft.apimanagement/service], roles: [gateway], pattern: '^apimedge-(?<service>[a-z]+)$', subscription: { nameLike: "*-{env}-edge" } }
+    - { name: gateways, types: [microsoft.apimanagement/service], roles: [gateway], pattern: '^apim-(?<service>[a-z]+)$', subscription: { nameLike: "platform-{env}-*" } }
+    - { name: edge-gateways, types: [microsoft.apimanagement/service], roles: [gateway], pattern: '^apimedge-(?<service>[a-z]+)$', subscription: { nameLike: "edge-{env}-*" } }
     - { name: plans, types: [microsoft.web/serverfarms], roles: [api], pattern: '^plan-[^-]+-(?<pillar>[^-]+)-(?<service>[^-]+)-(?<region>[a-z]+)', instances: "coalesce(toint(properties.numberOfWorkers), toint(sku.capacity))" }
     - { name: function-apps, types: [microsoft.web/sites], roles: [function], pattern: '^app-[^-]+-(?<pillar>[^-]+)-(?<service>[^-]+)-(?<region>[a-z]+)', state: "tostring(properties.state)", running: [Running] }
   assets:
@@ -50,8 +50,8 @@ scope:
     - { name: storage, label: Storage account, shape: store, types: [microsoft.storage/storageaccounts], pattern: '^st[a-z]{4}(?<pillar>[a-z]{2})(?<service>[a-z]{3})$' }
     - { name: app-config, label: App configuration, shape: settings, types: [microsoft.appconfiguration/configurationstores], pattern: '^appcfg-' }
     # shared monitoring resources stand on the hub in one cluster; they are looked for in the platform subscription, not the pillars'
-    - { name: log-workspaces, island: hub, group: Monitoring, subscription: { nameLike: "*-{env}-platform" }, label: Log workspace, shape: observatory, types: [microsoft.operationalinsights/workspaces], pattern: '^law-' }
-    - { name: app-insights, island: hub, group: Monitoring, subscription: { nameLike: "*-{env}-platform" }, label: Application Insights, shape: observatory, types: [microsoft.insights/components], pattern: '^appi-' }
+    - { name: log-workspaces, island: hub, group: Monitoring, subscription: { nameLike: "platform-{env}-*" }, label: Log workspace, shape: observatory, types: [microsoft.operationalinsights/workspaces], pattern: '^law-' }
+    - { name: app-insights, island: hub, group: Monitoring, subscription: { nameLike: "platform-{env}-*" }, label: Application Insights, shape: observatory, types: [microsoft.insights/components], pattern: '^appi-' }
   links:
     - { name: Cloud portal, url: "https://portal.example.test/#resource{resourceId}" }
 signals: { requests: telemetry, instances: inventory, cpu: platform, memory: platform, jobs: jobs }

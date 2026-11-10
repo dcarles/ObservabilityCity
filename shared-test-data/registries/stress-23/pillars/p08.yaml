@@ -27,6 +27,6 @@ systems:
 messaging:
   topics: [p08-s1]
   subscriptions:
-    - { topic: p07-p07-s1-outbox, consumer: p08.s1-worker }
-    - { topic: p07-p07-s1-outbox, consumer: p08.s2-worker }
-    - { topic: p07-p07-s1-outbox, consumer: p08.s3-worker }
+    - { topic: p07-p07-s1-events, consumer: p08.s1-worker }
+    - { topic: p07-p07-s1-events, consumer: p08.s2-worker }
+    - { topic: p07-p07-s1-events, consumer: p08.s3-worker }

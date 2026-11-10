@@ -1,4 +1,4 @@
-# Scripted events (the Konami code)
+# Easter eggs (the Konami code)
 
 Type **up up down down left right left right B A** in the town (or open it with `?event` in the address) and the theme plays a short scripted
 event on a random island of the town, using that island's own buildings. Escape ends it early; otherwise it ends by itself and the camera goes back. It is for the 3D town only: the dashboard view never plays events.
@@ -14,7 +14,7 @@ The damage is only for show. Fire and scorch are drawn over the buildings in a g
 ## How it is built
 
 - `frontend/src/events/` holds it all. The town only knows `EventDirector` (`director.ts`) and `KonamiWatcher` (`konami.ts`), wired in `townMain.ts`.
-- An event is a pure function of time: the same time always gives the same picture. The *story* (where everyone is, who shoots whom, when) is plain data (`zombieScript.ts`, `alienScript.ts`, `combat.ts`), so tests can check any moment. The *drawing* is in `pirates.ts`, `zombies.ts` and `aliens.ts`.
+- An event is a pure function of time: the same time always gives the same picture. The *story* (where everyone is, who shoots whom, when) is plain data (`pirateScript.ts`, `zombieScript.ts`, `alienScript.ts`, `combat.ts`), so tests can check any moment. The *drawing* is in `pirates.ts`, `zombies.ts` and `aliens.ts`.
 - `arena.ts` turns a real island (its coast, its buildings, the way out to sea) into ground the event can use: where people may stand, routes round the buildings, and which buildings to hit. `Town.eventSites()` hands it each island. `crowd.ts` delays anyone who would otherwise walk into someone else, and `ruin.ts` draws the fire and scorch.
 - Models live in `frontend/public/events/<theme event>/` as `.glb`. See `CREDITS.md` there for where they come from and their licence.
 - To give a theme a different event, add a builder to `events/index.ts` and map the theme id in `EVENT_FOR_THEME`.

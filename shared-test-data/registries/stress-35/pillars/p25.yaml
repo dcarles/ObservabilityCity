@@ -30,6 +30,6 @@ systems:
 messaging:
   topics: [p25-s1]
   subscriptions:
-    - { topic: p24-p24-s1-outbox, consumer: p25.s1-worker }
-    - { topic: p24-p24-s1-outbox, consumer: p25.s2-worker }
-    - { topic: p24-p24-s1-outbox, consumer: p25.s3-worker }
+    - { topic: p24-p24-s1-events, consumer: p25.s1-worker }
+    - { topic: p24-p24-s1-events, consumer: p25.s2-worker }
+    - { topic: p24-p24-s1-events, consumer: p25.s3-worker }

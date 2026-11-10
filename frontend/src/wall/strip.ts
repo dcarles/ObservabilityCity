@@ -68,7 +68,7 @@ export class WallStrip {
         <div class="wall-where"><b id="wall-town">${escapeHtml(c.townName)}</b><span>${escapeHtml(c.environmentName)}</span><span class="wall-clock">${escapeHtml(c.clock)}</span></div>
         <div class="wall-numbers">${m.numbers.map((n) => `<div class="wall-num ${n.tone}"><b>${escapeHtml(n.value)}</b><span>${escapeHtml(n.label)}</span></div>`).join('')}</div>
       </div>
-      <div class="wall-headline" id="wall-headline">${escapeHtml(m.headline)}</div>
+      <div class="wall-headline-row"><div class="wall-headline" id="wall-headline">${escapeHtml(m.headline)}</div>${m.dlqLabel ? `<div class="wall-dlq" id="wall-dlq">${escapeHtml(m.dlqLabel)}</div>` : ''}</div>
       ${countChips ? `<div class="wall-counts">${countChips}</div>` : ''}
       <div class="wall-caption" id="wall-caption">${escapeHtml(c.caption || m.subline)}</div>
       ${c.note ? `<div class="wall-note" id="wall-note">${escapeHtml(c.note)}</div>` : ''}`
@@ -76,9 +76,10 @@ export class WallStrip {
   }
 
   /** What the strip says, for tests. */
-  read(): { headline: string; caption: string; note: string | null; tone: string; connection: string; pulsing: boolean } {
+  read(): { headline: string; dlq: string; caption: string; note: string | null; tone: string; connection: string; pulsing: boolean } {
     return {
       headline: this.strip.querySelector('#wall-headline')?.textContent ?? '',
+      dlq: this.strip.querySelector('#wall-dlq')?.textContent ?? '',
       caption: this.strip.querySelector('#wall-caption')?.textContent ?? '',
       note: this.strip.querySelector('#wall-note')?.textContent ?? null,
       tone: this.strip.dataset.tone ?? '',

@@ -29,8 +29,8 @@
       "messaging": {
         "topics": [
           {
-            "name": "hub-egress",
-            "service": "egress"
+            "name": "hub-exports",
+            "service": "exports"
           }
         ],
         "subscriptions": [],
@@ -227,7 +227,8 @@
           }
         }
       ],
-      "assets": []
+      "assets": [],
+      "flow": null
     },
     {
       "id": "cl",
@@ -350,21 +351,21 @@
           "jobs": null,
           "regions": [
             {
-              "region": "North Europe",
-              "label": "North Europe",
-              "instances": 3,
-              "cpu": 0.5199999999999999,
-              "memory": 0.41800000000000004,
-              "share": 0.55,
-              "skewed": false
-            },
-            {
-              "region": "West Europe",
-              "label": "West Europe",
+              "region": "EU West",
+              "label": "EU West",
               "instances": 3,
               "cpu": 0.4763636363636364,
               "memory": 0.4041818181818182,
               "share": 0.45,
+              "skewed": false
+            },
+            {
+              "region": "US East",
+              "label": "US East",
+              "instances": 3,
+              "cpu": 0.5199999999999999,
+              "memory": 0.41800000000000004,
+              "share": 0.55,
               "skewed": false
             }
           ],
@@ -380,8 +381,8 @@
           "service": "ledger",
           "external": false,
           "state": "Healthy",
-          "instancesTotal": 4,
-          "instancesHealthy": 4,
+          "instancesTotal": 3,
+          "instancesHealthy": 3,
           "load": 0.5714285714285714,
           "cpu": 0.5014285714285713,
           "memory": 0.5060000000000001,
@@ -417,18 +418,18 @@
           "jobs": null,
           "regions": [
             {
-              "region": "North Europe",
-              "label": "North Europe",
-              "instances": 4,
+              "region": "EU West",
+              "label": "EU West",
+              "instances": 3,
               "cpu": 0.5014285714285713,
               "memory": 0.5060000000000001,
               "share": 0.5,
               "skewed": false
             },
             {
-              "region": "West Europe",
-              "label": "West Europe",
-              "instances": 3,
+              "region": "US East",
+              "label": "US East",
+              "instances": 4,
               "cpu": 0.5014285714285713,
               "memory": 0.5060000000000001,
               "share": 0.5,
@@ -900,7 +901,12 @@
           "engine": null
         }
       ],
-      "assets": []
+      "assets": [],
+      "flow": {
+        "sentPerSecond": 750.4,
+        "receivedPerSecond": 126.4,
+        "windowSeconds": 300
+      }
     },
     {
       "id": "acc",
@@ -1312,7 +1318,12 @@
           "engine": null
         }
       ],
-      "assets": []
+      "assets": [],
+      "flow": {
+        "sentPerSecond": 480,
+        "receivedPerSecond": 40,
+        "windowSeconds": 300
+      }
     },
     {
       "id": "pay",
@@ -1406,22 +1417,22 @@
           "jobs": null,
           "regions": [
             {
-              "region": "North Europe",
-              "label": "North Europe",
-              "instances": 6,
-              "cpu": 0.5199999999999999,
-              "memory": 0.41800000000000004,
-              "share": 0.94,
-              "skewed": true
-            },
-            {
-              "region": "West Europe",
-              "label": "West Europe",
+              "region": "EU West",
+              "label": "EU West",
               "instances": 1,
               "cpu": 0.2953191489361702,
               "memory": 0.34685106382978725,
               "share": 0.06,
               "skewed": false
+            },
+            {
+              "region": "US East",
+              "label": "US East",
+              "instances": 6,
+              "cpu": 0.5199999999999999,
+              "memory": 0.41800000000000004,
+              "share": 0.94,
+              "skewed": true
             }
           ],
           "queues": null,
@@ -1678,7 +1689,12 @@
           }
         }
       ],
-      "assets": []
+      "assets": [],
+      "flow": {
+        "sentPerSecond": 498.4,
+        "receivedPerSecond": 64.8,
+        "windowSeconds": 300
+      }
     },
     {
       "id": "frd",
@@ -2005,7 +2021,12 @@
           "engine": null
         }
       ],
-      "assets": []
+      "assets": [],
+      "flow": {
+        "sentPerSecond": 680,
+        "receivedPerSecond": 88,
+        "windowSeconds": 300
+      }
     },
     {
       "id": "cus",
@@ -2521,7 +2542,12 @@
           "engine": null
         }
       ],
-      "assets": []
+      "assets": [],
+      "flow": {
+        "sentPerSecond": 619.2,
+        "receivedPerSecond": 43.2,
+        "windowSeconds": 300
+      }
     },
     {
       "id": "acq",
@@ -2958,7 +2984,12 @@
           }
         }
       ],
-      "assets": []
+      "assets": [],
+      "flow": {
+        "sentPerSecond": 148,
+        "receivedPerSecond": 31.2,
+        "windowSeconds": 300
+      }
     },
     {
       "id": "dec",
@@ -3287,7 +3318,12 @@
           "engine": null
         }
       ],
-      "assets": []
+      "assets": [],
+      "flow": {
+        "sentPerSecond": 320,
+        "receivedPerSecond": 48,
+        "windowSeconds": 300
+      }
     },
     {
       "id": "bil",
@@ -3646,7 +3682,12 @@
           "engine": null
         }
       ],
-      "assets": []
+      "assets": [],
+      "flow": {
+        "sentPerSecond": 144,
+        "receivedPerSecond": 24,
+        "windowSeconds": 300
+      }
     },
     {
       "id": "col",
@@ -4269,7 +4310,12 @@
           "engine": null
         }
       ],
-      "assets": []
+      "assets": [],
+      "flow": {
+        "sentPerSecond": 196,
+        "receivedPerSecond": 48.8,
+        "windowSeconds": 300
+      }
     },
     {
       "id": "dsp",
@@ -4550,7 +4596,12 @@
           }
         }
       ],
-      "assets": []
+      "assets": [],
+      "flow": {
+        "sentPerSecond": 0,
+        "receivedPerSecond": 0,
+        "windowSeconds": 300
+      }
     },
     {
       "id": "rwd",
@@ -4877,7 +4928,12 @@
           "engine": null
         }
       ],
-      "assets": []
+      "assets": [],
+      "flow": {
+        "sentPerSecond": 296,
+        "receivedPerSecond": 56,
+        "windowSeconds": 300
+      }
     },
     {
       "id": "obk",
@@ -5150,7 +5206,7 @@
           "jobs": null,
           "regions": null,
           "queues": null,
-          "reason": "error rate 7.4%, 110% RU \u00B7 36.0% throttled",
+          "reason": "error rate 7.4%, 110% capacity \u00B7 36.0% throttled",
           "sources": null,
           "engine": {
             "id": "postgres",
@@ -5206,7 +5262,12 @@
           "engine": null
         }
       ],
-      "assets": []
+      "assets": [],
+      "flow": {
+        "sentPerSecond": 161.6,
+        "receivedPerSecond": 17.6,
+        "windowSeconds": 300
+      }
     },
     {
       "id": "ntf",
@@ -5574,7 +5635,12 @@
           "engine": null
         }
       ],
-      "assets": []
+      "assets": [],
+      "flow": {
+        "sentPerSecond": 244,
+        "receivedPerSecond": 68,
+        "windowSeconds": 300
+      }
     },
     {
       "id": "dat",
@@ -6045,7 +6111,12 @@
           "engine": null
         }
       ],
-      "assets": []
+      "assets": [],
+      "flow": {
+        "sentPerSecond": 456,
+        "receivedPerSecond": 100.8,
+        "windowSeconds": 300
+      }
     },
     {
       "id": "rcn",
@@ -6259,7 +6330,12 @@
           "engine": null
         }
       ],
-      "assets": []
+      "assets": [],
+      "flow": {
+        "sentPerSecond": 84,
+        "receivedPerSecond": 36,
+        "windowSeconds": 300
+      }
     },
     {
       "id": "reg",
@@ -6373,7 +6449,8 @@
           "engine": null
         }
       ],
-      "assets": []
+      "assets": [],
+      "flow": null
     },
     {
       "id": "lost-found",
@@ -6389,7 +6466,7 @@
         "topics": [],
         "subscriptions": [
           {
-            "topic": "hub-egress",
+            "topic": "hub-exports",
             "publisher": "hub",
             "consumer": "lost-found.batch-gateway-worker",
             "legacy": true
@@ -6592,7 +6669,12 @@
           "engine": null
         }
       ],
-      "assets": []
+      "assets": [],
+      "flow": {
+        "sentPerSecond": 0,
+        "receivedPerSecond": 3.2,
+        "windowSeconds": 300
+      }
     }
   ],
   "vendors": [
@@ -7042,5 +7124,6 @@
   "notes": null,
   "sources": null,
   "healthEvents": null,
-  "internalVendorsLabel": "Internal services"
+  "internalVendorsLabel": "Internal services",
+  "wall": null
 }

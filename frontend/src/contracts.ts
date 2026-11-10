@@ -160,6 +160,9 @@ export interface components {
             host: string;
             path: string;
             target: string;
+            /** Format: int32 */
+            depth?: number | null;
+            gateway?: boolean | null;
         };
         AddedHostSnapshot: {
             id: string;
@@ -233,6 +236,7 @@ export interface components {
             messaging: components["schemas"]["MessagingSnapshot"];
             nodes: components["schemas"]["NodeSnapshot"][];
             assets?: components["schemas"]["AssetSnapshot"][] | null;
+            flow?: components["schemas"]["PillarFlowSnapshot"];
         };
         HealthEventSnapshot: {
             id: string;
@@ -401,6 +405,14 @@ export interface components {
             /** Format: double */
             requestsPerSecond: number;
         };
+        PillarFlowSnapshot: {
+            /** Format: double */
+            sentPerSecond?: number | null;
+            /** Format: double */
+            receivedPerSecond?: number | null;
+            /** Format: int32 */
+            windowSeconds: number;
+        };
         QueueSnapshot: {
             name: string;
             /** Format: double */
@@ -497,6 +509,7 @@ export interface components {
             sources?: components["schemas"]["SourceFreshnessSnapshot"][] | null;
             healthEvents?: components["schemas"]["HealthEventSnapshot"][] | null;
             internalVendorsLabel: string;
+            wall?: components["schemas"]["WallSettingsSnapshot"];
         };
         SourceAgeSnapshot: {
             source: string;
@@ -629,6 +642,15 @@ export interface components {
             unknown: string[];
             hidden: components["schemas"]["HiddenIsland"][];
             links: components["schemas"]["OffscreenLink"][];
+        };
+        WallSettingsSnapshot: {
+            /** Format: double */
+            holdSeconds?: number | null;
+            /** Format: double */
+            overviewSeconds?: number | null;
+            /** Format: double */
+            overviewIslandSeconds?: number | null;
+            light?: string | null;
         };
     };
     responses: never;

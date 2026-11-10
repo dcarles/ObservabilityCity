@@ -6,6 +6,6 @@ resources:
   - { id: hub.egress, name: Central egress, role: egress }
   - { id: hub.customer-db, name: Shared customer DB, role: db }
 messaging:
-  topics: [egress]
+  topics: [broadcast]
 externalCallers:
   - { id: client-app, name: Client app, calls: [aa.orders-api, bb.billing-api] }

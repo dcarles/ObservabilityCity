@@ -12,5 +12,5 @@ systems:
 messaging:
   topics: [p13-s1]
   subscriptions:
-    - { topic: p12-p12-s1-outbox, consumer: p13.s1-worker }
-    - { topic: p12-p12-s1-outbox, consumer: p13.s2-worker }
+    - { topic: p12-p12-s1-events, consumer: p13.s1-worker }
+    - { topic: p12-p12-s1-events, consumer: p13.s2-worker }

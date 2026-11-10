@@ -395,6 +395,15 @@
           },
           "target": {
             "type": "string"
+          },
+          "depth": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "gateway": {
+            "type": "boolean",
+            "nullable": true
           }
         }
       },
@@ -685,6 +694,9 @@
               "$ref": "#/components/schemas/AssetSnapshot"
             },
             "nullable": true
+          },
+          "flow": {
+            "$ref": "#/components/schemas/PillarFlowSnapshot"
           }
         }
       },
@@ -1277,6 +1289,28 @@
           }
         }
       },
+      "PillarFlowSnapshot": {
+        "required": [
+          "windowSeconds"
+        ],
+        "type": "object",
+        "properties": {
+          "sentPerSecond": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "receivedPerSecond": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "windowSeconds": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
       "QueueSnapshot": {
         "required": [
           "name"
@@ -1655,6 +1689,9 @@
           },
           "internalVendorsLabel": {
             "type": "string"
+          },
+          "wall": {
+            "$ref": "#/components/schemas/WallSettingsSnapshot"
           }
         }
       },
@@ -2159,6 +2196,30 @@
             "items": {
               "$ref": "#/components/schemas/OffscreenLink"
             }
+          }
+        }
+      },
+      "WallSettingsSnapshot": {
+        "type": "object",
+        "properties": {
+          "holdSeconds": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "overviewSeconds": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "overviewIslandSeconds": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "light": {
+            "type": "string",
+            "nullable": true
           }
         }
       }

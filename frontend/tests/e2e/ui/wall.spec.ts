@@ -5,14 +5,14 @@ import { test, expect } from '../support/test'
 // (&hold=2) and time moves only when the test steps it, so every stop is reached on purpose.
 // mini-town: islands aa Alpha, bb Beta, cc Gamma; hub; vendors ext.bureau (called from aa) and ext.mailer.
 
-const WALL = '&wall=1&hold=2'
+const WALL = '&wall=1&hold=2&overview=0'
 
 interface WallStatus {
   mode: 'alert' | 'calm'
   stop: { key: string; kind: string; caption: string; cut: boolean } | null
   note: string | null
   cuts: number
-  strip: { headline: string; caption: string; note: string | null; tone: string; connection: string; pulsing: boolean }
+  strip: { headline: string; dlq: string; caption: string; note: string | null; tone: string; connection: string; pulsing: boolean }
 }
 
 const wall = (page: Page) => page.evaluate(() => (window as any).city.wall() as WallStatus)
@@ -36,6 +36,20 @@ const lookingAway = (page: Page, kind: 'building' | 'island', id: string) =>
     const t = c.stage.controls.target
     return Math.hypot(t.x - f.target.x, t.z - f.target.z)
   }, [kind, id] as const)
+
+/** The island's middle on the screen: pixels from the left and the top, and where the status strip starts. */
+const screenOf = (page: Page, id: string) => page.evaluate((i) => {
+  const c = (window as any).city
+  const v = c.town.islandFocusOf(i).target.clone().project(c.stage.camera)
+  return { x: ((v.x + 1) / 2) * window.innerWidth, island: ((1 - v.y) / 2) * window.innerHeight, strip: document.getElementById('wall-strip')!.getBoundingClientRect().top, width: window.innerWidth }
+}, id)
+
+/** The camera is on the island: its middle is in the middle of the screen across and above the status strip, with room to spare. */
+async function expectOnIsland(page: Page, id: string): Promise<void> {
+  const w = await screenOf(page, id)
+  expect(Math.abs(w.x - w.width / 2)).toBeLessThan(w.width * 0.05)
+  expect(w.island).toBeLessThan(w.strip - 60)
+}
 
 /** The stops the tour makes as the clock runs, one hold at a time. */
 async function tour(page: Page, stops: number, hold = 2): Promise<string[]> {
@@ -117,15 +131,15 @@ test.describe('the showcase loop, while all is well', () => {
     await town.open(WALL)
     await tour(page, 2) // hub, then island aa
     await town.step(1.5) // the glide takes a second or so
-    expect(await lookingAway(page, 'island', 'aa')).toBeLessThan(1)
+    await expectOnIsland(page, 'aa')
 
     await tour(page, 1, 0.45)
     await town.step(1.5)
-    expect(await lookingAway(page, 'island', 'bb')).toBeLessThan(1)
+    await expectOnIsland(page, 'bb')
   })
 
   test('holds at a stop for the time asked for, and not a moment less', async ({ town, page }) => {
-    await town.open('&wall=1&hold=3')
+    await town.open('&wall=1&hold=3&overview=0')
     await town.step(2.9)
     expect((await wall(page)).stop?.key).toBe('town')
     await town.step(0.2)
@@ -236,7 +250,8 @@ test.describe('trouble', () => {
 
     const s = await wall(page)
     expect(s.stop!.caption).toMatch(/^Sev \d incident on Gamma: /)
-    expect(await lookingAway(page, 'island', 'cc')).toBeLessThan(0.5)
+    await town.step(1.5) // the glide takes a second or so
+    await expectOnIsland(page, 'cc')
   })
 
   test('does not leave the first sign of trouble: the strip stays red while it lasts', async ({ town, page }) => {
@@ -432,3 +447,148 @@ test.describe('the Wall button and the ways out', () => {
     await page.waitForFunction(() => !document.body.classList.contains('wall') && (window as any).city?.seen.snapshots > 0)
   })
 })
+
+test.describe('the overview of the whole town', () => {
+  const OVERVIEW = '&wall=1&hold=2&overview=3&overviewIsland=2'
+  /** Opens on a calm town (an earlier test may have left trouble in the first snapshot) with no note up, as openCalm does. */
+  async function openOn(town: { open(q: string): Promise<void> }, page: Page, query: string): Promise<void> {
+    await town.open(query)
+    await page.waitForFunction(() => (window as any).city.wall().mode === 'calm')
+    await page.evaluate(() => (window as any).city.step(11))
+  }
+  /** The camera's side of what it looks at, as an angle (what Stage.focus calls azimuth). */
+  const side = (page: Page) => page.evaluate(() => {
+    const c = (window as any).city.stage
+    return Math.atan2(c.camera.position.x - c.controls.target.x, c.camera.position.z - c.controls.target.z)
+  })
+  const frontOf = (page: Page, id: string) => page.evaluate((i) => (window as any).city.town.islandFocusOf(i).azimuth as number, id)
+  const sameSide = (a: number, b: number) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)))
+
+  test('comes after the stop trouble cut to: the whole town, then each pillar island from its front (no hub), then the next stop', async ({ town, page }) => {
+    await openOn(town, page, OVERVIEW)
+    await town.effect('aa.orders-api', 'Down')
+    await page.waitForFunction(() => (window as any).city.wall().stop?.kind === 'down')
+    await town.step(2.05)
+
+    const s = await wall(page)
+    expect(s.stop).toMatchObject({ key: 'overview', kind: 'overview', cut: false })
+    expect(s.stop!.caption).toMatch(/^Overview: 1 system needs attention across 1 island$/)
+    // the whole town: the home view
+    await town.step(1.4)
+    expect(await lookingAway(page, 'island', 'aa')).toBeGreaterThan(5)
+
+    // each pillar island in turn, stood in front of it
+    const seen: string[] = []
+    for (const [n, id] of ['aa', 'bb', 'cc'].entries()) {
+      await town.step(n === 0 ? 1.7 : 0.2) // the whole town holds 3 s, then each island 2 s
+      const stop = (await wall(page)).stop!
+      seen.push(stop.key)
+      expect(stop.key).toBe(`overview:island:${id}`)
+      await town.step(1.4) // the glide
+      await expectOnIsland(page, id)
+      expect(sameSide(await side(page), await frontOf(page, id))).toBeLessThan(0.05)
+      await town.step(0.5)
+    }
+    expect(seen.some((k) => k.endsWith(':hub'))).toBe(false)
+    await town.step(0.2)
+    expect((await wall(page)).stop).toMatchObject({ key: 'down:aa.orders-api', cut: false })
+  })
+
+  test('an island stop on the tour shows the island from its front, whichever side the camera was on', async ({ town, page }) => {
+    await openOn(town, page, '&wall=1&hold=2&overview=0')
+    await page.evaluate(() => { const c = (window as any).city; c.stage.focus(c.town.islandFocusOf('cc').target, 90, true, 2.5) }) // standing on some other side
+    await town.effect('bb', 'Incident', 0.9)
+    await page.waitForFunction(() => (window as any).city.wall().stop?.kind === 'incident')
+    await town.step(1.5)
+    await expectOnIsland(page, 'bb')
+    expect(sameSide(await side(page), await frontOf(page, 'bb'))).toBeLessThan(0.05)
+  })
+
+  test('opens a tour of several stops before the first one, and again after the last', async ({ town, page }) => {
+    await openOn(town, page, OVERVIEW)
+    await town.effect('aa.orders-api', 'Down')
+    await town.effect('cc', 'Incident', 0.9)
+    await town.until('aa.orders-api', (n) => n.state === 'Down') // both kinds of trouble must be in the snapshot before the tour is read
+    await page.waitForFunction(() => (window as any).city.seen.last.totals.incidents >= 1)
+
+    // the overview holds 4 s and the others 2 s: sample every second and keep one entry for each stop
+    const kinds: string[] = []
+    for (let i = 0; i < 24; i++) {
+      await town.step(1)
+      const k = (await wall(page)).stop!.kind
+      if (kinds.at(-1) !== k) kinds.push(k)
+    }
+    expect(kinds).toContain('overview')
+    expect(kinds).toContain('down')
+    expect(kinds).toContain('incident')
+    // each pass goes: overview, then every stop once (incident first, then down), then the overview again
+    const first = kinds.indexOf('overview')
+    expect(kinds.slice(first, first + 3)).toEqual(['overview', 'incident', 'down'])
+  })
+
+  test('is left out with overview=0: the tour only goes through the trouble', async ({ town, page }) => {
+    await openOn(town, page, '&wall=1&hold=2&overview=0')
+    await town.effect('aa.orders-api', 'Down')
+    await page.waitForFunction(() => (window as any).city.wall().stop?.kind === 'down')
+    const seen = await tour(page, 3)
+    expect(seen.every((k) => k.startsWith('down:'))).toBe(true)
+  })
+
+  test('puts the systems with dead letters in red next to the headline, or as the headline when nothing else is wrong', async ({ town, page }) => {
+    await openOn(town, page, '&wall=1&hold=2&overview=0')
+    await town.effect('aa.orders-worker', 'Poison')
+    await town.until('aa.orders-worker', (n) => (n.deadLetters ?? 0) >= 1)
+    await expect(page.locator('#wall-headline')).toHaveText('1 WITH DLQ')
+    await expect(page.locator('#wall-dlq')).toHaveCount(0)
+
+    await town.effect('bb.ledger-api', 'Down')
+    await town.until('bb.ledger-api', (n) => n.state === 'Down')
+    await expect(page.locator('#wall-headline')).toHaveText('1 DOWN')
+    await expect(page.locator('#wall-dlq')).toHaveText('/ 1 with DLQ')
+    expect((await wall(page)).strip.dlq).toBe('/ 1 with DLQ')
+  })
+})
+
+test.describe("the town's own wall defaults (town.yaml wall)", () => {
+  /** Hands the page the server's latest snapshot with a wall block added, and holds the live feed so it stays. */
+  const feedWall = (page: Page, wall: unknown) => page.evaluate(async (w) => {
+    const s = await (await fetch('/api/snapshot/latest')).json()
+    s.wall = w
+    ;(window as any).city.hold(true)
+    ;(window as any).city.feed(s)
+  }, wall)
+
+  test("holds for the town's holdSeconds when the address says nothing, and the address wins when it does", async ({ town, page }) => {
+    await town.open('&wall=1')
+    await page.waitForFunction(() => (window as any).city.wall().mode === 'calm')
+    await feedWall(page, { holdSeconds: 3 })
+    await town.step(20.1) // the stop that was already on holds its 20 s; the next one holds the town's 3
+    const next = (await wall(page)).stop!.key
+    await town.step(1)
+    expect((await wall(page)).stop!.key).toBe(next)
+    await town.step(3)
+    expect((await wall(page)).stop!.key).not.toBe(next) // 4 s on: gone, so it was not the 20 s default
+
+    await town.open('&wall=1&hold=6')
+    await page.waitForFunction(() => (window as any).city.wall().mode === 'calm')
+    await feedWall(page, { holdSeconds: 3 })
+    await town.step(6.1)
+    const stop = (await wall(page)).stop!.key
+    await town.step(4.5)
+    expect((await wall(page)).stop!.key).toBe(stop) // the address (6 s) won over the town (3 s)
+  })
+
+  test('opens on the town light, once, and an address light beats it', async ({ town, page }) => {
+    await town.open('&wall=1')
+    await page.waitForFunction(() => (window as any).city.wall().mode === 'calm')
+    expect(await page.evaluate(() => (window as any).city.lighting())).toBe('dusk')
+    await feedWall(page, { light: 'day' })
+    expect(await page.evaluate(() => (window as any).city.lighting())).toBe('day')
+
+    await town.open('&wall=1&light=dusk')
+    await page.waitForFunction(() => (window as any).city.wall().mode === 'calm')
+    await feedWall(page, { light: 'day' })
+    expect(await page.evaluate(() => (window as any).city.lighting())).toBe('dusk')
+  })
+})
+

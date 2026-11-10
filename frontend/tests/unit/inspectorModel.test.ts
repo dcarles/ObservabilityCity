@@ -116,8 +116,8 @@ describe('the overview rows', () => {
   it('shows what the tenant databases are provisioned at, one size or the range', () => {
     const t = (limit: number | null) => ({ id: String(limit), name: 'T', kind: 'Customer' as const, database: 'd', state: 'Healthy' as const, utilisation: 0.5, throttled: 0, requestsPerSecond: 1, limit })
     const row = (limits: (number | null)[]) => overviewRows(node({ tenants: limits.map(t) })).find((r) => r.label === 'Provisioned')?.value
-    expect(row([20000, 20000])).toBe('20,000 RU/s')
-    expect(row([4000, 20000])).toBe('4,000 to 20,000 RU/s')
+    expect(row([20000, 20000])).toBe('20,000')
+    expect(row([4000, 20000])).toBe('4,000 to 20,000')
     expect(row([null])).toBeUndefined()
     expect(overviewRows(node({})).map((r) => r.label)).not.toContain('Provisioned')
   })
@@ -276,17 +276,17 @@ describe('the scope rows', () => {
     expect(scopeView(undefined)).toBeNull()
   })
 
-  it('lists what the rules give, each with how it was found', () => {
+  it('lists what the rules give, each with how it was found, in words that name no one cloud', () => {
     expect(scopeView(scope())!.rows).toEqual([
-      { key: 'subscription', value: 'sub-name', note: 'found by its name' },
-      { key: 'workspace', value: 'ws-prd', note: 'from the environment' },
+      { key: 'account', value: 'sub-name', note: 'found by its name' },
+      { key: 'telemetry store', value: 'ws-prd', note: 'from the environment' },
       { key: 'service code', value: 'ord', note: 'matched against resource names' },
       { key: 'telemetry role', value: 'OrdersApi', note: 'set on this system' },
     ])
   })
 
   it('says how the workspace was settled: by its name, or by an id that is given outright', () => {
-    const note = (via: string | null) => scopeView(scope({ workspaceVia: via }))!.rows.find((r) => r.key === 'workspace')!.note
+    const note = (via: string | null) => scopeView(scope({ workspaceVia: via }))!.rows.find((r) => r.key === 'telemetry store')!.note
 
     expect(note('name')).toBe('found by its name')
     expect(note('id')).toBe('its id is given, so nothing is looked up')
