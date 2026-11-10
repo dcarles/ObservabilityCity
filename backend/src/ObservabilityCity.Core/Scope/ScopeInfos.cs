@@ -17,7 +17,8 @@ public static class ScopeInfos
         var names = resolution.TenantNames.ToDictionary(t => t.Id, t => t.Name);
         var hasSource = env.Sources.Any(s => s.Kind == "resourcegraph" && (env.Scope.Inventory is null || s.Name == env.Scope.Inventory));
         var state = !hasSource ? "none" : store.Error is not null ? "failed" : store.Inventory is null ? "waiting" : "read";
-        var problems = resolution.Problems.Where(p => p.Contains($"'{systemId}'") || p.Contains($"Pillar '{node.GroupId}'") || p.Contains("Log Analytics workspace")).ToList();
+        // the workspace's problems concern every system, and are known by where the resolver put them, not by their words
+        var problems = resolution.Problems.Where(p => resolution.WorkspaceProblemList.Contains(p) || p.Contains($"'{systemId}'") || p.Contains($"Pillar '{node.GroupId}'")).ToList();
         if (store.Error is { } error) problems.Add($"The last inventory read failed: {error}");
         return new ScopeInfo(
             pillar?.SubscriptionName ?? pillar?.SubscriptionId, pillar is { Via.Length: > 0 } ? pillar.Via : null,

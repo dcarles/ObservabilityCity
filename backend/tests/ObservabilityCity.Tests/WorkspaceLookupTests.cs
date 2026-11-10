@@ -66,8 +66,8 @@ public class WorkspaceLookupTests
         var (resolution, _, _) = await Resolved(copy.Path);
 
         Assert.Null(resolution.WorkspaceId);
-        var problem = Assert.Single(resolution.Problems, p => p.Contains("Log Analytics workspaces match"));
-        Assert.Contains("2 Log Analytics workspaces match 'ws-*-main' (ws-prd-main, ws-stg-main)", problem);
+        var problem = Assert.Single(resolution.Problems, p => p.Contains("telemetry workspaces match"));
+        Assert.Contains("2 telemetry workspaces match 'ws-*-main' (ws-prd-main, ws-stg-main)", problem);
         Assert.Contains("scope.workspaceId", problem);
     }
 
@@ -80,7 +80,22 @@ public class WorkspaceLookupTests
         var (resolution, _, _) = await Resolved(copy.Path);
 
         Assert.Null(resolution.WorkspaceId);
-        Assert.Contains("No Log Analytics workspace is named 'ws-prd-missing'", Assert.Single(resolution.Problems, p => p.Contains("workspace")));
+        Assert.Contains("No telemetry workspace is named 'ws-prd-missing'", Assert.Single(resolution.Problems, p => p.Contains("workspace")));
+        Assert.DoesNotContain("Log Analytics", Assert.Single(resolution.WorkspaceProblemList));
+    }
+
+    [Fact]
+    public async Task Every_system_shows_the_workspace_problem_which_is_known_by_its_kind_and_not_by_its_words()
+    {
+        using var copy = new RegistryCopy(TownA);
+        copy.Replace("environments/prod.yaml", "workspace: \"ws-{env}-main\"", "workspace: \"ws-{env}-missing\"");
+
+        var (resolution, store, registry) = await Resolved(copy.Path);
+
+        var problem = Assert.Single(resolution.WorkspaceProblemList);
+        Assert.Contains(problem, resolution.Problems);
+        foreach (var id in new[] { "aa.orders-api", "bb.ledger-api" })
+            Assert.Contains(problem, ScopeInfos.Of(registry, store, id)!.Problems);
     }
 
     [Fact]
@@ -174,7 +189,7 @@ public class WorkspaceLookupTests
 
         var e = await Assert.ThrowsAsync<InvalidOperationException>(() => source.PollAsync(registry, CancellationToken.None));
 
-        Assert.Contains("No Log Analytics workspace is named 'ws-prd-missing'", e.Message);
+        Assert.Contains("No telemetry workspace is named 'ws-prd-missing'", e.Message);
         Assert.Empty(http.Sent);
     }
 
@@ -195,7 +210,7 @@ public class WorkspaceLookupTests
     private static object Answer(string query) =>
         query.Contains("operationalinsights")
             ? new object[] { new { id = "/subscriptions/s/resourceGroups/rg/providers/microsoft.operationalinsights/workspaces/ws-prd-main", name = "ws-prd-main", customerId = ProdWorkspace } }
-            : query.StartsWith("resourcecontainers") ? new object[] { new { id = "00000000-0000-0000-0000-0000000000a1", name = "acme-eu-prd-al", tags = new { } } } : Array.Empty<object>();
+            : query.StartsWith("resourcecontainers") ? new object[] { new { id = "00000000-0000-0000-0000-0000000000a1", name = "al-prd-eu", tags = new { } } } : Array.Empty<object>();
 
     [Fact]
     public async Task The_inventory_asks_for_workspaces_when_the_workspace_is_a_name_and_reads_their_ids()

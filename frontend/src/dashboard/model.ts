@@ -86,7 +86,7 @@ export interface Row {
   regions: RegionRow[] | null
   cpu: number | null
   memory: number | null
-  /** The largest provisioned throughput of the tenant whose %RU the row shows (the worst tenant), with its name; null when no limit is read. */
+  /** The largest provisioned throughput of the tenant whose capacity share the row shows (the worst tenant), with its name; null when no limit is read. */
   ruMax: { limit: number; tenant: string } | null
   ru: number | null
   backlog: number | null
@@ -98,7 +98,7 @@ export interface Row {
   /** The tenant lines show by themselves: a tenant is at its amber line or throttling. */
   tenantsOpenByDefault: boolean
   /** The cloud's open health report for this system's resource ("Degraded", "Unavailable"), with since when and the cloud's name; null when the cloud reports nothing. */
-  azure: { state: string; since: string; cloud: string } | null
+  cloudHealth: { state: string; since: string; cloud: string } | null
 }
 
 export interface Group {
@@ -176,6 +176,8 @@ export interface IncidentRow {
 
 export interface Dashboard {
   townName: string
+  /** What the town calls an island (town.yaml groupLabel), for the words of the page. */
+  groupLabel: string
   summary: {
     down: number
     degraded: number
@@ -316,16 +318,16 @@ function rowOf(n: NodeSnapshot, s: Snapshot, view: TenantView, links: ReturnType
     calls: byRate(links.calls.get(n.id) ?? []),
     tenants,
     tenantsOpenByDefault: tenants?.some((t) => t.hot) ?? false,
-    azure: azureOf(n.id, s),
+    cloudHealth: cloudHealthOf(n.id, s),
   }
 }
 
 function incidentsOf(s: Snapshot): Dashboard['summary']['incidents'] {
   const tool: IncidentRow[] = s.groups.flatMap((g) => g.incidents.map<IncidentRow>((i) => ({ source: 'Incident', what: `${i.title} · ${g.displayName}`, status: `sev ${i.severity}`, tone: 'bad', nodeId: null, times: i.startedAt ? `declared ${dayTime(i.startedAt, Date.now())}` : '', dismiss: null, cause: null })))
   const nameOf = new Map(s.groups.flatMap((g) => g.nodes.map((n) => [n.id, n.name] as const)))
-  const azure = healthEventsOf(s.healthEvents).map<IncidentRow>((e) => ({ source: s.cloud ?? 'Cloud', what: incidentName(e, nameOf), status: e.state, tone: isResolved(e) ? 'ok' : 'bad', nodeId: e.nodeId ?? null, times: [`declared ${dayTime(e.since, Date.now())}`, isResolved(e) && e.resolvedAt ? `resolved ${dayTime(e.resolvedAt, Date.now())}` : null].filter(Boolean).join(' · '), dismiss: e.id, cause: e.cause ?? null }))
+  const cloudReports = healthEventsOf(s.healthEvents).map<IncidentRow>((e) => ({ source: s.cloud ?? 'Cloud', what: incidentName(e, nameOf), status: e.state, tone: isResolved(e) ? 'ok' : 'bad', nodeId: e.nodeId ?? null, times: [`declared ${dayTime(e.since, Date.now())}`, isResolved(e) && e.resolvedAt ? `resolved ${dayTime(e.resolvedAt, Date.now())}` : null].filter(Boolean).join(' · '), dismiss: e.id, cause: e.cause ?? null }))
   if (s.healthEvents == null && tool.length === 0) return null
-  const rows = [...tool, ...azure].sort((a, b) => Number(a.tone === 'ok') - Number(b.tone === 'ok'))
+  const rows = [...tool, ...cloudReports].sort((a, b) => Number(a.tone === 'ok') - Number(b.tone === 'ok'))
   return { open: rows.filter((r) => r.tone === 'bad').length, rows }
 }
 
@@ -336,7 +338,7 @@ export function incidentName(e: { resource: string; nodeId?: string | null; tena
 }
 
 /** Only an open report marks a row: once resolved it is left to the Incidents card. */
-function azureOf(id: string, s: Snapshot): Row['azure'] {
+function cloudHealthOf(id: string, s: Snapshot): Row['cloudHealth'] {
   const e = eventOfNode(s.healthEvents, id)
   return e && !isResolved(e) ? { state: e.state, since: e.since, cloud: s.cloud ?? 'Cloud' } : null
 }
@@ -367,7 +369,7 @@ export function detailText(r: Row): string {
   if (r.errorPct != null && r.rps != null && r.rps > 0) parts.push(`errors ${num(r.errorPct, 1)}%`)
   if (r.p99 != null && r.rps != null && r.rps > 0) parts.push(`p99 ${num(r.p99)} ms`)
   if (r.cpu != null) parts.push(`CPU ${num(r.cpu)}%`)
-  if (r.ru != null) parts.push(`${num(r.ru)}% RU`)
+  if (r.ru != null) parts.push(`capacity ${num(r.ru)}%`)
   if (r.backlog != null) parts.push(`backlog ${num(r.backlog)}`)
   if (r.dlq != null) parts.push(`DLQ ${num(r.dlq)}`)
   return parts.join(' · ')
@@ -462,6 +464,7 @@ export function buildDashboard(s: Snapshot, view: TenantView, flowOrder: readonl
 
   return {
     townName: s.townName,
+    groupLabel: s.groupLabel,
     summary: {
       down: affected.filter((i) => i.level === 'bad').length,
       degraded: affected.filter((i) => i.level === 'warn').length,

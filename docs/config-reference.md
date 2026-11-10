@@ -26,14 +26,14 @@ Thresholds cascade: `defaults.yaml` (per role) → the pillar's `defaults` → t
 |---|---|---|---|
 | `id` | yes | | Short id of the town. |
 | `name` | yes | | Name shown in the top bar. |
-| `groupLabel` | no | `Group` | What one island is called in the interface (for example Pillar, Domain, Team). |
+| `groupLabel` | no | `Group` | What one island is called in the interface (for example Pillar, Domain, Team). Every label that names a group uses it; `pillar` in key and file names means the same group. |
 | `topology` | no | `direct` | `direct`: islands are linked by an outer ring road. `hub-and-spoke`: islands call each other through a gateway on the hub. |
 | `mode` | no | `live` | `demo` gives the town a fake source, the Break things panel and the story bar. `live` never does. |
 | `trafficDensity` | no | `1` | How many cars appear, as a multiple of the usual number: `1` is the usual look, `2` twice as many, `0.5` half. From `0.25` to `10`. A weak PC still lowers it with the quality setting, and the town never shows more than 420 cars at once. |
 | `islands` | no | file order | Pillar ids in the order the islands stand round the hub. Pillars not listed follow in file order, and Lost & found always comes last. Once the list is given, every pillar except Lost & found must be in it, or `validate` fails; with no list it only warns. |
 | `ringCapacity` | no | `12` | Islands on the first ring, from `6` to `18`. The second ring holds one fewer, since the airport takes a place there, so a town holds at most `2 × ringCapacity − 1` pillars. Lost & found counts. |
 | `databaseEngines` | no | none | The database engines this company uses, by id (see below). A database writes `engine: <id>`. |
-| `messaging` | no | see below | How the town names its message topics, and which topics are an old route (see below). |
+| `messaging` | no | see below | How the town names its message topics, and which topics are on a route you are moving off (see below). |
 | `labels` | no | see below | The words the town uses for things the app has no fixed name for (see below). |
 | `wall` | no | see below | The town's defaults for wall mode: how long the tour stays at each stop, how long the overview lasts and the light (see below). |
 | `expectedWarnings` | no | none | Warnings the validator should expect, for a test folder that shows a rule on purpose. |
@@ -57,18 +57,20 @@ A database (`role: db`) in a pillar file or the hub then writes `engine: cosmos`
 <!-- file: TownMessagingFile -->
 | Key | Required | Default | Meaning |
 |---|---|---|---|
-| `topicTemplate` | no | `{service}` | The name of the topic a pillar's service publishes. `{pillar}` and `{service}` are replaced; it must contain `{service}`. Two topics with the same name are a problem. |
+| `topicTemplate` | no | `{service}` | The name of the topic a pillar's service publishes. `{pillar}` and `{service}` are replaced; it must contain `{service}` (a current limit: every topic is named after a service). Two topics with the same name are a problem. |
 | `hubTopicTemplate` | no | `{service}` | The name of a topic of the hub. `{service}` is replaced by the name the hub gives it; it must contain `{service}`. |
-| `legacyFrom` | no | none | The owners whose topics are an old route to read. Only `hub` is known. A subscription to such a topic must say `legacy: true` and is drawn with an amber pennant; with `legacy: true` on any other topic, the validator reports a problem. |
+| `legacyFrom` | no | none | The owners whose topics are a route you are moving off. Only `hub` can be listed (a current limit). A subscription to such a topic must say `legacy: true` and is drawn with an amber pennant; with `legacy: true` on any other topic, the validator reports a problem. |
 
-For a town that names topics `<pillar>-<service>-outbox` and `hub-<name>`, and treats reading the hub's topics as the old route:
+For a town that names topics `<service>.events` and `shared.<name>`, and is moving off reading the hub's topics:
 
 ```yaml
 messaging:
-  topicTemplate: "{pillar}-{service}-outbox"
-  hubTopicTemplate: "hub-{service}"
+  topicTemplate: "{service}.events"
+  hubTopicTemplate: "shared.{service}"
   legacyFrom: [hub]
 ```
+
+The sample Galactic Credit uses `{pillar}-{service}-outbox` instead, and Droid Shop `{service}.events`.
 
 <!-- file: LabelsFile -->
 | Key | Required | Default | Meaning |
@@ -133,7 +135,7 @@ One island. The file name is the pillar id.
 | `defaults` | no | none | Role thresholds for this pillar (same shape as `defaults.yaml`). |
 | `signals` | no | none | Signal → source name (or `none`) for every system of the pillar. Signal names are listed under the environment's `signals`. |
 | `systems` | no | none | The pillar's systems, below. The validator warns when there are none. |
-| `messaging` | no | none | Outboxes it publishes and topics it consumes, below. |
+| `messaging` | no | none | Topics it publishes and topics it consumes, below. |
 | `scheduler` | no | none | Which services each scheduled job of a function starts work for, below. |
 | `scope` | no | none | How the pillar is spelt in an environment's scope rules. |
 
@@ -178,7 +180,7 @@ One island. The file name is the pillar id.
 <!-- file: MessagingFile -->
 | Key | Required | Default | Meaning |
 |---|---|---|---|
-| `topics` | no | none | Pillar: service names, each published under the name `messaging.topicTemplate` in `town.yaml` makes of them. Hub: free names, named by `messaging.hubTopicTemplate`. |
+| `topics` | no | none | Pillar: service names (a current limit: a topic must be one of the pillar's services), each published under the name `messaging.topicTemplate` in `town.yaml` makes of them. Hub: free names, named by `messaging.hubTopicTemplate`. |
 | `subscriptions` | no | none | The topics this pillar's workers consume. |
 
 <!-- file: SubscriptionFile -->
@@ -186,7 +188,7 @@ One island. The file name is the pillar id.
 |---|---|---|---|
 | `topic` | yes | | Full topic name. |
 | `consumer` | yes | | A system of this pillar with role `worker`, by its full id. |
-| `legacy` | no | `false` | A read of a topic of an owner the town lists in `messaging.legacyFrom`, the old way. Drawn with an amber pennant. |
+| `legacy` | no | `false` | A read of a topic of an owner the town lists in `messaging.legacyFrom`, a route you are moving off. Drawn with an amber pennant. |
 
 ### scheduler (pillar)
 A function's jobs are found in its logs, and nothing in the logs says which service a job starts work for, so the pillar file says it. A job that is not listed sends no boats, and the town shows a "Job not mapped" notice naming it. A job's boats sail from the function's island to the services' islands; for the services of the same pillar that is a short out-and-back lane from the harbour.
@@ -203,7 +205,7 @@ A function's jobs are found in its logs, and nothing in the logs says which serv
 |---|---|---|---|
 | `displayName` | no | `Hub` | Name of the middle island. |
 | `color` | no | `#f5c26b` | Its colour. |
-| `resources` | no | none | Shared systems (same shape as a pillar system): only a gateway, a broker, an egress and a database, one of each. |
+| `resources` | no | none | Shared systems (same shape as a pillar system), for example a gateway and a broker. Only the roles gateway, broker, egress (an outbound proxy, if you have one) and database, and today at most one of each (a current limit). |
 | `externalCallers` | no | none | Who calls in from outside, drawn at the airport. |
 | `messaging` | no | none | The hub's own topics, in lowercase kebab-case. The hub takes `topics` only: `subscriptions` here is an error. |
 
@@ -239,7 +241,7 @@ A function's jobs are found in its logs, and nothing in the logs says which serv
 | `name` | no | the id | Name shown. |
 | `match` | yes | | The addresses that mean a call to this service: entries with a `host` and an optional `path`. A call matching any entry belongs to it; the first service that matches wins. Link discovery draws the callers it finds from those calls. |
 | `calledBy` | no | none | Ids of our systems that call it, besides the ones link discovery finds. |
-| `roles` | no | none | The telemetry names this service's own calls are recorded under (list every instance name). Link discovery reads their calls like those of a town system: calls through the gateway are resolved by the same `links.rules`, drawn from this building to the town system, taken out of that system's outside traffic, and driven by cars from this island through the airport and the hub gateway. |
+| `roles` | no | none | The telemetry names this service's own calls are recorded under (list every instance name). Link discovery reads their calls like those of a town system: calls through the gateway are resolved by the same `links.rules`, drawn from this building to the town system, taken out of that system's outside traffic, and driven by cars from this island through the airport and the hub gateway. For hub-and-spoke towns with a gateway. |
 | `slaP99Ms` | no | the vendor's | Latency target. |
 | `errors` | no | the vendor's | Error thresholds. |
 
@@ -259,14 +261,14 @@ One file per environment. The pillar and system files are shared; this file says
 | `order` | no | 100 | Place in the picker, lowest first; ties go by id. |
 | `default` | no | `false` | The environment shown when none is asked for. At most one environment may be the default; without one, the first by `order`. |
 | `sources` | no | none | Where numbers come from, by source name. A signal no `signals` entry points elsewhere reads `messaging` (`backlog` and `deadLetters`), `jobs` (`jobs`) or `metrics` (the rest); any other kebab-case name can be pointed at by a signal. `incidents` is reserved: no live adapter reads it yet, and a source of that name is skipped. |
-| `credentials` | no | none | How sources sign in, by name. A source that names none uses the credential called `default` if there is one, else the Azure CLI login. |
+| `credentials` | no | none | How sources sign in, by name. A source that names none uses the credential called `default` if there is one, else the usual login of its adapter (Azure adapter: the Azure CLI login). |
 | `signals` | no | none | Signal → source name (or `none`) for the environment. The signals are `requests`, `errors`, `latency`, `instances`, `cpu`, `memory`, `utilisation`, `throttled`, `backlog`, `deadLetters` and `jobs` (a function only). |
 | `tenants` | no | none | The tenants listed here. Others are found from the cloud when a scope allows. |
 | `exclude` | no | none | Ids of systems not deployed in this environment. Not hub resources: the hub is the same everywhere. |
 | `fake` | no | none | Settings for the fake source only. |
 | `links` | no | none | How the calls the systems make are found in the telemetry (see `links` below). |
 | `logs` | no | none | Where a system's Logs tab reads from (see `logs` below). Without it the tab says logs are not set up. |
-| `scope` | no | none | How pillars and systems map onto the cloud. |
+| `scope` | no | none | How pillars and systems map onto the cloud provider. |
 
 <!-- file: TenantFile -->
 | Key | Required | Default | Meaning |
@@ -281,25 +283,27 @@ One file per environment. The pillar and system files are shared; this file says
 | `undeclaredTenants` | no | none | Tenants the fake source finds that the list does not name. |
 
 ### sources
+Keys marked **Azure adapter setting** belong to the Azure adapter. The core registry holds and checks them for now, so another adapter cannot add keys of its own yet.
+
 <!-- file: SourceFile -->
 | Key | Required | Default | Meaning |
 |---|---|---|---|
-| `regionQuery` | no | none | `loganalytics`: the query that says how a service's requests divide between regions: one row per telemetry name and region with the columns `role`, `region` and `calls`. Sampled counts are fine, only the proportions are used. Same template holes as `query`. With it each region shows its share of the requests. |
-| `typesQuery` | no | none | `servicebus`: a Log Analytics query that says which kinds of message each queue handled: one row per queue and message type with the columns `queue` (the entity's name, as the broker names it), `type` and `calls` (how many were handled over the window). Same template holes as `query`. With it each queue row of a reading system's drawer lists the kinds with their messages a second, highest first, up to 200 kinds per queue; the quietest beyond that are counted, not listed. The source needs the workspace the environment's scope gives (`scope.workspaceId`). Without it no kinds are shown. |
+| `regionQuery` | no | none | **Azure adapter setting.** `loganalytics`: the query that says how a service's requests divide between regions: one row per telemetry name and region with the columns `role`, `region` and `calls`. Sampled counts are fine, only the proportions are used. Same template holes as `query`. With it each region shows its share of the requests. |
+| `typesQuery` | no | none | **Azure adapter setting.** `servicebus`: a Log Analytics query that says which kinds of message each queue handled: one row per queue and message type with the columns `queue` (the entity's name, as the broker names it), `type` and `calls` (how many were handled over the window). Same template holes as `query`. With it each queue row of a reading system's drawer lists the kinds with their messages a second, highest first, up to 200 kinds per queue; the quietest beyond that are counted, not listed. The source needs the workspace the environment's scope gives (`scope.workspaceId`). Without it no kinds are shown. |
 | `kind` | yes | | `fake`, `resourcegraph`, `loganalytics`, `azuremonitor`, `functionjobs`, `servicebus`, `resourcehealth`, `prometheus` or `grafana-irm`. |
 | `connection` | no | from `scope` | How to reach it (a workspace id, an endpoint). Not used by `fake`. |
-| `credential` | no | `default` if defined, else the Azure CLI login | A name from `credentials`. Azure sources only. |
+| `credential` | no | `default` if defined, else the adapter's usual login (Azure: the Azure CLI login) | A name from `credentials`. Azure adapter sources only. |
 | `pollSeconds` | no | 30 (300 for `resourcehealth`) | How often the source is asked. Above 0. |
 | `timeoutSeconds` | no | 10 (60 for `resourcehealth`) | How long one ask may take. Above 0. |
 | `lateAfterSeconds` | no | twice `pollSeconds` | `functionjobs`: how long after its schedule says a job should run it may go without a newer run before it counts as late (amber). A value below the default is ignored, since a reading may lag that much anyway. Lets a log that arrives late stay quiet without polling slower. Above 0. |
 | `query` | for `functionjobs` (unless a recording) | none | `loganalytics`: the query to send, a template; `functionjobs`: the query that summarises the function apps' logs into one row per app and job (columns `resourceId`, `job`, `lastRun`, `succeeded`, `next`, `region`). `{window}`, `{windowSeconds}`, `{roles}`, scope variables and `{environment}` work. |
 | `window` | no | `5m` (`3d` for `resourcehealth`) | `loganalytics`, `azuremonitor`, `servicebus`, `functionjobs` and `resourcehealth`: how far back one answer looks. A unit is `s`, `m`, `h` or `d`. |
-| `metrics` | no | none | `azuremonitor`: which metric of which resources fills which signal. Required for an `azuremonitor` source. |
-| `providers` | no | none | `resourcehealth`: the resource providers whose health reports are read, as the cloud names them (`Namespace.Service`, for example the data store's). Required for a `resourcehealth` source. A subscription is asked for a provider only when the inventory has a resource of that provider in it. A resource's report is matched to the system that owns it by the resource's id, through `scope.resources`. |
+| `metrics` | no | none | **Azure adapter setting.** `azuremonitor`: which metric of which resources fills which signal. Required for an `azuremonitor` source. |
+| `providers` | no | none | **Azure adapter setting.** `resourcehealth`: the resource providers whose health reports are read, as the cloud names them (`Namespace.Service`, for example the data store's). Required for a `resourcehealth` source. A subscription is asked for a provider only when the inventory has a resource of that provider in it. A resource's report is matched to the system that owns it by the resource's id, through `scope.resources`. |
 | `keepResolvedFor` | no | `4h` | `resourcehealth`: how long a report stays listed, in green, after the resource recovered (a number and a unit: `4h`, `90m`, `1d`). The marker on the building goes away at once; the list entry and the drawer lines say resolved. A report can be dismissed earlier (the Dismiss button); a dismissal lasts until the server restarts. |
-| `entities` | no | none | `servicebus`: which namespaces to read, which metrics are the backlog and the dead letters, and how an entity's name says whose it is. Required for a `servicebus` source. |
+| `entities` | no | none | **Azure adapter setting.** `servicebus`: which namespaces to read, which metrics are the backlog and the dead letters, and how an entity's name says whose it is. Required for a `servicebus` source. |
 
-### metrics entries (`azuremonitor`)
+### metrics entries (`azuremonitor`, Azure adapter)
 <!-- file: MetricGroupFile -->
 | Key | Required | Default | Meaning |
 |---|---|---|---|
@@ -328,7 +332,7 @@ An entry needs at least one signal other than `limit`.
 | `orElse` | no | none | Another metric to read when this one gives no number or 0. It cannot have its own `over` or `orElse`. |
 | `whenEmpty` | no | `unknown` | What a read that worked but returned no number means: `unknown` (the system shows no data) or `idle` (nothing happened, so the signal is 0 and the tenant's row says "no activity reported"). A failed read is always unknown. Only on the signal itself, not on its `over` or `orElse`. |
 
-Example (a database account with an autoscale ceiling, falling back to fixed throughput):
+Azure adapter example (a Cosmos DB account with an autoscale ceiling, falling back to fixed throughput):
 
 ```yaml
 sources:
@@ -346,7 +350,7 @@ sources:
           orElse: { metric: ProvisionedThroughput, aggregation: maximum }
 ```
 
-### entities (`servicebus`)
+### entities (`servicebus`, Azure adapter)
 Reads the backlog and the dead letters of a message broker from the platform metrics of its namespaces, split by entity (queue or topic) name, and gives each entity's numbers to the system that consumes it. The program knows no metric name and no naming convention: this block says them. A system's backlog is what waits in all its entities, in every namespace the rule finds (one for each region); a namespace that cannot be read fails the poll, so a number made from only some of them never shows. An entity no pattern claims, or that no system consumes, is left out.
 
 ```yaml
@@ -361,12 +365,12 @@ sources:
       deadLetter: { metric: DeadletteredMessages, aggregation: last }   # last = the newest point: what is dead-lettered now, so a replayed queue clears at once. maximum would keep the peak of the whole window
       throughput: { metric: IncomingMessages, aggregation: total }
       patterns:                               # the first that matches decides; (?<service>) is the service code of the reader, (?<pillar>) the pillar code of the reader (left out: any pillar)
-        - { match: '^sbq-(?<pillar>[a-z]+)-(?<service>[a-z]+)-(?:inbox|changefeed-worker)$' }
+        - { match: '^(?<pillar>[a-z]+)\.(?<service>[a-z]+)\.in$' }
         # the name also says who publishes it, so the town builds the topic and the subscription itself: no `messaging:` block in a pillar file
-        - { match: '^sbq-(?<producerPillar>[a-z]+)-(?<producer>[a-z]+)-(?<service>[a-z]+)-outbox$' }
-      flows:                                  # what a whole pillar sends and receives: its egress topic and the topic its ingress queues hang on
-        - { match: '^sbt-(?<pillar>[a-z]+)-egress$', direction: sent }
-        - { match: '^(?<pillar>[a-z]+)-igrs-outbox$', direction: received }
+        - { match: '^(?<producerPillar>[a-z]+)\.(?<producer>[a-z]+)\.to\.(?<service>[a-z]+)$' }
+      flows:                                  # what a whole group sends and receives, for example one topic it publishes everything on and one it receives on
+        - { match: '^(?<pillar>[a-z]+)\.outbound$', direction: sent }
+        - { match: '^(?<pillar>[a-z]+)\.inbound$', direction: received }
 signals: { backlog: messaging, deadLetters: messaging }
 ```
 
@@ -379,17 +383,17 @@ signals: { backlog: messaging, deadLetters: messaging }
 | `backlog` | no | none | The metric of the messages waiting in an entity. |
 | `deadLetter` | no | none | The metric of the dead-lettered messages of an entity. |
 | `throughput` | no | none | The metric of the messages that arrive in an entity, usually incoming messages added up by `total`. Their rate (per second over the window) sets how many boats sail to the consumer; without it the boats follow the consumer's request rate. |
-| `deadLetterLink` | no | none | `{ name, url }`: an address that opens one queue's dead letters in your support tool, shown for each queue in its consumer's drawer. The url is a template over `{queue}`, `{pillar}`, `{service}` (the codes of the scope rules), `{system}` and `{environment}`. Without it, no link. |
-| `deadLetterLinks` | no | none | A list of `{ region, name, url }`: one support-tool address for each region, for a broker whose namespaces are in more than one region and a tool for each. A queue's dead letters in a region open the entry of that region (the region is matched ignoring case against the region of the namespace that holds them, as `scope.regions` and the resource rule give it). A region with no entry uses `deadLetterLink`. Each region may be given once. |
+| `deadLetterLink` | no | none | `{ name, url }`: an address that opens one queue's dead letters in your queue explorer, shown for each queue in its consumer's drawer. The url is a template over `{queue}`, `{pillar}`, `{service}` (the codes of the scope rules), `{system}` and `{environment}`. Without it, no link. |
+| `deadLetterLinks` | no | none | A list of `{ region, name, url }`: one queue-explorer address for each region, for a broker whose namespaces are in more than one region and a tool for each. A queue's dead letters in a region open the entry of that region (the region is matched ignoring case against the region of the namespace that holds them, as `scope.regions` and the resource rule give it). A region with no entry uses `deadLetterLink`. Each region may be given once. |
 | `flows` | no | none | Entities that carry a whole pillar's traffic, a list of `{ match, direction }`: the rate of their `throughput` (messages a second over the source's `window`) is what that pillar sends to other pillars (`sent`) or receives from them (`received`). Several entities of one pillar (the same name in each region) add up. The name says only the pillar, never the other end, so these are totals per pillar, not pairs. They need `throughput`. The dashboard and the town show them; without `flows` neither shows a flow. |
-| `patterns` | yes | | The shapes of entity names, tried in order: a regular expression with the group `service` (the code of the system that reads the entity; it must belong to one system of the kind only, or the entity is left out), optionally `pillar` (the code or id of the reader's pillar; without it the reader may be in any pillar), and optionally both `producerPillar` and `producer` (the code of the pillar and of the service that publish it). An entity whose name says its publisher is a route: the town adds that service's topic and the reader's subscription to what the pillar files say, on every poll, so queues teams add later appear without a config change. A queue Azure sends nothing for in one poll keeps its place with no numbers. |
+| `patterns` | yes | | The shapes of entity names, tried in order: a regular expression with the group `service` (the code of the system that reads the entity; it must belong to one system of the kind only, or the entity is left out), optionally `pillar` (the code or id of the reader's pillar; without it the reader may be in any pillar), and optionally both `producerPillar` and `producer` (the code of the pillar and of the service that publish it). An entity whose name says its publisher is a route: the town adds that service's topic and the reader's subscription to what the pillar files say, on every poll, so queues teams add later appear without a config change. A queue Azure Monitor sends nothing for in one poll keeps its place with no numbers. |
 
 At least one of `backlog`, `deadLetter` or `throughput` is required.
 
 <!-- file: EntityLinkFile -->
 | Key | Required | Default | Meaning |
 |---|---|---|---|
-| `name` | yes | | The words the link shows (for example `Support tool`). |
+| `name` | yes | | The words the link shows (for example `Open in queue explorer`). |
 | `url` | yes | | An `http://` or `https://` address, a template over `{queue}` (the queue's name), `{pillar}`, `{service}`, `{system}` and `{environment}`. A system with no code for a word it uses gets no link. |
 | `region` | no | | Only in `deadLetterLinks`: the region the address is for (required there, and not used in `deadLetterLink`). |
 
@@ -419,8 +423,8 @@ Finds the calls the systems really make, from the dependency data in the telemet
 <!-- file: LinksFile -->
 | Key | Required | Default | Meaning |
 |---|---|---|---|
-| `source` | yes | | Name of a `loganalytics` source of this file. Its workspace and login are used. |
-| `query` | yes | | The query to send, a template. Holes: `{roles}` (the telemetry names of the systems asked about, double-quoted, separated by commas), `{from}` and `{to}` (UTC, ISO 8601), `{environment}` and your `scope.variables`. It returns one row for each caller and address with the columns `caller` (a telemetry name), `host` and `days` (an array of the days it was seen on); `path` and `calls` may be left out. Azure does the counting; no raw rows come back. |
+| `source` | yes | | Name of a `loganalytics` source of this file (today it must be that Azure adapter kind). Its workspace and login are used. |
+| `query` | yes | | The query to send, a template. Holes: `{roles}` (the telemetry names of the systems asked about, double-quoted, separated by commas), `{from}` and `{to}` (UTC, ISO 8601), `{environment}` and your `scope.variables`. It returns one row for each caller and address with the columns `caller` (a telemetry name), `host` and `days` (an array of the days it was seen on); `path` and `calls` may be left out. The store does the counting; no raw rows come back. |
 | `interval` | no | `1h` | How often it reads, for example `30m`. A number and `s`, `m`, `h` or `d`. |
 | `firstRead` | no | `7d` | How far back the first read looks, and the longest gap a later read covers. After that each read starts where the last ended. |
 | `minDays` | no | `2` | The fewest different days a call must be seen on to be drawn. |
@@ -447,6 +451,8 @@ Finds the calls the systems really make, from the dependency data in the telemet
 | `interval` | no | `5m` | How often it reads. |
 
 Found links are saved under `_discovered/links/<environment>/` in the town's folder (one file for each pillar, plus `state.yaml`), never in a pillar file, and are meant to stay out of version control. Addresses no rule explains, no ignore pattern covers and no vendor `domains` entry names are listed under Notices.
+
+Azure adapter example, in KQL:
 
 ```yaml
 links:
@@ -480,10 +486,10 @@ What a system's Logs tab shows in a live town. Nothing is polled: when someone o
 <!-- file: LogsFile -->
 | Key | Required | Default | Meaning |
 |---|---|---|---|
-| `source` | yes | | Name of a `loganalytics` source of this file. Its workspace and login are used. |
-| `query` | yes | | The query to send, a template. Holes: `{roles}` (the system's telemetry name, double-quoted), `{from}` and `{to}` (UTC, ISO 8601), `{window}` (for example `4h`), `{windowSeconds}`, `{slaMs}` (the system's own p99 SLA), `{kind}` (`api`, `worker` and so on), `{environment}` and your `scope.variables`. It returns one row for each kind of entry with the columns `section` (`failed`, `slow`, `logs` or `exceptions`), `at` (the newest time) and `text`; `count` (default 1), `level` (`info`, `warn` or `error`, or a number where 2 is a warning and 3 and up an error), `durationMs` and `result` (a status code, say) may be left out. Azure does the grouping; no raw rows come back, and none are cut off. |
+| `source` | yes | | Name of a `loganalytics` source of this file (today it must be that Azure adapter kind). Its workspace and login are used. |
+| `query` | yes | | The query to send, a template. Holes: `{roles}` (the system's telemetry name, double-quoted), `{from}` and `{to}` (UTC, ISO 8601), `{window}` (for example `4h`), `{windowSeconds}`, `{slaMs}` (the system's own p99 SLA), `{kind}` (`api`, `worker` and so on), `{environment}` and your `scope.variables`. It returns one row for each kind of entry with the columns `section` (`failed`, `slow`, `logs` or `exceptions`), `at` (the newest time) and `text`; `count` (default 1), `level` (`info`, `warn` or `error`, or a number where 2 is a warning and 3 and up an error), `durationMs` and `result` (a status code, say) may be left out. The store does the grouping; no raw rows come back, and none are cut off. |
 | `window` | no | `4h` | How far back it looks, for example `30m`. |
-| `links` | no | none | Links in the header of a section that open the telemetry store's own search already filtered to the system, 0 to n, each `{ name, section, resources, url }`. `section` is `failed`, `slow`, `logs` or `exceptions`; `resources` names a `scope.assets` rule, and each resource it finds gets its own link (its name is added to the link's name when there is more than one). The url starts with `https://` (or `http://`) written out and may use `{resourceId}`, `{resourceIdTwice}` (the id percent-encoded twice, as the Azure portal's blade addresses want it), `{resourceName}`, `{role}`, `{from}`, `{to}`, `{windowMs}`, `{environment}` and your `scope.variables`; every value is percent-encoded. |
+| `links` | no | none | Links in the header of a section that open the telemetry store's own search already filtered to the system, 0 to n, each `{ name, section, resources, url }`. `section` is `failed`, `slow`, `logs` or `exceptions`; `resources` names a `scope.assets` rule, and each resource it finds gets its own link (its name is added to the link's name when there is more than one). The url starts with `https://` (or `http://`) written out and may use `{resourceId}`, `{resourceIdTwice}` (the id percent-encoded twice, for portals that nest it), `{resourceName}`, `{role}`, `{from}`, `{to}`, `{windowMs}`, `{environment}` and your `scope.variables`; every value is percent-encoded. |
 
 Each entry of `logs.links`:
 
@@ -494,6 +500,8 @@ Each entry of `logs.links`:
 | `section` | yes | | The section whose header carries it: `failed`, `slow`, `logs` or `exceptions`. |
 | `resources` | yes | | The name of a `scope.assets` rule; each resource it finds gets its own link. |
 | `url` | yes | | The address template, starting with `https://` or `http://` written out. |
+
+Azure adapter example, in KQL:
 
 ```yaml
 logs:
@@ -509,40 +517,42 @@ logs:
         | summarize count = count(), at = max(TimeGenerated), level = max(SeverityLevel)
             by section = "logs", text = Message)
   links:
-    - { name: 5xx in search, section: failed, resources: app-insights, url: "https://search.example.test/{resourceIdTwice}?service={role}&from={from}&to={to}" }
+    - { name: 5xx in search, section: failed, resources: telemetry-store, url: "https://search.example.test/{resourceIdTwice}?service={role}&from={from}&to={to}" }
 ```
 
 ### credentials
 <!-- file: CredentialFile -->
 | Key | Required | Default | Meaning |
 |---|---|---|---|
-| `kind` | yes | | `azure-cli`, `default`, `managed-identity` or `service-principal`. |
+| `kind` | yes | | A login kind of a loaded adapter. The Azure adapter's kinds are `azure-cli`, `default`, `managed-identity` and `service-principal`. |
 | `tenantId` | no | the login's own | Directory to sign in to. |
 | `clientId` | no | none | App registration (service principal) or user-assigned identity (managed identity). |
 | `clientSecretEnv` | no | none | Name of the environment variable that holds a service principal's secret. The secret itself never goes in a file. |
 
 ### scope
+How pillars and systems map onto the cloud provider. `inventory`, `workspace`, `workspaceId`, `subscription`, `pillars` and `queries` are **Azure adapter settings** (on Azure the account is a subscription and the telemetry store a Log Analytics workspace); the core registry holds them for now.
+
 <!-- file: ScopeFile -->
 | Key | Required | Default | Meaning |
 |---|---|---|---|
-| `inventory` | no | none | Name of the `resourcegraph` source that lists resources. |
-| `workspace` | no | none | Log Analytics workspace by name or wildcard (a template), looked up in the inventory. An id or resource id is used as given. |
-| `workspaceId` | no | none | The workspace's id (GUID or resource id), a template. Wins over `workspace`. |
+| `inventory` | no | none | **Azure adapter setting.** Name of the `resourcegraph` source that lists resources. |
+| `workspace` | no | none | **Azure adapter setting.** The telemetry store: a Log Analytics workspace by name or wildcard (a template), looked up in the inventory. An id or resource id is used as given. |
+| `workspaceId` | no | none | **Azure adapter setting.** The workspace's id (GUID or resource id), a template. Wins over `workspace`. |
 | `variables` | no | none | Your own names for use in templates. |
-| `subscription` | no | none | Which subscriptions belong to the environment, by exactly one of `nameLike` or `tag`. |
-| `pillars` | no | none | Pillar id → the id of the subscription that holds its resources. `hub` is accepted too, so the hub's gateway and broker find their resources and portal links. |
+| `subscription` | no | none | **Azure adapter setting.** Which subscriptions (accounts) belong to the environment, by exactly one of `nameLike` or `tag`. |
+| `pillars` | no | none | **Azure adapter setting.** Pillar id → the id of the subscription that holds its resources. `hub` is accepted too, so the hub's gateway and broker find their resources and portal links. |
 | `resources` | no | none | Rules that find a system's cloud resources. |
 | `telemetryRole` | no | none | Template for a system's telemetry name when it gives none. Holes: `{system}`, `{service}`, `{name}`, `{role}`, `{pillar}`, `{pillarId}`, your `variables` and `{environment}`. |
 | `links` | no | none | Addresses that open a resource in a portal or console, shown beside each resource in the Config tab. |
-| `cloud` | no | none | What the cloud is called in your words (for example `Azure`). A system whose app the inventory cannot find reads "not found in <cloud>"; without it, "not found in the inventory". |
-| `assets` | no | none | Resources that are not systems but stand as small buildings without health (a key vault, a storage account). See below. |
+| `cloud` | no | none | What the cloud is called in your words (for example `Azure`). A system whose app the inventory cannot find reads "not found in <cloud>"; without it, "not found in the inventory". A provider health report on the dashboard reads "<cloud> incident" ("Cloud incident" without it). |
+| `assets` | no | none | Resources that are not systems but stand as small buildings without health (a secrets store, a storage account). See below. |
 | `regions` | no | location, as is | How a service's region is read and named, and when a lopsided split of requests is flagged. |
-| `queries` | no | built-in | Replace the inventory queries. |
+| `queries` | no | built-in | **Azure adapter setting.** Replace the inventory queries. |
 
 <!-- file: SubscriptionRuleFile -->
 | Key | Required | Default | Meaning |
 |---|---|---|---|
-| `nameLike` | no | none | Subscription name pattern (a template). Give exactly one of `nameLike` and `tag`. |
+| `nameLike` | no | none | Subscription name pattern (a template, for example `{pillar}-{env}`). Give exactly one of `nameLike` and `tag`. |
 | `tag` | no | none | Match by tag instead. Give exactly one of `nameLike` and `tag`. |
 
 <!-- file: TagRuleFile -->
@@ -563,25 +573,25 @@ logs:
 | `instances` | no | none | Query expression for how many instances a resource runs. |
 | `state` | no | none | Query expression that reads a resource's app state as text. A system whose rule has it shows Running, Stopped (a building under construction) or, when the inventory has no such app, Missing (grey, "not found in" the `cloud` you name). |
 | `running` | with `state` | | The values of `state` that mean the app runs; any other value is shown as stopped. The core knows no state words. |
-| `subscription` | no | the system's pillar's | Which subscriptions this rule looks in, by `nameLike` (a template over your `variables` and `{environment}`) or by `tag` (`key`, `value`), exactly one of the two. For resources that live apart from their pillar, such as the hub's gateway or Service Bus. |
+| `subscription` | no | the system's pillar's | Which subscriptions this rule looks in, by `nameLike` (a template over your `variables` and `{environment}`) or by `tag` (`key`, `value`), exactly one of the two. For resources that live apart from their pillar, such as the hub's gateway or message broker. |
 
 <!-- file: AssetRuleFile -->
 | Key | Required | Default | Meaning |
 |---|---|---|---|
 | `name` | yes | | Names the rule (lowercase kebab-case). |
-| `label` | yes | | What the resource is, in the drawer's words (for example `Key vault`). |
+| `label` | yes | | What the resource is, in the drawer's words (for example `Secrets store`). |
 | `shape` | no | `box` | How the building looks: `box`, `vault`, `store`, `settings` or `observatory`. |
 | `types` | yes | | The resource types it applies to. They are looked for in each pillar's subscription (or, with `island: hub`, in the subscriptions `subscription` names). |
 | `pattern` | yes | | Regular expression over the resource's name. Optional named groups: `service` (matched with a system's `serviceCode`; a match stands the building beside that service's pad, otherwise it stands in the pillar's back yard), `pillar` (another pillar's resource is left out) and `region`. On the hub only `region` is allowed. |
 | `island` | no | the pillar it is found in | `hub` stands the building on the hub island, in the cluster `group` names. It belongs to no pillar and no service. |
-| `group` | with `island: hub` | | The cluster of buildings it stands in on the hub, named on a sign (for example `Monitoring`). Rules with the same group share a cluster. |
+| `group` | with `island: hub` | | The cluster of buildings it stands in on the hub, named on a sign (for example `Shared telemetry`). Rules with the same group share a cluster. |
 | `subscription` | no | the pillars' subscriptions | With `island: hub`: which subscriptions to look in, by `nameLike` (a template over your `variables` and `{environment}`) or by `tag` (`key`, `value`), exactly one of the two. Use it when the shared resources live in a subscription of their own. |
 
 <!-- file: RegionsFile -->
 | Key | Required | Default | Meaning |
 |---|---|---|---|
 | `tag` | no | none | Tag of a resource that says its region. Without it, the `region` group of the rule's pattern, else the location the cloud gives. |
-| `names` | no | none | Region value → the label to show (for example `northeurope: North`). A value without a label is shown as it is. |
+| `names` | no | none | Region value → the label to show (for example `us-east-1: East` or `eu-west: EU`). A value without a label is shown as it is. |
 | `skew` | no | `0.9` | The share of a service's requests one region may take, while another region runs instances, before the town flags it. Above `0.5` and at most `1`; `1` never flags. Needs the source's `regionQuery`. |
 
 <!-- file: ResourceLinkFile -->

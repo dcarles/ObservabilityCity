@@ -6,6 +6,7 @@ import type { Chip, Dashboard, Group, IncidentRow, Issue, JobRow, Level, Pillar,
 import type { SourceLine } from './freshness'
 import { busiest, windowText, type Flow, type FlowTile, type TrafficRow } from './flows'
 import { formatRate } from '../visuals'
+import { groupWords } from '../groupLabel'
 
 /** What the viewer has opened or closed. A group or a database that is not in the maps follows its own default. */
 export interface UiState {
@@ -27,7 +28,9 @@ const dot = (l: Level): string => `<span class="dot ${l}" title="${l === 'none' 
 const meter = (v: number | null, amber: number): string => (v == null
   ? '<span class="dim">–</span>'
   : `<span class="meter${v >= amber ? ' hot' : ''}"><i style="width:${Math.min(100, Math.max(0, v))}%"></i></span><span class="mv">${Math.round(v)}%</span>`)
-const loadRow = (label: string, bars: string): string => `<div class="lrow"><span class="lt">${label}</span>${bars}</div>`
+const loadRow = (label: string, bars: string, title = ''): string => `<div class="lrow"><span class="lt"${title ? ` title="${title}"` : ''}>${label}</span>${bars}</div>`
+/** A database's load: the share of its provisioned capacity it uses. No unit: the source sends none, and engines measure capacity differently. */
+const capacityRow = (bars: string): string => loadRow('Cap', bars, 'Capacity used')
 const plural = (n: number, word: string): string => `${n} ${word}${n === 1 ? '' : 's'}`
 
 export const countsText = (down: number, degraded: number): string => `${down} down · ${degraded} degraded`
@@ -60,7 +63,7 @@ export function summaryHtml(d: Dashboard, ui: Pick<UiState, 'flowsAll'> = {}): s
   const inc = s.incidents
   const incidents = inc ? `<div class="kpi" id="kpi-incidents"><span>Incidents</span><b class="${inc.open > 0 ? 'bad' : 'ok'}">${num(inc.open)}</b>
     <div class="ilist">${inc.rows.length ? inc.rows.map(incidentLine).join('') : '<small>No incidents</small>'}</div></div>` : ''
-  return services + traffic + flowTileHtml(s.flows, ui.flowsAll === true) + dlq + incidents
+  return services + traffic + flowTileHtml(s.flows, ui.flowsAll === true, d.groupLabel) + dlq + incidents
 }
 
 const rate = (v: number): string => `${formatRate(v)} msg/s`
@@ -93,7 +96,7 @@ const windowNote = (seconds: number): string => (windowText(seconds) ? `<small c
  * The Message flow tile: the busiest pillars, each with what it sends and what it receives (a bar for each, scaled to the busiest side of any pillar), and a button
  * for all of them. A side with no messages says so. Left out when no pillar moves any message.
  */
-export function flowTileHtml(f: FlowTile | null, all: boolean): string {
+export function flowTileHtml(f: FlowTile | null, all: boolean, groupLabel?: string | null): string {
   if (!f) return ''
   const list = all ? f.all : f.top
   const row = (x: { side: NonNullable<ReturnType<typeof flowSide>>; v: number | null }): string =>
@@ -101,7 +104,7 @@ export function flowTileHtml(f: FlowTile | null, all: boolean): string {
   const lines = list.map((x) => `<div class="fl" data-flow="${esc(x.id)}"><span class="fn">${esc(x.name)}</span>${sidesOf(x).map(row).join('')}</div>`).join('')
   const more = f.all.length > f.top.length || all
   const total = f.total != null ? `<b>${formatRate(f.total)} <u>msg/s</u></b><small>Taken in by all the queues of the platform</small>` : ''
-  return `<div class="kpi" id="kpi-flow"><span>Message flow</span>${total}<div class="flist">${lines || '<small>No pillar sends or receives 1 message a second or more.</small>'}</div>${windowNote(f.windowSeconds)}${more ? `<button class="btn fall" data-flows-all aria-expanded="${all}">${all ? 'Show fewer' : `Show all ${f.all.length}`}</button>` : ''}</div>`
+  return `<div class="kpi" id="kpi-flow"><span>Message flow</span>${total}<div class="flist">${lines || `<small>No ${esc(groupWords(groupLabel).lower)} sends or receives 1 message a second or more.</small>`}</div>${windowNote(f.windowSeconds)}${more ? `<button class="btn fall" data-flows-all aria-expanded="${all}">${all ? 'Show fewer' : `Show all ${f.all.length}`}</button>` : ''}</div>`
 }
 
 /**
@@ -142,12 +145,12 @@ function incidentLine(r: IncidentRow): string {
 
 const CPU_AMBER = 80
 const MEM_AMBER = 85
-const RU_AMBER = 85
+const CAPACITY_AMBER = 85
 
 function tenantLine(t: TenantRow): string {
   const throttled = (t.throttled ?? 0) > 0
   return `<tr class="sub" data-tenant="${esc(t.id)}"><td class="ind2">${dot(t.level)}<span class="tn">${esc(t.name)}</span>${t.test ? '<span class="test">test</span>' : ''}${t.unknown ? '<span class="test">unknown</span>' : ''}</td><td></td><td></td><td></td>
-    <td class="ld">${loadRow('RU', `${meter(t.ru, RU_AMBER)}${t.limit != null ? `<span class="mx">max ${num(t.limit)} RU/s</span>` : ''}`)}</td>
+    <td class="ld">${capacityRow(`${meter(t.ru, CAPACITY_AMBER)}${t.limit != null ? `<span class="mx">max ${num(t.limit)}</span>` : ''}`)}</td>
     <td colspan="2">${throttled ? `<span class="thr">${num(t.throttled, 1)}% throttled</span>` : '<span class="dim">no throttling</span>'}</td></tr>`
 }
 
@@ -173,8 +176,8 @@ function latencyCell(r: Row): string {
 function loadCell(r: Row): string {
   if (r.type === 'DB') {
     if (r.ru == null) return '<span class="dim">–</span>'
-    const max = r.ruMax ? `<span class="mx">max ${num(r.ruMax.limit)} RU/s<i>${esc(r.ruMax.tenant)}</i></span>` : ''
-    return loadRow('RU', `${meter(r.ru, RU_AMBER)}${max}`)
+    const max = r.ruMax ? `<span class="mx">max ${num(r.ruMax.limit)}<i>${esc(r.ruMax.tenant)}</i></span>` : ''
+    return capacityRow(`${meter(r.ru, CAPACITY_AMBER)}${max}`)
   }
   const per = (label: string, whole: number | null, key: 'cpu' | 'memory', amber: number): string => {
     if (r.regions && r.regions.length >= 2) {
@@ -199,7 +202,7 @@ function rowHtml(r: Row, ui: UiState): string {
   const conn = connectionsLabel(r)
   const showConn = ui.connections.has(r.id)
   const connCell = conn ? `<button class="conn" data-conn="${esc(r.id)}" aria-expanded="${showConn}">${conn}<span class="chev">${showConn ? '▴' : '▾'}</span></button>` : '<span class="dim">–</span>'
-  const main = `<tr class="row" data-system="${esc(r.id)}"><td class="ind">${dot(r.level)}<span class="nm">${label}${esc(r.name)}</span>${count}${r.dlq ? `<b class="bad dlq">DLQ ${num(r.dlq)}</b>` : ''}${r.azure ? `<b class="azure ${r.azure.state === 'Unavailable' ? 'down' : 'bad'}" title="${esc(r.azure.cloud)} reports this resource ${esc(r.azure.state.toLowerCase())}. Open Details for when and why.">! ${esc(r.azure.cloud)} incident</b>` : ''}<small>${esc(r.type)}${r.engine ? ` · <b class="engine" title="Database engine and type">${esc(r.engine.name)}<i>${esc(r.engine.type)}</i></b>` : ''}${r.instancesText ? ` · ${esc(r.instancesText)}` : ''}</small></td>
+  const main = `<tr class="row" data-system="${esc(r.id)}"><td class="ind">${dot(r.level)}<span class="nm">${label}${esc(r.name)}</span>${count}${r.dlq ? `<b class="bad dlq">DLQ ${num(r.dlq)}</b>` : ''}${r.cloudHealth ? `<b class="cloud-health ${r.cloudHealth.state === 'Unavailable' ? 'down' : 'bad'}" title="${esc(r.cloudHealth.cloud)} reports this resource ${esc(r.cloudHealth.state.toLowerCase())}. Open Details for when and why.">! ${esc(r.cloudHealth.cloud)} incident</b>` : ''}<small>${esc(r.type)}${r.engine ? ` · <b class="engine" title="Database engine and type">${esc(r.engine.name)}<i>${esc(r.engine.type)}</i></b>` : ''}${r.instancesText ? ` · ${esc(r.instancesText)}` : ''}</small></td>
     <td class="n">${trafficCell(r)}</td><td class="n">${errorCell(r)}</td><td class="n">${latencyCell(r)}</td><td class="ld">${loadCell(r)}</td>
     <td>${connCell}</td><td><button class="det" data-details="${esc(r.id)}">Details <b>›</b></button></td></tr>`
   const connRow = showConn && conn

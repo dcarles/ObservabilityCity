@@ -33,8 +33,8 @@ sources:
     # the kinds of message each queue handled, from the span metrics of the consumers
     typesQuery: |
       AppMetrics
-      | where TimeGenerated > ago({window}) and Name == "servicebus.span.metrics.calls"
-      | summarize calls = sum(Sum) by queue = tostring(Properties["messaging.consumer"]), type = tostring(Properties["messaging.type"])
+      | where TimeGenerated > ago({window}) and Name == "messaging.process.duration"
+      | summarize calls = sum(ItemCount) by queue = tostring(Properties["messaging.destination.name"]), type = tostring(Properties["messaging.message.type"])
     entities:
       resources: broker
       dimension: EntityName
@@ -54,7 +54,7 @@ scope:
   pillars: { bb: 00000000-0000-0000-0000-0000000000b2 }
   telemetryRole: "{name|nospace}"
   resources:
-    - { name: broker, types: [microsoft.servicebus/namespaces], roles: [broker], pattern: '^(?<service>sb)-acme-(?<region>[a-z]+)', subscription: { nameLike: "*-{stage}-hub" } }
+    - { name: broker, types: [microsoft.servicebus/namespaces], roles: [broker], pattern: '^(?<service>sb)-acme-(?<region>[a-z]+)', subscription: { nameLike: "hub-{stage}-*" } }
     - { name: container-apps, types: [microsoft.app/containerapps], roles: [api, worker], pattern: '^(?<service>[a-z]+)-(?<role>api|worker)$', instances: "toint(properties.template.scale.minReplicas)" }
     - { name: accounts, types: [microsoft.documentdb/databaseaccounts], roles: [db], pattern: '^cosmos-(?<service>[a-z]+)-(?<tenant>[a-z0-9]+)$', tenantNameTag: customer }
   # other address shapes: one per resource type, built from names and ids instead of the resource id

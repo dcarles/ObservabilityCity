@@ -21,14 +21,14 @@ public class PillarFlowTests
 
     private static TownRegistry Prod(string folder) => RegistryLoader.Load(folder).ForEnvironment("prod");
 
-    private static readonly IReadOnlyList<EntityFlow> ShapeA = [new(@"^sbt-(?<pillar>[a-z]+)-egress$", "sent"), new(@"^(?<pillar>[a-z]+)-igrs$", "received")];
+    private static readonly IReadOnlyList<EntityFlow> ShapeA = [new(@"^(?<pillar>[a-z]+)-out$", "sent"), new(@"^(?<pillar>[a-z]+)-in$", "received")];
     private static readonly IReadOnlyList<EntityFlow> ShapeB = [new(@"^out\.(?<pillar>[a-z]+)$", "sent"), new(@"^in\.(?<pillar>[a-z]+)\.all$", "received")];
 
     [Fact]
     public void Two_differently_shaped_patterns_give_the_same_flows()
     {
         // town A names a pillar by its code (al, be); town B by its id (aa, bb)
-        var a = ServiceBusSource.PillarFlows(Prod(TownA), ShapeA, new Dictionary<string, double> { ["sbt-al-egress"] = 6000, ["be-igrs"] = 1200 }, Window);
+        var a = ServiceBusSource.PillarFlows(Prod(TownA), ShapeA, new Dictionary<string, double> { ["al-out"] = 6000, ["be-in"] = 1200 }, Window);
         var b = ServiceBusSource.PillarFlows(Prod(TownB), ShapeB, new Dictionary<string, double> { ["out.aa"] = 6000, ["in.bb.all"] = 1200 }, Window);
 
         Assert.Equal(new PillarFlowReading(10, null, 600), a["aa"]);
@@ -39,7 +39,7 @@ public class PillarFlowTests
     [Fact]
     public void Entities_of_one_pillar_add_up_and_an_unknown_pillar_or_a_plain_entity_is_left_out()
     {
-        var arrived = new Dictionary<string, double> { ["sbt-al-egress"] = 600, ["sbt-AL-egress"] = 0, ["sbt-zz-egress"] = 999, ["sbq-al-ord-inbox"] = 300, ["al-igrs"] = 0 };
+        var arrived = new Dictionary<string, double> { ["al-out"] = 600, ["AL-out"] = 0, ["zz-out"] = 999, ["q-al-ord-in"] = 300, ["al-in"] = 0 };
 
         var flows = ServiceBusSource.PillarFlows(Prod(TownA), ShapeA, arrived, Window);
 
@@ -50,14 +50,14 @@ public class PillarFlowTests
     [Fact]
     public void Without_flows_in_the_config_nothing_is_reported()
     {
-        Assert.Empty(ServiceBusSource.PillarFlows(Prod(TownA), null, new Dictionary<string, double> { ["sbt-al-egress"] = 600 }, Window));
-        Assert.Empty(ServiceBusSource.PillarFlows(Prod(TownA), [], new Dictionary<string, double> { ["sbt-al-egress"] = 600 }, Window));
+        Assert.Empty(ServiceBusSource.PillarFlows(Prod(TownA), null, new Dictionary<string, double> { ["al-out"] = 600 }, Window));
+        Assert.Empty(ServiceBusSource.PillarFlows(Prod(TownA), [], new Dictionary<string, double> { ["al-out"] = 600 }, Window));
     }
 
     [Fact]
     public void The_hub_is_never_given_a_flow_and_a_second_pillar_code_names_the_pillar_by_id_too()
     {
-        var flows = ServiceBusSource.PillarFlows(Prod(TownA), ShapeA, new Dictionary<string, double> { ["sbt-aa-egress"] = 60, ["sbt-hub-egress"] = 60 }, Window);
+        var flows = ServiceBusSource.PillarFlows(Prod(TownA), ShapeA, new Dictionary<string, double> { ["aa-out"] = 60, ["hub-out"] = 60 }, Window);
 
         Assert.Equal(["aa"], flows.Keys);
     }
@@ -76,7 +76,7 @@ public class PillarFlowTests
     [Fact]
     public void Flows_are_read_from_the_environment_file()
     {
-        var path = WithFlows("      flows:\n        - { match: '^sbt-(?<pillar>[a-z]+)-egress$', direction: sent }\n        - { match: '^(?<pillar>[a-z]+)-igrs$', direction: Received }\n");
+        var path = WithFlows("      flows:\n        - { match: '^(?<pillar>[a-z]+)-out$', direction: sent }\n        - { match: '^(?<pillar>[a-z]+)-in$', direction: Received }\n");
 
         var flows = RegistryLoader.Load(path).ForEnvironment("prod").ActiveEnvironment!.Sources.Single(s => s.Name == "messaging").Entities!.Flows!;
 
@@ -84,9 +84,9 @@ public class PillarFlowTests
     }
 
     [Theory]
-    [InlineData("      flows:\n        - { match: '^sbt-(?<pillar>[a-z]+)-egress$', direction: sentt }\n", "direction 'sentt'. Use sent or received")]
-    [InlineData("      flows:\n        - { match: '^sbt-[a-z]+-egress$', direction: sent }\n", "no group named 'pillar'")]
-    [InlineData("      flows:\n        - { match: '^sbt-(?<pillar>[a-z+-egress$', direction: sent }\n", "not a valid regular expression")]
+    [InlineData("      flows:\n        - { match: '^(?<pillar>[a-z]+)-out$', direction: sentt }\n", "direction 'sentt'. Use sent or received")]
+    [InlineData("      flows:\n        - { match: '^[a-z]+-out$', direction: sent }\n", "no group named 'pillar'")]
+    [InlineData("      flows:\n        - { match: '^(?<pillar>[a-z+-out$', direction: sent }\n", "not a valid regular expression")]
     public void A_flow_with_a_wrong_direction_or_no_pillar_group_is_a_config_error(string flows, string message)
     {
         var path = WithFlows(flows);
@@ -101,7 +101,7 @@ public class PillarFlowTests
     {
         var copy = new RegistryCopy(TownA);
         var file = copy.FilePath(Path.Combine("environments", "prod.yaml"));
-        File.WriteAllText(file, File.ReadAllText(file).Replace("      throughput: { metric: IncomingMessages, aggregation: total }\n", "      flows:\n        - { match: '^sbt-(?<pillar>[a-z]+)-egress$', direction: sent }\n"));
+        File.WriteAllText(file, File.ReadAllText(file).Replace("      throughput: { metric: IncomingMessages, aggregation: total }\n", "      flows:\n        - { match: '^(?<pillar>[a-z]+)-out$', direction: sent }\n"));
         _copies.Add(copy);
 
         var ex = Assert.Throws<RegistryException>(() => RegistryLoader.Load(copy.Path));

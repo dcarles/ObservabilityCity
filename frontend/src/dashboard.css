@@ -127,10 +127,10 @@ body.dash #view-bar .vb-list { background: var(--surface); color: var(--fg); }
 body.dash #view-bar .vb-row:hover, body.dash #view-bar .vb-row.sel { background: color-mix(in srgb, var(--daccent) 14%, transparent); }
 body.dash #view-bar .vb-group, body.dash #view-bar .vb-none, body.dash #view-bar small { color: var(--muted); }
 body.dash #view-bar .vb-btn, body.dash #view-bar .vb-list input[type=search] { background: var(--surface2); color: var(--fg); border-color: var(--dline); }
-.svc .dlq, tr.g .dlq, .row .azure { font-size: 12.5px; font-weight: 600; margin-left: 10px; }
+.svc .dlq, tr.g .dlq, .row .cloud-health { font-size: 12.5px; font-weight: 600; margin-left: 10px; }
 
-.row .azure { display: inline-block; padding: 1px 8px; border-radius: 10px; color: #fff; background: var(--bad); letter-spacing: .2px; }
-.row .azure.down { background: color-mix(in srgb, var(--bad) 100%, #000 25%); }
+.row .cloud-health { display: inline-block; padding: 1px 8px; border-radius: 10px; color: #fff; background: var(--bad); letter-spacing: .2px; }
+.row .cloud-health.down { background: color-mix(in srgb, var(--bad) 100%, #000 25%); }
 
 .kpi b.bad { color: var(--bad); } .kpi b.ok { color: var(--ok); }
 .kpi .ilist { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; max-height: 190px; overflow-y: auto; }

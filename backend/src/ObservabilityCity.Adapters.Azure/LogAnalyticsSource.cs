@@ -384,7 +384,7 @@ public sealed class LogAnalyticsSource(
             var named = resolution.Workspace;
             if (string.IsNullOrWhiteSpace(named))
                 throw new InvalidOperationException($"source '{name}' has no workspace. Set its connection, or scope.workspaceId (or scope.workspace, a name to look up) in the environment file");
-            var why = resolution.Problems.FirstOrDefault(p => p.Contains("Log Analytics workspace")) ??
+            var why = resolution.WorkspaceProblemList.FirstOrDefault() ??
                       (resolution.InventoryRead ? "the inventory has no workspace by that name" : "the inventory has not been read yet, so the name could not be looked up");
             throw new InvalidOperationException($"the workspace '{named}' is a name and has no workspace id yet: {why}. Log Analytics is queried by workspace id (a GUID) or by resource id (starting with /subscriptions)");
         }

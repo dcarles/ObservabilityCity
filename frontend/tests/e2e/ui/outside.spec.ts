@@ -299,10 +299,19 @@ test.describe('the Unknown hosts button', () => {
     const options = await page.locator('#unknown-hosts select[data-target] option').allTextContents()
     expect(options.length).toBeGreaterThan(1)
     const target = options[1]
-    await page.locator('#unknown-hosts li[data-host="gw.example.test"] select').selectOption(target)
+    await page.locator('#unknown-hosts li[data-host="gw.example.test"] select[data-target]').selectOption(target)
     await page.locator('#unknown-hosts li[data-host="gw.example.test"]').getByRole('button', { name: 'Add rule' }).click()
     await expect(page.locator('#added-hosts-list > li')).toContainText('rule')
-    expect(posted).toEqual([{ host: 'gw.example.test', path: '/internal/x', target }])
+    // by default a rule keeps two parts of the path and goes through the gateway, as rules always did
+    expect(posted).toEqual([{ host: 'gw.example.test', path: '/internal/x', target, depth: 2, gateway: true }])
+
+    // the panel can keep one part and say the calls do not go through the gateway
+    await page.locator('#unknown-hosts li[data-host="gw.example.test"] select[data-depth]').selectOption('1')
+    await page.locator('#unknown-hosts li[data-host="gw.example.test"] input[data-gateway]').uncheck()
+    await page.locator('#unknown-hosts li[data-host="gw.example.test"] select[data-target]').selectOption(target)
+    await page.locator('#unknown-hosts li[data-host="gw.example.test"]').getByRole('button', { name: 'Add rule' }).click()
+    await expect.poll(() => posted.length).toBe(2)
+    expect(posted[1]).toEqual({ host: 'gw.example.test', path: '/internal/x', target, depth: 1, gateway: false })
 
     await page.locator('#unknown-hosts-vendors').check()
     await expect(page.locator('#unknown-hosts-toggle')).toHaveText(/2 unknown hosts/)

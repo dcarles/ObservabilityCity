@@ -123,7 +123,7 @@ public class InstancesTests
 
     private static async Task<(Inventory Inventory, Graph Graph)> Read(ScopeRules rules, object[]? resources = null)
     {
-        var subs = new[] { new { id = "sub-1", name = "acme-eu-prd-al", tags = new { } } };
+        var subs = new[] { new { id = "sub-1", name = "al-prd-eu", tags = new { } } };
         var graph = new Graph(body => new HttpResponseMessage(HttpStatusCode.OK)
         {
             Content = JsonContent.Create(new { data = body.RootElement.GetProperty("query").GetString()!.StartsWith("resourcecontainers") ? (object)subs : resources ?? [] }),

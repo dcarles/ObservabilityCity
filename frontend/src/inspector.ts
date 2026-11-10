@@ -3,8 +3,8 @@ import { escapeHtml } from './picker'
 import { scopeParams, type Scope } from './scope'
 import { tenantListOrder, tenantFigures, yardSummary, type TenantView } from './tenants'
 import { regionFigures, regionOptions, validChoice, WORST, type RegionChoice } from './regions'
-import { azureRows, dismissEvent, eventOfNode } from './healthEvents'
-import { ago, clockTime, configOrder, messagesPerSecond, messageRate, queueRows, groupDetail, incidentSummary, jobRows, LAYER_WORD, linkSections, logLinkLabel, logSectionEmpty, logSectionTitle, logTabLabel, pickLogSection, originLabel, type LinkItem, type QueueTypes, overviewLinks, overviewRows, reasons, repeatLabel, resourceLinks, scopeView, SEVERITY_WORD, sectionLinks, stateTone, vendorWhere } from './inspectorModel'
+import { cloudHealthRows, dismissEvent, eventOfNode } from './healthEvents'
+import { ago, clockTime, configOrder, messagesPerSecond, messageRate, queueRows, groupDetail, incidentSummary, jobRows, layerWord, linkSections, logLinkLabel, logSectionEmpty, logSectionTitle, logTabLabel, pickLogSection, originLabel, type LinkItem, type QueueTypes, overviewLinks, overviewRows, reasons, repeatLabel, resourceLinks, scopeView, SEVERITY_WORD, sectionLinks, stateTone, vendorWhere } from './inspectorModel'
 
 export type InspectorTab = 'overview' | 'links' | 'logs' | 'config'
 const TABS: { id: InspectorTab; label: string }[] = [
@@ -168,8 +168,8 @@ export class Inspector {
     if (t.closest('[data-refresh-logs]')) { void this.loadLogs(); return }
     const logTab = t.closest<HTMLElement>('[data-log-tab]')
     if (logTab) { this.logSection = logTab.dataset.logTab!; this.render(); return }
-    const dismiss = t.closest<HTMLElement>('[data-azure-dismiss]')
-    if (dismiss) { void dismissEvent(dismiss.dataset.azureDismiss!); return }
+    const dismiss = t.closest<HTMLElement>('[data-cloud-health-dismiss]')
+    if (dismiss) { void dismissEvent(dismiss.dataset.cloudHealthDismiss!); return }
     const more = t.closest<HTMLElement>('[data-types-toggle]')
     if (more) { const q = more.dataset.typesToggle!; if (!this.typesOpen.delete(q)) this.typesOpen.add(q); this.render(); return }
     const region = t.closest<HTMLElement>('[data-region]')
@@ -213,7 +213,7 @@ export class Inspector {
     return `
       ${why.length === 0 ? '<p class="fine">Nothing to flag: every number is inside its lines.</p>' : `<ul class="why">${why.map((w) => `<li>${escapeHtml(w)}</li>`).join('')}</ul>`}
       <div class="rows">${overviewRows(n, (id) => this.find(id)?.node.name ?? id, this.snap?.cloud, this.snap ? messagesPerSecond(this.snap.groups.flatMap((g) => g.nodes)) : null).map((r) => `<div class="row"><span>${r.label}</span><span class="${r.tone}">${escapeHtml(r.value)}</span></div>`).join('')}</div>
-      ${this.azure(n)}
+      ${this.cloudHealth(n)}
       ${this.jobs(n, group)}
       ${this.queues(n)}
       ${this.regions(n)}
@@ -224,11 +224,11 @@ export class Inspector {
   }
 
   /** The cloud's open health report for this building's resource. Nothing when the cloud reports nothing. */
-  private azure(n: NodeSnapshot): string {
+  private cloudHealth(n: NodeSnapshot): string {
     const e = eventOfNode(this.snap?.healthEvents, n.id)
     if (!e) return ''
-    return `<h4>${escapeHtml(this.snap?.cloud ?? 'Cloud')} resource health</h4><div class="azure" data-azure="${escapeHtml(e.state)}">${azureRows(e).map((r) => `<div class="row"><span>${r.label}</span><span class="${r.tone}">${escapeHtml(r.value)}</span></div>`).join('')}
-      <button class="azure-dismiss" data-azure-dismiss="${escapeHtml(e.id)}" title="Hide this report until the server restarts">Dismiss</button></div>`
+    return `<h4>${escapeHtml(this.snap?.cloud ?? 'Cloud')} resource health</h4><div class="cloud-health" data-cloud-health="${escapeHtml(e.state)}">${cloudHealthRows(e).map((r) => `<div class="row"><span>${r.label}</span><span class="${r.tone}">${escapeHtml(r.value)}</span></div>`).join('')}
+      <button class="cloud-health-dismiss" data-cloud-health-dismiss="${escapeHtml(e.id)}" title="Hide this report until the server restarts">Dismiss</button></div>`
   }
 
   /** The queues a consumer reads: each with what waits and what is dead-lettered, and a link to its dead letters when the environment names a support tool. Nothing for a system that reads none. */
@@ -342,7 +342,7 @@ export class Inspector {
     const d = this.detail
     return `
       <p class="note">Defined in <code>${escapeHtml(d.file)}</code>. Each value says which file layer it comes from.</p>
-      <div class="cfg">${configOrder(d.config).map((c) => `<div class="cfg-row" data-key="${escapeHtml(c.key)}"><span class="k">${escapeHtml(c.key)}</span><span class="v">${escapeHtml(c.value)}</span><span class="o ${c.layer.toLowerCase()}" title="${escapeHtml(c.source)}">${LAYER_WORD[c.layer]}</span></div>`).join('')}</div>${this.scope(d)}`
+      <div class="cfg">${configOrder(d.config).map((c) => `<div class="cfg-row" data-key="${escapeHtml(c.key)}"><span class="k">${escapeHtml(c.key)}</span><span class="v">${escapeHtml(c.value)}</span><span class="o ${c.layer.toLowerCase()}" title="${escapeHtml(c.source)}">${escapeHtml(layerWord(c.layer, this.snap?.groupLabel))}</span></div>`).join('')}</div>${this.scope(d)}`
   }
 
   private resourceLinkRow(r: ScopeResource): string {

@@ -182,11 +182,11 @@ internal sealed class SchedulerFile
 
 internal sealed class SubscriptionFile
 {
-    /// <summary>The full topic name, for example frd-screening-outbox.</summary>
+    /// <summary>The full topic name, for example orders-events.</summary>
     public string Topic { get; set; } = "";
     /// <summary>A worker in this pillar.</summary>
     public string Consumer { get; set; } = "";
-    /// <summary>Marks a read of the hub's egress topic by another pillar, the old way. Drawn with an amber pennant.</summary>
+    /// <summary>Marks a read of a hub topic by a pillar, the old way. Drawn with an amber pennant.</summary>
     public bool Legacy { get; set; }
 }
 
@@ -238,7 +238,7 @@ internal sealed class VendorServiceFile
     public List<VendorMatchFile> Match { get; set; } = [];
     /// <summary>Our systems that call this service, besides the ones link discovery finds.</summary>
     public List<string> CalledBy { get; set; } = [];
-    /// <summary>The telemetry names this service's own calls are recorded under (its AppRoleName). Link discovery reads their calls like those of a town system, so a service that calls town systems through the gateway is drawn calling them.</summary>
+    /// <summary>The telemetry names this service's own calls are recorded under (its telemetry role, for example AppRoleName in Azure). Link discovery reads their calls like those of a town system, so a service that calls town systems through the gateway is drawn calling them.</summary>
     public List<string> Roles { get; set; } = [];
     /// <summary>Overrides the vendor's own value.</summary>
     public double? SlaP99Ms { get; set; }
@@ -263,7 +263,7 @@ internal sealed class EnvironmentFile
     public bool Default { get; set; }
     /// <summary>Where this environment's numbers come from, by source name. The names metrics, incidents and messaging are the defaults for those groups of signals; any other kebab-case name is a source a signal can be pointed at.</summary>
     public Dictionary<string, SourceFile> Sources { get; set; } = new();
-    /// <summary>How sources sign in to Azure, by name. A source names one with credential; without it, the Azure CLI login is used.</summary>
+    /// <summary>How sources sign in, by name. A source names one with credential; without it, the adapter's usual login is used.</summary>
     public Dictionary<string, CredentialFile> Credentials { get; set; } = new();
     /// <summary>Which source each signal comes from in this environment (a source name, or none). Signals not listed use the source named metrics or messaging.</summary>
     public Dictionary<string, string> Signals { get; set; } = new();
@@ -369,7 +369,7 @@ internal sealed class ScopeFile
     public List<ResourceRuleFile> Resources { get; set; } = [];
     /// <summary>Resources that are not systems but stand as basic buildings without health (a key vault, a storage account).</summary>
     public List<AssetRuleFile> Assets { get; set; } = [];
-    /// <summary>What the cloud is called in the town's words, for a missing app ("not found in Azure").</summary>
+    /// <summary>What the cloud is called in the town's words, for a missing app ("not found in" and this name).</summary>
     public string? Cloud { get; set; }
     public string? TelemetryRole { get; set; }
     public ScopeQueriesFile? Queries { get; set; }
@@ -452,7 +452,7 @@ internal sealed class SourceFile
     public string Kind { get; set; } = "";
     /// <summary>How to reach it (a workspace, an endpoint). Not used by the fake source.</summary>
     public string? Connection { get; set; }
-    /// <summary>The login to use, by name from credentials. Azure sources only; without it, the Azure CLI login.</summary>
+    /// <summary>The login to use, by name from credentials. Sources that sign in only; without it, the adapter's usual login.</summary>
     public string? Credential { get; set; }
     /// <summary>How often the source is asked, in seconds.</summary>
     public double? PollSeconds { get; set; }
@@ -500,7 +500,7 @@ internal sealed class EntitiesFile
     public EntityMetricFile? Throughput { get; set; }
     /// <summary>Entity name patterns, tried in order: the first that matches decides whose the entity is. An entity no pattern matches is left out.</summary>
     public List<EntityPatternFile> Patterns { get; set; } = [];
-    /// <summary>Entities that stand for what a whole pillar sends to the others or receives from them (the pillar's egress topic, the topic its ingress queues hang on). Each is a name pattern with the group pillar and a direction; the rate of its throughput metric is the pillar's rate.</summary>
+    /// <summary>Entities that stand for what a whole pillar sends to the others or receives from them (for example the topic the pillar publishes its events to, or the topic its incoming queues hang on). Each is a name pattern with the group pillar and a direction; the rate of its throughput metric is the pillar's rate.</summary>
     public List<EntityFlowFile> Flows { get; set; } = [];
 }
 

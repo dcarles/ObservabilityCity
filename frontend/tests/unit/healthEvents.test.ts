@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { azureRows, eventItems, eventLine, eventOfNode, eventsByNode, healthEventsOf, isResolved } from '../../src/healthEvents'
+import { cloudHealthRows, eventItems, eventLine, eventOfNode, eventsByNode, healthEventsOf, isResolved } from '../../src/healthEvents'
 import type { HealthEventSnapshot } from '../../src/types'
 
 const NOW = Date.parse('2026-11-05T20:00:00Z')
@@ -45,11 +45,11 @@ describe('Azure resource health events', () => {
   })
 
   it('gives drawer rows, leaving out what Azure did not say', () => {
-    const rows = azureRows(ev({}), NOW)
+    const rows = cloudHealthRows(ev({}), NOW)
     expect(rows.map((r) => r.label)).toEqual(['State', 'Since', 'Before', 'Cause', 'Resource'])
     expect(rows[0]).toMatchObject({ value: 'Degraded', tone: 'warn' })
-    expect(azureRows(ev({ state: 'Unavailable', previous: null, cause: null }), NOW).map((r) => r.label)).toEqual(['State', 'Since', 'Resource'])
-    expect(azureRows(ev({ state: 'Unavailable' }), NOW)[0].tone).toBe('bad')
+    expect(cloudHealthRows(ev({ state: 'Unavailable', previous: null, cause: null }), NOW).map((r) => r.label)).toEqual(['State', 'Since', 'Resource'])
+    expect(cloudHealthRows(ev({ state: 'Unavailable' }), NOW)[0].tone).toBe('bad')
   })
 
   const done = (o: Partial<HealthEventSnapshot> = {}): HealthEventSnapshot => ev({ id: 'r', state: 'Resolved', resolvedAt: '2026-11-05T18:17:17Z', ...o })
@@ -77,7 +77,7 @@ describe('Azure resource health events', () => {
   })
 
   it('gives green drawer rows with the time of the resolution for a resolved report', () => {
-    const rows = azureRows(done(), NOW)
+    const rows = cloudHealthRows(done(), NOW)
     expect(rows.map((r) => r.label)).toEqual(['State', 'Resolved', 'Began', 'Before', 'Cause', 'Resource'])
     expect(rows.every((r) => r.tone === 'ok')).toBe(true)
   })

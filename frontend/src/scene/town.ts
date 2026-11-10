@@ -621,7 +621,7 @@ export class Town {
       const nodes = new Map(g.nodes.map((n) => [n.id, n]))
       for (const [key, sign] of isl.services) this.guard(`service ${key}`, () => { const sv = summariseService(sign.pad, g.id, g.displayName, nodes); sign.set(sv.state, sv.monitored) })
     }
-    this.guard('azure health', () => {
+    this.guard('cloud health', () => {
       const worst = eventsByNode(s.healthEvents)
       for (const [id, b] of this.buildings) b.setHealthEvent(worst.get(id) ?? null)
     })

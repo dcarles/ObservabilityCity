@@ -6,10 +6,10 @@ import { test, expect, type Page } from '@playwright/test'
 // proof that the rules, not the program, know the naming.
 
 const B = process.env.E2E_SUITE === 'messagingb'
-const tool = B ? 'Parked messages' : 'Support tool'
-const inbox = B ? 'bus.aa.orders.in' : 'sbq-al-ord-inbox'
-const queues = B ? ['bus.aa.orders.feed', 'bus.aa.orders.in', 'bus.bb.aa.orders.out'] : ['sbq-al-led-ord-outbox', 'sbq-al-ord-changefeed', 'sbq-al-ord-inbox']
-const inboxLink = B ? 'https://parked.example.test/prod/aa.orders-worker/bus.aa.orders.in' : 'https://support.example.test/queues/sbq-al-ord-inbox?team=al&service=ord'
+const tool = B ? 'Parked messages' : 'Open in queue explorer'
+const inbox = B ? 'bus.aa.orders.in' : 'q-al-ord-in'
+const queues = B ? ['bus.aa.orders.feed', 'bus.aa.orders.in', 'bus.bb.aa.orders.out'] : ['q-al-led-to-ord', 'q-al-ord-feed', 'q-al-ord-in']
+const inboxLink = B ? 'https://parked.example.test/prod/aa.orders-worker/bus.aa.orders.in' : 'https://support.example.test/queues/q-al-ord-in?team=al&service=ord'
 
 type Reading = { id: string; state: string; queueDepth: number | null; deadLetters: number | null; absent: string[] }
 
@@ -35,7 +35,7 @@ test.describe(`the broker's backlog and dead letters (${B ? 'ids, a total' : 'co
     await open(page)
 
     const orders = await reading(page, 'aa.orders-worker')
-    expect(orders.queueDepth).toBe(175) // its inbox, its changefeed and the outbox addressed to it
+    expect(orders.queueDepth).toBe(175) // its in queue, its feed queue and the queue addressed to it
     expect(orders.deadLetters).toBe(2)
     expect(orders.state).toBe('Degraded') // more than the count threshold waits
     expect(orders.absent).not.toContain('backlog')
@@ -47,7 +47,7 @@ test.describe(`the broker's backlog and dead letters (${B ? 'ids, a total' : 'co
     expect((await reading(page, 'aa.orders-api')).queueDepth).toBeNull()
   })
 
-  test('show in the consumer\'s drawer, one row for each queue, with a link to that queue\'s dead letters in the support tool', async ({ page }) => {
+  test('show in the consumer\'s drawer, one row for each queue, with a link to that queue\'s dead letters in the queue explorer', async ({ page }) => {
     await open(page)
     await page.evaluate(() => (window as any).city.openSystem('aa.orders-worker'))
 
@@ -131,7 +131,7 @@ test.describe(`the broker's backlog and dead letters (${B ? 'ids, a total' : 'co
     await expect(page.locator('#state-list')).toContainText('No queue has dead letters right now')
   })
 
-  /** Holds back the server's own snapshots, then feeds the town a snapshot in which the inbox's dead letters are in both regions: 3 in the north one and 8 in the west one, each with its own support tool. */
+  /** Holds back the server's own snapshots, then feeds the town a snapshot in which the inbox's dead letters are in both regions: 3 in the north one and 8 in the west one, each with its own queue explorer. */
   async function feedRegions(page: Page): Promise<void> {
     await page.evaluate((queue) => {
       const c = (window as any).city

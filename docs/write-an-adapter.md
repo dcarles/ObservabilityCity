@@ -1,6 +1,6 @@
 # Write an adapter
 
-An adapter connects the town to one system that knows something about your services: a metrics store, a cloud inventory, an incident tool. The core knows none of them by name. It knows request rate, error rate, latency, instances, CPU, memory, capacity used, throttling and queue depth, and an adapter fills those from whatever it reads.
+An adapter connects the town to one system that knows something about your services: a metrics store, a cloud inventory, an incident tool. The core knows none of them by name. It knows request rate, error rate, latency, instances, CPU, memory, capacity used, throttling and queue depth, and an adapter fills those from whatever it reads. The repo ships an Azure adapter (`backend/src/ObservabilityCity.Adapters.Azure`) today; adapters for other clouds and tools plug in the same way.
 
 This guide is for someone adding an adapter, in a fork or upstream. The working example is [templates/adapter](../templates/adapter), and the checks every adapter has to pass are in the kit at `backend/src/ObservabilityCity.AdapterKit`.
 
@@ -15,7 +15,7 @@ sources:                    IAdapterModule  (what it adds)       AdapterCatalog 
                                                                  SnapshotBuilder applies the health rules, the browser draws
 ```
 
-- A **module** is a class that implements `IAdapterModule`. Its `Register` only records what the module has: source kinds (`AddSource` with a factory, or `AddSourceKind` for a kind it knows but cannot read yet) and logins (`AddCredentialKind`). It signs nobody in and reaches nothing, so a town starts before `az login`.
+- A **module** is a class that implements `IAdapterModule`. Its `Register` only records what the module has: source kinds (`AddSource` with a factory, or `AddSourceKind` for a kind it knows but cannot read yet) and logins (`AddCredentialKind`). It signs nobody in and reaches nothing, so a town starts before anyone signs in.
 - A **factory** makes the source for each environment source of its kind. It gets a `SourceContext`: the environment id, the source as the file defines it (`connection`, `pollSeconds`, `timeoutSeconds`), the login it is to use, the environment's `scope:` rules and the `ScopeStore`, and the folder of the town's files. If the definition cannot work, throw `InvalidOperationException` with a sentence that says what to change; the host reports it at start-up and carries on without that source.
 - A **source** implements `IMetricSource`: a name, a `PollInterval`, a `Timeout` (take both from the definition) and `PollAsync(registry, ct)`, which answers for every system it can in one batched call. The poller runs one loop per source, cancels a poll that takes longer than `Timeout`, and logs one that throws.
 - A **login** implements `ICredentialKind`: `Check` says what is wrong with an entry in words, `Create` makes the login. Making one signs nobody in; the token is asked for when first needed.
@@ -39,10 +39,12 @@ An adapter that reads per-service data (a workspace, a resource group, a role na
 
 ```csharp
 var scope = context.Scope!.Resolve(registry.ForEnvironment(context.EnvironmentId));
-var system = scope.System("aa.orders-api");   // SubscriptionId, Workspace, TelemetryRole, ServiceCode, Resources
+var system = scope.System("aa.orders-api");   // SubscriptionId (the account), Workspace (the telemetry store), TelemetryRole, ServiceCode, Resources
 ```
 
-Before the inventory is read it holds only what the rules say on their own (a named subscription, the workspace, a system's telemetry role); the rest appears after the first read. Handle both. See "Scope" in [connect-your-company.md](connect-your-company.md).
+Before the inventory is read it holds only what the rules say on their own (a named account, the telemetry store, a system's telemetry role); the rest appears after the first read. Handle both.
+
+Current limits: the inventory that fills the `ScopeStore` is the Azure adapter's `resourcegraph` source, `logs` and `links` must name a `loganalytics` source, and the core registry holds and checks the Azure adapter's own source settings (marked **Azure adapter setting** in [config-reference.md](config-reference.md)). Unknown keys are an error, so an adapter for another cloud reads its settings from `connection` and the generic keys until that changes. See "Scope" in [connect-your-company.md](connect-your-company.md).
 
 ## Build it
 

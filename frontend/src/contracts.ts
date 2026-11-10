@@ -160,6 +160,9 @@ export interface components {
             host: string;
             path: string;
             target: string;
+            /** Format: int32 */
+            depth?: number | null;
+            gateway?: boolean | null;
         };
         AddedHostSnapshot: {
             id: string;

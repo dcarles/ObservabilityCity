@@ -10,4 +10,4 @@ systems:
   - { id: web.search-cache, service: catalog, name: Search cache, role: cache }
 messaging:
   subscriptions:
-    - { topic: inv-stock-outbox, consumer: web.catalog-worker }
+    - { topic: stock.events, consumer: web.catalog-worker }

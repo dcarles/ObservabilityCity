@@ -1,3 +1,4 @@
+import { groupWords } from '../groupLabel'
 import { fitHeads } from './sticky'
 import '../style.css'
 import '../dashboard.css'
@@ -79,7 +80,7 @@ export function startDashboard(): void {
   let last: Snapshot | null = null
   let model: Dashboard | null = null
   const seen = { snapshots: 0, rejected: 0 }
-  const shown = { sum: '', pillars: '', hidden: '', menu: '', brand: '', sections: '' }
+  const shown = { sum: '', pillars: '', hidden: '', menu: '', brand: '', sections: '', group: '' }
   const regionChoices = new Map<string, string>()
 
   const inspector = new Inspector({
@@ -139,6 +140,9 @@ export function startDashboard(): void {
     const key = active ? (['toggle', 'hide', 'show', 'db', 'group'] as const).map((k) => (active.dataset[k] !== undefined ? `[data-${k}="${CSS.escape(active.dataset[k]!)}"]` : '')).join('') : ''
     const put = (id: string, html: string, k: keyof typeof shown): void => { if (shown[k] !== html) { shown[k] = html; $(id).innerHTML = html } }
     if (shown.brand !== model.townName) { shown.brand = model.townName; $('dash-brand').textContent = model.townName }
+    // the town's own word for an island (groupLabel) on the menu button and the heading; the page's own words (Pillars) until the first snapshot
+    const groups = groupWords(model.groupLabel).many
+    if (shown.group !== groups) { shown.group = groups; $('pillars-button-label').textContent = groups; $('dash-pillars-title').textContent = groups }
     put('dash-sum', summaryHtml(model, ui), 'sum')
     put('dash-pillars', pillarsHtml(model, ui as UiState), 'pillars')
     put('hidden-pillars', hiddenHtml(model), 'hidden')

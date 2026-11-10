@@ -29,4 +29,4 @@ It also opens the Aspire dashboard (logs, traces and resource status in one plac
 
 ## Where a company's own parts plug in
 
-The core knows only generic concepts (groups, systems, resources, links). A company adds its town folder under `config/` and its own adapters under `extensions/`, and never edits the core. See [connect-your-company.md](connect-your-company.md) and [write-an-adapter.md](write-an-adapter.md).
+The core knows only generic concepts (groups, systems, resources, links) and is cloud-neutral: the Azure adapter ships today, and other clouds and tools plug in through adapters. A company adds its town folder under `config/` and its own adapters under `extensions/`, and never edits the core. See [connect-your-company.md](connect-your-company.md) and [write-an-adapter.md](write-an-adapter.md).

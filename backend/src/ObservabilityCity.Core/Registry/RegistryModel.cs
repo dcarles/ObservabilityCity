@@ -68,10 +68,10 @@ public sealed record DatabaseEngine(string Id, string Name, string Type);
 /// <summary>A scheduled job of a function and the services (of the same pillar) it starts work for. SystemId is the function's full id.</summary>
 public sealed record RegistrySchedule(string SystemId, string Job, IReadOnlyList<string> Services);
 
-/// <summary>A Service Bus topic. Name comes from the town's messaging.topicTemplate for a pillar and messaging.hubTopicTemplate for the hub; Service is the service (or hub name) that publishes it.</summary>
+/// <summary>A message broker topic. Name comes from the town's messaging.topicTemplate for a pillar and messaging.hubTopicTemplate for the hub; Service is the service (or hub name) that publishes it.</summary>
 public sealed record RegistryTopic(string Name, string GroupId, string Service);
 
-/// <summary>A worker reading a topic. PublisherGroupId is the island that owns the topic. Legacy marks a read of the hub's egress topic by a pillar.</summary>
+/// <summary>A worker reading a topic. PublisherGroupId is the island that owns the topic. Legacy marks a read of a hub topic by a pillar.</summary>
 public sealed record RegistrySubscription(string Topic, string PublisherGroupId, string ConsumerId, string ConsumerGroupId, bool Legacy);
 
 /// <summary>Mode is <see cref="TownModes.Demo"/> or <see cref="TownModes.Live"/>; a town that does not say is live.</summary>
@@ -262,7 +262,7 @@ public sealed record RegistryTenant(string Id, string Name, TenantKind Kind);
 /// <summary>Where one signal of an environment comes from.</summary>
 public sealed record RegistrySource(string Name, string Kind, string? Connection)
 {
-    /// <summary>The login it uses, by name from the environment's credentials. Null: the implicit Azure CLI login.</summary>
+    /// <summary>The login it uses, by name from the environment's credentials. Null: the adapter's usual login.</summary>
     public string? Credential { get; init; }
 
     /// <summary>How often it is asked, and how long one ask may take. Null: the default (<see cref="DefaultPollSeconds"/>, <see cref="DefaultTimeoutSeconds"/>).</summary>
@@ -349,7 +349,7 @@ public sealed record MetricGroup(string Resources, string? Namespace, IReadOnlyD
 /// </summary>
 public sealed record MetricSignal(string Metric, string Aggregation, string? Filter, double Scale, bool PerSecond, MetricSignal? Over, MetricSignal? OrElse = null, bool EmptyIsIdle = false);
 
-/// <summary>A way to sign in to Azure, named in the environment file. Secrets are not here: ClientSecretEnv names the variable that holds one.</summary>
+/// <summary>A way to sign in, named in the environment file. Secrets are not here: ClientSecretEnv names the variable that holds one.</summary>
 public sealed record RegistryCredential(string Name, string Kind, string? TenantId, string? ClientId, string? ClientSecretEnv);
 
 /// <summary>
@@ -370,7 +370,7 @@ public sealed record RegistryEnvironment(
 
     public const string TenantToken = "{tenant}";
 
-    /// <summary>Ways to sign in, by name. The one called "default" is the Azure CLI login unless the file says otherwise.</summary>
+    /// <summary>Ways to sign in, by name. The one called "default" is the adapter's usual login unless the file says otherwise.</summary>
     public IReadOnlyList<RegistryCredential> Credentials { get; init; } = [];
 
     /// <summary>The source each signal is pointed at in this environment (a source name, or none). Signals not listed use the source called metrics or messaging.</summary>

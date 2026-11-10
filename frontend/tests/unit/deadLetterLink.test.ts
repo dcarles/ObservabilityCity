@@ -4,14 +4,14 @@ import { checkSnapshot } from '../../src/snapshotGuard'
 import type { QueueSnapshot } from '../../src/types'
 import { healthyTown } from './wall.testutil'
 
-// Phase 3, slice 5: a consumer's drawer lists the queues it reads, each with a link to that queue's dead letters in the team's support tool, when the environment names one.
+// Phase 3, slice 5: a consumer's drawer lists the queues it reads, each with a link to that queue's dead letters in the team's queue explorer, when the environment names one.
 
 const q = (name: string, backlog: number | null, deadLetters: number | null, link: QueueSnapshot['link'] = undefined): QueueSnapshot => ({ name, backlog, deadLetters, link })
-const tool = { name: 'Support tool', url: 'https://support.example.test/queues/x' }
+const tool = { name: 'Open in queue explorer', url: 'https://support.example.test/queues/x' }
 
 describe('the queues of a consumer', () => {
   it('are rows with what waits, what is dead-lettered and the link', () => {
-    expect(queueRows({ queues: [q('sbq-a-inbox', 25, 2, tool)] })).toEqual([{ name: 'sbq-a-inbox', text: '25 waiting · 2 dead', tone: 'bad', link: tool, types: null, regions: [] }])
+    expect(queueRows({ queues: [q('q-a-in', 25, 2, tool)] })).toEqual([{ name: 'q-a-in', text: '25 waiting · 2 dead', tone: 'bad', link: tool, types: null, regions: [] }])
   })
 
   it('put the queue with dead letters first, then the biggest backlog', () => {
@@ -35,8 +35,8 @@ describe('the queues of a consumer', () => {
 })
 
 describe('dead letters in more than one region', () => {
-  const north = { name: 'Support tool East', url: 'https://north.example.test/queues/a' }
-  const west = { name: 'Support tool Far', url: 'https://west.example.test/queues/a' }
+  const north = { name: 'Queue explorer East', url: 'https://north.example.test/queues/a' }
+  const west = { name: 'Queue explorer Far', url: 'https://west.example.test/queues/a' }
   const split = (): QueueSnapshot => ({ name: 'a', backlog: 0, deadLetters: 11, link: tool, deadLetterRegions: [{ region: 'northeurope', label: 'North', count: 3, link: north }, { region: 'westeurope', label: 'West', count: 8, link: west }] })
 
   it('give the drawer row a tag, a count and its own link for each region, and not the one link for all', () => {

@@ -24,7 +24,9 @@ public static class ScopeResolver
         var problems = new List<string>();
         string? Custom(string name) => name == ScopeRules.EnvironmentVariable ? env.Id : rules.Variables.GetValueOrDefault(name);
         var workspace = rules.Workspace is null ? null : ScopeTemplate.Render(rules.Workspace, Custom);
-        var (workspaceId, workspaceVia) = ResolveWorkspace(rules, workspace, Custom, inventory, problems);
+        var workspaceProblems = new List<string>();
+        var (workspaceId, workspaceVia) = ResolveWorkspace(rules, workspace, Custom, inventory, workspaceProblems);
+        problems.AddRange(workspaceProblems);
 
         var pillars = new List<PillarScope>();
         foreach (var group in view.Groups)
@@ -43,7 +45,7 @@ public static class ScopeResolver
             problems.Add($"Telemetry role '{clash.Key}' is used by {string.Join(" and ", clash.Select(s => $"'{s.SystemId}'"))}; the telemetry of one would be read as the other. Give each its own telemetry.role.");
 
         return new Resolution(pillars, systems, tenantNames.Select(kv => new TenantName(kv.Key, kv.Value)).OrderBy(t => t.Id, StringComparer.Ordinal).ToList(), problems, inventory is not null, workspace ?? workspaceId, workspaceId, workspaceVia,
-            ResolveAssets(view, rules, pillars, inventory, Custom));
+            ResolveAssets(view, rules, pillars, inventory, Custom), workspaceProblems);
     }
 
     /// <summary>
@@ -162,10 +164,10 @@ public static class ScopeResolver
         {
             case 1: return (found[0].CustomerId ?? found[0].Id, "name");
             case 0:
-                problems.Add($"No Log Analytics workspace is named '{text}'. Check scope.workspace, or give the workspace's id under scope.workspaceId.");
+                problems.Add($"No telemetry workspace is named '{text}'. Check scope.workspace, or give the workspace's id under scope.workspaceId.");
                 return (null, null);
             default:
-                problems.Add($"{found.Count} Log Analytics workspaces match '{text}' ({string.Join(", ", found.Select(w => w.Name).Order(StringComparer.Ordinal))}). Make scope.workspace narrower, or give the workspace's id under scope.workspaceId.");
+                problems.Add($"{found.Count} telemetry workspaces match '{text}' ({string.Join(", ", found.Select(w => w.Name).Order(StringComparer.Ordinal))}). Make scope.workspace narrower, or give the workspace's id under scope.workspaceId.");
                 return (null, null);
         }
     }

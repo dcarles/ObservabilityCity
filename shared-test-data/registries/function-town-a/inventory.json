@@ -2,17 +2,17 @@
  "subscriptions": [
   {
    "id": "00000000-0000-0000-0000-0000000000f1",
-   "name": "acme-eu-prd-al",
+   "name": "al-prd-eu",
    "tags": {}
   },
   {
    "id": "00000000-0000-0000-0000-0000000000a9",
-   "name": "acme-eu-prd-platform",
+   "name": "platform-prd-eu",
    "tags": {}
   },
   {
    "id": "00000000-0000-0000-0000-0000000000e9",
-   "name": "acme-eu-prd-edge",
+   "name": "edge-prd-eu",
    "tags": {}
   }
  ],

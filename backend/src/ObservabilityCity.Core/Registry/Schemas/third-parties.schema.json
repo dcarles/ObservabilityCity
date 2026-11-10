@@ -95,7 +95,7 @@
                 },
                 "roles": {
                   "type": "array",
-                  "description": "The telemetry names this service's own calls are recorded under (its AppRoleName). Link discovery reads their calls like those of a town system, so a service that calls town systems through the gateway is drawn calling them.",
+                  "description": "The telemetry names this service's own calls are recorded under (its telemetry role, for example AppRoleName in Azure). Link discovery reads their calls like those of a town system, so a service that calls town systems through the gateway is drawn calling them.",
                   "items": {
                     "type": "string"
                   }

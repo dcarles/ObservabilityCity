@@ -23,6 +23,6 @@ systems:
 messaging:
   topics: [p27-s1]
   subscriptions:
-    - { topic: p26-p26-s1-outbox, consumer: p27.s1-worker }
-    - { topic: p26-p26-s1-outbox, consumer: p27.s2-worker }
-    - { topic: p26-p26-s1-outbox, consumer: p27.s3-worker }
+    - { topic: p26-p26-s1-events, consumer: p27.s1-worker }
+    - { topic: p26-p26-s1-events, consumer: p27.s2-worker }
+    - { topic: p26-p26-s1-events, consumer: p27.s3-worker }
