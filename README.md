@@ -20,22 +20,6 @@ The same town as a dashboard, for when you want the list rather than the picture
 
 ![The dashboard view](docs/screenshots/dashboard.png)
 
-## What it looks like
-
-The sample town (Galactic Credit) in each of the three themes: harbour town, space colony and works. The data, the layout and every signal are the same; only the look changes.
-
-| Harbour town | Space colony | Works |
-| --- | --- | --- |
-| ![The harbour town theme](docs/screenshots/theme-harbour-town.png) | ![The space colony theme](docs/screenshots/theme-space.png) | ![The works theme](docs/screenshots/theme-factory.png) |
-
-A bad day: an island with errors, the inspector open on a degraded API, and the effects listed in the Break things panel.
-
-![A bad day with the inspector open](docs/screenshots/trouble-inspector.png)
-
-The same town as a dashboard, for when you want the list rather than the picture.
-
-![The dashboard view](docs/screenshots/dashboard.png)
-
 ## What you need installed
 
 | Tool | Version | Why |
