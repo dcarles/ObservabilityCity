@@ -260,6 +260,11 @@ export class HarbourStatus {
     tex.needsUpdate = true
   }
 
+  /** Where the pier board stands in the world, for tests. */
+  boardPosition(): THREE.Vector3 {
+    return this.label.getWorldPosition(new THREE.Vector3())
+  }
+
   get alarming(): boolean {
     return this.lit
   }
