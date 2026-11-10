@@ -121,11 +121,11 @@ export function showTooltip(n: NodeSnapshot | null, x: number, y: number, view: 
 }
 
 /** The name of the island under the pointer, in the same box as a building's numbers. Null hides it. */
-export function showIslandTooltip(name: string | null, third: boolean, x: number, y: number, pier: string[] | null = null): void {
+export function showIslandTooltip(name: string | null, third: boolean, x: number, y: number, pier: string[] | null = null, tag = 'pier'): void {
   const el = $('tooltip')
   if (!name) { el.hidden = true; return }
   el.innerHTML = pier
-    ? `<b>${escapeHtml(name)}</b> <span class="stale">· pier</span>${pier.map((l) => `<div class="pierline">${escapeHtml(l)}</div>`).join('')}`
+    ? `<b>${escapeHtml(name)}</b> <span class="stale">· ${escapeHtml(tag)}</span>${pier.map((l) => `<div class="pierline">${escapeHtml(l)}</div>`).join('')}`
     : `<b>${escapeHtml(name)}</b> <span class="stale">· ${third ? 'third party island' : 'island'}</span>`
   el.hidden = false
   const w = el.offsetWidth, h = el.offsetHeight

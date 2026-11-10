@@ -447,7 +447,11 @@ export async function startTown(): Promise<void> {
     // over a pier, its crates or its dead-letter pen: what the pier carries
     const pierId = b ? undefined : ray.intersectObjects(town.harbourHits(), false)[0]?.object.userData.harbourIsland as string | undefined
     const pier = pierId ? town.pierSummary(pierId) : null
+    // over an island's sign: the pillar's name and its traffic
+    const signId = b || pier ? undefined : ray.intersectObjects(town.signHits(), false)[0]?.object.userData.signIsland as string | undefined
+    const sign = signId ? town.signSummary(signId) : null
     if (pier) showIslandTooltip(pier.name, false, pointerPx.x, pointerPx.y, pier.lines)
+    else if (sign && sign.lines.length > 0) showIslandTooltip(sign.name, false, pointerPx.x, pointerPx.y, sign.lines, 'traffic')
     // over an island but no building: the island's name
     else if (!b) {
       const ground = ray.ray.intersectPlane(groundPlane, groundHit)
