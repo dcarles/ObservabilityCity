@@ -249,7 +249,7 @@ public class HostViewTests : IDisposable
         Assert.Equal(["nowhere"], filtered.View.Unknown);
         Assert.Equal(["aa"], filtered.View.Islands);
 
-        // only unknown names: the hub alone (the decision log's rule), and the unknown names are still reported
+        // only unknown names: the hub alone (a rule in the plan's "Rules and why"), and the unknown names are still reported
         var none = await Get<Snapshot>("/api/snapshot/latest?islands=nowhere");
         Assert.Equal(["hub"], none.Groups.Select(g => g.Id));
         Assert.Equal(["nowhere"], none.View.Unknown);

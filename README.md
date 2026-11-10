@@ -4,6 +4,22 @@ A browser app that shows system health as a living, animated 3D town instead of 
 
 **Status: Phase 1, slice 3.5.** The pipeline runs end to end on fake data (backend, live push, browser), and the whole sample town is built: the hub, 16 pillar islands and a Lost & found island, with messaging between them. Everything else is in [docs/](docs/observability-city-plan.md).
 
+## What it looks like
+
+The sample town (Galactic Credit) in each of the three themes: harbour town, space colony and works. The data, the layout and every signal are the same; only the look changes.
+
+| Harbour town | Space colony | Works |
+| --- | --- | --- |
+| ![The harbour town theme](docs/screenshots/theme-harbour-town.png) | ![The space colony theme](docs/screenshots/theme-space.png) | ![The works theme](docs/screenshots/theme-factory.png) |
+
+A bad day: an island with errors, the inspector open on a degraded API, and the effects listed in the Break things panel.
+
+![A bad day with the inspector open](docs/screenshots/trouble-inspector.png)
+
+The same town as a dashboard, for when you want the list rather than the picture.
+
+![The dashboard view](docs/screenshots/dashboard.png)
+
 ## What you need installed
 
 | Tool | Version | Why |
@@ -152,7 +168,7 @@ frontend/                          Vite + TypeScript + three.js browser app (see
 config/galactic-credit/            registry (YAML): town, defaults, hub, pillars, schemas, fake-data baselines
 contracts/openapi.json             generated from the C# records
 shared-test-data/                  fixtures used by both sides: registries, golden snapshots, layout golden
-docs/                              plan, decision log, previews, connect-your-company runbook, config reference (every key of every config file), write-an-adapter guide
+docs/                              plan, connect-your-company runbook, config reference (every key of every config file), write-an-adapter guide
 templates/adapter/                 a working source adapter to copy into extensions/
 extensions/                        a company fork's own code (empty upstream)
 AGENTS.md, .github/copilot-instructions.md   instructions for coding assistants
