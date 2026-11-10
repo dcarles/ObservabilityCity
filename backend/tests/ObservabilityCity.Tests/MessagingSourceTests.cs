@@ -56,7 +56,7 @@ public class MessagingSourceTests
     {
         var snapshot = await TownSnapshot(town == "a" ? TownA : TownB);
 
-        // the orders worker's inbox (25 over the two regions), its changefeed (0) and the outbox addressed to it (150) wait for it
+        // the orders worker's inbox (25 over the two regions), its feed queue (0) and the outbox addressed to it (150) wait for it
         var orders = Node(snapshot, "aa.orders-worker");
         Assert.Equal(175, orders.QueueDepth);
         Assert.Equal(2, orders.DeadLetters); // town A's recording is a peak of 2, town B's a total of 2: each adds them up the way its entry says
@@ -90,7 +90,7 @@ public class MessagingSourceTests
     {
         using var copy = new RegistryCopy(TownA);
         var file = copy.FilePath(Path.Combine("environments", "prod.yaml"));
-        File.WriteAllText(file, File.ReadAllText(file).Replace("(?<pillar>[a-z]+)-(?<service>[a-z]+)-(?:inbox|changefeed)", "(?<pillar>[a-z]+)-[a-z]+-(?:inbox|changefeed)"));
+        File.WriteAllText(file, File.ReadAllText(file).Replace("(?<pillar>[a-z]+)-(?<service>[a-z]+)-(?:in|feed)", "(?<pillar>[a-z]+)-[a-z]+-(?:in|feed)"));
 
         var ex = Assert.Throws<RegistryException>(() => RegistryLoader.Load(copy.Path));
 
@@ -115,8 +115,8 @@ public class MessagingSourceTests
     {
         var http = new CannedHttp().Respond(_ => CannedHttp.Reply("""
             { "value": [ { "name": { "value": "ActiveMessages" }, "timeseries": [
-                { "metadatavalues": [ { "name": { "value": "entityname" }, "value": "sbq-al-ord-inbox" } ], "data": [ { "average": 10 }, { "average": 20 } ] },
-                { "metadatavalues": [ { "name": { "value": "entityname" }, "value": "sbq-be-led-inbox" } ], "data": [ { "average": 4 }, { } ] } ] } ] }
+                { "metadatavalues": [ { "name": { "value": "entityname" }, "value": "q-al-ord-in" } ], "data": [ { "average": 10 }, { "average": 20 } ] },
+                { "metadatavalues": [ { "name": { "value": "entityname" }, "value": "q-be-led-in" } ], "data": [ { "average": 4 }, { } ] } ] } ] }
             """));
         var (source, registry) = await Messaging(TownA, http);
 
@@ -143,7 +143,7 @@ public class MessagingSourceTests
     {
         const string answer = """
             { "value": [ { "name": { "value": "DeadletteredMessages" }, "timeseries": [
-                { "metadatavalues": [ { "name": { "value": "entityname" }, "value": "sbq-al-ord-inbox" } ], "data": [ { "maximum": 12 }, { "maximum": 12 }, { "maximum": 0 } ] } ] } ] }
+                { "metadatavalues": [ { "name": { "value": "entityname" }, "value": "q-al-ord-in" } ], "data": [ { "maximum": 12 }, { "maximum": 12 }, { "maximum": 0 } ] } ] } ] }
             """;
         foreach (var (aggregation, expected) in new[] { ("last", 0.0), ("maximum", 24.0) }) // two namespaces answer the same
         {
@@ -202,14 +202,14 @@ public class MessagingSourceTests
     {
         var http = new CannedHttp().Respond(r => Uri.UnescapeDataString(r.Uri!.Query).Contains("metricnames=IncomingMessages") ? CannedHttp.Reply("""
             { "value": [ { "name": { "value": "IncomingMessages" }, "timeseries": [
-                { "metadatavalues": [ { "name": { "value": "entityname" }, "value": "sbq-al-ord-inbox" } ], "data": [ { "total": 300 }, { "total": 300 }, { "total": 300 } ] } ] } ] }
+                { "metadatavalues": [ { "name": { "value": "entityname" }, "value": "q-al-ord-in" } ], "data": [ { "total": 300 }, { "total": 300 }, { "total": 300 } ] } ] } ] }
             """) : CannedHttp.Reply("""{ "value": [] }"""));
         var (source, registry) = await Messaging(TownA, http);
 
         var readings = await source.PollAsync(registry, CancellationToken.None);
 
         var queue = Assert.Single(readings["aa.orders-worker"].Queues!);
-        Assert.Equal("sbq-al-ord-inbox", queue.Name);
+        Assert.Equal("q-al-ord-in", queue.Name);
         Assert.Equal(6.0, queue.PerSecond!.Value, 3); // 900 in each of two namespaces over the 5 minute window of the town, 3 a second in each
         Assert.Null(queue.Backlog); // what is not asked for stays unknown
     }
@@ -230,7 +230,7 @@ public class MessagingSourceTests
     {
         var withNumbers = CannedHttp.Reply("""
             { "value": [ { "name": { "value": "ActiveMessages" }, "timeseries": [
-                { "metadatavalues": [ { "name": { "value": "entityname" }, "value": "sbq-al-ord-inbox" } ], "data": [ { "average": 10 } ] } ] } ] }
+                { "metadatavalues": [ { "name": { "value": "entityname" }, "value": "q-al-ord-in" } ], "data": [ { "average": 10 } ] } ] } ] }
             """);
         var calls = 0;
         var http = new CannedHttp().Respond(_ => ++calls <= 6 ? CannedHttp.Reply(withNumbers.Content.ReadAsStringAsync().Result) : CannedHttp.Reply("""{ "value": [] }"""));
@@ -240,7 +240,7 @@ public class MessagingSourceTests
         var second = await source.PollAsync(registry, CancellationToken.None); // Azure sends nothing for the queue this time
 
         var queue = Assert.Single(second["aa.orders-worker"].Queues!);
-        Assert.Equal("sbq-al-ord-inbox", queue.Name);
+        Assert.Equal("q-al-ord-in", queue.Name);
         Assert.Null(queue.Backlog);
         Assert.Null(second["aa.orders-worker"].QueueDepth); // no number, not a zero
     }
@@ -248,10 +248,10 @@ public class MessagingSourceTests
     [Fact]
     public async Task A_queue_name_that_names_only_the_service_is_read_by_that_service_in_whichever_pillar_it_is()
     {
-        // town a's outbox pattern has no pillar group: sbq-al-led-ord-outbox is addressed to the one service with the code ord
+        // town a's outbox pattern has no pillar group: q-al-led-to-ord is addressed to the one service with the code ord
         var http = new CannedHttp().Respond(_ => CannedHttp.Reply("""
             { "value": [ { "name": { "value": "ActiveMessages" }, "timeseries": [
-                { "metadatavalues": [ { "name": { "value": "entityname" }, "value": "sbq-zz-led-ord-outbox" } ], "data": [ { "average": 5 } ] } ] } ] }
+                { "metadatavalues": [ { "name": { "value": "entityname" }, "value": "q-zz-led-to-ord" } ], "data": [ { "average": 5 } ] } ] } ] }
             """));
         var (source, registry) = await Messaging(TownA, http);
 

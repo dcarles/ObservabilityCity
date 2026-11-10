@@ -19,6 +19,7 @@ export class LegendCard {
   private tab: TabId = 'problems'
   private topology: Topology = 'direct'
   private demo = false
+  private groupLabel = ''
 
   constructor(private readonly onChange: (open: boolean) => void = () => {}, private readonly themeId = 'harbour-town') {
     this.el.innerHTML = `
@@ -45,7 +46,7 @@ export class LegendCard {
 
   /** Writes the entries of every tab for this town's topology. */
   private fill(): void {
-    const sections = forTown(legendFor(this.themeId), { topology: this.topology, demo: this.demo })
+    const sections = forTown(legendFor(this.themeId), { topology: this.topology, demo: this.demo, groupLabel: this.groupLabel })
     for (const t of LEGEND_TABS) {
       this.el.querySelector<HTMLElement>(`[data-panel="${t.id}"]`)!.innerHTML = `
           <p class="blurb">${escapeHtml(t.blurb)}</p>
@@ -66,6 +67,13 @@ export class LegendCard {
   setDemo(demo: boolean): void {
     if (demo === this.demo) return
     this.demo = demo
+    this.fill()
+  }
+
+  /** What the town calls an island (its groupLabel), known from its first snapshot: the legend uses the town's own word. */
+  setGroupLabel(label: string): void {
+    if (label === this.groupLabel) return
+    this.groupLabel = label
     this.fill()
   }
 

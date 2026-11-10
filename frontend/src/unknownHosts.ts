@@ -4,14 +4,44 @@ import type { AddedHostSnapshot, UnknownHostSnapshot } from './types'
 
 const callsText = (n: number) => Math.round(n).toLocaleString('en-GB')
 
+/** How a rule added from the panel reads a gateway path: how many of its first parts it keeps, and whether the calls go through the gateway. */
+export interface RuleChoice {
+  depth: number
+  gateway: boolean
+}
+
+/** The parts of a path a rule can keep. Two (`/pillar/service` on many gateways) and through the gateway are what the panel offers first. */
+export const RULE_DEPTHS = [1, 2, 3] as const
+export const DEFAULT_RULE: RuleChoice = { depth: 2, gateway: true }
+
+/** The start of the path a rule keeps, as the panel shows it: "/aa/orders/…" for two parts of /aa/orders/x/y. */
+export function rulePrefix(path: string, depth: number): string {
+  const parts = path.split('/').filter(Boolean)
+  const kept = parts.slice(0, depth)
+  return kept.length === 0 ? '/' : `/${kept.join('/')}${parts.length > kept.length ? '/…' : ''}`
+}
+
+/** What the panel sends to add a rule for a path: the host, the path, the system it belongs to and how the rule reads it. */
+export function ruleRequest(host: string, path: string, target: string, choice: RuleChoice = DEFAULT_RULE): { host: string; path: string; target: string; depth: number; gateway: boolean } {
+  return { host, path, target, depth: choice.depth, gateway: choice.gateway }
+}
+
+/** The controls of a gateway host's rules: how many parts of the path a rule keeps, and whether the calls go through the gateway. */
+function ruleChoiceHtml(h: UnknownHostSnapshot, index: number, choice: RuleChoice): string {
+  const first = (h.paths ?? [])[0]?.path
+  return `<div class="rule-choice" data-i="${index}"><label class="dim">A rule keeps the first <select data-depth data-i="${index}">${RULE_DEPTHS.map((d) => `<option value="${d}"${d === choice.depth ? ' selected' : ''}>${d}</option>`).join('')}</select> part${choice.depth === 1 ? '' : 's'} of the path${first ? ` (${escapeHtml(rulePrefix(first, choice.depth))})` : ''}</label>
+      <label class="dim"><input type="checkbox" data-gateway data-i="${index}"${choice.gateway ? ' checked' : ''}> through the gateway</label></div>`
+}
+
 /** One row of the panel: the host, how many calls, who made them and on how many days, with the buttons that add it as a vendor, as one of our own or ignore it. A gateway host lists its unexplained paths instead. */
-export function unknownHostRow(h: UnknownHostSnapshot, index: number, showVendors = true, targets: readonly string[] = [], chosen: ReadonlyMap<string, string> = new Map()): string {
+export function unknownHostRow(h: UnknownHostSnapshot, index: number, showVendors = true, targets: readonly string[] = [], chosen: ReadonlyMap<string, string> = new Map(), rule: RuleChoice = DEFAULT_RULE): string {
   const head = `<div><b>${escapeHtml(h.host)}</b> <span class="dim">· about ${callsText(h.calls)} calls · ${h.days} day${h.days === 1 ? '' : 's'}</span></div>
     <div class="dim">called by ${escapeHtml(h.callers.join(', '))}</div>`
   if (h.gateway) {
     const paths = (h.paths ?? []).filter((p) => showVendors || !p.vendorsOnly)
     return `<li data-host="${escapeHtml(h.host)}" data-gateway="true">${head}
     <div class="dim">A gateway: no rule explains these paths. Pick the system a path belongs to and add a rule.</div>
+    ${ruleChoiceHtml(h, index, rule)}
     <ul class="paths">${paths.map((p, j) => `<li data-path="${escapeHtml(p.path)}"><span>${escapeHtml(p.path || '(no path)')}</span> <span class="dim">· about ${callsText(p.calls)} calls</span>
       <select data-target data-i="${index}" data-j="${j}"><option value="">system…</option>${targets.map((t) => `<option value="${escapeHtml(t)}"${chosen.get(`${h.host}|${p.path}`) === t ? ' selected' : ''}>${escapeHtml(t)}</option>`).join('')}</select>
       <button data-rule data-i="${index}" data-j="${j}">Add rule</button></li>`).join('')}</ul>${h.morePaths > 0 ? `<div class="dim">and ${h.morePaths} more path${h.morePaths === 1 ? '' : 's'}, the least called, not shown</div>` : ''}</li>`
@@ -48,6 +78,8 @@ export class UnknownHostsPanel {
   private timer: number | undefined
 
   private readonly chosen = new Map<string, string>()
+  /** How the rules of each gateway host read its paths, by host, when the viewer changed it from the default. */
+  private readonly rules = new Map<string, RuleChoice>()
 
   /** `targets` gives the ids of the systems a gateway path can be sent to, from the town on screen. */
   constructor(private readonly scope: Scope, private readonly targets: () => string[] = () => [], private readonly internalLabelOf: () => string = () => 'Internal services') {}
@@ -117,7 +149,7 @@ export class UnknownHostsPanel {
       <div class="panel" ${this.open ? '' : 'hidden'}>
         <label class="dim"><input type="checkbox" id="unknown-hosts-vendors" ${this.showVendors ? 'checked' : ''}> Include calls made by ${escapeHtml(this.internalLabel)} and vendors${vendorHosts > 0 ? ` (${vendorHosts} more)` : ''}</label>
         ${this.error ? `<div class="error" id="unknown-hosts-error">${escapeHtml(this.error)}</div>` : ''}
-        <ul id="unknown-hosts-list">${shown.map((h, i) => unknownHostRow(h, i, this.showVendors, this.targets(), this.chosen)).join('')}</ul>
+        <ul id="unknown-hosts-list">${shown.map((h, i) => unknownHostRow(h, i, this.showVendors, this.targets(), this.chosen, this.rules.get(h.host) ?? DEFAULT_RULE)).join('')}</ul>
         ${this.added.length > 0 ? `<div class="dim">Added from this panel (saved in _discovered/third-parties.yaml, which you can edit)</div><ul id="added-hosts-list">${this.added.map(addedRow).join('')}</ul>` : ''}</div>`
     this.el.querySelector('#unknown-hosts-toggle')!.addEventListener('click', () => { this.open = !this.open; this.render() })
     this.el.querySelector('#unknown-hosts-vendors')!.addEventListener('change', (e) => { this.showVendors = (e.target as HTMLInputElement).checked; this.render() })
@@ -143,6 +175,17 @@ export class UnknownHostsPanel {
         const hit = pathOf(sel)
         if (hit) this.chosen.set(`${hit.h.host}|${hit.path.path}`, sel.value)
       }))
+    const ruleOf = (host: string): RuleChoice => this.rules.get(host) ?? DEFAULT_RULE
+    this.el.querySelectorAll<HTMLSelectElement>('select[data-depth]').forEach((sel) =>
+      sel.addEventListener('change', () => {
+        const h = shown[Number(sel.dataset.i)]
+        if (h) { this.rules.set(h.host, { ...ruleOf(h.host), depth: Number(sel.value) }); this.render() }
+      }))
+    this.el.querySelectorAll<HTMLInputElement>('input[data-gateway]').forEach((box) =>
+      box.addEventListener('change', () => {
+        const h = shown[Number(box.dataset.i)]
+        if (h) this.rules.set(h.host, { ...ruleOf(h.host), gateway: box.checked })
+      }))
     this.el.querySelectorAll<HTMLButtonElement>('button[data-rule]').forEach((b) =>
       b.addEventListener('click', () => {
         const hit = pathOf(b)
@@ -153,7 +196,7 @@ export class UnknownHostsPanel {
           this.render()
           return
         }
-        void this.change(() => fetch(this.url('/api/added-rules'), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ host: hit.h.host, path: hit.path.path, target }) }))
+        void this.change(() => fetch(this.url('/api/added-rules'), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(ruleRequest(hit.h.host, hit.path.path, target, ruleOf(hit.h.host))) }))
       }))
   }
 }

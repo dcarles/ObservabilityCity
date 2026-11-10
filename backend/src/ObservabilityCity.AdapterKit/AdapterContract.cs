@@ -82,11 +82,13 @@ public static partial class AdapterContract
     public static IReadOnlyList<string> CheckReadings(IReadOnlyDictionary<string, NodeReading> readings, Registry registry)
     {
         var problems = new List<string>();
-        var known = registry.AllNodes.Select(n => n.Id).Concat(registry.Vendors.Select(v => v.Node.Id)).ToHashSet();
+        var known = registry.AllNodes.Select(n => n.Id).Concat(registry.Vendors.Select(v => v.Node.Id)).Concat(registry.Groups.Where(g => !g.IsHub).Select(g => NodeReading.FlowKey(g.Id))).ToHashSet(); // a pillar's flow is reported under its own key
         foreach (var (id, r) in readings)
         {
             if (!known.Contains(id)) { problems.Add($"a reading for '{id}', which the registry does not have; leave out what you cannot place"); continue; }
             void Rule(bool ok, string message) { if (!ok) problems.Add($"{id}: {message}"); }
+            if (r.Flow is { } flow)
+                Rule(flow.Sent is null or >= 0 && flow.Received is null or >= 0 && flow.WindowSeconds > 0, $"the flow is {flow.Sent}/{flow.Received} over {flow.WindowSeconds} s; rates cannot be negative and the window must be longer than 0");
             Rule(r.At != default, "At is not set; the reading would age as if it were from year one and show as stale");
             Rule(r.InstancesTotal >= 0, $"InstancesTotal is {r.InstancesTotal}");
             Rule(r.InstancesHealthy >= 0 && r.InstancesHealthy <= r.InstancesTotal, $"InstancesHealthy is {r.InstancesHealthy} of {r.InstancesTotal}");

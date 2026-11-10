@@ -1,5 +1,6 @@
 // What the inspector drawer says, as pure functions: a system's numbers in, rows and sentences out.
 
+import { groupWords, withGroupWords } from './groupLabel'
 import { regionLabel } from './deadLetters'
 import type { ConfigValue, HealthState, ScheduleSnapshot, IncidentSnapshot, JobSnapshot, LinkRef, LogGroup, LogSection, NodeSnapshot, ResourceLink, ScopeInfo, ScopeResource, SettingLayer, SystemDetail } from './types'
 import { inboundSplitText } from './inbound'
@@ -243,9 +244,14 @@ export function sectionLinks(section: { links?: ResourceLink[] | null }): Resour
 
 export const LAYER_WORD: Record<SettingLayer, string> = {
   System: 'this system',
-  Pillar: 'pillar defaults',
+  Pillar: '{group} defaults',
   App: 'defaults.yaml',
   BuiltIn: 'built in',
+}
+
+/** Where a setting came from, in the town's words: the island's own defaults are called after its groupLabel ("team defaults"; "pillar defaults" by default). */
+export function layerWord(layer: SettingLayer, groupLabel?: string | null): string {
+  return withGroupWords(LAYER_WORD[layer], groupWords(groupLabel))
 }
 
 /** The settings with the ones the system sets itself first, since those are the ones someone chose. The order inside a layer is kept. */
@@ -349,8 +355,8 @@ const INVENTORY: Record<string, string> = {
 export function scopeView(s: ScopeInfo | null | undefined): ScopeView | null {
   if (!s) return null
   const rows: ScopeRow[] = []
-  if (s.subscription) rows.push({ key: 'subscription', value: s.subscription, note: VIA[s.subscriptionVia ?? ''] ?? '' })
-  if (s.workspace) rows.push({ key: 'workspace', value: s.workspace, note: WORKSPACE_VIA[s.workspaceVia ?? ''] ?? 'from the environment' })
+  if (s.subscription) rows.push({ key: 'account', value: s.subscription, note: VIA[s.subscriptionVia ?? ''] ?? '' })
+  if (s.workspace) rows.push({ key: 'telemetry store', value: s.workspace, note: WORKSPACE_VIA[s.workspaceVia ?? ''] ?? 'from the environment' })
   if (s.serviceCode) rows.push({ key: 'service code', value: s.serviceCode, note: 'matched against resource names' })
   if (s.telemetryRole) rows.push({ key: 'telemetry role', value: s.telemetryRole, note: VIA[s.telemetryRoleVia ?? ''] ?? '' })
   if (s.instances != null) rows.push({ key: 'instances', value: String(s.instances), note: 'added up over the resources that are counted' })

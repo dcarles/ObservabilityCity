@@ -209,3 +209,152 @@ describe('a view of one team', () => {
     expect(d.mode).toBe('calm')
   })
 })
+
+describe('the overview of the whole town', () => {
+  const OVERVIEW = 12
+  const troubled = () => withState(withState(healthyTown(), 'cl.ledger-db', 'Degraded'), 'pay.payments-api', 'Down')
+
+  it('opens a tour of trouble, then visits each stop once, then comes round again', () => {
+    const d = new WallDirector(HOLD, 4, OVERVIEW)
+
+    const first = d.update(troubled(), 0)
+
+    expect(first).toMatchObject({ kind: 'overview', focus: { kind: 'home' }, cut: false })
+    expect(first?.caption).toBe('Overview: 2 systems need attention across 2 islands')
+    expect(d.tick(11.9)).toBeNull()
+    expect(d.tick(12)).toMatchObject({ kind: 'down' })
+    expect(d.tick(32)).toMatchObject({ kind: 'degraded' })
+    expect(d.tick(52)).toMatchObject({ kind: 'overview' })
+    expect(d.tick(64)).toMatchObject({ kind: 'down' })
+  })
+
+  it('holds the overview for its own seconds, not the hold', () => {
+    const d = new WallDirector(HOLD, 4, 5)
+    d.update(troubled(), 0)
+
+    expect(d.tick(4.9)).toBeNull()
+    expect(d.tick(5)).toMatchObject({ kind: 'down' })
+  })
+
+  it('has no overview when it is 0: the tour only loops through the trouble', () => {
+    const d = new WallDirector(HOLD, 4, 0)
+
+    expect(d.update(troubled(), 0)).toMatchObject({ kind: 'down' })
+    expect(d.tick(20)).toMatchObject({ kind: 'degraded' })
+    expect(d.tick(40)).toMatchObject({ kind: 'down' })
+  })
+
+  it('cuts to trouble that appears in a healthy town, then shows the overview after that stop', () => {
+    const d = new WallDirector(HOLD, 4, OVERVIEW)
+    d.update(healthyTown(), 0)
+
+    const stop = d.update(withState(healthyTown(), 'cl.ledger-api', 'Degraded'), 5)
+
+    expect(stop).toMatchObject({ kind: 'degraded', cut: true })
+    expect(d.tick(25)).toMatchObject({ kind: 'overview' })
+  })
+
+  it('still cuts to new trouble at once, and carries on from there', () => {
+    const d = new WallDirector(HOLD, 4, OVERVIEW)
+    d.update(withState(healthyTown(), 'cl.ledger-db', 'Degraded'), 0)
+
+    const cut = d.update(withState(withState(healthyTown(), 'cl.ledger-db', 'Degraded'), 'pay.payments-api', 'Down'), 3)
+
+    expect(cut).toMatchObject({ kind: 'down', cut: true })
+    expect(d.tick(23)).toMatchObject({ kind: 'degraded' })
+    expect(d.tick(43)).toMatchObject({ kind: 'overview' })
+  })
+
+  it('keeps the overview caption up to date and leaves it when the trouble ends', () => {
+    const d = new WallDirector(HOLD, 4, OVERVIEW)
+    d.update(troubled(), 0)
+
+    d.update(withState(healthyTown(), 'pay.payments-api', 'Down'), 2)
+    expect(d.current).toMatchObject({ kind: 'overview', caption: 'Overview: 1 system needs attention across 1 island' })
+
+    const stop = d.update(healthyTown(), 4)
+    expect(stop).toMatchObject({ kind: 'calm', key: 'town' })
+  })
+
+  it('does not change the healthy showcase loop', () => {
+    const d = new WallDirector(HOLD, 4, OVERVIEW)
+
+    expect(d.update(healthyTown(), 0)).toMatchObject({ key: 'town', kind: 'calm' })
+    expect(d.tick(20)?.key).toBe('hub')
+  })
+
+  it('takes new timings for the stops from now on', () => {
+    const d = new WallDirector(HOLD, 4, 0)
+    d.update(troubled(), 0)
+    expect(d.current).toMatchObject({ kind: 'down' })
+
+    d.configure(5, 3)
+
+    expect(d.tick(20)).toMatchObject({ kind: 'degraded' })
+    expect(d.tick(25)).toMatchObject({ kind: 'overview' })
+    expect(d.tick(28)).toMatchObject({ kind: 'down' })
+  })
+
+  describe('with islands', () => {
+    const keysOf = (d: WallDirector, from: number, stops: number, step: number): string[] => {
+      const keys: string[] = []
+      for (let i = 1; i <= stops; i++) { const st = d.tick(from + i * step); if (st) keys.push(st.key) }
+      return keys
+    }
+
+    it('shows the whole town, then each pillar island in ring order without the hub, then the trouble', () => {
+      const d = new WallDirector(HOLD, 4, 3, 2)
+      const first = d.update(troubled(), 0)
+      const islands = healthyTown().groups.filter((g) => !g.isHub && g.nodes.length > 0)
+
+      expect(first).toMatchObject({ key: 'overview', focus: { kind: 'home' } })
+      const seen: string[] = []
+      let now = 3
+      for (let i = 0; i < islands.length; i++) {
+        const st = d.tick(now)!
+        seen.push(st.key)
+        expect(st).toMatchObject({ kind: 'overview', focus: { kind: 'island', id: islands[i].id }, cut: false })
+        now += 2
+      }
+      expect(seen).toEqual(islands.map((g) => `overview:island:${g.id}`))
+      expect(seen.some((k) => k.includes(':hub'))).toBe(false)
+      expect(d.tick(now)).toMatchObject({ kind: 'down' }) // the trouble comes after the last island
+    })
+
+    it('holds the whole town for overview seconds and each island for overviewIsland seconds', () => {
+      const d = new WallDirector(HOLD, 4, 3, 2)
+      d.update(troubled(), 0)
+
+      expect(d.tick(2.9)).toBeNull()
+      expect(d.tick(3)).toMatchObject({ kind: 'overview', focus: { kind: 'island' } })
+      expect(d.tick(4.9)).toBeNull()
+      expect(d.tick(5)).toMatchObject({ kind: 'overview' })
+    })
+
+    it('says the island and its services in the caption', () => {
+      const d = new WallDirector(HOLD, 4, 3, 2)
+      d.update(troubled(), 0)
+
+      const st = d.tick(3)!
+
+      expect(st.caption).toMatch(/^Overview: .+, \d+ services?( plus scheduler)?$/)
+    })
+
+    it('has no island stops when overviewIsland is 0: the whole town only', () => {
+      const d = new WallDirector(HOLD, 4, 3, 0)
+      d.update(troubled(), 0)
+
+      expect(d.tick(3)).toMatchObject({ kind: 'down' })
+    })
+
+    it('comes back to the whole town after the last stop and goes round the islands again', () => {
+      const d = new WallDirector(1, 4, 1, 1)
+      d.update(troubled(), 0)
+      const keys = keysOf(d, 0, 40, 1)
+
+      expect(keys.filter((k) => k === 'overview').length).toBeGreaterThanOrEqual(2)
+      const islandStops = keys.filter((k) => k.startsWith('overview:island:'))
+      expect(islandStops.length).toBeGreaterThan(keys.filter((k) => k === 'overview').length)
+    })
+  })
+})

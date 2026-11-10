@@ -292,24 +292,25 @@ describe('saying which tenant throttles', () => {
 
 describe('showing what a tenant database is provisioned at', () => {
   const sized = (limit: number | null) => ({ ...unit('Customer', 'Healthy'), limit })
-  it('writes a size with thousands separators and the unit', () => {
-    expect(limitText(20000)).toBe('20,000 RU/s')
-    expect(limitText(400)).toBe('400 RU/s')
+  it('writes a size with thousands separators and no unit of one engine (the source sends none)', () => {
+    expect(limitText(20000)).toBe('max 20,000')
+    expect(limitText(400)).toBe('max 400')
+    expect(limitText(400)).not.toContain('RU')
   })
   it('gives the one size, or the range when the databases differ, and nothing when none is known', () => {
-    expect(limitRange([sized(20000), sized(20000)])).toBe('20,000 RU/s')
-    expect(limitRange([sized(4000), sized(20000), sized(10000)])).toBe('4,000 to 20,000 RU/s')
-    expect(limitRange([sized(null), sized(10000)])).toBe('10,000 RU/s')
+    expect(limitRange([sized(20000), sized(20000)])).toBe('20,000')
+    expect(limitRange([sized(4000), sized(20000), sized(10000)])).toBe('4,000 to 20,000')
+    expect(limitRange([sized(null), sized(10000)])).toBe('10,000')
     expect(limitRange([sized(null)])).toBeNull()
     expect(limitRange([])).toBeNull()
   })
   it('puts the size first on a tenant row, then the use and the throttling', () => {
-    expect(tenantFigures({ limit: 20000, utilisation: 0.4, throttled: 0.032 })).toBe('20,000 RU/s · 40% · 3.2% throttled')
+    expect(tenantFigures({ limit: 20000, utilisation: 0.4, throttled: 0.032 })).toBe('max 20,000 · 40% · 3.2% throttled')
     expect(tenantFigures({ limit: null, utilisation: 0.4, throttled: 0 })).toBe('40% · 0% throttled')
     expect(tenantFigures({ limit: null, utilisation: null, throttled: null })).toBe('–')
     // a quiet database read as no use says so, instead of a bare 0%
-    expect(tenantFigures({ limit: 4000, utilisation: 0, throttled: 0, idle: true })).toBe('4,000 RU/s · no activity reported · 0% throttled')
-    expect(tenantFigures({ limit: 4000, utilisation: 0, throttled: 0, idle: null })).toBe('4,000 RU/s · 0% · 0% throttled')
+    expect(tenantFigures({ limit: 4000, utilisation: 0, throttled: 0, idle: true })).toBe('max 4,000 · no activity reported · 0% throttled')
+    expect(tenantFigures({ limit: 4000, utilisation: 0, throttled: 0, idle: null })).toBe('max 4,000 · 0% · 0% throttled')
   })
 })
 

@@ -29,8 +29,8 @@
       "messaging": {
         "topics": [
           {
-            "name": "hub-egress",
-            "service": "egress"
+            "name": "hub-broadcast",
+            "service": "broadcast"
           }
         ],
         "subscriptions": [],
@@ -222,7 +222,8 @@
           "engine": null
         }
       ],
-      "assets": []
+      "assets": [],
+      "flow": null
     },
     {
       "id": "aa",
@@ -237,7 +238,7 @@
       "messaging": {
         "topics": [
           {
-            "name": "aa-orders-outbox",
+            "name": "aa-orders-events",
             "service": "orders"
           }
         ],
@@ -569,12 +570,17 @@
           "jobs": null,
           "regions": null,
           "queues": null,
-          "reason": "error rate 6.4%, tenant Acme \u00B7 108% RU \u00B7 31.2% throttled",
+          "reason": "error rate 6.4%, tenant Acme \u00B7 108% capacity \u00B7 31.2% throttled",
           "sources": null,
           "engine": null
         }
       ],
-      "assets": []
+      "assets": [],
+      "flow": {
+        "sentPerSecond": 128,
+        "receivedPerSecond": 0,
+        "windowSeconds": 300
+      }
     },
     {
       "id": "bb",
@@ -795,7 +801,8 @@
           "engine": null
         }
       ],
-      "assets": []
+      "assets": [],
+      "flow": null
     }
   ],
   "vendors": [],
@@ -883,5 +890,6 @@
   "notes": null,
   "sources": null,
   "healthEvents": null,
-  "internalVendorsLabel": "Internal services"
+  "internalVendorsLabel": "Internal services",
+  "wall": null
 }

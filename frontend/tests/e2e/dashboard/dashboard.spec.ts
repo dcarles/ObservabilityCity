@@ -280,32 +280,46 @@ test.describe('the dashboard view', () => {
     expect(text).toBe('No queue has dead letters right now.')
   })
 
-  const FLOW = `const bb = s.groups.find(g => g.id === 'bb'); const w = bb.nodes[0]
-      for (const m of s.groups.flatMap(g => g.nodes)) m.queues = []
-      bb.messaging.subscriptions = [{ topic: 'aa-orders-outbox', publisher: 'aa', consumer: w.id, legacy: false }]
-      w.queues = [{ name: 'aa-orders-outbox', backlog: 0, deadLetters: 0, perSecond: 3200 }]`
+  const FLOW = `const aa = s.groups.find(g => g.id === 'aa'); const bb = s.groups.find(g => g.id === 'bb')
+      for (const g of s.groups) { g.flow = undefined; for (const n of g.nodes) n.queues = [] }
+      aa.flow = { sentPerSecond: 3200, receivedPerSecond: 0, windowSeconds: 900 }
+      bb.flow = { sentPerSecond: null, receivedPerSecond: 40, windowSeconds: 900 }`
 
-  test('the Message flow tile lists the pillar pairs by messages a second, and the cards show who they send to', async ({ town, page }) => {
+  test('the Message flow tile lists the pillars by what they send and receive, and the cards say the same', async ({ town, page }) => {
     await open(town, page)
-    const read = `const t = document.querySelector('#kpi-flow'); return { lines: [...t.querySelectorAll('.fl')].map(l => l.textContent), bar: t.querySelector('.fbar i').style.width, button: !!t.querySelector('[data-flows-all]'), alpha: document.querySelector('[data-pillar="aa"] .pflow')?.textContent ?? null, billing: document.querySelector('[data-pillar="bb"] .pflow')?.textContent ?? null }`
-    const got = await withSnapshot<{ lines: string[]; bar: string; button: boolean; alpha: string | null; billing: string | null }>(page, FLOW, read)
-    expect(got.lines).toHaveLength(1)
-    expect(got.lines[0]).toMatch(/→ .*3\.2k msg\/s/)
+    const read = `const t = document.querySelector('#kpi-flow'); return { lines: [...t.querySelectorAll('.fl')].map(l => l.textContent), bar: t.querySelector('.fbar i').style.width, button: !!t.querySelector('[data-flows-all]'), window: t.querySelector('.fwin')?.textContent ?? null, alpha: document.querySelector('[data-pillar="aa"] .pflow [data-flow]')?.textContent ?? null, billing: document.querySelector('[data-pillar="bb"] .pflow [data-flow]')?.textContent ?? null }`
+    const got = await withSnapshot<{ lines: string[]; bar: string; button: boolean; window: string | null; alpha: string | null; billing: string | null }>(page, FLOW, read)
+    expect(got.lines).toHaveLength(2)
+    expect(got.lines[0]).toMatch(/sends ext3\.2k msg\/s/)
+    expect(got.lines[0]).toContain('no messages received')
+    expect(got.lines[1]).toContain('receives40 msg/s')
     expect(got.bar).toBe('100%')
     expect(got.button).toBe(false)
-    expect(got.alpha).toMatch(/^→ .* 3\.2k msg\/s$/)
-    expect(got.billing).toBeNull() // reads only: a closed card has nothing to show
+    expect(got.window).toBe('Average over the last 15 min')
+    expect(got.alpha).toMatch(/^sends ext 3\.2k msg\/s · no messages received$/)
+    expect(got.billing).toMatch(/^receives 40 msg\/s$/)
     await page.locator('[data-pillar="aa"] [data-toggle]').click()
-    await expect(page.locator('[data-pillar="aa"] .pflowx')).toContainText('Sends to')
+    await expect(page.locator('[data-pillar="aa"] .pflowx')).toContainText('Sends outside')
     await expect(page.locator('[data-pillar="aa"] .pflowx')).toContainText('3.2k msg/s')
+    await expect(page.locator('[data-pillar="aa"] .pflowx')).toContainText('no messages received')
     await page.locator('[data-pillar="bb"] [data-toggle]').click()
-    await expect(page.locator('[data-pillar="bb"] .pflowx')).toContainText('Reads from')
+    await expect(page.locator('[data-pillar="bb"] .pflowx')).toContainText('Receives')
   })
 
-  test('the Message flow tile is absent when no queue carries messages between pillars', async ({ town, page }) => {
+  test('the Message flow tile is absent when no pillar moves a message', async ({ town, page }) => {
     await open(town, page)
-    const present = await withSnapshot<boolean>(page, `for (const m of s.groups.flatMap(g => g.nodes)) m.queues = []`, `return !!document.querySelector('#kpi-flow')`)
+    const present = await withSnapshot<boolean>(page, `for (const g of s.groups) { g.flow = g.isHub ? undefined : { sentPerSecond: 0, receivedPerSecond: 0, windowSeconds: 900 }; for (const n of g.nodes) n.queues = [] }`, `return !!document.querySelector('#kpi-flow')`)
     expect(present).toBe(false)
+  })
+
+  test('the summary cards share one row on a big screen and the Total traffic card lists the pillars', async ({ town, page }) => {
+    await page.setViewportSize({ width: 1920, height: 1000 })
+    await open(town, page)
+    const got = await withSnapshot<{ tops: number[]; rows: number; total: string | null; over: number }>(page, FLOW, `const k = [...document.querySelectorAll('#dash-root .sum .kpi')]; return { tops: k.map(x => Math.round(x.getBoundingClientRect().top)), rows: document.querySelectorAll('#kpi-traffic [data-pillar-traffic]').length, total: document.querySelector('#kpi-flow > b')?.textContent ?? null, over: document.documentElement.scrollWidth - document.documentElement.clientWidth }`)
+    expect(got.tops.length).toBeGreaterThanOrEqual(3)
+    expect(new Set(got.tops).size).toBe(1)
+    expect(got.rows).toBeGreaterThan(0)
+    expect(got.over).toBeLessThanOrEqual(0)
   })
 
   test('the Message flow tile fits a phone screen without sideways scrolling', async ({ town, page }) => {
@@ -381,8 +395,8 @@ test.describe('the dashboard view', () => {
     const read = `const r = document.querySelector('[data-pillar="aa"] tr.row[data-system="aa.orders-db"] .mx')
       return { db: r?.textContent, lines: [...document.querySelectorAll('[data-pillar="aa"] tr.sub .mx')].map(x => x.textContent) }`
     const got = await withSnapshot<{ db: string; lines: string[] }>(page, edit, read)
-    expect(got.db).toContain('max 4,000 RU/s')
-    expect(got.lines).toContain('max 4,000 RU/s')
+    expect(got.db).toContain('max 4,000')
+    expect(got.lines).toContain('max 4,000')
     expect(got.lines.length).toBeGreaterThan(1)
   })
 
@@ -581,7 +595,7 @@ test.describe('the dashboard view', () => {
     })
 
     test('?wall=1&view=dashboard is a wall: no menu, big type, a strip, and no 3D town', async ({ town, page }) => {
-      await open(town, page, '&wall=1&hold=2')
+      await open(town, page, '&wall=1&hold=2&overview=0')
       await expect(page.locator('#wall-strip')).toBeVisible()
       await expect(page.locator('#wall-headline')).toHaveText('ALL SYSTEMS HEALTHY')
       await expect(page.locator('#dash-menu')).toBeHidden()
@@ -592,7 +606,7 @@ test.describe('the dashboard view', () => {
     })
 
     test('the tour opens one pillar at a time and picks the service out', async ({ town, page }) => {
-      await open(town, page, '&wall=1&hold=2')
+      await open(town, page, '&wall=1&hold=2&overview=0')
       const seen: string[] = []
       for (let i = 0; i < 6; i++) {
         await step(page, 2.05)
@@ -608,8 +622,62 @@ test.describe('the dashboard view', () => {
       expect(seen.some((k) => k.startsWith('island:'))).toBe(true)
     })
 
+    test('with trouble, the tour opens with a pillar overview: the closed list, then each pillar opened in turn, then the trouble', async ({ town, page }) => {
+      await open(town, page, '&wall=1&hold=2&overview=3&overviewIsland=2')
+      await step(page, 11)
+      const feed = (state: string) => page.evaluate(async (st) => {
+        const s = await (await fetch('/api/snapshot/latest')).json()
+        for (const n of s.groups.flatMap((g: any) => g.nodes)) n.state = n.id === 'aa.orders-api' ? st : 'Healthy'
+        s.totals.down = st === 'Down' ? 1 : 0
+        ;(window as any).dash.hold(true)
+        ;(window as any).dash.feed(s)
+      }, state)
+      await feed('Healthy')
+      await feed('Down')
+      expect((await wall(page))!.stop).toMatchObject({ key: 'down:aa.orders-api', cut: true })
+      await step(page, 2.05)
+      const w = (await wall(page))!
+      expect(w.stop).toMatchObject({ kind: 'overview', cut: false })
+      await expect(page.locator('#wall-caption')).toHaveText('Overview: 1 system needs attention across 1 island')
+      expect(w.open).toEqual([])
+      await expect(page.locator('#dash-pillars table.svc')).toHaveCount(0)
+      await expect.poll(() => page.evaluate(() => window.scrollY)).toBeLessThan(5) // the scroll back to the top glides
+      // then each pillar in turn, one open at a time, and then the trouble
+      const opened: string[] = []
+      await step(page, 3.05)
+      for (let i = 0; i < 6 && (await wall(page))!.stop!.kind === 'overview'; i++) {
+        const t = (await wall(page))!
+        expect(t.stop!.key).toMatch(/^overview:island:/)
+        const id = t.stop!.key.slice('overview:island:'.length)
+        expect(t.open).toEqual([id])
+        await expect(page.locator('#dash-pillars table.svc')).toHaveCount(1)
+        opened.push(id)
+        await step(page, 2.05)
+      }
+      expect(opened.length).toBeGreaterThanOrEqual(2)
+      expect(new Set(opened).size).toBe(opened.length)
+      expect((await wall(page))!.stop).toMatchObject({ key: 'down:aa.orders-api', cut: false })
+    })
+
+    test("holds for the town's holdSeconds when the address says nothing", async ({ town, page }) => {
+      await open(town, page, '&wall=1')
+      await step(page, 11)
+      await page.evaluate(async () => {
+        const s = await (await fetch('/api/snapshot/latest')).json()
+        s.wall = { holdSeconds: 3 }
+        ;(window as any).dash.hold(true)
+        ;(window as any).dash.feed(s)
+      })
+      await step(page, 20.1) // the stop that was already on holds its 20 s; the next one holds the town's 3
+      const before = (await wall(page))!.stop!.key
+      await step(page, 1)
+      expect((await wall(page))!.stop!.key).toBe(before)
+      await step(page, 3)
+      expect((await wall(page))!.stop!.key).not.toBe(before)
+    })
+
     test('new trouble cuts to its service at once, picks it out, and a resolved note comes when it ends', async ({ town, page }) => {
-      await open(town, page, '&wall=1&hold=2')
+      await open(town, page, '&wall=1&hold=2&overview=0')
       await step(page, 11)
       const feed = (state: string) => page.evaluate(async (st) => {
         const s = await (await fetch('/api/snapshot/latest')).json()
@@ -632,7 +700,7 @@ test.describe('the dashboard view', () => {
     })
 
     test('a system with dead letters is a stop of its own, named by queue, and is not counted as degraded', async ({ town, page }) => {
-      await open(town, page, '&wall=1&hold=2')
+      await open(town, page, '&wall=1&hold=2&overview=0')
       await step(page, 11)
       const feed = (dead: number) => page.evaluate(async (n) => {
         const s = await (await fetch('/api/snapshot/latest')).json()
@@ -657,7 +725,7 @@ test.describe('the dashboard view', () => {
     })
 
     test('a frozen feed greys the wall and the strip says so', async ({ town, page }) => {
-      await open(town, page, '&wall=1&hold=2')
+      await open(town, page, '&wall=1&hold=2&overview=0')
       await page.evaluate(() => (window as any).dash.muteFeed(true, 1000))
       await expect(page.locator('#wall-connection')).toBeVisible({ timeout: 15_000 })
       await expect(page.locator('#wall-connection')).toContainText('may be out of date')

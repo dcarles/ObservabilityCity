@@ -2,6 +2,8 @@
 // (red only ever means a failure, amber is a warning, grey is no data) and to the list of things the town really draws.
 // The card has four tabs. Each tab holds one or more sections; each section holds entries (a picture, what you see, what it means).
 
+import { groupWords, withGroupWords } from './groupLabel'
+
 export type Tone = 'neutral' | 'green' | 'amber' | 'red' | 'grey' | 'blue'
 
 export type TabId = 'problems' | 'islands' | 'buildings' | 'traffic' | 'controls'
@@ -91,7 +93,7 @@ export const LEGEND: readonly LegendSection[] = [
     title: 'The places',
     tab: 'islands',
     entries: [
-      { id: 'island', sees: 'Island with its name floating over it', means: 'A pillar: one team\'s own services', more: 'Its services stand in rows. The name shows from the air and fades as you come close.', tone: 'neutral', icon: '🏘️' },
+      { id: 'island', sees: 'Island with its name floating over it', means: 'A {group}: one team\'s own services', more: 'Its services stand in rows. The name shows from the air and fades as you come close.', tone: 'neutral', icon: '🏘️' },
       { id: 'hub', sees: 'The island in the middle', means: 'The platform hub, shared by every island', more: 'The API gateway, the message broker (Service Bus, Kafka), central egress and the shared databases stand here, with clusters of platform resources such as Monitoring.', tone: 'neutral', icon: '⚓' },
       { id: 'vendor', sees: 'Small island out at sea', means: 'A third party, or a service outside the platform', more: 'A third party we call, or a service of the company outside the monitored platform (labelled internal). Several services of one vendor stand on one island. Health comes from our calls to it.', tone: 'neutral', icon: '🏝️' },
       { id: 'airport', sees: 'Airport', means: 'Callers from outside', more: 'It has an island of its own at the edge of the town. Arrivals follow the inbound traffic.', tone: 'neutral', icon: '✈️' },
@@ -109,7 +111,7 @@ export const LEGEND: readonly LegendSection[] = [
   },
   {
     id: 'buildings',
-    title: 'On a pillar island',
+    title: 'On a {group} island',
     tab: 'buildings',
     entries: [
       { id: 'api', sees: 'Office tower', means: 'An API', tone: 'neutral', icon: '🏢' },
@@ -237,9 +239,19 @@ export const LEGEND_ENTRIES: readonly LegendEntry[] = LEGEND.flatMap((s) => s.en
 
 export const LEGEND_SEEN_KEY = 'oc.legendSeen'
 
-/** What a town shows of the legend: the entries that belong to its topology and its mode (demo or live) and are not hidden, and no empty sections. */
-export function forTown(sections: readonly LegendSection[], town: { topology: Topology; demo: boolean }): LegendSection[] {
+/**
+ * What a town shows of the legend: the entries that belong to its topology and its mode (demo or live) and are not hidden, and no empty sections. The
+ * {group} holes in the words become what the town calls an island (its groupLabel; Pillar when it sets none).
+ */
+export function forTown(sections: readonly LegendSection[], town: { topology: Topology; demo: boolean; groupLabel?: string | null }): LegendSection[] {
+  const words = groupWords(town.groupLabel)
+  const fill = (t: string): string => withGroupWords(t, words)
   return sections
-    .map((s) => ({ ...s, entries: s.entries.filter((e) => (!e.topology || e.topology === town.topology) && (!e.demoOnly || town.demo) && !e.hidden) }))
+    .map((s) => ({
+      ...s,
+      title: fill(s.title),
+      entries: s.entries.filter((e) => (!e.topology || e.topology === town.topology) && (!e.demoOnly || town.demo) && !e.hidden)
+        .map((e) => ({ ...e, sees: fill(e.sees), means: fill(e.means), ...(e.more ? { more: fill(e.more) } : {}) })),
+    }))
     .filter((s) => s.entries.length > 0)
 }

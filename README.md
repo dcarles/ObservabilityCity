@@ -1,8 +1,24 @@
 # Observability City
 
-A browser app that shows system health as a living, animated 3D town instead of a dashboard. Each pillar (or team) is an island, each system is a building, and what is going on shows in the town itself: floors for instances, lit windows for load, rooftop beacons for errors, cars for traffic.
+A browser app that shows system health as a living, animated 3D town instead of a dashboard. Each group of systems (a pillar, a team, a domain: `groupLabel` in `town.yaml` picks the word) is an island, each system is a building, and what is going on shows in the town itself: floors for instances, lit windows for load, rooftop beacons for errors, cars for traffic.
 
-**Status: Phase 1, slice 3.5.** The pipeline runs end to end on fake data (backend, live push, browser), and the whole sample town is built: the hub, 16 pillar islands and a Lost & found island, with messaging between them. Everything else is in [docs/](docs/observability-city-plan.md).
+**Status:** the demo towns run on fake data, and a live town reads real sources through adapter modules. It ships an Azure adapter today (Resource Graph, Log Analytics, Azure Monitor, Service Bus, Function jobs and Resource Health); other clouds and tools plug in through adapters (see [docs/write-an-adapter.md](docs/write-an-adapter.md)). The 3D town, the dashboard and the wall screen all work; the sample town has the hub, 16 pillar islands and a Lost & found island, with messaging between them. Incidents from a live source and hosting are still to come. The plan is in [docs/](docs/observability-city-plan.md).
+
+## What it looks like
+
+The sample town (Galactic Credit) in each of the three themes: harbour town, space colony and works. The data, the layout and every signal are the same; only the look changes.
+
+| Harbour town | Space colony | Works |
+| --- | --- | --- |
+| ![The harbour town theme](docs/screenshots/theme-harbour-town.png) | ![The space colony theme](docs/screenshots/theme-space.png) | ![The works theme](docs/screenshots/theme-factory.png) |
+
+A bad day: an island with errors, the inspector open on a degraded API, and the effects listed in the Break things panel.
+
+![A bad day with the inspector open](docs/screenshots/trouble-inspector.png)
+
+The same town as a dashboard, for when you want the list rather than the picture.
+
+![The dashboard view](docs/screenshots/dashboard.png)
 
 ## What you need installed
 
@@ -13,7 +29,7 @@ A browser app that shows system health as a living, animated 3D town instead of 
 | A browser with WebGL | Any current Chrome, Edge, Firefox or Safari | The 3D town |
 | Git | Any | To clone |
 
-**You do not need Docker, Docker Desktop, Rancher or any container tool.** Phase 1 uses fake data and keeps no history store, so nothing runs in a container. The .NET Aspire dashboard that opens with the app runs as a normal process.
+**You do not need Docker, Docker Desktop, Rancher or any container tool.** The app keeps no history store, so nothing runs in a container. The .NET Aspire dashboard that opens with the app runs as a normal process.
 
 On Windows: `winget install Microsoft.DotNet.SDK.10` and `winget install OpenJS.NodeJS.LTS`, then open a new terminal.
 
@@ -112,11 +128,11 @@ How to read the town, as built so far:
 | You see | It means |
 | --- | --- |
 | Number of floors | Instance count on a doubling scale (1, 2, 3-4, 5-8 ... 65+ gives 1 to 8 floors) |
-| Lit windows | Lights switch on floor by floor from the ground up. Apps and workers: CPU. Databases: share of provisioned capacity used (for example Cosmos RU %) |
+| Lit windows | Lights switch on floor by floor from the ground up. Apps and workers: CPU. Databases: share of provisioned capacity used (capacity %, for example request units on Cosmos DB or consumed capacity on DynamoDB) |
 | Dark, cracked floors and an amber plaque | Unhealthy instances ("5/10 healthy") |
 | Rooftop beacon: green, amber, red (red pulses) | Errors, throttling or resource pressure against the system's own thresholds. Amber is a warning (including high CPU, memory or database utilisation), red means errors or throttled requests |
 | Factory (workers) and storage units (databases) | Workers are yellow-brick factories with a FACTORY sign and roof chimneys, databases are storage buildings with a STORAGE sign, both next to the API office. Chimney smoke thickens as CPU climbs. Storage doors light up with database utilisation |
-| Meter bars on the name board | Apps and workers show CPU and memory. Databases show utilisation (for example Cosmos RU %) and the share of throttled requests. An ERR bar shows the failure share (5xx, timeouts and unhandled exceptions; 4xx are not failures and 429 counts as throttling) and a line shows p99 against the SLA. Workers also show queue depth and oldest message, and dead letters. Each bar turns amber then red against its thresholds |
+| Meter bars on the name board | Apps and workers show CPU and memory. Databases show capacity used (capacity %) and the share of throttled requests. An ERR bar shows the failure share (5xx, timeouts and unhandled exceptions; 4xx are not failures and 429 counts as throttling) and a line shows p99 against the SLA. Workers also show queue depth and oldest message, and dead letters. Each bar turns amber then red against its thresholds |
 | Lowered barrier gate at a database | Requests are being throttled |
 | Cars on the streets | Requests, drawn as a sample, not a count (at 200 requests a second only a few cars are shown, so more cars means more requests, not an exact number). Blue sedans are internal calls, yellow taxis external ones, all the same size. Cars never touch: in a lane each brakes for the car ahead, and at crossings a car keeps out of any older car's path |
 | Service lane beside a building, with cars waiting | Each building has a lane that holds five cars (three beside the spine, where it is shorter). Time at the door is the latency, so a slow system builds a queue. Over the SLA the queued cars blink amber hazard lights, a "!" bubble honks over the lane and the name board shows p99 against the SLA. When the lane is full no more cars appear for that building, so nothing turns round and the road stays clear. A "+N waiting" marker then shows the requests in flight (request rate times about half of p99) that the lane has no room to draw. A served car drives into the building |
@@ -124,11 +140,11 @@ How to read the town, as built so far:
 | Cars between buildings on one island | Calls between systems of the same pillar. A car runs only along a link declared in the pillar file (`calls: [pillar.system, ...]`). A callee's rate is shared evenly among its declared callers until a source reports each link's own rate, and a system with no declared caller sees no such traffic |
 | API, worker and database side by side | One service. Systems that share a `service` in the registry stand next to each other on one pad, with their fronts toward the road. Pads sit on a grid, so every building's front is visible from the road side. A small island has two pads a row, one each side of the main road; a bigger one has four, six or eight, whichever makes the smallest island for its pads, so it grows wider as well as longer |
 | Name board above a building | System name and "N/M healthy". Fades out when the camera is far away, except for troubled buildings |
-| Bridges | One road bridge from the hub's plaza to an island's gate, for an island that has an API or a call link over its coast (to a hub database or cache, through the gateway, or into it from another island). All sync traffic between islands goes through the hub. An island with neither has no bridge, and no car drives to it |
-| Islands on a ring round the hub, a few further out | Pillars, in the order of `islands` in `town.yaml`. `ringCapacity` (default 12, 6 to 18) fit on the first ring, the rest stand in a staggered second ring with their bridges passing between first-ring islands. Two rings only, so at most (ringCapacity x 2) - 1 pillars. The airport takes the second ring's north slot. A ring road circles the town, with third-party vendors outside it. The hub grows with the number of islands |
-| Island with a heap of boxes and bins by the gate | Lost & found: systems that carry no pillar tag and no `pillar.code` |
-| Pier with crates, only on an island with messaging | Where messaging boats dock, for an island that publishes a topic or has a worker that subscribes to one. The board reads PIER, the topics it publishes and the subscriptions it reads. Messages waiting pile up as crates on the quay with a "waiting N, oldest" sign. Dead letters sit in a pen of broken crates with a "DLQ N" badge and a sweeping red light. An amber pennant on the pier means a worker still reads the hub's egress topic (the old route) |
-| Service Bus port on the hub | The broker's one billboard shows its name and health, and a last line with the town's topics, subscriptions and piers (only when something is configured). The top bar's DLQ chip shows the town-wide dead-letter total; each island shows its own pen |
+| Bridges | One road bridge from the hub's plaza to an island's gate, for an island that has an API or a call link over its coast (to a hub database or cache, through the gateway, or into it from another island). In a hub-and-spoke town all sync traffic between islands goes through the hub. An island with neither has no bridge, and no car drives to it |
+| Islands on a ring round the hub, a few further out | Groups, in the order of `islands` in `town.yaml`. `ringCapacity` (default 12, 6 to 18) fit on the first ring, the rest stand in a staggered second ring with their bridges passing between first-ring islands. Two rings only, so at most (ringCapacity x 2) - 1 islands. The airport takes the second ring's north slot. A ring road circles the town, with third-party vendors outside it. The hub grows with the number of islands |
+| Island with a heap of boxes and bins by the gate | Lost & found: an optional island, id `lost-found`, for systems you declare that no team owns. It always stands last |
+| Pier with crates, only on an island with messaging | Where messaging boats dock, for an island that publishes a topic or has a worker that subscribes to one. The board reads PIER, the topics it publishes and the subscriptions it reads. Messages waiting pile up as crates on the quay with a "waiting N, oldest" sign. Dead letters sit in a pen of broken crates with a "DLQ N" badge and a sweeping red light. An amber pennant on the pier means a worker still reads a topic on a route you are moving off (`messaging.legacyFrom`; today it can list only `hub`) |
+| The message broker's port on the hub | The broker's one billboard shows its name (Service Bus, Kafka, ...) and health, and a last line with the town's topics, subscriptions and piers (only when something is configured). The top bar's DLQ chip shows the town-wide dead-letter total; each island shows its own pen |
 | Boats between hub quays and piers | Asynchronous messaging, to piers only. Busier queues send more boats, smaller than before, and the crates on a boat show how loaded it is. Bridges are synchronous calls, boats are asynchronous ones. Boats sail only on open water: each island has a quay on the hub in the water gap beside its bridge, and lanes are found around land and bridges |
 | "Closed for repairs" sign and a blackout | The system is down |
 | Grey building | No fresh data. Never shown as healthy |
@@ -152,13 +168,13 @@ frontend/                          Vite + TypeScript + three.js browser app (see
 config/galactic-credit/            registry (YAML): town, defaults, hub, pillars, schemas, fake-data baselines
 contracts/openapi.json             generated from the C# records
 shared-test-data/                  fixtures used by both sides: registries, golden snapshots, layout golden
-docs/                              plan, decision log, previews, connect-your-company runbook, config reference (every key of every config file), write-an-adapter guide
+docs/                              plan, connect-your-company runbook, config reference (every key of every config file), write-an-adapter guide
 templates/adapter/                 a working source adapter to copy into extensions/
 extensions/                        a company fork's own code (empty upstream)
 AGENTS.md, .github/copilot-instructions.md   instructions for coding assistants
 ```
 
-Data flows one way: a source writes readings, the snapshot builder joins them with the registry and applies the rules (stale is never green, down beats degraded), and one snapshot is pushed over SignalR every two seconds. The browser invents all motion from the numbers in the snapshot. It never knows which source produced them, so real adapters later replace the fake one without touching the town.
+Data flows one way: a source writes readings, the snapshot builder joins them with the registry and applies the rules (stale is never green, down beats degraded), and a snapshot is built every two seconds and sent over SignalR when it changed, and at least every 15 seconds. The browser invents all motion from the numbers in the snapshot. It never knows which source produced them, so a live adapter stands in for the fake one without touching the town.
 
 ### The contract
 
@@ -175,14 +191,14 @@ CI runs `npm run check:contracts` and fails if the generated files are out of da
 ```
 dotnet test --solution backend/ObservabilityCity.slnx  # registry, resilient loading, validator, rules, fake source, 23- and 35-island backend load, golden fixtures
 cd frontend && npm test          # visual rules, snapshot guard, island layout (including 24 uneven islands), golden fixtures
-cd frontend && npm run e2e       # browser scenarios on a small town (break things, check the town, calm it down), then the link rules on a town with an island for each case, then the environment, tenant and service rules (about 3 minutes)
+cd frontend && npm run e2e       # browser scenarios on a small town (break things, check the town, calm it down), then every other e2e suite except the slow ones below
 cd frontend && npm run e2e:links # the link rules alone: pier, bridge and buildings follow real links
 cd frontend && npm run e2e:tenants # environments, tenant yards, tenant traffic and service groups, on a town with three environments
 cd frontend && npm run e2e:ui      # top bar, island filter, layers, inspector drawer, legend, Day/Dusk
 cd frontend && npm run e2e:direct  # signposts for hidden islands in a town without a hub
 cd frontend && npm run e2e:slow  # 23- and 35-island stress towns, the full sample town with screenshots, and all three themes on a bad day (a few minutes)
 dotnet run --project backend/tools/ObservabilityCity.Validate -- --all   # check every registry folder in the repo
-dotnet run --project backend/tools/ObservabilityCity.Validate -- --sources config/<town>   # probe each configured source with your Azure login (see docs/connect-your-company.md)
+dotnet run --project backend/tools/ObservabilityCity.Validate -- --sources config/<town>   # probe each configured source with its own login (see docs/connect-your-company.md)
 ```
 
 A test registry that shows a validator rule on purpose (for example an island that stands alone) lists the warning under `expectedWarnings` in its `town.yaml`, as `{ rule: standalone, file: pillars/sta.yaml }`. The warning then stays out of the report and the pull request comment, and an expected warning that stops appearing is an error, so the rule is still proven.
@@ -200,15 +216,15 @@ To refresh the golden fixtures (calm town, a bad day across several islands, and
 | In a hub-and-spoke town, a pillar does not call another pillar directly; it goes through the hub | error |
 | Outside callers reach only systems marked `external` | error |
 | Thresholds make sense: ranges, and amber below red, also after the defaults are applied | error |
-| Colours are hex, pillars have a display name, the hub has one gateway, broker, egress and database at most | error |
+| Colours are hex, pillars have a display name, the hub holds only a gateway, broker, egress and database, at most one of each (a current limit) | error |
 | `fake.yaml` names real systems and its numbers make sense | error |
 | A town with `fake.yaml` or a `stories/` folder says `mode: demo` in `town.yaml`, and `mode` is `demo` or `live` | error |
 | A worker has a database, a system has a caller, no `islands` list in `town.yaml`, a database with no `engine` once the town lists its `databaseEngines`, an empty pillar, an island that stands alone (no API, messaging or call links) | warning |
-| Messaging: topics are services of the pillar, subscriptions name an existing topic and a worker of the same pillar, no duplicates, `legacy` exactly for the hub's egress topic | error |
+| Messaging: topics are services of the pillar (a current limit: every topic is named after a service), subscriptions name an existing topic and a worker of the same pillar, no duplicates, `legacy: true` exactly on reads of topics whose owner `messaging.legacyFrom` in `town.yaml` lists | error |
 
 On a pull request the check writes annotations on the files and posts one comment listing every finding with file and line (the same comment is updated on each push).
 
-**A broken pillar file does not stop the town.** The running app skips a pillar file with problems and draws its island as a *config error* island (a board saying what is wrong), drops call links that point nowhere, and lists everything it worked around in a small panel under the top bar. The registry folder is watched: a reload that fails keeps the last good registry and says so in the panel. If `town.yaml`, `defaults.yaml`, `hub.yaml` or `layout.yaml` is unreadable at start-up the app does not start, since there is nothing to show. The page also refuses a snapshot it cannot draw and keeps the last good town.
+**A broken pillar file does not stop the town.** The running app skips a pillar file with problems and draws its island as a *config error* island (a board saying what is wrong), drops call links that point nowhere, and lists everything it worked around in a small panel under the top bar. The registry folder is watched: a reload that fails keeps the last good registry and says so in the panel. If `town.yaml`, `defaults.yaml`, `hub.yaml` or `third-parties.yaml` is unreadable at start-up the app does not start, since there is nothing to show. The page also refuses a snapshot it cannot draw and keeps the last good town.
 
 **Pull request checks.** `.github/workflows/ci.yml` runs side by side the backend tests, the frontend tests and build, the registry checks and the UI scenarios (spread over five jobs, one per group of browser suites) and a final job called `PR checks` that passes when none of them failed. A first job, `What changed` (`.github/scripts/changed-areas.mjs`), skips the jobs a pull request does not need: documents run no tests (the few the backend tests read run the backend tests only), and a change inside `frontend/` skips the backend tests. Anything it does not recognise, and every push to `main`, runs everything. `.github/workflows/slow.yml` runs the stress towns, the full sample town and all three themes (a pull request runs only the harbour theme) on merge to main and every night.
 
@@ -220,11 +236,11 @@ One folder describes a town. The sample is `config/galactic-credit/`:
 
 | File | What it holds |
 | --- | --- |
-| `town.yaml` | Name, what an island is called, topology, `mode` (`demo` or `live`; left out means `live`), `islands` (the order of the islands round the hub: unlisted pillars follow, Lost & found is always last), `ringCapacity`, and `databaseEngines` (the engines your databases run on, each one of the fixed database types, see below) |
+| `town.yaml` | Name, what an island is called (`groupLabel`, used for the word in every part of the interface; `pillar` in file and key names means the same group), topology, `mode` (`demo` or `live`; left out means `live`), `islands` (the order of the islands round the hub: unlisted pillars follow, Lost & found is always last), `ringCapacity`, `databaseEngines` (the engines your databases run on, each one of the fixed database types, see below), `trafficDensity`, `messaging` (`topicTemplate`, `hubTopicTemplate`, `legacyFrom`), `labels`, `wall` (the wall tour's timings and light) and `expectedWarnings`. Every key is in [docs/config-reference.md](docs/config-reference.md) |
 | `defaults.yaml` | App-wide defaults per role (SLA, error, resource, throttle and backlog thresholds) |
-| `hub.yaml` | The hub's shared resources (gateway, broker, egress, database), its `messaging` topics (`egress`), and the outside callers (`externalCallers`, each lists the external systems it reaches) |
+| `hub.yaml` | The shared resources in the middle (for example a gateway and a broker; today at most one gateway, broker, egress and database), the hub's `messaging` topics, and the outside callers (`externalCallers`, each lists the external systems it reaches) |
 | `pillars/<code>.yaml` | One island: its systems, `calls` links, per-role `defaults`, and its `messaging` (topics it publishes, topics its workers consume) |
-| `pillars/lost-found.yaml` | The island for systems nobody owns |
+| `pillars/lost-found.yaml` | Optional: the island for systems you declare that no team owns. It always stands last |
 | `environments/<id>.yaml` | One file per environment (`dev`, `staging`, `prod`): its tenants, its sources and what it leaves out. Optional: a town without them has one environment, `demo` |
 | `fake.yaml` | Baseline numbers for the fake source only |
 
@@ -244,20 +260,20 @@ Settings cascade: system, then the pillar's `defaults`, then `defaults.yaml`, th
 
 ```yaml
 messaging:
-  topics: [payments, refunds]              # publishes pay-payments-outbox and pay-refunds-outbox
+  topics: [payments, refunds]              # publishes payments.events and refunds.events (with topicTemplate "{service}.events")
   subscriptions:                           # a worker of this pillar reads a topic
-    - { topic: frd-screening-outbox, consumer: pay.payments-worker }   # another pillar's outbox, directly
-    - { topic: hub-egress, consumer: pay.refunds-worker, legacy: true } # the old route, flagged
+    - { topic: screening.events, consumer: pay.payments-worker }        # another pillar's topic, directly
+    - { topic: orders-events, consumer: pay.refunds-worker, legacy: true } # a hub topic on a route you are moving off, flagged
 ```
 
 | Island has | Gets |
 | --- | --- |
-| A topic, or a worker with a subscription | A pier, its board, and boats from the Service Bus port. Only a subscribing worker has a queue and a dead-letter queue |
+| A topic, or a worker with a subscription | A pier, its board, and boats from the broker's port. Only a subscribing worker has a queue and a dead-letter queue |
 | An API, or a call link over its coast (a call to a hub database or cache, `gatewayCalls`, or a call into it) | A bridge to the hub, and cars |
 | Neither | Nothing connects it: it stands alone and the registry warns about it |
 | No database, or no worker | No storage unit, or no factory: buildings exist only for roles the island has |
 
-Reading the hub's egress topic from a pillar must say `legacy: true`; the egress topic is otherwise for external destinations such as Snowflake, which are third-party calls.
+Topic names come from `messaging.topicTemplate` and `hubTopicTemplate` in `town.yaml` (both `{service}` when left out). Galactic Credit uses `{pillar}-{service}-outbox`, Droid Shop `{service}.events`. Two current limits: both templates must contain `{service}`, so every topic is named after a service, and `messaging.legacyFrom` can list only `hub`. A read of a topic whose owner `legacyFrom` lists must say `legacy: true`, and no other read may.
 
 The loader checks everything and reports all problems at once, each with its file name. Ids must be `pillar.system` (the prefix matches the file, lowercase kebab-case, unique in the town). A misspelt key, role, call target, island or database engine gets a suggestion, for example `'aa.ledger-api' calls 'aa.ledger-dbb', which is not in this town. Did you mean 'aa.ledger-db'?`. When a system is renamed, keep its old id under `aliases: [old.id]` and files that still use it keep working.
 
@@ -275,11 +291,11 @@ A test fails if the committed schema files are out of date.
 # environments/staging.yaml
 name: Staging
 order: 2                                  # position in the picker
-default: false                            # exactly one environment is the default (shown when the address has no ?env=)
-sources:                                  # named sources: metrics, messaging and incidents are what signals use unless told otherwise
+default: false                            # at most one environment is the default (shown when the address has no ?env=); with none, the first by order
+sources:                                  # named sources: signals read metrics, messaging (backlog, dead letters) and jobs unless told otherwise; incidents is reserved, and no live adapter reads it yet
   metrics: { kind: fake }
   incidents: { kind: fake }
-# A live environment can name its own sources, a login and a source for each signal (see docs/connect-your-company.md):
+# A live environment can name its own sources, a login and a source for each signal (Azure adapter example; see docs/connect-your-company.md):
 #   credentials: { reader: { kind: service-principal, tenantId: ..., clientId: ..., clientSecretEnv: READER_SECRET } }
 #   sources: { telemetry: { kind: loganalytics, connection: ..., pollSeconds: 60, timeoutSeconds: 20, credential: reader } }
 #   signals: { requests: telemetry, errors: telemetry, latency: telemetry, instances: none }
@@ -308,14 +324,14 @@ fake: { undeclaredTenants: [zeta-trading] }   # fake source only: a tenant that 
 
 ### Two towns, quality levels and the wall screen
 
-- **Two sample towns.** The server runs every folder in `config/` that has a `town.yaml`: Galactic Credit (Service Bus, hub-and-spoke) and Droid Shop (Kafka, islands call each other directly, a payment gateway, a courier and a push service as third parties, and a flash-sale story). `?town=droid-shop` picks one (nothing asked gets the default); the town name in the top bar becomes a dropdown when there is more than one, and switching drops the environment, islands and tenants of the old town. A town the server does not have shows an empty page with a note. `GET /api/towns` lists them; every other call takes `?town=` as well. The port's sign and billboard carry the broker's own name (KAFKA, SERVICE BUS).
+- **Two sample towns.** The server runs every folder in `config/` that has a `town.yaml`: Galactic Credit (Service Bus, hub-and-spoke, topics named `{pillar}-{service}-outbox`) and Droid Shop (Kafka, islands call each other directly, topics named `{service}.events`, a secrets store, a config store and a media bucket as basic buildings, a payment gateway, a courier and a push service as third parties, and a flash-sale story). `?town=droid-shop` picks one (nothing asked gets the default); the town name in the top bar becomes a dropdown when there is more than one, and switching drops the environment, islands and tenants of the old town. A town the server does not have shows an empty page with a note. `GET /api/towns` lists them; every other call takes `?town=` as well. The port's sign and billboard carry the broker's own name (KAFKA, SERVICE BUS).
 - **Direct towns** (`topology: direct`): nothing goes through the central island. It holds the shared resources (the broker, a shared database) and has a spoke only to the islands that really call them. Islands reach each other over the outer ring road: each has a bridge from its back gate, and a call between teams drives out of one back gate, round the ring and in at the other. The airport and the third parties are on the ring road too, so outside callers arrive there. A hub-and-spoke town (`topology: hub-and-spoke`) is drawn as before.
 - **Quality** (top bar list, or `?quality=high|medium|low`, remembered per browser): High is full resolution with shadows every frame and all the traffic; Medium draws fewer pixels, refreshes shadows a few times a second and sends 70% of the traffic; Low has no shadows, normal resolution and 40% of the traffic. The page still steps down by itself unless a level was chosen.
 - **Dusk** has lit windows on every building (one shared glow, so it costs nothing extra) and a low sun.
-- **Wall screen** (`?wall=1`): no bar or panels, Dusk by default, Medium quality, and a big status strip that is always on (headline, town name, requests per second, errors, p99, dead letters, a caption). The camera tours by itself: with trouble, incidents first, then what is down, then what is degraded, holding on each for 20 seconds (`&hold=` seconds) with a caption; when all is well it runs a showcase loop (the whole town, the hub, each island in order, the busiest services, the hub again) and says "All systems healthy, N h since last incident". New trouble cuts straight to it with a red pulse; when it clears the strip says "Resolved" in green. `&islands=chk,shp` makes a view for one team, `&quality=low` lowers the load, `&light=day` overrides Dusk, `&retry=` sets the seconds between tries to open the live socket again. A wall that loses the backend polls and reconnects by itself.
+- **Wall screen** (`?wall=1`): no bar or panels, Dusk by default, Medium quality, and a big status strip that is always on (headline, town name, requests per second, errors, p99, dead letters, a caption). The camera tours by itself: with trouble, it opens with an overview (the whole town for 3 seconds, `&overview=` seconds, 0 for none, then each pillar island from its front for 3 seconds each, `&overviewIsland=` seconds), then goes through the trouble, incidents first, then what is down, then what is degraded, holding on each for 20 seconds (`&hold=` seconds) with a caption, and comes back to the overview after the last one. The headline shows in red how many systems have dead letters ("2 DEGRADED / 3 with DLQ"); when all is well it runs a showcase loop (the whole town, the hub, each island in order, the busiest services, the hub again) and says "All systems healthy, N h since last incident". New trouble cuts straight to it with a red pulse; when it clears the strip says "Resolved" in green. `&islands=chk,shp` makes a view for one team, `&quality=low` lowers the load, `&light=day` overrides Dusk, `&retry=` sets the seconds between tries to open the live socket again. A wall that loses the backend polls and reconnects by itself.
   - **The Wall button** (in the town's top bar and the dashboard's menu) turns a normal page into a wall without touching the address: it remembers "wall on" in this browser (`oc.wall`) and opens the page again as a wall, so a reload or a new tab stays a wall. When the top bar is too full for its buttons, Wall, Dashboard and Day/Dusk move into a "⋯" menu, so Wall is always reachable. A browser only goes full screen after a click, so a wall that is not full screen offers a "Click for full screen" chip for a few seconds.
   - **Leaving a wall**: Esc, the "Exit wall" chip (hidden until the mouse moves), or leaving full screen. All three forget the setting. `?wall=0` in the address also turns it off and forgets it.
-  - **The wall dashboard** (`?wall=1&view=dashboard`, or the Wall button on the dashboard): the same dashboard with the menu gone and the text scaled up for a TV, the same status strip, frozen-feed warning and reconnecting. The tour is the town wall's own (trouble first, then a showcase loop), but it opens one pillar at a time and brings the service to the middle of the screen with a highlight.
+  - **The wall dashboard** (`?wall=1&view=dashboard`, or the Wall button on the dashboard): the same dashboard with the menu gone and the text scaled up for a TV, the same status strip, frozen-feed warning and reconnecting. The tour is the town wall's own (an overview, then trouble, then a showcase loop when all is well), but it opens one pillar at a time and brings the service to the middle of the screen with a highlight. Its overview is the closed pillar list for `&overview=` seconds, then each pillar opened in turn for `&overviewIsland=` seconds.
 
 ### Performance
 
@@ -326,8 +342,9 @@ The sample town has 17 islands, about 110 buildings and up to 420 cars. Roads, l
 | Setting | Default | What it does |
 | --- | --- | --- |
 | `Registry:Path` | none | Run only this one folder, as the single town |
-| `Registry:Towns:0` ... | every `config/*/town.yaml` | The folders of the towns to run |
+| `Registry:Towns:0` ... | none | Town folders to run as well as the ones found (every `config/*/town.yaml`, unless `Registry:Path` is set) |
 | `Registry:DefaultTown` | `galactic-credit` | The town a page gets when it asks for none |
+| `Adapters:Path` | `adapters/` beside the program | The folder the adapter modules are loaded from |
 | `Fake:DayLengthSeconds` | `120` | Real seconds per simulated day |
 | `Polling:AlwaysOn` | `false` | A live environment reads its sources only while a browser looks at it (and 2 minutes after). `true` keeps every environment polling all the time |
 | `Snapshot:IntervalSeconds` | `2` | How often a snapshot is built (the newest is always at `/api/snapshot/latest`) |
@@ -340,7 +357,7 @@ Set them with environment variables (`Registry__Path=...`) or in `appsettings.js
 
 ## Using it at your own organisation
 
-The core knows only generic concepts (groups, systems, resources, links). Everything specific to an organisation is configuration: add your own town folder next to the sample in `config/`, point `Registry:Path` at it, and add company-only adapters under `extensions/`. Never edit the core files, so `git pull upstream` stays clean. Details are in the [plan](docs/observability-city-plan.md).
+The core knows only generic concepts (groups, systems, resources, links) and is cloud-neutral. It ships an Azure adapter today; other clouds and tools plug in through adapters (see [docs/write-an-adapter.md](docs/write-an-adapter.md)). Everything specific to an organisation is configuration: add your own town folder next to the sample in `config/`, point `Registry:Path` at it, and add company-only adapters under `extensions/`. Never edit the core files, so `git pull upstream` stays clean. Details are in the [plan](docs/observability-city-plan.md).
 
 The repo's `nuget.config` uses only nuget.org (this also hides any feed set in your machine-wide NuGet config, which avoids the NU1507 warning). If your extensions need a private feed, add it to that file together with a `<packageSourceMapping>` section that maps your own package ids to it and `*` to nuget.org.
 

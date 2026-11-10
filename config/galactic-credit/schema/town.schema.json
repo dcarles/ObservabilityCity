@@ -55,6 +55,17 @@
         "internalVendors": { "type": "string", "minLength": 1, "default": "Internal services", "description": "What the town calls its own services outside the monitored platform." }
       }
     },
+    "wall": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "The town's defaults for wall mode. An address parameter on the page (hold, overview, light) wins over these for one screen.",
+      "properties": {
+        "holdSeconds": { "type": "number", "minimum": 0.5, "default": 20, "description": "Seconds the tour stays at each stop." },
+        "overviewSeconds": { "type": "number", "minimum": 0, "default": 3, "description": "Seconds the overview shows the whole town when something is wrong, before it visits each pillar island. 0 for no overview." },
+        "overviewIslandSeconds": { "type": "number", "minimum": 0, "default": 3, "description": "Seconds the overview stays at each pillar island, seen from its front. 0 to show only the whole town." },
+        "light": { "enum": ["dusk", "day"], "default": "dusk", "description": "The light a wall opens in." }
+      }
+    },
     "expectedWarnings": {
       "type": "array",
       "description": "Warnings the validator should expect here: a test registry that shows a rule on purpose. They are left out of the report; if one stops appearing, that is an error.",

@@ -1,8 +1,9 @@
 // The wall's director: decides where the camera is and what the caption says. No DOM and no three.js, so the rules can be tested with a list of snapshots
 // and a clock.
 //
-//   Trouble about (an incident, a system down or degraded, a system with no data): the tour visits it, worst first (incidents, then down, then degraded), holding at
-//   each stop for `hold` seconds with a caption, then on to the next, round and round.
+//   Trouble about (an incident, a system down or degraded, a system with no data): the tour opens with an overview (the whole town for `overview` seconds, then each
+//   pillar island from its front for `overviewIsland` seconds), then visits the trouble, worst first (incidents, then down, then degraded), holding at each stop for
+//   `hold` seconds with a caption, then the overview again, round and round. With `overview` 0 there is no overview and the tour only goes through the trouble.
 //   Nothing wrong: the showcase loop (the whole town with "All systems healthy, N h since last incident", the hub, each island in ring order, the busiest systems).
 //   New trouble between two snapshots: the camera cuts to it at once (no glide) and holds there for a full stop; trouble that ends puts up a "resolved" note.
 
@@ -10,11 +11,12 @@ import type { Snapshot } from '../types'
 import { attentionOf, type Attention, type AttentionKind, type Focus } from './attention'
 import { calmScenes, type Scene } from './calm'
 import { diffCues, type Cue } from './cues'
+import { overviewStops, type OverviewStop } from './overview'
 
 export interface Stop {
   /** The trouble's key or the scene's key. Stays the same while the stop is the same place. */
   key: string
-  kind: AttentionKind | 'calm'
+  kind: AttentionKind | 'calm' | 'overview'
   focus: Focus
   caption: string
   /** True when the camera should jump there instead of gliding (new trouble). */
@@ -49,7 +51,14 @@ export class WallDirector {
   private holdUntil = 0
   private lastCut = -Infinity
 
-  constructor(private readonly hold: number, private readonly pulseSeconds = 4) {}
+  constructor(private hold: number, private readonly pulseSeconds = 4, private overview = 0, private overviewIsland = 0) {}
+
+  /** New timings, for the stops from now on (the town's own defaults arrive with the first snapshot, after the wall has started). */
+  configure(hold: number, overview: number, overviewIsland = this.overviewIsland): void {
+    this.hold = hold
+    this.overview = overview
+    this.overviewIsland = overviewIsland
+  }
 
   /** Takes a new snapshot. Returns the stop when the camera has to go somewhere now (new trouble, or what it was on has ended), else null. */
   update(s: Snapshot, now: number): Stop | null {
@@ -77,7 +86,11 @@ export class WallDirector {
     if (!this.current) return this.advance(now)
     // what the camera is on has ended, or the town changed from trouble to calm or back: move on
     if (this.mode !== modeBefore) return this.advance(now)
-    if (this.current.kind !== 'calm') {
+    if (this.current.kind === 'overview') {
+      const still = overviewStops(s, attention, this.overviewIsland).find((o) => o.key === this.current!.key)
+      if (!still) return this.advance(now)
+      this.current = { ...this.current, caption: still.caption }
+    } else if (this.current.kind !== 'calm') {
       const still = attention.find((a) => a.key === this.current!.key)
       if (!still) return this.advance(now)
       this.current = { ...this.current, caption: still.caption }
@@ -100,22 +113,47 @@ export class WallDirector {
     return now < this.pulseUntil
   }
 
+  /** Puts up one stop of the overview: the whole town holds for `overview` seconds, an island for `overviewIsland`. */
+  private showOverview(o: OverviewStop, now: number): Stop {
+    this.holdUntil = now + (o.focus.kind === 'home' ? this.overview : this.overviewIsland)
+    return (this.current = stopOfOverview(o))
+  }
+
   private advance(now: number): Stop | null {
     if (!this.snap) return null
-    this.holdUntil = now + this.hold
     const attention = attentionOf(this.snap)
     if (attention.length > 0) {
       this.mode = 'alert'
+      // in the middle of the overview: on to its next stop, and once it has been round every island, to the trouble
+      if (this.current?.kind === 'overview') {
+        const stops = overviewStops(this.snap, attention, this.overviewIsland)
+        const i = stops.findIndex((o) => o.key === this.current!.key)
+        if (i >= 0 && i + 1 < stops.length) return this.showOverview(stops[i + 1], now)
+        this.alertIndex = -1
+      }
       // on from where the camera is now, even if the list changed under it; from where it was when what it was on has ended
       const at = this.current ? attention.findIndex((a) => a.key === this.current!.key) : -1
-      this.alertIndex = ((at >= 0 ? at : this.alertIndex) + 1) % attention.length
+      const next = (at >= 0 ? at : this.alertIndex) + 1
+      // the overview opens the tour and comes again once every stop has had its turn
+      const overviewDue = this.overview > 0 && this.current?.kind !== 'overview' && (this.current === null || this.current.kind === 'calm' || next >= attention.length)
+      if (overviewDue) {
+        this.alertIndex = -1
+        return this.showOverview(overviewStops(this.snap, attention, this.overviewIsland)[0], now)
+      }
+      this.alertIndex = next % attention.length
+      this.holdUntil = now + this.hold
       return (this.current = stopOfAttention(attention[this.alertIndex], false))
     }
+    this.holdUntil = now + this.hold
     this.mode = 'calm'
     const scenes = calmScenes(this.snap)
     this.calmIndex = this.current?.kind === 'calm' ? (this.calmIndex + 1) % scenes.length : 0
     return (this.current = stopOfScene(scenes[this.calmIndex], false))
   }
+}
+
+function stopOfOverview(o: OverviewStop): Stop {
+  return { key: o.key, kind: 'overview', focus: o.focus, caption: o.caption, cut: false }
 }
 
 function stopOfAttention(a: Attention, cut: boolean): Stop {

@@ -97,6 +97,7 @@ export function checkSnapshot(raw: unknown): Checked {
     // what the environment calls its cloud, for "not found in ..."; null says "the inventory"
     // what the town calls its own services outside the monitored platform (labels.internalVendors)
     internalVendorsLabel: str(raw.internalVendorsLabel).trim() || 'Internal services',
+    wall: checkWall(raw.wall) as Snapshot['wall'], // null when the town sets none, as the server sends it
     cloud: typeof raw.cloud === 'string' && raw.cloud.trim() !== '' ? raw.cloud.trim() : null,
     dayFraction: isFiniteNumber(raw.dayFraction) ? raw.dayFraction : 0.5,
     totals: {
@@ -189,7 +190,18 @@ function checkGroup(g: unknown, seen: Set<string>, problems: string[]): GroupSna
     messaging: checkMessaging(g.messaging),
     nodes,
     assets: checkAssets(g.assets),
+    flow: checkFlow(g.flow) as GroupSnapshot['flow'], // null, as the server writes it, when nothing measures the pillar
   }
+}
+
+/** What the pillar sends and receives. A rate that is not a finite number is not measured (null); no usable window or no object at all is no flow. */
+function checkFlow(f: unknown): NonNullable<GroupSnapshot['flow']> | null {
+  if (!isObject(f)) return null
+  const rate = (v: unknown): number | null => (isFiniteNumber(v) && v >= 0 ? v : null)
+  const sent = rate(f.sentPerSecond)
+  const received = rate(f.receivedPerSecond)
+  if (sent === null && received === null) return null
+  return { sentPerSecond: sent, receivedPerSecond: received, windowSeconds: isFiniteNumber(f.windowSeconds) && f.windowSeconds > 0 ? Math.round(f.windowSeconds) : 0 }
 }
 
 const ASSET_SHAPES = ['box', 'vault', 'store', 'settings', 'observatory']
@@ -375,4 +387,15 @@ function str(v: unknown): string {
 
 function strings(v: unknown): string[] {
   return Array.isArray(v) ? v.filter((c): c is string => typeof c === 'string') : []
+}
+
+/** The town's wall defaults (town.yaml wall): only what is a usable value; nothing usable is no defaults at all. */
+function checkWall(raw: unknown): { holdSeconds?: number; overviewSeconds?: number; overviewIslandSeconds?: number; light?: 'dusk' | 'day' } | null {
+  if (!isObject(raw)) return null
+  const wall: { holdSeconds?: number; overviewSeconds?: number; overviewIslandSeconds?: number; light?: 'dusk' | 'day' } = {}
+  if (isFiniteNumber(raw.holdSeconds) && raw.holdSeconds >= 0.5) wall.holdSeconds = raw.holdSeconds
+  if (isFiniteNumber(raw.overviewSeconds) && raw.overviewSeconds >= 0) wall.overviewSeconds = raw.overviewSeconds
+  if (isFiniteNumber(raw.overviewIslandSeconds) && raw.overviewIslandSeconds >= 0) wall.overviewIslandSeconds = raw.overviewIslandSeconds
+  if (raw.light === 'dusk' || raw.light === 'day') wall.light = raw.light
+  return Object.keys(wall).length > 0 ? wall : null
 }

@@ -211,20 +211,20 @@ public class MessagingTests
     {
         var registry = RegistryLoader.Load(TestPaths.LinksTown);
 
-        Assert.Equal(["ful-orders-outbox", "hub-egress", "wrk-batch-outbox"], registry.Topics.Select(t => t.Name).Order());
+        Assert.Equal(["ful-orders-outbox", "hub-broadcast", "wrk-batch-outbox"], registry.Topics.Select(t => t.Name).Order());
         Assert.Equal("orders", registry.Topics.Single(t => t.Name == "ful-orders-outbox").Service);
     }
 
     [Fact]
-    public async Task Pillars_subscribe_directly_to_each_others_outboxes_and_the_egress_route_is_flagged_legacy()
+    public async Task Pillars_subscribe_directly_to_each_others_outboxes_and_the_hub_route_is_flagged_legacy()
     {
         var s = await new Rig().Run();
 
         var wrk = Group(s, "wrk").Messaging.Subscriptions.Single();
         Assert.Equal(new SubscriptionSnapshot("ful-orders-outbox", "ful", "wrk.batch-worker", false), wrk);
         var leg = Group(s, "leg").Messaging.Subscriptions.Single();
-        Assert.Equal(new SubscriptionSnapshot("hub-egress", "hub", "leg.feed-worker", true), leg);
-        Assert.Equal(["hub-egress"], Group(s, "hub").Messaging.Topics.Select(t => t.Name));
+        Assert.Equal(new SubscriptionSnapshot("hub-broadcast", "hub", "leg.feed-worker", true), leg);
+        Assert.Equal(["hub-broadcast"], Group(s, "hub").Messaging.Topics.Select(t => t.Name));
     }
 
     [Fact]
@@ -234,7 +234,7 @@ public class MessagingTests
         var links = TownLinks.Of(registry);
 
         Assert.True(registry.Subscriptions.Count(s => s.PublisherGroupId != s.ConsumerGroupId) > 10);
-        Assert.Contains(registry.Subscriptions, s => s is { Legacy: true, Topic: "hub-egress", ConsumerGroupId: "lost-found" });
+        Assert.Contains(registry.Subscriptions, s => s is { Legacy: true, Topic: "hub-exports", ConsumerGroupId: "lost-found" });
         Assert.False(links["rcn"].HasBridge);
         Assert.True(links["rcn"].HasMessaging);
         Assert.True(links["reg"].HasBridge);
@@ -300,7 +300,7 @@ public class MessagingTests
 
     [Theory]
     [InlineData("topic: wrk-batch-outbox,", "topic: wrk-batch-outbxo,", "which no pillar publishes")]
-    [InlineData("topic: wrk-batch-outbox,", "topic: hub-egress,", "reads 'hub-egress' from 'hub'")]
+    [InlineData("topic: wrk-batch-outbox,", "topic: hub-broadcast,", "reads 'hub-broadcast' from 'hub'")]
     [InlineData("consumer: ful.orders-worker", "consumer: ful.orders-db", "only workers do")]
     [InlineData("consumer: ful.orders-worker", "consumer: ful.orders-wroker", "is not a system of this pillar")]
     [InlineData("consumer: ful.orders-worker", "consumer: wrk.batch-worker", "is not a system of this pillar")]
@@ -335,12 +335,12 @@ public class MessagingTests
         copy.Replace("town.yaml", "topicTemplate: \"{pillar}-{service}-outbox\"", "topicTemplate: \"events.{pillar}.{service}\"");
         copy.Replace("town.yaml", "hubTopicTemplate: \"hub-{service}\"", "hubTopicTemplate: \"shared.{service}\"");
         foreach (var file in Directory.GetFiles(copy.FilePath("pillars"), "*.yaml").Append(copy.FilePath("hub.yaml")))
-            File.WriteAllText(file, File.ReadAllText(file).Replace("wrk-batch-outbox", "events.wrk.batch").Replace("ful-orders-outbox", "events.ful.orders").Replace("hub-egress", "shared.egress"));
+            File.WriteAllText(file, File.ReadAllText(file).Replace("wrk-batch-outbox", "events.wrk.batch").Replace("ful-orders-outbox", "events.ful.orders").Replace("hub-broadcast", "shared.broadcast"));
 
         var registry = RegistryLoader.Load(copy.Path);
 
-        Assert.Equal(["events.ful.orders", "events.wrk.batch", "shared.egress"], registry.Topics.Select(t => t.Name).Order());
-        Assert.Contains(registry.Subscriptions, s => s.Topic == "shared.egress" && s.Legacy);
+        Assert.Equal(["events.ful.orders", "events.wrk.batch", "shared.broadcast"], registry.Topics.Select(t => t.Name).Order());
+        Assert.Contains(registry.Subscriptions, s => s.Topic == "shared.broadcast" && s.Legacy);
     }
 
     [Fact]
@@ -350,11 +350,11 @@ public class MessagingTests
         var town = copy.Read("town.yaml");
         copy.Write("town.yaml", town[..town.IndexOf("messaging:", StringComparison.Ordinal)]);
         foreach (var file in Directory.GetFiles(copy.FilePath("pillars"), "*.yaml").Append(copy.FilePath("hub.yaml")))
-            File.WriteAllText(file, File.ReadAllText(file).Replace("wrk-batch-outbox", "batch").Replace("ful-orders-outbox", "orders").Replace("hub-egress", "egress").Replace(", legacy: true", ""));
+            File.WriteAllText(file, File.ReadAllText(file).Replace("wrk-batch-outbox", "batch").Replace("ful-orders-outbox", "orders").Replace("hub-broadcast", "broadcast").Replace(", legacy: true", ""));
 
         var registry = RegistryLoader.Load(copy.Path);
 
-        Assert.Equal(["batch", "egress", "orders"], registry.Topics.Select(t => t.Name).Order());
+        Assert.Equal(["batch", "broadcast", "orders"], registry.Topics.Select(t => t.Name).Order());
         Assert.All(registry.Subscriptions, s => Assert.False(s.Legacy));
     }
 
@@ -370,7 +370,7 @@ public class MessagingTests
     }
 
     [Fact]
-    public void Legacy_is_only_for_the_hubs_egress_topic()
+    public void Legacy_is_only_for_the_hubs_topics()
     {
         using var copy = new RegistryCopy(TestPaths.LinksTown);
         copy.Replace("pillars/ful.yaml", "topic: wrk-batch-outbox, consumer: ful.orders-worker", "topic: wrk-batch-outbox, consumer: ful.orders-worker, legacy: true");
@@ -395,7 +395,7 @@ public class MessagingTests
     public void The_hub_cannot_subscribe()
     {
         using var copy = new RegistryCopy(TestPaths.LinksTown);
-        copy.Replace("hub.yaml", "  topics: [egress]", "  topics: [egress]\n  subscriptions:\n    - { topic: ful-orders-outbox, consumer: hub.egress }");
+        copy.Replace("hub.yaml", "  topics: [broadcast]", "  topics: [broadcast]\n  subscriptions:\n    - { topic: ful-orders-outbox, consumer: hub.egress }");
 
         var e = Assert.Throws<RegistryException>(() => RegistryLoader.Load(copy.Path));
 

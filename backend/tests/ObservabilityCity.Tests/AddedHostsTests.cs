@@ -218,6 +218,30 @@ public class AddedHostsTests : IDisposable
     [InlineData("/", "^/")]
     public void A_rule_for_a_path_matches_its_first_two_parts(string path, string pattern) => Assert.Equal(pattern, AddedHosts.PathPattern(path));
 
+    [Theory]
+    [InlineData("/xx/sample-service/orchestrations/id/run", 1, "^/xx(/|$)")]
+    [InlineData("/xx/sample-service/orchestrations/id/run", 2, "^/xx/sample-service(/|$)")]
+    [InlineData("/xx/sample-service/orchestrations/id/run", 3, "^/xx/sample-service/orchestrations(/|$)")]
+    [InlineData("/aa", 3, "^/aa(/|$)")]
+    public void A_rule_keeps_as_many_parts_of_the_path_as_it_is_asked_for(string path, int depth, string pattern) => Assert.Equal(pattern, AddedHosts.PathPattern(path, depth));
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(4)]
+    public void A_rule_keeps_one_to_three_parts_of_the_path(int depth) => Assert.Throws<ArgumentOutOfRangeException>(() => AddedHosts.PathPattern("/a/b/c/d", depth));
+
+    [Fact]
+    public void A_rule_asked_for_one_part_and_no_gateway_is_saved_that_way()
+    {
+        AddedHosts.AddRule(_folder, new AddRule("gw.a.example.test", "/aa/special/x/y", "aa.orders-api", Depth: 1, Gateway: false));
+
+        var text = File.ReadAllText(Path.Combine(_folder, "_discovered", "third-parties.yaml"));
+        Assert.DoesNotContain("gateway: true", text);
+        Assert.Equal("^/aa(/|$)", Assert.Single(AddedHosts.Read(_folder)).Host);
+        var registry = RegistryLoader.LoadResilient(_folder);
+        Assert.False(registry.ForEnvironment("prod").ActiveEnvironment!.Links!.Rules.Last().Gateway);
+    }
+
     [Fact]
     public void A_rule_is_saved_with_the_gateway_host_the_wider_path_and_the_target_listed_and_removed_like_the_rest()
     {
@@ -343,6 +367,41 @@ public class AddedHostsTests : IDisposable
         Assert.Equal(["/yy/other/x"], gw.Paths!.Select(p => p.Path).ToArray()); // the path the rule explains left, the other stayed
         Assert.Equal(HttpStatusCode.OK, (await client.DeleteAsync("/api/added-hosts?id=" + Uri.EscapeDataString(list[0].Id), TestContext.Current.CancellationToken)).StatusCode);
         Assert.Empty(AddedHosts.Read(_folder));
+    }
+
+    [Fact]
+    public async Task The_panel_can_ask_for_another_depth_and_no_gateway_and_a_depth_out_of_range_is_refused()
+    {
+        using var server = Server();
+        var client = server.CreateClient();
+        Discovered(server).RecordUnresolved("aa.orders-api", "gw.a.example.test", "/zz/special/x", Days, 100);
+        Discovered(server).Judge(_ => false, host => host == "gw.a.example.test");
+
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync("/api/added-rules", new AddRuleRequest("gw.a.example.test", "/zz/special/x", "bb.ledger-api", Depth: 4), TestContext.Current.CancellationToken)).StatusCode);
+        Assert.Empty(AddedHosts.Read(_folder));
+        var ok = await client.PostAsJsonAsync("/api/added-rules", new AddRuleRequest("gw.a.example.test", "/zz/special/x", "bb.ledger-api", Depth: 3, Gateway: false), TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, ok.StatusCode);
+        Assert.Equal("^/zz/special/x(/|$)", Assert.Single(AddedHosts.Read(_folder)).Host);
+        var rule = server.Services.GetRequiredService<TownSet>().Default.Registry.Current.ForEnvironment("prod").ActiveEnvironment!.Links!.Rules.Last();
+        Assert.Equal("bb.ledger-api", rule.Target);
+        Assert.False(rule.Gateway);
+    }
+
+    [Fact]
+    public async Task A_rule_sent_without_depth_or_gateway_keeps_two_parts_through_the_gateway()
+    {
+        using var server = Server();
+        var client = server.CreateClient();
+        Discovered(server).RecordUnresolved("aa.orders-api", "gw.a.example.test", "/zz/special/x", Days, 100);
+        Discovered(server).Judge(_ => false, host => host == "gw.a.example.test");
+
+        const string body = "{\"host\":\"gw.a.example.test\",\"path\":\"/zz/special/x\",\"target\":\"bb.ledger-api\"}";
+        var ok = await client.PostAsync("/api/added-rules", new StringContent(body, System.Text.Encoding.UTF8, "application/json"), TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, ok.StatusCode);
+        Assert.Equal("^/zz/special(/|$)", Assert.Single(AddedHosts.Read(_folder)).Host);
+        Assert.True(server.Services.GetRequiredService<TownSet>().Default.Registry.Current.ForEnvironment("prod").ActiveEnvironment!.Links!.Rules.Last().Gateway);
     }
 
     [Fact]

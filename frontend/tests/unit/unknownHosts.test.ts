@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { addedRow, panelLabel, unknownHostRow } from '../../src/unknownHosts'
+import { addedRow, DEFAULT_RULE, panelLabel, rulePrefix, ruleRequest, unknownHostRow } from '../../src/unknownHosts'
 import type { UnknownHostSnapshot } from '../../src/types'
 
 const host = (over: Partial<UnknownHostSnapshot> = {}): UnknownHostSnapshot => ({ host: 'api.partner.example', calls: 12345.6, callers: ['aa.orders-api', 'bb.ledger-worker'], days: 3, gateway: false, vendorsOnly: false, morePaths: 0, ...over })
@@ -92,5 +92,39 @@ describe('a gateway host in the Unknown hosts panel', () => {
     expect(html).toContain('aa.orders-api')
     expect(html).toContain('rule')
     expect(html).toContain('Remove')
+  })
+})
+
+describe('how a rule added from the panel reads a gateway path', () => {
+  const gw = host({ host: 'gw.example.test', gateway: true, paths: [{ path: '/aa/orders/x/y', calls: 400, vendorsOnly: false }] })
+
+  it('starts at two parts of the path, through the gateway, as rules always were', () => {
+    expect(DEFAULT_RULE).toEqual({ depth: 2, gateway: true })
+    expect(ruleRequest('gw.example.test', '/aa/orders/x/y', 'aa.orders-api')).toEqual({ host: 'gw.example.test', path: '/aa/orders/x/y', target: 'aa.orders-api', depth: 2, gateway: true })
+    const html = unknownHostRow(gw, 0, true, ['aa.orders-api'])
+    expect(html).toContain('<option value="2" selected>2</option>')
+    expect(html).toMatch(/data-gateway data-i="0" checked/)
+    expect(html).toContain('(/aa/orders/…)')
+  })
+
+  it('offers one to three parts and the gateway tick box, and sends what was chosen', () => {
+    const html = unknownHostRow(gw, 0, true, [], new Map(), { depth: 3, gateway: false })
+    for (const d of [1, 2, 3]) expect(html).toContain(`<option value="${d}"`)
+    expect(html).not.toContain('<option value="4"')
+    expect(html).toContain('<option value="3" selected>3</option>')
+    expect(html).not.toMatch(/data-gateway data-i="0" checked/)
+    expect(html).toContain('(/aa/orders/x/…)')
+    expect(ruleRequest('gw.example.test', '/aa/orders/x/y', 'aa.orders-api', { depth: 1, gateway: false })).toEqual({ host: 'gw.example.test', path: '/aa/orders/x/y', target: 'aa.orders-api', depth: 1, gateway: false })
+  })
+
+  it('shows the start of the path the rule keeps', () => {
+    expect(rulePrefix('/aa/orders/x', 1)).toBe('/aa/…')
+    expect(rulePrefix('/aa/orders', 2)).toBe('/aa/orders')
+    expect(rulePrefix('/aa', 3)).toBe('/aa')
+    expect(rulePrefix('', 2)).toBe('/')
+  })
+
+  it('has no rule controls for a plain host', () => {
+    expect(unknownHostRow(host(), 0)).not.toContain('data-depth')
   })
 })

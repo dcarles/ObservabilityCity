@@ -14,7 +14,7 @@
       "enum": ["api", "worker", "db", "cache", "function", "cron", "gateway", "broker", "egress"]
     },
     "messaging": {
-      "description": "Service Bus topics and subscriptions. A pillar with neither has no pier, and no boats sail to it.",
+      "description": "Message broker topics and subscriptions. A pillar with neither has no pier, and no boats sail to it.",
       "type": "object",
       "additionalProperties": false,
       "properties": {
@@ -31,9 +31,9 @@
             "required": ["topic", "consumer"],
             "additionalProperties": false,
             "properties": {
-              "topic": { "type": "string", "description": "The full topic name, for example frd-screening-outbox. Another pillar's outbox is read directly." },
+              "topic": { "type": "string", "description": "The full topic name, for example orders-events. Another pillar's outbox is read directly." },
               "consumer": { "type": "string", "description": "The worker in this pillar that reads it." },
-              "legacy": { "type": "boolean", "description": "The old route: reading the hub's egress topic (hub-egress) instead of a pillar's outbox. Required for a hub topic, and only allowed there." }
+              "legacy": { "type": "boolean", "description": "The old route: reading a topic of the hub (for example platform-events) instead of a pillar's outbox. Required for a hub topic, and only allowed there." }
             }
           }
         }

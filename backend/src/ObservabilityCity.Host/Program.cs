@@ -231,7 +231,7 @@ app.MapPost("/api/added-hosts", (AddHostRequest request, EnvironmentSet envs, To
    .Produces<IReadOnlyList<AddedHostSnapshot>>()
    .WithName("AddHost");
 
-// Hides one Azure resource-health report (open or resolved) until the server restarts. The id is the one the snapshot gives; ids hold slashes, so it travels in the body.
+// Hides one cloud health report (open or resolved) until the server restarts. The id is the one the snapshot gives; ids hold slashes, so it travels in the body.
 app.MapPost("/api/health-events/dismiss", (DismissHealthEventRequest request, EnvironmentSet envs, string? env) =>
     {
         if (envs.Find(env) is not { } rt) return EnvironmentNotFound(envs, env);
@@ -240,7 +240,8 @@ app.MapPost("/api/health-events/dismiss", (DismissHealthEventRequest request, En
     })
    .WithName("DismissHealthEvent");
 
-// A rule for the paths of a gateway host that no rule explains: the system they belong to. The rule matches the first two parts of the path.
+// A rule for the paths of a gateway host that no rule explains: the system they belong to. The rule matches the first parts of the path (as many as the
+// panel asks, two unless it says) and marks the calls as going through the gateway unless the panel says they do not.
 app.MapPost("/api/added-rules", (AddRuleRequest request, EnvironmentSet envs, TownSet towns, string? env) =>
     {
         if (envs.Find(env) is not { } rt || towns.Find(envs.TownId) is not { } town) return EnvironmentNotFound(envs, env);
@@ -248,7 +249,10 @@ app.MapPost("/api/added-rules", (AddRuleRequest request, EnvironmentSet envs, To
         if (seen is null || !(seen.Paths ?? []).Any(p => p.Path == request.Path))
             return Results.BadRequest(new { error = $"{request.Path} on {request.Host} is not one of the paths no rule explains." });
         if (!rt.Registry.Current.AllNodes.Any(n => n.Id == request.Target)) return Results.BadRequest(new { error = $"'{request.Target}' is not a system of the town." });
-        AddedHosts.AddRule(town.Folder, new AddRule(seen.Host, request.Path, request.Target));
+        var depth = request.Depth ?? AddedHosts.DefaultDepth;
+        if (depth is < AddedHosts.MinDepth or > AddedHosts.MaxDepth)
+            return Results.BadRequest(new { error = $"A rule keeps {AddedHosts.MinDepth} to {AddedHosts.MaxDepth} parts of the path, not {depth}." });
+        AddedHosts.AddRule(town.Folder, new AddRule(seen.Host, request.Path, request.Target, depth, request.Gateway ?? true));
         town.Registry.ReloadFrom(town.Folder);
         foreach (var e in town.Environments.All) if (e.Discovered is { } found) LinkDiscoveryRunner.Reclassify(found, e.Registry.Current);
         return Results.Ok(AddedList(town.Folder));

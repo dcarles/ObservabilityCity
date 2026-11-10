@@ -9,7 +9,8 @@ import { stripModel } from './stripModel'
 import { WallStrip } from './strip'
 
 /** Where the town's camera stands to look at something. */
-export interface TownPlace { target: THREE.Vector3; distance: number }
+/** `azimuth` (radians round the target) is the side to look from: an island's front. Without it the camera keeps the side it is on. */
+export interface TownPlace { target: THREE.Vector3; distance: number; azimuth?: number }
 
 /** What the wall moves: the town's camera, or the dashboard's scroll position. `P` says where it can go. */
 export interface WallCamera<P = TownPlace> {
@@ -33,21 +34,26 @@ export class WallMode<P = TownPlace> {
   private snap: Snapshot | null = null
   private connection: ConnectionState = 'connecting'
 
-  constructor(hold: number, private readonly camera: WallCamera<P>) {
-    this.director = new WallDirector(hold)
+  constructor(hold: number, private readonly camera: WallCamera<P>, overview = 0, overviewIsland = 0) {
+    this.director = new WallDirector(hold, undefined, overview, overviewIsland)
+  }
+
+  /** The timings to run with from now on: set before each snapshot, from the address and the town's own defaults. */
+  setTimings(t: { hold: number; overview: number; overviewIsland: number }): void {
+    this.director.configure(t.hold, t.overview, t.overviewIsland)
   }
 
   onSnapshot(s: Snapshot, now: number): void {
     this.snap = s
     const stop = this.director.update(s, now)
+    this.draw(now) // before the camera moves: where an island fits on the screen depends on how tall the strip is with this caption
     if (stop) this.show(stop)
-    this.draw(now)
   }
 
   tick(now: number): void {
     const stop = this.director.tick(now)
-    if (stop) this.show(stop)
     this.draw(now)
+    if (stop) this.show(stop)
   }
 
   setConnection(state: ConnectionState): void {

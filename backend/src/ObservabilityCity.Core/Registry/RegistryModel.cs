@@ -68,18 +68,25 @@ public sealed record DatabaseEngine(string Id, string Name, string Type);
 /// <summary>A scheduled job of a function and the services (of the same pillar) it starts work for. SystemId is the function's full id.</summary>
 public sealed record RegistrySchedule(string SystemId, string Job, IReadOnlyList<string> Services);
 
-/// <summary>A Service Bus topic. Name comes from the town's messaging.topicTemplate for a pillar and messaging.hubTopicTemplate for the hub; Service is the service (or hub name) that publishes it.</summary>
+/// <summary>A message broker topic. Name comes from the town's messaging.topicTemplate for a pillar and messaging.hubTopicTemplate for the hub; Service is the service (or hub name) that publishes it.</summary>
 public sealed record RegistryTopic(string Name, string GroupId, string Service);
 
-/// <summary>A worker reading a topic. PublisherGroupId is the island that owns the topic. Legacy marks a read of the hub's egress topic by a pillar.</summary>
+/// <summary>A worker reading a topic. PublisherGroupId is the island that owns the topic. Legacy marks a read of a hub topic by a pillar.</summary>
 public sealed record RegistrySubscription(string Topic, string PublisherGroupId, string ConsumerId, string ConsumerGroupId, bool Legacy);
 
 /// <summary>Mode is <see cref="TownModes.Demo"/> or <see cref="TownModes.Live"/>; a town that does not say is live.</summary>
 public sealed record TownInfo(string Id, string Name, string GroupLabel, string Topology, string Mode = TownModes.Live, double TrafficDensity = TownTraffic.Usual,
-    MessagingConvention? Messaging = null, string InternalVendorsLabel = TownLabels.DefaultInternalVendors)
+    MessagingConvention? Messaging = null, string InternalVendorsLabel = TownLabels.DefaultInternalVendors, WallSettings? Wall = null)
 {
     public MessagingConvention MessagingRules => Messaging ?? MessagingConvention.Default;
     public bool IsDemo => Mode == TownModes.Demo;
+}
+
+/// <summary>The town's defaults for wall mode (town.yaml wall). A value that is null was not set: the app's own default applies.</summary>
+public sealed record WallSettings(double? HoldSeconds, double? OverviewSeconds, double? OverviewIslandSeconds, string? Light)
+{
+    public const double MinHoldSeconds = 0.5;
+    public static readonly string[] Lights = ["dusk", "day"];
 }
 
 /// <summary>The words a town can change. The default is plain, so no town's wording is built in.</summary>
@@ -255,7 +262,7 @@ public sealed record RegistryTenant(string Id, string Name, TenantKind Kind);
 /// <summary>Where one signal of an environment comes from.</summary>
 public sealed record RegistrySource(string Name, string Kind, string? Connection)
 {
-    /// <summary>The login it uses, by name from the environment's credentials. Null: the implicit Azure CLI login.</summary>
+    /// <summary>The login it uses, by name from the environment's credentials. Null: the adapter's usual login.</summary>
     public string? Credential { get; init; }
 
     /// <summary>How often it is asked, and how long one ask may take. Null: the default (<see cref="DefaultPollSeconds"/>, <see cref="DefaultTimeoutSeconds"/>).</summary>
@@ -295,12 +302,19 @@ public sealed record RegistrySource(string Name, string Kind, string? Connection
 }
 
 /// <summary>How a broker's entities are read: the rule that finds its namespaces, the dimension that names an entity, the metrics for the backlog and the dead letters, and the patterns that say whose an entity is.</summary>
-public sealed record EntitiesConfig(string Resources, string Dimension, EntityMetric? Backlog, EntityMetric? DeadLetter, IReadOnlyList<EntityPattern> Patterns, TimeSpan? Interval = null, EntityLink? DeadLetterLink = null, EntityMetric? Throughput = null, IReadOnlyList<EntityRegionLink>? DeadLetterLinks = null)
+public sealed record EntitiesConfig(string Resources, string Dimension, EntityMetric? Backlog, EntityMetric? DeadLetter, IReadOnlyList<EntityPattern> Patterns, TimeSpan? Interval = null, EntityLink? DeadLetterLink = null, EntityMetric? Throughput = null, IReadOnlyList<EntityRegionLink>? DeadLetterLinks = null, IReadOnlyList<EntityFlow>? Flows = null)
 {
     /// <summary>The variables a dead-letter link's URL may use.</summary>
     public static readonly string[] LinkVariables = ["pillar", "service", "system", "environment", "queue"];
 
     public const string DefaultDimension = "EntityName";
+}
+
+/// <summary>An entity that carries a pillar's traffic: <see cref="Match"/> has the named group <c>pillar</c>; <see cref="Direction"/> is <c>sent</c> or <c>received</c>.</summary>
+public sealed record EntityFlow(string Match, string Direction)
+{
+    public const string Sent = "sent";
+    public const string Received = "received";
 }
 
 /// <summary>An address that opens a consumer's dead letters elsewhere (a support tool): its name and a URL template over <see cref="EntitiesConfig.LinkVariables"/>.</summary>
@@ -335,7 +349,7 @@ public sealed record MetricGroup(string Resources, string? Namespace, IReadOnlyD
 /// </summary>
 public sealed record MetricSignal(string Metric, string Aggregation, string? Filter, double Scale, bool PerSecond, MetricSignal? Over, MetricSignal? OrElse = null, bool EmptyIsIdle = false);
 
-/// <summary>A way to sign in to Azure, named in the environment file. Secrets are not here: ClientSecretEnv names the variable that holds one.</summary>
+/// <summary>A way to sign in, named in the environment file. Secrets are not here: ClientSecretEnv names the variable that holds one.</summary>
 public sealed record RegistryCredential(string Name, string Kind, string? TenantId, string? ClientId, string? ClientSecretEnv);
 
 /// <summary>
@@ -356,7 +370,7 @@ public sealed record RegistryEnvironment(
 
     public const string TenantToken = "{tenant}";
 
-    /// <summary>Ways to sign in, by name. The one called "default" is the Azure CLI login unless the file says otherwise.</summary>
+    /// <summary>Ways to sign in, by name. The one called "default" is the adapter's usual login unless the file says otherwise.</summary>
     public IReadOnlyList<RegistryCredential> Credentials { get; init; } = [];
 
     /// <summary>The source each signal is pointed at in this environment (a source name, or none). Signals not listed use the source called metrics or messaging.</summary>

@@ -135,7 +135,7 @@ test.describe('Droid Shop', () => {
   })
 
   test('opens on a wall for one team, with its own islands only', async ({ town, page }) => {
-    await town.open('&wall=1&hold=2&islands=chk,shp')
+    await town.open('&wall=1&hold=2&overview=0&islands=chk,shp')
     await page.waitForFunction(() => (window as any).city.seen.last.view.islands.join() === 'chk,shp')
     await expect(page.locator('#wall-town')).toHaveText('Droid Shop')
     await expect(page.locator('#wall-headline')).toHaveText('ALL SYSTEMS HEALTHY')
@@ -162,6 +162,91 @@ test.describe('Galactic Credit keeps its hub and spokes', () => {
     expect(r).toMatchObject({ direct: false, airport: 'hub' })
     expect(r.hubBridges.length).toBeGreaterThanOrEqual(10)
     expect(r.routesThroughHub).toBeGreaterThan(0)
+  })
+
+  test('says the pillar\'s traffic under the island\'s name and its messages on the pier board, the numbers the dashboard has', async ({ town, page }) => {
+    await town.open()
+    const signs = (await page.evaluate(() => (window as any).city.town.inspectSigns())) as { id: string; line: string; pier: { sent: number | null; internal: number | null; received: number | null; windowSeconds: number } | null }[]
+    expect(signs.filter((s) => /^in .+ · out .+ rps$/.test(s.line)).length).toBeGreaterThanOrEqual(3)
+    const withPier = signs.filter((s) => s.pier)
+    expect(withPier.length).toBeGreaterThanOrEqual(3)
+    // the same pillar says the same on the dashboard card
+    const first = withPier[0]
+    await page.goto(`/?town=galactic-credit&view=dashboard`)
+    await page.waitForFunction(() => (window as any).dash?.seen.snapshots > 0)
+    await expect(page.locator(`[data-pillar="${first.id}"] .pflow [data-flow]`)).toContainText(/sends ext|receives|sends int|no /)
+  })
+
+  test('hovering an island\'s sign gives the pillar name and its traffic, the numbers on the sign', async ({ town, page }) => {
+    await town.open()
+    const got = await page.evaluate(() => {
+      const c = (window as any).city
+      const T = c.THREE
+      const rows: { id: string; picked: string | null; name: string; lines: string[]; line: string }[] = []
+      for (const isl of c.town.islands) {
+        const s = c.town.signSummary(isl.group.id)
+        if (!s || s.lines.length === 0) continue
+        const at = isl.nameSign.getWorldPosition(new T.Vector3()); at.y += 3.6 * 1.9
+        const ray = new T.Raycaster(c.stage.camera.position.clone(), at.clone().sub(c.stage.camera.position).normalize())
+        const hit = ray.intersectObjects(c.town.signHits(), false)[0]
+        rows.push({ id: isl.group.id, picked: hit ? hit.object.userData.signIsland : null, name: s.name, lines: s.lines, line: isl.nameSign.userData.line() })
+      }
+      return rows
+    })
+    expect(got.length).toBeGreaterThanOrEqual(3)
+    for (const r of got) {
+      expect(r.picked, r.id).toBe(r.id)
+      expect(r.lines.map((l) => l.split(' ')[1]), r.id).toEqual(['in', 'out', 'inside'])
+      // the sign's line has the same in and out
+      const rate = (label: string) => r.lines.find((l) => l.startsWith(`Requests ${label} `))!.split(' ')[2]
+      expect(r.line, r.id).toBe(`in ${rate('in')} · out ${rate('out')} rps`)
+    }
+  })
+
+  test('puts the island sign on the other side of the bridge from the pier board', async ({ town, page }) => {
+    await town.open()
+    const signs = (await page.evaluate(() => (window as any).city.town.inspectSigns())) as { id: string; signX: number; pierX: number | null }[]
+    const piers = signs.filter((s) => s.pierX != null && s.id !== 'lost-found')
+    expect(piers.length).toBeGreaterThanOrEqual(3)
+    for (const s of piers) expect(Math.sign(s.signX), s.id).toBe(-Math.sign(s.pierX!))
+  })
+
+  test('carries what each pillar sends and receives on its own straight lane to the hub, lanes apart and never crossing', async ({ town, page }) => {
+    await town.open()
+    const lanes = (await page.evaluate(() => (window as any).city.town.inspectLanes())) as { id: string; path: { x: number; z: number }[] }[]
+    const routes = (await town.sea()).routes
+    expect(lanes.length).toBeGreaterThanOrEqual(8)
+    // one lane out and one lane in for each island, and no boat between two islands
+    for (const l of lanes) {
+      expect(routes.filter((r) => r.from === l.id && r.to === 'hub'), l.id).toHaveLength(1)
+      expect(routes.filter((r) => r.from === null && r.to === l.id), l.id).toHaveLength(1)
+    }
+    expect(routes.filter((r) => r.from !== null && r.to !== 'hub' && !r.scheduler && !r.circuit)).toEqual([])
+
+    type P = { x: number; z: number }
+    const cross = (o: P, a: P, b: P) => (a.x - o.x) * (b.z - o.z) - (a.z - o.z) * (b.x - o.x)
+    const crosses = (a: P, b: P, c: P, d: P) => cross(a, b, c) * cross(a, b, d) < 0 && cross(c, d, a) * cross(c, d, b) < 0
+    const toSegment = (p: P, a: P, b: P) => {
+      const l2 = (b.x - a.x) ** 2 + (b.z - a.z) ** 2
+      const u = l2 === 0 ? 0 : Math.max(0, Math.min(1, ((p.x - a.x) * (b.x - a.x) + (p.z - a.z) * (b.z - a.z)) / l2))
+      return Math.hypot(p.x - (a.x + u * (b.x - a.x)), p.z - (a.z + u * (b.z - a.z)))
+    }
+    const segs = (path: P[]) => path.slice(1).map((p, i) => [path[i], p] as const)
+    const BOAT_WIDTH = 1.6
+    for (let i = 0; i < lanes.length; i++) for (let j = i + 1; j < lanes.length; j++) {
+      for (const [a, b] of segs(lanes[i].path)) for (const [c, d] of segs(lanes[j].path)) {
+        expect(crosses(a, b, c, d), `${lanes[i].id} crosses ${lanes[j].id}`).toBe(false)
+        const gap = Math.min(toSegment(a, c, d), toSegment(b, c, d), toSegment(c, a, b), toSegment(d, a, b))
+        expect(gap, `${lanes[i].id} and ${lanes[j].id}`).toBeGreaterThan(BOAT_WIDTH)
+      }
+    }
+    // each lane is straight: its last stretch (the one beside the bridge) runs the same way as the lane as a whole
+    for (const l of lanes) {
+      const first = l.path[0], last = l.path[l.path.length - 1]
+      const total = Math.hypot(last.x - first.x, last.z - first.z)
+      const length = segs(l.path).reduce((n, [a, b]) => n + Math.hypot(b.x - a.x, b.z - a.z), 0)
+      expect(length / total, l.id).toBeLessThan(1.35)
+    }
   })
 })
 

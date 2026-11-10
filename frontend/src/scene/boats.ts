@@ -13,6 +13,8 @@ export interface BoatRoute {
   scheduler?: boolean
   /** True when the path is a closed circuit round the island: sailed once, one way, instead of there and back. */
   circuit?: boolean
+  /** True for a boat that sails the path once and unloads at its end, loaded all the way, instead of there and back: the boats of a lane to the hub or from it. */
+  oneWay?: boolean
   /** Boats leaving per second. Zero while the broker is down or has no data. */
   rate: () => number
   /** Sailing speed multiplier from the broker's latency against its SLA. */
@@ -100,6 +102,11 @@ export class BoatSystem {
     }
   }
 
+  /** A boat that lies at the end of its path and hands its crates over before it leaves: one round an island, or one way to or from the hub. */
+  private static unloads(r: BoatRoute): boolean {
+    return r.circuit === true || r.oneWay === true
+  }
+
   /** Whether a lane is a loop out of an island's own harbour and back: its boats are the other colour. */
   private static isInternal(r: BoatRoute): boolean {
     return r.scheduler === true || (r.from !== null && r.from === r.to)
@@ -136,7 +143,7 @@ export class BoatSystem {
       const b = this.boats[i]
       b.dist += BASE_SPEED * b.route.speed() * b.slow * dt
       if (b.dist >= b.total) {
-        if (b.route.circuit === true) {
+        if (BoatSystem.unloads(b.route)) {
           // lies at the quay and hands its crates over one by one, then leaves
           b.dist = b.total
           b.hold += dt
@@ -161,7 +168,7 @@ export class BoatSystem {
     const out = r.path
     if (out.length < 2) return
     // there and back: the way back is the same lane in reverse, but each way keeps to its own side of it, like the cars, so boats going out and coming back pass side by side
-    const points = r.circuit ? [...out] : [...sidestep(out, LANE_SIDE), ...sidestep([...out].reverse(), LANE_SIDE).slice(1)]
+    const points = r.circuit ? [...out] : r.oneWay ? sidestep(out, LANE_SIDE) : [...sidestep(out, LANE_SIDE), ...sidestep([...out].reverse(), LANE_SIDE).slice(1)]
     const lengths: number[] = []
     let total = 0
     for (let i = 1; i < points.length; i++) { const l = points[i].distanceTo(points[i - 1]); lengths.push(l); total += l }
@@ -182,7 +189,7 @@ export class BoatSystem {
     const sail = this.boats.filter((b) => !BoatSystem.isInternal(b.route))
     for (const b of this.boats) { b.slow = 1; b.want = 0 }
     // boats on a circuit queue behind the one ahead on the same circuit, mostly the one lying at the quay unloading
-    const ring = this.boats.filter((b) => b.route.circuit === true)
+    const ring = this.boats.filter((b) => BoatSystem.unloads(b.route))
     for (const b of ring) {
       for (const c of ring) {
         if (c === b || c.route !== b.route || c.dist <= b.dist) continue
@@ -235,9 +242,9 @@ export class BoatSystem {
     o.position.y = SEA + kit.boatLift + bob * kit.boatBob
     o.rotation.z = bob * kit.boatBob * 0.5
     // a boat on a circuit round its island is loaded all the way and unloads at the quay; there and back, it is loaded only on the way out
-    b.cargo.visible = b.route.circuit === true || b.dist < b.total / 2
+    b.cargo.visible = BoatSystem.unloads(b.route) || b.dist < b.total / 2
     // ease in and out at the quays
-    const fade = b.route.circuit === true
+    const fade = BoatSystem.unloads(b.route)
       ? Math.min(clamp(b.dist / 4, 0, 1), clamp(1 - (b.hold - (b.cargo.children.length * UNLOAD_STEP)) / UNLOAD_LEAVE, 0, 1)) // a circuit boat stays full size at the quay until its crates are off
       : clamp(Math.min(b.dist, b.total - b.dist) / 4, 0, 1)
     o.scale.setScalar(BOAT_SCALE * (0.4 + 0.6 * fade))

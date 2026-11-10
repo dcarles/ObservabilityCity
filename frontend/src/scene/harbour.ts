@@ -8,6 +8,13 @@ import { GROUND } from './island'
 const CRATE_COLORS = ['#e0573f', '#3f8fd9', '#f2b632', '#4fb37a', '#8e6bd9']
 
 /** What an island's message consumers add up to. Every field is null when no consumer reports it. */
+/** The board is fully drawn up to this far from the camera and fades out by the second distance (world units): far enough to read it from where a whole island is in view. */
+const BOARD_NEAR = 130
+const BOARD_FAR = 210
+
+/** The height of the pier board's canvas: room for its rows and the three rows of what the pillar sends and receives. */
+const SIGN_H = 190 + 3 * 38
+
 export interface Messaging {
   perSecond: number
   waiting: number | null
@@ -20,6 +27,8 @@ export interface Messaging {
   subscriptions: number
   /** True when a worker still reads the hub's egress topic, the old route. */
   legacy: boolean
+  /** What the whole pillar sends to other pillars (`sent`), its services send each other (`internal`) and it receives, in messages a second, as the dashboard says them; null for a side nothing measures. Absent when nothing measures the pillar. */
+  pillar?: { sent: number | null; internal: number | null; received: number | null; windowSeconds: number } | null
 }
 
 /** The ids of the island's workers that consume a topic. Only these have a queue and a dead-letter queue. */
@@ -52,6 +61,17 @@ export function messagingOf(nodes: NodeSnapshot[], messaging?: MessagingSnapshot
     subscriptions: messaging?.subscriptions.length ?? 0,
     legacy: messaging?.subscriptions.some((x) => x.legacy) ?? false,
   }
+}
+
+/** What the pier says in words, for the panel a click opens and the tooltip over the pier: the messages its queues take in, what the pillar sends and receives, and the backlog. */
+export function pierLines(m: Messaging): string[] {
+  const lines = [`${formatRate(m.perSecond)} msg/s taken in by its queues`]
+  const p = m.pillar
+  const side = (label: string, v: number | null | undefined): void => { if (v != null) lines.push(v > 0 ? `${label} ${formatRate(v)} msg/s` : `${label}: none`) }
+  if (p) { side('Sends outside', p.sent); side('Sends inside', p.internal); side('Receives', p.received) }
+  if (m.waiting != null) lines.push(`Waiting ${formatRate(m.waiting)}${m.oldestSeconds != null ? ` · oldest ${formatAge(m.oldestSeconds)}` : ''}`)
+  lines.push(`${m.topics} topic${m.topics === 1 ? '' : 's'} · reads ${m.subscriptions}`)
+  return lines
 }
 
 export const halo = (() => {
@@ -165,9 +185,9 @@ export class HarbourStatus {
     this.group.add(this.pennant)
 
     // the board
-    this.label = new THREE.Sprite(new THREE.SpriteMaterial({ map: canvasTexture(448, 190, () => {}), transparent: true, depthTest: false, toneMapped: false }))
+    this.label = new THREE.Sprite(new THREE.SpriteMaterial({ map: canvasTexture(448, SIGN_H, () => {}), transparent: true, depthTest: false, toneMapped: false }))
     this.label.renderOrder = 10
-    this.label.scale.set(4.9, 2.08, 1)
+    this.label.scale.set(4.9, SIGN_H * (4.9 / 448), 1)
     this.label.center.set(0.5, 0)
     this.label.position.set(coastX - 4.6, GROUND + 4.6, z - 1.2)
     this.group.add(this.label)
@@ -200,25 +220,28 @@ export class HarbourStatus {
     this.draw(m)
     const trouble = alarm || (m.oldestSeconds ?? 0) >= m.amber
     const d = camera.position.distanceTo(this.label.getWorldPosition(new THREE.Vector3()))
-    const opacity = trouble ? 1 : 1 - clamp((d - 70) / 40, 0, 1)
+    const opacity = trouble ? 1 : 1 - clamp((d - BOARD_NEAR) / (BOARD_FAR - BOARD_NEAR), 0, 1)
     ;(this.label.material as THREE.SpriteMaterial).opacity = opacity
     this.label.visible = opacity > 0.02
   }
 
   private draw(m: Messaging): void {
-    const key = `${m.topics}/${m.subscriptions}/${m.legacy ? 1 : 0}|${Math.round(m.perSecond)}|${m.waiting == null ? -1 : Math.round(m.waiting / 5)}|${m.oldestSeconds == null ? -1 : Math.round(m.oldestSeconds / 2)}|${m.deadLetters ?? -1}`
+    const p = m.pillar
+    const key = `${p ? `${p.sent == null ? -1 : Math.round(p.sent * 10)}/${p.internal == null ? -1 : Math.round(p.internal * 10)}/${p.received == null ? -1 : Math.round(p.received * 10)}` : 'x'}|${m.topics}/${m.subscriptions}/${m.legacy ? 1 : 0}|${Math.round(m.perSecond)}|${m.waiting == null ? -1 : Math.round(m.waiting / 5)}|${m.oldestSeconds == null ? -1 : Math.round(m.oldestSeconds / 2)}|${m.deadLetters ?? -1}`
     if (key === this.labelKey) return
     this.labelKey = key
     const tex = (this.label.material as THREE.SpriteMaterial).map as THREE.CanvasTexture
     const ctx = (tex.image as HTMLCanvasElement).getContext('2d')!
-    ctx.clearRect(0, 0, 448, 190)
+    ctx.clearRect(0, 0, 448, SIGN_H)
     const late = m.oldestSeconds != null && m.oldestSeconds >= m.amber
     const veryLate = m.oldestSeconds != null && m.oldestSeconds >= m.red
     const dead = (m.deadLetters ?? 0) > 0
     const edge = veryLate || dead ? '#ff5a4d' : late ? '#ffb830' : '#9fb4cc'
-    const rows = 2 + (m.waiting != null ? 1 : 0) + (m.deadLetters != null ? 1 : 0)
+    const flowRows: [string, number | null][] = p ? [['sends ext', p.sent], ['sends int', p.internal], ['receives', p.received]] : []
+    const shown = flowRows.filter(([, v]) => v != null)
+    const rows = 2 + (m.waiting != null ? 1 : 0) + (m.deadLetters != null ? 1 : 0) + shown.length
     const h = 18 + rows * 38
-    const y0 = 190 - h - 6
+    const y0 = SIGN_H - h - 6
     ctx.fillStyle = 'rgba(20,28,40,0.92)'; roundRect(ctx, 4, y0, 440, h, 22); ctx.fill()
     ctx.strokeStyle = edge; ctx.lineWidth = 6; ctx.stroke()
     ctx.textBaseline = 'middle'; ctx.textAlign = 'left'
@@ -231,6 +254,14 @@ export class HarbourStatus {
     y += 38
     ctx.fillStyle = m.legacy ? '#ffb830' : '#b8c7da'; ctx.font = '700 26px system-ui, sans-serif'
     ctx.fillText(`${m.topics} topic${m.topics === 1 ? '' : 's'} · reads ${m.subscriptions}${m.legacy ? ' · legacy' : ''}`, 24, y, 400)
+    for (const [label, v] of shown) {
+      y += 38
+      ctx.fillStyle = '#b8c7da'; ctx.font = '700 26px system-ui, sans-serif'; ctx.textAlign = 'left'
+      ctx.fillText(label, 24, y)
+      ctx.textAlign = 'right'; ctx.fillStyle = v === 0 ? '#8496ab' : '#fff'
+      ctx.fillText(v === 0 ? 'none' : `${formatRate(v!)} msg/s`, 424, y)
+      ctx.textAlign = 'left'
+    }
     if (m.waiting != null) {
       y += 38
       ctx.fillStyle = veryLate ? '#ff5a4d' : late ? '#ffb830' : '#b8c7da'; ctx.font = '700 26px system-ui, sans-serif'
@@ -242,6 +273,11 @@ export class HarbourStatus {
       ctx.fillText(`DLQ ${formatCount(m.deadLetters)}`, 24, y)
     }
     tex.needsUpdate = true
+  }
+
+  /** Where the pier board stands in the world, for tests. */
+  boardPosition(): THREE.Vector3 {
+    return this.label.getWorldPosition(new THREE.Vector3())
   }
 
   get alarming(): boolean {

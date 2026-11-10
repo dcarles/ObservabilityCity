@@ -334,8 +334,8 @@ describe('the Incidents card', () => {
     const node = calm.groups.find((g) => !g.isHub)!.nodes[0]
     const open = JSON.stringify(buildDashboard({ ...calm, healthEvents: [event({ nodeId: node.id })] as never }, ALL_TENANTS))
     const resolved = JSON.stringify(buildDashboard({ ...calm, healthEvents: [event({ nodeId: node.id, state: 'Resolved', resolvedAt: '2026-11-05T17:00:00Z' })] as never }, ALL_TENANTS))
-    expect(open).toContain('"azure":{"state":"Degraded"')
-    expect(resolved).not.toContain('"azure":{')
+    expect(open).toContain('"cloudHealth":{"state":"Degraded"')
+    expect(resolved).not.toContain('"cloudHealth":{')
   })
 
   it('turns the number green when everything listed is resolved, and shows the card with no reports at all', () => {

@@ -154,8 +154,9 @@ public sealed partial class SnapshotBuilder
             bySource.Count == 1 ? [] : Signals.For(n.Kind).Where(sig => registry.SourceFor(n, sig) == s).ToList())).ToList();
 
     /// <summary>
-    /// Whether the reading is too old to show. Each source that supplies a signal has its own limit (see <see cref="FreshFor"/>) and one stale source
-    /// greys the building however fresh the others are. A single source's reading is judged by that source's limit.
+    /// Whether the reading is too old to show. Each source that supplies a signal has its own limit (see <see cref="FreshFor"/>). By the time this runs a
+    /// late source has already been taken out when a source of health signals is fresh, so a late source left here means none is, and the building is grey.
+    /// A single source's reading is judged by that source's limit.
     /// </summary>
     private bool IsStale(RegistryNode n, Registry.Registry registry, IReadOnlyDictionary<string, NodeReading> bySource, NodeReading merged, DateTimeOffset now)
     {

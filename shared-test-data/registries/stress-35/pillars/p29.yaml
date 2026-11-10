@@ -17,6 +17,6 @@ systems:
 messaging:
   topics: [p29-s1]
   subscriptions:
-    - { topic: p28-p28-s1-outbox, consumer: p29.s1-worker }
-    - { topic: p28-p28-s1-outbox, consumer: p29.s2-worker }
-    - { topic: p28-p28-s1-outbox, consumer: p29.s3-worker }
+    - { topic: p28-p28-s1-events, consumer: p29.s1-worker }
+    - { topic: p28-p28-s1-events, consumer: p29.s2-worker }
+    - { topic: p28-p28-s1-events, consumer: p29.s3-worker }
