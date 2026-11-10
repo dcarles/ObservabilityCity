@@ -15,7 +15,7 @@ import { boatRate, clamp, formatRate, speedFactor } from '../visuals'
 import { CarSystem, type Route } from './cars'
 import { BoatSystem, type BoatRoute } from './boats'
 import { archCount, clearArches, deckAt } from './arches'
-import { consumersOf, HarbourStatus, messagingOf, type Messaging } from './harbour'
+import { consumersOf, HarbourStatus, messagingOf, pierLines, type Messaging } from './harbour'
 import { connectorsOf, portSummary, type Connectors, type PortSummary } from './links'
 import { findLane, harbourCircuit, harbourLoop, OUTER_PAD, padLand, type SeaMap } from './sea'
 import { schedulerRate } from './scheduler'
@@ -88,6 +88,8 @@ interface Island {
   flow: PillarFlowSnapshot | null
   /** The island's sign by the gate: its name and, under it, the pillar's traffic. */
   nameSign: THREE.Group
+  /** What the sign says when hovered: the pillar's traffic in words (empty when nothing is reported). */
+  trafficWords: string[]
   weather: Weather
   /** Island-local z of the back gate, where the road to a third party's bridge leaves. Null for an island with no third party to reach. */
   backGateZ: number | null
@@ -609,6 +611,7 @@ export class Town {
         isl.messaging = { ...messagingOf([...g.nodes], g.messaging), pillar: f ? { sent: f.sent, internal: f.internal, received: f.received, windowSeconds: f.windowSeconds } : null }
         isl.flow = g.flow ?? null
         const tr = traffic.get(g.id)
+        isl.trafficWords = tr && tr.in + tr.out + tr.internal > 0 ? [`Requests in ${formatRate(tr.in)} rps`, `Requests out ${formatRate(tr.out)} rps`, `Requests inside ${formatRate(tr.internal)} rps`] : []
         isl.nameSign.userData.setLine(tr && tr.in + tr.out + tr.internal > 0 ? `in ${formatRate(tr.in)} · out ${formatRate(tr.out)} rps` : '')
       })
     }
@@ -794,9 +797,29 @@ export class Town {
     return this.hubLanePaths.map((l) => ({ id: l.id, path: l.path.map((p) => ({ x: p.x, z: p.z })) }))
   }
 
+  /** The parts of every island's sign, for picking with the pointer. Each carries `userData.signIsland`. */
+  signHits(): THREE.Object3D[] {
+    return this.islands.flatMap((i) => i.nameSign.children)
+  }
+
+  /** What hovering an island's sign says: the pillar's name and its traffic; null when the island is unknown. */
+  signSummary(islandId: string): { name: string; lines: string[] } | null {
+    const isl = this.islands.find((i) => i.group.id === islandId)
+    return isl ? { name: isl.group.displayName, lines: isl.trafficWords } : null
+  }
+
+  /** The pier's words for an island (see `pierLines`), or null when it has no pier. */
+  pierSummary(islandId: string): { name: string; lines: string[] } | null {
+    const isl = this.islands.find((i) => i.group.id === islandId)
+    return isl && isl.harbour ? { name: isl.group.displayName, lines: pierLines(isl.messaging) } : null
+  }
+
   /** What the signs say, for tests: each island's line under its name, and what the pier board gets for the pillar's messages. */
-  inspectSigns(): { id: string; line: string; pier: Messaging['pillar'] | null }[] {
-    return this.islands.map((i) => ({ id: i.group.id, line: i.nameSign.userData.line() as string, pier: i.messaging.pillar ?? null }))
+  inspectSigns(): { id: string; line: string; pier: Messaging['pillar'] | null; signX: number; pierX: number | null }[] {
+    return this.islands.map((i) => ({
+      id: i.group.id, line: i.nameSign.userData.line() as string, pier: i.messaging.pillar ?? null,
+      signX: i.nameSign.position.x, pierX: i.harbour ? i.root.worldToLocal(i.harbour.boardPosition()).x : null,
+    }))
   }
 
   inspectVendors(): { id: string; island: string; x: number; z: number; bx: number; bz: number; bridges: number }[] {
@@ -1089,17 +1112,23 @@ export class Town {
       avoid.push({ x: padX(spare), z: zf - PAD_D / 2, w: PAD_W + 1, d: PAD_D + 1 })
     }
 
-    // the island's sign: one post, standing on land beside the gate
+    // the island's sign: one post, standing on land beside the gate, on the side of the bridge away from the pier (the pier and its board are on the -x side).
+    // Lost & found keeps its heap of boxes on the +x side, so its sign stays on the -x side.
     const signZ = gateZ - 2.4
-    const nameSign = this.islandSign(g, -8.5, signZ)
+    const signX = g.isLostFound ? -8.5 : 8.5
+    const nameSign = this.islandSign(g, signX, signZ)
     decor.add(nameSign)
-    avoid.push({ x: -8.5, z: signZ, w: 12, d: 5 })
+    for (const part of nameSign.children) part.userData.signIsland = g.id
+    avoid.push({ x: signX, z: signZ, w: 12, d: 5 })
     // a town whose islands call each other directly: a signpost opposite the island's own sign, for the traffic to and from hidden islands
     let post: Signpost | null = null
     if (signpost && (links.bridge || links.ring)) {
-      post = new Signpost(8.5, signZ)
+      // beside the island's sign on the far side from the pier when the island is wide enough for both, else on the pier side
+      const wide = plan.rx - 4
+      const postX = g.isLostFound ? 8.5 : wide >= 17 ? Math.min(18.5, wide) : -8.5
+      post = new Signpost(postX, signZ)
       root.add(post.object)
-      avoid.push({ x: 8.5, z: signZ, w: 12, d: 5 })
+      avoid.push({ x: postX, z: signZ, w: 12, d: 5 })
     }
     // A pillar whose registry file is broken: the island stays on the map, empty, with the problem written on a board
     if (g.configError) decor.add(this.configErrorBoard(g.configError))
@@ -1136,7 +1165,7 @@ export class Town {
     root.updateMatrixWorld(true)
     const weather = new Weather(g.id, plan.rx, plan.rz)
     root.add(weather.object)
-    return { group: g, root, outline, buildings, harbour: status, links, consumers: consumersOf(g.messaging), messaging: messagingOf([], g.messaging), flow: g.flow ?? null, nameSign, weather, backGateZ: backZ, services, signpost: post, assets, nodeIds: new Set(g.nodes.map((n) => n.id)) }
+    return { group: g, root, outline, buildings, harbour: status, links, consumers: consumersOf(g.messaging), messaging: messagingOf([], g.messaging), flow: g.flow ?? null, nameSign, trafficWords: [], weather, backGateZ: backZ, services, signpost: post, assets, nodeIds: new Set(g.nodes.map((n) => n.id)) }
   }
 
   /** A quay with a pier house, a pier and crates: where the boats from the hub's Service Bus port land. */
@@ -1530,7 +1559,7 @@ export class Town {
   }
 
   /** What the camera should look at to show one building: its place in the world and how far back to stand. */
-  focusOf(id: string): { target: THREE.Vector3; distance: number } | null {
+  focusOf(id: string): { target: THREE.Vector3; distance: number; azimuth?: number } | null {
     const b = this.buildings.get(id)
     if (!b) return null
     b.root.updateWorldMatrix(true, false)
@@ -1602,7 +1631,12 @@ export class Town {
   }
 
   /** The same for a whole island, standing back far enough to show it. */
-  islandFocusOf(groupId: string): { target: THREE.Vector3; distance: number } | null {
+  /**
+   * Where to stand to see a whole island. For a pillar's island (or a third party's) `azimuth` is its front: the side with its gate, name sign and pier, which
+   * faces the hub (a third party's faces the ring road), so it is always seen from the same side whichever way the camera was looking. The hub and the airport
+   * have no front: the camera keeps its side.
+   */
+  islandFocusOf(groupId: string): { target: THREE.Vector3; distance: number; azimuth?: number } | null {
     if (groupId === 'hub') return { target: new THREE.Vector3(0, 0, 0), distance: Math.max(this.hubGeo.rx, this.hubGeo.rz) * 2.6 }
     if (groupId === 'airport' && this.airport) return { target: this.airport.root.getWorldPosition(new THREE.Vector3()).setY(0), distance: this.airport.rx * 2.2 }
     // a pillar's island, or a third party's (the id of the vendor, or the shared island of its services)
@@ -1610,7 +1644,8 @@ export class Town {
     if (!isl) return null
     let reach = 0
     for (const p of isl.outline.points) reach = Math.max(reach, Math.hypot(p.x, p.y))
-    return { target: isl.root.getWorldPosition(new THREE.Vector3()).setY(0), distance: reach * 2.1 }
+    // local +z is the island's front (see buildIsland: the gate, sign and pier are on that side), so the camera stands that way from the island's middle
+    return { target: isl.root.getWorldPosition(new THREE.Vector3()).setY(0), distance: reach * 2.1, azimuth: isl.root.rotation.y }
   }
 
   /** Marks one building as selected, so its name board stays visible. */

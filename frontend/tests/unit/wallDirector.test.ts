@@ -282,4 +282,79 @@ describe('the overview of the whole town', () => {
     expect(d.update(healthyTown(), 0)).toMatchObject({ key: 'town', kind: 'calm' })
     expect(d.tick(20)?.key).toBe('hub')
   })
+
+  it('takes new timings for the stops from now on', () => {
+    const d = new WallDirector(HOLD, 4, 0)
+    d.update(troubled(), 0)
+    expect(d.current).toMatchObject({ kind: 'down' })
+
+    d.configure(5, 3)
+
+    expect(d.tick(20)).toMatchObject({ kind: 'degraded' })
+    expect(d.tick(25)).toMatchObject({ kind: 'overview' })
+    expect(d.tick(28)).toMatchObject({ kind: 'down' })
+  })
+
+  describe('with islands', () => {
+    const keysOf = (d: WallDirector, from: number, stops: number, step: number): string[] => {
+      const keys: string[] = []
+      for (let i = 1; i <= stops; i++) { const st = d.tick(from + i * step); if (st) keys.push(st.key) }
+      return keys
+    }
+
+    it('shows the whole town, then each pillar island in ring order without the hub, then the trouble', () => {
+      const d = new WallDirector(HOLD, 4, 3, 2)
+      const first = d.update(troubled(), 0)
+      const islands = healthyTown().groups.filter((g) => !g.isHub && g.nodes.length > 0)
+
+      expect(first).toMatchObject({ key: 'overview', focus: { kind: 'home' } })
+      const seen: string[] = []
+      let now = 3
+      for (let i = 0; i < islands.length; i++) {
+        const st = d.tick(now)!
+        seen.push(st.key)
+        expect(st).toMatchObject({ kind: 'overview', focus: { kind: 'island', id: islands[i].id }, cut: false })
+        now += 2
+      }
+      expect(seen).toEqual(islands.map((g) => `overview:island:${g.id}`))
+      expect(seen.some((k) => k.includes(':hub'))).toBe(false)
+      expect(d.tick(now)).toMatchObject({ kind: 'down' }) // the trouble comes after the last island
+    })
+
+    it('holds the whole town for overview seconds and each island for overviewIsland seconds', () => {
+      const d = new WallDirector(HOLD, 4, 3, 2)
+      d.update(troubled(), 0)
+
+      expect(d.tick(2.9)).toBeNull()
+      expect(d.tick(3)).toMatchObject({ kind: 'overview', focus: { kind: 'island' } })
+      expect(d.tick(4.9)).toBeNull()
+      expect(d.tick(5)).toMatchObject({ kind: 'overview' })
+    })
+
+    it('says the island and its systems in the caption', () => {
+      const d = new WallDirector(HOLD, 4, 3, 2)
+      d.update(troubled(), 0)
+
+      const st = d.tick(3)!
+
+      expect(st.caption).toMatch(/^Overview: .+, \d+ systems?$/)
+    })
+
+    it('has no island stops when overviewIsland is 0: the whole town only', () => {
+      const d = new WallDirector(HOLD, 4, 3, 0)
+      d.update(troubled(), 0)
+
+      expect(d.tick(3)).toMatchObject({ kind: 'down' })
+    })
+
+    it('comes back to the whole town after the last stop and goes round the islands again', () => {
+      const d = new WallDirector(1, 4, 1, 1)
+      d.update(troubled(), 0)
+      const keys = keysOf(d, 0, 40, 1)
+
+      expect(keys.filter((k) => k === 'overview').length).toBeGreaterThanOrEqual(2)
+      const islandStops = keys.filter((k) => k.startsWith('overview:island:'))
+      expect(islandStops.length).toBeGreaterThan(keys.filter((k) => k === 'overview').length)
+    })
+  })
 })

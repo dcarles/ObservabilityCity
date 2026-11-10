@@ -17,6 +17,20 @@ describe('a good snapshot', () => {
   })
 })
 
+describe("the town's wall defaults", () => {
+  it('pass through when they are usable', () => {
+    const raw = { ...calm(), wall: { holdSeconds: 30, overviewSeconds: 0, overviewIslandSeconds: 4, light: 'day' } }
+    expect(checkSnapshot(structuredClone(raw)).snapshot?.wall).toEqual({ holdSeconds: 30, overviewSeconds: 0, overviewIslandSeconds: 4, light: 'day' })
+  })
+
+  it('drop what is not usable, and all of it when nothing is', () => {
+    const odd = { ...calm(), wall: { holdSeconds: 0.1, overviewSeconds: -3, overviewIslandSeconds: -1, light: 'night' } }
+    expect(checkSnapshot(odd).snapshot?.wall).toBeNull()
+    const part = { ...calm(), wall: { holdSeconds: 40, overviewSeconds: 'x' } }
+    expect(checkSnapshot(part).snapshot?.wall).toEqual({ holdSeconds: 40 })
+  })
+})
+
 describe('a snapshot that cannot be drawn is refused', () => {
   it.each([
     ['null', null],

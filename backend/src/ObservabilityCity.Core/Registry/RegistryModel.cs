@@ -76,10 +76,17 @@ public sealed record RegistrySubscription(string Topic, string PublisherGroupId,
 
 /// <summary>Mode is <see cref="TownModes.Demo"/> or <see cref="TownModes.Live"/>; a town that does not say is live.</summary>
 public sealed record TownInfo(string Id, string Name, string GroupLabel, string Topology, string Mode = TownModes.Live, double TrafficDensity = TownTraffic.Usual,
-    MessagingConvention? Messaging = null, string InternalVendorsLabel = TownLabels.DefaultInternalVendors)
+    MessagingConvention? Messaging = null, string InternalVendorsLabel = TownLabels.DefaultInternalVendors, WallSettings? Wall = null)
 {
     public MessagingConvention MessagingRules => Messaging ?? MessagingConvention.Default;
     public bool IsDemo => Mode == TownModes.Demo;
+}
+
+/// <summary>The town's defaults for wall mode (town.yaml wall). A value that is null was not set: the app's own default applies.</summary>
+public sealed record WallSettings(double? HoldSeconds, double? OverviewSeconds, double? OverviewIslandSeconds, string? Light)
+{
+    public const double MinHoldSeconds = 0.5;
+    public static readonly string[] Lights = ["dusk", "day"];
 }
 
 /// <summary>The words a town can change. The default is plain, so no town's wording is built in.</summary>

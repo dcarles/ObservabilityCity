@@ -9,7 +9,8 @@ import { stripModel } from './stripModel'
 import { WallStrip } from './strip'
 
 /** Where the town's camera stands to look at something. */
-export interface TownPlace { target: THREE.Vector3; distance: number }
+/** `azimuth` (radians round the target) is the side to look from: an island's front. Without it the camera keeps the side it is on. */
+export interface TownPlace { target: THREE.Vector3; distance: number; azimuth?: number }
 
 /** What the wall moves: the town's camera, or the dashboard's scroll position. `P` says where it can go. */
 export interface WallCamera<P = TownPlace> {
@@ -18,8 +19,6 @@ export interface WallCamera<P = TownPlace> {
   /** Moves the camera. `cut` jumps there at once; otherwise it glides. */
   go(place: P, cut: boolean): void
   home(cut: boolean): void
-  /** The overview stop: the whole town for `seconds`. A camera with nothing better to show (the dashboard) leaves this out and just goes home. */
-  overview?(seconds: number, cut: boolean): void
   /** Keeps a building's name board up while the camera is on it (null for none). */
   select(id: string | null): void
 }
@@ -35,8 +34,13 @@ export class WallMode<P = TownPlace> {
   private snap: Snapshot | null = null
   private connection: ConnectionState = 'connecting'
 
-  constructor(hold: number, private readonly camera: WallCamera<P>, private readonly overviewSeconds = 0) {
-    this.director = new WallDirector(hold, undefined, overviewSeconds)
+  constructor(hold: number, private readonly camera: WallCamera<P>, overview = 0, overviewIsland = 0) {
+    this.director = new WallDirector(hold, undefined, overview, overviewIsland)
+  }
+
+  /** The timings to run with from now on: set before each snapshot, from the address and the town's own defaults. */
+  setTimings(t: { hold: number; overview: number; overviewIsland: number }): void {
+    this.director.configure(t.hold, t.overview, t.overviewIsland)
   }
 
   onSnapshot(s: Snapshot, now: number): void {
@@ -59,7 +63,6 @@ export class WallMode<P = TownPlace> {
 
   private show(stop: Stop): void {
     this.camera.select(stop.focus.kind === 'building' ? stop.focus.id : null)
-    if (stop.kind === 'overview' && this.camera.overview) { this.camera.overview(this.overviewSeconds, stop.cut); return }
     if (stop.focus.kind === 'home') { this.camera.home(stop.cut); return }
     const f = this.camera.focusOf(stop.focus)
     // a place that is not on screen (an island the view left out) is skipped by going home, never left half-way

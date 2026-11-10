@@ -10,7 +10,7 @@ import { loadKit } from './assets/kit'
 import { Connection, markFeed } from './connection'
 import { addressForTown, fetchTowns, requestedScope, type TownChoice } from './scope'
 import { saveQuality, startQuality, type Quality } from './quality'
-import { parseWall } from './wall/params'
+import { parseWall, wallTimings } from './wall/params'
 import { enterWall, startWallControls } from './wall/controls'
 import { startMoreMenu } from './topbarMore'
 import { WallMode } from './wall/wall'
@@ -24,7 +24,7 @@ import { StoryBar } from './storyBar'
 import { Inspector } from './inspector'
 import { LegendCard } from './legendCard'
 import { LEGEND_SEEN_KEY } from './legend'
-import { browserStore, otherLighting, saveLighting, startLighting } from './lighting'
+import { browserStore, isLighting, otherLighting, saveLighting, startLighting } from './lighting'
 import { saveTheme, startTheme, themeById } from './themes'
 import { kitById } from './themes/kits'
 import { activateTheme, palette as livePalette } from './themes/active'
@@ -116,7 +116,7 @@ export async function startTown(): Promise<void> {
   function goTo(item: PickItem): void {
     const focus = item.kind === 'island' ? town.islandFocusOf(item.id) : town.focusOf(item.id)
     town.select(item.kind === 'building' ? item.id : null)
-    if (focus) stage.focus(focus.target, focus.distance)
+    if (focus) stage.focus(focus.target, focus.distance, false, focus.azimuth)
     if (item.kind === 'building') { servicePanel.close(); inspector.open(item.id) } else inspector.close()
   }
 
@@ -136,6 +136,7 @@ export async function startTown(): Promise<void> {
     },
     goTo,
     (id) => { void dismissEvent(id) },
+    (island) => town.pierSummary(island),
   )
   let tenantView: TenantView = loadTenantView(store)
   const topbar = new TopBar((state, anchor) => stateList.toggle(state, anchor), () => tenantView)
@@ -265,7 +266,7 @@ export async function startTown(): Promise<void> {
     /** The story bar's camera: glides to a system, a vendor or an island without opening anything. */
     void new StoryBar(fx, (id) => {
       const focus = town.focusOf(id) ?? town.islandFocusOf(id)
-      if (focus) stage.focus(focus.target, focus.distance)
+      if (focus) stage.focus(focus.target, focus.distance, false, focus.azimuth)
     })
     breakPanel.refresh()
     fx.start()
@@ -348,6 +349,15 @@ export async function startTown(): Promise<void> {
     seen.last = s
     topbar.setStatus('live') // a good snapshot just arrived, whatever the last bad one said
     wall?.setConnection('live')
+    if (wall) {
+      wall.setTimings(wallTimings(wallParams, s.wall))
+      // the town's own light for a wall, whenever the town's setting changes (the first snapshot, or a restart with another one): the address (light=) wins
+      const townLight = s.wall?.light ?? null
+      if (townLight !== wallTownLight) {
+        wallTownLight = townLight
+        if (!params.has('light') && isLighting(townLight) && townLight !== lighting) { lighting = townLight; stage.setLighting(lighting, true) }
+      }
+    }
     wall?.onSnapshot(s, nowSeconds())
     topbar.setSnapshot(s)
     legend.setTopology(s.topology === 'hub-and-spoke' ? 'hub-and-spoke' : 'direct')
@@ -366,16 +376,16 @@ export async function startTown(): Promise<void> {
   connection.start()
   void fetchTowns().then((list) => { towns = list; viewBar.refresh() })
 
+  let wallTownLight: string | null | undefined
   // Wall mode: a tour, a status strip and change cues, over the same town.
   const nowSeconds = (): number => (testMode ? simTime : clock.getElapsed())
   const wall = wallParams.on
     ? new WallMode(wallParams.hold, {
         focusOf: (f) => (f.kind === 'building' ? town.focusOf(f.id) : town.islandFocusOf(f.id)),
-        go: (f, cut) => stage.focus(f.target, f.distance, cut),
+        go: (f, cut) => stage.focus(f.target, f.distance, cut, f.azimuth),
         home: (cut) => stage.home(cut),
-        overview: (seconds, cut) => stage.orbit(seconds, cut),
         select: (id) => town.select(id),
-      }, wallParams.overview)
+      }, wallParams.overview, wallParams.overviewIsland)
     : null
 
   // Quality: the preset the page opens with, and what depends on it. A level chosen on purpose is never stepped down from.
@@ -443,13 +453,21 @@ export async function startTown(): Promise<void> {
     const hits = ray.intersectObjects(town.hitMeshes(), false)
     const b = hits[0]?.object.userData.building as Building | undefined
     showTooltip(b?.node ?? null, pointerPx.x, pointerPx.y, tenantView)
+    // over a pier, its crates or its dead-letter pen: what the pier carries
+    const pierId = b ? undefined : ray.intersectObjects(town.harbourHits(), false)[0]?.object.userData.harbourIsland as string | undefined
+    const pier = pierId ? town.pierSummary(pierId) : null
+    // over an island's sign: the pillar's name and its traffic
+    const signId = b || pier ? undefined : ray.intersectObjects(town.signHits(), false)[0]?.object.userData.signIsland as string | undefined
+    const sign = signId ? town.signSummary(signId) : null
+    if (pier) showIslandTooltip(pier.name, false, pointerPx.x, pointerPx.y, pier.lines)
+    else if (sign && sign.lines.length > 0) showIslandTooltip(sign.name, false, pointerPx.x, pointerPx.y, sign.lines, 'traffic')
     // over an island but no building: the island's name
-    if (!b) {
+    else if (!b) {
       const ground = ray.ray.intersectPlane(groundPlane, groundHit)
       const isl = ground ? town.islandAt(ground.x, ground.z) : null
       if (isl) showIslandTooltip(isl.name, isl.vendor, pointerPx.x, pointerPx.y)
     }
-    const overService = !b && (ray.intersectObjects(town.serviceHits(), false).length > 0 || ray.intersectObjects(town.assetHits(), false).length > 0)
+    const overService = !b && (pier != null || ray.intersectObjects(town.serviceHits(), false).length > 0 || ray.intersectObjects(town.assetHits(), false).length > 0)
     canvas.style.cursor = breakPanel?.armed ? 'crosshair' : b || overService ? 'pointer' : 'grab'
   }
 
@@ -470,6 +488,8 @@ export async function startTown(): Promise<void> {
   // Debug handle for automated tests, screenshots and poking from the console. A production page does not publish it (it would be a public surface for other scripts to depend on) unless the address has ?test=1.
   const handle = {
     stage, town, THREE, seen, step, islandLabels,
+    /** Reads what is under the pointer now and shows its tooltip, for tests (a test page draws no frames on its own). */
+    hover: () => hover(),
     /** The scripted event of the theme: start it, stop it, jump to a moment, or read what is going on. */
     event: {
       id: () => events.eventId,

@@ -17,7 +17,7 @@ import type { Snapshot } from '../types'
 import { buildDashboard, pillarSelection, type Dashboard } from './model'
 import { freshnessHtml, hiddenHtml, pillarMenuHtml, pillarsHtml, sectionsHtml, summaryHtml, type UiState } from './render'
 import { dashLegendHtml } from './legend'
-import { parseWall } from '../wall/params'
+import { parseWall, wallTimings } from '../wall/params'
 import { enterWall, startWallControls } from '../wall/controls'
 import { WallMode } from '../wall/wall'
 import { dashPlaceOf, type DashPlace } from './wallPlace'
@@ -168,6 +168,7 @@ export function startDashboard(): void {
     inspector.update(s)
     notices.show(s.notices, s.notes ?? [])
     draw()
+    wall?.setTimings(wallTimings(wallParams, s.wall))
     wall?.onSnapshot(s, wallNow())
     if (!freshPop.hidden) drawFreshness()
     setStatus('live')
@@ -263,7 +264,7 @@ export function startDashboard(): void {
           window.scrollTo({ top: 0, behavior: cut ? 'auto' : 'smooth' })
         },
         select: () => {},
-      }, wallParams.overview)
+      }, wallParams.overview, wallParams.overviewIsland)
     : null
   if (wall) {
     document.body.classList.add('wall')

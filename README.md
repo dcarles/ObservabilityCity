@@ -20,6 +20,22 @@ The same town as a dashboard, for when you want the list rather than the picture
 
 ![The dashboard view](docs/screenshots/dashboard.png)
 
+## What it looks like
+
+The sample town (Galactic Credit) in each of the three themes: harbour town, space colony and works. The data, the layout and every signal are the same; only the look changes.
+
+| Harbour town | Space colony | Works |
+| --- | --- | --- |
+| ![The harbour town theme](docs/screenshots/theme-harbour-town.png) | ![The space colony theme](docs/screenshots/theme-space.png) | ![The works theme](docs/screenshots/theme-factory.png) |
+
+A bad day: an island with errors, the inspector open on a degraded API, and the effects listed in the Break things panel.
+
+![A bad day with the inspector open](docs/screenshots/trouble-inspector.png)
+
+The same town as a dashboard, for when you want the list rather than the picture.
+
+![The dashboard view](docs/screenshots/dashboard.png)
+
 ## What you need installed
 
 | Tool | Version | Why |
@@ -328,10 +344,10 @@ fake: { undeclaredTenants: [zeta-trading] }   # fake source only: a tenant that 
 - **Direct towns** (`topology: direct`): nothing goes through the central island. It holds the shared resources (the broker, a shared database) and has a spoke only to the islands that really call them. Islands reach each other over the outer ring road: each has a bridge from its back gate, and a call between teams drives out of one back gate, round the ring and in at the other. The airport and the third parties are on the ring road too, so outside callers arrive there. A hub-and-spoke town (`topology: hub-and-spoke`) is drawn as before.
 - **Quality** (top bar list, or `?quality=high|medium|low`, remembered per browser): High is full resolution with shadows every frame and all the traffic; Medium draws fewer pixels, refreshes shadows a few times a second and sends 70% of the traffic; Low has no shadows, normal resolution and 40% of the traffic. The page still steps down by itself unless a level was chosen.
 - **Dusk** has lit windows on every building (one shared glow, so it costs nothing extra) and a low sun.
-- **Wall screen** (`?wall=1`): no bar or panels, Dusk by default, Medium quality, and a big status strip that is always on (headline, town name, requests per second, errors, p99, dead letters, a caption). The camera tours by itself: with trouble, it opens with an overview (an aerial lap round the whole town, 12 seconds, `&overview=` seconds, 0 for none), then goes through the trouble, incidents first, then what is down, then what is degraded, holding on each for 20 seconds (`&hold=` seconds) with a caption, and comes back to the overview after the last one. The headline shows in red how many systems have dead letters ("2 DEGRADED / 3 with DLQ"); when all is well it runs a showcase loop (the whole town, the hub, each island in order, the busiest services, the hub again) and says "All systems healthy, N h since last incident". New trouble cuts straight to it with a red pulse; when it clears the strip says "Resolved" in green. `&islands=chk,shp` makes a view for one team, `&quality=low` lowers the load, `&light=day` overrides Dusk, `&retry=` sets the seconds between tries to open the live socket again. A wall that loses the backend polls and reconnects by itself.
+- **Wall screen** (`?wall=1`): no bar or panels, Dusk by default, Medium quality, and a big status strip that is always on (headline, town name, requests per second, errors, p99, dead letters, a caption). The camera tours by itself: with trouble, it opens with an overview (the whole town for 3 seconds, `&overview=` seconds, 0 for none, then each pillar island from its front for 3 seconds each, `&overviewIsland=` seconds), then goes through the trouble, incidents first, then what is down, then what is degraded, holding on each for 20 seconds (`&hold=` seconds) with a caption, and comes back to the overview after the last one. The headline shows in red how many systems have dead letters ("2 DEGRADED / 3 with DLQ"); when all is well it runs a showcase loop (the whole town, the hub, each island in order, the busiest services, the hub again) and says "All systems healthy, N h since last incident". New trouble cuts straight to it with a red pulse; when it clears the strip says "Resolved" in green. `&islands=chk,shp` makes a view for one team, `&quality=low` lowers the load, `&light=day` overrides Dusk, `&retry=` sets the seconds between tries to open the live socket again. A wall that loses the backend polls and reconnects by itself.
   - **The Wall button** (in the town's top bar and the dashboard's menu) turns a normal page into a wall without touching the address: it remembers "wall on" in this browser (`oc.wall`) and opens the page again as a wall, so a reload or a new tab stays a wall. When the top bar is too full for its buttons, Wall, Dashboard and Day/Dusk move into a "⋯" menu, so Wall is always reachable. A browser only goes full screen after a click, so a wall that is not full screen offers a "Click for full screen" chip for a few seconds.
   - **Leaving a wall**: Esc, the "Exit wall" chip (hidden until the mouse moves), or leaving full screen. All three forget the setting. `?wall=0` in the address also turns it off and forgets it.
-  - **The wall dashboard** (`?wall=1&view=dashboard`, or the Wall button on the dashboard): the same dashboard with the menu gone and the text scaled up for a TV, the same status strip, frozen-feed warning and reconnecting. The tour is the town wall's own (an overview, then trouble, then a showcase loop when all is well), but it opens one pillar at a time and brings the service to the middle of the screen with a highlight. Its overview closes every pillar and goes back to the top of the page for the `&overview=` seconds.
+  - **The wall dashboard** (`?wall=1&view=dashboard`, or the Wall button on the dashboard): the same dashboard with the menu gone and the text scaled up for a TV, the same status strip, frozen-feed warning and reconnecting. The tour is the town wall's own (an overview, then trouble, then a showcase loop when all is well), but it opens one pillar at a time and brings the service to the middle of the screen with a highlight. Its overview is the closed pillar list for `&overview=` seconds, then each pillar opened in turn for `&overviewIsland=` seconds.
 
 ### Performance
 
