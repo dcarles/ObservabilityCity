@@ -645,6 +645,8 @@ export interface components {
             holdSeconds?: number | null;
             /** Format: double */
             overviewSeconds?: number | null;
+            /** Format: double */
+            overviewIslandSeconds?: number | null;
             light?: string | null;
         };
     };

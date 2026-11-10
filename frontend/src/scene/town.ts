@@ -1559,7 +1559,7 @@ export class Town {
   }
 
   /** What the camera should look at to show one building: its place in the world and how far back to stand. */
-  focusOf(id: string): { target: THREE.Vector3; distance: number } | null {
+  focusOf(id: string): { target: THREE.Vector3; distance: number; azimuth?: number } | null {
     const b = this.buildings.get(id)
     if (!b) return null
     b.root.updateWorldMatrix(true, false)
@@ -1631,7 +1631,12 @@ export class Town {
   }
 
   /** The same for a whole island, standing back far enough to show it. */
-  islandFocusOf(groupId: string): { target: THREE.Vector3; distance: number } | null {
+  /**
+   * Where to stand to see a whole island. For a pillar's island (or a third party's) `azimuth` is its front: the side with its gate, name sign and pier, which
+   * faces the hub (a third party's faces the ring road), so it is always seen from the same side whichever way the camera was looking. The hub and the airport
+   * have no front: the camera keeps its side.
+   */
+  islandFocusOf(groupId: string): { target: THREE.Vector3; distance: number; azimuth?: number } | null {
     if (groupId === 'hub') return { target: new THREE.Vector3(0, 0, 0), distance: Math.max(this.hubGeo.rx, this.hubGeo.rz) * 2.6 }
     if (groupId === 'airport' && this.airport) return { target: this.airport.root.getWorldPosition(new THREE.Vector3()).setY(0), distance: this.airport.rx * 2.2 }
     // a pillar's island, or a third party's (the id of the vendor, or the shared island of its services)
@@ -1639,7 +1644,8 @@ export class Town {
     if (!isl) return null
     let reach = 0
     for (const p of isl.outline.points) reach = Math.max(reach, Math.hypot(p.x, p.y))
-    return { target: isl.root.getWorldPosition(new THREE.Vector3()).setY(0), distance: reach * 2.1 }
+    // local +z is the island's front (see buildIsland: the gate, sign and pier are on that side), so the camera stands that way from the island's middle
+    return { target: isl.root.getWorldPosition(new THREE.Vector3()).setY(0), distance: reach * 2.1, azimuth: isl.root.rotation.y }
   }
 
   /** Marks one building as selected, so its name board stays visible. */

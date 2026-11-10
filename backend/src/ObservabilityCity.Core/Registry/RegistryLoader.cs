@@ -90,6 +90,8 @@ public static partial class RegistryLoader
             throw new RegistryException($"town.yaml: wall.holdSeconds {hold.ToString(System.Globalization.CultureInfo.InvariantCulture)} is too small. Use {WallSettings.MinHoldSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture)} seconds or more, or leave it out for the default.");
         if (wall.OverviewSeconds is { } overview && (double.IsNaN(overview) || overview < 0))
             throw new RegistryException($"town.yaml: wall.overviewSeconds {overview.ToString(System.Globalization.CultureInfo.InvariantCulture)} is not allowed. Use 0 for no overview, or a number of seconds.");
+        if (wall.OverviewIslandSeconds is { } island && (double.IsNaN(island) || island < 0))
+            throw new RegistryException($"town.yaml: wall.overviewIslandSeconds {island.ToString(System.Globalization.CultureInfo.InvariantCulture)} is not allowed. Use 0 to show only the whole town in the overview, or a number of seconds.");
         if (wall.Light is { } light && !WallSettings.Lights.Contains(light))
             throw new RegistryException($"town.yaml: wall.light '{light}' is not known. Use {string.Join(" or ", WallSettings.Lights)}.{DidYouMean.Hint(light, WallSettings.Lights)}");
         var defaults = File.Exists(Path.Combine(folder, "defaults.yaml"))
@@ -322,7 +324,7 @@ public static partial class RegistryLoader
             throw new RegistryException($"The registry has {errors.Count} problems:\n" + string.Join("\n", errors.Select(e => "  - " + e)));
 
         var final = groups.Select(g => g with { Nodes = g.Nodes.Select(n => n with { Calls = resolved[n.Id], GatewayCalls = resolvedGateway[n.Id] }).ToList() }).ToList();
-        var registry = new Registry(new TownInfo(town.Id, town.Name, town.GroupLabel, town.Topology, town.Mode, town.TrafficDensity, convention, town.Labels.InternalVendors, wall is { HoldSeconds: null, OverviewSeconds: null, Light: null } ? null : new WallSettings(wall.HoldSeconds, wall.OverviewSeconds, wall.Light)), final, callers)
+        var registry = new Registry(new TownInfo(town.Id, town.Name, town.GroupLabel, town.Topology, town.Mode, town.TrafficDensity, convention, town.Labels.InternalVendors, wall is { HoldSeconds: null, OverviewSeconds: null, OverviewIslandSeconds: null, Light: null } ? null : new WallSettings(wall.HoldSeconds, wall.OverviewSeconds, wall.OverviewIslandSeconds, wall.Light)), final, callers)
         {
             Notices = notices, Problems = problems, Vendors = vendors, RingCapacity = ringCapacity, Topics = topics, Subscriptions = subscriptions, Environments = environments, DatabaseEngines = engines.Values.ToList(),
         };

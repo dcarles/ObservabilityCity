@@ -400,7 +400,7 @@ public sealed record Snapshot(
 /// The town's defaults for wall mode (town.yaml wall); each is null when the town did not say, and the page then uses its own default. An address parameter on the page
 /// wins over these. Light is "dusk" or "day". The whole object is null when the town sets none.
 /// </summary>
-public sealed record WallSettingsSnapshot(double? HoldSeconds, double? OverviewSeconds, string? Light);
+public sealed record WallSettingsSnapshot(double? HoldSeconds, double? OverviewSeconds, double? OverviewIslandSeconds, string? Light);
 
 /// <summary>
 /// How fresh one configured source is: Name is the source's name in the environment file, LastRead when it last reported anything (null: not yet since the server started),

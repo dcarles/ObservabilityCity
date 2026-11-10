@@ -79,15 +79,17 @@ messaging:
 | Key | Required | Default | Meaning |
 |---|---|---|---|
 | `holdSeconds` | no | `20` | Seconds the wall tour stays at each stop. `0.5` or more. |
-| `overviewSeconds` | no | `12` | Seconds the overview of the whole town lasts when something is wrong: an aerial lap round the town (the dashboard wall closes every pillar and goes back to the top). The tour opens with it and comes back to it after the last stop. `0` for no overview. |
+| `overviewSeconds` | no | `3` | Seconds the overview shows the whole town when something is wrong. The tour opens with the overview and comes back to it after the last stop. `0` for no overview. |
+| `overviewIslandSeconds` | no | `3` | After the whole town, the overview visits each pillar island in the order they stand round the hub (the hub is left out), seen from its front, and stays this many seconds at each. `0` to show only the whole town. The dashboard wall does the same with its pillars: the closed list, then each pillar opened in turn. |
 | `light` | no | `dusk` | The light a wall opens in: `dusk` or `day`. |
 
-Every key is a default for the whole town. An address parameter on one screen wins over it: `?wall=1&hold=30&overview=20&light=day`. Without the address parameter or the key, the default in this table applies. A value out of range stops the load and says the range.
+Every key is a default for the whole town. An address parameter on one screen wins over it: `?wall=1&hold=30&overview=5&overviewIsland=4&light=day`. Without the address parameter or the key, the default in this table applies. A value out of range stops the load and says the range.
 
 ```yaml
 wall:
   holdSeconds: 30
-  overviewSeconds: 20
+  overviewSeconds: 5
+  overviewIslandSeconds: 4
   light: day
 ```
 

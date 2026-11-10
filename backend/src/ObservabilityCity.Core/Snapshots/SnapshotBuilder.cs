@@ -154,7 +154,7 @@ public sealed partial class SnapshotBuilder(IRegistryProvider registries, Latest
             vendors, callers, dependencies, registry.RingCapacity,
             env?.Name ?? Environment, environments, TenantsOf(env, allNodes), registry.Town.Topology, Mode ?? registry.Town.Mode, view, incidentFreeSince, incidentsSeen,
             OutsideRate(onScreenNodes.Values), env?.Scope.Cloud, registry.Town.TrafficDensity, registries.Notes is { Count: > 0 } notes ? notes : null, SourceFreshness(now), events, registry.Town.InternalVendorsLabel,
-            registry.Town.Wall is { } w ? new WallSettingsSnapshot(w.HoldSeconds, w.OverviewSeconds, w.Light) : null);
+            registry.Town.Wall is { } w ? new WallSettingsSnapshot(w.HoldSeconds, w.OverviewSeconds, w.OverviewIslandSeconds, w.Light) : null);
     }
 
     /// <summary>What the pillar sends and receives through the broker, from the source that reads it; absent when no source reports it or its reading is older than the source stands for.</summary>
