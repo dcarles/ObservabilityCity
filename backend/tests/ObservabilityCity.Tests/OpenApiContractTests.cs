@@ -33,7 +33,7 @@ public class OpenApiContractTests
         {
             var required = Required(schema.Value);
             foreach (var prop in schema.Value.GetProperty("properties").EnumerateObject())
-                if (prop.Name is not ("scope" or "link" or "level" or "app" or "engine" or "flow")) // the nullable ones below
+                if (prop.Name is not ("scope" or "link" or "level" or "app" or "engine" or "flow" or "wall")) // the nullable ones below
                     if (!schema.Value.GetProperty("properties").GetProperty(prop.Name).TryGetProperty("nullable", out _))
                         Assert.Contains(prop.Name, required);
         }

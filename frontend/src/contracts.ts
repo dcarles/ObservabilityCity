@@ -506,6 +506,7 @@ export interface components {
             sources?: components["schemas"]["SourceFreshnessSnapshot"][] | null;
             healthEvents?: components["schemas"]["HealthEventSnapshot"][] | null;
             internalVendorsLabel: string;
+            wall?: components["schemas"]["WallSettingsSnapshot"];
         };
         SourceAgeSnapshot: {
             source: string;
@@ -638,6 +639,13 @@ export interface components {
             unknown: string[];
             hidden: components["schemas"]["HiddenIsland"][];
             links: components["schemas"]["OffscreenLink"][];
+        };
+        WallSettingsSnapshot: {
+            /** Format: double */
+            holdSeconds?: number | null;
+            /** Format: double */
+            overviewSeconds?: number | null;
+            light?: string | null;
         };
     };
     responses: never;

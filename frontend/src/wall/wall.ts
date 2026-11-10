@@ -35,8 +35,14 @@ export class WallMode<P = TownPlace> {
   private snap: Snapshot | null = null
   private connection: ConnectionState = 'connecting'
 
-  constructor(hold: number, private readonly camera: WallCamera<P>, private readonly overviewSeconds = 0) {
+  constructor(hold: number, private readonly camera: WallCamera<P>, private overviewSeconds = 0) {
     this.director = new WallDirector(hold, undefined, overviewSeconds)
+  }
+
+  /** The timings to run with from now on: set before each snapshot, from the address and the town's own defaults. */
+  setTimings(t: { hold: number; overview: number }): void {
+    this.overviewSeconds = t.overview
+    this.director.configure(t.hold, t.overview)
   }
 
   onSnapshot(s: Snapshot, now: number): void {

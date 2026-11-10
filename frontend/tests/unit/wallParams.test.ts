@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_HOLD_SECONDS, DEFAULT_OVERVIEW_SECONDS, DEFAULT_RETRY_SECONDS, WALL_KEY, parseWall, rememberWall, wallRemembered, withoutWall } from '../../src/wall/params'
+import { DEFAULT_HOLD_SECONDS, DEFAULT_OVERVIEW_SECONDS, wallTimings, DEFAULT_RETRY_SECONDS, WALL_KEY, parseWall, rememberWall, wallRemembered, withoutWall } from '../../src/wall/params'
 import type { Store } from '../../src/lighting'
 
 const memory = (): Store & { data: Map<string, string> } => {
@@ -105,5 +105,27 @@ describe('the overview in the address', () => {
     expect(parseWall('?wall=1&overview=-3').overview).toBe(12)
     expect(parseWall('?wall=1&overview=soon').overview).toBe(12)
     expect(parseWall('?wall=1&overview=').overview).toBe(12)
+  })
+})
+
+describe('the timings a wall runs with: the address, then the town, then the default', () => {
+  it('uses the default when neither says', () => {
+    expect(wallTimings(parseWall('?wall=1'), null)).toEqual({ hold: 20, overview: 12 })
+    expect(wallTimings(parseWall('?wall=1'), {})).toEqual({ hold: 20, overview: 12 })
+  })
+
+  it("uses the town's own defaults when the address says nothing", () => {
+    expect(wallTimings(parseWall('?wall=1'), { holdSeconds: 30, overviewSeconds: 20 })).toEqual({ hold: 30, overview: 20 })
+    expect(wallTimings(parseWall('?wall=1'), { overviewSeconds: 0 })).toEqual({ hold: 20, overview: 0 })
+  })
+
+  it("lets the address win over the town, one key at a time, including 0 for no overview", () => {
+    const town = { holdSeconds: 30, overviewSeconds: 20 }
+    expect(wallTimings(parseWall('?wall=1&hold=5'), town)).toEqual({ hold: 5, overview: 20 })
+    expect(wallTimings(parseWall('?wall=1&overview=0'), town)).toEqual({ hold: 30, overview: 0 })
+  })
+
+  it("falls back to the town's value, not the built-in one, when the address value is not usable", () => {
+    expect(wallTimings(parseWall('?wall=1&hold=soon&overview=-2'), { holdSeconds: 30, overviewSeconds: 20 })).toEqual({ hold: 30, overview: 20 })
   })
 })

@@ -360,6 +360,7 @@ public sealed record TownTotals(
 /// does not measure it (links.traffic), and the airport then adds up what the outside callers bring.
 /// Cloud is what the environment calls its cloud (scope.cloud), for the words "not found in ..."; null: the renderer says "the inventory".
 /// InternalVendorsLabel is the town's labels.internalVendors: what its own services outside the monitored platform are called.
+/// Wall is the town's wall defaults (town.yaml wall), or null when it sets none.
 /// TrafficDensity is the town's trafficDensity setting: how many cars appear, as a multiple of the usual number (1).
 /// HealthEvents are the resources the cloud itself reports as Degraded or Unavailable right now, worst first (see <see cref="HealthEventSnapshot"/>); null when the environment reads none.
 /// With an island filter it holds the events of the islands on screen and those that belong to no building. They count in TownTotals.Incidents too.
@@ -392,7 +393,14 @@ public sealed record Snapshot(
     IReadOnlyList<string>? Notes = null,
     IReadOnlyList<SourceFreshnessSnapshot>? Sources = null,
     IReadOnlyList<HealthEventSnapshot>? HealthEvents = null,
-    string InternalVendorsLabel = "Internal services");
+    string InternalVendorsLabel = "Internal services",
+    WallSettingsSnapshot? Wall = null);
+
+/// <summary>
+/// The town's defaults for wall mode (town.yaml wall); each is null when the town did not say, and the page then uses its own default. An address parameter on the page
+/// wins over these. Light is "dusk" or "day". The whole object is null when the town sets none.
+/// </summary>
+public sealed record WallSettingsSnapshot(double? HoldSeconds, double? OverviewSeconds, string? Light);
 
 /// <summary>
 /// How fresh one configured source is: Name is the source's name in the environment file, LastRead when it last reported anything (null: not yet since the server started),

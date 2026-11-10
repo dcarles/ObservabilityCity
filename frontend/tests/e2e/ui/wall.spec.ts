@@ -510,3 +510,47 @@ test.describe('the overview of the whole town', () => {
     expect((await wall(page)).strip.dlq).toBe('/ 1 with DLQ')
   })
 })
+
+test.describe("the town's own wall defaults (town.yaml wall)", () => {
+  /** Hands the page the server's latest snapshot with a wall block added, and holds the live feed so it stays. */
+  const feedWall = (page: Page, wall: unknown) => page.evaluate(async (w) => {
+    const s = await (await fetch('/api/snapshot/latest')).json()
+    s.wall = w
+    ;(window as any).city.hold(true)
+    ;(window as any).city.feed(s)
+  }, wall)
+
+  test("holds for the town's holdSeconds when the address says nothing, and the address wins when it does", async ({ town, page }) => {
+    await town.open('&wall=1')
+    await page.waitForFunction(() => (window as any).city.wall().mode === 'calm')
+    await feedWall(page, { holdSeconds: 3 })
+    await town.step(20.1) // the stop that was already on holds its 20 s; the next one holds the town's 3
+    const next = (await wall(page)).stop!.key
+    await town.step(1)
+    expect((await wall(page)).stop!.key).toBe(next)
+    await town.step(3)
+    expect((await wall(page)).stop!.key).not.toBe(next) // 4 s on: gone, so it was not the 20 s default
+
+    await town.open('&wall=1&hold=6')
+    await page.waitForFunction(() => (window as any).city.wall().mode === 'calm')
+    await feedWall(page, { holdSeconds: 3 })
+    await town.step(6.1)
+    const stop = (await wall(page)).stop!.key
+    await town.step(4.5)
+    expect((await wall(page)).stop!.key).toBe(stop) // the address (6 s) won over the town (3 s)
+  })
+
+  test('opens on the town light, once, and an address light beats it', async ({ town, page }) => {
+    await town.open('&wall=1')
+    await page.waitForFunction(() => (window as any).city.wall().mode === 'calm')
+    expect(await page.evaluate(() => (window as any).city.lighting())).toBe('dusk')
+    await feedWall(page, { light: 'day' })
+    expect(await page.evaluate(() => (window as any).city.lighting())).toBe('day')
+
+    await town.open('&wall=1&light=dusk')
+    await page.waitForFunction(() => (window as any).city.wall().mode === 'calm')
+    await feedWall(page, { light: 'day' })
+    expect(await page.evaluate(() => (window as any).city.lighting())).toBe('dusk')
+  })
+})
+

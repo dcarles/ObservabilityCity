@@ -776,5 +776,6 @@
   "notes": null,
   "sources": null,
   "healthEvents": null,
-  "internalVendorsLabel": "Internal services"
+  "internalVendorsLabel": "Internal services",
+  "wall": null
 }

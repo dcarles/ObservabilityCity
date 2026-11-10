@@ -35,6 +35,7 @@ Thresholds cascade: `defaults.yaml` (per role) → the pillar's `defaults` → t
 | `databaseEngines` | no | none | The database engines this company uses, by id (see below). A database writes `engine: <id>`. |
 | `messaging` | no | see below | How the town names its message topics, and which topics are an old route (see below). |
 | `labels` | no | see below | The words the town uses for things the app has no fixed name for (see below). |
+| `wall` | no | see below | The town's defaults for wall mode: how long the tour stays at each stop, how long the overview lasts and the light (see below). |
 | `expectedWarnings` | no | none | Warnings the validator should expect, for a test folder that shows a rule on purpose. |
 
 <!-- file: DatabaseEngineFile -->
@@ -73,6 +74,22 @@ messaging:
 | Key | Required | Default | Meaning |
 |---|---|---|---|
 | `internalVendors` | no | `Internal services` | What the town calls its own services outside the monitored platform (third parties with `internal: true`): the dashboard section and the note in the Unknown hosts panel. |
+
+<!-- file: WallFile -->
+| Key | Required | Default | Meaning |
+|---|---|---|---|
+| `holdSeconds` | no | `20` | Seconds the wall tour stays at each stop. `0.5` or more. |
+| `overviewSeconds` | no | `12` | Seconds the overview of the whole town lasts when something is wrong: an aerial lap round the town (the dashboard wall closes every pillar and goes back to the top). The tour opens with it and comes back to it after the last stop. `0` for no overview. |
+| `light` | no | `dusk` | The light a wall opens in: `dusk` or `day`. |
+
+Every key is a default for the whole town. An address parameter on one screen wins over it: `?wall=1&hold=30&overview=20&light=day`. Without the address parameter or the key, the default in this table applies. A value out of range stops the load and says the range.
+
+```yaml
+wall:
+  holdSeconds: 30
+  overviewSeconds: 20
+  light: day
+```
 
 <!-- file: ExpectedWarningFile -->
 | Key | Required | Default | Meaning |

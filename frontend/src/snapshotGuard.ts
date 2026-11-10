@@ -97,6 +97,7 @@ export function checkSnapshot(raw: unknown): Checked {
     // what the environment calls its cloud, for "not found in ..."; null says "the inventory"
     // what the town calls its own services outside the monitored platform (labels.internalVendors)
     internalVendorsLabel: str(raw.internalVendorsLabel).trim() || 'Internal services',
+    wall: checkWall(raw.wall) as Snapshot['wall'], // null when the town sets none, as the server sends it
     cloud: typeof raw.cloud === 'string' && raw.cloud.trim() !== '' ? raw.cloud.trim() : null,
     dayFraction: isFiniteNumber(raw.dayFraction) ? raw.dayFraction : 0.5,
     totals: {
@@ -386,4 +387,14 @@ function str(v: unknown): string {
 
 function strings(v: unknown): string[] {
   return Array.isArray(v) ? v.filter((c): c is string => typeof c === 'string') : []
+}
+
+/** The town's wall defaults (town.yaml wall): only what is a usable value; nothing usable is no defaults at all. */
+function checkWall(raw: unknown): { holdSeconds?: number; overviewSeconds?: number; light?: 'dusk' | 'day' } | null {
+  if (!isObject(raw)) return null
+  const wall: { holdSeconds?: number; overviewSeconds?: number; light?: 'dusk' | 'day' } = {}
+  if (isFiniteNumber(raw.holdSeconds) && raw.holdSeconds >= 0.5) wall.holdSeconds = raw.holdSeconds
+  if (isFiniteNumber(raw.overviewSeconds) && raw.overviewSeconds >= 0) wall.overviewSeconds = raw.overviewSeconds
+  if (raw.light === 'dusk' || raw.light === 'day') wall.light = raw.light
+  return Object.keys(wall).length > 0 ? wall : null
 }
