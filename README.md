@@ -2,7 +2,23 @@
 
 A browser app that shows system health as a living, animated 3D town instead of a dashboard. Each pillar (or team) is an island, each system is a building, and what is going on shows in the town itself: floors for instances, lit windows for load, rooftop beacons for errors, cars for traffic.
 
-**Status: Phase 1, slice 3.5.** The pipeline runs end to end on fake data (backend, live push, browser), and the whole sample town is built: the hub, 16 pillar islands and a Lost & found island, with messaging between them. Everything else is in [docs/](docs/observability-city-plan.md).
+**Status:** the demo towns run on fake data, and a live town reads real Azure sources (Resource Graph, Log Analytics, Azure Monitor, Service Bus, Function jobs and Resource Health). The 3D town, the dashboard and the wall screen all work; the sample town has the hub, 16 pillar islands and a Lost & found island, with messaging between them. Incidents from a live source and hosting are still to come. The plan is in [docs/](docs/observability-city-plan.md).
+
+## What it looks like
+
+The sample town (Galactic Credit) in each of the three themes: harbour town, space colony and works. The data, the layout and every signal are the same; only the look changes.
+
+| Harbour town | Space colony | Works |
+| --- | --- | --- |
+| ![The harbour town theme](docs/screenshots/theme-harbour-town.png) | ![The space colony theme](docs/screenshots/theme-space.png) | ![The works theme](docs/screenshots/theme-factory.png) |
+
+A bad day: an island with errors, the inspector open on a degraded API, and the effects listed in the Break things panel.
+
+![A bad day with the inspector open](docs/screenshots/trouble-inspector.png)
+
+The same town as a dashboard, for when you want the list rather than the picture.
+
+![The dashboard view](docs/screenshots/dashboard.png)
 
 ## What it looks like
 
@@ -29,7 +45,7 @@ The same town as a dashboard, for when you want the list rather than the picture
 | A browser with WebGL | Any current Chrome, Edge, Firefox or Safari | The 3D town |
 | Git | Any | To clone |
 
-**You do not need Docker, Docker Desktop, Rancher or any container tool.** Phase 1 uses fake data and keeps no history store, so nothing runs in a container. The .NET Aspire dashboard that opens with the app runs as a normal process.
+**You do not need Docker, Docker Desktop, Rancher or any container tool.** The app keeps no history store, so nothing runs in a container. The .NET Aspire dashboard that opens with the app runs as a normal process.
 
 On Windows: `winget install Microsoft.DotNet.SDK.10` and `winget install OpenJS.NodeJS.LTS`, then open a new terminal.
 
@@ -174,7 +190,7 @@ extensions/                        a company fork's own code (empty upstream)
 AGENTS.md, .github/copilot-instructions.md   instructions for coding assistants
 ```
 
-Data flows one way: a source writes readings, the snapshot builder joins them with the registry and applies the rules (stale is never green, down beats degraded), and one snapshot is pushed over SignalR every two seconds. The browser invents all motion from the numbers in the snapshot. It never knows which source produced them, so real adapters later replace the fake one without touching the town.
+Data flows one way: a source writes readings, the snapshot builder joins them with the registry and applies the rules (stale is never green, down beats degraded), and a snapshot is built every two seconds and sent over SignalR when it changed, and at least every 15 seconds. The browser invents all motion from the numbers in the snapshot. It never knows which source produced them, so a live adapter stands in for the fake one without touching the town.
 
 ### The contract
 
@@ -191,7 +207,7 @@ CI runs `npm run check:contracts` and fails if the generated files are out of da
 ```
 dotnet test --solution backend/ObservabilityCity.slnx  # registry, resilient loading, validator, rules, fake source, 23- and 35-island backend load, golden fixtures
 cd frontend && npm test          # visual rules, snapshot guard, island layout (including 24 uneven islands), golden fixtures
-cd frontend && npm run e2e       # browser scenarios on a small town (break things, check the town, calm it down), then the link rules on a town with an island for each case, then the environment, tenant and service rules (about 3 minutes)
+cd frontend && npm run e2e       # browser scenarios on a small town (break things, check the town, calm it down), then every other e2e suite except the slow ones below
 cd frontend && npm run e2e:links # the link rules alone: pier, bridge and buildings follow real links
 cd frontend && npm run e2e:tenants # environments, tenant yards, tenant traffic and service groups, on a town with three environments
 cd frontend && npm run e2e:ui      # top bar, island filter, layers, inspector drawer, legend, Day/Dusk
@@ -220,11 +236,11 @@ To refresh the golden fixtures (calm town, a bad day across several islands, and
 | `fake.yaml` names real systems and its numbers make sense | error |
 | A town with `fake.yaml` or a `stories/` folder says `mode: demo` in `town.yaml`, and `mode` is `demo` or `live` | error |
 | A worker has a database, a system has a caller, no `islands` list in `town.yaml`, a database with no `engine` once the town lists its `databaseEngines`, an empty pillar, an island that stands alone (no API, messaging or call links) | warning |
-| Messaging: topics are services of the pillar, subscriptions name an existing topic and a worker of the same pillar, no duplicates, `legacy` exactly for the hub's egress topic | error |
+| Messaging: topics are services of the pillar, subscriptions name an existing topic and a worker of the same pillar, no duplicates, `legacy: true` exactly on reads of topics whose owner `messaging.legacyFrom` in `town.yaml` lists | error |
 
 On a pull request the check writes annotations on the files and posts one comment listing every finding with file and line (the same comment is updated on each push).
 
-**A broken pillar file does not stop the town.** The running app skips a pillar file with problems and draws its island as a *config error* island (a board saying what is wrong), drops call links that point nowhere, and lists everything it worked around in a small panel under the top bar. The registry folder is watched: a reload that fails keeps the last good registry and says so in the panel. If `town.yaml`, `defaults.yaml`, `hub.yaml` or `layout.yaml` is unreadable at start-up the app does not start, since there is nothing to show. The page also refuses a snapshot it cannot draw and keeps the last good town.
+**A broken pillar file does not stop the town.** The running app skips a pillar file with problems and draws its island as a *config error* island (a board saying what is wrong), drops call links that point nowhere, and lists everything it worked around in a small panel under the top bar. The registry folder is watched: a reload that fails keeps the last good registry and says so in the panel. If `town.yaml`, `defaults.yaml`, `hub.yaml` or `third-parties.yaml` is unreadable at start-up the app does not start, since there is nothing to show. The page also refuses a snapshot it cannot draw and keeps the last good town.
 
 **Pull request checks.** `.github/workflows/ci.yml` runs side by side the backend tests, the frontend tests and build, the registry checks and the UI scenarios (spread over five jobs, one per group of browser suites) and a final job called `PR checks` that passes when none of them failed. A first job, `What changed` (`.github/scripts/changed-areas.mjs`), skips the jobs a pull request does not need: documents run no tests (the few the backend tests read run the backend tests only), and a change inside `frontend/` skips the backend tests. Anything it does not recognise, and every push to `main`, runs everything. `.github/workflows/slow.yml` runs the stress towns, the full sample town and all three themes (a pull request runs only the harbour theme) on merge to main and every night.
 
@@ -236,7 +252,7 @@ One folder describes a town. The sample is `config/galactic-credit/`:
 
 | File | What it holds |
 | --- | --- |
-| `town.yaml` | Name, what an island is called, topology, `mode` (`demo` or `live`; left out means `live`), `islands` (the order of the islands round the hub: unlisted pillars follow, Lost & found is always last), `ringCapacity`, and `databaseEngines` (the engines your databases run on, each one of the fixed database types, see below) |
+| `town.yaml` | Name, what an island is called, topology, `mode` (`demo` or `live`; left out means `live`), `islands` (the order of the islands round the hub: unlisted pillars follow, Lost & found is always last), `ringCapacity`, `databaseEngines` (the engines your databases run on, each one of the fixed database types, see below), `trafficDensity`, `messaging` (`topicTemplate`, `hubTopicTemplate`, `legacyFrom`), `labels`, `wall` (the wall tour's timings and light) and `expectedWarnings`. Every key is in [docs/config-reference.md](docs/config-reference.md) |
 | `defaults.yaml` | App-wide defaults per role (SLA, error, resource, throttle and backlog thresholds) |
 | `hub.yaml` | The hub's shared resources (gateway, broker, egress, database), its `messaging` topics (`egress`), and the outside callers (`externalCallers`, each lists the external systems it reaches) |
 | `pillars/<code>.yaml` | One island: its systems, `calls` links, per-role `defaults`, and its `messaging` (topics it publishes, topics its workers consume) |
@@ -260,7 +276,7 @@ Settings cascade: system, then the pillar's `defaults`, then `defaults.yaml`, th
 
 ```yaml
 messaging:
-  topics: [payments, refunds]              # publishes pay-payments-outbox and pay-refunds-outbox
+  topics: [payments, refunds]              # publishes pay-payments-outbox and pay-refunds-outbox (the sample's topicTemplate is "{pillar}-{service}-outbox")
   subscriptions:                           # a worker of this pillar reads a topic
     - { topic: frd-screening-outbox, consumer: pay.payments-worker }   # another pillar's outbox, directly
     - { topic: hub-egress, consumer: pay.refunds-worker, legacy: true } # the old route, flagged
@@ -273,7 +289,7 @@ messaging:
 | Neither | Nothing connects it: it stands alone and the registry warns about it |
 | No database, or no worker | No storage unit, or no factory: buildings exist only for roles the island has |
 
-Reading the hub's egress topic from a pillar must say `legacy: true`; the egress topic is otherwise for external destinations such as Snowflake, which are third-party calls.
+Topic names come from `messaging.topicTemplate` and `hubTopicTemplate` in `town.yaml` (both `{service}` when left out). A read of a topic whose owner `messaging.legacyFrom` lists (the sample lists `hub`) must say `legacy: true`, and no other read may; in the sample the hub's egress topic is otherwise for external destinations, which are third-party calls.
 
 The loader checks everything and reports all problems at once, each with its file name. Ids must be `pillar.system` (the prefix matches the file, lowercase kebab-case, unique in the town). A misspelt key, role, call target, island or database engine gets a suggestion, for example `'aa.ledger-api' calls 'aa.ledger-dbb', which is not in this town. Did you mean 'aa.ledger-db'?`. When a system is renamed, keep its old id under `aliases: [old.id]` and files that still use it keep working.
 
@@ -291,8 +307,8 @@ A test fails if the committed schema files are out of date.
 # environments/staging.yaml
 name: Staging
 order: 2                                  # position in the picker
-default: false                            # exactly one environment is the default (shown when the address has no ?env=)
-sources:                                  # named sources: metrics, messaging and incidents are what signals use unless told otherwise
+default: false                            # at most one environment is the default (shown when the address has no ?env=); with none, the first by order
+sources:                                  # named sources: signals read metrics, messaging (backlog, dead letters) and jobs unless told otherwise; incidents is reserved, and no live adapter reads it yet
   metrics: { kind: fake }
   incidents: { kind: fake }
 # A live environment can name its own sources, a login and a source for each signal (see docs/connect-your-company.md):
@@ -342,8 +358,9 @@ The sample town has 17 islands, about 110 buildings and up to 420 cars. Roads, l
 | Setting | Default | What it does |
 | --- | --- | --- |
 | `Registry:Path` | none | Run only this one folder, as the single town |
-| `Registry:Towns:0` ... | every `config/*/town.yaml` | The folders of the towns to run |
+| `Registry:Towns:0` ... | none | Town folders to run as well as the ones found (every `config/*/town.yaml`, unless `Registry:Path` is set) |
 | `Registry:DefaultTown` | `galactic-credit` | The town a page gets when it asks for none |
+| `Adapters:Path` | `adapters/` beside the program | The folder the adapter modules are loaded from |
 | `Fake:DayLengthSeconds` | `120` | Real seconds per simulated day |
 | `Polling:AlwaysOn` | `false` | A live environment reads its sources only while a browser looks at it (and 2 minutes after). `true` keeps every environment polling all the time |
 | `Snapshot:IntervalSeconds` | `2` | How often a snapshot is built (the newest is always at `/api/snapshot/latest`) |
