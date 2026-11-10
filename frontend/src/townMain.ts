@@ -136,6 +136,7 @@ export async function startTown(): Promise<void> {
     },
     goTo,
     (id) => { void dismissEvent(id) },
+    (island) => town.pierSummary(island),
   )
   let tenantView: TenantView = loadTenantView(store)
   const topbar = new TopBar((state, anchor) => stateList.toggle(state, anchor), () => tenantView)
@@ -443,13 +444,21 @@ export async function startTown(): Promise<void> {
     const hits = ray.intersectObjects(town.hitMeshes(), false)
     const b = hits[0]?.object.userData.building as Building | undefined
     showTooltip(b?.node ?? null, pointerPx.x, pointerPx.y, tenantView)
+    // over a pier, its crates or its dead-letter pen: what the pier carries
+    const pierId = b ? undefined : ray.intersectObjects(town.harbourHits(), false)[0]?.object.userData.harbourIsland as string | undefined
+    const pier = pierId ? town.pierSummary(pierId) : null
+    // over an island's sign: the pillar's name and its traffic
+    const signId = b || pier ? undefined : ray.intersectObjects(town.signHits(), false)[0]?.object.userData.signIsland as string | undefined
+    const sign = signId ? town.signSummary(signId) : null
+    if (pier) showIslandTooltip(pier.name, false, pointerPx.x, pointerPx.y, pier.lines)
+    else if (sign && sign.lines.length > 0) showIslandTooltip(sign.name, false, pointerPx.x, pointerPx.y, sign.lines, 'traffic')
     // over an island but no building: the island's name
-    if (!b) {
+    else if (!b) {
       const ground = ray.ray.intersectPlane(groundPlane, groundHit)
       const isl = ground ? town.islandAt(ground.x, ground.z) : null
       if (isl) showIslandTooltip(isl.name, isl.vendor, pointerPx.x, pointerPx.y)
     }
-    const overService = !b && (ray.intersectObjects(town.serviceHits(), false).length > 0 || ray.intersectObjects(town.assetHits(), false).length > 0)
+    const overService = !b && (pier != null || ray.intersectObjects(town.serviceHits(), false).length > 0 || ray.intersectObjects(town.assetHits(), false).length > 0)
     canvas.style.cursor = breakPanel?.armed ? 'crosshair' : b || overService ? 'pointer' : 'grab'
   }
 
@@ -470,6 +479,8 @@ export async function startTown(): Promise<void> {
   // Debug handle for automated tests, screenshots and poking from the console. A production page does not publish it (it would be a public surface for other scripts to depend on) unless the address has ?test=1.
   const handle = {
     stage, town, THREE, seen, step, islandLabels,
+    /** Reads what is under the pointer now and shows its tooltip, for tests (a test page draws no frames on its own). */
+    hover: () => hover(),
     /** The scripted event of the theme: start it, stop it, jump to a moment, or read what is going on. */
     event: {
       id: () => events.eventId,

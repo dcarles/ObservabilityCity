@@ -177,6 +177,40 @@ test.describe('Galactic Credit keeps its hub and spokes', () => {
     await expect(page.locator(`[data-pillar="${first.id}"] .pflow [data-flow]`)).toContainText(/sends ext|receives|sends int|no /)
   })
 
+  test('hovering an island\'s sign gives the pillar name and its traffic, the numbers on the sign', async ({ town, page }) => {
+    await town.open()
+    const got = await page.evaluate(() => {
+      const c = (window as any).city
+      const T = c.THREE
+      const rows: { id: string; picked: string | null; name: string; lines: string[]; line: string }[] = []
+      for (const isl of c.town.islands) {
+        const s = c.town.signSummary(isl.group.id)
+        if (!s || s.lines.length === 0) continue
+        const at = isl.nameSign.getWorldPosition(new T.Vector3()); at.y += 3.6 * 1.9
+        const ray = new T.Raycaster(c.stage.camera.position.clone(), at.clone().sub(c.stage.camera.position).normalize())
+        const hit = ray.intersectObjects(c.town.signHits(), false)[0]
+        rows.push({ id: isl.group.id, picked: hit ? hit.object.userData.signIsland : null, name: s.name, lines: s.lines, line: isl.nameSign.userData.line() })
+      }
+      return rows
+    })
+    expect(got.length).toBeGreaterThanOrEqual(3)
+    for (const r of got) {
+      expect(r.picked, r.id).toBe(r.id)
+      expect(r.lines.map((l) => l.split(' ')[1]), r.id).toEqual(['in', 'out', 'inside'])
+      // the sign's line has the same in and out
+      const rate = (label: string) => r.lines.find((l) => l.startsWith(`Requests ${label} `))!.split(' ')[2]
+      expect(r.line, r.id).toBe(`in ${rate('in')} · out ${rate('out')} rps`)
+    }
+  })
+
+  test('puts the island sign on the other side of the bridge from the pier board', async ({ town, page }) => {
+    await town.open()
+    const signs = (await page.evaluate(() => (window as any).city.town.inspectSigns())) as { id: string; signX: number; pierX: number | null }[]
+    const piers = signs.filter((s) => s.pierX != null && s.id !== 'lost-found')
+    expect(piers.length).toBeGreaterThanOrEqual(3)
+    for (const s of piers) expect(Math.sign(s.signX), s.id).toBe(-Math.sign(s.pierX!))
+  })
+
   test('carries what each pillar sends and receives on its own straight lane to the hub, lanes apart and never crossing', async ({ town, page }) => {
     await town.open()
     const lanes = (await page.evaluate(() => (window as any).city.town.inspectLanes())) as { id: string; path: { x: number; z: number }[] }[]
