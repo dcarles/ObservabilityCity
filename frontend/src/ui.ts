@@ -121,10 +121,12 @@ export function showTooltip(n: NodeSnapshot | null, x: number, y: number, view: 
 }
 
 /** The name of the island under the pointer, in the same box as a building's numbers. Null hides it. */
-export function showIslandTooltip(name: string | null, third: boolean, x: number, y: number): void {
+export function showIslandTooltip(name: string | null, third: boolean, x: number, y: number, pier: string[] | null = null): void {
   const el = $('tooltip')
   if (!name) { el.hidden = true; return }
-  el.innerHTML = `<b>${escapeHtml(name)}</b> <span class="stale">· ${third ? 'third party island' : 'island'}</span>`
+  el.innerHTML = pier
+    ? `<b>${escapeHtml(name)}</b> <span class="stale">· pier</span>${pier.map((l) => `<div class="pierline">${escapeHtml(l)}</div>`).join('')}`
+    : `<b>${escapeHtml(name)}</b> <span class="stale">· ${third ? 'third party island' : 'island'}</span>`
   el.hidden = false
   const w = el.offsetWidth, h = el.offsetHeight
   el.style.left = `${Math.min(x + 16, window.innerWidth - w - 8)}px`
@@ -159,7 +161,7 @@ export class StateList {
   private key = ''
   private anchor: DOMRect | null = null
 
-  constructor(private readonly systems: (state: ListedState, island: string | null) => PickItem[], private readonly onPick: (item: PickItem) => void, private readonly onDismiss: (id: string) => void = () => {}) {
+  constructor(private readonly systems: (state: ListedState, island: string | null) => PickItem[], private readonly onPick: (item: PickItem) => void, private readonly onDismiss: (id: string) => void = () => {}, private readonly summary: (island: string) => { name: string; lines: string[] } | null = () => null) {
     document.addEventListener('pointerdown', (e) => {
       const t = e.target as HTMLElement
       if (!this.el.hidden && !t.closest('#state-list') && !t.closest('[data-list]')) this.close()
@@ -182,7 +184,8 @@ export class StateList {
     if (!this.state) return
     const found = this.systems(this.state, this.island)
     const items = this.state === 'DeadLetters' ? found : found.sort((a, b) => a.name.localeCompare(b.name)) // dead letters come worst first
-    const key = `${this.state}|${this.island ?? ''}|${items.map((i) => `${i.id}:${i.state ?? ''}:${i.detail ?? ''}`).join(',')}`
+    const pier = this.state === 'DeadLetters' && this.island ? this.summary(this.island) : null
+    const key = `${this.state}|${this.island ?? ''}|${pier ? pier.lines.join('/') : ''}|${items.map((i) => `${i.id}:${i.state ?? ''}:${i.detail ?? ''}`).join(',')}`
     if (key === this.key) return
     this.key = key
     const resolved = this.state === 'Incidents' ? items.filter((i) => i.state === 'Resolved').length : 0
@@ -191,7 +194,7 @@ export class StateList {
     const word = { Down: 'down', Degraded: 'degraded', Stale: 'with no data', Incidents: 'with open incidents', DeadLetters: queues === 1 ? 'queue with dead letters' : 'queues with dead letters' }[this.state]
     const none = this.state === 'Incidents' ? 'No incidents are open right now.' : this.state === 'DeadLetters' ? 'No queue has dead letters right now.' : `Nothing is ${word} right now.`
     this.el.innerHTML = `
-      <div class="head"><b>${(this.state === 'DeadLetters' ? queues : items.length) - resolved} ${word}${resolved ? ` · ${resolved} resolved` : ''}</b><button id="state-list-close" title="Close">✕</button></div>
+      ${pier ? `<div class="head"><b>${escapeHtml(pier.name)} · pier</b><button id="state-list-close" title="Close">✕</button></div><div class="pier-lines">${pier.lines.map((l) => `<div>${escapeHtml(l)}</div>`).join('')}</div><div class="subhead"><b>${queues} ${word}</b></div>` : `<div class="head"><b>${(this.state === 'DeadLetters' ? queues : items.length) - resolved} ${word}${resolved ? ` · ${resolved} resolved` : ''}</b><button id="state-list-close" title="Close">✕</button></div>`}
       ${items.length === 0 ? `<p class="none">${none}</p>` : items.map((m, i) => `<div class="hit${m.dismiss ? ' stacked' : ''}${m.inert ? ' inert' : ''}${m.state === 'Resolved' ? ' resolved' : ''}" data-i="${i}"${m.inert ? ' data-inert="1"' : ''}><b>${escapeHtml(m.name)}</b><span>${escapeHtml(m.where)}</span>${m.detail ? `<span class="detail">${escapeHtml(m.detail)}</span>` : ''}${m.dismiss ? '<button class="dismiss" title="Hide this report until the server restarts">Dismiss</button>' : ''}</div>`).join('')}`
     this.el.classList.toggle('wide', items.some((i) => i.dismiss))
     this.el.querySelector('#state-list-close')!.addEventListener('click', () => this.close())

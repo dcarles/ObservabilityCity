@@ -15,7 +15,7 @@ import { boatRate, clamp, formatRate, speedFactor } from '../visuals'
 import { CarSystem, type Route } from './cars'
 import { BoatSystem, type BoatRoute } from './boats'
 import { archCount, clearArches, deckAt } from './arches'
-import { consumersOf, HarbourStatus, messagingOf, type Messaging } from './harbour'
+import { consumersOf, HarbourStatus, messagingOf, pierLines, type Messaging } from './harbour'
 import { connectorsOf, portSummary, type Connectors, type PortSummary } from './links'
 import { findLane, harbourCircuit, harbourLoop, OUTER_PAD, padLand, type SeaMap } from './sea'
 import { schedulerRate } from './scheduler'
@@ -792,6 +792,12 @@ export class Town {
   /** The hub lanes: for each island the path of its lane from the island dock to the hub dock (the way back is the same path reversed). For tests. */
   inspectLanes(): { id: string; path: { x: number; z: number }[] }[] {
     return this.hubLanePaths.map((l) => ({ id: l.id, path: l.path.map((p) => ({ x: p.x, z: p.z })) }))
+  }
+
+  /** The pier's words for an island (see `pierLines`), or null when it has no pier. */
+  pierSummary(islandId: string): { name: string; lines: string[] } | null {
+    const isl = this.islands.find((i) => i.group.id === islandId)
+    return isl && isl.harbour ? { name: isl.group.displayName, lines: pierLines(isl.messaging) } : null
   }
 
   /** What the signs say, for tests: each island's line under its name, and what the pier board gets for the pillar's messages. */
