@@ -252,7 +252,7 @@ One folder describes a town. The sample is `config/galactic-credit/`:
 
 | File | What it holds |
 | --- | --- |
-| `town.yaml` | Name, what an island is called, topology, `mode` (`demo` or `live`; left out means `live`), `islands` (the order of the islands round the hub: unlisted pillars follow, Lost & found is always last), `ringCapacity`, `databaseEngines` (the engines your databases run on, each one of the fixed database types, see below), `trafficDensity`, `messaging` (`topicTemplate`, `hubTopicTemplate`, `legacyFrom`), `labels` and `expectedWarnings`. Every key is in [docs/config-reference.md](docs/config-reference.md) |
+| `town.yaml` | Name, what an island is called, topology, `mode` (`demo` or `live`; left out means `live`), `islands` (the order of the islands round the hub: unlisted pillars follow, Lost & found is always last), `ringCapacity`, `databaseEngines` (the engines your databases run on, each one of the fixed database types, see below), `trafficDensity`, `messaging` (`topicTemplate`, `hubTopicTemplate`, `legacyFrom`), `labels`, `wall` (the wall tour's timings and light) and `expectedWarnings`. Every key is in [docs/config-reference.md](docs/config-reference.md) |
 | `defaults.yaml` | App-wide defaults per role (SLA, error, resource, throttle and backlog thresholds) |
 | `hub.yaml` | The hub's shared resources (gateway, broker, egress, database), its `messaging` topics (`egress`), and the outside callers (`externalCallers`, each lists the external systems it reaches) |
 | `pillars/<code>.yaml` | One island: its systems, `calls` links, per-role `defaults`, and its `messaging` (topics it publishes, topics its workers consume) |
