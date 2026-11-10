@@ -34,6 +34,8 @@ internal sealed class WallFile
     public double? HoldSeconds { get; set; }
     /// <summary>Seconds the overview of the whole town lasts; 0 for no overview.</summary>
     public double? OverviewSeconds { get; set; }
+    /// <summary>Seconds the overview stays at each pillar island, seen from its front; 0 for the whole town only.</summary>
+    public double? OverviewIslandSeconds { get; set; }
     /// <summary>"dusk" or "day".</summary>
     public string? Light { get; set; }
 }

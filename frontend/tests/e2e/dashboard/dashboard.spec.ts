@@ -622,8 +622,8 @@ test.describe('the dashboard view', () => {
       expect(seen.some((k) => k.startsWith('island:'))).toBe(true)
     })
 
-    test('with trouble, the tour opens with a pillar overview (all pillars closed, top of the page) and comes back to it after the last stop', async ({ town, page }) => {
-      await open(town, page, '&wall=1&hold=2&overview=4')
+    test('with trouble, the tour opens with a pillar overview: the closed list, then each pillar opened in turn, then the trouble', async ({ town, page }) => {
+      await open(town, page, '&wall=1&hold=2&overview=3&overviewIsland=2')
       await step(page, 11)
       const feed = (state: string) => page.evaluate(async (st) => {
         const s = await (await fetch('/api/snapshot/latest')).json()
@@ -642,7 +642,20 @@ test.describe('the dashboard view', () => {
       expect(w.open).toEqual([])
       await expect(page.locator('#dash-pillars table.svc')).toHaveCount(0)
       await expect.poll(() => page.evaluate(() => window.scrollY)).toBeLessThan(5) // the scroll back to the top glides
-      await step(page, 4)
+      // then each pillar in turn, one open at a time, and then the trouble
+      const opened: string[] = []
+      await step(page, 3.05)
+      for (let i = 0; i < 6 && (await wall(page))!.stop!.kind === 'overview'; i++) {
+        const t = (await wall(page))!
+        expect(t.stop!.key).toMatch(/^overview:island:/)
+        const id = t.stop!.key.slice('overview:island:'.length)
+        expect(t.open).toEqual([id])
+        await expect(page.locator('#dash-pillars table.svc')).toHaveCount(1)
+        opened.push(id)
+        await step(page, 2.05)
+      }
+      expect(opened.length).toBeGreaterThanOrEqual(2)
+      expect(new Set(opened).size).toBe(opened.length)
       expect((await wall(page))!.stop).toMatchObject({ key: 'down:aa.orders-api', cut: false })
     })
 

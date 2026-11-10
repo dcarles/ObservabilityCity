@@ -116,7 +116,7 @@ export async function startTown(): Promise<void> {
   function goTo(item: PickItem): void {
     const focus = item.kind === 'island' ? town.islandFocusOf(item.id) : town.focusOf(item.id)
     town.select(item.kind === 'building' ? item.id : null)
-    if (focus) stage.focus(focus.target, focus.distance)
+    if (focus) stage.focus(focus.target, focus.distance, false, focus.azimuth)
     if (item.kind === 'building') { servicePanel.close(); inspector.open(item.id) } else inspector.close()
   }
 
@@ -266,7 +266,7 @@ export async function startTown(): Promise<void> {
     /** The story bar's camera: glides to a system, a vendor or an island without opening anything. */
     void new StoryBar(fx, (id) => {
       const focus = town.focusOf(id) ?? town.islandFocusOf(id)
-      if (focus) stage.focus(focus.target, focus.distance)
+      if (focus) stage.focus(focus.target, focus.distance, false, focus.azimuth)
     })
     breakPanel.refresh()
     fx.start()
@@ -382,11 +382,10 @@ export async function startTown(): Promise<void> {
   const wall = wallParams.on
     ? new WallMode(wallParams.hold, {
         focusOf: (f) => (f.kind === 'building' ? town.focusOf(f.id) : town.islandFocusOf(f.id)),
-        go: (f, cut) => stage.focus(f.target, f.distance, cut),
+        go: (f, cut) => stage.focus(f.target, f.distance, cut, f.azimuth),
         home: (cut) => stage.home(cut),
-        overview: (seconds, cut) => stage.orbit(seconds, cut),
         select: (id) => town.select(id),
-      }, wallParams.overview)
+      }, wallParams.overview, wallParams.overviewIsland)
     : null
 
   // Quality: the preset the page opens with, and what depends on it. A level chosen on purpose is never stepped down from.

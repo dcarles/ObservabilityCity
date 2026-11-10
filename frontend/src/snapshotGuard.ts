@@ -390,11 +390,12 @@ function strings(v: unknown): string[] {
 }
 
 /** The town's wall defaults (town.yaml wall): only what is a usable value; nothing usable is no defaults at all. */
-function checkWall(raw: unknown): { holdSeconds?: number; overviewSeconds?: number; light?: 'dusk' | 'day' } | null {
+function checkWall(raw: unknown): { holdSeconds?: number; overviewSeconds?: number; overviewIslandSeconds?: number; light?: 'dusk' | 'day' } | null {
   if (!isObject(raw)) return null
-  const wall: { holdSeconds?: number; overviewSeconds?: number; light?: 'dusk' | 'day' } = {}
+  const wall: { holdSeconds?: number; overviewSeconds?: number; overviewIslandSeconds?: number; light?: 'dusk' | 'day' } = {}
   if (isFiniteNumber(raw.holdSeconds) && raw.holdSeconds >= 0.5) wall.holdSeconds = raw.holdSeconds
   if (isFiniteNumber(raw.overviewSeconds) && raw.overviewSeconds >= 0) wall.overviewSeconds = raw.overviewSeconds
+  if (isFiniteNumber(raw.overviewIslandSeconds) && raw.overviewIslandSeconds >= 0) wall.overviewIslandSeconds = raw.overviewIslandSeconds
   if (raw.light === 'dusk' || raw.light === 'day') wall.light = raw.light
   return Object.keys(wall).length > 0 ? wall : null
 }

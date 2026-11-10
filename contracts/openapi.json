@@ -2203,6 +2203,11 @@
             "format": "double",
             "nullable": true
           },
+          "overviewIslandSeconds": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
           "light": {
             "type": "string",
             "nullable": true

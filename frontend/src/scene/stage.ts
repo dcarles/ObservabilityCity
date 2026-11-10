@@ -198,7 +198,6 @@ export class Stage {
   }
 
   home(instant = false): void {
-    this.orbitRun = null
     const offset = new THREE.Vector3().setFromSphericalCoords(this.homeDistance, this.homePolar, this.homeAzimuth)
     const pos = this.homeTarget.clone().add(offset)
     if (instant) {
@@ -210,13 +209,13 @@ export class Stage {
     }
   }
 
-  /** Glides to look at a point from the current side, standing `distance` away at a comfortable angle. */
-  focus(target: THREE.Vector3, distance: number, instant = false): void {
-    this.orbitRun = null
+  /** Glides to look at a point, standing `distance` away at a comfortable angle: from the side the camera is on, or from `azimuth` (radians round the point; an island's front) when given. */
+  focus(target: THREE.Vector3, distance: number, instant = false, azimuth?: number): void {
     const offset = this.camera.position.clone().sub(this.controls.target)
     const sph = new THREE.Spherical().setFromVector3(offset)
     sph.radius = THREE.MathUtils.clamp(distance, this.controls.minDistance, this.controls.maxDistance)
     sph.phi = THREE.MathUtils.clamp(sph.phi, THREE.MathUtils.degToRad(40), THREE.MathUtils.degToRad(62))
+    if (azimuth !== undefined) sph.theta = azimuth
     const position = target.clone().add(new THREE.Vector3().setFromSpherical(sph))
     if (!instant) { this.glideTo(target, position); return }
     // a cut: no glide, the camera is there at once
@@ -225,18 +224,6 @@ export class Stage {
     this.controls.target.copy(target)
     this.controls.update()
   }
-
-  /**
-   * The aerial pass: back to the home view, then once round the whole town in the time left. It ends where it began, so the next stop glides from the
-   * home view. Any drag, a glide or a cut ends it.
-   */
-  orbit(seconds: number, instant = false): void {
-    this.home(instant)
-    const lap = Math.max(1, seconds - GLIDE_SECONDS)
-    this.orbitRun = { t: 0, lap }
-  }
-
-  private orbitRun: { t: number; lap: number } | null = null
 
   private glide: { fromPos: THREE.Vector3; toPos: THREE.Vector3; fromT: THREE.Vector3; toT: THREE.Vector3; t: number } | null = null
 
@@ -263,14 +250,6 @@ export class Stage {
       this.camera.position.lerpVectors(g.fromPos, g.toPos, e)
       this.controls.target.lerpVectors(g.fromT, g.toT, e)
       if (g.t >= 1) this.glide = null
-    } else if (this.orbitRun) {
-      const o = this.orbitRun
-      o.t = Math.min(o.lap, o.t + dt)
-      const azimuth = this.homeAzimuth + (o.t / o.lap) * Math.PI * 2
-      const offset = new THREE.Vector3().setFromSphericalCoords(this.homeDistance, this.homePolar, azimuth)
-      this.camera.position.copy(this.homeTarget).add(offset)
-      this.controls.target.copy(this.homeTarget)
-      if (o.t >= o.lap) this.orbitRun = null
     }
     this.controls.update()
   }
@@ -278,7 +257,6 @@ export class Stage {
   /** Any drag cancels a glide. */
   cancelGlide(): void {
     this.glide = null
-    this.orbitRun = null
   }
 
   private clampPan(): void {

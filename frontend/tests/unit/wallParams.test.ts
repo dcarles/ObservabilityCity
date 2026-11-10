@@ -94,38 +94,43 @@ describe('wall mode this browser remembers', () => {
 })
 
 describe('the overview in the address', () => {
-  it('lasts 12 seconds unless told otherwise', () => {
-    expect(DEFAULT_OVERVIEW_SECONDS).toBe(12)
-    expect(parseWall('?wall=1').overview).toBe(12)
+  it('shows the whole town for 3 seconds and stays 3 seconds at each island unless told otherwise', () => {
+    expect(DEFAULT_OVERVIEW_SECONDS).toBe(3)
+    expect(parseWall('?wall=1').overview).toBe(3)
     expect(parseWall('?wall=1&overview=30').overview).toBe(30)
+    expect(parseWall('?wall=1').overviewIsland).toBe(3)
+    expect(parseWall('?wall=1&overviewIsland=5').overviewIsland).toBe(5)
   })
 
   it('is off with 0, and a bad value falls back to the default', () => {
     expect(parseWall('?wall=1&overview=0').overview).toBe(0)
-    expect(parseWall('?wall=1&overview=-3').overview).toBe(12)
-    expect(parseWall('?wall=1&overview=soon').overview).toBe(12)
-    expect(parseWall('?wall=1&overview=').overview).toBe(12)
+    expect(parseWall('?wall=1&overviewIsland=0').overviewIsland).toBe(0)
+    for (const bad of ['-3', 'soon', '']) {
+      expect(parseWall(`?wall=1&overview=${bad}`).overview).toBe(3)
+      expect(parseWall(`?wall=1&overviewIsland=${bad}`).overviewIsland).toBe(3)
+    }
   })
 })
 
 describe('the timings a wall runs with: the address, then the town, then the default', () => {
   it('uses the default when neither says', () => {
-    expect(wallTimings(parseWall('?wall=1'), null)).toEqual({ hold: 20, overview: 12 })
-    expect(wallTimings(parseWall('?wall=1'), {})).toEqual({ hold: 20, overview: 12 })
+    expect(wallTimings(parseWall('?wall=1'), null)).toEqual({ hold: 20, overview: 3, overviewIsland: 3 })
+    expect(wallTimings(parseWall('?wall=1'), {})).toEqual({ hold: 20, overview: 3, overviewIsland: 3 })
   })
 
   it("uses the town's own defaults when the address says nothing", () => {
-    expect(wallTimings(parseWall('?wall=1'), { holdSeconds: 30, overviewSeconds: 20 })).toEqual({ hold: 30, overview: 20 })
-    expect(wallTimings(parseWall('?wall=1'), { overviewSeconds: 0 })).toEqual({ hold: 20, overview: 0 })
+    expect(wallTimings(parseWall('?wall=1'), { holdSeconds: 30, overviewSeconds: 20, overviewIslandSeconds: 4 })).toEqual({ hold: 30, overview: 20, overviewIsland: 4 })
+    expect(wallTimings(parseWall('?wall=1'), { overviewSeconds: 0 })).toEqual({ hold: 20, overview: 0, overviewIsland: 3 })
   })
 
-  it("lets the address win over the town, one key at a time, including 0 for no overview", () => {
-    const town = { holdSeconds: 30, overviewSeconds: 20 }
-    expect(wallTimings(parseWall('?wall=1&hold=5'), town)).toEqual({ hold: 5, overview: 20 })
-    expect(wallTimings(parseWall('?wall=1&overview=0'), town)).toEqual({ hold: 30, overview: 0 })
+  it('lets the address win over the town, one key at a time, including 0', () => {
+    const town = { holdSeconds: 30, overviewSeconds: 20, overviewIslandSeconds: 4 }
+    expect(wallTimings(parseWall('?wall=1&hold=5'), town)).toEqual({ hold: 5, overview: 20, overviewIsland: 4 })
+    expect(wallTimings(parseWall('?wall=1&overview=0'), town)).toEqual({ hold: 30, overview: 0, overviewIsland: 4 })
+    expect(wallTimings(parseWall('?wall=1&overviewIsland=0'), town)).toEqual({ hold: 30, overview: 20, overviewIsland: 0 })
   })
 
   it("falls back to the town's value, not the built-in one, when the address value is not usable", () => {
-    expect(wallTimings(parseWall('?wall=1&hold=soon&overview=-2'), { holdSeconds: 30, overviewSeconds: 20 })).toEqual({ hold: 30, overview: 20 })
+    expect(wallTimings(parseWall('?wall=1&hold=soon&overview=-2&overviewIsland=x'), { holdSeconds: 30, overviewSeconds: 20, overviewIslandSeconds: 4 })).toEqual({ hold: 30, overview: 20, overviewIsland: 4 })
   })
 })

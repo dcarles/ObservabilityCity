@@ -140,6 +140,22 @@ test.describe('the island filter', () => {
   })
 })
 
+test.describe('finding an island from the top bar', () => {
+  test('shows it from its front, the side with its sign and pier, whichever side the camera was on', async ({ town, page }) => {
+    await town.open()
+    await page.evaluate(() => { const c = (window as any).city; c.stage.focus(c.town.islandFocusOf('cc').target, 90, true, 2.5) })
+    await page.locator('#search-input').fill('Gamma')
+    await page.locator('#search-results .hit').first().click()
+    await town.step(2)
+    const [side, front] = await page.evaluate(() => {
+      const c = (window as any).city
+      const s = c.stage
+      return [Math.atan2(s.camera.position.x - s.controls.target.x, s.camera.position.z - s.controls.target.z), c.town.islandFocusOf('cc').azimuth as number]
+    })
+    expect(Math.abs(Math.atan2(Math.sin(side - front), Math.cos(side - front)))).toBeLessThan(0.05)
+  })
+})
+
 test.describe('the layers', () => {
   test('all are on but Dependencies, and the button says nothing is off', async ({ town, page }) => {
     await town.open()

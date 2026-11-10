@@ -83,7 +83,7 @@ public sealed record TownInfo(string Id, string Name, string GroupLabel, string 
 }
 
 /// <summary>The town's defaults for wall mode (town.yaml wall). A value that is null was not set: the app's own default applies.</summary>
-public sealed record WallSettings(double? HoldSeconds, double? OverviewSeconds, string? Light)
+public sealed record WallSettings(double? HoldSeconds, double? OverviewSeconds, double? OverviewIslandSeconds, string? Light)
 {
     public const double MinHoldSeconds = 0.5;
     public static readonly string[] Lights = ["dusk", "day"];

@@ -23,12 +23,12 @@ public class WallConfigTests
     public void A_town_that_sets_them_gets_them_in_the_registry_and_the_snapshot()
     {
         using var f = new RegistryCopy(TestPaths.MiniTown);
-        f.Replace("town.yaml", "mode: demo", "mode: demo\nwall:\n  holdSeconds: 30\n  overviewSeconds: 20\n  light: day");
+        f.Replace("town.yaml", "mode: demo", "mode: demo\nwall:\n  holdSeconds: 30\n  overviewSeconds: 20\n  overviewIslandSeconds: 4\n  light: day");
 
         var registry = RegistryLoader.Load(f.Path);
 
-        Assert.Equal(new WallSettings(30, 20, "day"), registry.Town.Wall);
-        Assert.Equal(new WallSettingsSnapshot(30, 20, "day"), Snap(registry).Wall);
+        Assert.Equal(new WallSettings(30, 20, 4, "day"), registry.Town.Wall);
+        Assert.Equal(new WallSettingsSnapshot(30, 20, 4, "day"), Snap(registry).Wall);
     }
 
     [Fact]
@@ -39,12 +39,13 @@ public class WallConfigTests
 
         var wall = RegistryLoader.Load(f.Path).Town.Wall;
 
-        Assert.Equal(new WallSettings(null, 0, null), wall);
+        Assert.Equal(new WallSettings(null, 0, null, null), wall);
     }
 
     [Theory]
     [InlineData("holdSeconds: 0.5")]
     [InlineData("overviewSeconds: 0")]
+    [InlineData("overviewIslandSeconds: 0")]
     [InlineData("light: dusk")]
     public void The_ends_of_the_range_are_allowed(string line)
     {
@@ -58,6 +59,7 @@ public class WallConfigTests
     [InlineData("holdSeconds: 0.1", "wall.holdSeconds")]
     [InlineData("holdSeconds: -5", "wall.holdSeconds")]
     [InlineData("overviewSeconds: -1", "wall.overviewSeconds")]
+    [InlineData("overviewIslandSeconds: -1", "wall.overviewIslandSeconds")]
     [InlineData("light: night", "wall.light")]
     public void A_value_out_of_range_stops_the_load_and_names_the_key(string line, string key)
     {
