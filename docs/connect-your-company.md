@@ -4,7 +4,7 @@ How to take a copy of Observability City from the fake town to your own Azure, o
 
 Every key of every config file, with its default and whether it is required, is in the [config reference](config-reference.md).
 
-What works today: the sample towns run on fake data, and a live town reads Azure. The Azure module reads the kinds `resourcegraph` (the inventory and instance counts), `loganalytics` (request rate, errors, latency), `azuremonitor` (CPU, memory, capacity used, throttling), `servicebus` (backlog and dead letters), `functionjobs` (scheduled jobs) and `resourcehealth` (the cloud's own health reports, shown as incidents). `prometheus` and `grafana-irm` are only reserved kind names: nothing reads them yet, so a source of either kind shows no data. Grafana IRM incidents come in a later phase (see the [plan](observability-city-plan.md)). Each source is added by the same steps, and a source you have not enabled yet stays out of the town.
+What works today: the sample towns run on fake data, and a live town reads Azure. The Azure module reads the kinds `resourcegraph` (the inventory and instance counts), `loganalytics` (request rate, errors, latency), `azuremonitor` (CPU, memory, capacity used, throttling), `servicebus` (backlog and dead letters), `functionjobs` (scheduled jobs) and `resourcehealth` (the cloud's own health reports, shown as incidents). `prometheus` and `grafana-irm` are only reserved kind names: nothing reads them yet, so a source of either kind shows no data. Incidents come in a later phase (see the [plan](observability-city-plan.md)). Each source is added by the same steps, and a source you have not enabled yet stays out of the town.
 
 ## Keep your company config out of any public repository
 

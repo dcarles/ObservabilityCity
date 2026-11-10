@@ -15,7 +15,7 @@ Observability City shows system health as a living 3D town in the browser. This 
 ## Architecture in one minute
 
 ```
-source (fake in a demo town; Resource Graph, Log Analytics, Azure Monitor, Service Bus, Function jobs, Resource Health live; Prometheus / Grafana IRM later)
+source (fake in a demo town; Resource Graph, Log Analytics, Azure Monitor, Service Bus, Function jobs, Resource Health live; incidents and other sources later)
    -> LatestState -> SnapshotBuilder (rules) -> SnapshotPublisher -> SignalR /hubs/town and /api/snapshot/latest
    -> browser (three.js) draws the town from the snapshot
 ```

@@ -95,7 +95,7 @@ config/<town>/*.yaml -> registry loader -> sources poll -> latest state -> snaps
 | `functionjobs` | Whether each scheduled job of a function app ran, failed or is overdue |
 | `resourcehealth` | The cloud's own health reports for resources, from the activity log |
 
-Logins are the Azure CLI by default, or a named `credentials:` entry (`default`, `managed-identity` or `service-principal`, whose secret is read from an environment variable). The core also knows `fake`, and accepts `prometheus` and `grafana-irm`, which have no adapter yet: such a source is reported at start-up and its signals have no data. Several sources can serve one building, each signal from the source `signals:` names. A company writes its own adapter in `extensions/`, starting from `templates/adapter` and testing it with the adapter kit (see [write-an-adapter.md](write-an-adapter.md)).
+Logins are the Azure CLI by default, or a named `credentials:` entry (`default`, `managed-identity` or `service-principal`, whose secret is read from an environment variable). The core also knows `fake`, and reserves a few kind names for adapters still to come: such a source is reported at start-up and its signals have no data. Several sources can serve one building, each signal from the source `signals:` names. A company writes its own adapter in `extensions/`, starting from `templates/adapter` and testing it with the adapter kit (see [write-an-adapter.md](write-an-adapter.md)).
 
 **Running.**
 
@@ -198,13 +198,12 @@ Real sources are added one adapter at a time behind the same town, so the town i
 
 **Next**
 
-5. **Incidents and third parties.** A `grafana-irm` adapter so real incidents drive the weather over the right island (today only the fake source makes weather, and Resource Health reports go to the Incidents list), and third-party health from our own outbound calls in live towns.
+5. **Incidents and third parties.** An incidents adapter so real incidents drive the weather over the right island (today only the fake source makes weather, and Resource Health reports go to the Incidents list), and third-party health from our own outbound calls in live towns.
 6. **Hosting.** Sign-in, a hosted deployment, and what that needs from polling and security (`Polling:AlwaysOn`, `Security:AllowedOrigins` are already there).
 
 **Later, or ideas**
 
-- A Prometheus adapter (the kind is accepted but has no adapter).
-- A Kafka adapter, and runtime adapters for other platforms.
+- Adapters for other metric stores, message brokers and platforms.
 - History and replay of the town.
 - Hysteresis, so a state that hovers at a threshold does not flicker.
 - Deployment crews from CI/CD events.
@@ -219,7 +218,7 @@ The biggest risk is the mapping, not the 3D. The same system has different names
 
 Open questions:
 
-- [ ] Grafana IRM: which API gives open incidents, and how do they map to islands and systems (labels, service tags)?
+- [ ] Incidents: how do open incidents map to islands and systems (labels, service tags)?
 - [ ] Third parties: which vendors matter most, and are their status pages worth a second signal?
 - [ ] Hosting: where it should live, how people sign in, and whether it then needs per-team views beyond the island filter.
 - [ ] History and replay: how often to keep a snapshot, where to store it and for how long.
