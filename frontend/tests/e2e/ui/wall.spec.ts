@@ -37,6 +37,20 @@ const lookingAway = (page: Page, kind: 'building' | 'island', id: string) =>
     return Math.hypot(t.x - f.target.x, t.z - f.target.z)
   }, [kind, id] as const)
 
+/** The island's middle on the screen: pixels from the left and the top, and where the status strip starts. */
+const screenOf = (page: Page, id: string) => page.evaluate((i) => {
+  const c = (window as any).city
+  const v = c.town.islandFocusOf(i).target.clone().project(c.stage.camera)
+  return { x: ((v.x + 1) / 2) * window.innerWidth, island: ((1 - v.y) / 2) * window.innerHeight, strip: document.getElementById('wall-strip')!.getBoundingClientRect().top, width: window.innerWidth }
+}, id)
+
+/** The camera is on the island: its middle is in the middle of the screen across and above the status strip, with room to spare. */
+async function expectOnIsland(page: Page, id: string): Promise<void> {
+  const w = await screenOf(page, id)
+  expect(Math.abs(w.x - w.width / 2)).toBeLessThan(w.width * 0.05)
+  expect(w.island).toBeLessThan(w.strip - 60)
+}
+
 /** The stops the tour makes as the clock runs, one hold at a time. */
 async function tour(page: Page, stops: number, hold = 2): Promise<string[]> {
   const seen: string[] = []
@@ -117,11 +131,11 @@ test.describe('the showcase loop, while all is well', () => {
     await town.open(WALL)
     await tour(page, 2) // hub, then island aa
     await town.step(1.5) // the glide takes a second or so
-    expect(await lookingAway(page, 'island', 'aa')).toBeLessThan(1)
+    await expectOnIsland(page, 'aa')
 
     await tour(page, 1, 0.45)
     await town.step(1.5)
-    expect(await lookingAway(page, 'island', 'bb')).toBeLessThan(1)
+    await expectOnIsland(page, 'bb')
   })
 
   test('holds at a stop for the time asked for, and not a moment less', async ({ town, page }) => {
@@ -236,7 +250,8 @@ test.describe('trouble', () => {
 
     const s = await wall(page)
     expect(s.stop!.caption).toMatch(/^Sev \d incident on Gamma: /)
-    expect(await lookingAway(page, 'island', 'cc')).toBeLessThan(0.5)
+    await town.step(1.5) // the glide takes a second or so
+    await expectOnIsland(page, 'cc')
   })
 
   test('does not leave the first sign of trouble: the strip stays red while it lasts', async ({ town, page }) => {
@@ -470,7 +485,7 @@ test.describe('the overview of the whole town', () => {
       seen.push(stop.key)
       expect(stop.key).toBe(`overview:island:${id}`)
       await town.step(1.4) // the glide
-      expect(await lookingAway(page, 'island', id)).toBeLessThan(0.5)
+      await expectOnIsland(page, id)
       expect(sameSide(await side(page), await frontOf(page, id))).toBeLessThan(0.05)
       await town.step(0.5)
     }
@@ -485,7 +500,7 @@ test.describe('the overview of the whole town', () => {
     await town.effect('bb', 'Incident', 0.9)
     await page.waitForFunction(() => (window as any).city.wall().stop?.kind === 'incident')
     await town.step(1.5)
-    expect(await lookingAway(page, 'island', 'bb')).toBeLessThan(0.5)
+    await expectOnIsland(page, 'bb')
     expect(sameSide(await side(page), await frontOf(page, 'bb'))).toBeLessThan(0.05)
   })
 

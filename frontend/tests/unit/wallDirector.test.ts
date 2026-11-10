@@ -331,13 +331,13 @@ describe('the overview of the whole town', () => {
       expect(d.tick(5)).toMatchObject({ kind: 'overview' })
     })
 
-    it('says the island and its systems in the caption', () => {
+    it('says the island and its services in the caption', () => {
       const d = new WallDirector(HOLD, 4, 3, 2)
       d.update(troubled(), 0)
 
       const st = d.tick(3)!
 
-      expect(st.caption).toMatch(/^Overview: .+, \d+ systems?$/)
+      expect(st.caption).toMatch(/^Overview: .+, \d+ services?( plus scheduler)?$/)
     })
 
     it('has no island stops when overviewIsland is 0: the whole town only', () => {

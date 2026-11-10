@@ -2,6 +2,7 @@
 
 import type { Snapshot } from '../types'
 import type { Attention, Focus } from './attention'
+import { servicesText } from './servicesText'
 
 export interface OverviewStop {
   /** `overview` for the whole town, `overview:island:<id>` for an island. */
@@ -30,7 +31,7 @@ export function overviewCaption(s: Snapshot, attention: readonly Attention[]): s
 }
 
 /**
- * The whole town, then every island the snapshot shows (a team's view has only its own) with `islandSeconds` above 0, each as "Overview: Name, N systems".
+ * The whole town, then every island the snapshot shows (a team's view has only its own) with `islandSeconds` above 0, each as "Overview: Name, 4 services plus scheduler".
  * Islands are the groups in snapshot order, which is the order they stand round the hub.
  */
 export function overviewStops(s: Snapshot, attention: readonly Attention[], islandSeconds: number): OverviewStop[] {
@@ -38,7 +39,7 @@ export function overviewStops(s: Snapshot, attention: readonly Attention[], isla
   if (islandSeconds <= 0) return stops
   for (const g of s.groups) {
     if (g.isHub || g.nodes.length === 0) continue
-    stops.push({ key: `overview:island:${g.id}`, focus: { kind: 'island', id: g.id }, caption: `Overview: ${g.displayName}, ${plural(g.nodes.length, 'system')}` })
+    stops.push({ key: `overview:island:${g.id}`, focus: { kind: 'island', id: g.id }, caption: `Overview: ${g.displayName}, ${servicesText(g.nodes)}` })
   }
   return stops
 }
