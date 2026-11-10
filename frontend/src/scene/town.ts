@@ -88,6 +88,8 @@ interface Island {
   flow: PillarFlowSnapshot | null
   /** The island's sign by the gate: its name and, under it, the pillar's traffic. */
   nameSign: THREE.Group
+  /** What the sign says when hovered: the pillar's traffic in words (empty when nothing is reported). */
+  trafficWords: string[]
   weather: Weather
   /** Island-local z of the back gate, where the road to a third party's bridge leaves. Null for an island with no third party to reach. */
   backGateZ: number | null
@@ -609,6 +611,7 @@ export class Town {
         isl.messaging = { ...messagingOf([...g.nodes], g.messaging), pillar: f ? { sent: f.sent, internal: f.internal, received: f.received, windowSeconds: f.windowSeconds } : null }
         isl.flow = g.flow ?? null
         const tr = traffic.get(g.id)
+        isl.trafficWords = tr && tr.in + tr.out + tr.internal > 0 ? [`Requests in ${formatRate(tr.in)} rps`, `Requests out ${formatRate(tr.out)} rps`, `Requests inside ${formatRate(tr.internal)} rps`] : []
         isl.nameSign.userData.setLine(tr && tr.in + tr.out + tr.internal > 0 ? `in ${formatRate(tr.in)} · out ${formatRate(tr.out)} rps` : '')
       })
     }
@@ -792,6 +795,17 @@ export class Town {
   /** The hub lanes: for each island the path of its lane from the island dock to the hub dock (the way back is the same path reversed). For tests. */
   inspectLanes(): { id: string; path: { x: number; z: number }[] }[] {
     return this.hubLanePaths.map((l) => ({ id: l.id, path: l.path.map((p) => ({ x: p.x, z: p.z })) }))
+  }
+
+  /** The parts of every island's sign, for picking with the pointer. Each carries `userData.signIsland`. */
+  signHits(): THREE.Object3D[] {
+    return this.islands.flatMap((i) => i.nameSign.children)
+  }
+
+  /** What hovering an island's sign says: the pillar's name and its traffic; null when the island is unknown. */
+  signSummary(islandId: string): { name: string; lines: string[] } | null {
+    const isl = this.islands.find((i) => i.group.id === islandId)
+    return isl ? { name: isl.group.displayName, lines: isl.trafficWords } : null
   }
 
   /** The pier's words for an island (see `pierLines`), or null when it has no pier. */
@@ -1104,6 +1118,7 @@ export class Town {
     const signX = g.isLostFound ? -8.5 : 8.5
     const nameSign = this.islandSign(g, signX, signZ)
     decor.add(nameSign)
+    for (const part of nameSign.children) part.userData.signIsland = g.id
     avoid.push({ x: signX, z: signZ, w: 12, d: 5 })
     // a town whose islands call each other directly: a signpost opposite the island's own sign, for the traffic to and from hidden islands
     let post: Signpost | null = null
@@ -1150,7 +1165,7 @@ export class Town {
     root.updateMatrixWorld(true)
     const weather = new Weather(g.id, plan.rx, plan.rz)
     root.add(weather.object)
-    return { group: g, root, outline, buildings, harbour: status, links, consumers: consumersOf(g.messaging), messaging: messagingOf([], g.messaging), flow: g.flow ?? null, nameSign, weather, backGateZ: backZ, services, signpost: post, assets, nodeIds: new Set(g.nodes.map((n) => n.id)) }
+    return { group: g, root, outline, buildings, harbour: status, links, consumers: consumersOf(g.messaging), messaging: messagingOf([], g.messaging), flow: g.flow ?? null, nameSign, trafficWords: [], weather, backGateZ: backZ, services, signpost: post, assets, nodeIds: new Set(g.nodes.map((n) => n.id)) }
   }
 
   /** A quay with a pier house, a pier and crates: where the boats from the hub's Service Bus port land. */
