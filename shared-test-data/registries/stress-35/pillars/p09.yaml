@@ -11,5 +11,5 @@ systems:
 messaging:
   topics: [p09-s1]
   subscriptions:
-    - { topic: p08-p08-s1-outbox, consumer: p09.s1-worker }
-    - { topic: p08-p08-s1-outbox, consumer: p09.s2-worker }
+    - { topic: p08-p08-s1-events, consumer: p09.s1-worker }
+    - { topic: p08-p08-s1-events, consumer: p09.s2-worker }

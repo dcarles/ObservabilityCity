@@ -71,7 +71,7 @@
       ]
     },
     {
-      "entity": "egress-topic",
+      "entity": "shared-topic",
       "metric": "ActiveMessages",
       "aggregation": "maximum",
       "points": [

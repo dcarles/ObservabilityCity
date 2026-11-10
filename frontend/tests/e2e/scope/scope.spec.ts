@@ -8,7 +8,7 @@ import { API } from '../support/city'
 const B = process.env.E2E_SUITE === 'scopeb'
 const town = B
   ? { subscription: 'Alpha Production', via: 'found by its tag', workspace: 'law-live-prod', workspaceVia: 'id', workspaceNote: 'its id is given, so nothing is looked up', apiRole: 'OrdersAPI', apiNote: 'derived from the environment template', apiResources: ['orders-api'], dbResources: 3, countedText: /3 instances/, apiLink: ['Console', /^https:\/\/console\.example\.test\/subscriptions\/[0-9a-f-]+\/apps\/orders-api$/], dbLink: ['Customer page', /^https:\/\/admin\.example\.test\/customers\/.+\?name=.+&env=prod$/] }
-  : { subscription: 'acme-eu-prd-al', via: 'found by its name', workspace: 'ws-prd-main', workspaceVia: 'name', workspaceNote: 'found by its name', apiRole: 'OrdersApi', apiNote: 'set on this system', apiResources: ['api-acme-al-ord-northeurope1x', 'plan-acme-al-ord-northeurope1x', 'plan-acme-al-ord-westeurope9z'], dbResources: 3, countedText: /1 instance.*2 instances|2 instances.*1 instance/, apiLink: ['Cloud portal', /^https:\/\/portal\.example\.test\/#@example\.test\/resource\/subscriptions\/.+\/sites\/api-acme-al-ord-northeurope1x$/], dbLink: ['Cloud portal', /^https:\/\/portal\.example\.test\/#@example\.test\/resource\/subscriptions\/.+\/databaseaccounts\/[0-9a-f]{32}-al-ord$/] }
+  : { subscription: 'al-prd-eu', via: 'found by its name', workspace: 'ws-prd-main', workspaceVia: 'name', workspaceNote: 'found by its name', apiRole: 'OrdersApi', apiNote: 'set on this system', apiResources: ['api-acme-al-ord-northeurope1x', 'plan-acme-al-ord-northeurope1x', 'plan-acme-al-ord-westeurope9z'], dbResources: 3, countedText: /1 instance.*2 instances|2 instances.*1 instance/, apiLink: ['Cloud portal', /^https:\/\/portal\.example\.test\/#@example\.test\/resource\/subscriptions\/.+\/sites\/api-acme-al-ord-northeurope1x$/], dbLink: ['Cloud portal', /^https:\/\/portal\.example\.test\/#@example\.test\/resource\/subscriptions\/.+\/databaseaccounts\/[0-9a-f]{32}-al-ord$/] }
 
 async function openConfig(page: Page, name: string): Promise<void> {
   await page.goto('/?test=1&quality=low')
@@ -35,10 +35,10 @@ test.describe(`a live town with scope rules (${B ? 'tags and derived names' : 'n
     await openConfig(page, 'Orders API')
     await expect(page.locator('#inspector .scope-title')).toHaveText('Where it lives')
     await expect(page.locator('#inspector .scope-status')).toHaveCount(0) // the inventory has been read
-    const sub = page.locator('#inspector .cfg-row[data-key="subscription"]')
+    const sub = page.locator('#inspector .cfg-row[data-key="account"]')
     await expect(sub).toContainText(town.subscription)
     await expect(sub.locator('.o')).toHaveText(town.via)
-    const workspace = page.locator('#inspector .cfg-row[data-key="workspace"]')
+    const workspace = page.locator('#inspector .cfg-row[data-key="telemetry store"]')
     await expect(workspace).toContainText(town.workspace)
     await expect(workspace.locator('.o')).toHaveText(town.workspaceNote) // by name in one town, by an id given outright in the other
     const role = page.locator('#inspector .cfg-row[data-key="telemetry role"]')
@@ -135,7 +135,7 @@ test.describe(`a live town with scope rules (${B ? 'tags and derived names' : 'n
 
   test('a system of the other pillar is placed in its own subscription', async ({ page }) => {
     await openConfig(page, 'Ledger API')
-    await expect(page.locator('#inspector .cfg-row[data-key="subscription"]')).toContainText(B ? 'Beta Production' : 'acme-eu-prd-be')
+    await expect(page.locator('#inspector .cfg-row[data-key="account"]')).toContainText(B ? 'Beta Production' : 'be-prd-eu')
   })
 
   // Phase 2, slice 3: the floors come from the counted instances, and the two conventions count the same town (plan workers; container replicas).

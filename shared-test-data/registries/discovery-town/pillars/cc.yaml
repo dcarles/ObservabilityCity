@@ -8,5 +8,5 @@ systems:
 messaging:
   topics: [notify]
   subscriptions:
-    - { topic: aa-orders-outbox, consumer: cc.notify-worker }
-    - { topic: bb-ledger-outbox, consumer: cc.notify-worker }
+    - { topic: aa-orders-events, consumer: cc.notify-worker }
+    - { topic: bb-ledger-events, consumer: cc.notify-worker }

@@ -39,7 +39,8 @@ public sealed record TenantName(string Id, string Name);
 /// it (found subscriptions, resources, tenant names) are then missing, which is not a problem. <see cref="Problems"/> are things the rules could not
 /// settle: a pillar no subscription matches, two systems with the same telemetry role. <see cref="Workspace"/> is the workspace as the environment names
 /// it; <see cref="WorkspaceId"/> is the id a query goes to (null while it is not known) and <see cref="WorkspaceVia"/> says how it was settled: "id" (given
-/// as an id) or "name" (found in the inventory by its name).
+/// as an id) or "name" (found in the inventory by its name). <see cref="WorkspaceProblems"/> are the problems about that workspace, which every system
+/// shares; they are also in <see cref="Problems"/>, and are kept apart so a reader picks them by what they are about, not by their words.
 /// </summary>
 public sealed record Resolution(
     IReadOnlyList<PillarScope> Pillars,
@@ -50,9 +51,11 @@ public sealed record Resolution(
     string? Workspace,
     string? WorkspaceId = null,
     string? WorkspaceVia = null,
-    IReadOnlyList<ResolvedAsset>? Assets = null)
+    IReadOnlyList<ResolvedAsset>? Assets = null,
+    IReadOnlyList<string>? WorkspaceProblems = null)
 {
     public IReadOnlyList<ResolvedAsset> AssetList => Assets ?? [];
+    public IReadOnlyList<string> WorkspaceProblemList => WorkspaceProblems ?? [];
     public static Resolution Empty { get; } = new([], [], [], [], false, null);
     public SystemScope? System(string id) => Systems.FirstOrDefault(s => s.SystemId == id);
     public PillarScope? Pillar(string id) => Pillars.FirstOrDefault(p => p.PillarId == id);

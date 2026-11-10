@@ -5,6 +5,6 @@ topology: direct
 mode: demo
 islands: [aa, bb, cc]
 messaging:
-  topicTemplate: "{pillar}-{service}-outbox"
+  topicTemplate: "{pillar}-{service}-events"
   hubTopicTemplate: "hub-{service}"
   legacyFrom: [hub]

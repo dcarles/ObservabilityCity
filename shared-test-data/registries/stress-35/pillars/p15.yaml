@@ -8,4 +8,4 @@ systems:
 messaging:
   topics: [p15-s1]
   subscriptions:
-    - { topic: p14-p14-s1-outbox, consumer: p15.s1-worker }
+    - { topic: p14-p14-s1-events, consumer: p15.s1-worker }

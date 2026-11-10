@@ -116,7 +116,7 @@ public class MessageTypesTests
     {
         using var copy = new RegistryCopy(Town("messaging-town-b"));
         var file = copy.FilePath(Path.Combine("environments", "prod.yaml"));
-        File.WriteAllText(file, File.ReadAllText(file).Replace("Name == \"servicebus.span.metrics.calls\"", "Name == \"{nonsense}\""));
+        File.WriteAllText(file, File.ReadAllText(file).Replace("Name == \"messaging.process.duration\"", "Name == \"{nonsense}\""));
 
         var ex = Assert.Throws<RegistryException>(() => RegistryLoader.Load(copy.Path));
 

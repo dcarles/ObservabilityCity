@@ -37,7 +37,7 @@ export interface BuildingStatus {
   /** How the requests divide between the regions ("North 95% · West 5%"), with a warning sign in front when one region takes too much; empty when nothing measures it. */
   split: string
   /** The state The cloud's health report gives for this building's resource while its red exclamation mark is up; null when nothing is reported. */
-  azure: string | null
+  cloudHealth: string | null
 }
 
 interface FloorState {
@@ -95,7 +95,7 @@ export class Building {
   private readonly beaconAnchor = new THREE.Group()
   private level: BeaconLevel = 'green'
   private readonly alert: THREE.Sprite
-  private azure: HealthEventSnapshot | null = null
+  private cloudHealth: HealthEventSnapshot | null = null
   private pulsePhase = Math.random() * 6
   private readonly plaque: THREE.Mesh
   private plaqueCanvas: { ctx: CanvasRenderingContext2D; tex: THREE.CanvasTexture } | null = null
@@ -199,7 +199,7 @@ export class Building {
 
   /** The cloud's open health report for this building's resource, or null: shows or hides the red exclamation mark above the beacon. */
   setHealthEvent(e: HealthEventSnapshot | null): void {
-    this.azure = e
+    this.cloudHealth = e
     this.alert.visible = e !== null
   }
 
@@ -306,7 +306,7 @@ export class Building {
       underConstruction: n.app === 'Stopped',
       region: this.regionText,
       split: this.split ? (this.split.hot ? '⚠ ' : '') + this.split.text : '',
-      azure: this.azure?.state ?? null,
+      cloudHealth: this.cloudHealth?.state ?? null,
     }
   }
 
@@ -350,7 +350,7 @@ export class Building {
 
   /** The exclamation mark floats above the beacon, bobbing a little, and keeps a minimum size on screen so it reads from afar. */
   private updateAlert(time: number, camera: THREE.Camera): void {
-    if (!this.azure) return
+    if (!this.cloudHealth) return
     const world = this.beaconAnchor.getWorldPosition(new THREE.Vector3())
     const base = Math.max(2.2, camera.position.distanceTo(world) * 0.032)
     this.alert.scale.setScalar(base * 0.6)

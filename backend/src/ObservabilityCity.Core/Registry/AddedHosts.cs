@@ -14,8 +14,11 @@ public sealed record AddedHost(string Id, string Name, string Host, string Kind,
 /// <summary>What the panel asks to add: a host, and what to make of it.</summary>
 public sealed record AddHost(string Host, string Kind, IReadOnlyList<string> CalledBy);
 
-/// <summary>A links rule added from the panel: calls to this host whose path starts like this go to this system, through the gateway.</summary>
-public sealed record AddRule(string Host, string Path, string Target);
+/// <summary>
+/// A links rule added from the panel: calls to this host whose path starts with the first <paramref name="Depth"/> parts of this path go to this system,
+/// through the gateway when <paramref name="Gateway"/> is set. The defaults are the panel's: two parts, through the gateway.
+/// </summary>
+public sealed record AddRule(string Host, string Path, string Target, int Depth = AddedHosts.DefaultDepth, bool Gateway = true);
 
 /// <summary>
 /// The hosts added from the Unknown hosts panel, kept in the town's <c>_discovered/third-parties.yaml</c>. The file has the same shape as
@@ -32,6 +35,10 @@ public static class AddedHosts
     public const string IgnoreKind = "ignore";
     public const string RuleKind = "rule";
     public static readonly string[] Kinds = [VendorKind, InternalKind, IgnoreKind];
+    /// <summary>How many parts of a path a rule from the panel keeps, unless it asks for another number: <c>/pillar/service</c> on many gateways.</summary>
+    public const int DefaultDepth = 2;
+    public const int MinDepth = 1;
+    public const int MaxDepth = 3;
 
     private static readonly object Gate = new();
     private static readonly ISerializer Writer = new SerializerBuilder().WithNamingConvention(CamelCaseNamingConvention.Instance)
@@ -51,12 +58,13 @@ public static class AddedHosts
     public static string IgnorePattern(string host) => "^" + Regex.Escape(host) + "$";
 
     /// <summary>
-    /// A path pattern for the paths a rule should explain: the first two parts of the path, so every call under that service is explained and not one
-    /// path at a time. Written into the file, where it can be made wider or narrower by hand.
+    /// A path pattern for the paths a rule should explain: the first <paramref name="depth"/> parts of the path (two unless asked), so every call under
+    /// that service is explained and not one path at a time. Written into the file, where it can be made wider or narrower by hand.
     /// </summary>
-    public static string PathPattern(string path)
+    public static string PathPattern(string path, int depth = DefaultDepth)
     {
-        var parts = path.Split('/', StringSplitOptions.RemoveEmptyEntries).Take(2).ToList();
+        if (depth is < MinDepth or > MaxDepth) throw new ArgumentOutOfRangeException(nameof(depth), depth, $"a rule keeps {MinDepth} to {MaxDepth} parts of the path");
+        var parts = path.Split('/', StringSplitOptions.RemoveEmptyEntries).Take(depth).ToList();
         return parts.Count == 0 ? "^/" : "^/" + string.Join("/", parts.Select(Regex.Escape)) + "(/|$)";
     }
 
@@ -116,13 +124,13 @@ public static class AddedHosts
         }
     }
 
-    /// <summary>Adds a rule for a path on a gateway host, unless an identical one is there.</summary>
+    /// <summary>Adds a rule for a path on a host whose paths name the destination, unless an identical one is there.</summary>
     public static void AddRule(string folder, AddRule rule)
     {
         lock (Gate)
         {
             var file = Load(folder);
-            var entry = new LinkRuleFile { Host = IgnorePattern(rule.Host), Path = PathPattern(rule.Path), Target = rule.Target, Gateway = true };
+            var entry = new LinkRuleFile { Host = IgnorePattern(rule.Host), Path = PathPattern(rule.Path, rule.Depth), Target = rule.Target, Gateway = rule.Gateway };
             if (!file.Rules.Any(r => RuleId(r) == RuleId(entry))) file.Rules.Add(entry);
             Save(folder, file);
         }

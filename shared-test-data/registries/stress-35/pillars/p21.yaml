@@ -11,5 +11,5 @@ systems:
 messaging:
   topics: [p21-s1]
   subscriptions:
-    - { topic: p20-p20-s1-outbox, consumer: p21.s1-worker }
-    - { topic: p20-p20-s1-outbox, consumer: p21.s2-worker }
+    - { topic: p20-p20-s1-events, consumer: p21.s1-worker }
+    - { topic: p20-p20-s1-events, consumer: p21.s2-worker }

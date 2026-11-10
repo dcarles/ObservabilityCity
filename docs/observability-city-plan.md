@@ -6,6 +6,8 @@ This is the overview of what the app is, how it works and what comes next. The f
 
 Observability City is a browser app that shows system health as a living, animated 3D town. Each group of systems (a pillar, a team, a domain: the town chooses the word) is an island, each system is a building, and what is going on shows in the town itself: floors for instances, lit windows for load, rooftop beacons for errors, cars for requests and boats for messages. The same data is also available as a plain dashboard.
 
+The core is cloud-neutral. It ships an Azure adapter today; other clouds and tools plug in through adapters (see [write-an-adapter.md](write-an-adapter.md)).
+
 It is for the people who run the systems: a team looking at its own islands, someone on call during an incident, and a wall screen in the office that nobody touches.
 
 | Topic | How it is today |
@@ -25,12 +27,12 @@ Each signal has exactly one visual meaning, and it reads the same in every theme
 
 | Signal | What you see |
 | --- | --- |
-| Pillar | An island on a ring round the central hub, in the order of `islands` in `town.yaml`. Up to `ringCapacity` islands (default 12) on the first ring, the rest on a staggered second ring |
-| Hub | The island in the middle with the shared resources: the API gateway, the message broker's port, central egress and shared databases |
-| System | A building shaped by its role: an office for an API, a factory for a worker, a storage unit for a database (a storage yard for one database per tenant), a water tower for a cache, a clock tower for a function, a gate house for the gateway, a port for the broker and a tower with a dish for egress |
+| Group | An island on a ring round the central hub (a pillar, team or domain: every part of the interface uses the town's `groupLabel`), in the order of `islands` in `town.yaml`. Up to `ringCapacity` islands (default 12) on the first ring, the rest on a staggered second ring |
+| Hub | The island in the middle. In a hub-and-spoke town it holds the shared resources, for example an API gateway and the message broker's port, and an egress point or shared databases if you have them. Today it holds at most one of each kind |
+| System | A building shaped by its role: an office for an API, a factory for a worker, a storage unit for a database (a storage yard for one database per tenant), a water tower for a cache, a clock tower for a function, a gate house for the gateway, a port for the broker and a tower with a dish for egress (an outbound proxy, if you have one) |
 | Service | Systems that share a `service` stand together on one pad, with a low sign naming it and showing its worst state |
 | Database engine | A database's sign names its engine (from `databaseEngines` in `town.yaml`), with its type underneath |
-| Basic resources | Key vaults, storage, settings stores and other resources with no health of their own stand as simple buildings behind their service or in the island's back yard |
+| Basic resources | Secrets stores, storage, config stores and other resources with no health of their own stand as simple buildings behind their service or in the island's back yard |
 | Instances | Floors on a doubling scale (1, 2, 3-4, 5-8 ... 65+ gives 1 to 8 floors), with the count on the name board |
 | Instance health | Dark, cracked floors for the share of unhealthy instances, and "5/10 healthy" on the plaque |
 | Load | Lit windows, floor by floor from the ground: CPU for apps and workers, capacity used for a database. Chimney smoke thickens with CPU |
@@ -43,7 +45,7 @@ Each signal has exactly one visual meaning, and it reads the same in every theme
 | Sync calls | Bridges. In a hub-and-spoke town each island has one bridge to the hub, and calls between islands go through it. In a direct town (`topology: direct`) islands reach each other over an outer ring road |
 | Messaging | Boats from the broker's port to an island's pier. Messages waiting pile up as crates on the quay. Bridges are sync, water is async |
 | Dead letters | A pen of broken crates on the pier with a "DLQ N" badge and a sweeping red light. The top bar shows the town-wide total. Clicking a pier, a pen or the DLQ count lists the queues with dead letters |
-| Legacy route | An amber pennant on a pier whose worker still reads an old route (`legacyFrom` in `town.yaml`) |
+| Legacy route | An amber pennant on a pier whose worker still reads a route you are moving off (`legacyFrom` in `town.yaml`; today it can list only `hub`) |
 | Scheduled jobs | A function's jobs send boats to the services the pillar file maps them to. An unmapped job shows "Job not mapped" |
 | Regions | A service in two or more regions shows its worst region, with the split of requests under its name |
 | Tenants | A store with one database per tenant is a yard with a unit for each tenant. Test tenants are paler and striped and never go past amber; an undeclared tenant is a purple unit marked "?" |
@@ -52,7 +54,7 @@ Each signal has exactly one visual meaning, and it reads the same in every theme
 | Outside callers | An airport whose planes land at the rate of outside traffic, with an arrivals board. Taxis carry the requests from the terminal into the town |
 | Third parties | Vendor islands outside the ring road. A call leaves the island's back gate, goes round the ring road and down the vendor's own road |
 | Who calls whom | The dependency overlay: dashed arcs between islands, as thick as the traffic between them (a layer, off until shown) |
-| Lost & found | An island with boxes and bins by its gate, always last in the order, for systems no pillar owns |
+| Lost & found | An optional island, id `lost-found`, with boxes and bins by its gate, for systems you declare that no team owns. It always stands last |
 | Config error | A pillar file with problems is drawn as an island with a board saying what is wrong, and the rest of the town carries on |
 | Stale data | A grey building. If the live feed itself goes quiet, the whole page goes grey |
 
@@ -62,7 +64,7 @@ Each signal has exactly one visual meaning, and it reads the same in every theme
 
 **The dashboard.** `?view=dashboard`, remembered per browser. It reads the same snapshot and never loads Three.js. It has a service table (traffic with the share per region, errors, p99 against the SLA, CPU and memory per region, and the reason a service is amber or red), a Message flow tile, a Total traffic card, an Incidents card and a freshness marker for each source.
 
-**Wall mode.** `?wall=1`, or the Wall button, which remembers "wall on" in the browser. It hides the bar and panels, uses Dusk and Medium quality, and shows a status strip with the headline, the totals and a caption. The camera tours by itself: an overview (the whole town, then each island seen from its front), then incidents, then what is down, then what is degraded, and a showcase loop when all is well. The timings and light have town defaults in `town.yaml` (`wall:`), and `&hold=`, `&overview=`, `&overviewIsland=` and `&light=` override them on one screen. Esc, the Exit wall chip or leaving full screen ends it. `?wall=1&view=dashboard` is the wall dashboard: the same strip and tour, opening one pillar at a time.
+**Wall mode.** `?wall=1`, or the Wall button, which remembers "wall on" in the browser. It hides the bar and panels, uses Dusk and Medium quality, and shows a status strip with the headline, the totals and a caption. The camera tours by itself: an overview (the whole town, then each island seen from its front), then incidents, then what is down, then what is degraded, and a showcase loop when all is well. The timings and light have town defaults in `town.yaml` (`wall:`), and `&hold=`, `&overview=`, `&overviewIsland=` and `&light=` override them on one screen. Esc, the Exit wall chip or leaving full screen ends it. `?wall=1&view=dashboard` is the wall dashboard: the same strip and tour, opening one group at a time.
 
 **Themes.** Harbour town (the default), space colony and works. A theme changes the buildings, ground, water, bridges, vehicles, sky and the wording of the legend; the data, the layout and every signal stay the same. Picking another theme reloads the page.
 
@@ -84,18 +86,18 @@ config/<town>/*.yaml -> registry loader -> sources poll -> latest state -> snaps
 | Frontend | Draws the town or the dashboard from the snapshot and invents all motion (cars, boats, planes, weather) from the rates in it. It never knows which source produced a number |
 | Validate tool | The registry checks (`--all`) that CI runs, and `--sources`, which probes each configured source with your login |
 
-**Adapters.** Sources are plug-in modules (`IAdapterModule`). The host loads every module it finds in its `adapters/` folder and does not reference any of them. The Azure module provides these source kinds:
+**Adapters.** Sources are plug-in modules (`IAdapterModule`). The host loads every module it finds in its `adapters/` folder and does not reference any of them. The Azure adapter, the module that ships today, provides these source kinds:
 
 | Kind | Reads |
 | --- | --- |
 | `resourcegraph` | The inventory: which resources belong to which system, through the environment's `scope` rules, and the instance counts |
 | `loganalytics` | Request rate, error share and latency from your own query template, the split by region, and link discovery from dependency data |
 | `azuremonitor` | Platform metrics (CPU, memory, capacity used, throttling) for the resources the scope found |
-| `servicebus` | Backlog and dead letters per queue from the namespaces' metrics, message flows per pillar, and the message types a queue handled |
+| `servicebus` | Backlog and dead letters per queue from the namespaces' metrics, message flows per group, and the message types a queue handled |
 | `functionjobs` | Whether each scheduled job of a function app ran, failed or is overdue |
 | `resourcehealth` | The cloud's own health reports for resources, from the activity log |
 
-Logins are the Azure CLI by default, or a named `credentials:` entry (`default`, `managed-identity` or `service-principal`, whose secret is read from an environment variable). The core also knows `fake`, and reserves a few kind names for adapters still to come: such a source is reported at start-up and its signals have no data. Several sources can serve one building, each signal from the source `signals:` names. A company writes its own adapter in `extensions/`, starting from `templates/adapter` and testing it with the adapter kit (see [write-an-adapter.md](write-an-adapter.md)).
+The Azure adapter's logins are the Azure CLI by default, or a named `credentials:` entry (`default`, `managed-identity` or `service-principal`, whose secret is read from an environment variable). The core also knows `fake`, and reserves a few kind names for adapters still to come: such a source is reported at start-up and its signals have no data. Several sources can serve one building, each signal from the source `signals:` names. A company writes its own adapter in `extensions/`, starting from `templates/adapter` and testing it with the adapter kit (see [write-an-adapter.md](write-an-adapter.md)).
 
 **Running.**
 
@@ -126,9 +128,9 @@ config/<town>/
 - **Ids** are `<pillar>.<system>`, and `aliases` keep old ids working. A system's `role` is required. A key, id, role or engine the loader does not know is an error with a "did you mean".
 - **Thresholds cascade** from `defaults.yaml` to the pillar's `defaults` to the system. The inspector's Config tab shows each value and where it came from.
 - **Links are declared** (`calls`, `gatewayCalls`, `messaging`) and can be added from dependency data by link discovery (`links:` in an environment file). Buildings, bridges and piers exist only for links and roles that are really there.
-- **Scope** in an environment file maps pillars and systems onto the cloud with rules and templates: subscriptions, the workspace, which resources belong to a service, and what the telemetry calls a system.
+- **Scope** in an environment file maps pillars and systems onto the cloud provider with rules and templates: the accounts (Azure subscriptions), the telemetry store (a Log Analytics workspace), which resources belong to a service, and what the telemetry calls a system.
 
-**Staying company-neutral.** Core knows only generic things: islands, systems, links, brokers and vendors. Every naming convention, tag and query is a rule or template in the town's own files, and core assumes none. The two sample towns are shaped differently to prove it: Galactic Credit is hub-and-spoke with a gateway, Service Bus and 16 pillars plus Lost & found; Droid Shop has six teams that call each other directly, Kafka and no gateway. Both render with no code changes, and the scope tests run two towns with opposite conventions.
+**Staying company-neutral.** Core knows only generic things: islands, systems, links, brokers and vendors. Every naming convention, tag and query is a rule or template in the town's own files, and core assumes none. The two sample towns are shaped differently to prove it: Galactic Credit is hub-and-spoke with a gateway, Service Bus, 16 pillars plus Lost & found and topics named `{pillar}-{service}-outbox`; Droid Shop has six teams that call each other directly, Kafka, no gateway, topics named `{service}.events` and non-Azure basic buildings (a secrets store, a config store, a media bucket). Both render with no code changes, and the scope tests run two towns with opposite conventions.
 
 ## Rules and why
 
@@ -140,7 +142,6 @@ Why some rules are the way they are, where the reason is not obvious from the co
 - **Missing data is unknown, never healthy.** A metric that is not reported is null, never zero.
 - **Errors are 5xx, timeouts and unhandled exceptions.** 4xx are the caller's mistake, not failures. 429 is throttling.
 - **A late source leaves out only its own signals.** A building used to go grey when any source that feeds it was late, so one failed broker read blanked every worker that reads queues. Now a late source's signals are left out (listed as absent, so no health rule uses them) while some source of health signals is fresh. The building is grey only when none is. A source that supplies only instance counts or queue numbers cannot keep a building alive, because they do not say how it is doing.
-- **A short hiccup in the cloud's metrics API is tried again.** 429, 500, 502, 503, 504 or a dropped connection is tried up to three times a moment apart before the read counts as failed. A refusal (400, 403) fails at once, since trying again will not help.
 
 ### Links and layout
 
@@ -155,18 +156,22 @@ Why some rules are the way they are, where the reason is not obvious from the co
 - **Known limit: junction standoffs.** Cars never overlap: in a lane a car brakes for the one ahead, and at crossings a car keeps out of older cars' paths. When two cars still wait for each other for over a second and a half, the younger one dissolves from the sample. A reservation scheme at junctions is the proper fix if it becomes noticeable.
 - **Boat rates come from what arrives in the queues, not from the broker building's health.** The broker's own building may have no data source (it is watched through its queues), and a building nothing measures is not a stopped one. Only a broker that is Down stops the boats.
 - **Messages a second in all counts each hop.** Each queue is counted where it is read, so a message that crosses two queues counts twice, because each hop is work for a service.
-- **The cloud answers a read split by queue with only 10 series unless asked for more.** A namespace holds hundreds of queues, so queues came and went between polls. The read asks for up to 1000 series.
-- **A queue the cloud sends nothing for keeps its place, with no numbers.** Dropping it aged its reader into "late", and 0 is wrong: a quiet queue has no number to show.
 - **A queue name is matched to a reader only when it is certain.** A pattern may name only the reader's service; the queue goes to that service if its code belongs to exactly one system of the kind, otherwise it is left out rather than guessed. When the name also says the publisher, the queue becomes a route, so who sends to whom follows the broker, not a list kept in step by hand.
 - **A scheduled job's targets are declared in the pillar file, never read from queue names.** The logs name a job but not what it feeds, and queue names are free-form. An unmapped job sends no boats and says "Job not mapped", so the file can be completed. Scheduler boats are approximate on purpose: runs are not measured as messages.
-- **The dead-letter link is a template on the broker source.** The program knows no support tool. A system with no code for a word the address needs gets no link instead of a broken one.
+- **The dead-letter link is a template on the broker source.** The program knows no queue explorer. A system with no code for a word the address needs gets no link instead of a broken one.
 
-### Resource health
+### Provider health
 
-- **Read from the activity log, not a resource query.** The resource graph health table only covers virtual machines, and the CLI's activity log command stops at 50 events, so the server filters by provider itself and follows the pages.
 - **A report the log never closed still clears** when the resource's current status says Available. It is listed as resolved only if this server listed it open before, so a restart does not invent one.
 - **Dismissal is kept in memory.** A restart brings a report back if the cloud still lists it.
 - **A round where some reads fail keeps the last good reports for those reads**, with a notice that the list may be incomplete, instead of showing nothing.
+
+### Rules of the Azure adapter
+
+- **A short hiccup in the cloud's metrics API is tried again.** 429, 500, 502, 503, 504 or a dropped connection is tried up to three times a moment apart before the read counts as failed. A refusal (400, 403) fails at once, since trying again will not help.
+- **Azure Monitor answers a read split by queue with only 10 series unless asked for more.** A namespace holds hundreds of queues, so queues came and went between polls. The read asks for up to 1000 series.
+- **A queue Azure Monitor sends nothing for keeps its place, with no numbers.** Dropping it aged its reader into "late", and 0 is wrong: a quiet queue has no number to show.
+- **Resource Health is read from the activity log, not a resource query.** The Resource Graph health table only covers virtual machines, and the CLI's activity log command stops at 50 events, so the server filters by provider itself and follows the pages.
 
 ### Databases
 
@@ -187,18 +192,18 @@ Why some rules are the way they are, where the reason is not obvious from the co
 
 ## Roadmap
 
-Real sources are added one adapter at a time behind the same town, so the town itself does not change when one arrives.
+Real sources are added one adapter at a time behind the same town, so the town itself does not change when one arrives. The core is cloud-neutral: the Azure adapter is built, and other clouds, metric stores and brokers come as further adapters.
 
 **Built**
 
 1. **Demo town and themes.** The whole pipeline on the fake source: two sample towns, scenarios, stories, the daily cycle, the inspector, the legend, three themes, quality levels and resilient loading.
-2. **Real Azure sources.** The inventory and scope rules, Log Analytics (requests, errors, latency, regions, the Logs tab), Azure Monitor platform metrics, Service Bus backlog, dead letters and message flows from metrics, function jobs and the scheduler, link discovery and the Unknown hosts panel, and the `--sources` check.
-3. **Azure Resource Health.** The cloud's health reports as a mark on the building, in the drawer, the Incidents list and the dashboard, with Dismiss.
+2. **Real cloud sources (Azure adapter).** The inventory and scope rules, Log Analytics (requests, errors, latency, regions, the Logs tab), Azure Monitor platform metrics, Service Bus backlog, dead letters and message flows from metrics, function jobs and the scheduler, link discovery and the Unknown hosts panel, and the `--sources` check.
+3. **Cloud provider health (Azure Resource Health adapter).** The provider's health reports as a mark on the building, in the drawer, the Incidents list and the dashboard, with Dismiss.
 4. **Dashboard and wall mode.** The dashboard view, the wall tour and status strip, the Wall button and the wall dashboard.
 
 **Next**
 
-5. **Incidents and third parties.** An incidents adapter so real incidents drive the weather over the right island (today only the fake source makes weather, and Resource Health reports go to the Incidents list), and third-party health from our own outbound calls in live towns.
+5. **Incidents and third parties.** An incidents adapter so real incidents drive the weather over the right island (today only the fake source makes weather, and provider health reports go to the Incidents list), and third-party health from our own outbound calls in live towns.
 6. **Hosting.** Sign-in, a hosted deployment, and what that needs from polling and security (`Polling:AlwaysOn`, `Security:AllowedOrigins` are already there).
 
 **Later, or ideas**
@@ -215,6 +220,13 @@ The biggest risk is the mapping, not the 3D. The same system has different names
 - **Visual noise.** Too many cars and effects hide the signal. Cars and boats are sampled and capped at 420 cars, but without hysteresis a value near a threshold can still make a beacon flicker.
 - **False green.** Missing data must render grey, never healthy, and a signal that is not configured must stay absent rather than look measured.
 - **Performance on ordinary laptops.** Instanced cars, merged scenery and quality that steps down by itself on slow frames. Bigger towns than the sample (17 islands, about 110 buildings) are tested only in the stress towns.
+
+Current limits:
+
+- **The hub holds at most one gateway, broker, egress and database.** A town with two brokers or two gateways puts the extra one on an island or uses `topology: direct`.
+- **Every topic is named after a service.** `topicTemplate` and `hubTopicTemplate` must contain `{service}`, and a pillar's topics must be its own services, so topics named after events cannot be declared yet.
+- **`legacyFrom` can list only `hub`.** Marking a route you are moving off works only for the hub's topics.
+- **The core registry holds the Azure adapter's settings.** `regionQuery`, `typesQuery`, `metrics`, `entities`, `providers` and the subscription and workspace keys of `scope` are checked by the core, and logs, link discovery and the inventory must name an Azure source kind. An adapter for another cloud cannot add settings of its own without a core change.
 
 Open questions:
 

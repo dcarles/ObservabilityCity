@@ -64,10 +64,10 @@ public class ScopeResolutionTests
         var r = Resolved(TownA);
 
         var alpha = r.Pillar("aa")!;
-        Assert.Equal("acme-eu-prd-al", alpha.SubscriptionName);
+        Assert.Equal("al-prd-eu", alpha.SubscriptionName);
         Assert.Equal("name", alpha.Via);
         Assert.Equal("al", alpha.Code);
-        Assert.Equal("acme-eu-prd-be", r.Pillar("bb")!.SubscriptionName);
+        Assert.Equal("be-prd-eu", r.Pillar("bb")!.SubscriptionName);
     }
 
     [Fact]
@@ -154,11 +154,11 @@ public class ScopeResolutionTests
     public void A_pillar_no_subscription_matches_is_a_problem_naming_the_rule()
     {
         var inventory = Recorded(TownA);
-        var without = inventory with { Subscriptions = inventory.Subscriptions.Where(s => s.Name != "acme-eu-prd-be").ToList() };
+        var without = inventory with { Subscriptions = inventory.Subscriptions.Where(s => s.Name != "be-prd-eu").ToList() };
 
         var r = ScopeResolver.Resolve(Prod(TownA), without);
 
-        Assert.Contains(r.Problems, p => p.Contains("Pillar 'bb'") && p.Contains("name like '*-prd-be'"));
+        Assert.Contains(r.Problems, p => p.Contains("Pillar 'bb'") && p.Contains("name like 'be-prd-*'"));
         Assert.Null(r.Pillar("bb")!.SubscriptionId);
         Assert.Empty(r.System("bb.ledger-db")!.Resources);
     }
@@ -167,11 +167,11 @@ public class ScopeResolutionTests
     public void A_pillar_two_subscriptions_match_is_a_problem_and_neither_is_taken()
     {
         var inventory = Recorded(TownA);
-        var twice = inventory with { Subscriptions = [.. inventory.Subscriptions, new InventorySubscription("x", "other-eu-prd-al", new Dictionary<string, string>())] };
+        var twice = inventory with { Subscriptions = [.. inventory.Subscriptions, new InventorySubscription("x", "al-prd-us", new Dictionary<string, string>())] };
 
         var r = ScopeResolver.Resolve(Prod(TownA), twice);
 
-        Assert.Contains(r.Problems, p => p.Contains("Pillar 'aa'") && p.Contains("2 subscriptions") && p.Contains("acme-eu-prd-al") && p.Contains("other-eu-prd-al"));
+        Assert.Contains(r.Problems, p => p.Contains("Pillar 'aa'") && p.Contains("2 subscriptions") && p.Contains("al-prd-eu") && p.Contains("al-prd-us"));
         Assert.Null(r.Pillar("aa")!.SubscriptionId);
     }
 
@@ -385,8 +385,8 @@ public class ScopeResolutionTests
             pages++;
             var token = options.TryGetProperty("$skipToken", out var t) && t.ValueKind == JsonValueKind.String ? t.GetString() : null;
             return token is null
-                ? Json(new Dictionary<string, object> { ["data"] = new[] { new { id = "a", name = "acme-eu-prd-al", tags = new { } } }, ["$skipToken"] = "page-2" })
-                : Json(new { data = new[] { new { id = "b", name = "acme-eu-prd-be", tags = new { } } } });
+                ? Json(new Dictionary<string, object> { ["data"] = new[] { new { id = "a", name = "al-prd-eu", tags = new { } } }, ["$skipToken"] = "page-2" })
+                : Json(new { data = new[] { new { id = "b", name = "be-prd-eu", tags = new { } } } });
         });
 
         var inventory = await reader.ReadAsync(Prod(TownA), CancellationToken.None);
@@ -498,7 +498,7 @@ public class ScopeResolutionTests
         var detail = await ServedDetail(TownA, "aa.orders-api");
 
         var scope = detail.Scope!;
-        Assert.Equal("acme-eu-prd-al", scope.Subscription);
+        Assert.Equal("al-prd-eu", scope.Subscription);
         Assert.Equal("name", scope.SubscriptionVia);
         Assert.Equal("ws-prd-main", scope.Workspace);
         Assert.Equal("OrdersApi", scope.TelemetryRole);

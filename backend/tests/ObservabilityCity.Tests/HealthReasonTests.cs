@@ -63,6 +63,16 @@ public class HealthReasonTests
     }
 
     [Fact]
+    public async Task A_full_database_gives_its_share_of_capacity_with_no_unit_of_one_engine()
+    {
+        var s = await Run(f => f.Add("aa.orders-db", FakeEffectKind.Saturate, 1));
+
+        var reason = Node(s, "aa.orders-db").Reason;
+        Assert.Matches(@"\d+% capacity", reason);
+        Assert.DoesNotContain("RU", reason);
+    }
+
+    [Fact]
     public async Task Every_system_that_is_not_healthy_has_a_reason_and_every_healthy_one_has_none()
     {
         var s = await Run(f =>

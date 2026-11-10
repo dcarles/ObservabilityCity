@@ -31,8 +31,8 @@
       "messaging": {
         "topics": [
           {
-            "name": "hub-egress",
-            "service": "egress"
+            "name": "hub-broadcast",
+            "service": "broadcast"
           }
         ],
         "subscriptions": [],
@@ -761,7 +761,7 @@
         "topics": [],
         "subscriptions": [
           {
-            "topic": "hub-egress",
+            "topic": "hub-broadcast",
             "publisher": "hub",
             "consumer": "leg.feed-worker",
             "legacy": true

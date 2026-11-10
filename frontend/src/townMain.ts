@@ -331,7 +331,7 @@ export async function startTown(): Promise<void> {
       const open = servicePanel.key
       if (open?.startsWith('asset:')) {
         const av = town.assetSummary(open.slice('asset:'.length), s)
-        if (av) servicePanel.showAsset(av)
+        if (av) servicePanel.showAsset(av, seen.last?.groupLabel)
         else servicePanel.close()
       } else if (open) {
         const sv = town.serviceSummary(open, s)
@@ -363,6 +363,7 @@ export async function startTown(): Promise<void> {
     topbar.setSnapshot(s)
     legend.setTopology(s.topology === 'hub-and-spoke' ? 'hub-and-spoke' : 'direct')
     legend.setDemo(s.mode === 'demo')
+    legend.setGroupLabel(s.groupLabel)
     stateList.refresh()
     notices.show(s.notices, s.notes ?? [])
   }
@@ -440,7 +441,7 @@ export async function startTown(): Promise<void> {
     }
     if (b) { servicePanel.close(); inspector.open(b.id) }
     else if (sv) { inspector.close(); servicePanel.show(sv) }
-    else if (av) { inspector.close(); servicePanel.showAsset(av) }
+    else if (av) { inspector.close(); servicePanel.showAsset(av, seen.last?.groupLabel) }
     else if (pier) { servicePanel.close(); inspector.close(); stateList.toggle('DeadLetters', new DOMRect(e.clientX, e.clientY, 0, 0), pier) }
     else { servicePanel.close(); inspector.close() }
     town.select(b?.id ?? null)
@@ -526,7 +527,7 @@ export async function startTown(): Promise<void> {
     /** Open a service's panel as a click on its sign would. */
     openService: (key: string) => { const sv = seen.last ? town.serviceSummary(key, seen.last) : null; if (sv) { inspector.close(); servicePanel.show(sv) } return sv },
     /** Open a resource building's card as a click on it would. */
-    openAsset: (id: string) => { const av = seen.last ? town.assetSummary(id, seen.last) : null; if (av) { inspector.close(); servicePanel.showAsset(av) } return av },
+    openAsset: (id: string) => { const av = seen.last ? town.assetSummary(id, seen.last) : null; if (av) { inspector.close(); servicePanel.showAsset(av, seen.last?.groupLabel) } return av },
     tenantView: () => tenantView,
     breakArmed: () => breakPanel?.armed ?? false,
     mode: () => seen.last?.mode ?? null,

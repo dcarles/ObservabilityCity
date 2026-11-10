@@ -184,9 +184,9 @@ public class SystemDetailsTests
     {
         var worker = SystemDetails.Of(Mini, "aa.orders-worker")!;
 
-        Assert.Equal(["aa-orders-outbox"], worker.ServiceTopics);
+        Assert.Equal(["aa-orders-events"], worker.ServiceTopics);
         var sub = Assert.Single(worker.Subscriptions);
-        Assert.Equal(("bb-ledger-outbox", "bb", false), (sub.Topic, sub.Publisher, sub.Legacy));
+        Assert.Equal(("bb-ledger-events", "bb", false), (sub.Topic, sub.Publisher, sub.Legacy));
         Assert.Empty(SystemDetails.Of(Mini, "aa.orders-api")!.Subscriptions);
     }
 

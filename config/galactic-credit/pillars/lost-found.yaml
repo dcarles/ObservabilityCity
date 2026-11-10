@@ -1,5 +1,5 @@
 # yaml-language-server: $schema=../schema/pillar.schema.json
-# Systems that carry no pillar tag and no pillar.code attribute end up here, so nothing is silently dropped.
+# Optional island for systems you declare that no team owns. The id lost-found is reserved: it always stands last.
 pillar: lost-found
 displayName: Lost & found
 color: "#9aa3ad"
@@ -9,7 +9,7 @@ systems:
   - { id: lost-found.batch-gateway-db, service: batch-gateway, name: Batch gateway DB, role: db, engine: sqlserver }
   - { id: lost-found.legacy-ftp-api, name: Legacy file drop, role: api }
 
-# The old way: this worker still reads the hub's egress topic instead of a pillar's outbox. Flagged legacy.
+# The old way: this worker still reads the hub's exports topic instead of a pillar's outbox. Flagged legacy.
 messaging:
   subscriptions:
-    - { topic: hub-egress, consumer: lost-found.batch-gateway-worker, legacy: true }
+    - { topic: hub-exports, consumer: lost-found.batch-gateway-worker, legacy: true }

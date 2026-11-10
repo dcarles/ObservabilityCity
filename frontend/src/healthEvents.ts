@@ -45,24 +45,24 @@ export function eventItems(events: readonly HealthEventSnapshot[] | null | undef
     : { kind: 'building', id: e.id, name: e.resource, where: `${cloud} resource health · not in the town`, detail: eventLine(e, now), state: e.state, dismiss: e.id, inert: true })
 }
 
-export interface AzureRow {
+export interface CloudHealthRow {
   label: string
   value: string
   tone: 'bad' | 'warn' | 'ok'
 }
 
 /** The drawer rows for a building's report: the state and since when, what it was before, the cause, and which resource the cloud means. A resolved one says when it ended, in green. */
-export function azureRows(e: HealthEventSnapshot, now: number = Date.now()): AzureRow[] {
+export function cloudHealthRows(e: HealthEventSnapshot, now: number = Date.now()): CloudHealthRow[] {
   const resolved = isResolved(e)
-  const tone: AzureRow['tone'] = resolved ? 'ok' : e.state === 'Unavailable' ? 'bad' : 'warn'
+  const tone: CloudHealthRow['tone'] = resolved ? 'ok' : e.state === 'Unavailable' ? 'bad' : 'warn'
   return [
     { label: 'State', value: e.state, tone },
-    ...(resolved && e.resolvedAt ? [{ label: 'Resolved', value: dayTime(e.resolvedAt, now), tone } as AzureRow] : []),
+    ...(resolved && e.resolvedAt ? [{ label: 'Resolved', value: dayTime(e.resolvedAt, now), tone } as CloudHealthRow] : []),
     { label: resolved ? 'Began' : 'Since', value: dayTime(e.since, now), tone },
-    ...(e.previous ? [{ label: 'Before', value: e.previous, tone } as AzureRow] : []),
-    ...(e.cause ? [{ label: 'Cause', value: e.cause, tone } as AzureRow] : []),
+    ...(e.previous ? [{ label: 'Before', value: e.previous, tone } as CloudHealthRow] : []),
+    ...(e.cause ? [{ label: 'Cause', value: e.cause, tone } as CloudHealthRow] : []),
     { label: 'Resource', value: e.resource, tone },
-    ...(e.summary ? [{ label: 'Summary', value: e.summary, tone } as AzureRow] : []),
+    ...(e.summary ? [{ label: 'Summary', value: e.summary, tone } as CloudHealthRow] : []),
   ]
 }
 

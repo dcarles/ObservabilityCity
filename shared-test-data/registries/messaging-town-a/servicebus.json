@@ -1,7 +1,7 @@
 {
   "sb-acme-northeurope1x": [
     {
-      "entity": "sbq-al-ord-inbox",
+      "entity": "q-al-ord-in",
       "metric": "ActiveMessages",
       "aggregation": "average",
       "points": [
@@ -11,7 +11,7 @@
       ]
     },
     {
-      "entity": "sbq-al-ord-inbox",
+      "entity": "q-al-ord-in",
       "metric": "DeadletteredMessages",
       "aggregation": "maximum",
       "points": [
@@ -21,7 +21,7 @@
       ]
     },
     {
-      "entity": "sbq-al-ord-changefeed",
+      "entity": "q-al-ord-feed",
       "metric": "ActiveMessages",
       "aggregation": "average",
       "points": [
@@ -31,7 +31,7 @@
       ]
     },
     {
-      "entity": "sbq-al-led-ord-outbox",
+      "entity": "q-al-led-to-ord",
       "metric": "ActiveMessages",
       "aggregation": "average",
       "points": [
@@ -41,7 +41,7 @@
       ]
     },
     {
-      "entity": "sbq-be-led-inbox",
+      "entity": "q-be-led-in",
       "metric": "ActiveMessages",
       "aggregation": "average",
       "points": [
@@ -51,7 +51,7 @@
       ]
     },
     {
-      "entity": "sbq-be-led-inbox",
+      "entity": "q-be-led-in",
       "metric": "DeadletteredMessages",
       "aggregation": "maximum",
       "points": [
@@ -61,7 +61,7 @@
       ]
     },
     {
-      "entity": "sbq-zz-xyz-inbox",
+      "entity": "q-zz-xyz-in",
       "metric": "ActiveMessages",
       "aggregation": "average",
       "points": [
@@ -71,7 +71,7 @@
       ]
     },
     {
-      "entity": "sbt-egress",
+      "entity": "t-shared",
       "metric": "ActiveMessages",
       "aggregation": "average",
       "points": [
@@ -81,7 +81,7 @@
       ]
     },
     {
-      "entity": "sbq-al-ord-inbox",
+      "entity": "q-al-ord-in",
       "metric": "IncomingMessages",
       "aggregation": "total",
       "points": [
@@ -93,7 +93,7 @@
   ],
   "sb-acme-westeurope9z": [
     {
-      "entity": "sbq-al-ord-inbox",
+      "entity": "q-al-ord-in",
       "metric": "ActiveMessages",
       "aggregation": "average",
       "points": [
@@ -103,7 +103,7 @@
       ]
     },
     {
-      "entity": "sbq-al-ord-inbox",
+      "entity": "q-al-ord-in",
       "metric": "DeadletteredMessages",
       "aggregation": "maximum",
       "points": [

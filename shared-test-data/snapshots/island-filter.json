@@ -233,13 +233,13 @@
       "messaging": {
         "topics": [
           {
-            "name": "aa-orders-outbox",
+            "name": "aa-orders-events",
             "service": "orders"
           }
         ],
         "subscriptions": [
           {
-            "topic": "bb-ledger-outbox",
+            "topic": "bb-ledger-events",
             "publisher": "bb",
             "consumer": "aa.orders-worker",
             "legacy": false
@@ -411,19 +411,19 @@
       "messaging": {
         "topics": [
           {
-            "name": "cc-notify-outbox",
+            "name": "cc-notify-events",
             "service": "notify"
           }
         ],
         "subscriptions": [
           {
-            "topic": "aa-orders-outbox",
+            "topic": "aa-orders-events",
             "publisher": "aa",
             "consumer": "cc.notify-worker",
             "legacy": false
           },
           {
-            "topic": "bb-ledger-outbox",
+            "topic": "bb-ledger-events",
             "publisher": "bb",
             "consumer": "cc.notify-worker",
             "legacy": false

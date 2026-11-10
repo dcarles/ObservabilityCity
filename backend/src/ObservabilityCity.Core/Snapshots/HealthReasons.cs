@@ -34,7 +34,7 @@ internal static class HealthReasons
             var worst = tenants?.Where(t => t.State is HealthState.Degraded or HealthState.Down).OrderByDescending(t => t.Utilisation ?? 0).FirstOrDefault();
             var text = new List<string>();
             if (worst is not null) text.Add($"tenant {worst.Name}");
-            if ((utilisation ?? 0) >= n.ResourceAmber) text.Add($"{Pct((worst?.Utilisation ?? utilisation)!.Value)} RU");
+            if ((utilisation ?? 0) >= n.ResourceAmber) text.Add($"{Pct((worst?.Utilisation ?? utilisation)!.Value)} capacity");
             if ((throttled ?? 0) >= n.ThrottleAmber) text.Add($"{Pct((worst?.Throttled ?? throttled)!.Value, 1)} throttled");
             parts.Add(string.Join(" · ", text));
         }

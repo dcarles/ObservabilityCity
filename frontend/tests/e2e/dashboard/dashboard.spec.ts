@@ -395,8 +395,8 @@ test.describe('the dashboard view', () => {
     const read = `const r = document.querySelector('[data-pillar="aa"] tr.row[data-system="aa.orders-db"] .mx')
       return { db: r?.textContent, lines: [...document.querySelectorAll('[data-pillar="aa"] tr.sub .mx')].map(x => x.textContent) }`
     const got = await withSnapshot<{ db: string; lines: string[] }>(page, edit, read)
-    expect(got.db).toContain('max 4,000 RU/s')
-    expect(got.lines).toContain('max 4,000 RU/s')
+    expect(got.db).toContain('max 4,000')
+    expect(got.lines).toContain('max 4,000')
     expect(got.lines.length).toBeGreaterThan(1)
   })
 

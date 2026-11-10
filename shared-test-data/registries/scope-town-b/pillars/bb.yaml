@@ -8,4 +8,4 @@ systems:
 messaging:
   topics: [ledger]
   subscriptions:
-    - { topic: aa-orders-outbox, consumer: bb.ledger-worker }
+    - { topic: aa-orders-events, consumer: bb.ledger-worker }

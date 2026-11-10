@@ -1,4 +1,4 @@
-# Convention A: everything is in the names. A subscription is named <org>-<region>-<env>-<pillar code>; resources are named <kind>-<org>-<pillar code>-<service code>-<region><hash>;
+# Convention A: everything is in the names. A subscription is named <pillar code>-<env>-<region>; resources are named <kind>-<org>-<pillar code>-<service code>-<region><hash>;
 # a data account is <tenant id>-<pillar code>-<service code>. The telemetry names are written out on each system.
 name: Production
 default: true
@@ -38,7 +38,7 @@ scope:
   inventory: inventory
   variables: { env: prd, directory: example.test }
   workspace: "ws-{env}-main"
-  subscription: { nameLike: "*-{env}-{pillar}" }
+  subscription: { nameLike: "{pillar}-{env}-*" }
   resources:
     - { name: plans, types: [microsoft.web/serverfarms], roles: [api, worker], pattern: '^plan-[^-]+-(?<pillar>[^-]+)-(?<service>[^-]+)-[a-z]+', instances: "coalesce(toint(properties.numberOfWorkers), toint(sku.capacity))" }
     - { name: apps, types: [microsoft.web/sites], roles: [api, worker], pattern: '^(?<role>api|worker)-[^-]+-(?<pillar>[^-]+)-(?<service>[^-]+)-(?<region>[a-z]+)' }

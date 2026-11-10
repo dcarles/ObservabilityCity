@@ -117,6 +117,8 @@ body.wall #more-menu, body.dash #more-menu { display: none !important; }
 #unknown-hosts .panel[hidden] { display: none; }
 #unknown-hosts .panel ul.paths { margin: 4px 0 0 12px; }
 #unknown-hosts ul.paths button { padding: 2px 6px; font-size: 12px; font-weight: 500; margin-left: 6px; }
+#unknown-hosts .rule-choice { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 4px 0 0; }
+#unknown-hosts .rule-choice select { font: inherit; font-size: 12px; }
 #unknown-hosts li { margin: 0 0 10px; }
 #unknown-hosts .error { margin: 6px 0; color: #ffb4a8; }
 #unknown-hosts li button[data-remove] { padding: 2px 6px; font-size: 12px; font-weight: 500; margin-left: 6px; }
@@ -415,10 +417,10 @@ body.wall .island-label { font-size: 16px; }
 
 #state-list .hit.resolved b { color: var(--ok-ink, #3fae6a); }
 #state-list .hit.resolved .detail { color: var(--ok-ink, #3fae6a); }
-#state-list .hit .dismiss, #inspector .azure-dismiss { margin-left: auto; font-size: 11px; padding: 1px 8px; cursor: pointer; }
-#inspector .azure-dismiss { margin: 6px 0 0; display: block; }
+#state-list .hit .dismiss, #inspector .cloud-health-dismiss { margin-left: auto; font-size: 11px; padding: 1px 8px; cursor: pointer; }
+#inspector .cloud-health-dismiss { margin: 6px 0 0; display: block; }
 
-/* Azure health reports: each entry stacks its lines, so a long resource name wraps instead of pushing the panel sideways */
+/* Cloud health reports: each entry stacks its lines, so a long resource name wraps instead of pushing the panel sideways */
 #state-list.wide { width: 440px; max-width: 94vw; max-height: 75vh; overflow-x: hidden; }
 #state-list .hit.stacked { display: block; }
 #state-list .hit.stacked b, #state-list .hit.stacked span { display: block; overflow-wrap: anywhere; }
