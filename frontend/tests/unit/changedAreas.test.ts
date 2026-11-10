@@ -8,7 +8,7 @@ const everything = { backend: true, frontend: true, ui: true, registries: true }
 
 describe('changed-areas', () => {
   it('runs no tests for documents', () => {
-    expect(areasFor(['README.md', 'docs/events.md', 'docs/decision-log.md', 'frontend/public/events/CREDITS.md', 'templates/adapter/README.md'])).toEqual(nothing)
+    expect(areasFor(['README.md', 'docs/easter-eggs.md', 'docs/frontend-stack.md', 'frontend/public/events/CREDITS.md', 'templates/adapter/README.md'])).toEqual(nothing)
   })
 
   it('runs only the backend tests for a document the backend tests read', () => {
