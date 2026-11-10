@@ -282,4 +282,16 @@ describe('the overview of the whole town', () => {
     expect(d.update(healthyTown(), 0)).toMatchObject({ key: 'town', kind: 'calm' })
     expect(d.tick(20)?.key).toBe('hub')
   })
+
+  it('takes new timings for the stops from now on', () => {
+    const d = new WallDirector(HOLD, 4, 0)
+    d.update(troubled(), 0)
+    expect(d.current).toMatchObject({ kind: 'down' })
+
+    d.configure(5, 3)
+
+    expect(d.tick(20)).toMatchObject({ kind: 'degraded' })
+    expect(d.tick(25)).toMatchObject({ kind: 'overview' })
+    expect(d.tick(28)).toMatchObject({ kind: 'down' })
+  })
 })

@@ -51,7 +51,13 @@ export class WallDirector {
   private holdUntil = 0
   private lastCut = -Infinity
 
-  constructor(private readonly hold: number, private readonly pulseSeconds = 4, private readonly overview = 0) {}
+  constructor(private hold: number, private readonly pulseSeconds = 4, private overview = 0) {}
+
+  /** New timings, for the stops from now on (the town's own defaults arrive with the first snapshot, after the wall has started). */
+  configure(hold: number, overview: number): void {
+    this.hold = hold
+    this.overview = overview
+  }
 
   /** Takes a new snapshot. Returns the stop when the camera has to go somewhere now (new trouble, or what it was on has ended), else null. */
   update(s: Snapshot, now: number): Stop | null {

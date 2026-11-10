@@ -646,6 +646,23 @@ test.describe('the dashboard view', () => {
       expect((await wall(page))!.stop).toMatchObject({ key: 'down:aa.orders-api', cut: false })
     })
 
+    test("holds for the town's holdSeconds when the address says nothing", async ({ town, page }) => {
+      await open(town, page, '&wall=1')
+      await step(page, 11)
+      await page.evaluate(async () => {
+        const s = await (await fetch('/api/snapshot/latest')).json()
+        s.wall = { holdSeconds: 3 }
+        ;(window as any).dash.hold(true)
+        ;(window as any).dash.feed(s)
+      })
+      await step(page, 20.1) // the stop that was already on holds its 20 s; the next one holds the town's 3
+      const before = (await wall(page))!.stop!.key
+      await step(page, 1)
+      expect((await wall(page))!.stop!.key).toBe(before)
+      await step(page, 3)
+      expect((await wall(page))!.stop!.key).not.toBe(before)
+    })
+
     test('new trouble cuts to its service at once, picks it out, and a resolved note comes when it ends', async ({ town, page }) => {
       await open(town, page, '&wall=1&hold=2&overview=0')
       await step(page, 11)

@@ -1680,6 +1680,9 @@
           },
           "internalVendorsLabel": {
             "type": "string"
+          },
+          "wall": {
+            "$ref": "#/components/schemas/WallSettingsSnapshot"
           }
         }
       },
@@ -2184,6 +2187,25 @@
             "items": {
               "$ref": "#/components/schemas/OffscreenLink"
             }
+          }
+        }
+      },
+      "WallSettingsSnapshot": {
+        "type": "object",
+        "properties": {
+          "holdSeconds": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "overviewSeconds": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "light": {
+            "type": "string",
+            "nullable": true
           }
         }
       }

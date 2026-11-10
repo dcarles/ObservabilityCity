@@ -24,6 +24,18 @@ internal sealed class TownFile
     public TownMessagingFile Messaging { get; set; } = new();
     /// <summary>The words the town uses for things the app has no fixed name for.</summary>
     public LabelsFile Labels { get; set; } = new();
+    /// <summary>The town's defaults for wall mode. Each is optional: an address parameter wins, and without either the app's own default applies.</summary>
+    public WallFile Wall { get; set; } = new();
+}
+
+internal sealed class WallFile
+{
+    /// <summary>Seconds the tour stays at each stop.</summary>
+    public double? HoldSeconds { get; set; }
+    /// <summary>Seconds the overview of the whole town lasts; 0 for no overview.</summary>
+    public double? OverviewSeconds { get; set; }
+    /// <summary>"dusk" or "day".</summary>
+    public string? Light { get; set; }
 }
 
 internal sealed class TownMessagingFile
