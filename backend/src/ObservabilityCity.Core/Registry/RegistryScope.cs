@@ -11,7 +11,7 @@ public sealed record ScopeRules
 {
     public static ScopeRules None { get; } = new();
 
-    /// <summary>The name of the environment source that reads the inventory (a resourcegraph source). Without it, the only such source.</summary>
+    /// <summary>The name of the environment source that reads the inventory (a source whose kind can read an inventory). Without it, the only such source.</summary>
     public string? Inventory { get; init; }
 
     /// <summary>The workspace the telemetry is in, a template over <see cref="Variables"/> and {environment}. Null: none is configured.</summary>

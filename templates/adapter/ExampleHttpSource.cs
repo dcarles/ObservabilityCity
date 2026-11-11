@@ -11,7 +11,9 @@ public sealed class ExampleHttpSourceFactory(HttpClient? http = null, TimeProvid
 {
     private static readonly HttpClient Shared = new();
 
-    public string Kind => "example-http";
+    public const string SourceKind = "example-http";
+
+    public string Kind => SourceKind;
 
     public IMetricSource Create(SourceContext context)
     {

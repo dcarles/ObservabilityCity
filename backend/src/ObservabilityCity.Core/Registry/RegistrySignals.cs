@@ -28,9 +28,12 @@ public sealed partial record Registry
     public IReadOnlyList<string> AbsentSignals(RegistryNode node) =>
         Signals.For(node.Kind).Where(signal => SourceFor(node, signal) is null).ToList();
 
-    /// <summary>Sources an environment defines but no signal reads: probably a typo in a signal's source name or a leftover.</summary>
-    internal IEnumerable<string> UnusedSourceWarnings(RegistryEnvironment env) =>
-        env.Sources.Where(s => s.Name is not ("metrics" or "incidents" or "messaging" or "jobs") && s.Kind != SourceKinds.ResourceHealth
+    /// <summary>
+    /// Sources an environment defines but no signal reads: probably a typo in a signal's source name or a leftover. A source whose kind reads the cloud's
+    /// health reports fills no signal by design, which only the adapters know (<paramref name="kinds"/>).
+    /// </summary>
+    internal IEnumerable<string> UnusedSourceWarnings(RegistryEnvironment env, ISourceKindCatalog? kinds = null) =>
+        env.Sources.Where(s => s.Name is not ("metrics" or "incidents" or "messaging" or "jobs") && kinds?.CapabilitiesOf(s.Kind).HasFlag(SourceCapabilities.HealthEvents) != true
                                && !env.Signals.Values.Contains(s.Name) && !AllNodes.Any(n => n.Signals.Values.Contains(s.Name)))
             .Select(s => $"Environment '{env.Id}' defines source '{s.Name}', but no signal uses it. Point a signal at it in environments/{env.Id}.yaml, a pillar or a system, or remove it.");
 

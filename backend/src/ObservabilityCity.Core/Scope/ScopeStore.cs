@@ -13,6 +13,12 @@ public sealed class ScopeStore
 
     private sealed record Snapshot(Inventory? Inventory, DateTimeOffset? At, string? Error);
 
+    /// <summary>
+    /// True when the environment runs a source whose kind reads the inventory (see <see cref="Sources.SourceCapabilities.Inventory"/>), so an empty store is
+    /// waiting for its first read rather than having no inventory at all. The <see cref="Sources.AdapterCatalog"/> sets it when it builds the sources.
+    /// </summary>
+    public bool HasInventorySource { get; init; }
+
     public Inventory? Inventory => _state.Inventory;
     public DateTimeOffset? ReadAt => _state.At;
     /// <summary>Why the last read failed, or null. The previous inventory is kept meanwhile.</summary>

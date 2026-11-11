@@ -15,12 +15,33 @@ sources:                    IAdapterModule  (what it adds)       AdapterCatalog 
                                                                  SnapshotBuilder applies the health rules, the browser draws
 ```
 
-- A **module** is a class that implements `IAdapterModule`. Its `Register` only records what the module has: source kinds (`AddSource` with a factory, or `AddSourceKind` for a kind it knows but cannot read yet) and logins (`AddCredentialKind`). It signs nobody in and reaches nothing, so a town starts before anyone signs in.
+- A **module** is a class that implements `IAdapterModule`. Its `Register` only records what the module has: source kinds (`AddSource` with a factory, and `AddSourceKind` to say what a kind can do or for a kind it knows but cannot read yet) and logins (`AddCredentialKind`). It signs nobody in and reaches nothing, so a town starts before anyone signs in.
 - A **factory** makes the source for each environment source of its kind. It gets a `SourceContext`: the environment id, the source as the file defines it (`connection`, `pollSeconds`, `timeoutSeconds`), the login it is to use, the environment's `scope:` rules and the `ScopeStore`, and the folder of the town's files. If the definition cannot work, throw `InvalidOperationException` with a sentence that says what to change; the host reports it at start-up and carries on without that source.
 - A **source** implements `IMetricSource`: a name, a `PollInterval`, a `Timeout` (take both from the definition) and `PollAsync(registry, ct)`, which answers for every system it can in one batched call. The poller runs one loop per source, cancels a poll that takes longer than `Timeout`, and logs one that throws.
 - A **login** implements `ICredentialKind`: `Check` says what is wrong with an entry in words, `Create` makes the login. Making one signs nobody in; the token is asked for when first needed.
 
 Incident tools implement `IIncidentSource` (answers from what it already knows, refreshing on its own timer) and log stores `ILogSource` (read on demand when an inspector opens, never polled).
+
+## Say what a kind can do
+
+Some jobs in the town need a source that can do more than fill signals. The core never asks what a kind is called. It asks the adapter, so each kind says what its sources can do in `SourceKindInfo.Capabilities` when the module registers it:
+
+| Capability | What it serves | The environment file names it in | The source implements |
+| --- | --- | --- | --- |
+| `Logs` | The Logs tab's query | `logs.source` | `ILogRowSource` |
+| `Links` | The link discovery and link traffic queries | `links.source` | `IDependencySource` |
+| `Inventory` | The inventory that fills the `ScopeStore` | `scope.inventory` (or nothing: any such source) | nothing more: it fills the `ScopeStore` in its `SourceContext` |
+| `HealthEvents` | The cloud's own health reports | nothing: no signal reads it, so it is never named as unused | `IHealthEventSource` |
+
+```csharp
+public void Register(IAdapterRegistry registry)
+{
+    registry.AddSourceKind(new SourceKindInfo("metricstore") { Capabilities = SourceCapabilities.Logs | SourceCapabilities.Links });
+    registry.AddSource(new MetricStoreSourceFactory());
+}
+```
+
+A kind that only fills signals declares nothing (`SourceCapabilities.None`, the default). The registry check (`validate`) refuses a file whose `logs.source`, `links.source` or `scope.inventory` names a source whose kind cannot do that job, and lists the kinds that can. A kind no loaded module knows is reported once as unknown, and nothing is guessed about what it can do. The Azure adapter declares `Inventory` for `resourcegraph`, `Logs` and `Links` for `loganalytics`, and `HealthEvents` for `resourcehealth`.
 
 ## The rules a source keeps
 
@@ -44,7 +65,9 @@ var system = scope.System("aa.orders-api");   // SubscriptionId (the account), W
 
 Before the inventory is read it holds only what the rules say on their own (a named account, the telemetry store, a system's telemetry role); the rest appears after the first read. Handle both.
 
-Current limits: the inventory that fills the `ScopeStore` is the Azure adapter's `resourcegraph` source, `logs` and `links` must name a `loganalytics` source, and the core registry holds and checks the Azure adapter's own source settings (marked **Azure adapter setting** in [config-reference.md](config-reference.md)). Unknown keys are an error, so an adapter for another cloud reads its settings from `connection` and the generic keys until that changes. See "Scope" in [connect-your-company.md](connect-your-company.md).
+The source that reads the inventory is any source whose kind declares `Inventory` (see "Say what a kind can do"); with the Azure adapter it is `resourcegraph`.
+
+Current limit: the core registry holds and checks the Azure adapter's own source settings (marked **Azure adapter setting** in [config-reference.md](config-reference.md)). Unknown keys are an error, so an adapter for another cloud reads its settings from `connection` and the generic keys until that changes. See "Scope" in [connect-your-company.md](connect-your-company.md).
 
 ## Build it
 
@@ -67,8 +90,9 @@ Tests use recorded answers, never a live service. The kit has what an author nee
 | `AdapterContract.AssertModule` | A module has a kebab-case name, registers cleanly without reaching anything, adds a kind or login, and registers no kind twice |
 | `AdapterContract.AssertPollAsync` | A source has an interval and a timeout, answers only for known systems with numbers in range, and ends a poll it is told to stop |
 | `AdapterContract.CheckReadings` | The same checks on a set of readings you made yourself |
+| `AdapterContract.AssertCapabilities` | A source implements the interface for each capability its kind declares, and declares each one it implements (`CapabilitiesOf` reads what a module declares for a kind) |
 
-Write at least: the contract (module and source), the readings your canned answers must produce, a source that cannot be read (it throws), a definition that cannot start (the message), and **the same adapter run against a second, differently shaped config** to prove no convention is in it. `backend/tests/ObservabilityCity.Tests/TemplateAdapterTests.cs` and `ScopeResolutionTests.cs` are the examples. Keep recorded answers in `shared-test-data/` upstream or beside the extension in a fork.
+Write at least: the contract (module, source and capabilities), the readings your canned answers must produce, a source that cannot be read (it throws), a definition that cannot start (the message), and **the same adapter run against a second, differently shaped config** to prove no convention is in it. `backend/tests/ObservabilityCity.Tests/TemplateAdapterTests.cs` and `ScopeResolutionTests.cs` are the examples. Keep recorded answers in `shared-test-data/` upstream or beside the extension in a fork.
 
 Anything the adapter makes visible in the town needs a UI test too (a Vitest unit test of the model, a Playwright test through a fixture-backed source). A change that is backend-only says so in the pull request.
 

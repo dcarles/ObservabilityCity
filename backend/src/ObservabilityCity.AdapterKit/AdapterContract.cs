@@ -1,4 +1,6 @@
 using System.Text.RegularExpressions;
+using ObservabilityCity.Core.Links;
+using ObservabilityCity.Core.Logs;
 using ObservabilityCity.Core.Registry;
 using ObservabilityCity.Core.Sources;
 
@@ -37,6 +39,39 @@ public static partial class AdapterContract
     }
 
     public static void AssertModule(IAdapterModule module) => Raise(CheckModule(module));
+
+    /// <summary>What the module says a source of <paramref name="kind"/> can serve besides signals (<see cref="SourceKindInfo.Capabilities"/>), as its Register records it.</summary>
+    public static SourceCapabilities CapabilitiesOf(IAdapterModule module, string kind)
+    {
+        var catalog = new Recorder([]);
+        module.Register(catalog);
+        return catalog.Capabilities.GetValueOrDefault(kind);
+    }
+
+    /// <summary>
+    /// A source has the interface the core uses for each capability its kind declares (logs: <see cref="ILogRowSource"/>, links: <see cref="IDependencySource"/>,
+    /// health reports: <see cref="IHealthEventSource"/>), and declares each one it has, since the core checks the declaration before the source runs. An inventory
+    /// has no interface: the source fills the <see cref="SourceContext.Scope"/> it is given.
+    /// </summary>
+    public static IReadOnlyList<string> CheckCapabilities(SourceCapabilities declared, IMetricSource source)
+    {
+        var problems = new List<string>();
+        foreach (var (capability, has, needs) in new[]
+                 {
+                     (SourceCapabilities.Logs, source is ILogRowSource, nameof(ILogRowSource)),
+                     (SourceCapabilities.Links, source is IDependencySource, nameof(IDependencySource)),
+                     (SourceCapabilities.HealthEvents, source is IHealthEventSource, nameof(IHealthEventSource)),
+                 })
+        {
+            if (declared.HasFlag(capability) && !has)
+                problems.Add($"the kind declares {capability}, but its source does not implement {needs}, so the town would find nothing to ask");
+            if (!declared.HasFlag(capability) && has)
+                problems.Add($"the source implements {needs}, but its kind does not declare {capability}; declare it in SourceKindInfo.Capabilities, or the town refuses a config that uses it for that");
+        }
+        return problems;
+    }
+
+    public static void AssertCapabilities(SourceCapabilities declared, IMetricSource source) => Raise(CheckCapabilities(declared, source));
 
     /// <summary>The checks on a source before it is polled: how often it is asked and how long it may take.</summary>
     public static IReadOnlyList<string> CheckSource(IMetricSource source)
@@ -118,8 +153,13 @@ public static partial class AdapterContract
         public HashSet<string> Kinds { get; } = [];
         public List<string> Factories { get; } = [];
         public List<string> Logins { get; } = [];
+        public Dictionary<string, SourceCapabilities> Capabilities { get; } = [];
 
-        public void AddSourceKind(SourceKindInfo kind) => Kinds.Add(kind.Kind);
+        public void AddSourceKind(SourceKindInfo kind)
+        {
+            Kinds.Add(kind.Kind);
+            Capabilities[kind.Kind] = kind.Capabilities;
+        }
 
         public void AddSource(IMetricSourceFactory factory)
         {

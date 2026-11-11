@@ -61,7 +61,9 @@ public sealed class FunctionJobsSource(
 
 public sealed class FunctionJobsSourceFactory(HttpClient? http = null, TimeProvider? time = null) : IMetricSourceFactory
 {
-    public string Kind => "functionjobs";
+    public const string SourceKind = "functionjobs";
+
+    public string Kind => SourceKind;
 
     public IMetricSource Create(SourceContext context)
     {

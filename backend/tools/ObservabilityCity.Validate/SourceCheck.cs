@@ -58,7 +58,7 @@ public static class SourceCheck
                 {
                     var connection = source.Connection ?? "";
                     var note = "";
-                    if (string.IsNullOrWhiteSpace(connection) && source.Kind == "loganalytics" && workspaces is not null)
+                    if (string.IsNullOrWhiteSpace(connection) && probe.ProbesScopeWorkspace && workspaces is not null)
                         (connection, note) = await ScopeWorkspace(file, env, workspaces, limit.Token);
                     if (connection.Length == 0 && note.Length > 0) result = new ProbeResult(ProbeStatus.Unreachable, note);
                     else

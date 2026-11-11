@@ -81,7 +81,7 @@ foreach (var (folder, registry) in loaded)
         // link discovery saves under the town's folder, one folder for each environment; a town without a links block has none
         var discovered = registry.Environments.FirstOrDefault(e => e.Id == environmentId)?.Links is not null
             ? new DiscoveredLinks(Path.Combine(folder, RegistryReloader.DiscoveredFolder, "links", environmentId)) : null;
-        var view = new EnvironmentRegistry(registries, environmentId, discovered);
+        var view = new EnvironmentRegistry(registries, environmentId, discovered, kinds: sourceCatalog);
         var fake = demo ? new FakeSource(fakeProfiles, fakeOptions, TimeProvider.System, stories) : null;
         // a live environment polls what its file defines; a demo town has the fake source and nothing else
         var set = fake is not null || registry.Environments.FirstOrDefault(e => e.Id == environmentId) is not { } environment

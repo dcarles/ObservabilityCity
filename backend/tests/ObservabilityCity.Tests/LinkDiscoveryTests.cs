@@ -944,10 +944,15 @@ public class LinkDiscoveryTests
     }
 
     [Fact]
-    public void The_source_must_be_a_loganalytics_source_of_the_same_file()
+    public void The_source_must_be_a_source_of_the_same_file_whose_kind_can_read_dependencies()
     {
         Assert.Contains("links.source 'nope' is not a source of this file", LoadProblem(LinksA.Replace("source: telemetry", "source: nope")));
-        Assert.Contains("is a resourcegraph source", LoadProblem(LinksA.Replace("source: telemetry", "source: inventory")));
+
+        // what a kind can read is the adapters' word, so the catalog of loaded modules says it, not the loader
+        using var copy = new RegistryCopy(TownA);
+        copy.Write("environments/prod.yaml", copy.Read("environments/prod.yaml") + LinksA.Replace("source: telemetry", "source: inventory"));
+        var problems = new AdapterCatalog([new AzureAdapters()]).Check(RegistryLoader.Load(copy.Path).Environments.Single());
+        Assert.Contains("environments/prod.yaml: links.source 'inventory' has kind resourcegraph, which cannot read the dependencies link discovery needs. Name a source of a kind that can: loganalytics", problems);
     }
 
     [Fact]

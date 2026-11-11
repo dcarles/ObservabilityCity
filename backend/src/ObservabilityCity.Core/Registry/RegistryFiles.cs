@@ -283,7 +283,7 @@ internal sealed class EnvironmentFile
 /// <summary>The <c>logs:</c> block of an environment file.</summary>
 internal sealed class LogsFile
 {
-    /// <summary>The name of a loganalytics source of this file. Its connection and login are used.</summary>
+    /// <summary>The name of a source of this file whose kind can read logs (on Azure, loganalytics). Its connection and login are used.</summary>
     public string Source { get; set; } = "";
     /// <summary>The query to send, a template ({roles}, {from}, {to}, {window}, {windowSeconds}, {slaMs}, {kind}, scope variables, {environment}). One row for each kind of entry: section, at, text; count, level, durationMs and result optional.</summary>
     public string Query { get; set; } = "";
@@ -309,7 +309,7 @@ internal sealed class LogLinkFile
 /// <summary>The <c>links:</c> block of an environment file.</summary>
 internal sealed class LinksFile
 {
-    /// <summary>The name of a loganalytics source of this file. Its connection and login are used.</summary>
+    /// <summary>The name of a source of this file whose kind can read dependencies (on Azure, loganalytics). Its connection and login are used.</summary>
     public string Source { get; set; } = "";
     /// <summary>The query to send, a template ({roles}, {from}, {to}, scope variables, {environment}). One row for each caller and address: caller, host, days; path and calls optional.</summary>
     public string Query { get; set; } = "";

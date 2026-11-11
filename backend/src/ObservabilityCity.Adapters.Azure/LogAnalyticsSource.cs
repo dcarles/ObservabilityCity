@@ -423,7 +423,9 @@ public sealed class LogAnalyticsSource(
 
 public sealed class LogAnalyticsSourceFactory(HttpClient? http = null, TimeProvider? time = null) : IMetricSourceFactory
 {
-    public string Kind => "loganalytics";
+    public const string SourceKind = "loganalytics";
+
+    public string Kind => SourceKind;
 
     public IMetricSource Create(SourceContext context)
     {

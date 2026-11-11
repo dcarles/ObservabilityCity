@@ -14,8 +14,17 @@ public sealed class AzureAdapters : IAdapterModule
 
     public void Register(IAdapterRegistry registry)
     {
-        foreach (var kind in new[] { "resourcegraph", "loganalytics", "azuremonitor", "servicebus", "functionjobs", ObservabilityCity.Core.Sources.SourceKinds.ResourceHealth })
-            registry.AddSourceKind(new SourceKindInfo(kind, LoginKind));
+        // what each kind can serve besides signals: the core asks for these, never for a kind's name
+        foreach (var (kind, can) in new[]
+                 {
+                     (ResourceGraphSourceFactory.SourceKind, SourceCapabilities.Inventory),
+                     (LogAnalyticsSourceFactory.SourceKind, SourceCapabilities.Logs | SourceCapabilities.Links),
+                     (AzureMonitorSourceFactory.SourceKind, SourceCapabilities.None),
+                     (ServiceBusSourceFactory.SourceKind, SourceCapabilities.None),
+                     (FunctionJobsSourceFactory.SourceKind, SourceCapabilities.None),
+                     (ResourceHealthSourceFactory.SourceKind, SourceCapabilities.HealthEvents),
+                 })
+            registry.AddSourceKind(new SourceKindInfo(kind, LoginKind) { Capabilities = can });
         registry.AddSource(new ResourceGraphSourceFactory());
         registry.AddSource(new LogAnalyticsSourceFactory());
         registry.AddSource(new AzureMonitorSourceFactory());

@@ -135,7 +135,7 @@
       "required": ["source", "query"],
       "description": "What a system's Logs tab shows in a live town: 5xx requests, slow requests, warnings and errors, and exceptions, as four separate sections. Nothing is polled; the query runs only when the tab is opened and its answer is not kept. Without this block the tab says logs are not set up.",
       "properties": {
-        "source": { "type": "string", "description": "The loganalytics source (from sources) whose workspace and login are used." },
+        "source": { "type": "string", "description": "The source (from sources) the logs are read from: one whose kind can read logs (on Azure, loganalytics). Its connection and login are used." },
         "query": { "type": "string", "description": "The query, a template. {roles} stands for the system's telemetry name (double-quoted), {from} and {to} for the UTC bounds (ISO 8601), {window}, {windowSeconds}, {slaMs} (the system's p99 SLA) and {kind} (api, worker and so on); scope variables and {environment} work too. It returns one row for each kind of entry with the columns section (failed, slow, logs or exceptions), at and text; count, level, durationMs and result may be left out." },
         "window": { "type": "string", "pattern": "^[0-9]+(\\.[0-9]+)?[smhd]$", "description": "How far back it looks. Default 4h." },
         "links": {
@@ -161,7 +161,7 @@
       "required": ["source", "query"],
       "description": "Finds the calls the systems really make from the dependency data in the telemetry and adds them to the declared calls and gatewayCalls. Without this block the environment has only the declared links. Found links are saved under _discovered/links/<environment>/ in the town's folder, never in a pillar file.",
       "properties": {
-        "source": { "type": "string", "description": "The loganalytics source (from sources) whose workspace and login are used." },
+        "source": { "type": "string", "description": "The source (from sources) the dependencies are read from: one whose kind can read them (on Azure, loganalytics). Its connection and login are used." },
         "query": { "type": "string", "description": "The query, a template. {roles} stands for the telemetry names of the systems asked about (double-quoted, comma separated), {from} and {to} for the read's UTC bounds (ISO 8601); scope variables and {environment} work too. It returns one row for each caller and address with the columns caller, host and days (an array of the days it was seen on); path and calls may be left out." },
         "interval": { "type": "string", "pattern": "^[0-9]+(\\.[0-9]+)?[smhd]$", "description": "How often it reads. Default 1h." },
         "firstRead": { "type": "string", "pattern": "^[0-9]+(\\.[0-9]+)?[smhd]$", "description": "How far back the first read looks, and the longest gap a later read covers. Default 7d." },
@@ -203,7 +203,7 @@
       "additionalProperties": false,
       "description": "How this environment's pillars and systems map onto the cloud: the subscription of each pillar, the workspace, which resources belong to a service and what the telemetry calls each system. Every convention is a rule or a template here; the program assumes none. Templates have {variable} and {variable|filter} holes (filters: nospace, lower, upper); {environment} is this file's id and variables are your own.",
       "properties": {
-        "inventory": { "type": "string", "description": "The source (from sources) that reads the inventory, a resourcegraph source. Without it, the only one." },
+        "inventory": { "type": "string", "description": "The source (from sources) that reads the inventory: one whose kind can (on Azure, resourcegraph). Without it, any such source." },
         "workspace": { "type": "string", "description": "The workspace the telemetry is in, by name or wildcard pattern (for example log-*-{env}), a template over {environment} and variables. A name is looked up in the inventory (in Azure, through Resource Graph) and exactly one workspace must match. An id or resource id written here is used as it is." },
         "workspaceId": { "type": "string", "description": "The workspace's id (a GUID, or a resource id), a template. When it is given it is used as it is and the name is not looked up." },
         "variables": { "type": "object", "description": "Your own words for the templates, for example env: prd.", "additionalProperties": { "type": "string" } },

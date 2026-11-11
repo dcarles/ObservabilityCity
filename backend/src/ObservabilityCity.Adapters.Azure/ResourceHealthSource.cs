@@ -328,7 +328,9 @@ public sealed class ResourceHealthSource(
 
 public sealed class ResourceHealthSourceFactory(HttpClient? http = null, TimeProvider? time = null) : IMetricSourceFactory
 {
-    public string Kind => SourceKinds.ResourceHealth;
+    public const string SourceKind = "resourcehealth";
+
+    public string Kind => SourceKind;
 
     public IMetricSource Create(SourceContext context)
     {

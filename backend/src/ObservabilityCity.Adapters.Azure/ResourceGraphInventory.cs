@@ -193,7 +193,9 @@ public sealed class ResourceGraphSourceFactory(HttpClient? http = null, TimeProv
 {
     public const string RecordingPrefix = "file:";
 
-    public string Kind => "resourcegraph";
+    public const string SourceKind = "resourcegraph";
+
+    public string Kind => SourceKind;
 
     public IMetricSource Create(SourceContext context)
     {

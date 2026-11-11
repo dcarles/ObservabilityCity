@@ -15,7 +15,8 @@ public static class ScopeInfos
         var node = view.AllNodes.First(n => n.Id == systemId);
         var pillar = resolution.Pillar(node.GroupId);
         var names = resolution.TenantNames.ToDictionary(t => t.Id, t => t.Name);
-        var hasSource = env.Sources.Any(s => s.Kind == "resourcegraph" && (env.Scope.Inventory is null || s.Name == env.Scope.Inventory));
+        // which source reads the inventory is the adapters' word (a kind that declares it can), so the store says whether one runs; one that has read clearly does
+        var hasSource = store.HasInventorySource || store.ReadAt is not null;
         var state = !hasSource ? "none" : store.Error is not null ? "failed" : store.Inventory is null ? "waiting" : "read";
         // the workspace's problems concern every system, and are known by where the resolver put them, not by their words
         var problems = resolution.Problems.Where(p => resolution.WorkspaceProblemList.Contains(p) || p.Contains($"'{systemId}'") || p.Contains($"Pillar '{node.GroupId}'")).ToList();

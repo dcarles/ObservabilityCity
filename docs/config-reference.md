@@ -423,7 +423,7 @@ Finds the calls the systems really make, from the dependency data in the telemet
 <!-- file: LinksFile -->
 | Key | Required | Default | Meaning |
 |---|---|---|---|
-| `source` | yes | | Name of a `loganalytics` source of this file (today it must be that Azure adapter kind). Its workspace and login are used. |
+| `source` | yes | | Name of a source of this file whose kind can read dependencies (with the Azure adapter, a `loganalytics` source). Its connection and login are used. The adapter of each kind says what its sources can do; `validate` names the kinds that can. |
 | `query` | yes | | The query to send, a template. Holes: `{roles}` (the telemetry names of the systems asked about, double-quoted, separated by commas), `{from}` and `{to}` (UTC, ISO 8601), `{environment}` and your `scope.variables`. It returns one row for each caller and address with the columns `caller` (a telemetry name), `host` and `days` (an array of the days it was seen on); `path` and `calls` may be left out. The store does the counting; no raw rows come back. |
 | `interval` | no | `1h` | How often it reads, for example `30m`. A number and `s`, `m`, `h` or `d`. |
 | `firstRead` | no | `7d` | How far back the first read looks, and the longest gap a later read covers. After that each read starts where the last ended. |
@@ -486,7 +486,7 @@ What a system's Logs tab shows in a live town. Nothing is polled: when someone o
 <!-- file: LogsFile -->
 | Key | Required | Default | Meaning |
 |---|---|---|---|
-| `source` | yes | | Name of a `loganalytics` source of this file (today it must be that Azure adapter kind). Its workspace and login are used. |
+| `source` | yes | | Name of a source of this file whose kind can read logs (with the Azure adapter, a `loganalytics` source). Its connection and login are used. The adapter of each kind says what its sources can do; `validate` names the kinds that can. |
 | `query` | yes | | The query to send, a template. Holes: `{roles}` (the system's telemetry name, double-quoted), `{from}` and `{to}` (UTC, ISO 8601), `{window}` (for example `4h`), `{windowSeconds}`, `{slaMs}` (the system's own p99 SLA), `{kind}` (`api`, `worker` and so on), `{environment}` and your `scope.variables`. It returns one row for each kind of entry with the columns `section` (`failed`, `slow`, `logs` or `exceptions`), `at` (the newest time) and `text`; `count` (default 1), `level` (`info`, `warn` or `error`, or a number where 2 is a warning and 3 and up an error), `durationMs` and `result` (a status code, say) may be left out. The store does the grouping; no raw rows come back, and none are cut off. |
 | `window` | no | `4h` | How far back it looks, for example `30m`. |
 | `links` | no | none | Links in the header of a section that open the telemetry store's own search already filtered to the system, 0 to n, each `{ name, section, resources, url }`. `section` is `failed`, `slow`, `logs` or `exceptions`; `resources` names a `scope.assets` rule, and each resource it finds gets its own link (its name is added to the link's name when there is more than one). The url starts with `https://` (or `http://`) written out and may use `{resourceId}`, `{resourceIdTwice}` (the id percent-encoded twice, for portals that nest it), `{resourceName}`, `{role}`, `{from}`, `{to}`, `{windowMs}`, `{environment}` and your `scope.variables`; every value is percent-encoded. |
@@ -535,7 +535,7 @@ How pillars and systems map onto the cloud provider. `inventory`, `workspace`, `
 <!-- file: ScopeFile -->
 | Key | Required | Default | Meaning |
 |---|---|---|---|
-| `inventory` | no | none | **Azure adapter setting.** Name of the `resourcegraph` source that lists resources. |
+| `inventory` | no | none | Name of the source that lists resources: one whose kind can read an inventory (with the Azure adapter, a `resourcegraph` source). Without it, any such source of the file. |
 | `workspace` | no | none | **Azure adapter setting.** The telemetry store: a Log Analytics workspace by name or wildcard (a template), looked up in the inventory. An id or resource id is used as given. |
 | `workspaceId` | no | none | **Azure adapter setting.** The workspace's id (GUID or resource id), a template. Wins over `workspace`. |
 | `variables` | no | none | Your own names for use in templates. |
