@@ -73,25 +73,25 @@ for (const theme of themesUnderTest) {
     test('keeps every signal readable on a bad day', async ({ town, page }) => {
       await town.open(`&theme=${theme}`)
       await town.step(5)
-      const yard0 = await town.yard('cl.ledger-db')
+      const yard0 = await town.yard('ldg.ledger-db')
       const tenant = yard0.units[0].id
 
-      await town.effect('cl.ledger-api', 'Down')
+      await town.effect('ldg.ledger-api', 'Down')
       await town.effect('pay.payments-api', 'Errors', 0.8)
       await town.effect('pay.refunds-worker', 'UnhealthyInstances', 0.5)
-      await town.effect('cl.posting-worker', 'Poison')
+      await town.effect('ldg.posting-worker', 'Poison')
       await town.effect('pay.payments-worker', 'Backlog')
-      await town.effect('cl.session-cache', 'Stale')
-      await town.effect(`cl.ledger-db#${tenant}`, 'Saturate')
-      await town.effect('frd', 'Incident', 0.9)
-      await town.until('cl.ledger-api', (n) => n.state === 'Down')
-      await town.until('cl.posting-worker', (n) => (n.deadLetters ?? 0) >= 20)
+      await town.effect('ldg.session-cache', 'Stale')
+      await town.effect(`ldg.ledger-db#${tenant}`, 'Saturate')
+      await town.effect('fra', 'Incident', 0.9)
+      await town.until('ldg.ledger-api', (n) => n.state === 'Down')
+      await town.until('ldg.posting-worker', (n) => (n.deadLetters ?? 0) >= 20)
       await town.until('pay.payments-worker', (n) => (n.oldestMessageSeconds ?? 0) >= 60)
-      await page.waitForFunction(() => (window as any).city.seen.last.groups.find((g: any) => g.id === 'frd').incidents.length > 0, null, { timeout: 20_000 })
+      await page.waitForFunction(() => (window as any).city.seen.last.groups.find((g: any) => g.id === 'fra').incidents.length > 0, null, { timeout: 20_000 })
       await town.step(20)
 
       // down: a steady red light, a closed sign, every floor dark
-      const down = await town.inspect('cl.ledger-api')
+      const down = await town.inspect('ldg.ledger-api')
       expect(down).toMatchObject({ beacon: 'red', beaconSteady: true, closedSign: true })
       expect(down.darkFloors).toBe(down.floors)
       // failing requests: red, on that system only
@@ -100,20 +100,20 @@ for (const theme of themesUnderTest) {
       // sick instances: dark floors, in the same share
       expect((await town.inspect('pay.refunds-worker')).darkFloors).toBeGreaterThan(0)
       // no fresh data: grey, never healthy
-      expect((await town.inspect('cl.session-cache')).beacon).toBe('grey')
+      expect((await town.inspect('ldg.session-cache')).beacon).toBe('grey')
       // dead letters: the pen, and the harbour light
-      const cl = await town.island('cl')
-      expect(cl.alarm).toBe(true)
-      expect(cl.brokenCrates).toBeGreaterThan(0)
+      const ldg = await town.island('ldg')
+      expect(ldg.alarm).toBe(true)
+      expect(ldg.brokenCrates).toBeGreaterThan(0)
       await expect(page.locator('#topbar .chip.dlq')).toHaveClass(/bad/)
       // a backlog: crates on the pier
       expect((await town.island('pay')).crates).toBeGreaterThan(0)
       // an incident: weather over that island only
       const sky = (id: string) => page.evaluate((i) => (window as any).city.inspectIsland(i).sky, id)
-      expect((await sky('frd')).severity).toBe(1)
-      expect((await sky('cl')).severity).toBeNull()
+      expect((await sky('fra')).severity).toBe(1)
+      expect((await sky('ldg')).severity).toBeNull()
       // a throttled tenant: its unit turns from the calm colour
-      const yard = await town.yard('cl.ledger-db')
+      const yard = await town.yard('ldg.ledger-db')
       expect(yard.units.find((u) => u.id === tenant)!.throttled).toBe(true)
       expect(yard.sign.text).toContain('1 throttled')
       // the services keep their signs, and their worst state
@@ -127,14 +127,14 @@ for (const theme of themesUnderTest) {
     test('shows the same bad day on the dashboard, whatever theme the address names', async ({ town, page }) => {
       await town.open(`&theme=${theme}`)
       await town.step(5)
-      await town.effect('cl.ledger-api', 'Down')
-      await town.effect('cl.posting-worker', 'Poison')
+      await town.effect('ldg.ledger-api', 'Down')
+      await town.effect('ldg.posting-worker', 'Poison')
       await town.effect('pay.payments-worker', 'Backlog')
-      await town.effect('frd', 'Incident', 0.9)
-      await town.until('cl.ledger-api', (n) => n.state === 'Down')
-      await town.until('cl.posting-worker', (n) => (n.deadLetters ?? 0) >= 20)
+      await town.effect('fra', 'Incident', 0.9)
+      await town.until('ldg.ledger-api', (n) => n.state === 'Down')
+      await town.until('ldg.posting-worker', (n) => (n.deadLetters ?? 0) >= 20)
       await town.until('pay.payments-worker', (n) => (n.oldestMessageSeconds ?? 0) >= 60)
-      await page.waitForFunction(() => (window as any).city.seen.last.groups.find((g: any) => g.id === 'frd').incidents.length > 0, null, { timeout: 20_000 })
+      await page.waitForFunction(() => (window as any).city.seen.last.groups.find((g: any) => g.id === 'fra').incidents.length > 0, null, { timeout: 20_000 })
 
       await page.goto(`/?view=dashboard&theme=${theme}`)
       await page.waitForFunction(() => (window as any).dash?.seen.snapshots > 0)

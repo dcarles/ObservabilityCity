@@ -29,7 +29,7 @@ describe('a healthy town', () => {
     expect(d.tick(19.9)).toBeNull()
     expect(d.tick(20)?.key).toBe('hub')
     expect(d.tick(39.9)).toBeNull()
-    expect(d.tick(40)?.key).toBe('island:cl')
+    expect(d.tick(40)?.key).toBe('island:ldg')
   })
 
   it('goes round the whole loop and starts again', () => {
@@ -66,23 +66,23 @@ describe('a healthy town', () => {
 describe('trouble about', () => {
   it('turns the loop into a tour of the trouble, worst first, holding at each stop', () => {
     const d = new WallDirector(HOLD)
-    let s = withState(healthyTown(), 'cl.ledger-db', 'Degraded')
+    let s = withState(healthyTown(), 'ldg.ledger-db', 'Degraded')
     s = withState(s, 'pay.payments-api', 'Down')
-    s = withIncident(s, 'frd', { id: 'inc', severity: 2, title: 'Screening is slow' })
+    s = withIncident(s, 'fra', { id: 'inc', severity: 2, title: 'Screening is slow' })
 
     const first = d.update(s, 0)
 
     expect(d.mode).toBe('alert')
-    expect(first).toMatchObject({ kind: 'incident', focus: { kind: 'island', id: 'frd' } })
+    expect(first).toMatchObject({ kind: 'incident', focus: { kind: 'island', id: 'fra' } })
     expect(d.tick(10)).toBeNull()
     expect(d.tick(20)).toMatchObject({ kind: 'down', focus: { kind: 'building', id: 'pay.payments-api' } })
-    expect(d.tick(40)).toMatchObject({ kind: 'degraded', focus: { kind: 'building', id: 'cl.ledger-db' } })
+    expect(d.tick(40)).toMatchObject({ kind: 'degraded', focus: { kind: 'building', id: 'ldg.ledger-db' } })
     expect(d.tick(60)).toMatchObject({ kind: 'incident' }) // and round again
   })
 
   it('goes back to the showcase loop once everything is fine', () => {
     const d = new WallDirector(HOLD)
-    d.update(withState(healthyTown(), 'cl.ledger-api', 'Down'), 0)
+    d.update(withState(healthyTown(), 'ldg.ledger-api', 'Down'), 0)
 
     const stop = d.update(healthyTown(), 5)
 
@@ -92,12 +92,12 @@ describe('trouble about', () => {
 
   it('moves on from a stop at once when its trouble ends, without cutting', () => {
     const d = new WallDirector(HOLD)
-    let both = withState(healthyTown(), 'cl.ledger-api', 'Down')
+    let both = withState(healthyTown(), 'ldg.ledger-api', 'Down')
     both = withState(both, 'pay.payments-api', 'Down')
     d.update(both, 0)
     const holding = d.current!.focus.id
 
-    const stop = d.update(withState(healthyTown(), holding === 'cl.ledger-api' ? 'pay.payments-api' : 'cl.ledger-api', 'Down'), 3)
+    const stop = d.update(withState(healthyTown(), holding === 'ldg.ledger-api' ? 'pay.payments-api' : 'ldg.ledger-api', 'Down'), 3)
 
     expect(stop).not.toBeNull()
     expect(stop!.cut).toBe(false)
@@ -109,9 +109,9 @@ describe('new trouble', () => {
   it('cuts to it at once and holds there for a full stop', () => {
     const d = calmDirector()
 
-    const stop = d.update(withState(healthyTown(), 'cl.ledger-api', 'Down'), 7)
+    const stop = d.update(withState(healthyTown(), 'ldg.ledger-api', 'Down'), 7)
 
-    expect(stop).toMatchObject({ kind: 'down', cut: true, focus: { kind: 'building', id: 'cl.ledger-api' } })
+    expect(stop).toMatchObject({ kind: 'down', cut: true, focus: { kind: 'building', id: 'ldg.ledger-api' } })
     expect(d.cuts).toBe(1)
     expect(d.tick(26.9)).toBeNull() // 7 + 20 not yet reached
     expect(d.tick(27)).not.toBeNull()
@@ -120,7 +120,7 @@ describe('new trouble', () => {
   it('pulses the screen for a few seconds', () => {
     const d = calmDirector()
 
-    d.update(withState(healthyTown(), 'cl.ledger-api', 'Down'), 7)
+    d.update(withState(healthyTown(), 'ldg.ledger-api', 'Down'), 7)
 
     expect(d.pulsing(7)).toBe(true)
     expect(d.pulsing(10.9)).toBe(true)
@@ -129,7 +129,7 @@ describe('new trouble', () => {
 
   it('does not pulse for trouble that was already there', () => {
     const d = new WallDirector(HOLD)
-    d.update(withState(healthyTown(), 'cl.ledger-api', 'Down'), 0)
+    d.update(withState(healthyTown(), 'ldg.ledger-api', 'Down'), 0)
 
     expect(d.pulsing(0)).toBe(false)
     expect(d.cuts).toBe(0)
@@ -137,7 +137,7 @@ describe('new trouble', () => {
 
   it('cuts to the worst of several new troubles', () => {
     const d = calmDirector()
-    let s = withState(healthyTown(), 'cl.ledger-api', 'Degraded')
+    let s = withState(healthyTown(), 'ldg.ledger-api', 'Degraded')
     s = withState(s, 'pay.payments-api', 'Down')
 
     expect(d.update(s, 7)?.focus.id).toBe('pay.payments-api')
@@ -145,7 +145,7 @@ describe('new trouble', () => {
 
   it('does not whip the camera about: a second trouble right after the first waits for the tour, but the screen still pulses', () => {
     const d = calmDirector()
-    const first = withState(healthyTown(), 'cl.ledger-api', 'Down')
+    const first = withState(healthyTown(), 'ldg.ledger-api', 'Down')
     d.update(first, 7)
 
     const second = d.update(withState(first, 'pay.payments-api', 'Down'), 8)
@@ -153,26 +153,26 @@ describe('new trouble', () => {
     expect(second).toBeNull()
     expect(d.cuts).toBe(1)
     expect(d.pulseUntil).toBeGreaterThan(8)
-    expect(d.update(withState(withState(first, 'pay.payments-api', 'Down'), 'frd.cases-api', 'Down'), 11)).toMatchObject({ cut: true })
+    expect(d.update(withState(withState(first, 'pay.payments-api', 'Down'), 'fra.cases-api', 'Down'), 11)).toMatchObject({ cut: true })
   })
 
   it('continues the tour after the new trouble, not from the top', () => {
     const d = calmDirector()
-    let s = withState(healthyTown(), 'cl.ledger-api', 'Down')
+    let s = withState(healthyTown(), 'ldg.ledger-api', 'Down')
     d.update(s, 7)
 
     s = withState(s, 'pay.payments-api', 'Down')
     d.update(s, 8) // too soon to cut
     const next = d.tick(27)
 
-    expect(next?.focus.id).not.toBe('cl.ledger-api')
+    expect(next?.focus.id).not.toBe('ldg.ledger-api')
   })
 })
 
 describe('trouble that ends', () => {
   it('puts up a resolved note that goes away by itself', () => {
     const d = new WallDirector(HOLD)
-    d.update(withState(healthyTown(), 'cl.ledger-api', 'Down'), 0)
+    d.update(withState(healthyTown(), 'ldg.ledger-api', 'Down'), 0)
 
     d.update(healthyTown(), 12)
 
@@ -187,7 +187,7 @@ describe('trouble that ends', () => {
 describe('a view of one team', () => {
   it('tours only what it shows', () => {
     const d = new WallDirector(1)
-    const view = onlyIslands(healthyTown(), ['pay', 'frd'])
+    const view = onlyIslands(healthyTown(), ['pay', 'fra'])
     d.update(view, 0)
     const islands = new Set<string>()
 
@@ -196,14 +196,14 @@ describe('a view of one team', () => {
       if (stop?.key.startsWith('island:')) islands.add(stop.focus.id)
     }
 
-    expect([...islands].sort()).toEqual(['frd', 'pay'])
+    expect([...islands].sort()).toEqual(['fra', 'pay'])
   })
 
   it('does not hear about trouble on islands it does not show', () => {
     const d = new WallDirector(HOLD)
     d.update(onlyIslands(healthyTown(), ['pay']), 0)
 
-    const stop = d.update(onlyIslands(withState(healthyTown(), 'cl.ledger-api', 'Down'), ['pay']), 5)
+    const stop = d.update(onlyIslands(withState(healthyTown(), 'ldg.ledger-api', 'Down'), ['pay']), 5)
 
     expect(stop).toBeNull()
     expect(d.mode).toBe('calm')
@@ -212,7 +212,7 @@ describe('a view of one team', () => {
 
 describe('the overview of the whole town', () => {
   const OVERVIEW = 12
-  const troubled = () => withState(withState(healthyTown(), 'cl.ledger-db', 'Degraded'), 'pay.payments-api', 'Down')
+  const troubled = () => withState(withState(healthyTown(), 'ldg.ledger-db', 'Degraded'), 'pay.payments-api', 'Down')
 
   it('opens a tour of trouble, then visits each stop once, then comes round again', () => {
     const d = new WallDirector(HOLD, 4, OVERVIEW)
@@ -248,7 +248,7 @@ describe('the overview of the whole town', () => {
     const d = new WallDirector(HOLD, 4, OVERVIEW)
     d.update(healthyTown(), 0)
 
-    const stop = d.update(withState(healthyTown(), 'cl.ledger-api', 'Degraded'), 5)
+    const stop = d.update(withState(healthyTown(), 'ldg.ledger-api', 'Degraded'), 5)
 
     expect(stop).toMatchObject({ kind: 'degraded', cut: true })
     expect(d.tick(25)).toMatchObject({ kind: 'overview' })
@@ -256,9 +256,9 @@ describe('the overview of the whole town', () => {
 
   it('still cuts to new trouble at once, and carries on from there', () => {
     const d = new WallDirector(HOLD, 4, OVERVIEW)
-    d.update(withState(healthyTown(), 'cl.ledger-db', 'Degraded'), 0)
+    d.update(withState(healthyTown(), 'ldg.ledger-db', 'Degraded'), 0)
 
-    const cut = d.update(withState(withState(healthyTown(), 'cl.ledger-db', 'Degraded'), 'pay.payments-api', 'Down'), 3)
+    const cut = d.update(withState(withState(healthyTown(), 'ldg.ledger-db', 'Degraded'), 'pay.payments-api', 'Down'), 3)
 
     expect(cut).toMatchObject({ kind: 'down', cut: true })
     expect(d.tick(23)).toMatchObject({ kind: 'degraded' })

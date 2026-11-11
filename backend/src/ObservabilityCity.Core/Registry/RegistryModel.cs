@@ -269,7 +269,7 @@ public sealed record RegistryNode(
     /// <summary>The role as the files spell it: api, worker, db, cache, function, gateway, broker or egress.</summary>
     public string RoleName => Kind == NodeKind.Database ? "db" : Kind.ToString().ToLowerInvariant();
 
-    /// <summary>The registry file the system is declared in (cl.yaml, hub.yaml, third-parties.yaml).</summary>
+    /// <summary>The registry file the system is declared in (ldg.yaml, hub.yaml, third-parties.yaml).</summary>
     public string SourceFile { get; init; } = "";
 
     /// <summary>For each setting (slaP99Ms, errors.amber, ...) which layer its value came from. Empty for a node made in code.</summary>

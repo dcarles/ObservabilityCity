@@ -47,7 +47,7 @@ describe('the showcase loop', () => {
     const rates = healthyTown().groups.filter((g) => !g.isHub).flatMap((g) => g.nodes).sort((a, b) => b.requestsPerSecond - a.requestsPerSecond).slice(0, 3).map((n) => n.id)
     expect(busy.map((b) => b.focus.id)).toEqual(rates)
     expect(busy.map((b) => b.focus.kind)).toEqual(['building', 'building', 'building'])
-    // islands stand in the order cl, acc, pay, frd, cus, acq ...: a visit after the third, the sixth and the ninth
+    // islands stand in the order ldg, acc, pay, fra, cst, acq ...: a visit after the third, the sixth and the ninth
     const keys = scenes.map((c) => c.key)
     expect(keys.indexOf('busy:' + busy[0].focus.id)).toBe(keys.indexOf('island:pay') + 1)
     expect(keys.indexOf('busy:' + busy[1].focus.id)).toBe(keys.indexOf('island:acq') + 1)
@@ -73,13 +73,13 @@ describe('the showcase loop', () => {
   })
 
   it('shows a team view only its own islands', () => {
-    const scenes = calmScenes(onlyIslands(town(), ['pay', 'frd']))
+    const scenes = calmScenes(onlyIslands(town(), ['pay', 'fra']))
     const islands = scenes.filter((c) => c.key.startsWith('island:')).map((c) => c.focus.id)
 
-    expect(islands).toEqual(['pay', 'frd'])
+    expect(islands).toEqual(['pay', 'fra'])
     // a view too small to reach a third island still gets its busiest visits
     expect(scenes.some((c) => c.key.startsWith('busy:'))).toBe(true)
-    expect(scenes.filter((c) => c.key.startsWith('busy:')).every((c) => c.focus.id.startsWith('pay.') || c.focus.id.startsWith('frd.'))).toBe(true)
+    expect(scenes.filter((c) => c.key.startsWith('busy:')).every((c) => c.focus.id.startsWith('pay.') || c.focus.id.startsWith('fra.'))).toBe(true)
   })
 
   it('is just the town and the hub for a view with nothing but the hub', () => {

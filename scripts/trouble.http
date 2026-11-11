@@ -5,7 +5,7 @@
 POST {{host}}/api/fake/effects
 Content-Type: application/json
 
-{ "target": "cl.ledger-api", "kind": "HighCpu", "intensity": 0.9 }
+{ "target": "ldg.ledger-api", "kind": "HighCpu", "intensity": 0.9 }
 
 ### Dead letters building up in the Payments worker
 POST {{host}}/api/fake/effects
@@ -23,13 +23,13 @@ Content-Type: application/json
 POST {{host}}/api/fake/effects
 Content-Type: application/json
 
-{ "target": "cl.ledger-api", "kind": "Down", "intensity": 1 }
+{ "target": "ldg.ledger-api", "kind": "Down", "intensity": 1 }
 
 ### Screening API goes stale
 POST {{host}}/api/fake/effects
 Content-Type: application/json
 
-{ "target": "frd.screening-api", "kind": "Stale", "intensity": 1 }
+{ "target": "fra.screening-api", "kind": "Stale", "intensity": 1 }
 
 ### Errors across the whole Payments island
 POST {{host}}/api/fake/effects
@@ -41,13 +41,13 @@ Content-Type: application/json
 POST {{host}}/api/fake/effects
 Content-Type: application/json
 
-{ "target": "cl.ledger-db", "kind": "Saturate", "intensity": 1 }
+{ "target": "ldg.ledger-db", "kind": "Saturate", "intensity": 1 }
 
 ### One tenant's ledger database throttling (add ?env=staging to aim at another environment)
 POST {{host}}/api/fake/effects
 Content-Type: application/json
 
-{ "target": "cl.ledger-db#acme-bank", "kind": "Saturate", "intensity": 1 }
+{ "target": "ldg.ledger-db#acme-bank", "kind": "Saturate", "intensity": 1 }
 
 ### Rain over Payments (a sev 2 incident; intensity 0.9 is sev 1 and a storm, 0.4 overcast, 0.1 clouds)
 POST {{host}}/api/fake/effects
@@ -77,7 +77,7 @@ Content-Type: application/json
 POST {{host}}/api/fake/effects
 Content-Type: application/json
 
-{ "target": "frd", "kind": "Stale", "intensity": 1 }
+{ "target": "fra", "kind": "Stale", "intensity": 1 }
 
 ### Backlog on the worker-only pillar's pier (crates pile on the quay, no bridge needed)
 POST {{host}}/api/fake/effects

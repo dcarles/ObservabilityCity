@@ -1,12 +1,12 @@
 # yaml-language-server: $schema=schema/town.schema.json
 id: galactic-credit
 name: Galactic Credit
-groupLabel: Pillar        # what an island is called in this town
+groupLabel: Domain        # what an island is called in this town
 topology: hub-and-spoke   # cross-group calls go through the hub gateway
 mode: demo                # fake data, with the Break things panel and the story bar. Leave it out (live) for real sources
 # Islands in the order they stand round the hub. Pillars not listed follow in file order, and
 # Lost & found always comes last. ringCapacity (6 to 18, default 12) is how many islands stand on the first ring; the rest stand in a staggered second ring.
-islands: [cl, acc, pay, frd, cus, acq, dec, bil, col, dsp, rwd, obk, ntf, dat, rcn, reg]
+islands: [ldg, acc, pay, fra, cst, acq, dec, bil, col, dsp, rwd, obk, ntf, dat, rcn, reg]
 
 # How topics are named, and which are an old route: a pillar's service publishes <pillar>-<service>-outbox, the hub's topics are hub-<name>, and reading a hub topic is the old route.
 messaging:

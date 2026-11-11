@@ -1,6 +1,6 @@
 // Wall mode: the town on a big screen nobody is standing at. ?wall=1 turns it on; the rest of the address says how.
 //   ?wall=1                          the whole town, Dusk, the tour and the status strip
-//   ?wall=1&islands=pay,frd          a view for one team: only those islands, and the tour visits only what it shows
+//   ?wall=1&islands=pay,fra          a view for one team: only those islands, and the tour visits only what it shows
 //   ?wall=1&hold=30                  seconds the tour stays at each stop (default 20, or the town's wall.holdSeconds)
 //   ?wall=1&overview=3               seconds the overview of the whole town lasts when something is wrong (default 3, or the town's wall.overviewSeconds; 0 = no overview)
 //   ?wall=1&overviewIsland=3         seconds the overview stays at each pillar island, seen from its front (default 3, or wall.overviewIslandSeconds; 0 = the whole town only)

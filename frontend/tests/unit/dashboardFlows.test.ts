@@ -21,8 +21,8 @@ const flow = (id: string, sent: number | null, received: number | null, windowSe
 
 describe('pillar flows from the broker', () => {
   it('lists the pillars with a measured side, busiest first, with the name of each', () => {
-    const flows = flowsOf(withFlows({ pay: [3000, 20], cl: [null, 4000], bil: [null, null] }))
-    expect(flows.map((f) => [f.id, f.sent, f.received])).toEqual([['cl', null, 4000], ['pay', 3000, 20]])
+    const flows = flowsOf(withFlows({ pay: [3000, 20], ldg: [null, 4000], bil: [null, null] }))
+    expect(flows.map((f) => [f.id, f.sent, f.received])).toEqual([['ldg', null, 4000], ['pay', 3000, 20]])
     expect(flows[0]).toMatchObject({ name: 'Core Ledger', windowSeconds: 900 })
   })
 
@@ -100,16 +100,16 @@ describe('the Message flow tile', () => {
 })
 
 describe('the flow on the pillar cards', () => {
-  const s = withFlows({ pay: [3200, 40], cl: [null, 15], rwd: [0, 0] })
+  const s = withFlows({ pay: [3200, 40], ldg: [null, 15], rwd: [0, 0] })
   const d = buildDashboard(s, ALL_TENANTS)
   const card = (id: string) => d.pillars.find((p) => p.id === id)!
 
   it('a closed card shows what the pillar sends and receives, and nothing for a pillar that moves nothing or is not measured', () => {
     expect(pillarFlowHtml(card('pay').flow, false)).toContain('sends ext <i>3.2k msg/s</i> · receives <i>40 msg/s</i>')
-    expect(pillarFlowHtml(card('cl').flow, false)).toContain('receives <i>15 msg/s</i>')
-    expect(pillarFlowHtml(card('cl').flow, false)).not.toContain('sends')
+    expect(pillarFlowHtml(card('ldg').flow, false)).toContain('receives <i>15 msg/s</i>')
+    expect(pillarFlowHtml(card('ldg').flow, false)).not.toContain('sends')
     expect(pillarFlowHtml(card('rwd').flow, false)).toBe('') // measured, and nothing moves
-    expect(pillarFlowHtml(card('frd').flow, false)).toBe('') // not measured
+    expect(pillarFlowHtml(card('fra').flow, false)).toBe('') // not measured
     const quiet = pillarHtml(card('rwd'), ui())
     expect(quiet).not.toContain('data-flow')
     expect(quiet).not.toContain('Messages')
@@ -124,7 +124,7 @@ describe('the flow on the pillar cards', () => {
     const quiet = pillarFlowHtml(card('rwd').flow, true)
     expect(quiet).toContain('no external messages sent')
     expect(quiet).toContain('no messages received')
-    expect(pillarFlowHtml(card('frd').flow, true)).toBe('')
+    expect(pillarFlowHtml(card('fra').flow, true)).toBe('')
     expect(pillarHtml(card('pay'), ui({ openPillars: new Set(['pay']) }))).toContain('Sends')
     expect(pillarHtml(card('pay'), ui())).not.toContain('Average over')
   })
@@ -132,7 +132,7 @@ describe('the flow on the pillar cards', () => {
   it('finds a pillar flow among the flows', () => {
     const flows = flowsOf(s)
     expect(pillarFlow(flows, 'pay')).toMatchObject({ sent: 3200, received: 40 })
-    expect(pillarFlow(flows, 'frd')).toBeNull()
+    expect(pillarFlow(flows, 'fra')).toBeNull()
   })
 
   it('never uses a word for towns, islands, buildings or boats', () => {
@@ -148,14 +148,14 @@ describe('internal messages, the platform total and traffic by pillar', () => {
     const s = withFlows({ pay: [10, 4] })
     const aa = s.groups.find((g) => g.id === 'pay')!
     const [one, two] = aa.nodes
-    one.queues = [{ name: 'pay-in-1', perSecond: 2 } as never, { name: 'cl-in', perSecond: 50 } as never]
+    one.queues = [{ name: 'pay-in-1', perSecond: 2 } as never, { name: 'ldg-in', perSecond: 50 } as never]
     two.queues = [{ name: 'pay-in-2', perSecond: 3 } as never]
     aa.messaging = {
       topics: [],
       subscriptions: [
         { topic: 'pay-in-1', publisher: 'pay', consumer: one.id, legacy: false },
         { topic: 'pay-in-2', publisher: 'pay', consumer: two.id, legacy: false },
-        { topic: 'cl-in', publisher: 'cl', consumer: one.id, legacy: false },
+        { topic: 'ldg-in', publisher: 'ldg', consumer: one.id, legacy: false },
       ],
     } as never
     return s

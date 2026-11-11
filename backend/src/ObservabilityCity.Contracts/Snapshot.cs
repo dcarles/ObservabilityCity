@@ -473,7 +473,7 @@ public enum SettingLayer
 
 /// <summary>
 /// One effective setting of a system. Key is its name in the YAML (errors.amber), Value what the app uses, formatted for people (5%, 300 ms),
-/// Layer which file layer it came from and Source that layer in words (pillars/cl.yaml, defaults for api).
+/// Layer which file layer it came from and Source that layer in words (pillars/ldg.yaml, defaults for api).
 /// </summary>
 public sealed record ConfigValue(string Key, string Value, SettingLayer Layer, string Source);
 

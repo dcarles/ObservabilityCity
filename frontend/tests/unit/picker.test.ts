@@ -3,8 +3,8 @@ import { escapeHtml, rankItems, type PickItem } from '../../src/picker'
 
 const items: PickItem[] = [
   { kind: 'town', id: '*', name: 'Whole town', where: '' },
-  { kind: 'island', id: 'cl', name: 'Core Ledger', where: 'Core Ledger' },
-  { kind: 'building', id: 'cl.ledger-api', name: 'Ledger API', where: 'Core Ledger' },
+  { kind: 'island', id: 'ldg', name: 'Core Ledger', where: 'Core Ledger' },
+  { kind: 'building', id: 'ldg.ledger-api', name: 'Ledger API', where: 'Core Ledger' },
   { kind: 'building', id: 'pay.payments-api', name: 'Payments API', where: 'Payments' },
   { kind: 'building', id: 'pay.refunds-api', name: 'Refunds API', where: 'Payments' },
 ]
@@ -23,8 +23,8 @@ describe('rankItems', () => {
   })
 
   it('puts names that start with the text first, and islands before their buildings', () => {
-    expect(rankItems(items, 'ledger', 8).map((i) => i.id)).toEqual(['cl.ledger-api', 'cl'])
-    expect(rankItems(items, 'core', 8).map((i) => i.id)).toEqual(['cl', 'cl.ledger-api'])
+    expect(rankItems(items, 'ledger', 8).map((i) => i.id)).toEqual(['ldg.ledger-api', 'ldg'])
+    expect(rankItems(items, 'core', 8).map((i) => i.id)).toEqual(['ldg', 'ldg.ledger-api'])
     expect(rankItems(items, 'pay', 8)[0].id).toBe('pay.payments-api')
   })
 })

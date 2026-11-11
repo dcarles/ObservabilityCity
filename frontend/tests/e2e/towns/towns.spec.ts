@@ -1,7 +1,7 @@
 import { test, expect } from '../support/test'
 import { API } from '../support/city'
 
-// The server's own config folder holds two sample towns: Galactic Credit (16 pillars on a hub, Service Bus) and Droid Shop (six teams, Kafka,
+// The server's own config folder holds two sample towns: Galactic Credit (16 domains on a hub, Service Bus) and Droid Shop (six teams, Kafka,
 // direct calls between teams, three vendors). These tests run against both together.
 
 const SHOP = 'droid-shop'
@@ -162,22 +162,24 @@ test.describe('Galactic Credit keeps its hub and spokes', () => {
     expect(r).toMatchObject({ direct: false, airport: 'hub' })
     expect(r.hubBridges.length).toBeGreaterThanOrEqual(10)
     expect(r.routesThroughHub).toBeGreaterThan(0)
+    // its islands are called domains
+    expect(await page.evaluate(() => (window as any).city.seen.last.groupLabel)).toBe('Domain')
   })
 
-  test('says the pillar\'s traffic under the island\'s name and its messages on the pier board, the numbers the dashboard has', async ({ town, page }) => {
+  test('says the domain\'s traffic under the island\'s name and its messages on the pier board, the numbers the dashboard has', async ({ town, page }) => {
     await town.open()
     const signs = (await page.evaluate(() => (window as any).city.town.inspectSigns())) as { id: string; line: string; pier: { sent: number | null; internal: number | null; received: number | null; windowSeconds: number } | null }[]
     expect(signs.filter((s) => /^in .+ · out .+ rps$/.test(s.line)).length).toBeGreaterThanOrEqual(3)
     const withPier = signs.filter((s) => s.pier)
     expect(withPier.length).toBeGreaterThanOrEqual(3)
-    // the same pillar says the same on the dashboard card
+    // the same domain says the same on the dashboard card
     const first = withPier[0]
     await page.goto(`/?town=galactic-credit&view=dashboard`)
     await page.waitForFunction(() => (window as any).dash?.seen.snapshots > 0)
     await expect(page.locator(`[data-pillar="${first.id}"] .pflow [data-flow]`)).toContainText(/sends ext|receives|sends int|no /)
   })
 
-  test('hovering an island\'s sign gives the pillar name and its traffic, the numbers on the sign', async ({ town, page }) => {
+  test('hovering an island\'s sign gives the domain name and its traffic, the numbers on the sign', async ({ town, page }) => {
     await town.open()
     const got = await page.evaluate(() => {
       const c = (window as any).city
@@ -211,7 +213,7 @@ test.describe('Galactic Credit keeps its hub and spokes', () => {
     for (const s of piers) expect(Math.sign(s.signX), s.id).toBe(-Math.sign(s.pierX!))
   })
 
-  test('carries what each pillar sends and receives on its own straight lane to the hub, lanes apart and never crossing', async ({ town, page }) => {
+  test('carries what each domain sends and receives on its own straight lane to the hub, lanes apart and never crossing', async ({ town, page }) => {
     await town.open()
     const lanes = (await page.evaluate(() => (window as any).city.town.inspectLanes())) as { id: string; path: { x: number; z: number }[] }[]
     const routes = (await town.sea()).routes
@@ -303,15 +305,15 @@ test.describe('the sample towns show regions and basic buildings', () => {
   test('Galactic Credit: a service in two regions, one that sends nearly all to one of them, and key vaults', async ({ request }) => {
     const s = await snapshot(request, '')
 
-    const ledger = node(s, 'cl.ledger-api').regions!
+    const ledger = node(s, 'ldg.ledger-api').regions!
     expect(ledger.length).toBe(2)
     expect(ledger.reduce((a, r) => a + r.share, 0)).toBeCloseTo(1, 2)
     expect(ledger.some((r) => r.skewed)).toBe(false)
     expect(node(s, 'pay.payments-api').regions!.filter((r) => r.skewed).length).toBe(1)
-    expect(node(s, 'cl.statements-api').regions).toBeFalsy()
-    const cl = s.groups.find((g) => g.id === 'cl')!
-    expect(cl.assets.some((a) => a.shape === 'vault' && a.service === 'ledger')).toBe(true)
-    expect(cl.assets.some((a) => a.service === null)).toBe(true)
+    expect(node(s, 'ldg.statements-api').regions).toBeFalsy()
+    const ldg = s.groups.find((g) => g.id === 'ldg')!
+    expect(ldg.assets.some((a) => a.shape === 'vault' && a.service === 'ledger')).toBe(true)
+    expect(ldg.assets.some((a) => a.service === null)).toBe(true)
   })
 
   test('Droid Shop: regions on the catalog and a key vault behind it', async ({ request }) => {
@@ -326,8 +328,8 @@ test.describe('the sample towns show regions and basic buildings', () => {
     await page.goto('/?test=1&quality=low')
     await page.waitForFunction(() => (window as any).city?.seen.snapshots > 0, null, { timeout: 55_000 })
 
-    const assets = await page.evaluate(() => (window as any).city.inspectAssets('cl') as { id: string }[])
-    expect(assets.map((a) => a.id)).toContain('cl.kv-cl-ledger')
+    const assets = await page.evaluate(() => (window as any).city.inspectAssets('ldg') as { id: string }[])
+    expect(assets.map((a) => a.id)).toContain('ldg.kv-ldg-ledger')
     const regionLine = await page.evaluate(() => (window as any).city.seen.last.groups.flatMap((g: any) => g.nodes).find((n: any) => n.id === 'pay.payments-api').regions.length)
     expect(regionLine).toBe(2)
   })
@@ -342,7 +344,7 @@ test.describe('the scheduler of Galactic Credit', () => {
     const loops = sea.routes.filter((r) => r.scheduler)
     expect(loops.length).toBeGreaterThan(0)
     for (const r of loops) expect(r.from).toBe(r.to) // every mapped service is on the scheduler's own island
-    expect(sea.routes.some((r) => r.scheduler && r.to === 'cl')).toBe(true)
+    expect(sea.routes.some((r) => r.scheduler && r.to === 'ldg')).toBe(true)
     expect(loops.every((r) => r.circuit)).toBe(true) // each sails once round its island, one way, not there and back along one line
     await expect.poll(async () => (await town.sea()).routes.filter((r) => r.scheduler).some((r) => r.rate > 0), { timeout: 20_000 }).toBe(true)
 
@@ -352,7 +354,7 @@ test.describe('the scheduler of Galactic Credit', () => {
 
   test('the drawer says which service each job starts work for', async ({ town, page }) => {
     await town.open()
-    await page.evaluate(() => (window as any).city.openSystem('cl.statement-cron'))
+    await page.evaluate(() => (window as any).city.openSystem('ldg.statement-cron'))
     const jobs = page.locator('#inspector .job')
     await expect(jobs).toHaveCount(2)
     for (const text of await jobs.allTextContents()) expect(text).toContain('starts statements')
@@ -361,7 +363,7 @@ test.describe('the scheduler of Galactic Credit', () => {
 
 // Each sample town lists its database engines in town.yaml, and its databases say which one they run on.
 test.describe('what a database runs on', () => {
-  const ledger = 'cl.ledger-db'
+  const ledger = 'ldg.ledger-db'
   type Snap = { groups: { nodes: { kind: string; engine?: { name: string; typeName: string } }[] }[] }
   const snapshot = async (request: any, q: string) => {
     await expect.poll(async () => (await request.get(`${API}/api/snapshot/latest${q}`)).status(), { timeout: 30_000 }).toBe(200)
@@ -409,12 +411,12 @@ test.describe('what a database runs on', () => {
   test('the dashboard names the engine next to the type under each database', async ({ page }) => {
     await page.goto('/?view=dashboard')
     await page.waitForFunction(() => document.querySelectorAll('[data-pillar]').length > 0, null, { timeout: 55_000 })
-    const cl = page.locator('section[data-pillar="cl"]')
-    await cl.locator('[data-toggle="cl"]').click()
-    const closed = cl.locator('tr.g[aria-expanded="false"]')
+    const ldg = page.locator('section[data-pillar="ldg"]')
+    await ldg.locator('[data-toggle="ldg"]').click()
+    const closed = ldg.locator('tr.g[aria-expanded="false"]')
     while ((await closed.count()) > 0) await closed.first().click() // each click redraws the table, so the first closed group is asked for again
 
-    await expect(cl.locator('b.engine').first()).toBeVisible()
-    await expect(cl.locator('b.engine').first()).toContainText('Cosmos DB')
+    await expect(ldg.locator('b.engine').first()).toBeVisible()
+    await expect(ldg.locator('b.engine').first()).toContainText('Cosmos DB')
   })
 })

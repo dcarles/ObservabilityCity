@@ -25,7 +25,7 @@ describe('the address for another town', () => {
   })
 
   it('drops the environment and the islands, which mean nothing in another town', () => {
-    expect(addressForTown('?env=staging&islands=pay,frd&town=galactic-credit', shop)).toBe('?town=droid-shop')
+    expect(addressForTown('?env=staging&islands=pay,fra&town=galactic-credit', shop)).toBe('?town=droid-shop')
   })
 
   it('keeps everything else: the wall, the lighting, the layers', () => {

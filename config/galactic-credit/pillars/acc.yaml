@@ -5,7 +5,7 @@ color: "#4dc3c9"
 defaults:
   api: { slaP99Ms: 400 }
 systems:
-  - { id: acc.accounts-api, service: accounts, name: Accounts API, role: api, external: true, calls: [acc.accounts-db, acc.accounts-cache, acc.limits-api], gatewayCalls: [cl.ledger-api] }
+  - { id: acc.accounts-api, service: accounts, name: Accounts API, role: api, external: true, calls: [acc.accounts-db, acc.accounts-cache, acc.limits-api], gatewayCalls: [ldg.ledger-api] }
   - { id: acc.accounts-worker, service: accounts, name: Accounts worker, role: worker, calls: [acc.accounts-db] }
   - { id: acc.accounts-db, service: accounts, name: Accounts DB, role: db, engine: sqlserver }
   - { id: acc.limits-api, service: limits, name: Limits API, role: api, calls: [acc.limits-db, acc.accounts-cache] }
@@ -18,7 +18,7 @@ messaging:
   topics: [accounts]
   subscriptions:
     - { topic: acq-applications-outbox, consumer: acc.accounts-worker }
-    - { topic: cl-ledger-outbox, consumer: acc.accounts-worker }
+    - { topic: ldg-ledger-outbox, consumer: acc.accounts-worker }
 scheduler:
   - system: acc.interest-cron
     jobs: { daily: [accounts], hourly: [accounts] }

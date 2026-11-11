@@ -14,7 +14,7 @@ systems:
 messaging:
   topics: [invoices]
   subscriptions:
-    - { topic: cl-posting-outbox, consumer: bil.invoices-worker }
+    - { topic: ldg-posting-outbox, consumer: bil.invoices-worker }
 scheduler:
   - system: bil.billing-cron
     jobs: { daily: [invoices], hourly: [invoices] }

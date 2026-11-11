@@ -11,9 +11,9 @@ const calm = JSON.parse(readFileSync(resolve(__dirname, '../../../shared-test-da
 
 describe('islands from the address', () => {
   it('reads a comma list, repeats and blanks', () => {
-    expect(parseIslands('?islands=cl,pay')).toEqual(['cl', 'pay'])
-    expect(parseIslands('?islands=cl&islands=pay,cl')).toEqual(['cl', 'pay'])
-    expect(parseIslands('?islands=%20cl%20,,pay')).toEqual(['cl', 'pay'])
+    expect(parseIslands('?islands=ldg,pay')).toEqual(['ldg', 'pay'])
+    expect(parseIslands('?islands=ldg&islands=pay,ldg')).toEqual(['ldg', 'pay'])
+    expect(parseIslands('?islands=%20ldg%20,,pay')).toEqual(['ldg', 'pay'])
   })
 
   it('shows every island when the address names none', () => {
@@ -23,9 +23,9 @@ describe('islands from the address', () => {
   })
 
   it('writes the choice back in a fixed order', () => {
-    expect(islandsParam(['pay', 'cl'])).toBe('cl,pay')
+    expect(islandsParam(['pay', 'ldg'])).toBe('ldg,pay')
     expect(islandsParam([])).toBe('')
-    expect(parseIslands(`?islands=${islandsParam(['pay', 'cl'])}`)).toEqual(['cl', 'pay'])
+    expect(parseIslands(`?islands=${islandsParam(['pay', 'ldg'])}`)).toEqual(['ldg', 'pay'])
   })
 })
 

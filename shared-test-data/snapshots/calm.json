@@ -1,7 +1,7 @@
 {
   "townId": "galactic-credit",
   "townName": "Galactic Credit",
-  "groupLabel": "Pillar",
+  "groupLabel": "Domain",
   "environment": "demo",
   "generatedAt": "2026-10-24T12:00:01+00:00",
   "dayFraction": 0.5,
@@ -231,7 +231,7 @@
       "flow": null
     },
     {
-      "id": "cl",
+      "id": "ldg",
       "displayName": "Core Ledger",
       "color": "#5aa9ff",
       "isHub": false,
@@ -243,15 +243,15 @@
       "messaging": {
         "topics": [
           {
-            "name": "cl-ledger-outbox",
+            "name": "ldg-ledger-outbox",
             "service": "ledger"
           },
           {
-            "name": "cl-posting-outbox",
+            "name": "ldg-posting-outbox",
             "service": "posting"
           },
           {
-            "name": "cl-statements-outbox",
+            "name": "ldg-statements-outbox",
             "service": "statements"
           }
         ],
@@ -259,44 +259,44 @@
           {
             "topic": "pay-payments-outbox",
             "publisher": "pay",
-            "consumer": "cl.ledger-worker",
+            "consumer": "ldg.ledger-worker",
             "legacy": false
           },
           {
             "topic": "bil-invoices-outbox",
             "publisher": "bil",
-            "consumer": "cl.ledger-worker",
+            "consumer": "ldg.ledger-worker",
             "legacy": false
           },
           {
             "topic": "pay-payments-outbox",
             "publisher": "pay",
-            "consumer": "cl.posting-worker",
+            "consumer": "ldg.posting-worker",
             "legacy": false
           },
           {
             "topic": "pay-refunds-outbox",
             "publisher": "pay",
-            "consumer": "cl.posting-worker",
+            "consumer": "ldg.posting-worker",
             "legacy": false
           },
           {
-            "topic": "cl-ledger-outbox",
-            "publisher": "cl",
-            "consumer": "cl.statements-worker",
+            "topic": "ldg-ledger-outbox",
+            "publisher": "ldg",
+            "consumer": "ldg.statements-worker",
             "legacy": false
           }
         ],
         "schedules": [
           {
-            "system": "cl.statement-cron",
+            "system": "ldg.statement-cron",
             "job": "daily",
             "services": [
               "statements"
             ]
           },
           {
-            "system": "cl.statement-cron",
+            "system": "ldg.statement-cron",
             "job": "hourly",
             "services": [
               "statements"
@@ -306,7 +306,7 @@
       },
       "nodes": [
         {
-          "id": "cl.ledger-api",
+          "id": "ldg.ledger-api",
           "name": "Ledger API",
           "kind": "Api",
           "service": "ledger",
@@ -335,9 +335,9 @@
           "backlogAmber": 60,
           "backlogRed": 300,
           "calls": [
-            "cl.ledger-db",
-            "cl.session-cache",
-            "cl.posting-api"
+            "ldg.ledger-db",
+            "ldg.session-cache",
+            "ldg.posting-api"
           ],
           "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00",
@@ -375,7 +375,7 @@
           "engine": null
         },
         {
-          "id": "cl.ledger-worker",
+          "id": "ldg.ledger-worker",
           "name": "Ledger worker",
           "kind": "Worker",
           "service": "ledger",
@@ -404,7 +404,7 @@
           "backlogAmber": 60,
           "backlogRed": 300,
           "calls": [
-            "cl.ledger-db"
+            "ldg.ledger-db"
           ],
           "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00",
@@ -442,7 +442,7 @@
           "engine": null
         },
         {
-          "id": "cl.ledger-db",
+          "id": "ldg.ledger-db",
           "name": "Ledger DB",
           "kind": "Database",
           "service": "ledger",
@@ -493,7 +493,7 @@
           }
         },
         {
-          "id": "cl.posting-api",
+          "id": "ldg.posting-api",
           "name": "Posting API",
           "kind": "Api",
           "service": "posting",
@@ -522,8 +522,8 @@
           "backlogAmber": 60,
           "backlogRed": 300,
           "calls": [
-            "cl.posting-db",
-            "cl.session-cache"
+            "ldg.posting-db",
+            "ldg.session-cache"
           ],
           "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00",
@@ -542,7 +542,7 @@
           "engine": null
         },
         {
-          "id": "cl.posting-worker",
+          "id": "ldg.posting-worker",
           "name": "Posting worker",
           "kind": "Worker",
           "service": "posting",
@@ -571,8 +571,8 @@
           "backlogAmber": 60,
           "backlogRed": 300,
           "calls": [
-            "cl.posting-db",
-            "cl.statements-api"
+            "ldg.posting-db",
+            "ldg.statements-api"
           ],
           "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00",
@@ -591,7 +591,7 @@
           "engine": null
         },
         {
-          "id": "cl.posting-db",
+          "id": "ldg.posting-db",
           "name": "Posting DB",
           "kind": "Database",
           "service": "posting",
@@ -642,7 +642,7 @@
           }
         },
         {
-          "id": "cl.statements-api",
+          "id": "ldg.statements-api",
           "name": "Statements API",
           "kind": "Api",
           "service": "statements",
@@ -671,8 +671,8 @@
           "backlogAmber": 60,
           "backlogRed": 300,
           "calls": [
-            "cl.statements-db",
-            "cl.ledger-api"
+            "ldg.statements-db",
+            "ldg.ledger-api"
           ],
           "gatewayCalls": [
             "ntf.dispatch-api"
@@ -693,7 +693,7 @@
           "engine": null
         },
         {
-          "id": "cl.statements-worker",
+          "id": "ldg.statements-worker",
           "name": "Statements worker",
           "kind": "Worker",
           "service": "statements",
@@ -722,7 +722,7 @@
           "backlogAmber": 60,
           "backlogRed": 300,
           "calls": [
-            "cl.statements-db"
+            "ldg.statements-db"
           ],
           "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00",
@@ -741,7 +741,7 @@
           "engine": null
         },
         {
-          "id": "cl.statements-db",
+          "id": "ldg.statements-db",
           "name": "Statements DB",
           "kind": "Database",
           "service": "statements",
@@ -792,7 +792,7 @@
           }
         },
         {
-          "id": "cl.statement-cron",
+          "id": "ldg.statement-cron",
           "name": "Statement run",
           "kind": "Function",
           "service": null,
@@ -821,7 +821,7 @@
           "backlogAmber": 60,
           "backlogRed": 300,
           "calls": [
-            "cl.statements-api"
+            "ldg.statements-api"
           ],
           "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00",
@@ -855,7 +855,7 @@
           "engine": null
         },
         {
-          "id": "cl.session-cache",
+          "id": "ldg.session-cache",
           "name": "Session cache",
           "kind": "Cache",
           "service": null,
@@ -933,8 +933,8 @@
             "legacy": false
           },
           {
-            "topic": "cl-ledger-outbox",
-            "publisher": "cl",
+            "topic": "ldg-ledger-outbox",
+            "publisher": "ldg",
             "consumer": "acc.accounts-worker",
             "legacy": false
           }
@@ -992,7 +992,7 @@
             "acc.limits-api"
           ],
           "gatewayCalls": [
-            "cl.ledger-api"
+            "ldg.ledger-api"
           ],
           "lastUpdated": "2026-10-24T12:00:01+00:00",
           "tenants": null,
@@ -1348,8 +1348,8 @@
         ],
         "subscriptions": [
           {
-            "topic": "frd-screening-outbox",
-            "publisher": "frd",
+            "topic": "fra-screening-outbox",
+            "publisher": "fra",
             "consumer": "pay.payments-worker",
             "legacy": false
           },
@@ -1403,8 +1403,8 @@
             "pay.refunds-api"
           ],
           "gatewayCalls": [
-            "frd.screening-api",
-            "cl.posting-api"
+            "fra.screening-api",
+            "ldg.posting-api"
           ],
           "lastUpdated": "2026-10-24T12:00:01+00:00",
           "tenants": null,
@@ -1572,7 +1572,7 @@
             "pay.refunds-db"
           ],
           "gatewayCalls": [
-            "cl.posting-api"
+            "ldg.posting-api"
           ],
           "lastUpdated": "2026-10-24T12:00:01+00:00",
           "tenants": null,
@@ -1697,7 +1697,7 @@
       }
     },
     {
-      "id": "frd",
+      "id": "fra",
       "displayName": "Fraud",
       "color": "#e0566e",
       "isHub": false,
@@ -1709,7 +1709,7 @@
       "messaging": {
         "topics": [
           {
-            "name": "frd-screening-outbox",
+            "name": "fra-screening-outbox",
             "service": "screening"
           }
         ],
@@ -1717,7 +1717,7 @@
           {
             "topic": "pay-payments-outbox",
             "publisher": "pay",
-            "consumer": "frd.screening-worker",
+            "consumer": "fra.screening-worker",
             "legacy": false
           }
         ],
@@ -1725,7 +1725,7 @@
       },
       "nodes": [
         {
-          "id": "frd.screening-api",
+          "id": "fra.screening-api",
           "name": "Screening API",
           "kind": "Api",
           "service": "screening",
@@ -1754,9 +1754,9 @@
           "backlogAmber": 60,
           "backlogRed": 300,
           "calls": [
-            "frd.screening-db",
-            "frd.rules-cache",
-            "frd.cases-api"
+            "fra.screening-db",
+            "fra.rules-cache",
+            "fra.cases-api"
           ],
           "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00",
@@ -1775,7 +1775,7 @@
           "engine": null
         },
         {
-          "id": "frd.screening-worker",
+          "id": "fra.screening-worker",
           "name": "Screening worker",
           "kind": "Worker",
           "service": "screening",
@@ -1804,7 +1804,7 @@
           "backlogAmber": 60,
           "backlogRed": 300,
           "calls": [
-            "frd.screening-db"
+            "fra.screening-db"
           ],
           "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00",
@@ -1823,7 +1823,7 @@
           "engine": null
         },
         {
-          "id": "frd.screening-db",
+          "id": "fra.screening-db",
           "name": "Screening DB",
           "kind": "Database",
           "service": "screening",
@@ -1874,7 +1874,7 @@
           }
         },
         {
-          "id": "frd.cases-api",
+          "id": "fra.cases-api",
           "name": "Cases API",
           "kind": "Api",
           "service": "fraud-cases",
@@ -1903,10 +1903,10 @@
           "backlogAmber": 60,
           "backlogRed": 300,
           "calls": [
-            "frd.cases-db"
+            "fra.cases-db"
           ],
           "gatewayCalls": [
-            "cus.profile-api"
+            "cst.profile-api"
           ],
           "lastUpdated": "2026-10-24T12:00:01+00:00",
           "tenants": null,
@@ -1924,7 +1924,7 @@
           "engine": null
         },
         {
-          "id": "frd.cases-db",
+          "id": "fra.cases-db",
           "name": "Cases DB",
           "kind": "Database",
           "service": "fraud-cases",
@@ -1975,7 +1975,7 @@
           }
         },
         {
-          "id": "frd.rules-cache",
+          "id": "fra.rules-cache",
           "name": "Rules cache",
           "kind": "Cache",
           "service": null,
@@ -2029,7 +2029,7 @@
       }
     },
     {
-      "id": "cus",
+      "id": "cst",
       "displayName": "Customers",
       "color": "#3fb68b",
       "isHub": false,
@@ -2041,11 +2041,11 @@
       "messaging": {
         "topics": [
           {
-            "name": "cus-profile-outbox",
+            "name": "cst-profile-outbox",
             "service": "profile"
           },
           {
-            "name": "cus-consent-outbox",
+            "name": "cst-consent-outbox",
             "service": "consent"
           }
         ],
@@ -2053,26 +2053,26 @@
           {
             "topic": "acq-applications-outbox",
             "publisher": "acq",
-            "consumer": "cus.profile-worker",
+            "consumer": "cst.profile-worker",
             "legacy": false
           },
           {
             "topic": "obk-data-outbox",
             "publisher": "obk",
-            "consumer": "cus.consent-worker",
+            "consumer": "cst.consent-worker",
             "legacy": false
           }
         ],
         "schedules": [
           {
-            "system": "cus.archive-cron",
+            "system": "cst.archive-cron",
             "job": "daily",
             "services": [
               "profile"
             ]
           },
           {
-            "system": "cus.archive-cron",
+            "system": "cst.archive-cron",
             "job": "hourly",
             "services": [
               "profile"
@@ -2082,7 +2082,7 @@
       },
       "nodes": [
         {
-          "id": "cus.profile-api",
+          "id": "cst.profile-api",
           "name": "Profile API",
           "kind": "Api",
           "service": "profile",
@@ -2111,9 +2111,9 @@
           "backlogAmber": 60,
           "backlogRed": 300,
           "calls": [
-            "cus.profile-db",
-            "cus.consent-api",
-            "cus.kyc-api"
+            "cst.profile-db",
+            "cst.consent-api",
+            "cst.kyc-api"
           ],
           "gatewayCalls": [
             "ntf.dispatch-api"
@@ -2134,7 +2134,7 @@
           "engine": null
         },
         {
-          "id": "cus.profile-worker",
+          "id": "cst.profile-worker",
           "name": "Profile worker",
           "kind": "Worker",
           "service": "profile",
@@ -2163,7 +2163,7 @@
           "backlogAmber": 60,
           "backlogRed": 300,
           "calls": [
-            "cus.profile-db"
+            "cst.profile-db"
           ],
           "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00",
@@ -2182,7 +2182,7 @@
           "engine": null
         },
         {
-          "id": "cus.profile-db",
+          "id": "cst.profile-db",
           "name": "Profile DB",
           "kind": "Database",
           "service": "profile",
@@ -2233,7 +2233,7 @@
           }
         },
         {
-          "id": "cus.consent-api",
+          "id": "cst.consent-api",
           "name": "Consent API",
           "kind": "Api",
           "service": "consent",
@@ -2262,7 +2262,7 @@
           "backlogAmber": 60,
           "backlogRed": 300,
           "calls": [
-            "cus.consent-db"
+            "cst.consent-db"
           ],
           "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00",
@@ -2281,7 +2281,7 @@
           "engine": null
         },
         {
-          "id": "cus.consent-worker",
+          "id": "cst.consent-worker",
           "name": "Consent worker",
           "kind": "Worker",
           "service": "consent",
@@ -2310,7 +2310,7 @@
           "backlogAmber": 60,
           "backlogRed": 300,
           "calls": [
-            "cus.consent-db"
+            "cst.consent-db"
           ],
           "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00",
@@ -2329,7 +2329,7 @@
           "engine": null
         },
         {
-          "id": "cus.consent-db",
+          "id": "cst.consent-db",
           "name": "Consent DB",
           "kind": "Database",
           "service": "consent",
@@ -2380,7 +2380,7 @@
           }
         },
         {
-          "id": "cus.kyc-api",
+          "id": "cst.kyc-api",
           "name": "KYC API",
           "kind": "Api",
           "service": "kyc",
@@ -2409,7 +2409,7 @@
           "backlogAmber": 60,
           "backlogRed": 300,
           "calls": [
-            "cus.kyc-db"
+            "cst.kyc-db"
           ],
           "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00",
@@ -2428,7 +2428,7 @@
           "engine": null
         },
         {
-          "id": "cus.kyc-db",
+          "id": "cst.kyc-db",
           "name": "KYC DB",
           "kind": "Database",
           "service": "kyc",
@@ -2479,7 +2479,7 @@
           }
         },
         {
-          "id": "cus.archive-cron",
+          "id": "cst.archive-cron",
           "name": "Archive run",
           "kind": "Function",
           "service": null,
@@ -2508,7 +2508,7 @@
           "backlogAmber": 60,
           "backlogRed": 300,
           "calls": [
-            "cus.profile-api"
+            "cst.profile-api"
           ],
           "gatewayCalls": [],
           "lastUpdated": "2026-10-24T12:00:01+00:00",
@@ -2574,8 +2574,8 @@
             "legacy": false
           },
           {
-            "topic": "cus-profile-outbox",
-            "publisher": "cus",
+            "topic": "cst-profile-outbox",
+            "publisher": "cst",
             "consumer": "acq.leads-worker",
             "legacy": false
           }
@@ -2618,7 +2618,7 @@
           ],
           "gatewayCalls": [
             "dec.decision-api",
-            "cus.kyc-api"
+            "cst.kyc-api"
           ],
           "lastUpdated": "2026-10-24T12:00:01+00:00",
           "tenants": null,
@@ -2867,7 +2867,7 @@
             "acq.applications-api"
           ],
           "gatewayCalls": [
-            "cus.profile-api"
+            "cst.profile-api"
           ],
           "lastUpdated": "2026-10-24T12:00:01+00:00",
           "tenants": null,
@@ -3054,8 +3054,8 @@
             "dec.scorecards-api"
           ],
           "gatewayCalls": [
-            "frd.screening-api",
-            "cus.profile-api"
+            "fra.screening-api",
+            "cst.profile-api"
           ],
           "lastUpdated": "2026-10-24T12:00:01+00:00",
           "tenants": null,
@@ -3344,8 +3344,8 @@
         ],
         "subscriptions": [
           {
-            "topic": "cl-posting-outbox",
-            "publisher": "cl",
+            "topic": "ldg-posting-outbox",
+            "publisher": "ldg",
             "consumer": "bil.invoices-worker",
             "legacy": false
           }
@@ -3784,7 +3784,7 @@
           ],
           "gatewayCalls": [
             "bil.invoices-api",
-            "cus.profile-api"
+            "cst.profile-api"
           ],
           "lastUpdated": "2026-10-24T12:00:01+00:00",
           "tenants": null,
@@ -4380,7 +4380,7 @@
           ],
           "gatewayCalls": [
             "pay.payments-api",
-            "frd.cases-api"
+            "fra.cases-api"
           ],
           "lastUpdated": "2026-10-24T12:00:01+00:00",
           "tenants": null,
@@ -4666,7 +4666,7 @@
             "rwd.catalog-api"
           ],
           "gatewayCalls": [
-            "cl.ledger-api"
+            "ldg.ledger-api"
           ],
           "lastUpdated": "2026-10-24T12:00:01+00:00",
           "tenants": null,
@@ -5099,7 +5099,7 @@
           ],
           "gatewayCalls": [
             "acc.accounts-api",
-            "cus.consent-api"
+            "cst.consent-api"
           ],
           "lastUpdated": "2026-10-24T12:00:01+00:00",
           "tenants": null,
@@ -5288,8 +5288,8 @@
         ],
         "subscriptions": [
           {
-            "topic": "cl-posting-outbox",
-            "publisher": "cl",
+            "topic": "ldg-posting-outbox",
+            "publisher": "ldg",
             "consumer": "ntf.dispatch-worker",
             "legacy": false
           },
@@ -5667,8 +5667,8 @@
             "legacy": false
           },
           {
-            "topic": "cl-ledger-outbox",
-            "publisher": "cl",
+            "topic": "ldg-ledger-outbox",
+            "publisher": "ldg",
             "consumer": "dat.ingest-worker",
             "legacy": false
           },
@@ -5736,7 +5736,7 @@
             "dat.ingest-db"
           ],
           "gatewayCalls": [
-            "cl.ledger-api",
+            "ldg.ledger-api",
             "pay.payments-api"
           ],
           "lastUpdated": "2026-10-24T12:00:01+00:00",
@@ -6143,8 +6143,8 @@
             "legacy": false
           },
           {
-            "topic": "cl-posting-outbox",
-            "publisher": "cl",
+            "topic": "ldg-posting-outbox",
+            "publisher": "ldg",
             "consumer": "rcn.matching-worker",
             "legacy": false
           }
@@ -6907,7 +6907,7 @@
       "name": "Mobile app",
       "requestsPerSecond": 332,
       "calls": [
-        "cl.ledger-api",
+        "ldg.ledger-api",
         "pay.payments-api",
         "rwd.points-api"
       ]
@@ -6949,12 +6949,12 @@
     },
     {
       "from": "dec",
-      "to": "frd",
+      "to": "fra",
       "requestsPerSecond": 128
     },
     {
       "from": "pay",
-      "to": "frd",
+      "to": "fra",
       "requestsPerSecond": 128
     },
     {
@@ -6969,7 +6969,7 @@
     },
     {
       "from": "pay",
-      "to": "cl",
+      "to": "ldg",
       "requestsPerSecond": 74.66666666666667
     },
     {
@@ -6999,37 +6999,37 @@
     },
     {
       "from": "acq",
-      "to": "cus",
+      "to": "cst",
       "requestsPerSecond": 48.800000000000004
     },
     {
       "from": "col",
-      "to": "cus",
+      "to": "cst",
       "requestsPerSecond": 41.6
     },
     {
       "from": "dec",
-      "to": "cus",
+      "to": "cst",
       "requestsPerSecond": 41.6
     },
     {
-      "from": "frd",
-      "to": "cus",
+      "from": "fra",
+      "to": "cst",
       "requestsPerSecond": 41.6
     },
     {
       "from": "acc",
-      "to": "cl",
+      "to": "ldg",
       "requestsPerSecond": 36
     },
     {
       "from": "dat",
-      "to": "cl",
+      "to": "ldg",
       "requestsPerSecond": 36
     },
     {
       "from": "rwd",
-      "to": "cl",
+      "to": "ldg",
       "requestsPerSecond": 36
     },
     {
@@ -7044,13 +7044,8 @@
     },
     {
       "from": "obk",
-      "to": "cus",
+      "to": "cst",
       "requestsPerSecond": 24
-    },
-    {
-      "from": "cl",
-      "to": "ntf",
-      "requestsPerSecond": 20
     },
     {
       "from": "col",
@@ -7058,7 +7053,12 @@
       "requestsPerSecond": 20
     },
     {
-      "from": "cus",
+      "from": "cst",
+      "to": "ntf",
+      "requestsPerSecond": 20
+    },
+    {
+      "from": "ldg",
       "to": "ntf",
       "requestsPerSecond": 20
     },
@@ -7074,7 +7074,7 @@
     },
     {
       "from": "dsp",
-      "to": "frd",
+      "to": "fra",
       "requestsPerSecond": 10
     },
     {

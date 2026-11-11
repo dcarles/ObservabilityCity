@@ -14,7 +14,7 @@ systems:
 messaging:
   topics: [dispatch]
   subscriptions:
-    - { topic: cl-posting-outbox, consumer: ntf.dispatch-worker }
+    - { topic: ldg-posting-outbox, consumer: ntf.dispatch-worker }
     - { topic: col-dunning-outbox, consumer: ntf.dispatch-worker }
     - { topic: dsp-disputes-outbox, consumer: ntf.dispatch-worker }
 scheduler:

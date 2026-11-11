@@ -1,0 +1,19 @@
+# yaml-language-server: $schema=../schema/pillar.schema.json
+pillar: fra
+displayName: Fraud
+color: "#e0566e"
+defaults:
+  api: { slaP99Ms: 250 }
+systems:
+  - { id: fra.screening-api, service: screening, name: Screening API, role: api, external: true, calls: [fra.screening-db, fra.rules-cache, fra.cases-api] }
+  - { id: fra.screening-worker, service: screening, name: Screening worker, role: worker, calls: [fra.screening-db] }
+  - { id: fra.screening-db, service: screening, tenantPattern: "merchant-{tenant}-db", name: Screening DB, role: db, engine: cosmos }
+  - { id: fra.cases-api, service: fraud-cases, name: Cases API, role: api, calls: [fra.cases-db], gatewayCalls: [cst.profile-api] }
+  - { id: fra.cases-db, service: fraud-cases, name: Cases DB, role: db, engine: postgres }
+  - { id: fra.rules-cache, name: Rules cache, role: cache }
+
+# Messaging: the outboxes this pillar publishes (fra-<service>-outbox) and the topics its workers consume.
+messaging:
+  topics: [screening]
+  subscriptions:
+    - { topic: pay-payments-outbox, consumer: fra.screening-worker }

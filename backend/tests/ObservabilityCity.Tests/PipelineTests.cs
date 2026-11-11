@@ -57,7 +57,7 @@ public class PipelineTests
     {
         var rig = new Rig { Fake = { Calm = true } };
         rig.Fake.Add("pay.payments-api", FakeEffectKind.Errors, 0.6);
-        rig.Fake.Add("frd", FakeEffectKind.Latency, 0.7);
+        rig.Fake.Add("fra", FakeEffectKind.Latency, 0.7);
         rig.Fake.Add("obk.data-db", FakeEffectKind.Saturate, 1);
         rig.Fake.Add("col.cases-worker", FakeEffectKind.Poison, 1);
         rig.Fake.Add("dsp", FakeEffectKind.Down, 1);
@@ -94,22 +94,22 @@ public class PipelineTests
     {
         var rig = new Rig();
         await rig.Tick();
-        rig.Fake.Add("cl.ledger-api", FakeEffectKind.Errors, 0.5);
+        rig.Fake.Add("ldg.ledger-api", FakeEffectKind.Errors, 0.5);
         var s = await rig.Tick();
 
-        Assert.Equal(HealthState.Degraded, Node(s, "cl.ledger-api").State);
-        Assert.True(Node(s, "cl.ledger-api").ErrorRate > Node(s, "cl.ledger-api").ErrorAmber);
-        Assert.Equal(HealthState.Healthy, Node(s, "cl.ledger-db").State);
+        Assert.Equal(HealthState.Degraded, Node(s, "ldg.ledger-api").State);
+        Assert.True(Node(s, "ldg.ledger-api").ErrorRate > Node(s, "ldg.ledger-api").ErrorAmber);
+        Assert.Equal(HealthState.Healthy, Node(s, "ldg.ledger-db").State);
     }
 
     [Fact]
     public async Task Down_effect_marks_down_and_zeroes_traffic()
     {
         var rig = new Rig();
-        rig.Fake.Add("cl", FakeEffectKind.Down, 1);
+        rig.Fake.Add("ldg", FakeEffectKind.Down, 1);
         var s = await rig.Tick();
 
-        var n = Node(s, "cl.ledger-db");
+        var n = Node(s, "ldg.ledger-db");
         Assert.Equal(HealthState.Down, n.State);
         Assert.Equal(0, n.InstancesHealthy);
         Assert.Equal(0, n.RequestsPerSecond);
@@ -120,8 +120,8 @@ public class PipelineTests
     public async Task Unhealthy_instances_show_as_partly_healthy_fleet()
     {
         var rig = new Rig { Fake = { Calm = true } };
-        rig.Fake.Add("cl.posting-api", FakeEffectKind.UnhealthyInstances, 0.5);
-        var n = Node(await rig.Tick(), "cl.posting-api");
+        rig.Fake.Add("ldg.posting-api", FakeEffectKind.UnhealthyInstances, 0.5);
+        var n = Node(await rig.Tick(), "ldg.posting-api");
 
         Assert.Equal(HealthState.Degraded, n.State);
         Assert.InRange(n.InstancesHealthy, 1, n.InstancesTotal - 1);
@@ -131,14 +131,14 @@ public class PipelineTests
     public async Task A_saturated_database_reports_utilisation_and_throttles()
     {
         var rig = new Rig { Fake = { Calm = true } };
-        var calm = Node(await rig.Tick(), "cl.ledger-db");
+        var calm = Node(await rig.Tick(), "ldg.ledger-db");
         Assert.InRange(calm.Utilisation!.Value, 0.2, 0.8);
         Assert.Equal(0, calm.Throttled);
         Assert.Equal(HealthState.Healthy, calm.State);
         Assert.Null(calm.Cpu);
 
-        rig.Fake.Add("cl.ledger-db", FakeEffectKind.Saturate, 1);
-        var hot = Node(await rig.Tick(), "cl.ledger-db");
+        rig.Fake.Add("ldg.ledger-db", FakeEffectKind.Saturate, 1);
+        var hot = Node(await rig.Tick(), "ldg.ledger-db");
         Assert.True(hot.Utilisation > 0.95);
         Assert.True(hot.Throttled > hot.ThrottleAmber);
         Assert.Equal(HealthState.Degraded, hot.State);
@@ -148,14 +148,14 @@ public class PipelineTests
     public async Task High_cpu_degrades_an_app_and_apps_report_cpu_and_memory()
     {
         var rig = new Rig { Fake = { Calm = true } };
-        var calm = Node(await rig.Tick(), "cl.ledger-api");
+        var calm = Node(await rig.Tick(), "ldg.ledger-api");
         Assert.InRange(calm.Cpu!.Value, 0.1, 0.7);
         Assert.InRange(calm.Memory!.Value, 0.1, 0.7);
         Assert.Null(calm.Utilisation);
         Assert.Equal(HealthState.Healthy, calm.State);
 
-        rig.Fake.Add("cl.ledger-api", FakeEffectKind.HighCpu, 1);
-        var hot = Node(await rig.Tick(), "cl.ledger-api");
+        rig.Fake.Add("ldg.ledger-api", FakeEffectKind.HighCpu, 1);
+        var hot = Node(await rig.Tick(), "ldg.ledger-api");
         Assert.True(hot.Cpu >= hot.ResourceAmber);
         Assert.Equal(HealthState.Degraded, hot.State);
     }
@@ -164,15 +164,15 @@ public class PipelineTests
     public async Task A_stalled_consumer_builds_a_backlog_and_degrades()
     {
         var rig = new Rig { Fake = { Calm = true } };
-        var calm = Node(await rig.Tick(), "cl.ledger-worker");
+        var calm = Node(await rig.Tick(), "ldg.ledger-worker");
         Assert.InRange(calm.QueueDepth!.Value, 0, 100);
         Assert.Equal(0, calm.DeadLetters);
-        Assert.Null(Node(await rig.Tick(), "cl.ledger-db").QueueDepth);
+        Assert.Null(Node(await rig.Tick(), "ldg.ledger-db").QueueDepth);
 
-        rig.Fake.Add("cl.ledger-worker", FakeEffectKind.Backlog, 1);
+        rig.Fake.Add("ldg.ledger-worker", FakeEffectKind.Backlog, 1);
         Snapshot s = null!;
         for (var i = 0; i < 30; i++) s = await rig.Tick();
-        var late = Node(s, "cl.ledger-worker");
+        var late = Node(s, "ldg.ledger-worker");
         Assert.True(late.QueueDepth > 500);
         Assert.True(late.OldestMessageSeconds >= late.BacklogAmber);
         Assert.Equal(HealthState.Degraded, late.State);
@@ -182,11 +182,11 @@ public class PipelineTests
     public async Task Poison_messages_fill_the_dead_letter_queue()
     {
         var rig = new Rig { Fake = { Calm = true } };
-        rig.Fake.Add("cl.ledger-worker", FakeEffectKind.Poison, 1);
+        rig.Fake.Add("ldg.ledger-worker", FakeEffectKind.Poison, 1);
         Snapshot s = null!;
         for (var i = 0; i < 10; i++) s = await rig.Tick();
 
-        Assert.True(Node(s, "cl.ledger-worker").DeadLetters > 40);
+        Assert.True(Node(s, "ldg.ledger-worker").DeadLetters > 40);
     }
 
     [Fact]
@@ -205,11 +205,11 @@ public class PipelineTests
     public async Task Traffic_effect_scales_instances_up()
     {
         var rig = new Rig();
-        var before = Node(await rig.Tick(), "cl.ledger-api").InstancesTotal;
-        rig.Fake.Add("cl.ledger-api", FakeEffectKind.Traffic, 1);
+        var before = Node(await rig.Tick(), "ldg.ledger-api").InstancesTotal;
+        rig.Fake.Add("ldg.ledger-api", FakeEffectKind.Traffic, 1);
         Snapshot s = null!;
         for (var i = 0; i < 10; i++) s = await rig.Tick();
 
-        Assert.True(Node(s, "cl.ledger-api").InstancesTotal > before);
+        Assert.True(Node(s, "ldg.ledger-api").InstancesTotal > before);
     }
 }
