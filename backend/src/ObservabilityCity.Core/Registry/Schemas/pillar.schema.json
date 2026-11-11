@@ -1,11 +1,13 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Pillar file: one island",
+  "title": "Group file: one island (groups/<id>.yaml, or pillars/<id>.yaml, the older folder name)",
   "type": "object",
-  "required": ["pillar", "displayName", "systems"],
+  "required": ["displayName", "systems"],
+  "oneOf": [{ "required": ["group"] }, { "required": ["pillar"] }],
   "additionalProperties": false,
   "properties": {
-    "pillar": { "$ref": "defs.schema.json#/$defs/kebabName", "description": "Short lowercase code. Must match the file name, and prefixes every system id." },
+    "group": { "$ref": "defs.schema.json#/$defs/kebabName", "description": "The group's id: a short lowercase code. Must match the file name, and prefixes every system id. Older name: pillar. Set one of the two." },
+    "pillar": { "$ref": "defs.schema.json#/$defs/kebabName", "description": "The older name of group. Set one of the two." },
     "displayName": { "type": "string", "description": "Name on the island's sign." },
     "color": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$", "description": "Accent colour of the island." },
     "external": { "type": "boolean", "description": "Every system here is reached by outside callers, unless it says otherwise." },
@@ -14,8 +16,8 @@
     "scope": {
       "type": "object",
       "additionalProperties": false,
-      "description": "How the environments' scope rules spell this pillar.",
-      "properties": { "code": { "type": "string", "minLength": 1, "description": "What {pillar} stands for in the scope rules of the environment files. Without it, the pillar id." } }
+      "description": "How the environments' scope rules spell this group.",
+      "properties": { "code": { "type": "string", "minLength": 1, "description": "What {group} (older name {pillar}) stands for in the scope rules of the environment files. Without it, the group id." } }
     },
     "messaging": { "$ref": "defs.schema.json#/$defs/messaging" },
     "systems": {

@@ -5,7 +5,7 @@ namespace ObservabilityCity.Core.Registry;
 
 public static partial class RegistryLoader
 {
-    private static readonly string[] ResourceGroups = ["service", "role", "pillar", "region", "tenant"];
+    private static readonly string[] ResourceGroups = ["service", "role", GroupWords.Group, GroupWords.Pillar, "region", "tenant"]; // group: older name pillar
     private static readonly string[] SystemRoles = ["api", "worker", "db", "cache", "function", "cron", "gateway", "broker", "egress"];
 
     private static ScopeRules ToScope(ScopeFile? f) =>
@@ -56,6 +56,8 @@ public static partial class RegistryLoader
         foreach (var variable in s.Variables.Keys)
         {
             if (variable == ScopeRules.EnvironmentVariable) errors.Add($"{at}.variables: '{variable}' is the environment's own id and cannot be redefined");
+            // {group} and {groupId} are the group's own words (older names {pillar} and {pillarId}): a variable of that name would hide them in one spelling and not the other
+            else if (GroupWords.OlderNames.ContainsKey(variable)) errors.Add($"{at}.variables: '{variable}' is a word of the group itself ({{{variable}}}, older name {{{GroupWords.OlderNames[variable]}}}) and cannot be redefined. Give the variable another name");
             else if (!Regex.IsMatch(variable, "^[A-Za-z][A-Za-z0-9]*$")) errors.Add($"{at}.variables: '{variable}' must be letters and digits, starting with a letter, to be used as {{{variable}}}");
         }
         var own = s.Variables.Keys.Append(ScopeRules.EnvironmentVariable).ToList();

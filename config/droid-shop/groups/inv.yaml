@@ -1,5 +1,5 @@
 # yaml-language-server: $schema=../schema/pillar.schema.json
-pillar: inv
+group: inv
 displayName: Inventory
 color: "#4dc3c9"
 systems:

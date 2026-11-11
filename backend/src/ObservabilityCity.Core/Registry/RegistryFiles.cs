@@ -47,7 +47,7 @@ internal sealed class WallFile
 
 internal sealed class TownMessagingFile
 {
-    /// <summary>The name of the topic a pillar's service publishes, for a topic listed by its service: <c>{pillar}</c> and <c>{service}</c> are replaced. Not used by a topic listed by its own name.</summary>
+    /// <summary>The name of the topic a pillar's service publishes, for a topic listed by its service: <c>{group}</c> (older name <c>{pillar}</c>) and <c>{service}</c> are replaced. Not used by a topic listed by its own name.</summary>
     public string TopicTemplate { get; set; } = MessagingConvention.Default.TopicTemplate;
     /// <summary>The name of a topic of the hub listed by a short name: <c>{service}</c> is replaced by that name. Not used by a topic listed by its own name.</summary>
     public string HubTopicTemplate { get; set; } = MessagingConvention.Default.HubTopicTemplate;
@@ -137,8 +137,15 @@ internal sealed class SystemFile
     public List<string> Aliases { get; set; } = [];
 }
 
-internal sealed class PillarFile
+/// <summary>A group file (<c>groups/&lt;id&gt;.yaml</c>, or <c>pillars/</c>, the older folder): one island. Its id is <c>group:</c>, or <c>pillar:</c>, the older name.</summary>
+internal sealed class PillarFile : AliasedBlock
 {
+    private static readonly IReadOnlyDictionary<string, string> Names = new Dictionary<string, string> { [GroupWords.Pillar] = GroupWords.Group };
+    internal override IReadOnlyDictionary<string, string> Aliases => Names;
+    protected override string Block => "the group file";
+
+    /// <summary>The group's id, written <c>group:</c> (older name <c>pillar:</c>).</summary>
+    [YamlMember(Alias = GroupWords.Group)]
     public string Pillar { get; set; } = "";
     public string DisplayName { get; set; } = "";
     public string Color { get; set; } = "#8ab4ff";
@@ -156,7 +163,7 @@ internal sealed class PillarFile
 
 internal sealed class PillarScopeFile
 {
-    /// <summary>What {pillar} stands for in the scope rules. Without it, the pillar id.</summary>
+    /// <summary>What {group} (older name {pillar}) stands for in the scope rules. Without it, the group id.</summary>
     public string? Code { get; set; }
 }
 
@@ -421,7 +428,8 @@ internal sealed class LinkRuleFile
 /// <summary>
 /// A block some of whose keys may also be written by an older name: the scope's keys once spoke in one cloud's words (an Azure subscription, a Log Analytics
 /// workspace), and a file written that way still reads the same. Each property is read under its own (neutral) name or an alias of it; both on one block are
-/// a mistake, since one of them would be ignored. Any other key is unknown, as in every other block.
+/// a mistake, since one of them would be ignored. Any other key is unknown, as in every other block. A property is read under its camelCase name, or under the
+/// name its <see cref="YamlMemberAttribute"/> gives.
 /// </summary>
 internal abstract class AliasedBlock : IYamlConvertible
 {
@@ -436,7 +444,7 @@ internal abstract class AliasedBlock : IYamlConvertible
     void IYamlConvertible.Read(IParser parser, Type expectedType, ObjectDeserializer nestedObjectDeserializer)
     {
         var properties = Keys.GetOrAdd(GetType(), t => t.GetProperties().Where(p => p.CanWrite && p.SetMethod!.IsPublic)
-            .ToDictionary(p => char.ToLowerInvariant(p.Name[0]) + p.Name[1..], StringComparer.Ordinal));
+            .ToDictionary(KeyOf, StringComparer.Ordinal));
         parser.Consume<MappingStart>();
         var written = new Dictionary<string, string>(StringComparer.Ordinal); // the key a value is for, to the spelling it was written in
         while (!parser.TryConsume<MappingEnd>(out _))
@@ -457,6 +465,10 @@ internal abstract class AliasedBlock : IYamlConvertible
     }
 
     void IYamlConvertible.Write(IEmitter emitter, ObjectSerializer nestedObjectSerializer) => throw new NotSupportedException("registry files are only read");
+
+    /// <summary>The key a property is written under in a file.</summary>
+    internal static string KeyOf(System.Reflection.PropertyInfo p) =>
+        p.GetCustomAttributes(typeof(YamlMemberAttribute), false) is [YamlMemberAttribute { Alias: { Length: > 0 } alias }] ? alias : char.ToLowerInvariant(p.Name[0]) + p.Name[1..];
 }
 
 /// <summary>An environment's <c>scope:</c> block. The account and telemetry store keys also read under their Azure names (see <see cref="Aliases"/>).</summary>

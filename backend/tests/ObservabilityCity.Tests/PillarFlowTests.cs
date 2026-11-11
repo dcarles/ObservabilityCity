@@ -85,7 +85,7 @@ public class PillarFlowTests
 
     [Theory]
     [InlineData("      flows:\n        - { match: '^(?<pillar>[a-z]+)-out$', direction: sentt }\n", "direction 'sentt'. Use sent or received")]
-    [InlineData("      flows:\n        - { match: '^[a-z]+-out$', direction: sent }\n", "no group named 'pillar'")]
+    [InlineData("      flows:\n        - { match: '^[a-z]+-out$', direction: sent }\n", "no group named 'group' (older name 'pillar')")]
     [InlineData("      flows:\n        - { match: '^(?<pillar>[a-z+-out$', direction: sent }\n", "not a valid regular expression")]
     public void A_flow_with_a_wrong_direction_or_no_pillar_group_is_a_config_error(string flows, string message)
     {

@@ -290,7 +290,8 @@ public static class ScopeResolver
         return new SystemScope(node.Id, serviceCode, telemetry, via, pillar.AccountId, store, resources.OrderBy(r => r.Name, StringComparer.Ordinal).ToList()) { AppState = app };
     }
 
-    private static string Group(Match match, string name) => match.Groups[name].Success ? match.Groups[name].Value : "";
+    // a pattern may name the group's code (?<group>...) or, its older name, (?<pillar>...)
+    private static string Group(Match match, string name) => GroupWords.Captured(match, name) is { Success: true } g ? g.Value : "";
     private static string Compact(string text) => text.Replace(" ", "");
     private static string? TagValue(InventoryResource r, string key) => r.Tags.FirstOrDefault(t => t.Key.Equals(key, StringComparison.OrdinalIgnoreCase)).Value;
 }

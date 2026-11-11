@@ -48,7 +48,7 @@ public sealed record EntitiesConfig(string Resources, string Dimension, EntityMe
     public const string DefaultDimension = "EntityName";
 }
 
-/// <summary>An entity that carries a pillar's traffic: <see cref="Match"/> has the named group <c>pillar</c>; <see cref="Direction"/> is <c>sent</c> or <c>received</c>.</summary>
+/// <summary>An entity that carries a pillar's traffic: <see cref="Match"/> has the named group <c>group</c> (older name <c>pillar</c>); <see cref="Direction"/> is <c>sent</c> or <c>received</c>.</summary>
 public sealed record EntityFlow(string Match, string Direction)
 {
     public const string Sent = "sent";
@@ -58,7 +58,7 @@ public sealed record EntityFlow(string Match, string Direction)
 /// <summary>A metric and the way its points are added up.</summary>
 public sealed record EntityMetric(string Metric, string Aggregation);
 
-/// <summary>One shape of entity name. <see cref="Match"/> has the named groups <c>pillar</c> and <c>service</c>; <see cref="Consumer"/> is the role of the system that reads the entity.</summary>
+/// <summary>One shape of entity name. <see cref="Match"/> has the named groups <c>group</c> (older name <c>pillar</c>) and <c>service</c>; <see cref="Consumer"/> is the role of the system that reads the entity.</summary>
 public sealed record EntityPattern(string Match, string Consumer);
 
 /// <summary>The metrics of the resources one rule of <c>scope.resources</c> finds, by signal (cpu, memory, utilisation, throttled, requests, and limit, the provisioned size shown as a number). <c>Interval</c> is the time grain they are asked at; none means the adapter's default (one minute). <c>Window</c> is how far back the entry looks; none means the source's own window.</summary>

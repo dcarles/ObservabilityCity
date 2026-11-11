@@ -90,9 +90,11 @@ Create the folder outside the clone (the examples below call it `<company-config
   hub.yaml                  shared resources, for example a gateway and a message broker (today at most one
                             gateway, broker, egress and database)
   third-parties.yaml
-  pillars/<pillar>.yaml     one island per pillar
+  groups/<group>.yaml       one island per group (pillars/<pillar>.yaml, the older name, reads the same)
   environments/<env>.yaml   dev, staging, prod...
 ```
+
+**Group** is the neutral word the files use for one island's set of systems, and **pillar** its older name: `groups/` or `pillars/`, `group:` or `pillar:` in a group file, `{group}` or `{pillar}` in a template and `(?<group>...)` or `(?<pillar>...)` in a pattern all read the same, so a town written either way loads unchanged. Use one spelling of the folder and of the key; both is an error. The interface never shows either word: it uses your `groupLabel` (Team, Domain, Pillar). The rest of this page says pillar for a group.
 
 The sample is a demo town, so a copy of it must be turned into a live one before it reads anything real:
 

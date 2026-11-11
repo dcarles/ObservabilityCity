@@ -75,7 +75,7 @@ public sealed record RegionRules(string? Tag, IReadOnlyDictionary<string, string
     public string Label(string region) => Names.FirstOrDefault(kv => kv.Key.Equals(region, StringComparison.OrdinalIgnoreCase)).Value is { Length: > 0 } label ? label : region;
 }
 
-/// <summary>Finds a pillar's account by its display name (a wildcard pattern) or by a tag on the account. Both are templates over {pillar}, {pillarId} and the variables.</summary>
+/// <summary>Finds a pillar's account by its display name (a wildcard pattern) or by a tag on the account. Both are templates over {group}, {groupId} (older names {pillar}, {pillarId}) and the variables.</summary>
 public sealed record AccountRule(string? NameLike, string? TagKey, string? TagValue);
 
 /// <summary>
@@ -99,7 +99,7 @@ public sealed record ResourceRule(string Name, IReadOnlyList<string> Types, stri
 public sealed record AssetRule(string Name, string Label, string Shape, IReadOnlyList<string> Types, string Pattern)
 {
     public static readonly string[] Shapes = ["box", "vault", "store", "settings", "observatory"];
-    public static readonly string[] Groups = ["service", "pillar", "region"];
+    public static readonly string[] Groups = ["service", GroupWords.Group, GroupWords.Pillar, "region"]; // group: older name pillar
     /// <summary>The groups a pattern may use for a building on the hub island, which belongs to no pillar and no service.</summary>
     public static readonly string[] HubGroups = ["region"];
 
@@ -139,10 +139,13 @@ public static partial class ScopeTemplate
     public static IEnumerable<(string Variable, string? Filter)> Holes(string template) =>
         Hole().Matches(template).Select(m => (m.Groups[1].Value, m.Groups[2].Success ? m.Groups[2].Value : null));
 
-    /// <summary>What is wrong with a template: a variable not in <paramref name="known"/> or a filter that does not exist. Empty when it is fine.</summary>
+    /// <summary>
+    /// What is wrong with a template: a variable not in <paramref name="known"/> or a filter that does not exist. Empty when it is fine. A variable may be
+    /// written with either spelling of a group's word (<c>{group}</c> for <c>{pillar}</c>, see <see cref="GroupWords"/>).
+    /// </summary>
     public static IEnumerable<string> Check(string template, IEnumerable<string> known)
     {
-        var allowed = known.ToHashSet(StringComparer.Ordinal);
+        var allowed = GroupWords.WithTwins(known).ToHashSet(StringComparer.Ordinal);
         foreach (var (variable, filter) in Holes(template))
         {
             if (!allowed.Contains(variable))
@@ -152,11 +155,12 @@ public static partial class ScopeTemplate
         }
     }
 
-    /// <summary>The template with every hole filled; a variable without a value becomes empty.</summary>
+    /// <summary>The template with every hole filled; a variable without a value becomes empty. A variable with no value of its own takes its twin's (<c>{group}</c> that of <c>{pillar}</c>, and the other way round).</summary>
     public static string Render(string template, Func<string, string?> value) =>
         Hole().Replace(template, m =>
         {
-            var text = value(m.Groups[1].Value) ?? "";
+            var name = m.Groups[1].Value;
+            var text = value(name) ?? (GroupWords.Twin(name) is { } twin ? value(twin) : null) ?? "";
             return m.Groups[2].Value switch
             {
                 "nospace" => text.Replace(" ", ""),

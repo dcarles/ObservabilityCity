@@ -77,7 +77,7 @@ public sealed partial class AzureSourceSettings : SourceSettingsReader<AzureSour
 
     private static EntityMetric? ToEntityMetric(EntityMetricFile? f) => f is null ? null : new EntityMetric(f.Metric.Trim(), f.Aggregation.Trim().ToLowerInvariant());
 
-    /// <summary>A broker source's entities: the rule must exist, the metrics must be named, and each pattern must be a regular expression with the group service (and pillar, producerPillar and producer when the name says them).</summary>
+    /// <summary>A broker source's entities: the rule must exist, the metrics must be named, and each pattern must be a regular expression with the group service (and group or its older name pillar, producerPillar and producer when the name says them).</summary>
     private static void CheckEntities(AzureSourceFile def, SourceSettingsContext context, SettingsReport report)
     {
         var errors = new Placed(report);
@@ -125,12 +125,13 @@ public sealed partial class AzureSourceSettings : SourceSettingsReader<AzureSour
             if (direction is not (EntityFlow.Sent or EntityFlow.Received)) errors.Add($"{where}: direction '{e.Flows[i].Direction}'. Use sent or received.{DidYouMean.Hint(direction, [EntityFlow.Sent, EntityFlow.Received])}");
             try
             {
-                if (!new Regex(e.Flows[i].Match, RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1)).GetGroupNames().Contains("pillar")) errors.Add($"{where}: the match has no group named 'pillar'. Write it as (?<pillar>...)");
+                if (!GroupWords.HasGroup(new Regex(e.Flows[i].Match, RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1)).GetGroupNames(), GroupWords.Group))
+                    errors.Add($"{where}: the match has no group named 'group' (older name 'pillar'). Write it as (?<group>...)");
             }
             catch (ArgumentException ex) { errors.Add($"{where}: the match is not a valid regular expression: {ex.Message}"); }
         }
         if (e.Flows.Count > 0 && e.Throughput is null) errors.Add($"{at}: flows need a throughput metric to read the rate from. Give throughput");
-        if (e.Patterns.Count == 0) errors.Add($"{at}: patterns is empty. Give at least one pattern: a regular expression with the named group service (and pillar when the name says it)");
+        if (e.Patterns.Count == 0) errors.Add($"{at}: patterns is empty. Give at least one pattern: a regular expression with the named group service (and group, older name pillar, when the name says it)");
         for (var i = 0; i < e.Patterns.Count; i++)
         {
             try
@@ -260,7 +261,7 @@ public sealed class EntitiesFile
     public EntityMetricFile? Backlog { get; set; }
     /// <summary>The dead-lettered messages of an entity, for example a metric of dead-lettered messages added up by maximum.</summary>
     public EntityMetricFile? DeadLetter { get; set; }
-    /// <summary>An address that opens a consumer's dead letters in your support tool: a name and a URL template over {pillar}, {service}, {system} and {environment}. Without it, no link.</summary>
+    /// <summary>An address that opens a consumer's dead letters in your support tool: a name and a URL template over {group} (older name {pillar}), {service}, {system} and {environment}. Without it, no link.</summary>
     public EntityLinkFile? DeadLetterLink { get; set; }
     /// <summary>One support-tool address for each region, when the regions have their own tool: each is a name, a URL template and the region it is for. A queue's dead letters in a region open the entry of that region; a region with no entry uses deadLetterLink.</summary>
     public List<EntityLinkFile> DeadLetterLinks { get; set; } = [];

@@ -7,7 +7,7 @@ using YamlDotNet.Serialization.NamingConventions;
 namespace ObservabilityCity.Core.Registry;
 
 /// <summary>
-/// Loads a registry folder: town.yaml (which also sets the island order and ring size), defaults.yaml, hub.yaml and pillars/*.yaml.
+/// Loads a registry folder: town.yaml (which also sets the island order and ring size), defaults.yaml, hub.yaml and groups/*.yaml (pillars/, the older name of the folder, reads the same).
 /// Settings resolve through defaults.yaml, then the pillar's defaults, then the system's own values.
 /// Every problem found in the files is collected and reported together, each naming its file, with a
 /// "did you mean" for names that are close to a real one.
@@ -137,7 +137,8 @@ public static partial class RegistryLoader
         var pillars = new List<RegistryGroup>();
         var brokenPillars = new HashSet<string>();
         var brokenTopics = new HashSet<string>(StringComparer.Ordinal); // the topics the skipped pillars would publish
-        var pillarDir = Path.Combine(folder, "pillars");
+        var groupFolder = GroupFolderOf(folder);
+        var pillarDir = Path.Combine(folder, groupFolder);
         if (Directory.Exists(pillarDir))
         {
             foreach (var file in Directory.GetFiles(pillarDir, "*.yaml").OrderBy(f => f, StringComparer.Ordinal))
@@ -187,7 +188,7 @@ public static partial class RegistryLoader
 
         var groups = new List<RegistryGroup> { hubGroup };
         groups.AddRange(Order(pillars, town, Problem));
-        CheckTemplates(groups, convention);
+        CheckTemplates(groups, convention, groupFolder);
         var ringCapacity = CheckRingCapacity(town, pillars.Count, errors);
 
         // every declared call must point at a system in this town (by id or by an old alias), and not at itself
@@ -342,7 +343,7 @@ public static partial class RegistryLoader
         var final = groups.Select(g => g with { Nodes = g.Nodes.Select(n => n with { Calls = resolved[n.Id], GatewayCalls = resolvedGateway[n.Id] }).ToList() }).ToList();
         var registry = new Registry(new TownInfo(town.Id, town.Name, town.GroupLabel, town.Topology, town.Mode, town.TrafficDensity, convention, town.Labels.InternalVendors, wall is { HoldSeconds: null, OverviewSeconds: null, OverviewIslandSeconds: null, Light: null } ? null : new WallSettings(wall.HoldSeconds, wall.OverviewSeconds, wall.OverviewIslandSeconds, wall.Light)), final, callers)
         {
-            Notices = notices, Problems = problems, ProblemLines = lines, Vendors = vendors, RingCapacity = ringCapacity, Topics = topics, Subscriptions = subscriptions, Environments = environments, DatabaseEngines = engines.Values.ToList(),
+            GroupFolder = groupFolder, Notices = notices, Problems = problems, ProblemLines = lines, Vendors = vendors, RingCapacity = ringCapacity, Topics = topics, Subscriptions = subscriptions, Environments = environments, DatabaseEngines = engines.Values.ToList(),
         };
         return registry with { Warnings = TownLinks.Warnings(registry).ToList() };
     }
@@ -351,14 +352,14 @@ public static partial class RegistryLoader
     /// A topic listed by its service is named by the town's template, so that template must contain {service}. A town that lists every topic by its own
     /// name needs no template, and one without {service} is fine there.
     /// </summary>
-    private static void CheckTemplates(List<RegistryGroup> groups, MessagingConvention convention)
+    private static void CheckTemplates(List<RegistryGroup> groups, MessagingConvention convention, string groupFolder)
     {
         foreach (var g in groups)
         {
             var template = g.IsHub ? convention.HubTopicTemplate : convention.TopicTemplate;
             if (template.Contains("{service}") || g.TopicDecls.FirstOrDefault(d => d.Name is null) is not { } first) continue;
             var key = g.IsHub ? "messaging.hubTopicTemplate" : "messaging.topicTemplate";
-            throw new RegistryException($"town.yaml: {key} must contain {{service}}, which is replaced by the service's name: {(g.IsHub ? "hub.yaml" : $"pillars/{g.Id}.yaml")} lists topic '{first.Service}' by its service. "
+            throw new RegistryException($"town.yaml: {key} must contain {{service}}, which is replaced by the service's name: {(g.IsHub ? "hub.yaml" : $"{groupFolder}/{g.Id}.yaml")} lists topic '{first.Service}' by its service. "
                 + $"Add {{service}} to the template, or give the topic its own name: {{ topic: <name>, service: {first.Service} }}");
         }
     }
@@ -380,6 +381,19 @@ public static partial class RegistryLoader
         }
         ordered.AddRange(pillars.Where(p => !seen.Contains(p.Id)));
         return ordered.Where(p => !p.IsLostFound).Concat(ordered.Where(p => p.IsLostFound));
+    }
+
+    /// <summary>
+    /// The folder of a town's group files: <c>groups</c>, or <c>pillars</c>, its older name. A town without either has no groups and reads as <c>groups</c>.
+    /// A town with both is a mistake, since one of them would be left unread.
+    /// </summary>
+    public static string GroupFolderOf(string folder)
+    {
+        var neutral = Directory.Exists(Path.Combine(folder, GroupWords.Folder));
+        var older = Directory.Exists(Path.Combine(folder, GroupWords.OlderFolder));
+        if (neutral && older)
+            throw new RegistryException($"The town folder has both {GroupWords.Folder}/ and {GroupWords.OlderFolder}/, which are one folder ({GroupWords.OlderFolder}/ is the older name of {GroupWords.Folder}/). Keep one of them: move the files of the other into it");
+        return older ? GroupWords.OlderFolder : GroupWords.Folder;
     }
 
     private static T Read<T>(string path, string? displayName = null)

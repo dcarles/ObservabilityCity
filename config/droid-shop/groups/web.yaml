@@ -1,5 +1,5 @@
 # yaml-language-server: $schema=../schema/pillar.schema.json
-pillar: web
+group: web
 displayName: Web
 color: "#5aa9ff"
 systems:

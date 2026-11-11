@@ -51,7 +51,7 @@
       "File": "environments/prod.yaml",
       "Line": 67,
       "Rule": "registry",
-      "Message": "environments/prod.yaml: source \u0027messaging\u0027 entities.deadLetterLink: {queu} is not a variable of the url. Use {pillar}, {service}, {system}, {environment}, {queue}. Did you mean \u0027queue\u0027?"
+      "Message": "environments/prod.yaml: source \u0027messaging\u0027 entities.deadLetterLink: {queu} is not a variable of the url. Use {group}, {pillar}, {service}, {system}, {environment}, {queue}. Did you mean \u0027queue\u0027?"
     },
     {
       "Severity": "Warning",
@@ -74,7 +74,7 @@
       "File": "environments/prod.yaml",
       "Line": 69,
       "Rule": "registry",
-      "Message": "environments/prod.yaml: source \u0027messaging\u0027 entities.flows[0]: the match has no group named \u0027pillar\u0027. Write it as (?\u003Cpillar\u003E...)"
+      "Message": "environments/prod.yaml: source \u0027messaging\u0027 entities.flows[0]: the match has no group named \u0027group\u0027 (older name \u0027pillar\u0027). Write it as (?\u003Cgroup\u003E...)"
     },
     {
       "Severity": "Warning",
@@ -106,7 +106,7 @@
       "File": "environments/prod.yaml",
       "Line": 63,
       "Rule": "registry",
-      "Message": "environments/prod.yaml: source \u0027messaging\u0027 entities: patterns is empty. Give at least one pattern: a regular expression with the named group service (and pillar when the name says it)"
+      "Message": "environments/prod.yaml: source \u0027messaging\u0027 entities: patterns is empty. Give at least one pattern: a regular expression with the named group service (and group, older name pillar, when the name says it)"
     },
     {
       "Severity": "Warning",

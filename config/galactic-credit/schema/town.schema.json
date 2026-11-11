@@ -42,7 +42,7 @@
       "additionalProperties": false,
       "description": "How this town names its message topics.",
       "properties": {
-        "topicTemplate": { "type": "string", "default": "{service}", "description": "The name of the topic of a pillar's service, for a topic a pillar file lists by its service. {pillar} and {service} are replaced; it must contain {service} while any pillar lists a topic that way. A topic listed by its own name does not use it." },
+        "topicTemplate": { "type": "string", "default": "{service}", "description": "The name of the topic of a pillar's service, for a topic a pillar file lists by its service. {group} (older name {pillar}) and {service} are replaced; it must contain {service} while any pillar lists a topic that way. A topic listed by its own name does not use it." },
         "hubTopicTemplate": { "type": "string", "default": "{service}", "description": "The name of a topic of the hub listed by a short name. {service} is replaced by that name; it must contain {service} while hub.yaml lists a topic that way. A topic listed by its own name does not use it." }
       }
     },
@@ -74,7 +74,7 @@
         "additionalProperties": false,
         "properties": {
           "rule": { "type": "string", "description": "The rule name shown in the warning, for example standalone." },
-          "file": { "type": "string", "description": "The file it is expected in, relative to the registry folder, for example pillars/sta.yaml. Leave out for any file." }
+          "file": { "type": "string", "description": "The file it is expected in, relative to the registry folder, for example groups/sta.yaml (or pillars/sta.yaml in a town that keeps the older folder name). Leave out for any file." }
         }
       }
     }
