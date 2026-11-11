@@ -6,7 +6,7 @@ resources:
   - { id: hub.service-bus, name: Service Bus, role: broker }
   - { id: hub.egress, name: Central egress, role: egress }
   - { id: hub.customer-db, name: Shared customer DB, role: db, engine: sqlserver }
-# The exports topic: for external destinations (Snowflake) and the old pillar-to-pillar route. Published as hub-exports.
+# The exports topic: for external destinations (Snowflake) and pillars that read it. Published as hub-exports.
 messaging:
   topics: [exports]
 # Outside callers of the town (apps, partners, vendors' webhooks). Each lists the external systems it reaches.

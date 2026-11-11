@@ -1,7 +1,7 @@
 import { test, expect } from '../support/test'
 
 // A demo town whose topics have names of their own (free-topics-town): orders.created and orders.cancelled from one service, billing.invoice.paid
-// from another, billing.audit that no service publishes, and the hub's platform.broadcast read the old way. No template names them; the file that
+// from another, billing.audit that no service publishes, and the hub's platform.broadcast. No template names them; the file that
 // lists a topic owns it. The piers, the boats and the drawer come out as they do for a town whose topics are named after services.
 
 test.describe('a town whose topics are named after events', () => {
@@ -10,8 +10,8 @@ test.describe('a town whose topics are named after events', () => {
     await town.step(5)
 
     for (const id of ['ord', 'bil', 'shp']) expect((await town.island(id)).pier, id).toBe(true)
-    expect(await town.hub()).toMatchObject({ topics: 5, subscriptions: 6, piers: 3, legacy: 1 })
-    expect((await town.hub()).sign.counts).toBe('5 topics · 6 subscriptions · 3 piers · 1 legacy')
+    expect(await town.hub()).toMatchObject({ topics: 5, subscriptions: 6, piers: 3 })
+    expect((await town.hub()).sign.counts).toBe('5 topics · 6 subscriptions · 3 piers')
   })
 
   test('sails boats from the island that publishes orders.created and to the islands that read it', async ({ town }) => {
@@ -39,6 +39,7 @@ test.describe('a town whose topics are named after events', () => {
     await page.locator('#inspector [data-tab="links"]').click()
     await expect(page.locator('#inspector')).toContainText('billing.audit')
     await expect(page.locator('#inspector')).toContainText('bil → shp.shipping-worker')
-    await expect(page.locator('#inspector')).toContainText('platform.broadcast (legacy)')
+    await expect(page.locator('#inspector')).toContainText('platform.broadcast')
+    await expect(page.locator('#inspector')).toContainText('hub → shp.shipping-worker')
   })
 })

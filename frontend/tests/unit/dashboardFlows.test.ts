@@ -153,9 +153,9 @@ describe('internal messages, the platform total and traffic by pillar', () => {
     aa.messaging = {
       topics: [],
       subscriptions: [
-        { topic: 'pay-in-1', publisher: 'pay', consumer: one.id, legacy: false },
-        { topic: 'pay-in-2', publisher: 'pay', consumer: two.id, legacy: false },
-        { topic: 'ldg-in', publisher: 'ldg', consumer: one.id, legacy: false },
+        { topic: 'pay-in-1', publisher: 'pay', consumer: one.id },
+        { topic: 'pay-in-2', publisher: 'pay', consumer: two.id },
+        { topic: 'ldg-in', publisher: 'ldg', consumer: one.id },
       ],
     } as never
     return s

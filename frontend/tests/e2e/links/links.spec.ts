@@ -11,7 +11,7 @@ import { test, expect } from '../support/test'
 //   wrk  worker only                 pier, no bridge
 //   nom  API + cache, no messaging   bridge, no pier, no worker, no database
 //   hbk  cron calling the hub DB     bridge, no pier
-//   leg  API + legacy egress reader  bridge, pier, amber pennant
+//   leg  API + hub topic reader      bridge, pier
 //   sta  nothing                     no bridge, no pier, a registry warning
 
 test.describe('connectors follow real links', () => {
@@ -77,30 +77,22 @@ test.describe('connectors follow real links', () => {
     await town.open()
 
     const hub = await town.hub()
-    expect(hub).toMatchObject({ topics: 3, subscriptions: 3, piers: 3, legacy: 1, boats: 3 })
+    expect(hub).toMatchObject({ topics: 3, subscriptions: 3, piers: 3, boats: 3 })
     expect(await town.mostBoats(120)).toBeGreaterThan(0)
   })
 
   test('the broker has one billboard: its counts are the last line, and the Messaging layer hides them', async ({ town, page }) => {
     await town.open()
     await town.step(2)
-    // the counts sit on the broker's own billboard, with the legacy reads in the same line (there is no separate board)
-    expect((await town.hub()).sign.counts).toBe('3 topics · 3 subscriptions · 3 piers · 1 legacy')
+    // the counts sit on the broker's own billboard (there is no separate board)
+    expect((await town.hub()).sign.counts).toBe('3 topics · 3 subscriptions · 3 piers')
     await page.locator('#layers-button').click()
     await page.locator('#layer-messaging').click()
     await town.step(1)
     expect((await town.hub()).sign.counts).toBeNull()
     await page.locator('#layer-messaging').click()
     await town.step(1)
-    expect((await town.hub()).sign.counts).toBe('3 topics · 3 subscriptions · 3 piers · 1 legacy')
-  })
-
-  test('the old egress route is flagged with a pennant on the pier that still uses it', async ({ town }) => {
-    await town.open()
-    await town.step(5)
-
-    expect((await town.island('leg')).pennant).toBe(true)
-    for (const id of ['ful', 'wrk']) expect((await town.island(id)).pennant, id).toBe(false)
+    expect((await town.hub()).sign.counts).toBe('3 topics · 3 subscriptions · 3 piers')
   })
 })
 

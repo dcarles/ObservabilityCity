@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { pierLines, type Messaging } from '../../src/scene/harbour'
 
-const base: Messaging = { perSecond: 126.4, waiting: null, oldestSeconds: null, deadLetters: null, amber: 60, red: 300, topics: 3, subscriptions: 5, legacy: false }
+const base: Messaging = { perSecond: 126.4, waiting: null, oldestSeconds: null, deadLetters: null, amber: 60, red: 300, topics: 3, subscriptions: 5 }
 
 describe('what the pier says in words', () => {
   it('gives the rate its queues take in and its topics, and nothing about a side nothing measures', () => {

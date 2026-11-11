@@ -40,11 +40,10 @@
     "messaging": {
       "type": "object",
       "additionalProperties": false,
-      "description": "How this town names its message topics, and which topics are an old route.",
+      "description": "How this town names its message topics.",
       "properties": {
         "topicTemplate": { "type": "string", "default": "{service}", "description": "The name of the topic of a pillar's service, for a topic a pillar file lists by its service. {pillar} and {service} are replaced; it must contain {service} while any pillar lists a topic that way. A topic listed by its own name does not use it." },
-        "hubTopicTemplate": { "type": "string", "default": "{service}", "description": "The name of a topic of the hub listed by a short name. {service} is replaced by that name; it must contain {service} while hub.yaml lists a topic that way. A topic listed by its own name does not use it." },
-        "legacyFrom": { "type": "array", "items": { "enum": ["hub"] }, "description": "The owners whose topics are an old route to read. A subscription to one of them must say legacy: true." }
+        "hubTopicTemplate": { "type": "string", "default": "{service}", "description": "The name of a topic of the hub listed by a short name. {service} is replaced by that name; it must contain {service} while hub.yaml lists a topic that way. A topic listed by its own name does not use it." }
       }
     },
     "labels": {

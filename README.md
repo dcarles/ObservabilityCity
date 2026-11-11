@@ -115,7 +115,6 @@ A story with problems is skipped and reported when the server starts. The same c
 ./scripts/trouble.ps1 high-cpu dlq-buildup  # presets stack
 ./scripts/trouble.ps1 bad-day               # errors, slowness, dead letters and a throttled DB across Payments and Core Ledger
 ./scripts/trouble.ps1 pier-backlog pier-dlq # a backlog and dead letters on the worker-only pillar's pier; the top-bar DLQ chip turns red
-./scripts/trouble.ps1 legacy-dlq            # dead letters on the legacy egress reader in Lost & found
 ./scripts/trouble.ps1 rain vendor-down      # incident weather over Payments, a third party offline
 ./scripts/trouble.ps1 raw ldg.ledger-api Errors 0.5
 ./scripts/trouble.ps1 reset                 # back to a calm baseline
@@ -143,7 +142,7 @@ How to read the town, as built so far:
 | Bridges | One road bridge from the hub's plaza to an island's gate, for an island that has an API or a call link over its coast (to a hub database or cache, through the gateway, or into it from another island). In a hub-and-spoke town all sync traffic between islands goes through the hub. An island with neither has no bridge, and no car drives to it |
 | Islands on a ring round the hub, a few further out | Groups, in the order of `islands` in `town.yaml`. `ringCapacity` (default 12, 6 to 18) fit on the first ring, the rest stand in a staggered second ring with their bridges passing between first-ring islands. Two rings only, so at most (ringCapacity x 2) - 1 islands. The airport takes the second ring's north slot. A ring road circles the town, with third-party vendors outside it. The hub grows with the number of islands |
 | Island with a heap of boxes and bins by the gate | Lost & found: an optional island, id `lost-found`, for systems you declare that no team owns. It always stands last |
-| Pier with crates, only on an island with messaging | Where messaging boats dock, for an island that publishes a topic or has a worker that subscribes to one. The board reads PIER, the topics it publishes and the subscriptions it reads. Messages waiting pile up as crates on the quay with a "waiting N, oldest" sign. Dead letters sit in a pen of broken crates with a "DLQ N" badge and a sweeping red light. An amber pennant on the pier means a worker still reads a topic on a route you are moving off (`messaging.legacyFrom`; today it can list only `hub`) |
+| Pier with crates, only on an island with messaging | Where messaging boats dock, for an island that publishes a topic or has a worker that subscribes to one. The board reads PIER, the topics it publishes and the subscriptions it reads. Messages waiting pile up as crates on the quay with a "waiting N, oldest" sign. Dead letters sit in a pen of broken crates with a "DLQ N" badge and a sweeping red light. |
 | The message broker's port on the hub | The broker's one billboard shows its name (Service Bus, Kafka, ...) and health, and a last line with the town's topics, subscriptions and piers (only when something is configured). The top bar's DLQ chip shows the town-wide dead-letter total; each island shows its own pen |
 | Boats between hub quays and piers | Asynchronous messaging, to piers only. Busier queues send more boats, smaller than before, and the crates on a boat show how loaded it is. Bridges are synchronous calls, boats are asynchronous ones. Boats sail only on open water: each island has a quay on the hub in the water gap beside its bridge, and lanes are found around land and bridges |
 | "Closed for repairs" sign and a blackout | The system is down |
@@ -220,7 +219,7 @@ To refresh the golden fixtures (calm town, a bad day across several islands, and
 | `fake.yaml` names real systems and its numbers make sense | error |
 | A town with `fake.yaml` or a `stories/` folder says `mode: demo` in `town.yaml`, and `mode` is `demo` or `live` | error |
 | A worker has a database, a system has a caller, no `islands` list in `town.yaml`, a database with no `engine` once the town lists its `databaseEngines`, an empty pillar, an island that stands alone (no API, messaging or call links) | warning |
-| Messaging: a topic listed by its service names a service of the pillar, a topic listed by name names a service of the pillar or none, a topic name is unique in the town (also against the names the templates make), subscriptions name an existing topic and a worker of the same pillar, no duplicates, `legacy: true` exactly on reads of topics whose owner `messaging.legacyFrom` in `town.yaml` lists | error |
+| Messaging: a topic listed by its service names a service of the pillar, a topic listed by name names a service of the pillar or none, a topic name is unique in the town (also against the names the templates make), subscriptions name an existing topic and a worker of the same pillar, no duplicates | error |
 
 On a pull request the check writes annotations on the files and posts one comment listing every finding with file and line (the same comment is updated on each push).
 
@@ -236,7 +235,7 @@ One folder describes a town. The sample is `config/galactic-credit/`:
 
 | File | What it holds |
 | --- | --- |
-| `town.yaml` | Name, what an island is called (`groupLabel`, used for the word in every part of the interface; `pillar` in file and key names means the same group), topology, `mode` (`demo` or `live`; left out means `live`), `islands` (the order of the islands round the hub: unlisted pillars follow, Lost & found is always last), `ringCapacity`, `databaseEngines` (the engines your databases run on, each one of the fixed database types, see below), `trafficDensity`, `messaging` (`topicTemplate`, `hubTopicTemplate`, `legacyFrom`; the templates only name topics listed by their service), `labels`, `wall` (the wall tour's timings and light) and `expectedWarnings`. Every key is in [docs/config-reference.md](docs/config-reference.md) |
+| `town.yaml` | Name, what an island is called (`groupLabel`, used for the word in every part of the interface; `pillar` in file and key names means the same group), topology, `mode` (`demo` or `live`; left out means `live`), `islands` (the order of the islands round the hub: unlisted pillars follow, Lost & found is always last), `ringCapacity`, `databaseEngines` (the engines your databases run on, each one of the fixed database types, see below), `trafficDensity`, `messaging` (`topicTemplate`, `hubTopicTemplate`; the templates only name topics listed by their service), `labels`, `wall` (the wall tour's timings and light) and `expectedWarnings`. Every key is in [docs/config-reference.md](docs/config-reference.md) |
 | `defaults.yaml` | App-wide defaults per role (SLA, error, resource, throttle and backlog thresholds) |
 | `hub.yaml` | The shared resources in the middle (for example a gateway and a broker; today at most one gateway, broker, egress and database), the hub's `messaging` topics, and the outside callers (`externalCallers`, each lists the external systems it reaches) |
 | `pillars/<code>.yaml` | One island: its systems, `calls` links, per-role `defaults`, and its `messaging` (topics it publishes, topics its workers consume) |
@@ -267,7 +266,7 @@ messaging:
     - { topic: payments.audit }                         # a topic of the pillar as a whole, no service
   subscriptions:                           # a worker of this pillar reads a topic
     - { topic: screening.events, consumer: pay.payments-worker }        # another pillar's topic, directly
-    - { topic: orders-events, consumer: pay.refunds-worker, legacy: true } # a hub topic on a route you are moving off, flagged
+    - { topic: orders-events, consumer: pay.refunds-worker }            # a topic of the hub
 ```
 
 | Island has | Gets |
@@ -277,7 +276,7 @@ messaging:
 | Neither | Nothing connects it: it stands alone and the registry warns about it |
 | No database, or no worker | No storage unit, or no factory: buildings exist only for roles the island has |
 
-A topic is listed in one of two ways. A plain entry is a service, and `messaging.topicTemplate` in `town.yaml` names its topic (`hubTopicTemplate` for the hub; both `{service}` when left out). Galactic Credit uses `{pillar}-{service}-outbox`, Droid Shop `{service}.events`. A block, `{ topic: orders.created, service: orders }`, gives the topic its own name, so topics named after events, or several for one service, fit too; leave `service` out for a topic of the pillar as a whole. The file that lists a topic owns it: piers, boats and the old-route check never read an owner from a name. A topic name is unique in the town. A template is needed only while a file lists a topic by its service, and then it must contain `{service}`. One current limit: `messaging.legacyFrom` can list only `hub`. A read of a topic whose owner `legacyFrom` lists must say `legacy: true`, and no other read may.
+A topic is listed in one of two ways. A plain entry is a service, and `messaging.topicTemplate` in `town.yaml` names its topic (`hubTopicTemplate` for the hub; both `{service}` when left out). Galactic Credit uses `{pillar}-{service}-outbox`, Droid Shop `{service}.events`. A block, `{ topic: orders.created, service: orders }`, gives the topic its own name, so topics named after events, or several for one service, fit too; leave `service` out for a topic of the pillar as a whole. The file that lists a topic owns it: piers and boats never read an owner from a name. A topic name is unique in the town. A template is needed only while a file lists a topic by its service, and then it must contain `{service}`.
 
 The loader checks everything and reports all problems at once, each with its file name. Ids must be `pillar.system` (the prefix matches the file, lowercase kebab-case, unique in the town). A misspelt key, role, call target, island or database engine gets a suggestion, for example `'aa.ledger-api' calls 'aa.ledger-dbb', which is not in this town. Did you mean 'aa.ledger-db'?`. When a system is renamed, keep its old id under `aliases: [old.id]` and files that still use it keep working.
 

@@ -250,10 +250,9 @@ public sealed record HealthEventSnapshot(
 public sealed record TopicSnapshot(string Name, string? Service);
 
 /// <summary>
-/// A worker reading a topic. Publisher is the id of the island that owns the topic, Consumer the id of the worker. Legacy marks a pillar reading
-/// a topic of the hub, the old way, which the renderer flags with an amber pennant.
+/// A worker reading a topic. Publisher is the id of the island that owns the topic, Consumer the id of the worker.
 /// </summary>
-public sealed record SubscriptionSnapshot(string Topic, string Publisher, string Consumer, bool Legacy);
+public sealed record SubscriptionSnapshot(string Topic, string Publisher, string Consumer);
 
 /// <summary>A scheduled job the pillar's file maps to services: System is the function's id, Job its name in the logs, Services the services of the island it starts work for.</summary>
 public sealed record ScheduleSnapshot(string System, string Job, IReadOnlyList<string> Services);

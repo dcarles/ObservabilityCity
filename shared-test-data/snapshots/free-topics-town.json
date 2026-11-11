@@ -158,8 +158,7 @@
           {
             "topic": "billing.invoice.paid",
             "publisher": "bil",
-            "consumer": "ord.orders-worker",
-            "legacy": false
+            "consumer": "ord.orders-worker"
           }
         ],
         "schedules": []
@@ -340,14 +339,12 @@
           {
             "topic": "orders.created",
             "publisher": "ord",
-            "consumer": "bil.billing-worker",
-            "legacy": false
+            "consumer": "bil.billing-worker"
           },
           {
             "topic": "orders.cancelled",
             "publisher": "ord",
-            "consumer": "bil.billing-worker",
-            "legacy": false
+            "consumer": "bil.billing-worker"
           }
         ],
         "schedules": []
@@ -519,20 +516,17 @@
           {
             "topic": "orders.created",
             "publisher": "ord",
-            "consumer": "shp.shipping-worker",
-            "legacy": false
+            "consumer": "shp.shipping-worker"
           },
           {
             "topic": "billing.audit",
             "publisher": "bil",
-            "consumer": "shp.shipping-worker",
-            "legacy": false
+            "consumer": "shp.shipping-worker"
           },
           {
             "topic": "platform.broadcast",
             "publisher": "hub",
-            "consumer": "shp.shipping-worker",
-            "legacy": true
+            "consumer": "shp.shipping-worker"
           }
         ],
         "schedules": []

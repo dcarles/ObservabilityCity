@@ -1,4 +1,4 @@
-# Reads only: a worker on topics of two other islands, and the hub's topic, the old route.
+# Reads only: a worker on topics of two other islands, and the hub's topic.
 pillar: shp
 displayName: Shipping
 color: "#4dc3c9"
@@ -9,4 +9,4 @@ messaging:
   subscriptions:
     - { topic: orders.created, consumer: shp.shipping-worker }
     - { topic: billing.audit, consumer: shp.shipping-worker }
-    - { topic: platform.broadcast, consumer: shp.shipping-worker, legacy: true }
+    - { topic: platform.broadcast, consumer: shp.shipping-worker }

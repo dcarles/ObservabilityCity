@@ -9,7 +9,7 @@ systems:
   - { id: lost-found.batch-gateway-db, service: batch-gateway, name: Batch gateway DB, role: db, engine: sqlserver }
   - { id: lost-found.legacy-ftp-api, name: Legacy file drop, role: api }
 
-# The old way: this worker still reads the hub's exports topic instead of a pillar's outbox. Flagged legacy.
+# This worker reads the hub's exports topic.
 messaging:
   subscriptions:
-    - { topic: hub-exports, consumer: lost-found.batch-gateway-worker, legacy: true }
+    - { topic: hub-exports, consumer: lost-found.batch-gateway-worker }

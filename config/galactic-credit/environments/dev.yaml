@@ -15,7 +15,7 @@ tenants:
   - { id: dev-hotel, name: Dev hotel, kind: test }
   - { id: dev-india, name: Dev india, kind: test }
   - { id: dev-juliet, name: Dev juliet, kind: test }
-# Not deployed in development: the legacy batch gateway (its whole island) and the nightly statement run.
+# Not deployed in development: the batch gateway and the file drop (the whole island) and the nightly statement run.
 exclude:
   - lost-found.batch-gateway-api
   - lost-found.batch-gateway-worker

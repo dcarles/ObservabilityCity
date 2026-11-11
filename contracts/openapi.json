@@ -1751,8 +1751,7 @@
         "required": [
           "topic",
           "publisher",
-          "consumer",
-          "legacy"
+          "consumer"
         ],
         "type": "object",
         "properties": {
@@ -1764,9 +1763,6 @@
           },
           "consumer": {
             "type": "string"
-          },
-          "legacy": {
-            "type": "boolean"
           }
         }
       },

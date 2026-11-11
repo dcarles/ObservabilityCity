@@ -25,8 +25,6 @@ export interface Messaging {
   /** Topics the island publishes and subscriptions its workers hold, for the board. */
   topics: number
   subscriptions: number
-  /** True when a worker still reads the hub's egress topic, the old route. */
-  legacy: boolean
   /** What the whole pillar sends to other pillars (`sent`), its services send each other (`internal`) and it receives, in messages a second, as the dashboard says them; null for a side nothing measures. Absent when nothing measures the pillar. */
   pillar?: { sent: number | null; internal: number | null; received: number | null; windowSeconds: number } | null
 }
@@ -59,7 +57,6 @@ export function messagingOf(nodes: NodeSnapshot[], messaging?: MessagingSnapshot
     red: workers[0]?.backlogRed ?? 300,
     topics: messaging?.topics.length ?? 0,
     subscriptions: messaging?.subscriptions.length ?? 0,
-    legacy: messaging?.subscriptions.some((x) => x.legacy) ?? false,
   }
 }
 
@@ -98,8 +95,6 @@ export class HarbourStatus {
   private readonly bulb: THREE.Mesh
   private readonly glow: THREE.Sprite
   private readonly label: THREE.Sprite
-  private readonly pennant: THREE.Group
-  private legacy = false
   private labelKey = ''
   private lit = false
   private visibleCrates = 0
@@ -174,16 +169,6 @@ export class HarbourStatus {
     this.beam.visible = false
     this.group.add(this.bulb, this.glow, this.beam)
 
-    // an amber pennant on a pole at the pier head: a worker here still reads the hub's egress topic (the old route)
-    this.pennant = new THREE.Group()
-    const pole = cyl(0.07, 0.09, 4.2, flat('#5a626d'), { y: 2.1 }, 6)
-    const cloth = new THREE.Mesh(new THREE.ShapeGeometry(new THREE.Shape([new THREE.Vector2(0, 0), new THREE.Vector2(0, -0.9), new THREE.Vector2(1.9, -0.45)])), new THREE.MeshBasicMaterial({ color: '#ffb830', side: THREE.DoubleSide, toneMapped: false }))
-    cloth.position.set(0.05, 4.1, 0)
-    this.pennant.add(pole, cloth)
-    this.pennant.position.set(coastX - 1.4, GROUND, z + 2.4)
-    this.pennant.visible = false
-    this.group.add(this.pennant)
-
     // the board
     this.label = new THREE.Sprite(new THREE.SpriteMaterial({ map: canvasTexture(448, SIGN_H, () => {}), transparent: true, depthTest: false, toneMapped: false }))
     this.label.renderOrder = 10
@@ -214,9 +199,6 @@ export class HarbourStatus {
       this.beam.rotation.y = time * 1.8 + this.phase
       ;(this.glow.material as THREE.SpriteMaterial).opacity = 0.55 + 0.4 * Math.sin(time * 6 + this.phase)
     }
-    this.legacy = m.legacy
-    this.pennant.visible = m.legacy
-    if (m.legacy) this.pennant.rotation.y = Math.sin(time * 1.6 + this.phase) * 0.25
     this.draw(m)
     const trouble = alarm || (m.oldestSeconds ?? 0) >= m.amber
     const d = camera.position.distanceTo(this.label.getWorldPosition(new THREE.Vector3()))
@@ -227,7 +209,7 @@ export class HarbourStatus {
 
   private draw(m: Messaging): void {
     const p = m.pillar
-    const key = `${p ? `${p.sent == null ? -1 : Math.round(p.sent * 10)}/${p.internal == null ? -1 : Math.round(p.internal * 10)}/${p.received == null ? -1 : Math.round(p.received * 10)}` : 'x'}|${m.topics}/${m.subscriptions}/${m.legacy ? 1 : 0}|${Math.round(m.perSecond)}|${m.waiting == null ? -1 : Math.round(m.waiting / 5)}|${m.oldestSeconds == null ? -1 : Math.round(m.oldestSeconds / 2)}|${m.deadLetters ?? -1}`
+    const key = `${p ? `${p.sent == null ? -1 : Math.round(p.sent * 10)}/${p.internal == null ? -1 : Math.round(p.internal * 10)}/${p.received == null ? -1 : Math.round(p.received * 10)}` : 'x'}|${m.topics}/${m.subscriptions}|${Math.round(m.perSecond)}|${m.waiting == null ? -1 : Math.round(m.waiting / 5)}|${m.oldestSeconds == null ? -1 : Math.round(m.oldestSeconds / 2)}|${m.deadLetters ?? -1}`
     if (key === this.labelKey) return
     this.labelKey = key
     const tex = (this.label.material as THREE.SpriteMaterial).map as THREE.CanvasTexture
@@ -252,8 +234,8 @@ export class HarbourStatus {
     ctx.fillText(`${formatRate(m.perSecond)} msg/s`, 424, y)
     ctx.textAlign = 'left'
     y += 38
-    ctx.fillStyle = m.legacy ? '#ffb830' : '#b8c7da'; ctx.font = '700 26px system-ui, sans-serif'
-    ctx.fillText(`${m.topics} topic${m.topics === 1 ? '' : 's'} · reads ${m.subscriptions}${m.legacy ? ' · legacy' : ''}`, 24, y, 400)
+    ctx.fillStyle = '#b8c7da'; ctx.font = '700 26px system-ui, sans-serif'
+    ctx.fillText(`${m.topics} topic${m.topics === 1 ? '' : 's'} · reads ${m.subscriptions}`, 24, y, 400)
     for (const [label, v] of shown) {
       y += 38
       ctx.fillStyle = '#b8c7da'; ctx.font = '700 26px system-ui, sans-serif'; ctx.textAlign = 'left'
@@ -285,7 +267,7 @@ export class HarbourStatus {
   }
 
   /** What the harbour shows, for tests: crates on the quay, broken crates in the pen, and whether the red light sweeps. */
-  status(): { crates: number; brokenCrates: number; alarm: boolean; pennant: boolean } {
-    return { crates: this.visibleCrates, brokenCrates: this.visibleBroken, alarm: this.lit, pennant: this.legacy }
+  status(): { crates: number; brokenCrates: number; alarm: boolean } {
+    return { crates: this.visibleCrates, brokenCrates: this.visibleBroken, alarm: this.lit }
   }
 }

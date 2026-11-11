@@ -84,7 +84,7 @@ public class EnvironmentTests
     public void Excluding_a_system_drops_the_calls_that_lead_to_it_and_the_subscriptions_of_a_worker_that_is_gone()
     {
         using var copy = new RegistryCopy(TestPaths.TenantsTown);
-        copy.Replace("pillars/aa.yaml", "messaging:\n  topics: [orders]\n", "messaging:\n  topics: [orders]\n  subscriptions:\n    - { topic: hub-broadcast, consumer: aa.orders-worker, legacy: true }\n");
+        copy.Replace("pillars/aa.yaml", "messaging:\n  topics: [orders]\n", "messaging:\n  topics: [orders]\n  subscriptions:\n    - { topic: hub-broadcast, consumer: aa.orders-worker }\n");
         copy.Replace("environments/dev.yaml", "aa.tools-cron]", "aa.tools-cron, aa.audit-cache, aa.orders-worker]");
 
         var full = RegistryLoader.Load(copy.Path);

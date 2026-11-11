@@ -75,7 +75,6 @@ export const LEGEND: readonly LegendSection[] = [
       { id: 'hazard', sees: 'Amber hazard lights on a car', means: 'Stuck in a line of cars behind a slow service', more: 'The service\'s p99 is past its SLA.', tone: 'amber', icon: '🚧' },
       { id: 'bubble', sees: 'Bubble over a line of cars', means: 'A "!" or a "+N waiting"', more: 'The "!" shows when p99 is well past the SLA and a car is stuck behind it. "+N waiting" counts the requests in flight that the lane has no room to draw.', tone: 'amber', icon: '💬' },
       { id: 'crates', sees: 'Crates piling up on a pier', means: 'A backlog: messages waiting for a worker', tone: 'amber', icon: '📦' },
-      { id: 'pennant', sees: 'Amber pennant', means: 'A legacy route to migrate', more: 'A worker still reads the old egress topic.', tone: 'amber', icon: '🚩', hidden: 'No company config uses a legacy route yet. Remove this to show it again.' },
       { id: 'weather', sees: 'Weather over an island', means: 'An open incident there', more: 'Clouds for severity 4, overcast for 3, rain for 2, a storm with lightning for 1. The worst one wins.', tone: 'amber', icon: '⛈️', hidden: 'The incident work (Phase 5) is not built yet. Remove this when it is.' },
     ],
   },

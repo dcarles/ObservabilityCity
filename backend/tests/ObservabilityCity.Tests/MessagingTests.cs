@@ -216,14 +216,14 @@ public class MessagingTests
     }
 
     [Fact]
-    public async Task Pillars_subscribe_directly_to_each_others_outboxes_and_the_hub_route_is_flagged_legacy()
+    public async Task Pillars_subscribe_directly_to_each_others_outboxes_and_to_the_hubs_topic()
     {
         var s = await new Rig().Run();
 
         var wrk = Group(s, "wrk").Messaging.Subscriptions.Single();
-        Assert.Equal(new SubscriptionSnapshot("ful-orders-outbox", "ful", "wrk.batch-worker", false), wrk);
+        Assert.Equal(new SubscriptionSnapshot("ful-orders-outbox", "ful", "wrk.batch-worker"), wrk);
         var leg = Group(s, "leg").Messaging.Subscriptions.Single();
-        Assert.Equal(new SubscriptionSnapshot("hub-broadcast", "hub", "leg.feed-worker", true), leg);
+        Assert.Equal(new SubscriptionSnapshot("hub-broadcast", "hub", "leg.feed-worker"), leg);
         Assert.Equal(["hub-broadcast"], Group(s, "hub").Messaging.Topics.Select(t => t.Name));
     }
 
@@ -234,7 +234,7 @@ public class MessagingTests
         var links = TownLinks.Of(registry);
 
         Assert.True(registry.Subscriptions.Count(s => s.PublisherGroupId != s.ConsumerGroupId) > 10);
-        Assert.Contains(registry.Subscriptions, s => s is { Legacy: true, Topic: "hub-exports", ConsumerGroupId: "lost-found" });
+        Assert.Contains(registry.Subscriptions, s => s is { Topic: "hub-exports", PublisherGroupId: "hub", ConsumerGroupId: "lost-found" });
         Assert.False(links["rcn"].HasBridge);
         Assert.True(links["rcn"].HasMessaging);
         Assert.True(links["reg"].HasBridge);
@@ -300,7 +300,6 @@ public class MessagingTests
 
     [Theory]
     [InlineData("topic: wrk-batch-outbox,", "topic: wrk-batch-outbxo,", "which no pillar publishes")]
-    [InlineData("topic: wrk-batch-outbox,", "topic: hub-broadcast,", "reads 'hub-broadcast' from 'hub'")]
     [InlineData("consumer: ful.orders-worker", "consumer: ful.orders-db", "only workers do")]
     [InlineData("consumer: ful.orders-worker", "consumer: ful.orders-wroker", "is not a system of this pillar")]
     [InlineData("consumer: ful.orders-worker", "consumer: wrk.batch-worker", "is not a system of this pillar")]
@@ -340,22 +339,22 @@ public class MessagingTests
         var registry = RegistryLoader.Load(copy.Path);
 
         Assert.Equal(["events.ful.orders", "events.wrk.batch", "shared.broadcast"], registry.Topics.Select(t => t.Name).Order());
-        Assert.Contains(registry.Subscriptions, s => s.Topic == "shared.broadcast" && s.Legacy);
+        Assert.Contains(registry.Subscriptions, s => s is { Topic: "shared.broadcast", PublisherGroupId: "hub" });
     }
 
     [Fact]
-    public void Without_a_messaging_block_topics_are_named_after_the_service_and_no_route_is_legacy()
+    public void Without_a_messaging_block_topics_are_named_after_the_service()
     {
         using var copy = new RegistryCopy(TestPaths.LinksTown);
         var town = copy.Read("town.yaml");
         copy.Write("town.yaml", town[..town.IndexOf("messaging:", StringComparison.Ordinal)]);
         foreach (var file in Directory.GetFiles(copy.FilePath("pillars"), "*.yaml").Append(copy.FilePath("hub.yaml")))
-            File.WriteAllText(file, File.ReadAllText(file).Replace("wrk-batch-outbox", "batch").Replace("ful-orders-outbox", "orders").Replace("hub-broadcast", "broadcast").Replace(", legacy: true", ""));
+            File.WriteAllText(file, File.ReadAllText(file).Replace("wrk-batch-outbox", "batch").Replace("ful-orders-outbox", "orders").Replace("hub-broadcast", "broadcast"));
 
         var registry = RegistryLoader.Load(copy.Path);
 
         Assert.Equal(["batch", "broadcast", "orders"], registry.Topics.Select(t => t.Name).Order());
-        Assert.All(registry.Subscriptions, s => Assert.False(s.Legacy));
+        Assert.Contains(registry.Subscriptions, s => s is { Topic: "broadcast", PublisherGroupId: "hub" });
     }
 
     [Fact]
@@ -369,15 +368,17 @@ public class MessagingTests
         Assert.Contains("must contain {service}", e.Message);
     }
 
-    [Fact]
-    public void Legacy_is_only_for_the_hubs_topics()
+    [Theory]
+    [InlineData("pillars/leg.yaml", "consumer: leg.feed-worker }", "consumer: leg.feed-worker, legacy: true }", "legacy")]
+    [InlineData("town.yaml", "  hubTopicTemplate: \"hub-{service}\"\n", "  hubTopicTemplate: \"hub-{service}\"\n  legacyFrom: [hub]\n", "legacyFrom")]
+    public void A_legacy_key_is_an_unknown_key(string file, string from, string to, string key)
     {
         using var copy = new RegistryCopy(TestPaths.LinksTown);
-        copy.Replace("pillars/ful.yaml", "topic: wrk-batch-outbox, consumer: ful.orders-worker", "topic: wrk-batch-outbox, consumer: ful.orders-worker, legacy: true");
+        copy.Replace(file, from, to);
 
         var e = Assert.Throws<RegistryException>(() => RegistryLoader.Load(copy.Path));
 
-        Assert.Contains("is not listed in messaging.legacyFrom", e.Message);
+        Assert.Contains($"unknown key '{key}'", e.Message);
     }
 
     [Fact]

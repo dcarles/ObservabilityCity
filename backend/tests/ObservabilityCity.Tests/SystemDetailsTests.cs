@@ -186,18 +186,8 @@ public class SystemDetailsTests
 
         Assert.Equal(["aa-orders-events"], worker.ServiceTopics);
         var sub = Assert.Single(worker.Subscriptions);
-        Assert.Equal(("bb-ledger-events", "bb", false), (sub.Topic, sub.Publisher, sub.Legacy));
+        Assert.Equal(("bb-ledger-events", "bb"), (sub.Topic, sub.Publisher));
         Assert.Empty(SystemDetails.Of(Mini, "aa.orders-api")!.Subscriptions);
-    }
-
-    [Fact]
-    public void A_legacy_read_is_marked()
-    {
-        var legacy = Galactic.Subscriptions.First(s => s.Legacy);
-
-        var sub = SystemDetails.Of(Galactic, legacy.ConsumerId)!.Subscriptions.Single(s => s.Topic == legacy.Topic);
-
-        Assert.True(sub.Legacy);
     }
 
     [Fact]

@@ -38,7 +38,7 @@ public static partial class RegistryLoader
     [
         "id", "name", "groupLabel", "topology", "expectedWarnings", "ringCapacity", "databaseEngines", "engine", "type", "rule", "file", "pillar", "displayName", "color", "external", "defaults", "systems", "resources",
         "externalCallers", "islands", "role", "service", "slaP99Ms", "errors", "resources", "throttle", "backlog", "calls", "aliases",
-        "amber", "red", "vendors", "calledBy", "gatewayCalls", "messaging", "topics", "subscriptions", "topic", "consumer", "legacy",
+        "amber", "red", "vendors", "calledBy", "gatewayCalls", "messaging", "topics", "subscriptions", "topic", "consumer",
         "tenantPattern", "order", "default", "sources", "kind", "connection", "tenants", "exclude", "environments", "fake", "undeclaredTenants",
         "signals", "credentials", "credential", "pollSeconds", "timeoutSeconds", "lateAfterSeconds", "tenantId", "clientId", "clientSecretEnv",
         "scope", "inventory", "telemetryStore", "telemetryStoreId", "workspace", "workspaceId", "variables", "account", "subscription", "pillarAccounts", "pillars", "accounts", "telemetryStores", "workspaces", "assets", "cloud", "island", "group", "label", "shape", "instances", "types", "pattern", "roles", "serviceTag", "tenantNameTag",
@@ -93,9 +93,7 @@ public static partial class RegistryLoader
             throw new RegistryException($"town.yaml: mode '{town.Mode}' is not known. Use {string.Join(" or ", TownModes.All)}.{DidYouMean.Hint(town.Mode, TownModes.All)}");
         if (double.IsNaN(town.TrafficDensity) || town.TrafficDensity < TownTraffic.Min || town.TrafficDensity > TownTraffic.Max)
             throw new RegistryException($"town.yaml: trafficDensity {town.TrafficDensity.ToString(System.Globalization.CultureInfo.InvariantCulture)} is out of range. Use a number from {TownTraffic.Min.ToString(System.Globalization.CultureInfo.InvariantCulture)} to {TownTraffic.Max.ToString(System.Globalization.CultureInfo.InvariantCulture)} (1 is the usual number of cars).");
-        var convention = new MessagingConvention(town.Messaging.TopicTemplate, town.Messaging.HubTopicTemplate, town.Messaging.LegacyFrom);
-        foreach (var owner in convention.LegacyFrom.Where(o => o != "hub"))
-            throw new RegistryException($"town.yaml: messaging.legacyFrom lists '{owner}'. Only 'hub' is known: the topics of the hub are the one old route a town can mark");
+        var convention = new MessagingConvention(town.Messaging.TopicTemplate, town.Messaging.HubTopicTemplate);
         if (string.IsNullOrWhiteSpace(town.Labels.InternalVendors))
             throw new RegistryException("town.yaml: labels.internalVendors is empty. Leave it out to use the default, or give it a name");
         var wall = town.Wall;

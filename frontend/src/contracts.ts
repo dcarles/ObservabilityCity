@@ -530,7 +530,6 @@ export interface components {
             topic: string;
             publisher: string;
             consumer: string;
-            legacy: boolean;
         };
         SystemDetail: {
             id: string;
