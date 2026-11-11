@@ -22,7 +22,7 @@ public class ScopeAliasTests
     private static readonly (string Neutral, string Azure)[] Keys =
     [
         ("telemetryStoreId", "workspaceId"), ("telemetryStores", "workspaces"), ("telemetryStore", "workspace"),
-        ("pillarAccounts", "pillars"), ("accounts", "subscriptions"), ("account", "subscription"),
+        ("groupAccounts", "pillars"), ("accounts", "subscriptions"), ("account", "subscription"),
     ];
 
     /// <summary>An environment file with every scope key written the other way. Keys are matched where a key stands: after a line's indent or inside a flow mapping.</summary>
@@ -120,7 +120,7 @@ public class ScopeAliasTests
 
         Assert.Empty(r.Problems);
         Assert.Equal(("00000000-0000-0000-0000-0000000000a1", "name"), (r.Pillar("aa")!.AccountId, r.Pillar("aa")!.Via)); // account
-        Assert.Equal(("00000000-0000-0000-0000-0000000000a2", "explicit"), (r.Pillar("bb")!.AccountId, r.Pillar("bb")!.Via)); // pillarAccounts
+        Assert.Equal(("00000000-0000-0000-0000-0000000000a2", "explicit"), (r.Pillar("bb")!.AccountId, r.Pillar("bb")!.Via)); // groupAccounts
         Assert.Equal(("logs-prd-*", "00000000-0000-0000-0000-00000000beef", "name"), (r.TelemetryStore, r.TelemetryStoreId, r.TelemetryStoreVia)); // telemetryStore, looked up
         Assert.Equal("gw-gateway", Assert.Single(r.System("hub.gateway")!.Resources).Name); // a resource rule's own account
         Assert.Contains(r.AssetList, a => a.PillarId == AssetRule.HubIsland && a.Name == "logs-prd-main" && a.AccountId == "00000000-0000-0000-0000-0000000000f1"); // an asset rule's own account
@@ -144,7 +144,7 @@ public class ScopeAliasTests
         { "  telemetryStore: \"logs-{env}-*\"", "  telemetryStore: \"logs-{env}-*\"\n  workspace: \"logs-other\"", "workspace:", "scope", "telemetryStore" },
         { "  telemetryStore: \"logs-{env}-*\"", "  telemetryStore: \"logs-{env}-*\"\n  workspaceId: \"00000000-0000-0000-0000-000000000001\"\n  telemetryStoreId: \"00000000-0000-0000-0000-000000000002\"", "telemetryStoreId:", "scope", "telemetryStoreId" },
         { "  account: { nameLike: \"{pillar}-{env}-*\" }", "  subscription: { nameLike: \"x-*\" }\n  account: { nameLike: \"{pillar}-{env}-*\" }", "  account:", "scope", "account" },
-        { "  pillarAccounts: {", "  pillars: { aa: x }\n  pillarAccounts: {", "  pillarAccounts:", "scope", "pillarAccounts" },
+        { "  groupAccounts: {", "  pillars: { aa: x }\n  groupAccounts: {", "  groupAccounts:", "scope", "groupAccounts" },
         { "    accounts: \"accounts | project id, name, tags\"", "    accounts: \"accounts | project id, name, tags\"\n    subscriptions: \"other\"", "subscriptions:", "scope.queries", "accounts" },
         { "    telemetryStores: \"stores | project id, name, customerId\"", "    workspaces: \"other\"\n    telemetryStores: \"stores | project id, name, customerId\"", "telemetryStores:", "scope.queries", "telemetryStores" },
         { "account: { tag: { key: unit, value: platform } } }\n    - { name: apps", "account: { tag: { key: unit, value: platform } }, subscription: { nameLike: \"x\" } }\n    - { name: apps", "name: gateways", "scope.resources 'gateways'", "account" },
@@ -209,11 +209,14 @@ public class ScopeAliasTests
         var r = ScopeResolver.Resolve(RegistryLoader.Load(copy.Path).ForEnvironment("prod"), ResourceGraphInventory.FromRecording(copy.Read("inventory.json")));
 
         Assert.Contains("No telemetry store is named 'nothing-*'. Check scope.telemetryStore, or give the store's id under scope.telemetryStoreId.", r.Problems);
-        Assert.Contains("Pillar 'aa': no account has name like 'none-*'. Check scope.account, or name the account under scope.pillarAccounts.", r.Problems);
+        Assert.Contains("Pillar 'aa': no account has name like 'none-*'. Check scope.account, or name the account under scope.groupAccounts.", r.Problems);
         Assert.All(r.Problems, p => Assert.DoesNotMatch("(?i)subscription|workspace", p));
     }
 
     // ---- schema and docs ----
+
+    /// <summary>What the schema and the docs call an alias: pillarAccounts is the older (pillar) name of groupAccounts (see <see cref="GroupAliasTests"/>), every other alias an Azure name.</summary>
+    private static string NameOf(string alias) => alias == GroupWords.OlderGroupAccounts ? "Older name" : "Azure name";
 
     /// <summary>Every block of the scope that takes aliases, with its aliases. The group file's own alias (pillar for group) is proven by <see cref="GroupAliasTests"/>.</summary>
     private static IEnumerable<(string Type, IReadOnlyDictionary<string, string> Aliases)> Blocks() =>
@@ -238,8 +241,8 @@ public class ScopeAliasTests
             var keys = where[type].AsObject().Select(p => p.Key).ToList();
             foreach (var (alias, neutral) in aliases)
             {
-                Assert.True(keys.IndexOf(neutral) >= 0 && keys.IndexOf(neutral) < keys.IndexOf(alias), $"{type}: '{neutral}' must come before its Azure name '{alias}' in the schema");
-                Assert.Contains($"Azure name: {alias}", (string)where[type][neutral]!["description"]!);
+                Assert.True(keys.IndexOf(neutral) >= 0 && keys.IndexOf(neutral) < keys.IndexOf(alias), $"{type}: '{neutral}' must come before its older name '{alias}' in the schema");
+                Assert.Contains($"{NameOf(alias)}: {alias}", (string)where[type][neutral]!["description"]!);
             }
         }
     }
@@ -252,7 +255,7 @@ public class ScopeAliasTests
         {
             var table = Regex.Match(doc, $@"<!-- file: {type} -->\n((?:\|.*\n?)+)").Groups[1].Value;
             foreach (var (alias, neutral) in aliases)
-                Assert.Matches($@"(?m)^\| `{neutral}` \|.*Azure name: `{alias}`", table);
+                Assert.Matches($@"(?m)^\| `{neutral}` \|.*{NameOf(alias)}: `{alias}`", table);
         }
     }
 }

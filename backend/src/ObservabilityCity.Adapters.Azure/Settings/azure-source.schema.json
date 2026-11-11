@@ -108,7 +108,7 @@
             "required": ["match"],
             "additionalProperties": false,
             "properties": {
-              "match": { "type": "string", "description": "A regular expression with the named group service (and group, older name pillar, when the name says it; producerPillar and producer together for a route)." },
+              "match": { "type": "string", "description": "A regular expression with the named group service (and group, older name pillar, when the name says it; producerGroup, older name producerPillar, and producer together for a route)." },
               "consumer": { "type": "string", "description": "The role of the system that reads the entity. Default worker." }
             }
           }

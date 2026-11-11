@@ -129,7 +129,7 @@
       "File": "environments/prod.yaml",
       "Line": 67,
       "Rule": "registry",
-      "Message": "environments/prod.yaml: source \u0027messaging\u0027 entities.patterns[1]: a route needs both groups, (?\u003CproducerPillar\u003E...) and (?\u003Cproducer\u003E...); this match has only producer"
+      "Message": "environments/prod.yaml: source \u0027messaging\u0027 entities.patterns[1]: a route needs both groups, (?\u003CproducerGroup\u003E...) (older name producerPillar) and (?\u003Cproducer\u003E...); this match has only producer"
     },
     {
       "Severity": "Warning",

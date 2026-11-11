@@ -189,7 +189,7 @@ public sealed partial class SnapshotBuilder(IRegistryProvider registries, Latest
     }
 
     /// <summary>
-    /// The registry with the routes the broker's queue names add: a queue whose name says who publishes it (see the <c>producerPillar</c> and <c>producer</c> groups of an entity pattern)
+    /// The registry with the routes the broker's queue names add: a queue whose name says who publishes it (see the <c>producerGroup</c> (older name <c>producerPillar</c>) and <c>producer</c> groups of an entity pattern)
     /// is a topic of that publisher and a subscription of the worker that reads it. What the pillar files already say is kept; a route they already hold is not added twice.
     /// </summary>
     private Registry.Registry WithRoutes(Registry.Registry registry)

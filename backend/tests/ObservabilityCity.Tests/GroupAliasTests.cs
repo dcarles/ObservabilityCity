@@ -16,7 +16,8 @@ namespace ObservabilityCity.Tests;
 
 /// <summary>
 /// The files say group, the neutral word, or pillar, its older name: the folder (groups/ or pillars/), the key of a group file (group: or pillar:), the template
-/// variables ({group}, {groupId}, {callerGroup} or {pillar}, {pillarId}, {callerPillar}) and the named group of a pattern ((?&lt;group&gt;) or (?&lt;pillar&gt;)).
+/// variables ({group}, {groupId}, {callerGroup} or {pillar}, {pillarId}, {callerPillar}), the named groups of a pattern ((?&lt;group&gt;) or (?&lt;pillar&gt;),
+/// (?&lt;producerGroup&gt;) or (?&lt;producerPillar&gt;)) and the scope key groupAccounts (or pillarAccounts; its Azure name pillars is <see cref="ScopeAliasTests"/>'s).
 /// Every test and sample town is written each way here, and once with the spellings mixed, and each must load to the same registry, snapshot, scope, Config tab
 /// and findings, apart from the folder its files are in. Droid Shop uses the neutral names and Galactic Credit the older ones. A town with both folders, or a
 /// file with both keys, is an error that names both.
@@ -40,7 +41,16 @@ public class GroupAliasTests
         return yaml;
     }
 
-    private static string Patterns(string yaml, bool neutral) => neutral ? yaml.Replace("(?<pillar>", "(?<group>") : yaml.Replace("(?<group>", "(?<pillar>");
+    private static string Patterns(string yaml, bool neutral) => neutral
+        ? yaml.Replace("(?<pillar>", "(?<group>").Replace("(?<producerPillar>", "(?<producerGroup>")
+        : yaml.Replace("(?<group>", "(?<pillar>").Replace("(?<producerGroup>", "(?<producerPillar>");
+
+    /// <summary>The scope key of the groups' accounts written the one way or the other, where a key stands: after a line's indent or inside a flow mapping. Its Azure name stays.</summary>
+    private static string Keys(string yaml, bool neutral)
+    {
+        var (from, to) = neutral ? (GroupWords.OlderGroupAccounts, GroupWords.GroupAccounts) : (GroupWords.GroupAccounts, GroupWords.OlderGroupAccounts);
+        return Regex.Replace(yaml, $@"(?<=(^|[{{,])[ \t]*){from}:(?=[ \t\r\n])", to + ":", RegexOptions.Multiline);
+    }
 
     /// <summary>
     /// Writes a copy of a town one way: <see cref="Spelling.Mixed"/> has the neutral folder and templates, and the older key and pattern groups. Templates and
@@ -63,6 +73,7 @@ public class GroupAliasTests
             var text = File.ReadAllText(file);
             text = Templates(text, neutral: spelling != Spelling.Older);
             text = Patterns(text, neutral: spelling == Spelling.Neutral);
+            text = Keys(text, neutral: spelling == Spelling.Neutral);
             File.WriteAllText(file, text);
         }
         return copy;
@@ -153,6 +164,10 @@ public class GroupAliasTests
         Assert.Contains("{pillar}", text);
         Assert.Contains("{pillarId}", text); // {callerPillar} is used by no town: the link rule tests below show it
         Assert.Contains("(?<pillar>", text);
+        Assert.Contains("(?<producerGroup>", text); // (?<producerPillar> is used by no town since routes-town took the new name: the spelt copies show it
+        Assert.Contains("\n  groupAccounts:", text);
+        Assert.Contains("\n  pillarAccounts:", text);
+        Assert.Contains("\n  pillars:", text);
         Assert.Contains(all, t => Directory.Exists(Path.Combine(t, GroupWords.OlderFolder)));
         // Droid Shop uses the neutral names, Galactic Credit the older ones
         Assert.True(Directory.Exists(Path.Combine(TestPaths.DroidShop, GroupWords.Folder)));
@@ -331,5 +346,107 @@ public class GroupAliasTests
         copy.Replace("environments/prod.yaml", "variables: { env: prd }", "variables: { env: prd, group: x }");
 
         Assert.Contains("scope.variables: 'group' is a word of the group itself ({group}, older name {pillar}) and cannot be redefined. Give the variable another name", Assert.Throws<RegistryException>(() => RegistryLoader.Load(copy.Path)).Message);
+    }
+
+    // ---- groupAccounts and producerGroup ----
+
+    private static string NeutralScopeTown => Path.Combine(Registries, "neutral-scope-town");
+
+    [Theory]
+    [InlineData("groupAccounts")]
+    [InlineData("pillarAccounts")]
+    [InlineData("pillars")]
+    public void The_groups_accounts_read_the_same_under_each_of_their_three_names(string key)
+    {
+        // groupAccounts, its older name pillarAccounts and its Azure name pillars
+        using var copy = new RegistryCopy(NeutralScopeTown);
+        copy.Replace("environments/prod.yaml", "  groupAccounts: {", $"  {key}: {{");
+        var inventory = ResourceGraphInventory.FromRecording(copy.Read("inventory.json"));
+
+        var expected = ScopeResolver.Resolve(RegistryLoader.Load(NeutralScopeTown).ForEnvironment("prod"), inventory);
+        var actual = ScopeResolver.Resolve(RegistryLoader.Load(copy.Path).ForEnvironment("prod"), inventory);
+
+        Assert.Equal(("00000000-0000-0000-0000-0000000000a2", "explicit"), (actual.Pillar("bb")!.AccountId, actual.Pillar("bb")!.Via));
+        Assert.Equal(JsonSerializer.Serialize(expected, Json), JsonSerializer.Serialize(actual, Json));
+        Assert.Equal(RegistryLoader.Load(NeutralScopeTown).Environments.Single(e => e.Id == "prod").Scope.PillarAccounts, RegistryLoader.Load(copy.Path).Environments.Single(e => e.Id == "prod").Scope.PillarAccounts);
+    }
+
+    [Theory]
+    [InlineData("pillarAccounts", "groupAccounts", "'groupAccounts' and 'pillarAccounts', which are one setting ('pillarAccounts' is the older name of 'groupAccounts')")]
+    [InlineData("pillars", "groupAccounts", "'groupAccounts' and 'pillars', which are one setting ('pillars' is the older name of 'groupAccounts')")]
+    [InlineData("pillars", "pillarAccounts", "'pillars' and 'pillarAccounts', which are one setting (both are older names of 'groupAccounts')")]
+    public void A_scope_that_sets_two_names_of_the_groups_accounts_is_an_error_that_names_both_and_the_line(string first, string second, string says)
+    {
+        using var copy = new RegistryCopy(NeutralScopeTown);
+        copy.Replace("environments/prod.yaml", "  groupAccounts: {", $"  {first}: {{ aa: x }}\n  {second}: {{");
+        var line = copy.LineOf("environments/prod.yaml", $"  {second}:");
+
+        Assert.Contains($"environments/prod.yaml (line {line}): scope sets both {says}. Keep one of them", Assert.Throws<RegistryException>(() => RegistryLoader.Load(copy.Path)).Message);
+        var hit = Assert.Single(RegistryValidator.Validate(copy.Path).Findings, f => f.Message.Contains("sets both"));
+        Assert.Equal((Severity.Error, "environments/prod.yaml", line), (hit.Severity, hit.File, hit.Line));
+    }
+
+    [Fact]
+    public void A_problem_with_the_groups_accounts_names_the_neutral_key_whichever_was_written()
+    {
+        using var copy = new RegistryCopy(NeutralScopeTown);
+        copy.Replace("environments/prod.yaml", "  groupAccounts: { bb:", "  pillarAccounts: { Bad_Id: x, bb:");
+
+        Assert.Contains("scope.groupAccounts: 'Bad_Id' must be a group id (lowercase kebab-case)", Assert.Throws<RegistryException>(() => RegistryLoader.Load(copy.Path)).Message);
+    }
+
+    [Fact]
+    public void The_environment_schema_lists_the_three_names_of_the_groups_accounts_the_neutral_one_first_and_refuses_any_two()
+    {
+        var scope = System.Text.Json.Nodes.JsonNode.Parse(RegistrySchema.Files(RegistryLoader.Load(TestPaths.Registry))["environment.schema.json"])!["properties"]!["scope"]!;
+        var keys = scope["properties"]!.AsObject().Select(p => p.Key).ToList();
+        var pairs = scope["allOf"]!.AsArray().Select(n => string.Join(",", n!["not"]!["required"]!.AsArray().Select(k => (string)k!))).ToList();
+
+        Assert.True(keys.IndexOf("groupAccounts") >= 0 && keys.IndexOf("groupAccounts") < keys.IndexOf("pillarAccounts") && keys.IndexOf("pillarAccounts") < keys.IndexOf("pillars"));
+        Assert.Contains("Older name: pillarAccounts. Azure name: pillars.", (string)scope["properties"]!["groupAccounts"]!["description"]!);
+        Assert.Contains("groupAccounts,pillarAccounts", pairs);
+        Assert.Contains("groupAccounts,pillars", pairs);
+        Assert.Contains("pillarAccounts,pillars", pairs);
+        var adapter = RegistrySchema.Files(RegistryLoader.Load(TestPaths.Registry), Adapters)["environment.schema.json"];
+        Assert.Contains("producerGroup, older name producerPillar", adapter);
+    }
+
+    [Theory]
+    [InlineData("producerGroup")]
+    [InlineData("producerPillar")]
+    public async Task A_broker_route_names_its_publishers_group_under_either_name(string name)
+    {
+        // routes-town's queues say who publishes them: bus.<publisher group>.<publisher service>.<reader service>.out
+        static async Task<(string Json, Snapshot Snapshot)> Routes(string folder)
+        {
+            var registry = RegistryLoader.Load(folder, TestAdapters.Azure).ForEnvironment("prod");
+            var set = Adapters.Build(registry.ActiveEnvironment!, folder);
+            Assert.Empty(set.Problems);
+            var state = new LatestState();
+            foreach (var source in set.Sources) state.Update(source.Name, await source.PollAsync(registry, CancellationToken.None));
+            var snapshot = new SnapshotBuilder(registry, state, new FakeTimeProvider(DateTimeOffset.Parse("2026-01-01T00:00:00Z"))) { Environment = "prod" }.Build();
+            return (Regex.Replace(JsonSerializer.Serialize(snapshot, Json), @"\d{4}-\d\d-\d\dT[0-9:.]+\+00:00", "<time>"), snapshot);
+        }
+        var folder = Path.Combine(Registries, "routes-town");
+        using var copy = new RegistryCopy(folder);
+        copy.Replace("environments/prod.yaml", "(?<producerGroup>", $"(?<{name}>");
+
+        var (expected, _) = await Routes(folder);
+        var (actual, snapshot) = await Routes(copy.Path);
+
+        Assert.Equal(expected, actual);
+        Assert.Contains(snapshot.Groups.Single(g => g.Id == "bb").Messaging!.Subscriptions, s => s.Topic == "bus.aa.orders.ledger.out" && s.Publisher == "aa" && s.Consumer == "bb.ledger-worker");
+    }
+
+    [Theory]
+    [InlineData("producerGroup")]
+    [InlineData("producerPillar")]
+    public void A_broker_route_without_its_publishers_service_is_an_error_under_either_name(string name)
+    {
+        using var copy = new RegistryCopy(Path.Combine(Registries, "routes-town"));
+        copy.Replace("environments/prod.yaml", "(?<producerGroup>[a-z]+)\\.(?<producer>[a-z]+)", $"(?<{name}>[a-z]+)\\.[a-z]+");
+
+        var hit = Assert.Single(RegistryValidator.Validate(copy.Path, Adapters).Findings, f => f.Message.Contains("a route needs both groups"));
+        Assert.EndsWith($"a route needs both groups, (?<producerGroup>...) (older name producerPillar) and (?<producer>...); this match has only {name}", hit.Message);
     }
 }

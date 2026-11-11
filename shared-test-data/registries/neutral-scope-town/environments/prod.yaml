@@ -10,7 +10,7 @@ scope:
   variables: { env: prd }
   telemetryStore: "logs-{env}-*"
   account: { nameLike: "{pillar}-{env}-*" }
-  pillarAccounts: { bb: 00000000-0000-0000-0000-0000000000a2 }
+  groupAccounts: { bb: 00000000-0000-0000-0000-0000000000a2 }
   telemetryRole: "{service}-{role}"
   resources:
     - { name: gateways, types: [example/gateways], roles: [gateway], pattern: '^gw-(?<service>[a-z]+)$', account: { tag: { key: unit, value: platform } } }
