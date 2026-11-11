@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url'
 //   npm run e2e:sources  a live town whose environment configures some signals and not others: absent signals are not shown, silent ones are grey
 //   npm run e2e:scope    two live towns with opposite scope conventions (names; tags): the inspector says where each system lives, from a recorded inventory
 //   npm run e2e:functions two live towns with opposite conventions (names; tags) whose functions have an app state and scheduled jobs, and whose services run in two regions
-//   npm run e2e:messaging two live towns with differently shaped queue names, patterns and dead-letter links: the broker's backlog and dead letters reach the consumers' buildings, drawers and boats; and a town whose pillar files say nothing about messaging, whose piers and boats come from the queue names alone
+//   npm run e2e:messaging two live towns with differently shaped queue names, patterns and dead-letter links: the broker's backlog and dead letters reach the consumers' buildings, drawers and boats; a town whose pillar files say nothing about messaging, whose piers and boats come from the queue names alone; and a demo town whose topics are named after events, not services
 //   npm run e2e:health   two live towns with differently shaped health sources (names; tags): the cloud's own health reports mark the buildings, fill the Incidents list (resolved ones green, dismissable), the drawer and the dashboard
 //   npm run e2e:discovery a live town whose environment finds links from dependency data: found links are drawn and tagged "Seen in calls", unresolved calls are notices
 //   npm run e2e:tenants  environments, tenant yards, tenant traffic and service groups, on a town with two pillars and three environments
@@ -42,6 +42,7 @@ const registries: Record<string, string> = {
   messaging: 'shared-test-data/registries/messaging-town-a',
   messagingb: 'shared-test-data/registries/messaging-town-b',
   routes: 'shared-test-data/registries/routes-town',
+  freetopics: 'shared-test-data/registries/free-topics-town',
   health: 'shared-test-data/registries/health-town-a',
   healthb: 'shared-test-data/registries/health-town-b',
   scope: 'shared-test-data/registries/scope-town-a',
@@ -57,7 +58,7 @@ const fixture = registries[suite] ? resolve(repo, registries[suite]) : ''
 
 // The scenario tests edit registry files to check reloading, so they run against a copy. The main process makes the copy and
 // passes its path down in the environment, which the workers inherit, so there is only ever one.
-if (['scenarios', 'links', 'tenants', 'dashboard', 'ui', 'direct', 'live', 'sources', 'discovery', 'scope', 'scopeb', 'health', 'healthb', 'functions', 'functionsb', 'messaging', 'messagingb', 'routes'].includes(suite) && !process.env.E2E_REGISTRY_COPY) {
+if (['scenarios', 'links', 'tenants', 'dashboard', 'ui', 'direct', 'live', 'sources', 'discovery', 'scope', 'scopeb', 'health', 'healthb', 'functions', 'functionsb', 'messaging', 'messagingb', 'routes', 'freetopics'].includes(suite) && !process.env.E2E_REGISTRY_COPY) {
   const copy = mkdtempSync(join(tmpdir(), 'oc-e2e-registry-'))
   cpSync(fixture, copy, { recursive: true })
   process.env.E2E_REGISTRY_COPY = copy
@@ -76,7 +77,7 @@ export default defineConfig({
   workers: 1,
   fullyParallel: false,
   retries: process.env.CI ? 1 : 0,
-  timeout: ['scenarios', 'links', 'tenants', 'dashboard', 'ui', 'direct', 'live', 'sources', 'scope', 'scopeb', 'health', 'healthb', 'functions', 'functionsb', 'messaging', 'messagingb', 'routes', 'towns', 'wide'].includes(suite) ? 60_000 : 240_000,
+  timeout: ['scenarios', 'links', 'tenants', 'dashboard', 'ui', 'direct', 'live', 'sources', 'scope', 'scopeb', 'health', 'healthb', 'functions', 'functionsb', 'messaging', 'messagingb', 'routes', 'freetopics', 'towns', 'wide'].includes(suite) ? 60_000 : 240_000,
   expect: { timeout: 10_000 },
   reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
   outputDir: 'test-results',

@@ -29,7 +29,7 @@ public sealed partial record Registry(
     /// <summary>Third parties outside the town. They are not part of any group: they stand on offshore islands.</summary>
     public IReadOnlyList<RegistryVendor> Vendors { get; init; } = [];
 
-    /// <summary>Every topic in the town: the outboxes the pillars publish and the hub's own.</summary>
+    /// <summary>Every topic in the town: the pillars' and the hub's own. This is the one map from a topic's name to its owner; nothing reads the owner from the name.</summary>
     public IReadOnlyList<RegistryTopic> Topics { get; init; } = [];
 
     /// <summary>Every worker's subscription to a topic. A worker consumes only what it subscribes to.</summary>
@@ -71,8 +71,18 @@ public sealed record DatabaseEngine(string Id, string Name, string Type);
 /// <summary>A scheduled job of a function and the services (of the same pillar) it starts work for. SystemId is the function's full id.</summary>
 public sealed record RegistrySchedule(string SystemId, string Job, IReadOnlyList<string> Services);
 
-/// <summary>A message broker topic. Name comes from the town's messaging.topicTemplate for a pillar and messaging.hubTopicTemplate for the hub; Service is the service (or hub name) that publishes it.</summary>
-public sealed record RegistryTopic(string Name, string GroupId, string Service);
+/// <summary>
+/// A message broker topic and its owner. GroupId is the island that publishes it. Service is the service that publishes it (for a hub topic listed by a short
+/// name, that name), or null for a topic that belongs to the island as a whole. Name is the topic's own name in the file, or the one the town's
+/// messaging.topicTemplate (hubTopicTemplate for the hub) makes of a service.
+/// </summary>
+public sealed record RegistryTopic(string Name, string GroupId, string? Service);
+
+/// <summary>
+/// A topic as a registry file lists it. Name null: the short form, a service whose topic the town's template names. Name set: the topic's own name, with
+/// the service that publishes it, or none. Line is where it is written.
+/// </summary>
+internal sealed record TopicDecl(string? Name, string? Service, int Line = 0);
 
 /// <summary>A worker reading a topic. PublisherGroupId is the island that owns the topic. Legacy marks a read of a hub topic by a pillar.</summary>
 public sealed record RegistrySubscription(string Topic, string PublisherGroupId, string ConsumerId, string ConsumerGroupId, bool Legacy);
@@ -99,8 +109,8 @@ public static class TownLabels
 }
 
 /// <summary>
-/// The town's messaging convention, from town.yaml: how a topic is named and which owners are an old route.
-/// The default names a topic after its service alone and has no legacy route.
+/// The town's messaging convention, from town.yaml: how a topic listed by its service is named, and which owners are an old route.
+/// The default names a topic after its service alone and has no legacy route. A topic listed by its own name does not use the templates.
 /// </summary>
 public sealed record MessagingConvention(string TopicTemplate, string HubTopicTemplate, IReadOnlyList<string> LegacyFrom)
 {
@@ -108,6 +118,19 @@ public sealed record MessagingConvention(string TopicTemplate, string HubTopicTe
 
     public string TopicName(string pillar, string service) => TopicTemplate.Replace("{pillar}", pillar).Replace("{service}", service);
     public string HubTopicName(string service) => HubTopicTemplate.Replace("{service}", service);
+
+    /// <summary>
+    /// Whether a name could be one that <see cref="TopicTemplate"/> makes for a service of <paramref name="pillar"/>. Only a template with both <c>{pillar}</c>
+    /// and <c>{service}</c> can say; without <c>{pillar}</c> any pillar could own the name, so this is false.
+    /// </summary>
+    public bool CouldBeTopicOf(string pillar, string name)
+    {
+        if (!TopicTemplate.Contains("{pillar}") || !TopicTemplate.Contains("{service}")) return false;
+        var pattern = "^" + System.Text.RegularExpressions.Regex.Escape(TopicTemplate)
+            .Replace(System.Text.RegularExpressions.Regex.Escape("{pillar}"), System.Text.RegularExpressions.Regex.Escape(pillar))
+            .Replace(System.Text.RegularExpressions.Regex.Escape("{service}"), ".+") + "$";
+        return System.Text.RegularExpressions.Regex.IsMatch(name, pattern);
+    }
 }
 
 /// <summary>The range of the town.yaml trafficDensity setting: a multiple of the usual number of cars.</summary>
@@ -135,11 +158,11 @@ public sealed record RegistryGroup(
     IReadOnlyList<RegistryNode> Nodes,
     string? ConfigError = null)
 {
-    /// <summary>The service names this island publishes outboxes for, as written in its file. The loader turns them into topics.</summary>
-    internal IReadOnlyList<string> TopicServices { get; init; } = [];
+    /// <summary>The topics this island publishes, as written in its file. The loader turns them into topics.</summary>
+    internal IReadOnlyList<TopicDecl> TopicDecls { get; init; } = [];
 
     /// <summary>The subscriptions as written in its file, before they are checked against the rest of the town.</summary>
-    internal IReadOnlyList<(string Topic, string Consumer, bool Legacy)> SubscriptionDecls { get; init; } = [];
+    internal IReadOnlyList<(string Topic, string Consumer, bool Legacy, int Line)> SubscriptionDecls { get; init; } = [];
 
     /// <summary>The pillar id of the island that collects systems no pillar owns.</summary>
     public const string LostFoundId = "lost-found";

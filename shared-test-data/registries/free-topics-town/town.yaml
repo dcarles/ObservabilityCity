@@ -1,0 +1,10 @@
+id: free-topics-town
+name: Free Topics Town
+groupLabel: Domain
+topology: hub-and-spoke
+mode: demo
+# Topics are named after events, not services, and a service can publish several. No template: every topic is listed by its own name, and the
+# file that lists it is its owner. Reading the hub's topic is still the old route.
+messaging:
+  legacyFrom: [hub]
+islands: [ord, bil, shp]

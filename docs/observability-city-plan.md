@@ -157,6 +157,7 @@ Why some rules are the way they are, where the reason is not obvious from the co
 - **Boat rates come from what arrives in the queues, not from the broker building's health.** The broker's own building may have no data source (it is watched through its queues), and a building nothing measures is not a stopped one. Only a broker that is Down stops the boats.
 - **Messages a second in all counts each hop.** Each queue is counted where it is read, so a message that crosses two queues counts twice, because each hop is work for a service.
 - **A queue name is matched to a reader only when it is certain.** A pattern may name only the reader's service; the queue goes to that service if its code belongs to exactly one system of the kind, otherwise it is left out rather than guessed. When the name also says the publisher, the queue becomes a route, so who sends to whom follows the broker, not a list kept in step by hand.
+- **A topic's owner is the file that lists it, never read from its name.** A topic is listed by its service (the town's template names it) or by its own name, with the service that publishes it or none, so event names such as `orders.created` and several topics for one service fit. Piers, boats and the old-route check work from that owner.
 - **A scheduled job's targets are declared in the pillar file, never read from queue names.** The logs name a job but not what it feeds, and queue names are free-form. An unmapped job sends no boats and says "Job not mapped", so the file can be completed. Scheduler boats are approximate on purpose: runs are not measured as messages.
 - **The dead-letter link is a template on the broker source.** The program knows no queue explorer. A system with no code for a word the address needs gets no link instead of a broken one.
 
@@ -224,7 +225,6 @@ The biggest risk is the mapping, not the 3D. The same system has different names
 Current limits:
 
 - **The hub holds at most one gateway, broker, egress and database.** A town with two brokers or two gateways puts the extra one on an island or uses `topology: direct`.
-- **Every topic is named after a service.** `topicTemplate` and `hubTopicTemplate` must contain `{service}`, and a pillar's topics must be its own services, so topics named after events cannot be declared yet.
 - **`legacyFrom` can list only `hub`.** Marking a route you are moving off works only for the hub's topics.
 - **The scope speaks in Azure's words.** The subscription and workspace keys of `scope` (`subscription`, `pillars`, `workspace`, `workspaceId`, `queries`) are Azure adapter settings the core registry still holds and checks. A source's own settings are its adapter's (each adapter checks them), but the scope has no neutral names for the account and the telemetry store yet.
 

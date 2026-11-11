@@ -20,8 +20,21 @@
       "properties": {
         "topics": {
           "type": "array",
-          "description": "Services whose outbox this publishes. Each becomes a topic named by messaging.topicTemplate in town.yaml (in hub.yaml, by messaging.hubTopicTemplate).",
-          "items": { "type": "string" }
+          "description": "The topics this publishes. A plain entry is a service, whose topic messaging.topicTemplate in town.yaml names (in hub.yaml, a name for messaging.hubTopicTemplate). A block gives a topic its own name, for example { topic: orders.created, service: orders }; leave service out for a topic that belongs to the island as a whole. A topic name is unique in the town.",
+          "items": {
+            "oneOf": [
+              { "type": "string", "description": "A service of this island; the town's template names its topic." },
+              {
+                "type": "object",
+                "required": ["topic"],
+                "additionalProperties": false,
+                "properties": {
+                  "topic": { "type": "string", "pattern": "^[^\\s{}]+$", "description": "The topic's full name, as the broker knows it, for example orders.created." },
+                  "service": { "type": "string", "description": "The service of this island that publishes it. Leave it out for a topic that belongs to the island as a whole." }
+                }
+              }
+            ]
+          }
         },
         "subscriptions": {
           "type": "array",
@@ -31,7 +44,7 @@
             "required": ["topic", "consumer"],
             "additionalProperties": false,
             "properties": {
-              "topic": { "type": "string", "description": "The full topic name, for example orders-events. Another pillar's outbox is read directly." },
+              "topic": { "type": "string", "description": "The full topic name, for example orders-events. It is the topic's own name, or the one the town's template makes for a topic listed by its service." },
               "consumer": { "type": "string", "description": "The worker in this pillar that reads it." },
               "legacy": { "type": "boolean", "description": "The old route: reading a topic of the hub (for example platform-events) instead of a pillar's outbox. Required for a hub topic, and only allowed there." }
             }

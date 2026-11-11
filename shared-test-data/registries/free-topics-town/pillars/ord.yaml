@@ -1,0 +1,14 @@
+# One service that publishes two topics, each named after its event.
+pillar: ord
+displayName: Orders
+color: "#5aa9ff"
+systems:
+  - { id: ord.orders-api, service: orders, name: Orders API, role: api, external: true, calls: [ord.orders-db] }
+  - { id: ord.orders-worker, service: orders, name: Orders worker, role: worker, calls: [ord.orders-db] }
+  - { id: ord.orders-db, service: orders, name: Orders DB, role: db }
+messaging:
+  topics:
+    - { topic: orders.created, service: orders }
+    - { topic: orders.cancelled, service: orders }
+  subscriptions:
+    - { topic: billing.invoice.paid, consumer: ord.orders-worker }

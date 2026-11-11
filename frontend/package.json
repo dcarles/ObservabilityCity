@@ -24,7 +24,7 @@
     "e2e:tenants": "node scripts/e2e.mjs tenants --",
     "e2e:dashboard": "node scripts/e2e.mjs dashboard --",
     "e2e:wide": "node scripts/e2e.mjs wide --",
-    "e2e:messaging": "node scripts/e2e.mjs messaging messagingb routes --",
+    "e2e:messaging": "node scripts/e2e.mjs messaging messagingb routes freetopics --",
     "e2e:towns": "node scripts/e2e.mjs towns --",
     "e2e:themes": "node scripts/e2e.mjs towns E2E_ALL_THEMES=1 -- themes.spec.ts --",
     "e2e:slow": "npm run e2e:stress && npm run e2e:stress35 && npm run e2e:town && npm run e2e:themes",

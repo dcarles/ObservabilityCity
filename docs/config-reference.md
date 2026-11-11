@@ -57,8 +57,8 @@ A database (`role: db`) in a pillar file or the hub then writes `engine: cosmos`
 <!-- file: TownMessagingFile -->
 | Key | Required | Default | Meaning |
 |---|---|---|---|
-| `topicTemplate` | no | `{service}` | The name of the topic a pillar's service publishes. `{pillar}` and `{service}` are replaced; it must contain `{service}` (a current limit: every topic is named after a service). Two topics with the same name are a problem. |
-| `hubTopicTemplate` | no | `{service}` | The name of a topic of the hub. `{service}` is replaced by the name the hub gives it; it must contain `{service}`. |
+| `topicTemplate` | no | `{service}` | The name of the topic of a service that a pillar file lists by its service (a plain entry under `topics`). `{pillar}` and `{service}` are replaced. It must contain `{service}` while any pillar lists a topic that way; a town that lists every topic by its own name needs none. Two topics with the same name are a problem. |
+| `hubTopicTemplate` | no | `{service}` | The same for a plain entry under the hub's `topics`: `{service}` is replaced by the name the hub gives it. |
 | `legacyFrom` | no | none | The owners whose topics are a route you are moving off. Only `hub` can be listed (a current limit). A subscription to such a topic must say `legacy: true` and is drawn with an amber pennant; with `legacy: true` on any other topic, the validator reports a problem. |
 
 For a town that names topics `<service>.events` and `shared.<name>`, and is moving off reading the hub's topics:
@@ -70,7 +70,7 @@ messaging:
   legacyFrom: [hub]
 ```
 
-The sample Galactic Credit uses `{pillar}-{service}-outbox` instead, and Droid Shop `{service}.events`.
+The sample Galactic Credit uses `{pillar}-{service}-outbox` instead, and Droid Shop `{service}.events`. A town whose topics are named after events (`orders.created`) lists them by name in the pillar files (see [messaging](#messaging-pillar-or-hub)) and can leave the templates out.
 
 <!-- file: LabelsFile -->
 | Key | Required | Default | Meaning |
@@ -180,13 +180,32 @@ One island. The file name is the pillar id.
 <!-- file: MessagingFile -->
 | Key | Required | Default | Meaning |
 |---|---|---|---|
-| `topics` | no | none | Pillar: service names (a current limit: a topic must be one of the pillar's services), each published under the name `messaging.topicTemplate` in `town.yaml` makes of them. Hub: free names, named by `messaging.hubTopicTemplate`. |
+| `topics` | no | none | The topics it publishes. A plain entry is a service of the pillar, published under the name `messaging.topicTemplate` in `town.yaml` makes of it (in `hub.yaml`, a kebab-case name for `messaging.hubTopicTemplate`). A block gives a topic its own name (below). |
 | `subscriptions` | no | none | The topics this pillar's workers consume. |
+
+A topic block, for a topic named after an event, or one of several a service publishes:
+
+<!-- file: TopicFile -->
+| Key | Required | Default | Meaning |
+|---|---|---|---|
+| `topic` | yes | | The topic's full name, as the broker knows it, for example `orders.created`. No spaces and no `{variables}`. |
+| `service` | no | none | The service of this island that publishes it. Leave it out for a topic that belongs to the island as a whole. |
+
+```yaml
+messaging:
+  topics:
+    - payments                                      # named by topicTemplate
+    - { topic: orders.created, service: orders }
+    - { topic: orders.cancelled, service: orders }  # a second topic of one service
+    - { topic: billing.audit }                      # no service publishes it
+```
+
+The file that lists a topic owns it: its island is where the boats for it sail from, and `legacyFrom` is checked against it. Nothing reads an owner from a topic's name. A topic name is unique in the town, also against the names the templates make, and the validator says where both are listed.
 
 <!-- file: SubscriptionFile -->
 | Key | Required | Default | Meaning |
 |---|---|---|---|
-| `topic` | yes | | Full topic name. |
+| `topic` | yes | | Full topic name: a topic's own name, or the one the template makes for a topic listed by its service. |
 | `consumer` | yes | | A system of this pillar with role `worker`, by its full id. |
 | `legacy` | no | `false` | A read of a topic of an owner the town lists in `messaging.legacyFrom`, a route you are moving off. Drawn with an amber pennant. |
 

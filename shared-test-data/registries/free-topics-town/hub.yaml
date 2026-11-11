@@ -1,0 +1,10 @@
+displayName: Platform hub
+color: "#f5c26b"
+resources:
+  - { id: hub.apim, name: API gateway, role: gateway }
+  - { id: hub.broker, name: Broker, role: broker }
+messaging:
+  topics:
+    - { topic: platform.broadcast }
+externalCallers:
+  - { id: shop-app, name: Shop app, calls: [ord.orders-api, bil.billing-api] }

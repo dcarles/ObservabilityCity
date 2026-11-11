@@ -227,7 +227,7 @@ function checkMessaging(m: unknown): MessagingSnapshot {
   const raw = isObject(m) ? m : {}
   return {
     topics: (Array.isArray(raw.topics) ? raw.topics : []).filter(isObject).filter((t) => typeof t.name === 'string' && t.name !== '')
-      .map((t) => ({ name: t.name as string, service: str(t.service) })),
+      .map((t) => ({ name: t.name as string, service: typeof t.service === 'string' ? t.service : null })), // null: the topic belongs to the island as a whole
     subscriptions: (Array.isArray(raw.subscriptions) ? raw.subscriptions : []).filter(isObject)
       .filter((x) => typeof x.topic === 'string' && typeof x.consumer === 'string' && x.consumer !== '')
       .map((x) => ({ topic: x.topic as string, publisher: str(x.publisher), consumer: x.consumer as string, legacy: x.legacy === true })),

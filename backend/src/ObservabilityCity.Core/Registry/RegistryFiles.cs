@@ -47,9 +47,9 @@ internal sealed class WallFile
 
 internal sealed class TownMessagingFile
 {
-    /// <summary>The name of the topic a pillar's service publishes: <c>{pillar}</c> and <c>{service}</c> are replaced.</summary>
+    /// <summary>The name of the topic a pillar's service publishes, for a topic listed by its service: <c>{pillar}</c> and <c>{service}</c> are replaced. Not used by a topic listed by its own name.</summary>
     public string TopicTemplate { get; set; } = MessagingConvention.Default.TopicTemplate;
-    /// <summary>The name of a topic of the hub: <c>{service}</c> is replaced by the hub's name for it.</summary>
+    /// <summary>The name of a topic of the hub listed by a short name: <c>{service}</c> is replaced by that name. Not used by a topic listed by its own name.</summary>
     public string HubTopicTemplate { get; set; } = MessagingConvention.Default.HubTopicTemplate;
     /// <summary>The owners whose topics are an old route to read (only <c>hub</c> is known). A subscription to one of them must say <c>legacy: true</c>; no other may.</summary>
     public List<string> LegacyFrom { get; set; } = [];
@@ -168,12 +168,55 @@ internal sealed class TelemetryFile
     public string? Role { get; set; }
 }
 
-/// <summary>The "messaging" block of a pillar file (or hub.yaml): the outboxes it publishes and the topics its workers consume.</summary>
+/// <summary>The "messaging" block of a pillar file (or hub.yaml): the topics it publishes and the topics its workers consume.</summary>
 internal sealed class MessagingFile
 {
-    /// <summary>Pillar files: service names, each published as the topic that messaging.topicTemplate names. hub.yaml: free names, each named by messaging.hubTopicTemplate.</summary>
-    public List<string> Topics { get; set; } = [];
+    /// <summary>
+    /// The topics it publishes. Each entry is a service name, whose topic messaging.topicTemplate names (in hub.yaml: a name for messaging.hubTopicTemplate),
+    /// or a topic by its own name, with the service that publishes it if one does: <c>{ topic: orders.created, service: orders }</c>.
+    /// </summary>
+    public List<TopicFile> Topics { get; set; } = [];
     public List<SubscriptionFile> Subscriptions { get; set; } = [];
+}
+
+/// <summary>
+/// One entry of a <c>topics:</c> list. A plain name is a service (the short form), whose topic the town's template names; a block names the topic itself
+/// and, optionally, the service that publishes it. A topic with no service belongs to its island as a whole.
+/// </summary>
+internal sealed class TopicFile : IYamlConvertible
+{
+    /// <summary>The topic's full name, as the broker knows it. Without it the entry is the short form, and the template names the topic.</summary>
+    public string? Topic { get; set; }
+    /// <summary>The service of this island that publishes the topic. Optional with <c>topic</c>.</summary>
+    public string? Service { get; set; }
+
+    /// <summary>The entry was a plain name: a service, named by the template.</summary>
+    internal bool ByService { get; private set; }
+
+    /// <summary>The line of the entry in its file, 1-based.</summary>
+    internal int Line { get; private set; }
+
+    private sealed class Named
+    {
+        public string? Topic { get; set; }
+        public string? Service { get; set; }
+    }
+
+    void IYamlConvertible.Read(IParser parser, Type expectedType, ObjectDeserializer nestedObjectDeserializer)
+    {
+        Line = (int)parser.Current!.Start.Line;
+        if (parser.TryConsume<Scalar>(out var scalar))
+        {
+            Service = scalar.Value;
+            ByService = true;
+            return;
+        }
+        var named = (Named?)nestedObjectDeserializer(typeof(Named)) ?? new Named();
+        Topic = named.Topic ?? "";
+        Service = named.Service;
+    }
+
+    void IYamlConvertible.Write(IEmitter emitter, ObjectSerializer nestedObjectSerializer) => throw new NotSupportedException("registry files are only read");
 }
 
 /// <summary>One entry of a pillar's <c>scheduler:</c> list: a function and, for each of its jobs, the services the job starts work for.</summary>
@@ -185,7 +228,7 @@ internal sealed class SchedulerFile
     public Dictionary<string, List<string>> Jobs { get; set; } = [];
 }
 
-internal sealed class SubscriptionFile
+internal sealed class SubscriptionFile : IYamlConvertible
 {
     /// <summary>The full topic name, for example orders-events.</summary>
     public string Topic { get; set; } = "";
@@ -193,6 +236,25 @@ internal sealed class SubscriptionFile
     public string Consumer { get; set; } = "";
     /// <summary>Marks a read of a hub topic by a pillar, the old way. Drawn with an amber pennant.</summary>
     public bool Legacy { get; set; }
+
+    /// <summary>The line of the entry in its file, 1-based, so a problem with it can point there.</summary>
+    internal int Line { get; private set; }
+
+    private sealed class Plain
+    {
+        public string Topic { get; set; } = "";
+        public string Consumer { get; set; } = "";
+        public bool Legacy { get; set; }
+    }
+
+    void IYamlConvertible.Read(IParser parser, Type expectedType, ObjectDeserializer nestedObjectDeserializer)
+    {
+        Line = (int)parser.Current!.Start.Line;
+        var plain = (Plain?)nestedObjectDeserializer(typeof(Plain)) ?? new Plain();
+        (Topic, Consumer, Legacy) = (plain.Topic, plain.Consumer, plain.Legacy);
+    }
+
+    void IYamlConvertible.Write(IEmitter emitter, ObjectSerializer nestedObjectSerializer) => throw new NotSupportedException("registry files are only read");
 }
 
 internal sealed class HubFile

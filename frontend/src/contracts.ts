@@ -587,7 +587,7 @@ export interface components {
         };
         TopicSnapshot: {
             name: string;
-            service: string;
+            service?: string | null;
         };
         TownSummary: {
             id: string;

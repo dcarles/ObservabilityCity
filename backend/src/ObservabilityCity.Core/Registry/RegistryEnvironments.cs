@@ -33,9 +33,9 @@ public sealed partial record Registry
         if (found is { Count: > 0 }) groups = WithFoundLinks(groups, found);
         var present = groups.SelectMany(g => g.Nodes).Select(n => n.Id).ToHashSet();
         var groupIds = groups.Select(g => g.Id).ToHashSet();
-        // a topic stays while its island is there and, for a pillar, a system of that service is still deployed
+        // a topic stays while its island is there and, for a pillar's topic that a service publishes, a system of that service is still deployed
         var topics = Topics.Where(t => groupIds.Contains(t.GroupId)
-            && (t.GroupId == "hub" || groups.First(g => g.Id == t.GroupId).Nodes.Any(n => n.Service == t.Service))).ToList();
+            && (t.GroupId == "hub" || t.Service is null || groups.First(g => g.Id == t.GroupId).Nodes.Any(n => n.Service == t.Service))).ToList();
         var topicNames = topics.Select(t => t.Name).ToHashSet();
         var subscriptions = Subscriptions.Where(s => present.Contains(s.ConsumerId) && topicNames.Contains(s.Topic)).ToList();
         // calls link discovery found to a service of a vendor island come from callers that are deployed here and have discovery on

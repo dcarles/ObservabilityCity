@@ -220,7 +220,7 @@ To refresh the golden fixtures (calm town, a bad day across several islands, and
 | `fake.yaml` names real systems and its numbers make sense | error |
 | A town with `fake.yaml` or a `stories/` folder says `mode: demo` in `town.yaml`, and `mode` is `demo` or `live` | error |
 | A worker has a database, a system has a caller, no `islands` list in `town.yaml`, a database with no `engine` once the town lists its `databaseEngines`, an empty pillar, an island that stands alone (no API, messaging or call links) | warning |
-| Messaging: topics are services of the pillar (a current limit: every topic is named after a service), subscriptions name an existing topic and a worker of the same pillar, no duplicates, `legacy: true` exactly on reads of topics whose owner `messaging.legacyFrom` in `town.yaml` lists | error |
+| Messaging: a topic listed by its service names a service of the pillar, a topic listed by name names a service of the pillar or none, a topic name is unique in the town (also against the names the templates make), subscriptions name an existing topic and a worker of the same pillar, no duplicates, `legacy: true` exactly on reads of topics whose owner `messaging.legacyFrom` in `town.yaml` lists | error |
 
 On a pull request the check writes annotations on the files and posts one comment listing every finding with file and line (the same comment is updated on each push).
 
@@ -236,7 +236,7 @@ One folder describes a town. The sample is `config/galactic-credit/`:
 
 | File | What it holds |
 | --- | --- |
-| `town.yaml` | Name, what an island is called (`groupLabel`, used for the word in every part of the interface; `pillar` in file and key names means the same group), topology, `mode` (`demo` or `live`; left out means `live`), `islands` (the order of the islands round the hub: unlisted pillars follow, Lost & found is always last), `ringCapacity`, `databaseEngines` (the engines your databases run on, each one of the fixed database types, see below), `trafficDensity`, `messaging` (`topicTemplate`, `hubTopicTemplate`, `legacyFrom`), `labels`, `wall` (the wall tour's timings and light) and `expectedWarnings`. Every key is in [docs/config-reference.md](docs/config-reference.md) |
+| `town.yaml` | Name, what an island is called (`groupLabel`, used for the word in every part of the interface; `pillar` in file and key names means the same group), topology, `mode` (`demo` or `live`; left out means `live`), `islands` (the order of the islands round the hub: unlisted pillars follow, Lost & found is always last), `ringCapacity`, `databaseEngines` (the engines your databases run on, each one of the fixed database types, see below), `trafficDensity`, `messaging` (`topicTemplate`, `hubTopicTemplate`, `legacyFrom`; the templates only name topics listed by their service), `labels`, `wall` (the wall tour's timings and light) and `expectedWarnings`. Every key is in [docs/config-reference.md](docs/config-reference.md) |
 | `defaults.yaml` | App-wide defaults per role (SLA, error, resource, throttle and backlog thresholds) |
 | `hub.yaml` | The shared resources in the middle (for example a gateway and a broker; today at most one gateway, broker, egress and database), the hub's `messaging` topics, and the outside callers (`externalCallers`, each lists the external systems it reaches) |
 | `pillars/<code>.yaml` | One island: its systems, `calls` links, per-role `defaults`, and its `messaging` (topics it publishes, topics its workers consume) |
@@ -260,7 +260,11 @@ Settings cascade: system, then the pillar's `defaults`, then `defaults.yaml`, th
 
 ```yaml
 messaging:
-  topics: [payments, refunds]              # publishes payments.events and refunds.events (with topicTemplate "{service}.events")
+  topics:
+    - payments                                          # a service: publishes payments.events (with topicTemplate "{service}.events")
+    - { topic: refunds.issued, service: refunds }       # a topic by its own name, and the service that publishes it
+    - { topic: refunds.reversed, service: refunds }     # a service can publish several
+    - { topic: payments.audit }                         # a topic of the pillar as a whole, no service
   subscriptions:                           # a worker of this pillar reads a topic
     - { topic: screening.events, consumer: pay.payments-worker }        # another pillar's topic, directly
     - { topic: orders-events, consumer: pay.refunds-worker, legacy: true } # a hub topic on a route you are moving off, flagged
@@ -273,7 +277,7 @@ messaging:
 | Neither | Nothing connects it: it stands alone and the registry warns about it |
 | No database, or no worker | No storage unit, or no factory: buildings exist only for roles the island has |
 
-Topic names come from `messaging.topicTemplate` and `hubTopicTemplate` in `town.yaml` (both `{service}` when left out). Galactic Credit uses `{pillar}-{service}-outbox`, Droid Shop `{service}.events`. Two current limits: both templates must contain `{service}`, so every topic is named after a service, and `messaging.legacyFrom` can list only `hub`. A read of a topic whose owner `legacyFrom` lists must say `legacy: true`, and no other read may.
+A topic is listed in one of two ways. A plain entry is a service, and `messaging.topicTemplate` in `town.yaml` names its topic (`hubTopicTemplate` for the hub; both `{service}` when left out). Galactic Credit uses `{pillar}-{service}-outbox`, Droid Shop `{service}.events`. A block, `{ topic: orders.created, service: orders }`, gives the topic its own name, so topics named after events, or several for one service, fit too; leave `service` out for a topic of the pillar as a whole. The file that lists a topic owns it: piers, boats and the old-route check never read an owner from a name. A topic name is unique in the town. A template is needed only while a file lists a topic by its service, and then it must contain `{service}`. One current limit: `messaging.legacyFrom` can list only `hub`. A read of a topic whose owner `legacyFrom` lists must say `legacy: true`, and no other read may.
 
 The loader checks everything and reports all problems at once, each with its file name. Ids must be `pillar.system` (the prefix matches the file, lowercase kebab-case, unique in the town). A misspelt key, role, call target, island or database engine gets a suggestion, for example `'aa.ledger-api' calls 'aa.ledger-dbb', which is not in this town. Did you mean 'aa.ledger-db'?`. When a system is renamed, keep its old id under `aliases: [old.id]` and files that still use it keep working.
 

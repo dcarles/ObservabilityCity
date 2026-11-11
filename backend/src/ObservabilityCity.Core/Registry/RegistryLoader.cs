@@ -94,8 +94,6 @@ public static partial class RegistryLoader
         if (double.IsNaN(town.TrafficDensity) || town.TrafficDensity < TownTraffic.Min || town.TrafficDensity > TownTraffic.Max)
             throw new RegistryException($"town.yaml: trafficDensity {town.TrafficDensity.ToString(System.Globalization.CultureInfo.InvariantCulture)} is out of range. Use a number from {TownTraffic.Min.ToString(System.Globalization.CultureInfo.InvariantCulture)} to {TownTraffic.Max.ToString(System.Globalization.CultureInfo.InvariantCulture)} (1 is the usual number of cars).");
         var convention = new MessagingConvention(town.Messaging.TopicTemplate, town.Messaging.HubTopicTemplate, town.Messaging.LegacyFrom);
-        if (!convention.TopicTemplate.Contains("{service}") || !convention.HubTopicTemplate.Contains("{service}"))
-            throw new RegistryException("town.yaml: messaging.topicTemplate and messaging.hubTopicTemplate must contain {service}, which is replaced by the service's name");
         foreach (var owner in convention.LegacyFrom.Where(o => o != "hub"))
             throw new RegistryException($"town.yaml: messaging.legacyFrom lists '{owner}'. Only 'hub' is known: the topics of the hub are the one old route a town can mark");
         if (string.IsNullOrWhiteSpace(town.Labels.InternalVendors))
@@ -133,14 +131,14 @@ public static partial class RegistryLoader
             .Select(r => ToNode(r, "hub", "hub.yaml", "hub", defaults, new DefaultsFile(), false, new Dictionary<string, string>(), ids, aliases, errors, engines))
             .OfType<RegistryNode>()
             .ToList();
-        var hubGroup = new RegistryGroup("hub", hub.DisplayName, hub.Color, true, hubNodes) { TopicServices = hub.Messaging?.Topics ?? [] };
+        var hubGroup = new RegistryGroup("hub", hub.DisplayName, hub.Color, true, hubNodes) { TopicDecls = ToTopicDecls(hub.Messaging) };
         if (hub.Messaging is { Subscriptions.Count: > 0 })
             errors.Add("hub.yaml: the hub has no workers, so it cannot subscribe to topics. Subscriptions belong in the pillar file of the worker that reads them");
-        foreach (var topic in hubGroup.TopicServices.Where(t => !KebabId.IsMatch(t)))
-            errors.Add($"hub.yaml: topic '{topic}' must be lowercase kebab-case");
+        CheckTopics(hubGroup, "hub.yaml", errors);
 
         var pillars = new List<RegistryGroup>();
         var brokenPillars = new HashSet<string>();
+        var brokenTopics = new HashSet<string>(StringComparer.Ordinal); // the topics the skipped pillars would publish
         var pillarDir = Path.Combine(folder, "pillars");
         if (Directory.Exists(pillarDir))
         {
@@ -178,6 +176,9 @@ public static partial class RegistryLoader
                 // Skipped: the island stays on the map, empty, saying what is wrong.
                 var id = KebabId.IsMatch(stem) ? stem : group?.Id ?? "broken-" + pillars.Count;
                 brokenPillars.Add(id);
+                brokenTopics.UnionWith(group is null
+                    ? TopicNamesOfUnreadFile(file, id, convention)
+                    : group.TopicDecls.Select(d => TopicNameOf(d, group, convention)).OfType<string>());
                 var shown = group is { DisplayName.Length: > 0 } ? group.DisplayName : stem;
                 var detail = own.Count == 1 ? own[0] : $"{own[0]} (and {own.Count - 1} more)";
                 pillars.Add(new RegistryGroup(id, shown, group?.Color ?? "#d63a2f", false, [], ConfigError: detail));
@@ -188,6 +189,7 @@ public static partial class RegistryLoader
 
         var groups = new List<RegistryGroup> { hubGroup };
         groups.AddRange(Order(pillars, town, Problem));
+        CheckTemplates(groups, convention);
         var ringCapacity = CheckRingCapacity(town, pillars.Count, errors);
 
         // every declared call must point at a system in this town (by id or by an old alias), and not at itself
@@ -301,8 +303,8 @@ public static partial class RegistryLoader
             }
         }
 
-        var (topics, subscriptions) = ResolveMessaging(groups, brokenPillars, resilient, Problem, convention);
         var lines = new Dictionary<string, int>(StringComparer.Ordinal);
+        var (topics, subscriptions) = ResolveMessaging(groups, brokenPillars, brokenTopics, resilient, Problem, convention, lines);
         var environments = LoadEnvironments(folder, ids, aliases, resilient, Problem, kinds, lines);
         // a system that names the environments it is deployed in must name environments the town has
         if (environments.Count > 0)
@@ -345,6 +347,22 @@ public static partial class RegistryLoader
             Notices = notices, Problems = problems, ProblemLines = lines, Vendors = vendors, RingCapacity = ringCapacity, Topics = topics, Subscriptions = subscriptions, Environments = environments, DatabaseEngines = engines.Values.ToList(),
         };
         return registry with { Warnings = TownLinks.Warnings(registry).ToList() };
+    }
+
+    /// <summary>
+    /// A topic listed by its service is named by the town's template, so that template must contain {service}. A town that lists every topic by its own
+    /// name needs no template, and one without {service} is fine there.
+    /// </summary>
+    private static void CheckTemplates(List<RegistryGroup> groups, MessagingConvention convention)
+    {
+        foreach (var g in groups)
+        {
+            var template = g.IsHub ? convention.HubTopicTemplate : convention.TopicTemplate;
+            if (template.Contains("{service}") || g.TopicDecls.FirstOrDefault(d => d.Name is null) is not { } first) continue;
+            var key = g.IsHub ? "messaging.hubTopicTemplate" : "messaging.topicTemplate";
+            throw new RegistryException($"town.yaml: {key} must contain {{service}}, which is replaced by the service's name: {(g.IsHub ? "hub.yaml" : $"pillars/{g.Id}.yaml")} lists topic '{first.Service}' by its service. "
+                + $"Add {{service}} to the template, or give the topic its own name: {{ topic: <name>, service: {first.Service} }}");
+        }
     }
 
     /// <summary>Pillars in town.yaml islands order, then any that it does not list in file order. Lost &amp; found is always last.</summary>
