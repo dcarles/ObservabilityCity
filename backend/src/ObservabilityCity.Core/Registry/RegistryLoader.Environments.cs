@@ -79,10 +79,9 @@ public static partial class RegistryLoader
     {
         if (f.Logs is not { } logs) return;
         var owner = $"{name}: logs";
-        if (!f.Sources.TryGetValue(logs.Source, out var source))
+        // whether the source's kind can read logs is the adapters' word: the AdapterCatalog checks it, since the files alone cannot say
+        if (!f.Sources.ContainsKey(logs.Source))
             errors.Add($"{owner}.source '{logs.Source}' is not a source of this file.{DidYouMean.Hint(logs.Source, f.Sources.Keys)}");
-        else if (!source.Kind.Equals("loganalytics", StringComparison.OrdinalIgnoreCase))
-            errors.Add($"{owner}.source '{logs.Source}' is a {source.Kind} source; the logs are read from a loganalytics source");
         var own = (IEnumerable<string>?)f.Scope?.Variables.Keys ?? [];
         if (string.IsNullOrWhiteSpace(logs.Query)) errors.Add($"{owner}.query is empty. Write the query that returns one row for each kind of entry with the columns {string.Join(", ", ObservabilityCity.Core.Logs.LogQuery.Columns)}");
         else foreach (var problem in ScopeTemplate.Check(logs.Query, ObservabilityCity.Core.Logs.LogQuery.Variables.Append(ScopeRules.EnvironmentVariable).Concat(own))) errors.Add($"{owner}.query: {problem}");
@@ -112,10 +111,9 @@ public static partial class RegistryLoader
     {
         if (f.Links is not { } links) return;
         var owner = $"{name}: links";
-        if (!f.Sources.TryGetValue(links.Source, out var source))
+        // whether the source's kind can read dependencies is the adapters' word: the AdapterCatalog checks it
+        if (!f.Sources.ContainsKey(links.Source))
             errors.Add($"{owner}.source '{links.Source}' is not a source of this file.{DidYouMean.Hint(links.Source, f.Sources.Keys)}");
-        else if (!source.Kind.Equals("loganalytics", StringComparison.OrdinalIgnoreCase))
-            errors.Add($"{owner}.source '{links.Source}' is a {source.Kind} source; link discovery reads dependencies from a loganalytics source");
         if (string.IsNullOrWhiteSpace(links.Query)) errors.Add($"{owner}.query is empty. Write the query that returns one row for each caller and address with the columns {string.Join(", ", ObservabilityCity.Core.Links.LinkQuery.Columns)}");
         else
         {

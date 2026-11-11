@@ -363,7 +363,9 @@ public sealed class AzureMonitorSource(
 
 public sealed class AzureMonitorSourceFactory(HttpClient? http = null, TimeProvider? time = null) : IMetricSourceFactory
 {
-    public string Kind => "azuremonitor";
+    public const string SourceKind = "azuremonitor";
+
+    public string Kind => SourceKind;
 
     public IMetricSource Create(SourceContext context)
     {

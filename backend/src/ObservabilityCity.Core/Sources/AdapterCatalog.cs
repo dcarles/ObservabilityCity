@@ -38,9 +38,13 @@ public interface ICredentialKind
 
 /// <summary>
 /// A kind of source that exists, whether or not an adapter for it does yet. <paramref name="DefaultCredentialKind"/> is the login a source of this
-/// kind uses when it names none; null means it does not sign in.
+/// kind uses when it names none; null means it does not sign in. <see cref="Capabilities"/> says what a source of the kind can serve besides signals:
+/// the logs, link discovery, the inventory or the cloud's health reports. The core checks those roles against it, never against a kind's name.
 /// </summary>
-public sealed record SourceKindInfo(string Kind, string? DefaultCredentialKind = null);
+public sealed record SourceKindInfo(string Kind, string? DefaultCredentialKind = null)
+{
+    public SourceCapabilities Capabilities { get; init; }
+}
 
 /// <summary>What an adapter module adds to the town.</summary>
 public interface IAdapterRegistry
@@ -79,7 +83,7 @@ public sealed class CoreAdapters : IAdapterModule
 /// worth naming) and turns an environment's source definitions into running sources. A source whose kind has no adapter yet, or whose login cannot
 /// be made, is left out and reported: its signals then have no fresh data, which is not the same as having no source (that is the signal being absent).
 /// </summary>
-public sealed class AdapterCatalog : IAdapterRegistry
+public sealed class AdapterCatalog : IAdapterRegistry, ISourceKindCatalog
 {
     private readonly Dictionary<string, SourceKindInfo> _kinds = new(StringComparer.Ordinal);
     private readonly Dictionary<string, IMetricSourceFactory> _factories = new(StringComparer.Ordinal);
@@ -100,6 +104,14 @@ public sealed class AdapterCatalog : IAdapterRegistry
     public IReadOnlyCollection<string> CredentialKindNames => _logins.Keys;
 
     public void AddSourceKind(SourceKindInfo kind) => _kinds[kind.Kind] = kind;
+
+    public bool Knows(string kind) => _kinds.ContainsKey(kind);
+
+    public SourceCapabilities CapabilitiesOf(string kind) => _kinds.GetValueOrDefault(kind)?.Capabilities ?? SourceCapabilities.None;
+
+    /// <summary>The kinds whose sources can do all of <paramref name="capability"/>, in the order they were registered.</summary>
+    public IReadOnlyList<string> KindsThatCan(SourceCapabilities capability) =>
+        _kinds.Values.Where(k => k.Capabilities.HasFlag(capability)).Select(k => k.Kind).ToList();
 
     public void AddSource(IMetricSourceFactory factory)
     {
@@ -125,6 +137,15 @@ public sealed class AdapterCatalog : IAdapterRegistry
             if (source.Credential is not null && info.DefaultCredentialKind is null)
                 problems.Add($"{name}: source '{source.Name}' names a credential, but a {source.Kind} source does not sign in");
         }
+        foreach (var (role, sourceName, capability, task) in Roles(environment))
+        {
+            // a source the file does not define is the loader's error; a kind no module knows is named above, and nothing is known of what it can do
+            if (environment.Sources.FirstOrDefault(s => s.Name == sourceName) is not { } source || !_kinds.TryGetValue(source.Kind, out var info)) continue;
+            if (info.Capabilities.HasFlag(capability)) continue;
+            var able = KindsThatCan(capability);
+            problems.Add($"{name}: {role} '{sourceName}' has kind {source.Kind}, which cannot {task}. " +
+                         (able.Count > 0 ? $"Name a source of a kind that can: {string.Join(", ", able)}" : "No loaded adapter has a kind that can"));
+        }
         foreach (var credential in environment.Credentials)
         {
             if (!_logins.TryGetValue(credential.Kind, out var kind))
@@ -138,9 +159,21 @@ public sealed class AdapterCatalog : IAdapterRegistry
         return problems;
     }
 
+    /// <summary>The places an environment file names a source for a job only some kinds can do, with the capability that job needs.</summary>
+    private static IEnumerable<(string Role, string Source, SourceCapabilities Capability, string Task)> Roles(RegistryEnvironment environment)
+    {
+        if (environment.Logs is { } logs) yield return ("logs.source", logs.Source, SourceCapabilities.Logs, "read the logs");
+        if (environment.Links is { } links) yield return ("links.source", links.Source, SourceCapabilities.Links, "read the dependencies link discovery needs");
+        if (environment.Scope.Inventory is { } inventory) yield return ("scope.inventory", inventory, SourceCapabilities.Inventory, "read the inventory");
+    }
+
+    /// <summary>True when the source is the one that reads the environment's inventory: its kind can, and the scope names it or names none.</summary>
+    public bool ReadsInventory(RegistryEnvironment environment, RegistrySource source) =>
+        CapabilitiesOf(source.Kind).HasFlag(SourceCapabilities.Inventory) && (environment.Scope.Inventory is null || environment.Scope.Inventory == source.Name);
+
     public SourceSet Build(RegistryEnvironment environment, string? registryFolder = null)
     {
-        var scope = new ScopeStore();
+        var scope = new ScopeStore { HasInventorySource = environment.Sources.Any(s => ReadsInventory(environment, s)) };
         var sources = new List<IMetricSource>();
         var problems = new List<string>();
         var logins = new Dictionary<string, ICredentialSource>();

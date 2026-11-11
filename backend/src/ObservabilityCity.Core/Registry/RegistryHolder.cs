@@ -56,10 +56,11 @@ public sealed class RegistryHolder(Registry initial) : IRegistryProvider
 }
 
 /// <summary>
-/// The registry as one environment sees it (see <see cref="Registry.ForEnvironment"/>), following the holder through reloads. The view is made
+/// The registry as one environment sees it (see <c>Registry.ForEnvironment</c>), following the holder through reloads.
+/// <c>kinds</c> is what the loaded adapters say their source kinds can do, for the warnings the view carries. The view is made
 /// once for each registry the holder has, not once for each snapshot.
 /// </summary>
-public sealed class EnvironmentRegistry(RegistryHolder source, string environmentId, Links.DiscoveredLinks? discovered = null, TimeProvider? time = null) : IRegistryProvider
+public sealed class EnvironmentRegistry(RegistryHolder source, string environmentId, Links.DiscoveredLinks? discovered = null, TimeProvider? time = null, Sources.ISourceKindCatalog? kinds = null) : IRegistryProvider
 {
     private readonly object _gate = new();
     private Registry? _from;
@@ -84,7 +85,7 @@ public sealed class EnvironmentRegistry(RegistryHolder source, string environmen
                     var links = discovered is not null && current.Environments.FirstOrDefault(e => e.Id == environmentId)?.Links is { } config
                         ? discovered.Found((time ?? TimeProvider.System).GetUtcNow(), config.MinDays, config.KeepFor)
                         : null;
-                    _view = current.ForEnvironment(environmentId, links);
+                    _view = current.ForEnvironment(environmentId, links, kinds);
                     _from = current;
                     _discoveredVersion = version;
                     _day = today;

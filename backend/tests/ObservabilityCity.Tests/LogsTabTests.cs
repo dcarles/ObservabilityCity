@@ -376,10 +376,16 @@ public class LogsTabTests
     }
 
     [Fact]
-    public void A_source_that_is_not_in_the_file_or_not_a_log_analytics_source_is_an_error()
+    public void A_source_that_is_not_in_the_file_or_cannot_read_logs_is_an_error()
     {
         Assert.Contains("logs.source 'nope' is not a source of this file", LoadProblem(LogsA.Replace("source: telemetry", "source: nope")));
-        Assert.Contains("the logs are read from a loganalytics source", LoadProblem(LogsA.Replace("source: telemetry", "source: inventory")));
+
+        // what a kind can read is the adapters' word, so the catalog of loaded modules says it, not the loader
+        using var copy = new RegistryCopy(TownA);
+        copy.Replace("environments/prod.yaml", "\nscope:\n", "\nscope:\n" + StoresRule);
+        copy.Write("environments/prod.yaml", copy.Read("environments/prod.yaml") + LogsA.Replace("source: telemetry", "source: inventory"));
+        var problems = new AdapterCatalog([new AzureAdapters()]).Check(RegistryLoader.Load(copy.Path).Environments.Single());
+        Assert.Contains("environments/prod.yaml: logs.source 'inventory' has kind resourcegraph, which cannot read the logs. Name a source of a kind that can: loganalytics", problems);
     }
 
     [Fact]

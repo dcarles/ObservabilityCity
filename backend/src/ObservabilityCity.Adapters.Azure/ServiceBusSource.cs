@@ -242,7 +242,9 @@ public sealed class ServiceBusSource(
 
 public sealed class ServiceBusSourceFactory(HttpClient? http = null, TimeProvider? time = null) : IMetricSourceFactory
 {
-    public string Kind => "servicebus";
+    public const string SourceKind = "servicebus";
+
+    public string Kind => SourceKind;
 
     public IMetricSource Create(SourceContext context)
     {

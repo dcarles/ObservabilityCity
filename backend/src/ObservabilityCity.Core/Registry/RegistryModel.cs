@@ -46,7 +46,7 @@ public sealed partial record Registry(
     /// </summary>
     public IReadOnlyList<RegistryEnvironment> Environments { get; init; } = [];
 
-    /// <summary>The environment this registry is the view of (see <see cref="ForEnvironment"/>), or null for the whole town.</summary>
+    /// <summary>The environment this registry is the view of (see <c>ForEnvironment</c>), or null for the whole town.</summary>
     public RegistryEnvironment? ActiveEnvironment { get; init; }
 
     /// <summary>The environment shown when none is asked for: the one marked default, else the first, else "demo".</summary>

@@ -515,7 +515,8 @@ public class ResourceHealthTests
     [InlineData("b")]
     public void A_health_source_fills_no_signal_and_is_not_reported_as_unused(string town)
     {
-        var registry = RegistryLoader.Load(Folder(town)).ForEnvironment("prod");
+        // that its kind fills no signal is the module's word (it declares HealthEvents), so the view is made with the loaded modules, as the host makes it
+        var registry = RegistryLoader.Load(Folder(town)).ForEnvironment("prod", null, new AdapterCatalog([new AzureAdapters()]));
 
         Assert.DoesNotContain(registry.Warnings, w => w.Contains(SourceName(town)));
         Assert.Equal("resourcehealth", registry.ActiveEnvironment!.Sources.Single(s => s.Name == SourceName(town)).Kind);

@@ -87,6 +87,20 @@ public class AdapterKitTests
         await AdapterContract.AssertPollAsync(source, RegistryLoader.Load(folder));
     }
 
+    [Fact]
+    public void Every_azure_source_has_what_its_kind_declares_and_declares_what_it_has()
+    {
+        var folder = Path.Combine(TestPaths.RepoRoot, "shared-test-data", "registries", "health-town-a");
+        var environment = RegistryLoader.Load(folder).Environments.Single();
+        var set = new AdapterCatalog([new AzureAdapters()]).Build(environment, folder);
+        Assert.Empty(set.Problems);
+
+        var kinds = environment.Sources.ToDictionary(s => s.Name, s => s.Kind);
+        Assert.Equal(["inventory", "telemetry", "platform", "health"], set.Sources.Select(s => s.Name));
+        foreach (var source in set.Sources)
+            AdapterContract.AssertCapabilities(AdapterContract.CapabilitiesOf(new AzureAdapters(), kinds[source.Name]), source);
+    }
+
     // ---- the contract: what it refuses ----
 
     private sealed class Module(string name, Action<IAdapterRegistry> register) : IAdapterModule
@@ -145,6 +159,28 @@ public class AdapterKitTests
         Task.FromResult<IReadOnlyDictionary<string, NodeReading>>(items.ToDictionary(i => i.Id, i => i.Reading));
 
     private static readonly TownRegistry Town = RegistryLoader.Load(TestPaths.LiveTown);
+
+    private sealed class LogReader : IMetricSource, ObservabilityCity.Core.Logs.ILogRowSource
+    {
+        public string Name => "logs";
+        public TimeSpan PollInterval => TimeSpan.FromSeconds(30);
+        public Task<IReadOnlyDictionary<string, NodeReading>> PollAsync(TownRegistry registry, CancellationToken ct) => Readings();
+        public bool CanReadLogs => true;
+        public Task<IReadOnlyList<ObservabilityCity.Core.Logs.LogRow>> ReadLogsAsync(TownRegistry registry, string query, DateTimeOffset from, DateTimeOffset to, CancellationToken ct) => Task.FromResult<IReadOnlyList<ObservabilityCity.Core.Logs.LogRow>>([]);
+    }
+
+    [Fact]
+    public void A_source_that_lacks_a_declared_capability_or_has_one_its_kind_does_not_declare_is_refused()
+    {
+        var plain = new Source((_, _) => Readings());
+
+        Assert.Contains(AdapterContract.CheckCapabilities(SourceCapabilities.Logs | SourceCapabilities.HealthEvents, plain), p => p.Contains("declares Logs") && p.Contains("ILogRowSource"));
+        Assert.Contains(AdapterContract.CheckCapabilities(SourceCapabilities.Logs | SourceCapabilities.HealthEvents, plain), p => p.Contains("declares HealthEvents") && p.Contains("IHealthEventSource"));
+        Assert.Contains(AdapterContract.CheckCapabilities(SourceCapabilities.None, new LogReader()), p => p.Contains("implements ILogRowSource") && p.Contains("does not declare Logs"));
+        Assert.Empty(AdapterContract.CheckCapabilities(SourceCapabilities.Logs, new LogReader()));
+        Assert.Empty(AdapterContract.CheckCapabilities(SourceCapabilities.Inventory, plain)); // an inventory has no interface: the source fills the scope store
+        Assert.Equal(SourceCapabilities.Logs, AdapterContract.CapabilitiesOf(new Module("m", r => r.AddSourceKind(new SourceKindInfo("k") { Capabilities = SourceCapabilities.Logs })), "k"));
+    }
 
     [Fact]
     public async Task A_source_that_answers_for_known_systems_with_sane_numbers_passes()

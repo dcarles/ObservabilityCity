@@ -219,7 +219,7 @@ A login defined with the name `default` replaces the Azure CLI one for every sou
 
 Nothing in the program knows how your company names things. An environment file's `scope:` block says it, with rules and templates, so a company with other names, tags or resource types writes other rules and changes no code. Templates have `{variable}` holes (and `{variable|nospace}`, `|lower`, `|upper`); `{environment}` is the environment's id and `variables:` are your own words.
 
-The scope's account and telemetry store keys (`subscription`, `pillars`, `workspace`, `workspaceId`, `queries`) are Azure adapter settings for now: on Azure the account is a subscription and the telemetry store a Log Analytics workspace, and the `resourcegraph` source reads the inventory.
+The scope's account and telemetry store keys (`subscription`, `pillars`, `workspace`, `workspaceId`, `queries`) are Azure adapter settings for now: on Azure the account is a subscription and the telemetry store a Log Analytics workspace. The inventory is read by a source whose kind can read one: with the Azure adapter, the `resourcegraph` source. Another adapter's kind can do it too, if its adapter says so.
 
 ```yaml
 sources:
@@ -381,7 +381,7 @@ Every key, with its default, is under `entities` in the [config reference](confi
 
 ### Links: find the calls your systems make
 
-Declared `calls` and `gatewayCalls` are always drawn. An environment can also find the rest from its dependency data: add a `links:` block to its file (see `links` in [config-reference.md](config-reference.md)). It names a `loganalytics` source of the file and a query template that returns one row for each caller and address, with the days it was seen on (`make_set(startofday(TimeGenerated))` in KQL), so the store does the counting and no raw data comes back. Your own rules turn an address into a system: a regular expression over the host (and over the path, for a gateway that names the destination in it) with named groups, and a `target` template such as `{pillar}.{service}`. Nothing about names is built in.
+Declared `calls` and `gatewayCalls` are always drawn. An environment can also find the rest from its dependency data: add a `links:` block to its file (see `links` in [config-reference.md](config-reference.md)). It names a source of the file whose kind can read dependencies (with the Azure adapter, a `loganalytics` source) and a query template that returns one row for each caller and address, with the days it was seen on (`make_set(startofday(TimeGenerated))` in KQL), so the store does the counting and no raw data comes back. Your own rules turn an address into a system: a regular expression over the host (and over the path, for a gateway that names the destination in it) with named groups, and a `target` template such as `{pillar}.{service}`. Nothing about names is built in.
 
 - It runs in the background and never holds up the town, while someone views the environment (see [step 6](#6-watch-the-town)). The first read looks back `firstRead` (7 days); after that each start reads only the gap since the last read, then once every `interval` (1 hour). When the rules, the ignore list, the aliases, the third parties' domains and matches or the town's systems change (including a rule or vendor added from the Unknown hosts panel), the next read looks back the whole `firstRead` window again for every name, so a new rule shows its links at once instead of only for new calls. Edits made by hand to the files are picked up at the next scheduled read; the panel asks for the read straight away.
 - A link needs both ends to be systems of the town and `minDays` (2) different days in the data. A link not seen for `keepFor` (30 days) drops off.
@@ -432,7 +432,7 @@ The callers' calls are counted over the whole `shareWindow`, so the town compare
 
 ### Logs tab: failed and slow requests, warnings, exceptions
 
-A system's inspector has a Logs tab. In a live town it is empty of everything until you write a `logs:` block in the environment file (see `logs` in [config-reference.md](config-reference.md)); without it the tab says logs are not set up. With it, opening the tab sends one query for that system's telemetry name over the last `window` (4 hours by default) to the `loganalytics` source you name. Nothing is polled, nothing is stored, and the tab never changes a building's colour: health comes from your unsampled metrics.
+A system's inspector has a Logs tab. In a live town it is empty of everything until you write a `logs:` block in the environment file (see `logs` in [config-reference.md](config-reference.md)); without it the tab says logs are not set up. With it, opening the tab sends one query for that system's telemetry name over the last `window` (4 hours by default) to the source you name: one whose kind can read logs (with the Azure adapter, a `loganalytics` source). Nothing is polled, nothing is stored, and the tab never changes a building's colour: health comes from your unsampled metrics.
 
 The query is yours (which table, which columns, which status counts as a failure). It returns one row for each kind of entry, already grouped by the store, with a `section` column saying which of four lists it belongs to:
 

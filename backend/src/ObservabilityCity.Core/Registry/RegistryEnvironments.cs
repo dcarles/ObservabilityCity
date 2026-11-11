@@ -9,7 +9,13 @@ public sealed partial record Registry
     /// vendor links that depended on them, and an island left with no systems is not on the map. The environment's tenants come along in
     /// <see cref="ActiveEnvironment"/>. An unknown id, or a town without environments, gives the registry itself.
     /// </summary>
-    public Registry ForEnvironment(string id, IReadOnlyList<Links.FoundLink>? found = null)
+    public Registry ForEnvironment(string id, IReadOnlyList<Links.FoundLink>? found = null) => ForEnvironment(id, found, null);
+
+    /// <summary>
+    /// The same, with what the loaded adapters say their source kinds can do (<paramref name="kinds"/>), so a source that fills no signal by design (one
+    /// that reads the cloud's health reports) is not named as unused. Without it nothing is known of a kind, and every source no signal reads is named.
+    /// </summary>
+    public Registry ForEnvironment(string id, IReadOnlyList<Links.FoundLink>? found, Sources.ISourceKindCatalog? kinds)
     {
         var env = Environments.FirstOrDefault(e => e.Id == id);
         if (env is null) return this;
@@ -47,7 +53,7 @@ public sealed partial record Registry
             .ToList();
         var callers = ExternalCallers.Select(c => c with { Calls = c.Calls.Where(present.Contains).ToList() }).ToList();
         var view = this with { Groups = groups, ExternalCallers = callers, Topics = topics, Subscriptions = subscriptions, Vendors = vendors, ActiveEnvironment = env };
-        return view with { Warnings = [.. TownLinks.Warnings(view), .. EnvironmentWarnings(env, view), .. view.UnknownSourceWarnings(env), .. view.UnusedSourceWarnings(env)] };
+        return view with { Warnings = [.. TownLinks.Warnings(view), .. EnvironmentWarnings(env, view), .. view.UnknownSourceWarnings(env), .. view.UnusedSourceWarnings(env, kinds)] };
     }
 
     /// <summary>

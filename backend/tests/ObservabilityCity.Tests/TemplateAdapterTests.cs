@@ -57,6 +57,14 @@ public class TemplateAdapterTests
     }
 
     [Fact]
+    public void The_source_has_what_its_kind_declares_and_declares_what_it_has()
+    {
+        using var town = Town();
+
+        AdapterContract.AssertCapabilities(AdapterContract.CapabilitiesOf(new TemplateAdapters(), "example-http"), SourceOver(town, CannedHttp.Always(Answer)));
+    }
+
+    [Fact]
     public async Task The_source_reads_the_address_it_was_given_and_turns_the_answer_into_readings()
     {
         using var town = Town();

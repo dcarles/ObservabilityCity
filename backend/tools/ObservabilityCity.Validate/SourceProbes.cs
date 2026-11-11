@@ -31,6 +31,9 @@ public interface ISourceProbe
 {
     string Kind { get; }
     Task<ProbeResult> ProbeAsync(string connection, CancellationToken ct);
+
+    /// <summary>True when a source with no connection is probed with the telemetry store its environment's scope names (the workspace, for Log Analytics).</summary>
+    bool ProbesScopeWorkspace => false;
 }
 
 /// <summary>Gives a bearer token for a scope. The real one uses the Azure login; tests pass a fake.</summary>
@@ -52,6 +55,7 @@ public sealed class AzureTokenProvider : ITokenProvider
 internal abstract class HttpProbe(HttpClient http, ITokenProvider tokens) : ISourceProbe
 {
     public abstract string Kind { get; }
+    public virtual bool ProbesScopeWorkspace => false;
     protected abstract string Scope { get; }
     protected abstract HttpRequestMessage Request(string connection);
     /// <summary>True when a successful body holds data.</summary>
@@ -99,6 +103,7 @@ internal sealed class PrometheusProbe(HttpClient http, ITokenProvider tokens) : 
 internal sealed class LogAnalyticsProbe(HttpClient http, ITokenProvider tokens) : HttpProbe(http, tokens)
 {
     public override string Kind => "loganalytics";
+    public override bool ProbesScopeWorkspace => true;
     protected override string Scope => "https://api.loganalytics.io/.default";
     protected override HttpRequestMessage Request(string connection) =>
         new(HttpMethod.Post, $"https://api.loganalytics.io/v1/workspaces/{Uri.EscapeDataString(connection)}/query")
