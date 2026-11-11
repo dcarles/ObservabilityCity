@@ -25,20 +25,18 @@ export function connectorsOf(g: GroupSnapshot): Connectors {
   return { id: g.id, bridge, ring, pier, standalone: !bridge && !ring && !pier }
 }
 
-/** What the Service Bus port reports for the whole town: topics, subscriptions, the piers they land on, and how many reads are the old egress route. */
+/** What the Service Bus port reports for the whole town: topics, subscriptions and the piers they land on. */
 export interface PortSummary {
   topics: number
   subscriptions: number
   piers: number
-  legacy: number
 }
 
 export function portSummary(groups: GroupSnapshot[]): PortSummary {
-  const out: PortSummary = { topics: 0, subscriptions: 0, piers: 0, legacy: 0 }
+  const out: PortSummary = { topics: 0, subscriptions: 0, piers: 0 }
   for (const g of groups) {
     out.topics += g.messaging?.topics.length ?? 0
     out.subscriptions += g.messaging?.subscriptions.length ?? 0
-    out.legacy += g.messaging?.subscriptions.filter((s) => s.legacy).length ?? 0
     if (connectorsOf(g).pier) out.piers++
   }
   return out

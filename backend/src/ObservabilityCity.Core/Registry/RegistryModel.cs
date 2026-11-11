@@ -84,8 +84,8 @@ public sealed record RegistryTopic(string Name, string GroupId, string? Service)
 /// </summary>
 internal sealed record TopicDecl(string? Name, string? Service, int Line = 0);
 
-/// <summary>A worker reading a topic. PublisherGroupId is the island that owns the topic. Legacy marks a read of a hub topic by a pillar.</summary>
-public sealed record RegistrySubscription(string Topic, string PublisherGroupId, string ConsumerId, string ConsumerGroupId, bool Legacy);
+/// <summary>A worker reading a topic. PublisherGroupId is the island that owns the topic.</summary>
+public sealed record RegistrySubscription(string Topic, string PublisherGroupId, string ConsumerId, string ConsumerGroupId);
 
 /// <summary>Mode is <see cref="TownModes.Demo"/> or <see cref="TownModes.Live"/>; a town that does not say is live.</summary>
 public sealed record TownInfo(string Id, string Name, string GroupLabel, string Topology, string Mode = TownModes.Live, double TrafficDensity = TownTraffic.Usual,
@@ -109,12 +109,12 @@ public static class TownLabels
 }
 
 /// <summary>
-/// The town's messaging convention, from town.yaml: how a topic listed by its service is named, and which owners are an old route.
-/// The default names a topic after its service alone and has no legacy route. A topic listed by its own name does not use the templates.
+/// The town's messaging convention, from town.yaml: how a topic listed by its service is named.
+/// The default names a topic after its service alone. A topic listed by its own name does not use the templates.
 /// </summary>
-public sealed record MessagingConvention(string TopicTemplate, string HubTopicTemplate, IReadOnlyList<string> LegacyFrom)
+public sealed record MessagingConvention(string TopicTemplate, string HubTopicTemplate)
 {
-    public static readonly MessagingConvention Default = new("{service}", "{service}", []);
+    public static readonly MessagingConvention Default = new("{service}", "{service}");
 
     public string TopicName(string pillar, string service) => TopicTemplate.Replace("{pillar}", pillar).Replace("{service}", service);
     public string HubTopicName(string service) => HubTopicTemplate.Replace("{service}", service);
@@ -162,7 +162,7 @@ public sealed record RegistryGroup(
     internal IReadOnlyList<TopicDecl> TopicDecls { get; init; } = [];
 
     /// <summary>The subscriptions as written in its file, before they are checked against the rest of the town.</summary>
-    internal IReadOnlyList<(string Topic, string Consumer, bool Legacy, int Line)> SubscriptionDecls { get; init; } = [];
+    internal IReadOnlyList<(string Topic, string Consumer, int Line)> SubscriptionDecls { get; init; } = [];
 
     /// <summary>The pillar id of the island that collects systems no pillar owns.</summary>
     public const string LostFoundId = "lost-found";

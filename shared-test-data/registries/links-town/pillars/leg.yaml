@@ -1,4 +1,4 @@
-# Still reads the hub's broadcast topic instead of a pillar's outbox: a pier with an amber pennant.
+# Reads the hub's broadcast topic instead of a pillar's outbox: a pier with no topic of its own.
 pillar: leg
 displayName: Legacy feed
 color: "#c8a2c8"
@@ -8,4 +8,4 @@ systems:
   - { id: leg.feed-db, service: feed, name: Feed DB, role: db }
 messaging:
   subscriptions:
-    - { topic: hub-broadcast, consumer: leg.feed-worker, legacy: true }
+    - { topic: hub-broadcast, consumer: leg.feed-worker }

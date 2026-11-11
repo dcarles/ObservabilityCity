@@ -307,7 +307,7 @@ export function linkSections(d: SystemDetail): LinkSection[] {
     {
       id: 'subscriptions',
       title: 'Messages',
-      items: d.subscriptions.map((s) => ({ id: null, name: `${s.topic}${s.legacy ? ' (legacy)' : ''}`, where: `${s.publisher} → ${s.consumer}` })),
+      items: d.subscriptions.map((s) => ({ id: null, name: s.topic, where: `${s.publisher} → ${s.consumer}` })),
     },
   ]
   return sections.filter((s) => s.items.length > 0)

@@ -63,8 +63,8 @@ public class FreeTopicsTests
             registry.Topics.Select(t => $"{t.Name} {t.GroupId} {t.Service ?? "-"}").Order(StringComparer.Ordinal));
         Assert.Equal(
             ["billing.audit bil>shp.shipping-worker", "billing.invoice.paid bil>ord.orders-worker", "orders.cancelled ord>bil.billing-worker",
-             "orders.created ord>bil.billing-worker", "orders.created ord>shp.shipping-worker", "platform.broadcast hub>shp.shipping-worker legacy"],
-            registry.Subscriptions.Select(s => $"{s.Topic} {s.PublisherGroupId}>{s.ConsumerId}{(s.Legacy ? " legacy" : "")}").Order(StringComparer.Ordinal));
+             "orders.created ord>bil.billing-worker", "orders.created ord>shp.shipping-worker", "platform.broadcast hub>shp.shipping-worker"],
+            registry.Subscriptions.Select(s => $"{s.Topic} {s.PublisherGroupId}>{s.ConsumerId}").Order(StringComparer.Ordinal));
     }
 
     [Fact]
@@ -76,8 +76,8 @@ public class FreeTopicsTests
         foreach (var id in new[] { "ord", "bil", "shp" }) Assert.True(links[id].HasMessaging, id);
         Assert.Equal([new TopicSnapshot("orders.created", "orders"), new TopicSnapshot("orders.cancelled", "orders")], Group(s, "ord").Messaging.Topics);
         Assert.Contains(new TopicSnapshot("billing.audit", null), Group(s, "bil").Messaging.Topics);
-        Assert.Contains(new SubscriptionSnapshot("billing.invoice.paid", "bil", "ord.orders-worker", false), Group(s, "ord").Messaging.Subscriptions);
-        Assert.Contains(new SubscriptionSnapshot("platform.broadcast", "hub", "shp.shipping-worker", true), Group(s, "shp").Messaging.Subscriptions);
+        Assert.Contains(new SubscriptionSnapshot("billing.invoice.paid", "bil", "ord.orders-worker"), Group(s, "ord").Messaging.Subscriptions);
+        Assert.Contains(new SubscriptionSnapshot("platform.broadcast", "hub", "shp.shipping-worker"), Group(s, "shp").Messaging.Subscriptions);
         // a consumer has a queue and the fake broker's backlog
         Assert.NotNull(s.Groups.SelectMany(g => g.Nodes).Single(n => n.Id == "shp.shipping-worker").QueueDepth);
         // what the services that publish send, and what the workers that read take in
@@ -88,13 +88,13 @@ public class FreeTopicsTests
 
     /// <summary>
     /// The same town written the old way: one topic per service named by the templates. It has fewer topics (a template cannot give one service two),
-    /// but the same piers, the same boat routes from island to island, the same old route and the same flows.
+    /// but the same piers, the same boat routes from island to island and the same flows.
     /// </summary>
     [Fact]
     public async Task The_town_has_the_same_shape_as_its_twin_named_by_templates()
     {
         using var twin = new RegistryCopy(TestPaths.FreeTopicsTown);
-        twin.Replace("town.yaml", "  legacyFrom: [hub]", "  topicTemplate: \"{pillar}.{service}.events\"\n  hubTopicTemplate: \"platform.{service}\"\n  legacyFrom: [hub]");
+        twin.Replace("town.yaml", "islands: [ord, bil, shp]", "messaging:\n  topicTemplate: \"{pillar}.{service}.events\"\n  hubTopicTemplate: \"platform.{service}\"\nislands: [ord, bil, shp]");
         twin.Replace("hub.yaml", "    - { topic: platform.broadcast }", "    - broadcast");
         twin.Replace("pillars/ord.yaml", "    - { topic: orders.created, service: orders }\n    - { topic: orders.cancelled, service: orders }", "    - orders");
         twin.Replace("pillars/ord.yaml", "topic: billing.invoice.paid,", "topic: bil.billing.events,");
@@ -109,7 +109,7 @@ public class FreeTopicsTests
         {
             g.Id,
             Pier = g.Messaging.Topics.Count + g.Messaging.Subscriptions.Count > 0,
-            Routes = string.Join(",", g.Messaging.Subscriptions.Select(x => $"{x.Publisher}>{x.Consumer}{(x.Legacy ? "!" : "")}").Distinct().Order(StringComparer.Ordinal)),
+            Routes = string.Join(",", g.Messaging.Subscriptions.Select(x => $"{x.Publisher}>{x.Consumer}").Distinct().Order(StringComparer.Ordinal)),
             Publishes = g.Messaging.Topics.Count > 0,
             Flow = g.Flow is { } f ? $"{f.SentPerSecond}/{f.ReceivedPerSecond}" : "none",
         }).Select(x => x.ToString()).ToList();
@@ -186,7 +186,7 @@ public class FreeTopicsTests
     public void A_topic_name_the_template_also_makes_is_reported()
     {
         using var copy = new RegistryCopy(TestPaths.FreeTopicsTown);
-        copy.Replace("town.yaml", "  legacyFrom: [hub]", "  topicTemplate: \"{service}.events\"\n  legacyFrom: [hub]");
+        copy.Replace("town.yaml", "islands: [ord, bil, shp]", "messaging:\n  topicTemplate: \"{service}.events\"\nislands: [ord, bil, shp]");
         copy.Replace("pillars/bil.yaml", "    - { topic: billing.audit }\n", "    - { topic: billing.audit }\n    - billing\n");
         copy.Replace("pillars/shp.yaml", "messaging:\n", "messaging:\n  topics:\n    - { topic: billing.events }\n");
 
@@ -199,7 +199,7 @@ public class FreeTopicsTests
     public void A_template_name_that_another_island_lists_by_name_is_reported_on_the_template_entry()
     {
         using var copy = new RegistryCopy(TestPaths.FreeTopicsTown);
-        copy.Replace("town.yaml", "  legacyFrom: [hub]", "  topicTemplate: \"{service}.events\"\n  legacyFrom: [hub]");
+        copy.Replace("town.yaml", "islands: [ord, bil, shp]", "messaging:\n  topicTemplate: \"{service}.events\"\nislands: [ord, bil, shp]");
         copy.Replace("pillars/ord.yaml", "    - { topic: orders.cancelled, service: orders }\n", "    - { topic: orders.cancelled, service: orders }\n    - { topic: shipping.events }\n");
         copy.Replace("pillars/shp.yaml", "messaging:\n", "messaging:\n  topics: [shipping]\n");
 
@@ -241,7 +241,7 @@ public class FreeTopicsTests
     public void A_template_without_the_service_is_fine_when_every_topic_has_its_own_name()
     {
         using var copy = new RegistryCopy(TestPaths.FreeTopicsTown);
-        copy.Replace("town.yaml", "  legacyFrom: [hub]", "  topicTemplate: \"events\"\n  hubTopicTemplate: \"shared\"\n  legacyFrom: [hub]");
+        copy.Replace("town.yaml", "islands: [ord, bil, shp]", "messaging:\n  topicTemplate: \"events\"\n  hubTopicTemplate: \"shared\"\nislands: [ord, bil, shp]");
 
         Assert.Equal(5, RegistryLoader.Load(copy.Path).Topics.Count);
     }
@@ -250,7 +250,7 @@ public class FreeTopicsTests
     public void A_template_without_the_service_is_refused_once_a_file_lists_a_topic_by_its_service()
     {
         using var copy = new RegistryCopy(TestPaths.FreeTopicsTown);
-        copy.Replace("town.yaml", "  legacyFrom: [hub]", "  topicTemplate: \"events\"\n  legacyFrom: [hub]");
+        copy.Replace("town.yaml", "islands: [ord, bil, shp]", "messaging:\n  topicTemplate: \"events\"\nislands: [ord, bil, shp]");
         copy.Replace("pillars/bil.yaml", "    - { topic: billing.audit }\n", "    - { topic: billing.audit }\n    - billing\n");
 
         var e = Assert.Throws<RegistryException>(() => RegistryLoader.Load(copy.Path));
@@ -263,7 +263,7 @@ public class FreeTopicsTests
     public void Both_forms_can_stand_in_one_file()
     {
         using var copy = new RegistryCopy(TestPaths.FreeTopicsTown);
-        copy.Replace("town.yaml", "  legacyFrom: [hub]", "  topicTemplate: \"{pillar}-{service}-outbox\"\n  legacyFrom: [hub]");
+        copy.Replace("town.yaml", "islands: [ord, bil, shp]", "messaging:\n  topicTemplate: \"{pillar}-{service}-outbox\"\nislands: [ord, bil, shp]");
         copy.Replace("pillars/bil.yaml", "    - { topic: billing.audit }\n", "    - { topic: billing.audit }\n    - billing\n");
 
         var registry = RegistryLoader.Load(copy.Path);
@@ -279,7 +279,7 @@ public class FreeTopicsTests
     [InlineData("{service}", "ord", "ord-orders", false)] // without {pillar} no name says its owner
     public void A_name_the_template_makes_for_a_pillar_is_recognised(string template, string pillar, string name, bool expected)
     {
-        Assert.Equal(expected, new MessagingConvention(template, "{service}", []).CouldBeTopicOf(pillar, name));
+        Assert.Equal(expected, new MessagingConvention(template, "{service}").CouldBeTopicOf(pillar, name));
     }
 
     // ── a resilient load ────────────────────────────────────────────────────

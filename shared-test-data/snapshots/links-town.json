@@ -248,8 +248,7 @@
           {
             "topic": "wrk-batch-outbox",
             "publisher": "wrk",
-            "consumer": "ful.orders-worker",
-            "legacy": false
+            "consumer": "ful.orders-worker"
           }
         ],
         "schedules": []
@@ -426,8 +425,7 @@
           {
             "topic": "ful-orders-outbox",
             "publisher": "ful",
-            "consumer": "wrk.batch-worker",
-            "legacy": false
+            "consumer": "wrk.batch-worker"
           }
         ],
         "schedules": []
@@ -763,8 +761,7 @@
           {
             "topic": "hub-broadcast",
             "publisher": "hub",
-            "consumer": "leg.feed-worker",
-            "legacy": true
+            "consumer": "leg.feed-worker"
           }
         ],
         "schedules": []

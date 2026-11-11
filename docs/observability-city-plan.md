@@ -45,7 +45,6 @@ Each signal has exactly one visual meaning, and it reads the same in every theme
 | Sync calls | Bridges. In a hub-and-spoke town each island has one bridge to the hub, and calls between islands go through it. In a direct town (`topology: direct`) islands reach each other over an outer ring road |
 | Messaging | Boats from the broker's port to an island's pier. Messages waiting pile up as crates on the quay. Bridges are sync, water is async |
 | Dead letters | A pen of broken crates on the pier with a "DLQ N" badge and a sweeping red light. The top bar shows the town-wide total. Clicking a pier, a pen or the DLQ count lists the queues with dead letters |
-| Legacy route | An amber pennant on a pier whose worker still reads a route you are moving off (`legacyFrom` in `town.yaml`; today it can list only `hub`) |
 | Scheduled jobs | A function's jobs send boats to the services the pillar file maps them to. An unmapped job shows "Job not mapped" |
 | Regions | A service in two or more regions shows its worst region, with the split of requests under its name |
 | Tenants | A store with one database per tenant is a yard with a unit for each tenant. Test tenants are paler and striped and never go past amber; an undeclared tenant is a purple unit marked "?" |
@@ -225,7 +224,6 @@ The biggest risk is the mapping, not the 3D. The same system has different names
 Current limits:
 
 - **The hub holds at most one gateway, broker, egress and database.** A town with two brokers or two gateways puts the extra one on an island or uses `topology: direct`.
-- **`legacyFrom` can list only `hub`.** Marking a route you are moving off works only for the hub's topics.
 
 Open questions:
 

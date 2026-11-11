@@ -152,7 +152,7 @@ export class Town {
   private snapshotId = ''
   /** The hub's message broker by name (Service Bus, Kafka, ...), for the port's board. */
   private brokerName: string | null = null
-  private port: PortSummary = { topics: 0, subscriptions: 0, piers: 0, legacy: 0 }
+  private port: PortSummary = { topics: 0, subscriptions: 0, piers: 0 }
   /** The islands that have a sea lane for boats, and how many car routes cross each one's bridge. */
   private readonly boatLanes = new Set<string>()
   private readonly hubLanePaths: { id: string; path: THREE.Vector3[] }[] = []
@@ -690,16 +690,16 @@ export class Town {
   inspectIsland(groupId: string): {
     id: string; buildings: number; kinds: string[]; configError: string | null
     bridge: boolean; pier: boolean; lane: boolean; crossings: number
-    crates: number; brokenCrates: number; alarm: boolean; pennant: boolean; sky: SkyStatus
+    crates: number; brokenCrates: number; alarm: boolean; sky: SkyStatus
   } | null {
-    const none = { kinds: [], bridge: false, pier: false, lane: false, crossings: 0, crates: 0, brokenCrates: 0, alarm: false, pennant: false }
+    const none = { kinds: [], bridge: false, pier: false, lane: false, crossings: 0, crates: 0, brokenCrates: 0, alarm: false }
     if (groupId === 'hub' && this.hubWeather) return { id: groupId, buildings: 0, configError: null, ...none, sky: this.hubWeather.status() }
     const isl = this.islands.find((i) => i.group.id === groupId)
     if (!isl) return null
     return {
       id: groupId, buildings: isl.buildings.size, kinds: [...isl.buildings.values()].map((b) => b.kind), configError: isl.group.configError ?? null,
       bridge: isl.links.bridge, pier: isl.harbour !== null, lane: this.boatLanes.has(groupId), crossings: this.crossings.get(groupId) ?? 0,
-      ...(isl.harbour?.status() ?? { crates: 0, brokenCrates: 0, alarm: false, pennant: false }), sky: isl.weather.status(),
+      ...(isl.harbour?.status() ?? { crates: 0, brokenCrates: 0, alarm: false }), sky: isl.weather.status(),
     }
   }
 

@@ -25,7 +25,7 @@ internal sealed class TownFile
     public List<ExpectedWarningFile> ExpectedWarnings { get; set; } = [];
     /// <summary>The database engines this company uses, by id. A database says <c>engine: &lt;id&gt;</c> and takes the name and the type from here.</summary>
     public Dictionary<string, DatabaseEngineFile> DatabaseEngines { get; set; } = new();
-    /// <summary>How the town names its message topics, and which publishers are an old route. Without it: topics are named after the service and no route is legacy.</summary>
+    /// <summary>How the town names its message topics. Without it: topics are named after the service.</summary>
     public TownMessagingFile Messaging { get; set; } = new();
     /// <summary>The words the town uses for things the app has no fixed name for.</summary>
     public LabelsFile Labels { get; set; } = new();
@@ -51,8 +51,6 @@ internal sealed class TownMessagingFile
     public string TopicTemplate { get; set; } = MessagingConvention.Default.TopicTemplate;
     /// <summary>The name of a topic of the hub listed by a short name: <c>{service}</c> is replaced by that name. Not used by a topic listed by its own name.</summary>
     public string HubTopicTemplate { get; set; } = MessagingConvention.Default.HubTopicTemplate;
-    /// <summary>The owners whose topics are an old route to read (only <c>hub</c> is known). A subscription to one of them must say <c>legacy: true</c>; no other may.</summary>
-    public List<string> LegacyFrom { get; set; } = [];
 }
 
 internal sealed class LabelsFile
@@ -234,8 +232,6 @@ internal sealed class SubscriptionFile : IYamlConvertible
     public string Topic { get; set; } = "";
     /// <summary>A worker in this pillar.</summary>
     public string Consumer { get; set; } = "";
-    /// <summary>Marks a read of a hub topic by a pillar, the old way. Drawn with an amber pennant.</summary>
-    public bool Legacy { get; set; }
 
     /// <summary>The line of the entry in its file, 1-based, so a problem with it can point there.</summary>
     internal int Line { get; private set; }
@@ -244,14 +240,13 @@ internal sealed class SubscriptionFile : IYamlConvertible
     {
         public string Topic { get; set; } = "";
         public string Consumer { get; set; } = "";
-        public bool Legacy { get; set; }
     }
 
     void IYamlConvertible.Read(IParser parser, Type expectedType, ObjectDeserializer nestedObjectDeserializer)
     {
         Line = (int)parser.Current!.Start.Line;
         var plain = (Plain?)nestedObjectDeserializer(typeof(Plain)) ?? new Plain();
-        (Topic, Consumer, Legacy) = (plain.Topic, plain.Consumer, plain.Legacy);
+        (Topic, Consumer) = (plain.Topic, plain.Consumer);
     }
 
     void IYamlConvertible.Write(IEmitter emitter, ObjectSerializer nestedObjectSerializer) => throw new NotSupportedException("registry files are only read");

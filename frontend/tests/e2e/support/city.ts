@@ -52,15 +52,12 @@ export interface IslandStatus {
   crates: number
   brokenCrates: number
   alarm: boolean
-  /** The amber pennant: a worker here still reads the hub's egress topic. */
-  pennant: boolean
 }
 
 export interface HubStatus {
   topics: number
   subscriptions: number
   piers: number
-  legacy: number
   /** Islands with a sea lane. */
   boats: number
   /** `counts` is the last line of the broker's one billboard: null when nothing is configured or the Messaging layer is off. */

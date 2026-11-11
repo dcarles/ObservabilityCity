@@ -7,4 +7,3 @@ islands: [aa, bb]
 messaging:
   topicTemplate: "{pillar}-{service}-events"
   hubTopicTemplate: "hub-{service}"
-  legacyFrom: [hub]

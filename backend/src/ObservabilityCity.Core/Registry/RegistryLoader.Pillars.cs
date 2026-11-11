@@ -14,7 +14,6 @@ public static partial class RegistryLoader
     /// A topic is listed either by its service, and named by the town's messaging.topicTemplate (the hub's by messaging.hubTopicTemplate), or by its own
     /// name, with the service that publishes it or none. Either way the file that lists it is its owner: no owner is read from a name. A name is unique in the town.
     /// A subscription names the full topic and a worker of its own pillar.
-    /// Reading a topic of an owner the town lists in messaging.legacyFrom is the old route, so it must say so with legacy: true.
     /// In a resilient load, a subscription to a topic of a pillar that was skipped (<paramref name="brokenTopics"/>, or a name the template makes for it) is that pillar's problem.
     /// </summary>
     private static (List<RegistryTopic>, List<RegistrySubscription>) ResolveMessaging(List<RegistryGroup> groups, HashSet<string> brokenPillars, HashSet<string> brokenTopics, bool resilient, Action<string> problem, MessagingConvention convention, Dictionary<string, int> lines)
@@ -49,7 +48,7 @@ public static partial class RegistryLoader
         foreach (var g in groups.Where(g => !g.IsHub))
         {
             var file = $"{g.Id}.yaml";
-            foreach (var (topicName, consumer, legacy, line) in g.SubscriptionDecls)
+            foreach (var (topicName, consumer, line) in g.SubscriptionDecls)
             {
                 // the message stays as it was; the validator finds the entry's line from here
                 void Problem(string message)
@@ -65,23 +64,12 @@ public static partial class RegistryLoader
                     continue;
                 }
                 var topic = owned.Topic;
-                var oldRoute = convention.LegacyFrom.Contains(topic.GroupId);
-                if (oldRoute && !legacy)
-                {
-                    Problem($"{file}: '{consumer}' reads '{topicName}' from '{topic.GroupId}', which this town lists in messaging.legacyFrom. If this is the old route, say so with legacy: true");
-                    continue;
-                }
-                if (!oldRoute && legacy)
-                {
-                    Problem($"{file}: the subscription of '{consumer}' to '{topicName}' is marked legacy, but '{topic.GroupId}' is not listed in messaging.legacyFrom in town.yaml");
-                    continue;
-                }
                 if (!seen.Add((topicName, consumer)))
                 {
                     Problem($"{file}: '{consumer}' subscribes to '{topicName}' twice");
                     continue;
                 }
-                subscriptions.Add(new RegistrySubscription(topicName, topic.GroupId, consumer, g.Id, legacy));
+                subscriptions.Add(new RegistrySubscription(topicName, topic.GroupId, consumer, g.Id));
             }
         }
         return (topics, subscriptions);
@@ -160,7 +148,7 @@ public static partial class RegistryLoader
         {
             Code = p.Scope?.Code,
             TopicDecls = ToTopicDecls(p.Messaging),
-            SubscriptionDecls = (p.Messaging?.Subscriptions ?? []).Select(x => (x.Topic, x.Consumer, x.Legacy, x.Line)).ToList(),
+            SubscriptionDecls = (p.Messaging?.Subscriptions ?? []).Select(x => (x.Topic, x.Consumer, x.Line)).ToList(),
             Schedules = ToSchedules(p, nodes, name, errors),
         };
         CheckMessaging(group, p.Systems.Select(x => x.Id).ToHashSet(), name, errors);
@@ -201,7 +189,7 @@ public static partial class RegistryLoader
     private static void CheckMessaging(RegistryGroup g, HashSet<string> declaredIds, string fileName, List<string> errors)
     {
         CheckTopics(g, fileName, errors);
-        foreach (var (topic, consumer, _, _) in g.SubscriptionDecls)
+        foreach (var (topic, consumer, _) in g.SubscriptionDecls)
         {
             if (string.IsNullOrWhiteSpace(topic)) errors.Add($"{fileName}: a subscription needs a topic");
             var node = g.Nodes.FirstOrDefault(n => n.Id == consumer);

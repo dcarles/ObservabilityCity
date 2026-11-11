@@ -40,7 +40,7 @@ public static class SystemDetails
         var topics = node.Service is null ? []
             : registry.Topics.Where(t => t.GroupId == node.GroupId && t.Service == node.Service).Select(t => t.Name).ToList();
         var subscriptions = registry.Subscriptions.Where(s => s.ConsumerId == id)
-            .Select(s => new SubscriptionSnapshot(s.Topic, s.PublisherGroupId, s.ConsumerId, s.Legacy)).ToList();
+            .Select(s => new SubscriptionSnapshot(s.Topic, s.PublisherGroupId, s.ConsumerId)).ToList();
 
         var island2 = node.GroupId == RegistryVendor.GroupId ? "Third party" : groups.TryGetValue(node.GroupId, out var own) ? own.DisplayName : node.GroupId;
         return new SystemDetail(node.Id, node.Name, node.Kind, node.Service, node.GroupId, island2, FileOf(node),

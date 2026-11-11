@@ -22,7 +22,7 @@ describe('the connectors an island gets (links-town)', () => {
     ['wrk', false, true, 'a worker only: a pier and no bridge'],
     ['nom', true, false, 'an API and no messaging: a bridge and no pier'],
     ['hbk', true, false, 'no API, but a call to the shared hub database: a bridge and no pier'],
-    ['leg', true, true, 'an API and a legacy consumer: a bridge and a pier'],
+    ['leg', true, true, 'an API and a reader of the hub\'s topic: a bridge and a pier'],
     ['sta', false, false, 'nothing at all: no bridge and no pier'],
   ])('%s: %s', (id, bridge, pier) => {
     const c = connectorsOf(group(links, id))
@@ -61,13 +61,12 @@ describe('buildings exist only for roles an island has', () => {
 })
 
 describe('the Service Bus port summary', () => {
-  it('counts topics, subscriptions, piers and the old-route reads in links-town', () => {
-    expect(portSummary(links.groups)).toEqual({ topics: 3, subscriptions: 3, piers: 3, legacy: 1 })
+  it('counts topics, subscriptions and piers in links-town', () => {
+    expect(portSummary(links.groups)).toEqual({ topics: 3, subscriptions: 3, piers: 3 })
   })
 
-  it('counts the sample town: a pier for every pillar with messaging, the legacy read in Lost & found', () => {
+  it('counts the sample town: a pier for every pillar with messaging', () => {
     const p = portSummary(sample.groups)
-    expect(p.legacy).toBe(1)
     expect(p.piers).toBe(sample.groups.filter((g) => !g.isHub && hasMessaging(g.messaging)).length)
     expect(p.piers).toBe(16) // every pillar except reg, which has none
     expect(p.subscriptions).toBeGreaterThan(30)
@@ -102,7 +101,7 @@ describe('the sample town', () => {
 
 describe('what a pier reports', () => {
   const worker = (id: string, extra: Partial<NodeSnapshot>) => ({ id, kind: 'Worker', state: 'Healthy', requestsPerSecond: 10, backlogAmber: 60, backlogRed: 300, queueDepth: 100, oldestMessageSeconds: 5, deadLetters: 3, ...extra }) as unknown as NodeSnapshot
-  const messaging = { topics: [{ name: 'a-x-outbox', service: 'x' }], subscriptions: [{ topic: 'b-y-outbox', publisher: 'b', consumer: 'a.one', legacy: false }] }
+  const messaging = { topics: [{ name: 'a-x-outbox', service: 'x' }], subscriptions: [{ topic: 'b-y-outbox', publisher: 'b', consumer: 'a.one' }] }
 
   it('adds up only the workers that subscribe to a topic', () => {
     const m = messagingOf([worker('a.one', {}), worker('a.two', { queueDepth: 5000, deadLetters: 40 })], messaging)
@@ -110,7 +109,7 @@ describe('what a pier reports', () => {
     expect(m.waiting).toBe(100)
     expect(m.deadLetters).toBe(3)
     expect(m.perSecond).toBe(10)
-    expect([m.topics, m.subscriptions, m.legacy]).toEqual([1, 1, false])
+    expect([m.topics, m.subscriptions]).toEqual([1, 1])
   })
 
   it('reports nothing for an island with no subscriptions, however busy its workers are', () => {
@@ -118,12 +117,6 @@ describe('what a pier reports', () => {
 
     expect(m.waiting).toBeNull()
     expect(m.deadLetters).toBeNull()
-  })
-
-  it('flags the old route', () => {
-    const m = messagingOf([worker('a.one', {})], { ...messaging, subscriptions: [{ ...messaging.subscriptions[0], legacy: true }] })
-
-    expect(m.legacy).toBe(true)
   })
 
   it('treats a missing messaging block as no messaging', () => {
@@ -185,7 +178,7 @@ describe('a town whose topics have names of their own (free-topics-town)', () =>
   })
 
   it('counts every topic and read on the broker\'s sign', () => {
-    expect(portSummary(free.groups)).toEqual({ topics: 5, subscriptions: 6, piers: 3, legacy: 1 })
-    expect(messagingOf(group(free, 'ord').nodes, group(free, 'ord').messaging)).toMatchObject({ topics: 2, subscriptions: 1, legacy: false })
+    expect(portSummary(free.groups)).toEqual({ topics: 5, subscriptions: 6, piers: 3 })
+    expect(messagingOf(group(free, 'ord').nodes, group(free, 'ord').messaging)).toMatchObject({ topics: 2, subscriptions: 1 })
   })
 })

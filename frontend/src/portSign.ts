@@ -8,14 +8,12 @@ export interface PortCounts {
   topics: number
   subscriptions: number
   piers: number
-  legacy: number
 }
 
 /** The broker sign's last line: how many topics and subscriptions the town has and how many piers they reach. Null when nothing is configured, so an unconfigured broker shows no counts. */
 export function portCountsLine(p: PortCounts): { text: string; hot: boolean } | null {
-  if (p.topics + p.subscriptions + p.piers + p.legacy === 0) return null
-  const base = `${p.topics} topics · ${p.subscriptions} subscriptions · ${p.piers} pier${p.piers === 1 ? '' : 's'}`
-  return { text: p.legacy > 0 ? `${base} · ${p.legacy} legacy` : base, hot: p.legacy > 0 }
+  if (p.topics + p.subscriptions + p.piers === 0) return null
+  return { text: `${p.topics} topics · ${p.subscriptions} subscriptions · ${p.piers} pier${p.piers === 1 ? '' : 's'}`, hot: false }
 }
 
 /** The sign text for a broker named so: upper case, and short enough to fit the board. A broker with no name is the Service Bus. */

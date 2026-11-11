@@ -50,7 +50,7 @@ export function parkProps(x: number, z: number): THREE.Object3D[] {
 }
 
 export function layoutKey(s: Snapshot): string {
-  const groups = s.groups.map((g) => `${g.id}${g.configError ? '!' : ''}:${g.nodes.map((n) => `${n.id}/${n.kind}/${n.tenants != null ? 'T' : ''}/${n.service ?? ''}/${n.calls.join('+')}/${(n.gatewayCalls ?? []).join('+')}`).join(',')}|${g.hasBridge === false ? 'nb' : 'b'}${g.hasRingBridge ? 'r' : ''}${g.flow ? 'f' : ''}|${(g.assets ?? []).map((a) => `${a.id}/${a.shape}/${a.service ?? ''}/${a.group ?? ''}`).join('+')}|${(g.messaging?.topics ?? []).map((t) => t.name).join('+')}|${(g.messaging?.subscriptions ?? []).map((x) => `${x.topic}>${x.consumer}${x.legacy ? '!' : ''}`).join('+')}`).join(';')
+  const groups = s.groups.map((g) => `${g.id}${g.configError ? '!' : ''}:${g.nodes.map((n) => `${n.id}/${n.kind}/${n.tenants != null ? 'T' : ''}/${n.service ?? ''}/${n.calls.join('+')}/${(n.gatewayCalls ?? []).join('+')}`).join(',')}|${g.hasBridge === false ? 'nb' : 'b'}${g.hasRingBridge ? 'r' : ''}${g.flow ? 'f' : ''}|${(g.assets ?? []).map((a) => `${a.id}/${a.shape}/${a.service ?? ''}/${a.group ?? ''}`).join('+')}|${(g.messaging?.topics ?? []).map((t) => t.name).join('+')}|${(g.messaging?.subscriptions ?? []).map((x) => `${x.topic}>${x.consumer}`).join('+')}`).join(';')
   const vendors = (s.vendors ?? []).map((v) => `${v.node.id}@${v.islandId ?? ''}<${v.calledBy.join('+')}>${(v.calls ?? []).join("+")}`).join(';')
   return `${s.townId}|${s.environment ?? ''}|${groups}|${vendors}|${edgeKey(s)}`
 }

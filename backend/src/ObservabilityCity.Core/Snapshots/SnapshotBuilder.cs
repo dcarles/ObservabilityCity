@@ -204,7 +204,7 @@ public sealed partial class SnapshotBuilder(IRegistryProvider registries, Latest
             {
                 if (q.ProducerGroup is null || q.ProducerService is null) continue;
                 if (!topics.Any(t => t.Name == q.Name)) { topics.Add(new RegistryTopic(q.Name, q.ProducerGroup, q.ProducerService)); added = true; }
-                if (!subscriptions.Any(s => s.Topic == q.Name && s.ConsumerId == n.Id)) { subscriptions.Add(new RegistrySubscription(q.Name, q.ProducerGroup, n.Id, n.GroupId, false)); added = true; }
+                if (!subscriptions.Any(s => s.Topic == q.Name && s.ConsumerId == n.Id)) { subscriptions.Add(new RegistrySubscription(q.Name, q.ProducerGroup, n.Id, n.GroupId)); added = true; }
             }
         }
         return added ? registry with { Topics = topics, Subscriptions = subscriptions } : registry;
@@ -212,6 +212,6 @@ public sealed partial class SnapshotBuilder(IRegistryProvider registries, Latest
 
     private static MessagingSnapshot MessagingOf(Registry.Registry registry, RegistryGroup g) => new(
         registry.Topics.Where(t => t.GroupId == g.Id).Select(t => new TopicSnapshot(t.Name, t.Service)).ToList(),
-        registry.Subscriptions.Where(s => s.ConsumerGroupId == g.Id).Select(s => new SubscriptionSnapshot(s.Topic, s.PublisherGroupId, s.ConsumerId, s.Legacy)).ToList(),
+        registry.Subscriptions.Where(s => s.ConsumerGroupId == g.Id).Select(s => new SubscriptionSnapshot(s.Topic, s.PublisherGroupId, s.ConsumerId)).ToList(),
         g.Schedules.Select(x => new ScheduleSnapshot(x.SystemId, x.Job, x.Services)).ToList());
 }

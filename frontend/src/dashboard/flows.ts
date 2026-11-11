@@ -40,7 +40,7 @@ export function internalOf(s: Snapshot): Map<string, number> {
   for (const g of s.groups) {
     if (g.isHub) continue
     for (const sub of g.messaging?.subscriptions ?? []) {
-      if (sub.legacy || sub.publisher !== g.id) continue
+      if (sub.publisher !== g.id) continue
       const queue = g.nodes.find((n) => n.id === sub.consumer)?.queues?.find((q) => q.name === sub.topic)
       if (queue?.perSecond != null) out.set(g.id, (out.get(g.id) ?? 0) + queue.perSecond)
     }

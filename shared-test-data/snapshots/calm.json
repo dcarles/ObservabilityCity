@@ -259,32 +259,27 @@
           {
             "topic": "pay-payments-outbox",
             "publisher": "pay",
-            "consumer": "ldg.ledger-worker",
-            "legacy": false
+            "consumer": "ldg.ledger-worker"
           },
           {
             "topic": "bil-invoices-outbox",
             "publisher": "bil",
-            "consumer": "ldg.ledger-worker",
-            "legacy": false
+            "consumer": "ldg.ledger-worker"
           },
           {
             "topic": "pay-payments-outbox",
             "publisher": "pay",
-            "consumer": "ldg.posting-worker",
-            "legacy": false
+            "consumer": "ldg.posting-worker"
           },
           {
             "topic": "pay-refunds-outbox",
             "publisher": "pay",
-            "consumer": "ldg.posting-worker",
-            "legacy": false
+            "consumer": "ldg.posting-worker"
           },
           {
             "topic": "ldg-ledger-outbox",
             "publisher": "ldg",
-            "consumer": "ldg.statements-worker",
-            "legacy": false
+            "consumer": "ldg.statements-worker"
           }
         ],
         "schedules": [
@@ -929,14 +924,12 @@
           {
             "topic": "acq-applications-outbox",
             "publisher": "acq",
-            "consumer": "acc.accounts-worker",
-            "legacy": false
+            "consumer": "acc.accounts-worker"
           },
           {
             "topic": "ldg-ledger-outbox",
             "publisher": "ldg",
-            "consumer": "acc.accounts-worker",
-            "legacy": false
+            "consumer": "acc.accounts-worker"
           }
         ],
         "schedules": [
@@ -1350,20 +1343,17 @@
           {
             "topic": "fra-screening-outbox",
             "publisher": "fra",
-            "consumer": "pay.payments-worker",
-            "legacy": false
+            "consumer": "pay.payments-worker"
           },
           {
             "topic": "dec-decision-outbox",
             "publisher": "dec",
-            "consumer": "pay.payments-worker",
-            "legacy": false
+            "consumer": "pay.payments-worker"
           },
           {
             "topic": "dsp-disputes-outbox",
             "publisher": "dsp",
-            "consumer": "pay.refunds-worker",
-            "legacy": false
+            "consumer": "pay.refunds-worker"
           }
         ],
         "schedules": []
@@ -1717,8 +1707,7 @@
           {
             "topic": "pay-payments-outbox",
             "publisher": "pay",
-            "consumer": "fra.screening-worker",
-            "legacy": false
+            "consumer": "fra.screening-worker"
           }
         ],
         "schedules": []
@@ -2053,14 +2042,12 @@
           {
             "topic": "acq-applications-outbox",
             "publisher": "acq",
-            "consumer": "cst.profile-worker",
-            "legacy": false
+            "consumer": "cst.profile-worker"
           },
           {
             "topic": "obk-data-outbox",
             "publisher": "obk",
-            "consumer": "cst.consent-worker",
-            "legacy": false
+            "consumer": "cst.consent-worker"
           }
         ],
         "schedules": [
@@ -2570,14 +2557,12 @@
           {
             "topic": "dec-decision-outbox",
             "publisher": "dec",
-            "consumer": "acq.applications-worker",
-            "legacy": false
+            "consumer": "acq.applications-worker"
           },
           {
             "topic": "cst-profile-outbox",
             "publisher": "cst",
-            "consumer": "acq.leads-worker",
-            "legacy": false
+            "consumer": "acq.leads-worker"
           }
         ],
         "schedules": []
@@ -3012,8 +2997,7 @@
           {
             "topic": "acq-applications-outbox",
             "publisher": "acq",
-            "consumer": "dec.decision-worker",
-            "legacy": false
+            "consumer": "dec.decision-worker"
           }
         ],
         "schedules": []
@@ -3346,8 +3330,7 @@
           {
             "topic": "ldg-posting-outbox",
             "publisher": "ldg",
-            "consumer": "bil.invoices-worker",
-            "legacy": false
+            "consumer": "bil.invoices-worker"
           }
         ],
         "schedules": [
@@ -3714,20 +3697,17 @@
           {
             "topic": "bil-invoices-outbox",
             "publisher": "bil",
-            "consumer": "col.cases-worker",
-            "legacy": false
+            "consumer": "col.cases-worker"
           },
           {
             "topic": "col-cases-outbox",
             "publisher": "col",
-            "consumer": "col.dunning-worker",
-            "legacy": false
+            "consumer": "col.dunning-worker"
           },
           {
             "topic": "col-dunning-outbox",
             "publisher": "col",
-            "consumer": "col.agency-worker",
-            "legacy": false
+            "consumer": "col.agency-worker"
           }
         ],
         "schedules": [
@@ -4338,8 +4318,7 @@
           {
             "topic": "pay-payments-outbox",
             "publisher": "pay",
-            "consumer": "dsp.disputes-worker",
-            "legacy": false
+            "consumer": "dsp.disputes-worker"
           }
         ],
         "schedules": []
@@ -4624,8 +4603,7 @@
           {
             "topic": "pay-payments-outbox",
             "publisher": "pay",
-            "consumer": "rwd.points-worker",
-            "legacy": false
+            "consumer": "rwd.points-worker"
           }
         ],
         "schedules": []
@@ -4956,8 +4934,7 @@
           {
             "topic": "acc-accounts-outbox",
             "publisher": "acc",
-            "consumer": "obk.data-worker",
-            "legacy": false
+            "consumer": "obk.data-worker"
           }
         ],
         "schedules": []
@@ -5290,20 +5267,17 @@
           {
             "topic": "ldg-posting-outbox",
             "publisher": "ldg",
-            "consumer": "ntf.dispatch-worker",
-            "legacy": false
+            "consumer": "ntf.dispatch-worker"
           },
           {
             "topic": "col-dunning-outbox",
             "publisher": "col",
-            "consumer": "ntf.dispatch-worker",
-            "legacy": false
+            "consumer": "ntf.dispatch-worker"
           },
           {
             "topic": "dsp-disputes-outbox",
             "publisher": "dsp",
-            "consumer": "ntf.dispatch-worker",
-            "legacy": false
+            "consumer": "ntf.dispatch-worker"
           }
         ],
         "schedules": [
@@ -5663,26 +5637,22 @@
           {
             "topic": "pay-payments-outbox",
             "publisher": "pay",
-            "consumer": "dat.ingest-worker",
-            "legacy": false
+            "consumer": "dat.ingest-worker"
           },
           {
             "topic": "ldg-ledger-outbox",
             "publisher": "ldg",
-            "consumer": "dat.ingest-worker",
-            "legacy": false
+            "consumer": "dat.ingest-worker"
           },
           {
             "topic": "rcn-matching-outbox",
             "publisher": "rcn",
-            "consumer": "dat.ingest-worker",
-            "legacy": false
+            "consumer": "dat.ingest-worker"
           },
           {
             "topic": "dat-ingest-outbox",
             "publisher": "dat",
-            "consumer": "dat.reports-worker",
-            "legacy": false
+            "consumer": "dat.reports-worker"
           }
         ],
         "schedules": [
@@ -6139,14 +6109,12 @@
           {
             "topic": "pay-payments-outbox",
             "publisher": "pay",
-            "consumer": "rcn.matching-worker",
-            "legacy": false
+            "consumer": "rcn.matching-worker"
           },
           {
             "topic": "ldg-posting-outbox",
             "publisher": "ldg",
-            "consumer": "rcn.matching-worker",
-            "legacy": false
+            "consumer": "rcn.matching-worker"
           }
         ],
         "schedules": [
@@ -6468,8 +6436,7 @@
           {
             "topic": "hub-exports",
             "publisher": "hub",
-            "consumer": "lost-found.batch-gateway-worker",
-            "legacy": true
+            "consumer": "lost-found.batch-gateway-worker"
           }
         ],
         "schedules": []

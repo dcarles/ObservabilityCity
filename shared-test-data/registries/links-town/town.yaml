@@ -6,7 +6,6 @@ mode: demo
 messaging:
   topicTemplate: "{pillar}-{service}-outbox"
   hubTopicTemplate: "hub-{service}"
-  legacyFrom: [hub]
 # the island 'sta' stands alone on purpose: it is what shows the standalone rule
 expectedWarnings:
   - { rule: standalone, file: pillars/sta.yaml }

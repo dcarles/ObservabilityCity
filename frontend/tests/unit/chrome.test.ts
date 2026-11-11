@@ -218,13 +218,11 @@ describe('what the legend leaves out', () => {
     expect(LEGEND_ENTRIES.filter((e) => e.demoOnly).map((e) => e.id)).toEqual(['break'])
   })
 
-  it('keeps the incident weather and the legacy pennant in the data but hidden, each with a reason', () => {
-    for (const id of ['weather', 'pennant']) {
-      const e = LEGEND_ENTRIES.find((x) => x.id === id)!
-      expect(e.hidden, id).toBeTruthy()
-      expect(shown({ ...town, demo: true }), id).not.toContain(id)
-    }
-    expect(LEGEND_ENTRIES.filter((e) => e.hidden).map((e) => e.id).sort()).toEqual(['pennant', 'weather'])
+  it('keeps the incident weather in the data but hidden, with a reason', () => {
+    const e = LEGEND_ENTRIES.find((x) => x.id === 'weather')!
+    expect(e.hidden).toBeTruthy()
+    expect(shown({ ...town, demo: true })).not.toContain('weather')
+    expect(LEGEND_ENTRIES.filter((e) => e.hidden).map((e) => e.id)).toEqual(['weather'])
   })
 
   it('says nothing about the weather where it is shown', () => {

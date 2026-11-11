@@ -241,8 +241,7 @@
           {
             "topic": "bb-ledger-events",
             "publisher": "bb",
-            "consumer": "aa.orders-worker",
-            "legacy": false
+            "consumer": "aa.orders-worker"
           }
         ],
         "schedules": []
@@ -419,14 +418,12 @@
           {
             "topic": "aa-orders-events",
             "publisher": "aa",
-            "consumer": "cc.notify-worker",
-            "legacy": false
+            "consumer": "cc.notify-worker"
           },
           {
             "topic": "bb-ledger-events",
             "publisher": "bb",
-            "consumer": "cc.notify-worker",
-            "legacy": false
+            "consumer": "cc.notify-worker"
           }
         ],
         "schedules": []

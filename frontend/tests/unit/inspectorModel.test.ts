@@ -216,7 +216,7 @@ describe('the links tab', () => {
     id: 'aa.api', name: 'Aa API', kind: 'Api', islandId: 'aa', islandName: 'Alpha', file: 'pillars/aa.yaml', config: [],
     calls: [{ id: 'hub.db', name: 'Hub DB', kind: 'System', islandId: 'hub', islandName: 'Platform hub', found: false, lastSeen: null }, { id: 'ext.bureau', name: 'Bureau', kind: 'Vendor', islandId: '', islandName: '', found: false, lastSeen: null }],
     calledBy: [], gatewayCalls: [], gatewayCalledBy: [{ id: 'bb.api', name: 'Bb API', kind: 'System', islandId: 'bb', islandName: 'Beta', found: true, lastSeen: '2026-10-29' }],
-    outsideCallers: ['mobile-app'], serviceTopics: ['aa.events'], subscriptions: [{ topic: 'aa.events', publisher: 'aa.api', consumer: 'bb.worker', legacy: true }],
+    outsideCallers: ['mobile-app'], serviceTopics: ['aa.events'], subscriptions: [{ topic: 'aa.events', publisher: 'aa.api', consumer: 'bb.worker' }],
   }
 
   it('lists only the sections that have something, in reading order', () => {
@@ -229,9 +229,9 @@ describe('the links tab', () => {
     expect(outside.items).toEqual([{ id: null, name: 'mobile-app', where: 'Outside caller' }])
   })
 
-  it('says which subscriptions are legacy', () => {
+  it('names a subscription by its topic, with who publishes it and who reads it', () => {
     const subs = linkSections(detail).find((s) => s.id === 'subscriptions')!
-    expect(subs.items[0]).toEqual({ id: null, name: 'aa.events (legacy)', where: 'aa.api → bb.worker' })
+    expect(subs.items[0]).toEqual({ id: null, name: 'aa.events', where: 'aa.api → bb.worker' })
   })
 
   it('tags a link found in the telemetry with the day it was last seen, and a declared link as declared', () => {

@@ -42,7 +42,6 @@ $presets = [ordered]@{
   'stale-island' = @(, @('fra', 'Stale', 1))
   'pier-backlog' = @(, @('rcn.matching-worker', 'Backlog', 1))
   'pier-dlq'     = @(, @('rcn.matching-worker', 'Poison', 1))
-  'legacy-dlq'   = @(, @('lost-found.batch-gateway-worker', 'Poison', 1))
   'dlq-everywhere' = @(@('rcn.matching-worker', 'Poison', 1), @('pay.payments-worker', 'Poison', 1), @('ldg.ledger-worker', 'Poison', 0.6), @('lost-found.batch-gateway-worker', 'Poison', 0.4))
   # a database with a database for each tenant: aim at one tenant with store#tenant (prod tenants; zeta-trading is the staging tenant nobody listed)
   'tenant-throttle' = @(, @('ldg.ledger-db#acme-bank', 'Saturate', 1))

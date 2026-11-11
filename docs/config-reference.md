@@ -33,7 +33,7 @@ Thresholds cascade: `defaults.yaml` (per role) → the pillar's `defaults` → t
 | `islands` | no | file order | Pillar ids in the order the islands stand round the hub. Pillars not listed follow in file order, and Lost & found always comes last. Once the list is given, every pillar except Lost & found must be in it, or `validate` fails; with no list it only warns. |
 | `ringCapacity` | no | `12` | Islands on the first ring, from `6` to `18`. The second ring holds one fewer, since the airport takes a place there, so a town holds at most `2 × ringCapacity − 1` pillars. Lost & found counts. |
 | `databaseEngines` | no | none | The database engines this company uses, by id (see below). A database writes `engine: <id>`. |
-| `messaging` | no | see below | How the town names its message topics, and which topics are on a route you are moving off (see below). |
+| `messaging` | no | see below | How the town names its message topics (see below). |
 | `labels` | no | see below | The words the town uses for things the app has no fixed name for (see below). |
 | `wall` | no | see below | The town's defaults for wall mode: how long the tour stays at each stop, how long the overview lasts and the light (see below). |
 | `expectedWarnings` | no | none | Warnings the validator should expect, for a test folder that shows a rule on purpose. |
@@ -59,15 +59,13 @@ A database (`role: db`) in a pillar file or the hub then writes `engine: cosmos`
 |---|---|---|---|
 | `topicTemplate` | no | `{service}` | The name of the topic of a service that a pillar file lists by its service (a plain entry under `topics`). `{pillar}` and `{service}` are replaced. It must contain `{service}` while any pillar lists a topic that way; a town that lists every topic by its own name needs none. Two topics with the same name are a problem. |
 | `hubTopicTemplate` | no | `{service}` | The same for a plain entry under the hub's `topics`: `{service}` is replaced by the name the hub gives it. |
-| `legacyFrom` | no | none | The owners whose topics are a route you are moving off. Only `hub` can be listed (a current limit). A subscription to such a topic must say `legacy: true` and is drawn with an amber pennant; with `legacy: true` on any other topic, the validator reports a problem. |
 
-For a town that names topics `<service>.events` and `shared.<name>`, and is moving off reading the hub's topics:
+For a town that names topics `<service>.events` and `shared.<name>`:
 
 ```yaml
 messaging:
   topicTemplate: "{service}.events"
   hubTopicTemplate: "shared.{service}"
-  legacyFrom: [hub]
 ```
 
 The sample Galactic Credit uses `{pillar}-{service}-outbox` instead, and Droid Shop `{service}.events`. A town whose topics are named after events (`orders.created`) lists them by name in the pillar files (see [messaging](#messaging-pillar-or-hub)) and can leave the templates out.
@@ -200,14 +198,13 @@ messaging:
     - { topic: billing.audit }                      # no service publishes it
 ```
 
-The file that lists a topic owns it: its island is where the boats for it sail from, and `legacyFrom` is checked against it. Nothing reads an owner from a topic's name. A topic name is unique in the town, also against the names the templates make, and the validator says where both are listed.
+The file that lists a topic owns it: its island is where the boats for it sail from. Nothing reads an owner from a topic's name. A topic name is unique in the town, also against the names the templates make, and the validator says where both are listed.
 
 <!-- file: SubscriptionFile -->
 | Key | Required | Default | Meaning |
 |---|---|---|---|
 | `topic` | yes | | Full topic name: a topic's own name, or the one the template makes for a topic listed by its service. |
 | `consumer` | yes | | A system of this pillar with role `worker`, by its full id. |
-| `legacy` | no | `false` | A read of a topic of an owner the town lists in `messaging.legacyFrom`, a route you are moving off. Drawn with an amber pennant. |
 
 ### scheduler (pillar)
 A function's jobs are found in its logs, and nothing in the logs says which service a job starts work for, so the pillar file says it. A job that is not listed sends no boats, and the town shows a "Job not mapped" notice naming it. A job's boats sail from the function's island to the services' islands; for the services of the same pillar that is a short out-and-back lane from the harbour.

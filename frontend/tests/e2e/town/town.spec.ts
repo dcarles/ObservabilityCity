@@ -15,7 +15,7 @@ test('the sample town renders, calm and on a bad day', async ({ town, page }, in
   // the two islands that show the link rule: a worker-only domain with a pier and no bridge, a domain with no messaging that has a bridge and no pier
   expect(await town.island('rcn')).toMatchObject({ bridge: false, pier: true, lane: true })
   expect(await town.island('reg')).toMatchObject({ bridge: true, pier: false, lane: false })
-  expect(await town.hub()).toMatchObject({ piers: 16, legacy: 1 })
+  expect(await town.hub()).toMatchObject({ piers: 16 })
 
   const cost = await frameCost(page)
   note(info, 'draw calls', String(cost.calls))
