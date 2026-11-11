@@ -125,6 +125,38 @@ public class AdapterKitTests
         Assert.Contains(problems, p => p.Contains("two factories") && p.Contains("'twice'"));
     }
 
+    private sealed class Fragment(string? schema) : ISourceSettingsReader
+    {
+        public SourceSettingsResult Read(SourceSettingsContext context) => new(null, []);
+        public string? Schema => schema;
+    }
+
+    [Fact]
+    public void A_settings_schema_that_cannot_be_merged_or_that_describes_the_cores_keys_is_refused()
+    {
+        Module With(string? schema) => new("with-settings", r => r.AddSourceKind(new SourceKindInfo("store") { Settings = new Fragment(schema) }));
+
+        Assert.Empty(AdapterContract.CheckModule(With(null)));
+        Assert.Empty(AdapterContract.CheckModule(With("""{ "properties": { "queries": { "type": "object" } } }""")));
+        Assert.Contains(AdapterContract.CheckModule(With("not json")), p => p.Contains("is not a JSON object"));
+        Assert.Contains(AdapterContract.CheckModule(With("""{ "properties": [] }""")), p => p.Contains("'properties' that is not an object"));
+        Assert.Contains(AdapterContract.CheckModule(With("""{ "properties": { "pollSeconds": {} } }""")), p => p.Contains("'pollSeconds', which is the core's key"));
+        AdapterContract.AssertModule(new AzureAdapters()); // the Azure adapter's own fragment passes
+    }
+
+    [Fact]
+    public void The_kit_says_which_settings_a_module_declares_for_a_kind_and_reads_a_block_with_them()
+    {
+        Assert.Same(AzureSourceSettings.Reader, AdapterContract.SettingsOf(new AzureAdapters(), "servicebus"));
+        Assert.Null(AdapterContract.SettingsOf(new AzureAdapters(), "nobody-knows-this"));
+
+        var read = AdapterContract.ReadSettings(new AzureAdapters(), "resourcehealth", "kind: resourcehealth\nproviders: [documentdb]\n");
+        Assert.Equal(2, read.Findings.Single().Line);
+        Assert.Equal("providers[0]", read.Findings.Single().Key);
+        Assert.Equal(["documentdb"], ((AzureSettings)read.Settings!).Providers);
+        Assert.Throws<ArgumentException>(() => AdapterContract.ReadSettings(new AzureAdapters(), "nobody-knows-this", "kind: x"));
+    }
+
     [Fact]
     public void A_module_that_adds_nothing_or_throws_when_registering_is_refused()
     {

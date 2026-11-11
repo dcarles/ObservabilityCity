@@ -4,7 +4,7 @@ Every key you can write in a town folder, file by file. For the order to do thin
 
 Your editor can check most of this as you type: each sample file starts with a `# yaml-language-server: $schema=` line that points at the files in `schema/`. `dotnet run --project backend/tools/ObservabilityCity.Validate -- <folder>` checks the whole folder, including the rules an editor cannot see.
 
-**Required** means the file is rejected without the key. **Optional** keys can be left out; the default says what happens then. Keys are written in camelCase. A key the loader does not know is an error, so a typo never passes silently.
+**Required** means the file is rejected without the key. **Optional** keys can be left out; the default says what happens then. Keys are written in camelCase. A key the loader does not know is an error, so a typo never passes silently. The keys of a source block beyond the core's belong to the adapter of the source's kind, which checks them the same way (see [sources](#sources)).
 
 A town folder looks like this:
 
@@ -283,27 +283,36 @@ One file per environment. The pillar and system files are shared; this file says
 | `undeclaredTenants` | no | none | Tenants the fake source finds that the list does not name. |
 
 ### sources
-Keys marked **Azure adapter setting** belong to the Azure adapter. The core registry holds and checks them for now, so another adapter cannot add keys of its own yet.
+A source block has two kinds of key. The keys in this table are the core's and mean the same for every kind. Every other key belongs to the adapter of the source's kind: that adapter checks it and says what it means (for the Azure adapter, see [Azure adapter settings](#azure-adapter-settings)). A key no adapter of that kind knows is an error. A source whose kind has no adapter loaded is reported once by `validate` and its other keys are not checked, since nothing loaded knows them.
+
+`query` and `window` are core keys because any adapter that sends a query can use them in the same way: the core fills the same template holes and reads the same time span. What the query must return is the adapter's to say.
 
 <!-- file: SourceFile -->
 | Key | Required | Default | Meaning |
 |---|---|---|---|
-| `regionQuery` | no | none | **Azure adapter setting.** `loganalytics`: the query that says how a service's requests divide between regions: one row per telemetry name and region with the columns `role`, `region` and `calls`. Sampled counts are fine, only the proportions are used. Same template holes as `query`. With it each region shows its share of the requests. |
-| `typesQuery` | no | none | **Azure adapter setting.** `servicebus`: a Log Analytics query that says which kinds of message each queue handled: one row per queue and message type with the columns `queue` (the entity's name, as the broker names it), `type` and `calls` (how many were handled over the window). Same template holes as `query`. With it each queue row of a reading system's drawer lists the kinds with their messages a second, highest first, up to 200 kinds per queue; the quietest beyond that are counted, not listed. The source needs the workspace the environment's scope gives (`scope.workspaceId`). Without it no kinds are shown. |
-| `kind` | yes | | `fake`, `resourcegraph`, `loganalytics`, `azuremonitor`, `functionjobs`, `servicebus`, `resourcehealth`, `prometheus` or `grafana-irm`. |
+| `kind` | yes | | The kind of source. The core has `fake`, `prometheus` and `grafana-irm`; each adapter loaded adds its own (the Azure adapter: `resourcegraph`, `loganalytics`, `azuremonitor`, `functionjobs`, `servicebus`, `resourcehealth`). |
 | `connection` | no | from `scope` | How to reach it (a workspace id, an endpoint). Not used by `fake`. |
-| `credential` | no | `default` if defined, else the adapter's usual login (Azure: the Azure CLI login) | A name from `credentials`. Azure adapter sources only. |
-| `pollSeconds` | no | 30 (300 for `resourcehealth`) | How often the source is asked. Above 0. |
+| `credential` | no | `default` if defined, else the adapter's usual login (Azure: the Azure CLI login) | A name from `credentials`. Only for a kind that signs in. |
+| `pollSeconds` | no | 30 (the adapter may use another; 300 for `resourcehealth`) | How often the source is asked. Above 0. |
 | `timeoutSeconds` | no | 10 (60 for `resourcehealth`) | How long one ask may take. Above 0. |
-| `lateAfterSeconds` | no | twice `pollSeconds` | `functionjobs`: how long after its schedule says a job should run it may go without a newer run before it counts as late (amber). A value below the default is ignored, since a reading may lag that much anyway. Lets a log that arrives late stay quiet without polling slower. Above 0. |
-| `query` | for `functionjobs` (unless a recording) | none | `loganalytics`: the query to send, a template; `functionjobs`: the query that summarises the function apps' logs into one row per app and job (columns `resourceId`, `job`, `lastRun`, `succeeded`, `next`, `region`). `{window}`, `{windowSeconds}`, `{roles}`, scope variables and `{environment}` work. |
-| `window` | no | `5m` (`3d` for `resourcehealth`) | `loganalytics`, `azuremonitor`, `servicebus`, `functionjobs` and `resourcehealth`: how far back one answer looks. A unit is `s`, `m`, `h` or `d`. |
-| `metrics` | no | none | **Azure adapter setting.** `azuremonitor`: which metric of which resources fills which signal. Required for an `azuremonitor` source. |
-| `providers` | no | none | **Azure adapter setting.** `resourcehealth`: the resource providers whose health reports are read, as the cloud names them (`Namespace.Service`, for example the data store's). Required for a `resourcehealth` source. A subscription is asked for a provider only when the inventory has a resource of that provider in it. A resource's report is matched to the system that owns it by the resource's id, through `scope.resources`. |
-| `keepResolvedFor` | no | `4h` | `resourcehealth`: how long a report stays listed, in green, after the resource recovered (a number and a unit: `4h`, `90m`, `1d`). The marker on the building goes away at once; the list entry and the drawer lines say resolved. A report can be dismissed earlier (the Dismiss button); a dismissal lasts until the server restarts. |
-| `entities` | no | none | **Azure adapter setting.** `servicebus`: which namespaces to read, which metrics are the backlog and the dead letters, and how an entity's name says whose it is. Required for a `servicebus` source. |
+| `lateAfterSeconds` | no | twice `pollSeconds` | A job source (`functionjobs`): how long after its schedule says a job should run it may go without a newer run before it counts as late (amber). A value below the default is ignored, since a reading may lag that much anyway. Lets a log that arrives late stay quiet without polling slower. Above 0. |
+| `query` | for `functionjobs` (unless a recording) | none | A source that sends a query: the query, a template. `{window}`, `{windowSeconds}`, `{roles}`, scope variables and `{environment}` work. For the Azure adapter, `loganalytics` sends it to the workspace, and `functionjobs` summarises the function apps' logs into one row per app and job (columns `resourceId`, `job`, `lastRun`, `succeeded`, `next`, `region`). |
+| `window` | no | `5m` (`3d` for `resourcehealth`) | How far back one answer looks. A unit is `s`, `m`, `h` or `d`. The Azure adapter's `loganalytics`, `azuremonitor`, `servicebus`, `functionjobs` and `resourcehealth` all read it. |
 
-### metrics entries (`azuremonitor`, Azure adapter)
+### Azure adapter settings
+These keys of a source block belong to the Azure adapter, which checks them (`validate`, and the server when it loads a town) and reads them. Every Azure kind takes the same keys; each reads the ones it uses. Without the Azure adapter loaded they are not checked.
+
+<!-- file: AzureSourceFile -->
+| Key | Required | Default | Meaning |
+|---|---|---|---|
+| `regionQuery` | no | none | `loganalytics`: the query that says how a service's requests divide between regions: one row per telemetry name and region with the columns `role`, `region` and `calls`. Sampled counts are fine, only the proportions are used. Same template holes as `query`. With it each region shows its share of the requests. |
+| `typesQuery` | no | none | `servicebus`: a Log Analytics query that says which kinds of message each queue handled: one row per queue and message type with the columns `queue` (the entity's name, as the broker names it), `type` and `calls` (how many were handled over the window). Same template holes as `query`. With it each queue row of a reading system's drawer lists the kinds with their messages a second, highest first, up to 200 kinds per queue; the quietest beyond that are counted, not listed. The source needs the workspace the environment's scope gives (`scope.workspaceId`). Without it no kinds are shown. |
+| `metrics` | no | none | `azuremonitor`: which metric of which resources fills which signal (see below). Required for an `azuremonitor` source. |
+| `providers` | no | none | `resourcehealth`: the resource providers whose health reports are read, as the cloud names them (`Namespace.Service`, for example the data store's). Required for a `resourcehealth` source. A subscription is asked for a provider only when the inventory has a resource of that provider in it. A resource's report is matched to the system that owns it by the resource's id, through `scope.resources`. |
+| `keepResolvedFor` | no | `4h` | `resourcehealth`: how long a report stays listed, in green, after the resource recovered (a number and a unit: `4h`, `90m`, `1d`). The marker on the building goes away at once; the list entry and the drawer lines say resolved. A report can be dismissed earlier (the Dismiss button); a dismissal lasts until the server restarts. |
+| `entities` | no | none | `servicebus`: which namespaces to read, which metrics are the backlog and the dead letters, and how an entity's name says whose it is (see below). Required for a `servicebus` source. |
+
+#### metrics entries (`azuremonitor`)
 <!-- file: MetricGroupFile -->
 | Key | Required | Default | Meaning |
 |---|---|---|---|
@@ -332,7 +341,7 @@ An entry needs at least one signal other than `limit`.
 | `orElse` | no | none | Another metric to read when this one gives no number or 0. It cannot have its own `over` or `orElse`. |
 | `whenEmpty` | no | `unknown` | What a read that worked but returned no number means: `unknown` (the system shows no data) or `idle` (nothing happened, so the signal is 0 and the tenant's row says "no activity reported"). A failed read is always unknown. Only on the signal itself, not on its `over` or `orElse`. |
 
-Azure adapter example (a Cosmos DB account with an autoscale ceiling, falling back to fixed throughput):
+Example (a Cosmos DB account with an autoscale ceiling, falling back to fixed throughput):
 
 ```yaml
 sources:
@@ -350,7 +359,7 @@ sources:
           orElse: { metric: ProvisionedThroughput, aggregation: maximum }
 ```
 
-### entities (`servicebus`, Azure adapter)
+#### entities (`servicebus`)
 Reads the backlog and the dead letters of a message broker from the platform metrics of its namespaces, split by entity (queue or topic) name, and gives each entity's numbers to the system that consumes it. The program knows no metric name and no naming convention: this block says them. A system's backlog is what waits in all its entities, in every namespace the rule finds (one for each region); a namespace that cannot be read fails the poll, so a number made from only some of them never shows. An entity no pattern claims, or that no system consumes, is left out.
 
 ```yaml

@@ -32,7 +32,7 @@ public static partial class RegistryValidator
         Registry registry;
         try
         {
-            registry = RegistryLoader.LoadResilient(folder);
+            registry = RegistryLoader.LoadResilient(folder, adapters); // each adapter checks the settings of its own kinds' sources
         }
         catch (RegistryException e)
         {
@@ -181,6 +181,7 @@ public static partial class RegistryValidator
                 file = m.Groups[1].Value;
                 file = TopLevel.Contains(file) || file.StartsWith("environments/") ? file : PillarFile(Path.GetFileNameWithoutExtension(file));
                 if (m.Groups[2].Success) line = int.Parse(m.Groups[2].Value);
+                else if (registry?.ProblemLines.TryGetValue(message, out var known) == true) line = known; // an adapter placed it
                 if (message.Contains("external caller") && Quoted.Matches(message) is { Count: > 1 } q)
                     line = Raw(file).FindScalar(q[1].Groups[1].Value);
             }

@@ -11,12 +11,20 @@ using Microsoft.AspNetCore.SignalR;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// The adapters this build has: every module found in adapters/ beside the program (Adapters:Path moves the folder). A live environment starts
+// one source for each source its file defines. The host knows no platform by name; no module for it means its kinds are unknown. They are loaded
+// before the towns, because each module reads and checks the settings of its own kinds' sources.
+var adapterFolder = builder.Configuration["Adapters:Path"] ?? Path.Combine(AppContext.BaseDirectory, "adapters");
+var plugins = AdapterLoader.LoadFrom(adapterFolder);
+foreach (var problem in plugins.Problems) Console.Error.WriteLine(problem);
+var sourceCatalog = new AdapterCatalog(plugins.Modules);
+
 // A town whose files every other file depends on being sound stops the server, as before; an extra town that is broken is left out and reported.
 var townFolders = RegistryPath.ResolveAll(builder.Configuration);
 var loaded = new List<(string Folder, Registry Registry)>();
 foreach (var folder in townFolders)
 {
-    try { loaded.Add((folder, RegistryLoader.LoadResilient(folder))); }
+    try { loaded.Add((folder, RegistryLoader.LoadResilient(folder, sourceCatalog))); }
     catch (Exception e) when (loaded.Count > 0)
     {
         Console.Error.WriteLine($"Town {folder} left out: {e.Message.ReplaceLineEndings(" ")}");
@@ -30,7 +38,7 @@ if (args.Contains("--write-schema"))
 {
     foreach (var (folder, registry) in loaded)
     {
-        RegistrySchema.Write(registry, folder);
+        RegistrySchema.Write(registry, folder, sourceCatalog);
         Console.WriteLine($"Schemas written to {Path.Combine(folder, RegistrySchema.FolderName)}");
     }
     return;
@@ -42,12 +50,6 @@ var snapshotInterval = TimeSpan.FromSeconds(builder.Configuration.GetValue("Snap
 var keepAliveSeconds = builder.Configuration.GetValue("Snapshot:KeepAliveSeconds", 15.0);
 var staleAfter = TimeSpan.FromSeconds(builder.Configuration.GetValue("Snapshot:StaleAfterSeconds", 30.0));
 
-// The adapters this build has: every module found in adapters/ beside the program (Adapters:Path moves the folder). A live environment starts
-// one source for each source its file defines. The host knows no platform by name; no module for it means its kinds are unknown.
-var adapterFolder = builder.Configuration["Adapters:Path"] ?? Path.Combine(AppContext.BaseDirectory, "adapters");
-var plugins = AdapterLoader.LoadFrom(adapterFolder);
-foreach (var problem in plugins.Problems) Console.Error.WriteLine(problem);
-var sourceCatalog = new AdapterCatalog(plugins.Modules);
 Console.WriteLine($"Adapters: {string.Join(", ", sourceCatalog.Modules)}");
 foreach (var (_, registry) in loaded)
     foreach (var environment in registry.Environments)
@@ -66,7 +68,7 @@ foreach (var (folder, registry) in loaded)
         Console.Error.WriteLine($"Town {folder} left out: another town already has the id '{registry.Town.Id}'.");
         continue;
     }
-    var registries = new RegistryHolder(registry);
+    var registries = new RegistryHolder(registry, sourceCatalog);
     // A demo town runs on the fake source and can be steered (Break things, stories). A live town has no fake source at all and no /api/fake.
     // The mode is read once, when the server starts: change town.yaml and restart to switch.
     var demo = registry.Town.IsDemo;

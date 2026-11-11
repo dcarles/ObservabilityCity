@@ -339,6 +339,7 @@ public sealed class LogAnalyticsSource(
     public TimeSpan PollInterval => definition.PollInterval;
     public TimeSpan Timeout => definition.Timeout;
     public TimeSpan Window { get; } = SourceQuery.WindowOf(definition);
+    private readonly AzureSettings _settings = AzureSettings.Of(definition);
 
     public async Task<IReadOnlyDictionary<string, NodeReading>> PollAsync(TownRegistry registry, CancellationToken ct)
     {
@@ -362,9 +363,9 @@ public sealed class LogAnalyticsSource(
         if (recording is not null)
         {
             var sibling = Path.ChangeExtension(recording, ".regions.json");
-            if (definition.RegionQuery is not null && File.Exists(sibling)) regionRows = LogAnalyticsReader.ParseRegions(await File.ReadAllTextAsync(sibling, ct));
+            if (_settings.RegionQuery is not null && File.Exists(sibling)) regionRows = LogAnalyticsReader.ParseRegions(await File.ReadAllTextAsync(sibling, ct));
         }
-        else if (definition.RegionQuery is { } regionQuery)
+        else if (_settings.RegionQuery is { } regionQuery)
             regionRows = await reader.QueryRegionsAsync(Workspace(resolution), SourceQuery.Render(regionQuery, definition, environmentId, rules, asked.Select(s => s.TelemetryRole!).Distinct(StringComparer.OrdinalIgnoreCase)), Window, ct);
         return Readings(asked, rows, Window, time.GetUtcNow(), regionRows);
     }

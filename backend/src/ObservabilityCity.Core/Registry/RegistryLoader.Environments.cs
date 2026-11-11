@@ -13,7 +13,7 @@ public static partial class RegistryLoader
     /// Reads environments/*.yaml. The file name is the environment's id. A file with problems is reported (an error in a strict load) and, in a
     /// resilient load, left out, so the other environments still run. A town without the folder has no environments.
     /// </summary>
-    private static List<RegistryEnvironment> LoadEnvironments(string folder, HashSet<string> ids, Dictionary<string, string> aliases, bool resilient, Action<string> problem)
+    private static List<RegistryEnvironment> LoadEnvironments(string folder, HashSet<string> ids, Dictionary<string, string> aliases, bool resilient, Action<string> problem, ISourceKindCatalog kinds, Dictionary<string, int> lines)
     {
         var dir = Path.Combine(folder, "environments");
         var result = new List<RegistryEnvironment>();
@@ -27,7 +27,12 @@ public static partial class RegistryLoader
             EnvironmentFile? f = null;
             try { f = Read<EnvironmentFile>(file, name); }
             catch (RegistryException e) { own.Add(e.Message); }
-            if (f is not null) CheckEnvironment(f, stem, name, ids, aliases, own);
+            var typed = new Dictionary<string, object?>();
+            if (f is not null)
+            {
+                CheckEnvironment(f, stem, name, ids, aliases, own);
+                ReadSettings(f, stem, name, kinds, own, lines, typed);
+            }
             if (own.Count > 0)
             {
                 foreach (var message in own) problem(message);
@@ -37,7 +42,7 @@ public static partial class RegistryLoader
             parsed.Add((new RegistryEnvironment(
                 stem, f.Name ?? stem, f.Default,
                 f.Sources.Select(kv => new RegistrySource(kv.Key, kv.Value.Kind.ToLowerInvariant(), kv.Value.Connection)
-                    { Credential = kv.Value.Credential, PollSeconds = kv.Value.PollSeconds, TimeoutSeconds = kv.Value.TimeoutSeconds, LateAfterSeconds = kv.Value.LateAfterSeconds, Query = kv.Value.Query, RegionQuery = kv.Value.RegionQuery, TypesQuery = kv.Value.TypesQuery, Window = kv.Value.Window, Metrics = ToMetrics(kv.Value.Metrics), Entities = ToEntities(kv.Value.Entities), Providers = kv.Value.Providers.Select(p => p.Trim()).ToList(), KeepResolvedFor = kv.Value.KeepResolvedFor }).ToList(),
+                    { Credential = kv.Value.Credential, PollSeconds = kv.Value.PollSeconds, TimeoutSeconds = kv.Value.TimeoutSeconds, LateAfterSeconds = kv.Value.LateAfterSeconds, Query = kv.Value.Query, Window = kv.Value.Window, Settings = kv.Value.Settings, Typed = typed.GetValueOrDefault(kv.Key) }).ToList(),
                 f.Tenants.Select(t => new RegistryTenant(t.Id, t.Name ?? t.Id, t.Kind.Equals("test", StringComparison.OrdinalIgnoreCase) ? TenantKind.Test : TenantKind.Customer)).ToList(),
                 excluded, f.Fake?.UndeclaredTenants ?? [])
             {
@@ -163,6 +168,43 @@ public static partial class RegistryLoader
         catch (ArgumentException e) { problem = $"is not a valid regular expression ({e.Message})"; return false; }
     }
 
+    /// <summary>
+    /// Hands each source's own keys to the module of its kind, which checks them and makes the settings its source reads. A kind no loaded module knows
+    /// is left alone: the <see cref="AdapterCatalog"/> names the kind, and nothing is guessed about its settings. A kind whose module reads no settings
+    /// takes none: any key beyond the core's is unknown, as in every other registry file.
+    /// </summary>
+    private static void ReadSettings(EnvironmentFile f, string stem, string name, ISourceKindCatalog kinds, List<string> errors, Dictionary<string, int> lines, Dictionary<string, object?> typed)
+    {
+        ScopeRules? scope = null;
+        foreach (var (source, def) in f.Sources)
+        {
+            var kind = def.Kind.ToLowerInvariant();
+            if (!kinds.Knows(kind)) continue;
+            if (kinds.SettingsOf(kind) is not { } reader)
+            {
+                foreach (var key in def.Settings.Keys)
+                    errors.Add($"{name} (line {def.Settings.LineOf(key)}): unknown key '{key}'.{DidYouMean.Hint(key, SourceKeys)}");
+                continue;
+            }
+            SourceSettingsResult result;
+            try { result = reader.Read(new SourceSettingsContext(stem, source, kind, def.Settings, scope ??= ToScope(f.Scope))); }
+            catch (Exception e) when (e is not OutOfMemoryException)
+            {
+                // a mistake in a module must not take the environment's other sources down with it; it is named like any other problem
+                errors.Add($"{name}: source '{source}' has settings its adapter could not read: {e.Message}");
+                continue;
+            }
+            foreach (var finding in result.Findings)
+            {
+                if (finding.LineInMessage) { errors.Add($"{name} (line {finding.Line}): {finding.Message}"); continue; }
+                var message = $"{name}: {finding.Message}";
+                errors.Add(message);
+                lines.TryAdd(message, finding.Line);
+            }
+            typed[source] = result.Settings;
+        }
+    }
+
     private static void CheckEnvironment(EnvironmentFile f, string stem, string name, HashSet<string> ids, Dictionary<string, string> aliases, List<string> errors)
     {
         if (!KebabId.IsMatch(stem)) errors.Add($"{name}: the file name '{stem}' is the environment's id and must be lowercase kebab-case");
@@ -176,13 +218,6 @@ public static partial class RegistryLoader
             if (def.TimeoutSeconds is <= 0) errors.Add($"{name}: source '{source}' has timeoutSeconds {def.TimeoutSeconds}; it must be above 0");
             if (def.LateAfterSeconds is <= 0) errors.Add($"{name}: source '{source}' has lateAfterSeconds {def.LateAfterSeconds}; it must be above 0");
             CheckQuery(f, def, source, name, errors);
-            CheckMetrics(f, def, source, name, errors);
-            CheckEntities(f, def, source, name, errors);
-            foreach (var provider in def.Providers)
-                if (!System.Text.RegularExpressions.Regex.IsMatch(provider.Trim(), @"^[A-Za-z0-9]+(\.[A-Za-z0-9]+)+$"))
-                    errors.Add($"{name}: source '{source}' has the provider '{provider}'. Write a resource provider the way the cloud names it, for example Namespace.Service");
-            if (def.KeepResolvedFor is { } keep && !SourceQuery.TryParseWindow(keep, out _))
-                errors.Add($"{name}: source '{source}' has keepResolvedFor '{keep}', which is not a number and a unit like 4h or 90m");
             if (def.Credential is not null && !f.Credentials.ContainsKey(def.Credential))
                 errors.Add($"{name}: source '{source}' uses credential '{def.Credential}', which this file does not define.{DidYouMean.Hint(def.Credential, f.Credentials.Keys)}");
         }

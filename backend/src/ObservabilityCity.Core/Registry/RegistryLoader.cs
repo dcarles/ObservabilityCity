@@ -22,6 +22,15 @@ public static partial class RegistryLoader
         .WithNamingConvention(CamelCaseNamingConvention.Instance)
         .Build();
 
+    /// <summary>The reader every registry file is read with, for a module's settings too (see <see cref="SourceSettings.TryBind"/>).</summary>
+    internal static IDeserializer Strict => Yaml;
+
+    /// <summary>The key a "property not found" message is about, or null for any other message.</summary>
+    internal static string? UnknownKeyOf(string message) => UnknownKey.Match(message) is { Success: true } m ? m.Groups[1].Value : null;
+
+    /// <summary>The keys of a source that the core reads itself. Every other key belongs to the module of the source's kind.</summary>
+    public static IReadOnlyCollection<string> SourceKeys => SourceFile.KeyNames;
+
     private static readonly string[] Roles = ["api", "worker", "db", "cache", "function", "cron", "gateway", "broker", "egress"];
 
     // Every key a registry file may use, for suggesting the right one when a key is misspelt.
@@ -31,7 +40,7 @@ public static partial class RegistryLoader
         "externalCallers", "islands", "role", "service", "slaP99Ms", "errors", "resources", "throttle", "backlog", "calls", "aliases",
         "amber", "red", "vendors", "calledBy", "gatewayCalls", "messaging", "topics", "subscriptions", "topic", "consumer", "legacy",
         "tenantPattern", "order", "default", "sources", "kind", "connection", "tenants", "exclude", "environments", "fake", "undeclaredTenants",
-        "signals", "credentials", "credential", "providers", "keepResolvedFor", "pollSeconds", "timeoutSeconds", "lateAfterSeconds", "tenantId", "clientId", "clientSecretEnv",
+        "signals", "credentials", "credential", "pollSeconds", "timeoutSeconds", "lateAfterSeconds", "tenantId", "clientId", "clientSecretEnv",
         "scope", "inventory", "workspace", "variables", "subscription", "pillars", "types", "pattern", "roles", "serviceTag", "tenantNameTag",
         "telemetryRole", "queries", "links", "url", "nameLike", "tag", "key", "value", "code", "serviceCode", "telemetry", "minCalls", "query", "window", "discoverLinks", "regions", "tag", "names", "skew", "state", "running", "minDays", "keepFor", "firstRead", "interval", "ignoreHosts", "rules", "host", "path", "target", "gateway", "domains", "services", "internal", "match", "traffic", "shareWindow", "logs", "section", "resources",
     ];
@@ -47,8 +56,12 @@ public static partial class RegistryLoader
         MinCalls = 1,
     };
 
-    /// <summary>Strict load: any problem in any file fails the whole load, with every problem listed. This is what CI and the validator use.</summary>
-    public static Registry Load(string folder) => Build(folder, resilient: false);
+    /// <summary>
+    /// Strict load: any problem in any file fails the whole load, with every problem listed. This is what CI and the validator use.
+    /// <paramref name="kinds"/> are the source kinds of the loaded adapter modules, which read and check their sources' own settings; without them only the
+    /// core's kinds are known, and the settings of any other kind are kept unread.
+    /// </summary>
+    public static Registry Load(string folder, ISourceKindCatalog? kinds = null) => Build(folder, resilient: false, kinds ?? CoreOnly);
 
     /// <summary>
     /// Resilient load, for a running app. A pillar file that cannot be read, or has problems of its own, is skipped and its island
@@ -56,9 +69,11 @@ public static partial class RegistryLoader
     /// Everything worked around is listed in Registry.Notices. The files every pillar depends on (town, defaults, hub, third parties)
     /// still have to be sound: when they are not this throws, and the caller keeps the registry it already has.
     /// </summary>
-    public static Registry LoadResilient(string folder) => Build(folder, resilient: true);
+    public static Registry LoadResilient(string folder, ISourceKindCatalog? kinds = null) => Build(folder, resilient: true, kinds ?? CoreOnly);
 
-    private static Registry Build(string folder, bool resilient)
+    private static readonly AdapterCatalog CoreOnly = new([]);
+
+    private static Registry Build(string folder, bool resilient, ISourceKindCatalog kinds)
     {
         if (!Directory.Exists(folder))
             throw new RegistryException($"Registry folder not found: {folder}");
@@ -287,7 +302,8 @@ public static partial class RegistryLoader
         }
 
         var (topics, subscriptions) = ResolveMessaging(groups, brokenPillars, resilient, Problem, convention);
-        var environments = LoadEnvironments(folder, ids, aliases, resilient, Problem);
+        var lines = new Dictionary<string, int>(StringComparer.Ordinal);
+        var environments = LoadEnvironments(folder, ids, aliases, resilient, Problem, kinds, lines);
         // a system that names the environments it is deployed in must name environments the town has
         if (environments.Count > 0)
         {
@@ -326,7 +342,7 @@ public static partial class RegistryLoader
         var final = groups.Select(g => g with { Nodes = g.Nodes.Select(n => n with { Calls = resolved[n.Id], GatewayCalls = resolvedGateway[n.Id] }).ToList() }).ToList();
         var registry = new Registry(new TownInfo(town.Id, town.Name, town.GroupLabel, town.Topology, town.Mode, town.TrafficDensity, convention, town.Labels.InternalVendors, wall is { HoldSeconds: null, OverviewSeconds: null, OverviewIslandSeconds: null, Light: null } ? null : new WallSettings(wall.HoldSeconds, wall.OverviewSeconds, wall.OverviewIslandSeconds, wall.Light)), final, callers)
         {
-            Notices = notices, Problems = problems, Vendors = vendors, RingCapacity = ringCapacity, Topics = topics, Subscriptions = subscriptions, Environments = environments, DatabaseEngines = engines.Values.ToList(),
+            Notices = notices, Problems = problems, ProblemLines = lines, Vendors = vendors, RingCapacity = ringCapacity, Topics = topics, Subscriptions = subscriptions, Environments = environments, DatabaseEngines = engines.Values.ToList(),
         };
         return registry with { Warnings = TownLinks.Warnings(registry).ToList() };
     }

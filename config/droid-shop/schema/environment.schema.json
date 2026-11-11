@@ -7,40 +7,149 @@
   "$defs": {
     "fallbackMetric": {
       "type": "object",
-      "required": ["metric"],
+      "required": [
+        "metric"
+      ],
       "additionalProperties": false,
       "description": "Another metric to read in place of the one it belongs to, when that gives no number or 0 (the autoscale ceiling, then the fixed throughput of an account without autoscale). It has no over or orElse of its own.",
       "properties": {
-        "metric": { "type": "string" },
-        "aggregation": { "enum": ["average", "total", "count", "maximum", "minimum"] },
-        "filter": { "type": "string" }
+        "metric": {
+          "type": "string"
+        },
+        "aggregation": {
+          "enum": [
+            "average",
+            "total",
+            "count",
+            "maximum",
+            "minimum"
+          ]
+        },
+        "filter": {
+          "type": "string"
+        }
       }
     },
     "metricSignal": {
       "type": "object",
-      "required": ["metric"],
+      "required": [
+        "metric"
+      ],
       "additionalProperties": false,
       "description": "Where one signal's number comes from. The town reads fractions (0.42 is 42%) and rates per second.",
       "properties": {
-        "metric": { "type": "string", "description": "The metric's name as the cloud spells it." },
-        "aggregation": { "enum": ["average", "total", "count", "maximum", "minimum"], "description": "How the points of the window are added up. Default average." },
-        "filter": { "type": "string", "description": "A dimension filter, for example StatusCode eq '429'." },
-        "scale": { "type": "number", "exclusiveMinimum": 0, "description": "Multiplies the value. A percentage has scale 0.01. Default 1." },
-        "perSecond": { "type": "boolean", "description": "Divide by the seconds of the window, to turn a total into a rate." },
+        "metric": {
+          "type": "string",
+          "description": "The metric's name as the cloud spells it."
+        },
+        "aggregation": {
+          "enum": [
+            "average",
+            "total",
+            "count",
+            "maximum",
+            "minimum"
+          ],
+          "description": "How the points of the window are added up. Default average."
+        },
+        "filter": {
+          "type": "string",
+          "description": "A dimension filter, for example StatusCode eq '429'."
+        },
+        "scale": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Multiplies the value. A percentage has scale 0.01. Default 1."
+        },
+        "perSecond": {
+          "type": "boolean",
+          "description": "Divide by the seconds of the window, to turn a total into a rate."
+        },
         "over": {
           "type": "object",
-          "required": ["metric"],
+          "required": [
+            "metric"
+          ],
           "additionalProperties": false,
           "description": "Another metric the value is divided by (provisioned capacity, all requests), which gives a share. It may have an orElse of its own.",
           "properties": {
-            "metric": { "type": "string" },
-            "aggregation": { "enum": ["average", "total", "count", "maximum", "minimum"] },
-            "filter": { "type": "string" },
-            "orElse": { "$ref": "#/$defs/fallbackMetric" }
+            "metric": {
+              "type": "string"
+            },
+            "aggregation": {
+              "enum": [
+                "average",
+                "total",
+                "count",
+                "maximum",
+                "minimum"
+              ]
+            },
+            "filter": {
+              "type": "string"
+            },
+            "orElse": {
+              "$ref": "#/$defs/fallbackMetric"
+            }
           }
         },
-        "orElse": { "$ref": "#/$defs/fallbackMetric" },
-        "whenEmpty": { "enum": ["unknown", "idle"], "description": "What a read that worked but returned no number means. unknown (default): the system shows no data. idle: nothing happened, so the signal is 0 and the tenant's row says no activity reported. A failed read is always unknown." }
+        "orElse": {
+          "$ref": "#/$defs/fallbackMetric"
+        },
+        "whenEmpty": {
+          "enum": [
+            "unknown",
+            "idle"
+          ],
+          "description": "What a read that worked but returned no number means. unknown (default): the system shows no data. idle: nothing happened, so the signal is 0 and the tenant's row says no activity reported. A failed read is always unknown."
+        }
+      }
+    },
+    "entityMetric": {
+      "type": "object",
+      "required": [
+        "metric"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "metric": {
+          "type": "string",
+          "description": "The metric's name as the cloud spells it."
+        },
+        "aggregation": {
+          "enum": [
+            "average",
+            "total",
+            "count",
+            "maximum",
+            "minimum",
+            "last"
+          ],
+          "description": "How the points of the window are added up. Default average. last (backlog and deadLetter only) is the newest point: what is there now."
+        }
+      }
+    },
+    "entityLink": {
+      "type": "object",
+      "required": [
+        "name",
+        "url"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The words the link shows."
+        },
+        "url": {
+          "type": "string",
+          "pattern": "^https?://",
+          "description": "A template that starts with https:// (or http://). Holes: {pillar}, {service}, {system}, {environment} and {queue}."
+        },
+        "region": {
+          "type": "string",
+          "description": "deadLetterLinks only: the region the address is for, matched ignoring case."
+        }
       }
     }
   },
@@ -55,42 +164,263 @@
       "additionalProperties": {
         "type": "object",
         "required": ["kind"],
-        "additionalProperties": false,
+        "description": "The keys below are the core's. Every other key belongs to the adapter of the source's kind, which checks it; `--write-schema` adds the keys of the adapters loaded, so an editor completes them too.",
         "properties": {
-          "kind": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$", "description": "The kind of source. Which kinds exist depends on the adapters loaded (the adapters folder beside the program): fake and prometheus are built in, and each adapter adds its own (the azure adapter adds the Azure ones). `validate` checks the kind against them. A kind accepted before the adapter that reads it exists shows no data." },
+          "kind": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$", "description": "The kind of source. Which kinds exist depends on the adapters loaded (the adapters folder beside the program): fake, prometheus and grafana-irm are built in, and each adapter adds its own (the azure adapter adds the Azure ones). `validate` checks the kind against them. A kind accepted before the adapter that reads it exists shows no data." },
           "connection": { "type": "string", "description": "How to reach it (a workspace, an endpoint). Not used by the fake source." },
           "credential": { "type": "string", "description": "Sources that sign in only: the login to use, by name from credentials. Without it, the one called default, else the adapter's usual login for that kind (for example the Azure CLI login for Azure sources)." },
           "pollSeconds": { "type": "number", "exclusiveMinimum": 0, "description": "How often the source is asked. Default 30." },
           "timeoutSeconds": { "type": "number", "exclusiveMinimum": 0, "description": "How long one ask may take before it is given up. Default 10." },
-          "lateAfterSeconds": { "type": "number", "exclusiveMinimum": 0, "description": "Job sources (functionjobs): how long after its schedule says a job should run it may go without a newer run before it counts as late (amber). Default twice pollSeconds. A value below that is ignored: a reading may lag that much anyway. Use it to stay quiet about a log that arrives late without polling slower." },
-          "query": { "type": "string", "description": "Sources that send a query (loganalytics): the query, a template. {window} and {windowSeconds} stand for the window, {roles} for the telemetry names of the systems asked about (double-quoted, comma separated); scope variables and {environment} work too. It returns one row per telemetry name with the columns role, calls, errors and latencyMs." },
-          "regionQuery": { "type": "string", "description": "Request sources (loganalytics): the query that says how each service's requests divide between regions, a template like query. It returns one row per telemetry name and region with the columns role, region and calls. Sampled counts are fine: only the proportions are used. Without it the split is not measured." },
-          "typesQuery": { "type": "string", "description": "Message-broker sources (for example servicebus): a query to the telemetry store that says which kinds of message each queue handled, a template like query. It returns one row per queue and message type with the columns queue, type and calls. Without it the kinds are not shown." },
-          "window": { "type": "string", "pattern": "^[0-9]+(\\.[0-9]+)?[smhd]$", "description": "Query sources: how far back one answer looks, a number and a unit (30s, 5m, 1h, 3d). Default 5m. A system with fewer calls than its minCalls in this window is quiet. Platform-metric sources (azuremonitor) look back this far too. Resource-health sources (resourcehealth) look back this far for the cloud's health events: default 3d, so a problem that lasts days is still listed." },
-          "providers": { "type": "array", "items": { "type": "string", "pattern": "^[A-Za-z0-9]+(\\.[A-Za-z0-9]+)+$" }, "description": "Resource-health sources (resourcehealth): the resource providers whose health reports are read, as the cloud names them (Namespace.Service). The program lists none; a source without any does not start. A resource's report is matched to the system that owns it by the resource's id, through scope.resources." },
-          "keepResolvedFor": { "type": "string", "pattern": "^[0-9]+(\\.[0-9]+)?[smhd]$", "description": "Resource-health sources (resourcehealth): how long a report stays listed, in green, after the resource recovered, a number and a unit (4h, 90m, 1d). Default 4h. A report can be dismissed earlier." },
-          "metrics": {
-            "type": "array",
-            "description": "Platform-metric sources (azuremonitor): which metric of which resources fills which signal. The program knows no metric name; everything is written here. Each entry takes the resources one rule of scope.resources finds for a system; a system's value is the worst (highest) over its resources.",
-            "items": {
-              "type": "object",
-              "required": ["resources"],
-              "additionalProperties": false,
+          "lateAfterSeconds": { "type": "number", "exclusiveMinimum": 0, "description": "Job sources: how long after its schedule says a job should run it may go without a newer run before it counts as late (amber). Default twice pollSeconds. A value below that is ignored: a reading may lag that much anyway. Use it to stay quiet about a log that arrives late without polling slower." },
+          "query": { "type": "string", "description": "Sources that send a query: the query, a template. {window} and {windowSeconds} stand for the window, {roles} for the telemetry names of the systems asked about (double-quoted, comma separated); scope variables and {environment} work too. What it must return is the adapter's to say." },
+          "window": { "type": "string", "pattern": "^[0-9]+(\\.[0-9]+)?[smhd]$", "description": "How far back one answer looks, a number and a unit (30s, 5m, 1h, 3d). Default 5m. A system with fewer calls than its minCalls in this window is quiet." }
+        },
+        "allOf": [
+          {
+            "if": {
               "properties": {
-                "resources": { "type": "string", "description": "The name of a scope.resources rule." },
-                "namespace": { "type": "string", "description": "The metric namespace, for a resource type that has more than one. Usually left out." },
-                "interval": { "enum": ["1m", "5m", "15m", "30m", "1h", "6h", "12h", "24h"], "description": "The time grain the metrics are asked at. Default 1m. Some metrics do not support a minute (for example Cosmos DB provisioned throughput needs 5m or more); then give the entry a longer interval and a window that holds a few points of it." },
-                "window": { "type": "string", "pattern": "^[0-9]+(\\.[0-9]+)?[smh]$", "description": "How far back this entry looks, a number and a unit (15m, 1h). Without it the source's window applies. It must hold at least two points of the entry's interval." },
-                "cpu": { "$ref": "#/$defs/metricSignal" },
-                "memory": { "$ref": "#/$defs/metricSignal" },
-                "utilisation": { "$ref": "#/$defs/metricSignal" },
-                "throttled": { "$ref": "#/$defs/metricSignal" },
-                "requests": { "$ref": "#/$defs/metricSignal" },
-                "limit": { "$ref": "#/$defs/metricSignal" }
-              }
+                "kind": {
+                  "enum": [
+                    "fake",
+                    "prometheus",
+                    "grafana-irm"
+                  ]
+                }
+              },
+              "required": [
+                "kind"
+              ]
+            },
+            "then": {
+              "properties": {
+                "kind": true,
+                "connection": true,
+                "credential": true,
+                "pollSeconds": true,
+                "timeoutSeconds": true,
+                "lateAfterSeconds": true,
+                "query": true,
+                "window": true
+              },
+              "additionalProperties": false
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "resourcegraph",
+                    "loganalytics",
+                    "azuremonitor",
+                    "servicebus",
+                    "functionjobs",
+                    "resourcehealth"
+                  ]
+                }
+              },
+              "required": [
+                "kind"
+              ]
+            },
+            "then": {
+              "properties": {
+                "kind": true,
+                "connection": true,
+                "credential": true,
+                "pollSeconds": true,
+                "timeoutSeconds": true,
+                "lateAfterSeconds": true,
+                "query": true,
+                "window": {
+                  "type": "string",
+                  "pattern": "^[0-9]+(\\.[0-9]+)?[smhd]$",
+                  "description": "How far back one answer looks, a number and a unit (30s, 5m, 1h, 3d). Default 5m. A system with fewer calls than its minCalls in this window is quiet. Platform-metric sources (azuremonitor) look back this far too. Resource-health sources (resourcehealth) look back this far for the cloud's health events: default 3d, so a problem that lasts days is still listed."
+                },
+                "regionQuery": {
+                  "type": "string",
+                  "description": "Request sources (loganalytics): the query that says how each service's requests divide between regions, a template like query. It returns one row per telemetry name and region with the columns role, region and calls. Sampled counts are fine: only the proportions are used. Without it the split is not measured."
+                },
+                "typesQuery": {
+                  "type": "string",
+                  "description": "Message-broker sources (servicebus): a query to the telemetry store that says which kinds of message each queue handled, a template like query. It returns one row per queue and message type with the columns queue, type and calls. Without it the kinds are not shown."
+                },
+                "providers": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9]+(\\.[A-Za-z0-9]+)+$"
+                  },
+                  "description": "Resource-health sources (resourcehealth): the resource providers whose health reports are read, as the cloud names them (Namespace.Service). The program lists none; a source without any does not start. A resource's report is matched to the system that owns it by the resource's id, through scope.resources."
+                },
+                "keepResolvedFor": {
+                  "type": "string",
+                  "pattern": "^[0-9]+(\\.[0-9]+)?[smhd]$",
+                  "description": "Resource-health sources (resourcehealth): how long a report stays listed, in green, after the resource recovered, a number and a unit (4h, 90m, 1d). Default 4h. A report can be dismissed earlier."
+                },
+                "metrics": {
+                  "type": "array",
+                  "description": "Platform-metric sources (azuremonitor): which metric of which resources fills which signal. The program knows no metric name; everything is written here. Each entry takes the resources one rule of scope.resources finds for a system; a system's value is the worst (highest) over its resources.",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "resources"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                      "resources": {
+                        "type": "string",
+                        "description": "The name of a scope.resources rule."
+                      },
+                      "namespace": {
+                        "type": "string",
+                        "description": "The metric namespace, for a resource type that has more than one. Usually left out."
+                      },
+                      "interval": {
+                        "enum": [
+                          "1m",
+                          "5m",
+                          "15m",
+                          "30m",
+                          "1h",
+                          "6h",
+                          "12h",
+                          "24h"
+                        ],
+                        "description": "The time grain the metrics are asked at. Default 1m. Some metrics do not support a minute (for example Cosmos DB provisioned throughput needs 5m or more); then give the entry a longer interval and a window that holds a few points of it."
+                      },
+                      "window": {
+                        "type": "string",
+                        "pattern": "^[0-9]+(\\.[0-9]+)?[smh]$",
+                        "description": "How far back this entry looks, a number and a unit (15m, 1h). Without it the source's window applies. It must hold at least two points of the entry's interval."
+                      },
+                      "cpu": {
+                        "$ref": "#/$defs/metricSignal"
+                      },
+                      "memory": {
+                        "$ref": "#/$defs/metricSignal"
+                      },
+                      "utilisation": {
+                        "$ref": "#/$defs/metricSignal"
+                      },
+                      "throttled": {
+                        "$ref": "#/$defs/metricSignal"
+                      },
+                      "requests": {
+                        "$ref": "#/$defs/metricSignal"
+                      },
+                      "limit": {
+                        "$ref": "#/$defs/metricSignal"
+                      }
+                    }
+                  }
+                },
+                "entities": {
+                  "type": "object",
+                  "required": [
+                    "resources",
+                    "patterns"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Message-broker sources (servicebus): which namespaces are read, which metrics give the backlog, the dead letters and the throughput, and how an entity's name says whose it is.",
+                  "properties": {
+                    "resources": {
+                      "type": "string",
+                      "description": "The name of a scope.resources rule: the namespaces it finds are the ones asked."
+                    },
+                    "dimension": {
+                      "type": "string",
+                      "description": "The metric dimension that carries the entity's name. Default EntityName."
+                    },
+                    "interval": {
+                      "enum": [
+                        "1m",
+                        "5m",
+                        "15m",
+                        "30m",
+                        "1h",
+                        "6h",
+                        "12h",
+                        "24h",
+                        "1d"
+                      ],
+                      "description": "The time grain the metrics are asked at. Default 1m."
+                    },
+                    "backlog": {
+                      "$ref": "#/$defs/entityMetric",
+                      "description": "The messages waiting in an entity."
+                    },
+                    "deadLetter": {
+                      "$ref": "#/$defs/entityMetric",
+                      "description": "The dead-lettered messages of an entity."
+                    },
+                    "throughput": {
+                      "$ref": "#/$defs/entityMetric",
+                      "description": "The messages that arrive in an entity; their rate sets how many boats sail."
+                    },
+                    "deadLetterLink": {
+                      "$ref": "#/$defs/entityLink",
+                      "description": "Where a consumer's dead letters open in your support tool."
+                    },
+                    "deadLetterLinks": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/$defs/entityLink"
+                      },
+                      "description": "One support-tool address for each region that has its own; a region with none uses deadLetterLink."
+                    },
+                    "patterns": {
+                      "type": "array",
+                      "description": "Entity name patterns, tried in order: the first that matches says whose the entity is. An entity no pattern matches is left out.",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "match"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                          "match": {
+                            "type": "string",
+                            "description": "A regular expression with the named group service (and pillar when the name says it; producerPillar and producer together for a route)."
+                          },
+                          "consumer": {
+                            "type": "string",
+                            "description": "The role of the system that reads the entity. Default worker."
+                          }
+                        }
+                      }
+                    },
+                    "flows": {
+                      "type": "array",
+                      "description": "Entities that carry what a whole pillar sends to the others or receives from them.",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "match",
+                          "direction"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                          "match": {
+                            "type": "string",
+                            "description": "A regular expression with the named group pillar."
+                          },
+                          "direction": {
+                            "enum": [
+                              "sent",
+                              "received"
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "additionalProperties": false
             }
           }
-        }
+        ]
       }
     },
     "credentials": {

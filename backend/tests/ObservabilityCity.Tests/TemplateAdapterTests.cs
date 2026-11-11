@@ -114,6 +114,40 @@ public class TemplateAdapterTests
         Assert.Contains(set.Problems, p => p.Contains("connection must be the address to read"));
     }
 
+    // ---- the kind's own settings ----
+
+    [Fact]
+    public async Task The_source_reads_its_own_setting_from_the_environment_file()
+    {
+        using var town = Town();
+        town.Write("environments/prod.yaml", Environment.Replace("timeoutSeconds: 5 }", "timeoutSeconds: 5, field: readings }"));
+        var http = CannedHttp.Always(Answer.Replace("\"systems\"", "\"readings\""));
+        var source = new ExampleHttpSourceFactory(new HttpClient(http), new Microsoft.Extensions.Time.Testing.FakeTimeProvider(DateTimeOffset.Parse("2026-01-01T00:00:00Z")))
+            .Create(new SourceContext("prod", town.Load("prod", new TemplateAdapters()).ActiveEnvironment!.Sources.Single(), null));
+
+        var readings = await source.PollAsync(RegistryLoader.Load(town.Path), TestContext.Current.CancellationToken);
+
+        Assert.Equal(12, readings["aa.orders-api"].RequestsPerSecond);
+        Assert.Equal(new ExampleHttpOptions("systems"), AdapterContract.ReadSettings(new TemplateAdapters(), "example-http", "{ kind: example-http }").Settings); // the default
+    }
+
+    [Fact]
+    public void A_mistake_in_the_kinds_own_settings_is_reported_by_the_module_on_the_line_of_its_key()
+    {
+        var bad = AdapterContract.ReadSettings(new TemplateAdapters(), "example-http", "kind: example-http\nconnection: https://metrics.example.test/\nfield: not a name\n");
+        var unknown = AdapterContract.ReadSettings(new TemplateAdapters(), "example-http", "kind: example-http\nfields: readings\n");
+
+        Assert.Equal((3, "field", "source 'telemetry' has field 'not a name'. Write the name of a property of the answer, letters and digits"), (bad.Findings.Single().Line, bad.Findings.Single().Key, bad.Findings.Single().Message));
+        Assert.Equal(2, unknown.Findings.Single().Line);
+        Assert.Equal("unknown key 'fields'. Did you mean 'field'?", unknown.Findings.Single().Message);
+
+        // the loader runs the same checks when the module is loaded, and names the file and line
+        using var town = Town();
+        town.Write("environments/prod.yaml", Environment.Replace("timeoutSeconds: 5 }", "timeoutSeconds: 5, fields: readings }"));
+        var e = Assert.Throws<RegistryException>(() => RegistryLoader.Load(town.Path, new AdapterCatalog([new TemplateAdapters()])));
+        Assert.Contains("environments/prod.yaml (line 3): unknown key 'fields'. Did you mean 'field'?", e.Message);
+    }
+
     [Fact]
     public void The_catalog_builds_the_source_from_the_environment_file()
     {

@@ -1,3 +1,5 @@
+using ObservabilityCity.Adapters.Azure;
+using ObservabilityCity.Core.Sources;
 using ObservabilityCity.Contracts;
 using ObservabilityCity.Core.Registry;
 
@@ -175,27 +177,58 @@ public class RegistryValidationTests
     [Fact]
     public void Schemas_on_disk_match_what_the_app_generates()
     {
-        var registry = RegistryLoader.Load(TestPaths.Registry);
-        var dir = Path.Combine(TestPaths.Registry, RegistrySchema.FolderName);
-        var update = Environment.GetEnvironmentVariable("UPDATE_GOLDEN") == "1";
-        if (update) RegistrySchema.Write(registry, TestPaths.Registry);
+        // the schemas in a town's folder are written with the adapter modules this repository builds, so the Azure adapter's keys complete in an editor too
+        var adapters = new AdapterCatalog([new AzureAdapters()]);
+        foreach (var town in new[] { TestPaths.Registry, TestPaths.DroidShop })
+        {
+            var registry = RegistryLoader.Load(town, adapters);
+            var dir = Path.Combine(town, RegistrySchema.FolderName);
+            if (Environment.GetEnvironmentVariable("UPDATE_GOLDEN") == "1") RegistrySchema.Write(registry, town, adapters);
 
-        foreach (var (name, text) in RegistrySchema.Files(registry))
-            Assert.Equal(text.TrimEnd(), File.ReadAllText(Path.Combine(dir, name)).ReplaceLineEndings("\n").TrimEnd());
+            foreach (var (name, text) in RegistrySchema.Files(registry, adapters))
+                Assert.Equal(text.TrimEnd(), File.ReadAllText(Path.Combine(dir, name)).ReplaceLineEndings("\n").TrimEnd());
+        }
     }
 
     [Fact]
-    public void The_environment_schema_names_every_key_a_metrics_entry_and_its_signals_can_have()
+    public void The_generated_environment_schema_holds_the_core_keys_of_a_source_and_each_modules_own_for_its_kinds()
+    {
+        var schema = System.Text.Json.Nodes.JsonNode.Parse(RegistrySchema.Files(RegistryLoader.Load(TestPaths.Registry), new AdapterCatalog([new AzureAdapters()]))["environment.schema.json"])!;
+        var source = schema["properties"]!["sources"]!["additionalProperties"]!;
+        Assert.Equal(RegistryLoader.SourceKeys.Order(), source["properties"]!.AsObject().Select(p => p.Key).Order());
+        Assert.Null(source["additionalProperties"]); // any other key is the kind's: the branches below say which
+
+        var branches = source["allOf"]!.AsArray().ToDictionary(b => string.Join(",", b!["if"]!["properties"]!["kind"]!["enum"]!.AsArray().Select(k => (string)k!)), b => b!["then"]!);
+        var azure = branches["resourcegraph,loganalytics,azuremonitor,servicebus,functionjobs,resourcehealth"];
+        Assert.False((bool)azure["additionalProperties"]!);
+        foreach (var key in new[] { "regionQuery", "typesQuery", "metrics", "entities", "providers", "keepResolvedFor", "kind", "pollSeconds" })
+            Assert.NotNull(azure["properties"]![key]);
+        Assert.NotNull(schema["$defs"]!["metricSignal"]);
+        var core = branches["fake,prometheus,grafana-irm"]; // the kinds that take no settings: only the core's keys
+        Assert.Equal(RegistryLoader.SourceKeys.Order(), core["properties"]!.AsObject().Select(p => p.Key).Order());
+
+        // without the module, nothing is said about its kinds, and the core schema has no Azure word in a source
+        var bare = RegistrySchema.Files(RegistryLoader.Load(TestPaths.Registry))["environment.schema.json"];
+        Assert.DoesNotContain("regionQuery", bare);
+        Assert.DoesNotContain("metricSignal", bare);
+    }
+
+    [Fact]
+    public void The_azure_adapters_schema_names_every_key_its_settings_a_metrics_entry_and_its_signals_can_have()
     {
         // the schema is written by hand; without this an editor flags a valid key as a mistake as soon as the loader learns it
-        static IEnumerable<string> Keys(string type) => typeof(RegistryLoader).Assembly.GetType($"ObservabilityCity.Core.Registry.{type}")!
+        static IEnumerable<string> Keys(string type) => typeof(AzureSourceSettings).Assembly.GetType($"ObservabilityCity.Adapters.Azure.{type}")!
             .GetProperties().Select(p => char.ToLowerInvariant(p.Name[0]) + p.Name[1..]);
-        var schema = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(Path.Combine(TestPaths.Registry, RegistrySchema.FolderName, "environment.schema.json")))!;
-        var entry = schema["properties"]!["sources"]!["additionalProperties"]!["properties"]!["metrics"]!["items"]!["properties"]!.AsObject().Select(p => p.Key);
+        var schema = System.Text.Json.Nodes.JsonNode.Parse(AzureSourceSettings.Reader.Schema)!;
+        var entry = schema["properties"]!["metrics"]!["items"]!["properties"]!.AsObject().Select(p => p.Key);
         var signal = schema["$defs"]!["metricSignal"]!["properties"]!.AsObject().Select(p => p.Key);
+        var keys = schema["properties"]!.AsObject().Select(p => p.Key).Where(k => k != "window"); // the Azure adapter says more about the core's window for its kinds
+        var entities = schema["properties"]!["entities"]!["properties"]!.AsObject().Select(p => p.Key);
 
         Assert.Equal(Keys("MetricGroupFile").Order(), entry.Order());
         Assert.Equal(Keys("MetricSignalFile").Order(), signal.Order());
+        Assert.Equal(Keys("AzureSourceFile").Order(), keys.Order());
+        Assert.Equal(Keys("EntitiesFile").Order(), entities.Order());
     }
 
     [Fact]
@@ -277,9 +310,13 @@ public class RegistryValidationTests
         var doc = File.ReadAllText(Path.Combine(TestPaths.RepoRoot, "docs", "config-reference.md")).ReplaceLineEndings("\n");
         var sections = System.Text.RegularExpressions.Regex.Matches(doc, @"<!-- file: (\w+) -->\n((?:\|.*\n?)+)");
         var documented = sections.ToDictionary(m => m.Groups[1].Value, m => System.Text.RegularExpressions.Regex.Matches(m.Groups[2].Value, @"^\| `(\w+)` \|", System.Text.RegularExpressions.RegexOptions.Multiline).Select(k => k.Groups[1].Value).Order().ToList());
+        // the core's files, and the settings an adapter reads from a source block: the Azure adapter's are documented as its own section
         var types = typeof(RegistryLoader).Assembly.GetTypes()
             .Where(t => t.Namespace == "ObservabilityCity.Core.Registry" && t.Name.EndsWith("File", StringComparison.Ordinal) && t.IsClass)
-            .Where(t => t.Name != "DefaultsFile");
+            .Where(t => t.Name != "DefaultsFile")
+            .Concat(typeof(AzureSourceSettings).Assembly.GetTypes().Where(t => t.Namespace == "ObservabilityCity.Adapters.Azure" && t.Name.EndsWith("File", StringComparison.Ordinal) && t.IsClass))
+            .ToList();
+        Assert.Contains(types, t => t.Name == "AzureSourceFile");
 
         foreach (var type in types)
         {

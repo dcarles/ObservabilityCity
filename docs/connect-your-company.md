@@ -195,6 +195,8 @@ Every source takes `pollSeconds` (default 30) and `timeoutSeconds` (default 10);
 
 The program knows no platform by name. Each platform's source kinds and logins come in an adapter module: a folder under `adapters/` beside the program, which the host loads when it starts (`Adapters:Path` moves the folder). The build puts every adapter project in `backend/src/` and every project in `extensions/` there. Azure is the `azure` module; a company on another cloud, or that reads metrics from somewhere else, adds a module for it and leaves Azure out (`dotnet build -p:ExcludeAdapters=true` builds without any). Sources do not have to share a platform: an environment can read metrics through another module while its resources are read from Azure. A module of your own lives in `extensions/` (see [The shape of a company setup](#the-shape-of-a-company-setup)).
 
+A source block has the core's keys (`kind`, `connection`, `credential`, `pollSeconds`, `timeoutSeconds`, `lateAfterSeconds`, `query`, `window`) and the keys of its kind's adapter. Each adapter checks its own keys, in `validate` and when the server loads the town, and says where a mistake is. The Azure adapter's keys (`regionQuery`, `typesQuery`, `metrics`, `entities`, `providers`, `keepResolvedFor`) are in the sections below and under [Azure adapter settings](config-reference.md#azure-adapter-settings). A kind whose adapter is not loaded is reported once and its keys are not checked.
+
 ### Logins
 
 Each adapter has its own login kinds. The Azure adapter's sources (`resourcegraph`, `loganalytics`, `azuremonitor`, `servicebus`, `functionjobs`, `resourcehealth`) sign in with whoever ran `az login`, unless you say otherwise. Define logins in the environment file and name one on a source:

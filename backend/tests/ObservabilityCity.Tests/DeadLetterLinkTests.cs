@@ -20,7 +20,7 @@ public class DeadLetterLinkTests
 
     private static async Task<Snapshot> TownSnapshot(string folder)
     {
-        var registry = RegistryLoader.Load(folder).ForEnvironment("prod");
+        var registry = RegistryLoader.Load(folder, TestAdapters.Azure).ForEnvironment("prod");
         var set = new AdapterCatalog([new AzureAdapters()]).Build(registry.ActiveEnvironment!, folder);
         Assert.Empty(set.Problems);
         var state = new LatestState();
@@ -77,7 +77,7 @@ public class DeadLetterLinkTests
     [Fact]
     public async Task A_queue_name_cannot_change_the_shape_of_the_address()
     {
-        var registry = RegistryLoader.Load(Town("b")).ForEnvironment("prod");
+        var registry = RegistryLoader.Load(Town("b"), TestAdapters.Azure).ForEnvironment("prod");
         var node = registry.AllNodes.First(n => n.Id == "aa.orders-worker");
 
         var link = DeadLetterLinks.For(registry, node, "a/b?c=d e#f")!;
@@ -108,7 +108,7 @@ public class DeadLetterLinkTests
         var folder = Copy("a", yaml => yaml.Replace("https://support.example.test/queues/{queue}?team={pillar}&service={service}", url));
         try
         {
-            var error = Assert.Throws<RegistryException>(() => RegistryLoader.Load(folder));
+            var error = Assert.Throws<RegistryException>(() => RegistryLoader.Load(folder, TestAdapters.Azure));
             Assert.Contains(expected, error.Message);
         }
         finally { Directory.Delete(folder, true); }

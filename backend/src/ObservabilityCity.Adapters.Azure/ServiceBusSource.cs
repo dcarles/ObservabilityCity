@@ -25,6 +25,7 @@ public sealed class ServiceBusSource(
     public TimeSpan PollInterval => definition.PollInterval;
     public TimeSpan Timeout => definition.Timeout;
     public TimeSpan Window { get; } = SourceQuery.WindowOf(definition);
+    private readonly AzureSettings _settings = AzureSettings.Of(definition);
 
     /// <summary>The most kinds of message listed for one queue; the quietest beyond it are counted, not listed.</summary>
     public const int TypeCeiling = 200;
@@ -34,7 +35,7 @@ public sealed class ServiceBusSource(
 
     public async Task<IReadOnlyDictionary<string, NodeReading>> PollAsync(TownRegistry registry, CancellationToken ct)
     {
-        var config = definition.Entities!;
+        var config = _settings.Entities!;
         var view = registry.ForEnvironment(environmentId);
         if (store.Inventory is null) await store.WaitForReadAsync(Timeout / 2, ct);
         var resolution = store.Resolve(view);
@@ -77,7 +78,7 @@ public sealed class ServiceBusSource(
             if (claim is null) { unclaimed++; continue; }
             _seen[entity] = claim;
         }
-        var types = definition.TypesQuery is { } typesQuery ? TypesByQueue(await ReadTypes(typesQuery, resolution, ct), Window) : null;
+        var types = _settings.TypesQuery is { } typesQuery ? TypesByQueue(await ReadTypes(typesQuery, resolution, ct), Window) : null;
         foreach (var (entity, claim) in _seen.OrderBy(kv => kv.Key, StringComparer.Ordinal))
         {
             var node = claim.Node;
@@ -248,7 +249,7 @@ public sealed class ServiceBusSourceFactory(HttpClient? http = null, TimeProvide
 
     public IMetricSource Create(SourceContext context)
     {
-        if (context.Source.Entities is null)
+        if (AzureSettings.Of(context.Source).Entities is null)
             throw new InvalidOperationException("it has no entities block. Say which scope.resources rule finds the namespaces, which metrics are the backlog and the dead letters, and the name patterns (see docs/config-reference.md)");
         var connection = context.Source.Connection ?? "";
         string? recording = null;

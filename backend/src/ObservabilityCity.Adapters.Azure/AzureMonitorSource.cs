@@ -196,6 +196,7 @@ public sealed class AzureMonitorSource(
     public TimeSpan PollInterval => definition.PollInterval;
     public TimeSpan Timeout => definition.Timeout;
     public TimeSpan Window { get; } = SourceQuery.WindowOf(definition);
+    private readonly AzureSettings _settings = AzureSettings.Of(definition);
 
     /// <summary>One resource of one system and the entry that says what to read from it.</summary>
     private sealed record Target(string SystemId, ResolvedResource Resource, MetricGroup Group);
@@ -217,7 +218,7 @@ public sealed class AzureMonitorSource(
         var view = registry.ForEnvironment(environmentId);
         if (store.Inventory is null) await store.WaitForReadAsync(Timeout / 2, ct); // the resources to read are in the inventory
         var resolution = store.Resolve(view);
-        var targets = resolution.Systems.SelectMany(s => s.Resources.SelectMany(r => definition.Metrics.Where(g => g.Resources == r.Rule).Select(g => new Target(s.SystemId, r, g)))).ToList();
+        var targets = resolution.Systems.SelectMany(s => s.Resources.SelectMany(r => _settings.Metrics.Where(g => g.Resources == r.Rule).Select(g => new Target(s.SystemId, r, g)))).ToList();
         if (targets.Count == 0) return;
 
         var at = time.GetUtcNow();
@@ -369,7 +370,7 @@ public sealed class AzureMonitorSourceFactory(HttpClient? http = null, TimeProvi
 
     public IMetricSource Create(SourceContext context)
     {
-        if (context.Source.Metrics.Count == 0)
+        if (AzureSettings.Of(context.Source).Metrics.Count == 0)
             throw new InvalidOperationException("it has no metrics. List the metrics to read under metrics: which scope.resources rule they are for, and which metric fills which signal (see docs/connect-your-company.md)");
         var connection = context.Source.Connection ?? "";
         string? recording = null;

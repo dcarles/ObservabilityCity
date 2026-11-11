@@ -14,7 +14,7 @@ public sealed class AzureAdapters : IAdapterModule
 
     public void Register(IAdapterRegistry registry)
     {
-        // what each kind can serve besides signals: the core asks for these, never for a kind's name
+        // what each kind can serve besides signals: the core asks for these, never for a kind's name. The adapter reads and checks its sources' own keys
         foreach (var (kind, can) in new[]
                  {
                      (ResourceGraphSourceFactory.SourceKind, SourceCapabilities.Inventory),
@@ -24,7 +24,7 @@ public sealed class AzureAdapters : IAdapterModule
                      (FunctionJobsSourceFactory.SourceKind, SourceCapabilities.None),
                      (ResourceHealthSourceFactory.SourceKind, SourceCapabilities.HealthEvents),
                  })
-            registry.AddSourceKind(new SourceKindInfo(kind, LoginKind) { Capabilities = can });
+            registry.AddSourceKind(new SourceKindInfo(kind, LoginKind) { Capabilities = can, Settings = AzureSourceSettings.Reader }); // every Azure kind takes the same settings keys
         registry.AddSource(new ResourceGraphSourceFactory());
         registry.AddSource(new LogAnalyticsSourceFactory());
         registry.AddSource(new AzureMonitorSourceFactory());

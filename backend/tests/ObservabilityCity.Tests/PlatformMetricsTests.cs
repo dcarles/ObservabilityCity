@@ -25,7 +25,7 @@ public class PlatformMetricsTests
     private static string TownB => Path.Combine(TestPaths.RepoRoot, "shared-test-data", "registries", "scope-town-b");
     private static readonly DateTimeOffset T0 = DateTimeOffset.Parse("2026-01-01T00:00:00Z");
 
-    private static TownRegistry Prod(string folder) => RegistryLoader.Load(folder).ForEnvironment("prod");
+    private static TownRegistry Prod(string folder) => RegistryLoader.Load(folder, TestAdapters.Azure).ForEnvironment("prod");
     private static NodeSnapshot Node(Snapshot s, string id) => s.Groups.SelectMany(g => g.Nodes).First(n => n.Id == id);
 
     private static async Task<Snapshot> TownSnapshot(string folder, FakeTimeProvider time)
@@ -247,7 +247,7 @@ public class PlatformMetricsTests
         Assert.Contains("utilisation.over.whenEmpty: it belongs on the signal itself, not on its over or orElse", onOver);
         using var copy = new RegistryCopy(TownA);
         copy.Replace("environments/prod.yaml", utilisation, utilisation.Replace(" over:", " whenEmpty: unknown, over:"));
-        Assert.NotNull(RegistryLoader.Load(copy.Path));
+        Assert.NotNull(RegistryLoader.Load(copy.Path, TestAdapters.Azure));
     }
 
     [Fact]
@@ -651,7 +651,7 @@ public class PlatformMetricsTests
         using var copy = new RegistryCopy(TownA);
         var edit = change(copy);
         copy.Replace("environments/prod.yaml", edit[0], edit[1]);
-        return Assert.Throws<RegistryException>(() => RegistryLoader.Load(copy.Path)).Message;
+        return Assert.Throws<RegistryException>(() => RegistryLoader.Load(copy.Path, TestAdapters.Azure)).Message;
     }
 
     [Fact]
@@ -703,8 +703,8 @@ public class PlatformMetricsTests
     [Fact]
     public void A_platform_source_with_no_metrics_cannot_start_and_says_so()
     {
-        var env = RegistryLoader.Load(TownA).Environments.Single();
-        var bare = env with { Sources = env.Sources.Select(s => s.Name == "platform" ? s with { Metrics = [] } : s).ToList() };
+        var env = RegistryLoader.Load(TownA, TestAdapters.Azure).Environments.Single();
+        var bare = env with { Sources = env.Sources.Select(s => s.Name == "platform" ? s with { Typed = AzureSettings.Of(s) with { Metrics = [] } } : s).ToList() };
 
         var set = new AdapterCatalog([new AzureAdapters()]).Build(bare, TownA);
 

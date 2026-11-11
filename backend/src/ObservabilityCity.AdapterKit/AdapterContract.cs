@@ -35,7 +35,48 @@ public static partial class AdapterContract
             if (!Kebab().IsMatch(kind)) problems.Add($"'{kind}' must be lowercase kebab-case, because it is written in environment files");
         foreach (var duplicate in catalog.Factories.GroupBy(k => k).Where(g => g.Count() > 1))
             problems.Add($"two factories are registered for the kind '{duplicate.Key}'; the second would silently replace the first");
+        foreach (var reader in catalog.Settings.Values.Distinct())
+            problems.AddRange(CheckSchema(reader));
         return problems;
+    }
+
+    /// <summary>
+    /// A settings reader's schema fragment, if it has one, is what <c>--write-schema</c> can merge: a JSON object whose <c>properties</c> and <c>$defs</c>
+    /// are objects, which leaves the core's own keys of a source alone.
+    /// </summary>
+    public static IReadOnlyList<string> CheckSchema(ISourceSettingsReader reader)
+    {
+        var problems = new List<string>();
+        if (reader.Schema is not { } text) return problems;
+        System.Text.Json.Nodes.JsonObject fragment;
+        try { fragment = System.Text.Json.Nodes.JsonNode.Parse(text)?.AsObject() ?? throw new InvalidOperationException("it is empty"); }
+        catch (Exception e) when (e is System.Text.Json.JsonException or InvalidOperationException) { return [$"the settings schema of {reader.GetType().Name} is not a JSON object: {e.Message}"]; }
+        foreach (var key in new[] { "properties", "$defs" })
+            if (fragment[key] is { } part && part is not System.Text.Json.Nodes.JsonObject)
+                problems.Add($"the settings schema of {reader.GetType().Name} has '{key}' that is not an object");
+        foreach (var (key, _) in fragment["properties"] as System.Text.Json.Nodes.JsonObject ?? [])
+            if (key is "kind" or "connection" or "credential" or "pollSeconds" or "timeoutSeconds" or "lateAfterSeconds")
+                problems.Add($"the settings schema of {reader.GetType().Name} describes '{key}', which is the core's key of a source; leave it to the core");
+        return problems;
+    }
+
+    /// <summary>How the module reads the settings of a source of <paramref name="kind"/> (<see cref="SourceKindInfo.Settings"/>), as its Register records it; null when the kind takes none.</summary>
+    public static ISourceSettingsReader? SettingsOf(IAdapterModule module, string kind)
+    {
+        var catalog = new Recorder([]);
+        module.Register(catalog);
+        return catalog.Settings.GetValueOrDefault(kind);
+    }
+
+    /// <summary>
+    /// Reads one source block, written as it would be in an environment file (<c>{ kind: x, connection: "...", queries: { ... } }</c>), with the module's
+    /// settings reader for <paramref name="kind"/>: the settings its source would get and the mistakes the validator would report, each with its line in
+    /// <paramref name="sourceYaml"/>. Throws <see cref="ArgumentException"/> when the module reads no settings for the kind.
+    /// </summary>
+    public static SourceSettingsResult ReadSettings(IAdapterModule module, string kind, string sourceYaml, ScopeRules? scope = null, string sourceName = "telemetry")
+    {
+        var reader = SettingsOf(module, kind) ?? throw new ArgumentException($"the module registers no settings for the kind '{kind}'", nameof(kind));
+        return reader.Read(new SourceSettingsContext("test", sourceName, kind, SourceSettings.Parse(sourceYaml), scope ?? ScopeRules.None));
     }
 
     public static void AssertModule(IAdapterModule module) => Raise(CheckModule(module));
@@ -154,11 +195,14 @@ public static partial class AdapterContract
         public List<string> Factories { get; } = [];
         public List<string> Logins { get; } = [];
         public Dictionary<string, SourceCapabilities> Capabilities { get; } = [];
+        public Dictionary<string, ISourceSettingsReader> Settings { get; } = [];
 
         public void AddSourceKind(SourceKindInfo kind)
         {
             Kinds.Add(kind.Kind);
             Capabilities[kind.Kind] = kind.Capabilities;
+            if (kind.Settings is { } settings) Settings[kind.Kind] = settings;
+            else Settings.Remove(kind.Kind);
         }
 
         public void AddSource(IMetricSourceFactory factory)

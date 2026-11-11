@@ -226,7 +226,7 @@ Current limits:
 - **The hub holds at most one gateway, broker, egress and database.** A town with two brokers or two gateways puts the extra one on an island or uses `topology: direct`.
 - **Every topic is named after a service.** `topicTemplate` and `hubTopicTemplate` must contain `{service}`, and a pillar's topics must be its own services, so topics named after events cannot be declared yet.
 - **`legacyFrom` can list only `hub`.** Marking a route you are moving off works only for the hub's topics.
-- **The core registry holds the Azure adapter's settings.** `regionQuery`, `typesQuery`, `metrics`, `entities`, `providers` and the subscription and workspace keys of `scope` are checked by the core. An adapter for another cloud cannot add settings of its own without a core change.
+- **The scope speaks in Azure's words.** The subscription and workspace keys of `scope` (`subscription`, `pillars`, `workspace`, `workspaceId`, `queries`) are Azure adapter settings the core registry still holds and checks. A source's own settings are its adapter's (each adapter checks them), but the scope has no neutral names for the account and the telemetry store yet.
 
 Open questions:
 

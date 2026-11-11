@@ -154,8 +154,13 @@ public sealed class ResourceHealthSource(
     public TimeSpan Timeout => TimeSpan.FromSeconds(definition.TimeoutSeconds ?? DefaultTimeoutSeconds);
     public TimeSpan Window { get; } = SourceQuery.TryParseWindow(definition.Window ?? DefaultWindow, out var w) ? w : throw new InvalidOperationException($"the window '{definition.Window}' is not a number and a unit like 3d");
 
+    private readonly AzureSettings _settings = AzureSettings.Of(definition);
+
     /// <summary>How long a report stays listed, as resolved, after the resource recovered.</summary>
-    public TimeSpan KeepResolvedFor { get; } = SourceQuery.TryParseWindow(definition.KeepResolvedFor ?? DefaultKeepResolvedFor, out var k) ? k : throw new InvalidOperationException($"keepResolvedFor '{definition.KeepResolvedFor}' is not a number and a unit like 4h");
+    public TimeSpan KeepResolvedFor { get; } = KeepFor(AzureSettings.Of(definition).KeepResolvedFor);
+
+    private static TimeSpan KeepFor(string? text) =>
+        SourceQuery.TryParseWindow(text ?? DefaultKeepResolvedFor, out var k) ? k : throw new InvalidOperationException($"keepResolvedFor '{text}' is not a number and a unit like 4h");
 
     public IReadOnlyList<ResourceHealthEvent> Current() => _events.Where(e => !_dismissed.ContainsKey(e.Id)).ToList();
 
@@ -264,7 +269,7 @@ public sealed class ResourceHealthSource(
     public IReadOnlyList<(string Subscription, string Provider)> AsksOf(IReadOnlyList<string> subscriptions, Inventory? inventory)
     {
         var has = inventory is null ? null : inventory.Resources.Select(r => (r.SubscriptionId.ToLowerInvariant(), ProviderOf(r.Type))).ToHashSet();
-        return subscriptions.SelectMany(s => definition.Providers.Select(p => (Subscription: s, Provider: p)))
+        return subscriptions.SelectMany(s => _settings.Providers.Select(p => (Subscription: s, Provider: p)))
             .Where(a => has is null || has.Contains((a.Subscription.ToLowerInvariant(), a.Provider.ToLowerInvariant()))).ToList();
     }
 
@@ -334,7 +339,7 @@ public sealed class ResourceHealthSourceFactory(HttpClient? http = null, TimePro
 
     public IMetricSource Create(SourceContext context)
     {
-        if (context.Source.Providers.Count == 0)
+        if (AzureSettings.Of(context.Source).Providers.Count == 0)
             throw new InvalidOperationException("it names no resource provider. List the providers whose health reports to read under providers: (for example the data store's), as the cloud names them (see docs/connect-your-company.md)");
         var connection = context.Source.Connection ?? "";
         string? recording = null;
