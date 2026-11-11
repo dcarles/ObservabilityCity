@@ -13,6 +13,9 @@ public sealed partial record Registry(
     /// <summary>How many islands fit on the first ring (town.yaml ringCapacity). The town holds up to <see cref="MaxPillars"/> pillars on two rings.</summary>
     public int RingCapacity { get; init; } = DefaultRingCapacity;
 
+    /// <summary>The folder of the town's group files, relative to the registry folder: groups, or pillars, its older name.</summary>
+    public string GroupFolder { get; init; } = GroupWords.OlderFolder;
+
     /// <summary>The database engines the company defined in town.yaml (databaseEngines). Empty when it defined none.</summary>
     public IReadOnlyList<DatabaseEngine> DatabaseEngines { get; init; } = [];
 
@@ -116,18 +119,22 @@ public sealed record MessagingConvention(string TopicTemplate, string HubTopicTe
 {
     public static readonly MessagingConvention Default = new("{service}", "{service}");
 
-    public string TopicName(string pillar, string service) => TopicTemplate.Replace("{pillar}", pillar).Replace("{service}", service);
+    // the group's id is {group} in a template, or {pillar}, its older name; both may stand in one template
+    private const string GroupHole = "{" + GroupWords.Group + "}", PillarHole = "{" + GroupWords.Pillar + "}";
+
+    public string TopicName(string pillar, string service) => TopicTemplate.Replace(GroupHole, pillar).Replace(PillarHole, pillar).Replace("{service}", service);
     public string HubTopicName(string service) => HubTopicTemplate.Replace("{service}", service);
 
     /// <summary>
-    /// Whether a name could be one that <see cref="TopicTemplate"/> makes for a service of <paramref name="pillar"/>. Only a template with both <c>{pillar}</c>
-    /// and <c>{service}</c> can say; without <c>{pillar}</c> any pillar could own the name, so this is false.
+    /// Whether a name could be one that <see cref="TopicTemplate"/> makes for a service of <paramref name="pillar"/>. Only a template with both <c>{group}</c>
+    /// (or <c>{pillar}</c>) and <c>{service}</c> can say; without the group any group could own the name, so this is false.
     /// </summary>
     public bool CouldBeTopicOf(string pillar, string name)
     {
-        if (!TopicTemplate.Contains("{pillar}") || !TopicTemplate.Contains("{service}")) return false;
+        if (!(TopicTemplate.Contains(GroupHole) || TopicTemplate.Contains(PillarHole)) || !TopicTemplate.Contains("{service}")) return false;
         var pattern = "^" + System.Text.RegularExpressions.Regex.Escape(TopicTemplate)
-            .Replace(System.Text.RegularExpressions.Regex.Escape("{pillar}"), System.Text.RegularExpressions.Regex.Escape(pillar))
+            .Replace(System.Text.RegularExpressions.Regex.Escape(GroupHole), System.Text.RegularExpressions.Regex.Escape(pillar))
+            .Replace(System.Text.RegularExpressions.Regex.Escape(PillarHole), System.Text.RegularExpressions.Regex.Escape(pillar))
             .Replace(System.Text.RegularExpressions.Regex.Escape("{service}"), ".+") + "$";
         return System.Text.RegularExpressions.Regex.IsMatch(name, pattern);
     }

@@ -43,22 +43,23 @@ public static class SystemDetails
             .Select(s => new SubscriptionSnapshot(s.Topic, s.PublisherGroupId, s.ConsumerId)).ToList();
 
         var island2 = node.GroupId == RegistryVendor.GroupId ? "Third party" : groups.TryGetValue(node.GroupId, out var own) ? own.DisplayName : node.GroupId;
-        return new SystemDetail(node.Id, node.Name, node.Kind, node.Service, node.GroupId, island2, FileOf(node),
-            Config(node), calls, calledBy, gatewayCalls, gatewayCalledBy, outside, topics, subscriptions);
+        return new SystemDetail(node.Id, node.Name, node.Kind, node.Service, node.GroupId, island2, FileOf(node, registry.GroupFolder),
+            Config(node, registry.GroupFolder), calls, calledBy, gatewayCalls, gatewayCalledBy, outside, topics, subscriptions);
     }
 
-    /// <summary>The path of the registry file a system is declared in, relative to the registry folder.</summary>
-    public static string FileOf(RegistryNode node) => PathOf(node.SourceFile);
+    /// <summary>The path of the registry file a system is declared in, relative to the registry folder whose group files are in <paramref name="groupFolder"/>.</summary>
+    public static string FileOf(RegistryNode node, string groupFolder = GroupWords.OlderFolder) => PathOf(node.SourceFile, groupFolder);
 
-    /// <summary>A registry file name as it is found in the registry folder: pillar files live in pillars/, the rest beside town.yaml.</summary>
-    private static string PathOf(string? file) =>
-        string.IsNullOrEmpty(file) ? "" : file is "hub.yaml" or "third-parties.yaml" or "defaults.yaml" ? file : $"pillars/{file}";
+    /// <summary>A registry file name as it is found in the registry folder: group files live in groups/ (or pillars/, the older name), the rest beside town.yaml.</summary>
+    private static string PathOf(string? file, string groupFolder) =>
+        string.IsNullOrEmpty(file) ? "" : file is "hub.yaml" or "third-parties.yaml" or "defaults.yaml" ? file : $"{groupFolder}/{file}";
 
     private static string RoleOf(NodeKind kind) => kind == NodeKind.Database ? "db" : kind.ToString().ToLowerInvariant();
 
     /// <summary>The settings that matter for this kind of system, each with its effective value and the layer it came from.</summary>
-    public static List<ConfigValue> Config(RegistryNode n)
+    public static List<ConfigValue> Config(RegistryNode n, string groupFolder = GroupWords.OlderFolder)
     {
+        string PathOf(string? file) => SystemDetails.PathOf(file, groupFolder);
         var role = RoleOf(n.Kind);
         string Source(string key)
         {

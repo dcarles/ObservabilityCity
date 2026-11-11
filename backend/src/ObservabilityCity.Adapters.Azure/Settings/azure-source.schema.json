@@ -54,7 +54,7 @@
       "additionalProperties": false,
       "properties": {
         "name": { "type": "string", "description": "The words the link shows." },
-        "url": { "type": "string", "pattern": "^https?://", "description": "A template that starts with https:// (or http://). Holes: {pillar}, {service}, {system}, {environment} and {queue}." },
+        "url": { "type": "string", "pattern": "^https?://", "description": "A template that starts with https:// (or http://). Holes: {group} (older name {pillar}), {service}, {system}, {environment} and {queue}." },
         "region": { "type": "string", "description": "deadLetterLinks only: the region the address is for, matched ignoring case." }
       }
     }
@@ -108,20 +108,20 @@
             "required": ["match"],
             "additionalProperties": false,
             "properties": {
-              "match": { "type": "string", "description": "A regular expression with the named group service (and pillar when the name says it; producerPillar and producer together for a route)." },
+              "match": { "type": "string", "description": "A regular expression with the named group service (and group, older name pillar, when the name says it; producerPillar and producer together for a route)." },
               "consumer": { "type": "string", "description": "The role of the system that reads the entity. Default worker." }
             }
           }
         },
         "flows": {
           "type": "array",
-          "description": "Entities that carry what a whole pillar sends to the others or receives from them.",
+          "description": "Entities that carry what a whole group sends to the others or receives from them.",
           "items": {
             "type": "object",
             "required": ["match", "direction"],
             "additionalProperties": false,
             "properties": {
-              "match": { "type": "string", "description": "A regular expression with the named group pillar." },
+              "match": { "type": "string", "description": "A regular expression with the named group group (older name pillar)." },
               "direction": { "enum": ["sent", "received"] }
             }
           }

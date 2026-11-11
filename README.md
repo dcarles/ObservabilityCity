@@ -200,7 +200,7 @@ dotnet run --project backend/tools/ObservabilityCity.Validate -- --all   # check
 dotnet run --project backend/tools/ObservabilityCity.Validate -- --sources config/<town>   # probe each configured source with its own login (see docs/connect-your-company.md)
 ```
 
-A test registry that shows a validator rule on purpose (for example an island that stands alone) lists the warning under `expectedWarnings` in its `town.yaml`, as `{ rule: standalone, file: pillars/sta.yaml }`. The warning then stays out of the report and the pull request comment, and an expected warning that stops appearing is an error, so the rule is still proven.
+A test registry that shows a validator rule on purpose (for example an island that stands alone) lists the warning under `expectedWarnings` in its `town.yaml`, as `{ rule: standalone, file: groups/sta.yaml }` (or `pillars/`, in a town that keeps the older folder name). The warning then stays out of the report and the pull request comment, and an expected warning that stops appearing is an error, so the rule is still proven.
 
 To refresh the golden fixtures (calm town, a bad day across several islands, and the editor schemas) after an intended change: `UPDATE_GOLDEN=1 dotnet test --solution backend/ObservabilityCity.slnx`. The island layout golden is refreshed with `cd frontend && UPDATE_GOLDEN=1 npm test`.
 
@@ -235,11 +235,11 @@ One folder describes a town. The sample is `config/galactic-credit/`:
 
 | File | What it holds |
 | --- | --- |
-| `town.yaml` | Name, what an island is called (`groupLabel`, used for the word in every part of the interface; `pillar` in file and key names means the same group), topology, `mode` (`demo` or `live`; left out means `live`), `islands` (the order of the islands round the hub: unlisted pillars follow, Lost & found is always last), `ringCapacity`, `databaseEngines` (the engines your databases run on, each one of the fixed database types, see below), `trafficDensity`, `messaging` (`topicTemplate`, `hubTopicTemplate`; the templates only name topics listed by their service), `labels`, `wall` (the wall tour's timings and light) and `expectedWarnings`. Every key is in [docs/config-reference.md](docs/config-reference.md) |
+| `town.yaml` | Name, what an island is called (`groupLabel`, used for the word in every part of the interface; in file and key names a group is `group`, the neutral word, or `pillar`, its older name, and both read the same), topology, `mode` (`demo` or `live`; left out means `live`), `islands` (the order of the islands round the hub: unlisted pillars follow, Lost & found is always last), `ringCapacity`, `databaseEngines` (the engines your databases run on, each one of the fixed database types, see below), `trafficDensity`, `messaging` (`topicTemplate`, `hubTopicTemplate`; the templates only name topics listed by their service), `labels`, `wall` (the wall tour's timings and light) and `expectedWarnings`. Every key is in [docs/config-reference.md](docs/config-reference.md) |
 | `defaults.yaml` | App-wide defaults per role (SLA, error, resource, throttle and backlog thresholds) |
 | `hub.yaml` | The shared resources in the middle (for example a gateway and a broker; today at most one gateway, broker, egress and database), the hub's `messaging` topics, and the outside callers (`externalCallers`, each lists the external systems it reaches) |
-| `pillars/<code>.yaml` | One island: its systems, `calls` links, per-role `defaults`, and its `messaging` (topics it publishes, topics its workers consume) |
-| `pillars/lost-found.yaml` | Optional: the island for systems you declare that no team owns. It always stands last |
+| `groups/<code>.yaml` | One island: its id (`group:`), its systems, `calls` links, per-role `defaults`, and its `messaging` (topics it publishes, topics its workers consume). `pillars/` and `pillar:` are the older names and read the same: Galactic Credit keeps them, Droid Shop uses the new ones. A town has one of the two folders, and a file sets one of the two keys |
+| `groups/lost-found.yaml` | Optional: the island for systems you declare that no team owns. It always stands last |
 | `environments/<id>.yaml` | One file per environment (`dev`, `staging`, `prod`): its tenants, its sources and what it leaves out. Optional: a town without them has one environment, `demo` |
 | `fake.yaml` | Baseline numbers for the fake source only |
 

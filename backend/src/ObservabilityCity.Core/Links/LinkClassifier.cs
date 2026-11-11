@@ -127,7 +127,7 @@ public sealed class LinkClassifier
         var value = _aliases.TryGetValue(group.Value, out var alias) ? alias : group.Value;
         if (name != "service") return value;
         // an address may carry a service's short code instead of its name: the pillar's own serviceCode says which service it is
-        var pillarGroup = host.Groups["pillar"].Success ? host.Groups["pillar"] : path?.Groups["pillar"];
+        var pillarGroup = GroupWords.Captured(host, GroupWords.Group) is { Success: true } named ? named : path is null ? null : GroupWords.Captured(path, GroupWords.Group);
         var pillar = (pillarGroup is { Success: true } ? pillarGroup.Value : callerPillar).ToLowerInvariant();
         if (_aliases.ContainsKey(group.Value) || _serviceNames.Contains((pillar, value.ToLowerInvariant()))) return value;
         return _byCode.TryGetValue((pillar, value.ToLowerInvariant()), out var service) ? service : value;

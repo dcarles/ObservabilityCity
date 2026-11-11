@@ -1,5 +1,5 @@
 # yaml-language-server: $schema=../schema/pillar.schema.json
-pillar: ntf
+group: ntf
 displayName: Notifications
 color: "#ff6b9d"
 systems:

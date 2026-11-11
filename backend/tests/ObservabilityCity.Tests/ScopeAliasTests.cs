@@ -215,9 +215,9 @@ public class ScopeAliasTests
 
     // ---- schema and docs ----
 
-    /// <summary>Every block that takes aliases, with its aliases.</summary>
+    /// <summary>Every block of the scope that takes aliases, with its aliases. The group file's own alias (pillar for group) is proven by <see cref="GroupAliasTests"/>.</summary>
     private static IEnumerable<(string Type, IReadOnlyDictionary<string, string> Aliases)> Blocks() =>
-        typeof(RegistryLoader).Assembly.GetTypes().Where(t => !t.IsAbstract && t.IsSubclassOf(typeof(AliasedBlock)))
+        typeof(RegistryLoader).Assembly.GetTypes().Where(t => !t.IsAbstract && t.IsSubclassOf(typeof(AliasedBlock)) && t != typeof(PillarFile))
             .Select(t => (t.Name, ((AliasedBlock)Activator.CreateInstance(t, nonPublic: true)!).Aliases));
 
     [Fact]

@@ -321,7 +321,7 @@ public class RegistryValidationTests
         foreach (var type in types)
         {
             Assert.True(documented.ContainsKey(type.Name), $"docs/config-reference.md has no section tagged <!-- file: {type.Name} -->");
-            var keys = type.GetProperties().Select(p => char.ToLowerInvariant(p.Name[0]) + p.Name[1..]).Order().ToList();
+            var keys = type.GetProperties().Select(AliasedBlock.KeyOf).Order().ToList(); // a key named apart from its property (group: for Pillar) by its own name
             Assert.Equal(keys, documented[type.Name]);
         }
     }

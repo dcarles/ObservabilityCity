@@ -81,10 +81,11 @@ public static partial class RegistryValidator
             var line = RawYaml.Line(entry);
             if (string.IsNullOrWhiteSpace(rule))
             {
-                problems.Add(new Finding(Severity.Error, "town.yaml", line, "expected-warning", "An expectedWarnings entry needs a 'rule', for example { rule: standalone, file: pillars/sta.yaml }."));
+                problems.Add(new Finding(Severity.Error, "town.yaml", line, "expected-warning", "An expectedWarnings entry needs a 'rule', for example { rule: standalone, file: groups/sta.yaml }."));
                 continue;
             }
-            var hits = findings.Where(f => f.Severity == Severity.Warning && f.Rule == rule && (file is null || f.File == file.Replace('\\', '/'))).ToList();
+            var expectedFile = file is null ? null : c.InGroupFolder(file.Replace('\\', '/'));
+            var hits = findings.Where(f => f.Severity == Severity.Warning && f.Rule == rule && (expectedFile is null || f.File == expectedFile)).ToList();
             if (hits.Count == 0)
             {
                 problems.Add(new Finding(Severity.Error, "town.yaml", line, "expected-warning", $"Expected a '{rule}' warning{(file is null ? "" : $" in {file}")}, but there is none. If the rule no longer applies here, remove this entry; if it should, this registry has stopped showing it."));
@@ -137,15 +138,22 @@ public static partial class RegistryValidator
 
         public IEnumerable<string> RootFiles(params string[] names) => names.Where(n => File.Exists(Path.Combine(Folder, n)));
 
+        /// <summary>The folder of the group files: groups/, or pillars/, its older name. A town with both does not load, so nothing else is checked.</summary>
+        private string GroupFolder => Directory.Exists(Path.Combine(Folder, GroupWords.OlderFolder)) && !Directory.Exists(Path.Combine(Folder, GroupWords.Folder)) ? GroupWords.OlderFolder : GroupWords.Folder;
+
         public IEnumerable<string> PillarFiles()
         {
-            var dir = Path.Combine(Folder, "pillars");
+            var dir = Path.Combine(Folder, GroupFolder);
             return Directory.Exists(dir)
-                ? Directory.GetFiles(dir, "*.yaml").OrderBy(f => f, StringComparer.Ordinal).Select(f => "pillars/" + Path.GetFileName(f))
+                ? Directory.GetFiles(dir, "*.yaml").OrderBy(f => f, StringComparer.Ordinal).Select(f => GroupFolder + "/" + Path.GetFileName(f))
                 : [];
         }
 
-        public string PillarFile(string pillarId) => "pillars/" + pillarId + ".yaml";
+        public string PillarFile(string pillarId) => GroupFolder + "/" + pillarId + ".yaml";
+
+        /// <summary>A file named in groups/ or pillars/ (its older name), as it is found in this town's group folder; any other file as it is.</summary>
+        public string InGroupFolder(string file) =>
+            file.StartsWith(GroupWords.Folder + "/", StringComparison.Ordinal) || file.StartsWith(GroupWords.OlderFolder + "/", StringComparison.Ordinal) ? GroupFolder + file[file.IndexOf('/')..] : file;
 
         public HashSet<string> Aliases()
         {

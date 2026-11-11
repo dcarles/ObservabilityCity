@@ -13,12 +13,14 @@ town.yaml          required   the town's name and kind, and where the islands st
 defaults.yaml      optional   thresholds per role
 hub.yaml           required   shared resources in the middle
 third-parties.yaml optional   vendors outside the town
-pillars/<id>.yaml             one island each
+groups/<id>.yaml              one island each (pillars/ is the older name of the folder)
 environments/<id>.yaml        one per environment (live towns)
 fake.yaml, fake-assets.yaml, stories/   demo towns only (mode: demo)
 ```
 
-Thresholds cascade: `defaults.yaml` (per role) → the pillar's `defaults` → the system's own keys, then built-in values when no layer sets one. The nearest one wins.
+**Group** is the neutral word the files use for one island's set of systems; **pillar** is its older name, and every place that takes one takes the other: the folder (`groups/` or `pillars/`), the key of a group file (`group:` or `pillar:`), the template variables (`{group}` or `{pillar}`, `{groupId}` or `{pillarId}`, `{callerGroup}` or `{callerPillar}`) and the named group of a pattern (`(?<group>...)` or `(?<pillar>...)`). A town with both folders, or a file that sets both keys, is an error that names both; one template may use both spellings. The interface never shows either word: it calls a group what the town's `groupLabel` says. Where this page says pillar it means a group.
+
+Thresholds cascade: `defaults.yaml` (per role) → the group's `defaults` → the system's own keys, then built-in values when no layer sets one. The nearest one wins.
 
 ## town.yaml
 <!-- file: TownFile -->
@@ -26,7 +28,7 @@ Thresholds cascade: `defaults.yaml` (per role) → the pillar's `defaults` → t
 |---|---|---|---|
 | `id` | yes | | Short id of the town. |
 | `name` | yes | | Name shown in the top bar. |
-| `groupLabel` | no | `Group` | What one island is called in the interface (for example Pillar, Domain, Team). Every label that names a group uses it; `pillar` in key and file names means the same group. |
+| `groupLabel` | no | `Group` | What one island is called in the interface (for example Pillar, Domain, Team). Every label that names a group uses it. The files say `group` (older name `pillar`) for the same thing. |
 | `topology` | no | `direct` | `direct`: islands are linked by an outer ring road. `hub-and-spoke`: islands call each other through a gateway on the hub. |
 | `mode` | no | `live` | `demo` gives the town a fake source, the Break things panel and the story bar. `live` never does. |
 | `trafficDensity` | no | `1` | How many cars appear, as a multiple of the usual number: `1` is the usual look, `2` twice as many, `0.5` half. From `0.25` to `10`. A weak PC still lowers it with the quality setting, and the town never shows more than 420 cars at once. |
@@ -57,7 +59,7 @@ A database (`role: db`) in a pillar file or the hub then writes `engine: cosmos`
 <!-- file: TownMessagingFile -->
 | Key | Required | Default | Meaning |
 |---|---|---|---|
-| `topicTemplate` | no | `{service}` | The name of the topic of a service that a pillar file lists by its service (a plain entry under `topics`). `{pillar}` and `{service}` are replaced. It must contain `{service}` while any pillar lists a topic that way; a town that lists every topic by its own name needs none. Two topics with the same name are a problem. |
+| `topicTemplate` | no | `{service}` | The name of the topic of a service that a pillar file lists by its service (a plain entry under `topics`). `{group}` (older name `{pillar}`) and `{service}` are replaced. It must contain `{service}` while any pillar lists a topic that way; a town that lists every topic by its own name needs none. Two topics with the same name are a problem. |
 | `hubTopicTemplate` | no | `{service}` | The same for a plain entry under the hub's `topics`: `{service}` is replaced by the name the hub gives it. |
 
 For a town that names topics `<service>.events` and `shared.<name>`:
@@ -120,13 +122,13 @@ A map from a role name (`api`, `worker`, `db`, `cache`, `function` (old spelling
 | `amber` | no | none | Value at which the light turns amber. |
 | `red` | no | none | Value at which the light turns red. |
 
-## pillars/&lt;id&gt;.yaml
-One island. The file name is the pillar id.
+## groups/&lt;id&gt;.yaml
+One island. The file name is the group id. `pillars/` is the older name of the folder and reads the same; a town has one of the two.
 
 <!-- file: PillarFile -->
 | Key | Required | Default | Meaning |
 |---|---|---|---|
-| `pillar` | yes | | The pillar id. System ids are `<pillar>.<system>`. |
+| `group` | yes | | The group id (older name of the key: `pillar`; set one of the two). System ids are `<group>.<system>`. |
 | `displayName` | yes | | Name on the island's sign. |
 | `color` | no | `#8ab4ff` | Island colour. |
 | `external` | no | `false` | The pillar is outside the company (a vendor island). |
@@ -140,7 +142,7 @@ One island. The file name is the pillar id.
 <!-- file: PillarScopeFile -->
 | Key | Required | Default | Meaning |
 |---|---|---|---|
-| `code` | no | the pillar id | What `{pillar}` stands for in scope rules. |
+| `code` | no | the group id | What `{group}` (older name `{pillar}`) stands for in scope rules. |
 
 ### A system (pillar `systems`, hub `resources`)
 <!-- file: SystemFile -->
@@ -391,13 +393,13 @@ sources:
       backlog: { metric: ActiveMessages, aggregation: average }
       deadLetter: { metric: DeadletteredMessages, aggregation: last }   # last = the newest point: what is dead-lettered now, so a replayed queue clears at once. maximum would keep the peak of the whole window
       throughput: { metric: IncomingMessages, aggregation: total }
-      patterns:                               # the first that matches decides; (?<service>) is the service code of the reader, (?<pillar>) the pillar code of the reader (left out: any pillar)
-        - { match: '^(?<pillar>[a-z]+)\.(?<service>[a-z]+)\.in$' }
+      patterns:                               # the first that matches decides; (?<service>) is the service code of the reader, (?<group>) the group code of the reader (left out: any group; older name (?<pillar>))
+        - { match: '^(?<group>[a-z]+)\.(?<service>[a-z]+)\.in$' }
         # the name also says who publishes it, so the town builds the topic and the subscription itself: no `messaging:` block in a pillar file
         - { match: '^(?<producerPillar>[a-z]+)\.(?<producer>[a-z]+)\.to\.(?<service>[a-z]+)$' }
       flows:                                  # what a whole group sends and receives, for example one topic it publishes everything on and one it receives on
-        - { match: '^(?<pillar>[a-z]+)\.outbound$', direction: sent }
-        - { match: '^(?<pillar>[a-z]+)\.inbound$', direction: received }
+        - { match: '^(?<group>[a-z]+)\.outbound$', direction: sent }
+        - { match: '^(?<group>[a-z]+)\.inbound$', direction: received }
 signals: { backlog: messaging, deadLetters: messaging }
 ```
 
@@ -410,10 +412,10 @@ signals: { backlog: messaging, deadLetters: messaging }
 | `backlog` | no | none | The metric of the messages waiting in an entity. |
 | `deadLetter` | no | none | The metric of the dead-lettered messages of an entity. |
 | `throughput` | no | none | The metric of the messages that arrive in an entity, usually incoming messages added up by `total`. Their rate (per second over the window) sets how many boats sail to the consumer; without it the boats follow the consumer's request rate. |
-| `deadLetterLink` | no | none | `{ name, url }`: an address that opens one queue's dead letters in your queue explorer, shown for each queue in its consumer's drawer. The url is a template over `{queue}`, `{pillar}`, `{service}` (the codes of the scope rules), `{system}` and `{environment}`. Without it, no link. |
+| `deadLetterLink` | no | none | `{ name, url }`: an address that opens one queue's dead letters in your queue explorer, shown for each queue in its consumer's drawer. The url is a template over `{queue}`, `{group}` (older name `{pillar}`), `{service}` (the codes of the scope rules), `{system}` and `{environment}`. Without it, no link. |
 | `deadLetterLinks` | no | none | A list of `{ region, name, url }`: one queue-explorer address for each region, for a broker whose namespaces are in more than one region and a tool for each. A queue's dead letters in a region open the entry of that region (the region is matched ignoring case against the region of the namespace that holds them, as `scope.regions` and the resource rule give it). A region with no entry uses `deadLetterLink`. Each region may be given once. |
 | `flows` | no | none | Entities that carry a whole pillar's traffic, a list of `{ match, direction }`: the rate of their `throughput` (messages a second over the source's `window`) is what that pillar sends to other pillars (`sent`) or receives from them (`received`). Several entities of one pillar (the same name in each region) add up. The name says only the pillar, never the other end, so these are totals per pillar, not pairs. They need `throughput`. The dashboard and the town show them; without `flows` neither shows a flow. |
-| `patterns` | yes | | The shapes of entity names, tried in order: a regular expression with the group `service` (the code of the system that reads the entity; it must belong to one system of the kind only, or the entity is left out), optionally `pillar` (the code or id of the reader's pillar; without it the reader may be in any pillar), and optionally both `producerPillar` and `producer` (the code of the pillar and of the service that publish it). An entity whose name says its publisher is a route: the town adds that service's topic and the reader's subscription to what the pillar files say, on every poll, so queues teams add later appear without a config change. A queue Azure Monitor sends nothing for in one poll keeps its place with no numbers. |
+| `patterns` | yes | | The shapes of entity names, tried in order: a regular expression with the group `service` (the code of the system that reads the entity; it must belong to one system of the kind only, or the entity is left out), optionally `group` (older name `pillar`: the code or id of the reader's group; without it the reader may be in any group), and optionally both `producerPillar` and `producer` (the code of the pillar and of the service that publish it). An entity whose name says its publisher is a route: the town adds that service's topic and the reader's subscription to what the pillar files say, on every poll, so queues teams add later appear without a config change. A queue Azure Monitor sends nothing for in one poll keeps its place with no numbers. |
 
 At least one of `backlog`, `deadLetter` or `throughput` is required.
 
@@ -421,7 +423,7 @@ At least one of `backlog`, `deadLetter` or `throughput` is required.
 | Key | Required | Default | Meaning |
 |---|---|---|---|
 | `name` | yes | | The words the link shows (for example `Open in queue explorer`). |
-| `url` | yes | | An `http://` or `https://` address, a template over `{queue}` (the queue's name), `{pillar}`, `{service}`, `{system}` and `{environment}`. A system with no code for a word it uses gets no link. |
+| `url` | yes | | An `http://` or `https://` address, a template over `{queue}` (the queue's name), `{group}` (older name `{pillar}`), `{service}`, `{system}` and `{environment}`. A system with no code for a word it uses gets no link. |
 | `region` | no | | Only in `deadLetterLinks`: the region the address is for (required there, and not used in `deadLetterLink`). |
 
 <!-- file: EntityMetricFile -->
@@ -433,13 +435,13 @@ At least one of `backlog`, `deadLetter` or `throughput` is required.
 <!-- file: EntityPatternFile -->
 | Key | Required | Default | Meaning |
 |---|---|---|---|
-| `match` | yes | | A regular expression with the group `service` (required: the code of the system that reads the entity), optionally `pillar` (the code or id of the reader's pillar), and optionally both `producerPillar` and `producer` (never one alone), as in `patterns` above. |
+| `match` | yes | | A regular expression with the group `service` (required: the code of the system that reads the entity), optionally `group` (older name `pillar`: the code or id of the reader's group), and optionally both `producerPillar` and `producer` (never one alone), as in `patterns` above. |
 | `consumer` | no | `worker` | The role of the system that reads the entity (`worker`, `api`, ...). |
 
 <!-- file: EntityFlowFile -->
 | Key | Required | Default | Meaning |
 |---|---|---|---|
-| `match` | yes | | A regular expression with the named group `pillar`: the pillar's code (or id). |
+| `match` | yes | | A regular expression with the named group `group` (older name `pillar`): the group's code (or id). |
 | `direction` | yes | | `sent` (what arrives in this entity is what the pillar sends to the other pillars) or `received` (what the other pillars send to it). |
 
 The thresholds that turn a waiting count amber and red are `backlogCount` in the defaults.
@@ -466,7 +468,7 @@ Finds the calls the systems really make, from the dependency data in the telemet
 |---|---|---|---|
 | `host` | yes | | A regular expression over the host, with named groups `(?<name>...)`. |
 | `path` | no | none | A regular expression over the path, for a gateway that names the destination in it. |
-| `target` | yes | | The system id, written with `{name}` holes for the named groups and `{callerPillar}` for the pillar of the caller. A rule whose result is not a system of the town is skipped. A captured group named `service` may hold the service's name or its `serviceCode` (in the pillar the address names, else the caller's): when it is not a service name, the pillar's `serviceCode` finds the service, so one rule serves addresses written with short codes. An entry in `aliases` wins over that lookup; a code shared by two services of a pillar is never guessed. |
+| `target` | yes | | The system id, written with `{name}` holes for the named groups and `{callerGroup}` (older name `{callerPillar}`) for the group of the caller. A rule whose result is not a system of the town is skipped. A captured group named `service` may hold the service's name or its `serviceCode` (in the pillar the address names, else the caller's): when it is not a service name, the pillar's `serviceCode` finds the service, so one rule serves addresses written with short codes. An entry in `aliases` wins over that lookup; a code shared by two services of a pillar is never guessed. |
 | `gateway` | no | `false` | The call goes through the API gateway, so it is drawn as one (to a system on another island). |
 
 <!-- file: TrafficFile -->
@@ -493,8 +495,8 @@ links:
         by caller = AppRoleName, host = tostring(u.Host), path = tostring(u.Path)
   ignoreHosts: ['^169\.254\.']
   rules:
-    - { host: '^(?<service>[a-z-]+)\.services\.example\.test$', target: '{callerPillar}.{service}' }
-    - { host: '^gateway\.example\.test$', path: '^/(?<pillar>[a-z]+)/(?<service>[a-z-]+)/', target: '{pillar}.{service}', gateway: true }
+    - { host: '^(?<service>[a-z-]+)\.services\.example\.test$', target: '{callerGroup}.{service}' }
+    - { host: '^gateway\.example\.test$', path: '^/(?<group>[a-z]+)/(?<service>[a-z-]+)/', target: '{group}.{service}', gateway: true }
   aliases: { pay: payments }
   traffic:
     shareWindow: 1h
@@ -565,11 +567,11 @@ How pillars and systems map onto the cloud provider: the **account** a pillar li
 | `inventory` | no | none | Name of the source that lists resources: one whose kind can read an inventory (with the Azure adapter, a `resourcegraph` source). Without it, any such source of the file. |
 | `telemetryStore` | no | none | The telemetry store, by name or wildcard (a template), looked up in the inventory: exactly one must match. An id or resource id is used as given. Azure name: `workspace` (a Log Analytics workspace). |
 | `telemetryStoreId` | no | none | The telemetry store's id (a GUID or resource id), a template. Wins over `telemetryStore`, and nothing is looked up. Azure name: `workspaceId`. |
-| `variables` | no | none | Your own names for use in templates. |
+| `variables` | no | none | Your own names for use in templates. `environment`, `group` and `groupId` are taken. |
 | `account` | no | none | How a pillar finds its account, by exactly one of `nameLike` or `tag` (see below). Azure name: `subscription`. |
 | `pillarAccounts` | no | none | Pillar id → the id of the account that holds its resources, for pillars named instead of found. `hub` is accepted too, so the hub's gateway and broker find their resources and portal links. Azure name: `pillars`. |
 | `resources` | no | none | Rules that find a system's cloud resources. |
-| `telemetryRole` | no | none | Template for a system's telemetry name when it gives none. Holes: `{system}`, `{service}`, `{name}`, `{role}`, `{pillar}`, `{pillarId}`, your `variables` and `{environment}`. |
+| `telemetryRole` | no | none | Template for a system's telemetry name when it gives none. Holes: `{system}`, `{service}`, `{name}`, `{role}`, `{group}`, `{groupId}` (older names `{pillar}`, `{pillarId}`), your `variables` and `{environment}`. |
 | `links` | no | none | Addresses that open a resource in a portal or console, shown beside each resource in the Config tab. |
 | `cloud` | no | none | What the cloud is called in your words (for example `Azure`). A system whose app the inventory cannot find reads "not found in <cloud>"; without it, "not found in the inventory". A provider health report on the dashboard reads "<cloud> incident" ("Cloud incident" without it). |
 | `assets` | no | none | Resources that are not systems but stand as small buildings without health (a secrets store, a storage account). See below. |
@@ -581,7 +583,7 @@ An `account` rule (in `scope`, a resource rule or an asset rule):
 <!-- file: AccountRuleFile -->
 | Key | Required | Default | Meaning |
 |---|---|---|---|
-| `nameLike` | no | none | Account name pattern, a wildcard (a template, for example `{pillar}-{env}-*`). Give exactly one of `nameLike` and `tag`. |
+| `nameLike` | no | none | Account name pattern, a wildcard (a template over `{group}` (the group's code), `{groupId}` (older names `{pillar}`, `{pillarId}`) and your `variables`, for example `{group}-{env}-*`). Give exactly one of `nameLike` and `tag`. |
 | `tag` | no | none | Match by tag instead. Give exactly one of `nameLike` and `tag`. |
 
 <!-- file: TagRuleFile -->
@@ -595,7 +597,7 @@ An `account` rule (in `scope`, a resource rule or an asset rule):
 |---|---|---|---|
 | `name` | yes | | Name that `metrics` entries refer to. |
 | `types` | yes | | Cloud resource types the rule looks at, for example a plan or an account type. |
-| `pattern` | yes | | A regular expression over a resource's name with named groups: `service` (required), and optionally `role`, `pillar`, `region`, `tenant`. |
+| `pattern` | yes | | A regular expression over a resource's name with named groups: `service` (required), and optionally `role`, `group` (older name `pillar`), `region`, `tenant`. |
 | `roles` | no | all roles | Limit the rule to systems of these roles. |
 | `serviceTag` | no | none | Tag that carries the service. |
 | `tenantNameTag` | no | none | Tag that carries a tenant's friendly name. |
@@ -611,7 +613,7 @@ An `account` rule (in `scope`, a resource rule or an asset rule):
 | `label` | yes | | What the resource is, in the drawer's words (for example `Secrets store`). |
 | `shape` | no | `box` | How the building looks: `box`, `vault`, `store`, `settings` or `observatory`. |
 | `types` | yes | | The resource types it applies to. They are looked for in each pillar's account (or, with `island: hub`, in the accounts `account` names). |
-| `pattern` | yes | | Regular expression over the resource's name. Optional named groups: `service` (matched with a system's `serviceCode`; a match stands the building beside that service's pad, otherwise it stands in the pillar's back yard), `pillar` (another pillar's resource is left out) and `region`. On the hub only `region` is allowed. |
+| `pattern` | yes | | Regular expression over the resource's name. Optional named groups: `service` (matched with a system's `serviceCode`; a match stands the building beside that service's pad, otherwise it stands in the pillar's back yard), `group` (older name `pillar`: another group's resource is left out) and `region`. On the hub only `region` is allowed. |
 | `island` | no | the pillar it is found in | `hub` stands the building on the hub island, in the cluster `group` names. It belongs to no pillar and no service. |
 | `group` | with `island: hub` | | The cluster of buildings it stands in on the hub, named on a sign (for example `Shared telemetry`). Rules with the same group share a cluster. |
 | `account` | no | the pillars' accounts | With `island: hub`: which accounts to look in, by `nameLike` (a template over your `variables` and `{environment}`) or by `tag` (`key`, `value`), exactly one of the two. Use it when the shared resources live in an account of their own. Azure name: `subscription`. |

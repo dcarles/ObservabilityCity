@@ -30,8 +30,8 @@ public sealed record LinkDiscovery(
 
 /// <summary>
 /// One way to turn a call's address into a system. <see cref="Host"/> (and <see cref="Path"/>, when the call goes through a gateway that names its
-/// destination in the path) are regular expressions with named groups; <see cref="Target"/> is a system id written with {group} holes, and
-/// {callerPillar} for the pillar of the system that made the call. <see cref="Gateway"/> says the call goes through the API gateway.
+/// destination in the path) are regular expressions with named groups; <see cref="Target"/> is a system id written with {name} holes for them, and
+/// {callerGroup} (older name {callerPillar}) for the group of the system that made the call. <see cref="Gateway"/> says the call goes through the API gateway.
 /// </summary>
 public sealed record LinkRule(string Host, string? Path, string Target, bool Gateway);
 

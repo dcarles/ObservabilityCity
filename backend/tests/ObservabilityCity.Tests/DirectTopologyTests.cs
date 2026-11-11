@@ -37,7 +37,7 @@ public class DirectTopologyTests
     {
         // an island with no API of its own that calls into another island: it gets the ring road, and no hub bridge
         using var copy = new RegistryCopy(TestPaths.DroidShop);
-        copy.Replace("pillars/ntf.yaml", "role: api", "role: worker");
+        copy.Replace("groups/ntf.yaml", "role: api", "role: worker");
         var links = TownLinks.Of(RegistryLoader.Load(copy.Path));
 
         Assert.False(links["ntf"].HasApi);

@@ -156,7 +156,7 @@ public static partial class RegistryLoader
                 if (!TryRegex(rule.Path, out var problem)) errors.Add($"{at}.path '{rule.Path}': {problem}");
                 else groups.AddRange(ObservabilityCity.Core.Links.LinkRules.GroupNames(rule.Path));
             }
-            if (string.IsNullOrWhiteSpace(rule.Target)) errors.Add($"{at} needs a target: the system id, with {{group}} holes for what the patterns capture");
+            if (string.IsNullOrWhiteSpace(rule.Target)) errors.Add($"{at} needs a target: the system id, with {{name}} holes for what the patterns capture");
             else foreach (var problem in ScopeTemplate.Check(rule.Target, groups)) errors.Add($"{at}.target: {problem} Name the group in the host or path pattern, as (?<name>...)");
         }
     }

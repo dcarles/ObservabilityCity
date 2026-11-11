@@ -71,13 +71,15 @@ config/<company>/
   defaults.yaml      thresholds that every pillar and system inherits
   hub.yaml           shared resources, for example a gateway and a broker (today at most one gateway, broker, egress and database)
   third-parties.yaml outside vendors
-  pillars/<id>.yaml  one island per pillar: its systems, calls and messaging
+  groups/<id>.yaml   one island per group: its id (group:), systems, calls and messaging (pillars/ and pillar: are the older names)
   environments/<id>.yaml  what differs per environment: sources, tenants, excluded systems
   fake.yaml          baseline numbers for the fake source (mode: demo only)
   fake-assets.yaml   the basic buildings of the fake source (mode: demo only)
   stories/*.yaml     scripted timelines (mode: demo only)
   schema/            editor schemas (regenerated, do not edit)
 ```
+
+**Group and pillar.** In the files a group is `group`, the neutral word, or `pillar`, its older name: the folder (`groups/` or `pillars/`), the key of a group file (`group:` or `pillar:`), the template variables (`{group}`, `{groupId}`, `{callerGroup}` or `{pillar}`, `{pillarId}`, `{callerPillar}`) and the named group of a pattern (`(?<group>...)` or `(?<pillar>...)`) read the same (`GroupWords` in the core). A town with both folders, or a file with both keys, is an error that names both. The interface shows neither: it uses the town's `groupLabel`. Droid Shop uses the new names and Galactic Credit the old ones; `GroupAliasTests` loads towns both ways. `scope.pillarAccounts` and `producerPillar` keep their names.
 
 **Cascade:** `defaults.yaml` -> pillar `defaults` -> system, else built-in values. The most specific wins. System ids are `pillar.system`. Pillar and system files are shared by every environment; an environment file only says what is different (sources, tenants, `exclude`).
 

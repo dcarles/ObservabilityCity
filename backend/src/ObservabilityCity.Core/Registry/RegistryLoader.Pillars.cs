@@ -30,7 +30,7 @@ public static partial class RegistryLoader
                 {
                     if (first.Topic.GroupId == g.Id && first.ByService == byService) continue; // listed twice in one file, which its own check reports
                     if (byService && first.ByService)
-                        problem($"{g.Id}.yaml: the topic of '{decl.Service}' is called '{name}', which '{first.Topic.GroupId}' already publishes. Add {{pillar}} to messaging.topicTemplate in town.yaml");
+                        problem($"{g.Id}.yaml: the topic of '{decl.Service}' is called '{name}', which '{first.Topic.GroupId}' already publishes. Add {{group}} (older name {{pillar}}) to messaging.topicTemplate in town.yaml");
                     else if (byService)
                         problem($"{g.Id}.yaml (line {decl.Line}): the topic of '{decl.Service}' is called '{name}' by the template in town.yaml, but '{first.Topic.GroupId}' lists a topic of that name already. A topic name is unique in the town: rename one of them");
                     else if (first.ByService)
@@ -133,10 +133,12 @@ public static partial class RegistryLoader
         var p = Read<PillarFile>(file);
         CheckRoleKeys(p.Defaults, name, errors);
         CheckSignals(p.Signals, "the pillar", name, errors);
-        if (!KebabId.IsMatch(p.Pillar))
-            errors.Add($"{name}: pillar '{p.Pillar}' must be lowercase kebab-case");
+        if (p.Pillar.Length == 0)
+            errors.Add($"{name}: group is missing: give the group's id, the file name without .yaml (older name of the key: pillar)");
+        else if (!KebabId.IsMatch(p.Pillar))
+            errors.Add($"{name}: group '{p.Pillar}' must be lowercase kebab-case");
         else if (Path.GetFileNameWithoutExtension(file) != p.Pillar)
-            errors.Add($"{name}: pillar '{p.Pillar}' must match the file name");
+            errors.Add($"{name}: group '{p.Pillar}' must match the file name");
 
         var nodes = p.Systems
             .Select(s => ToNode(s, p.Pillar, name, p.Pillar, defaults, p.Defaults, p.External, p.Signals, ids, aliases, errors, engines))

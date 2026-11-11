@@ -117,8 +117,8 @@ public sealed class ServiceBusSource(
             foreach (var (entity, count) in arrived.OrderBy(kv => kv.Key, StringComparer.Ordinal))
             {
                 var match = regex.Match(entity);
-                if (!match.Success || !match.Groups["pillar"].Success) continue;
-                var group = registry.Groups.FirstOrDefault(g => !g.IsHub && Is(g, match.Groups["pillar"].Value));
+                if (!match.Success || GroupWords.Captured(match, GroupWords.Group) is not { Success: true } code) continue; // (?<group>...), or its older name (?<pillar>...)
+                var group = registry.Groups.FirstOrDefault(g => !g.IsHub && Is(g, code.Value));
                 if (group is null) continue;
                 var rate = count / window.TotalSeconds;
                 var before = result.GetValueOrDefault(group.Id) ?? new PillarFlowReading(null, null, seconds);
@@ -197,7 +197,7 @@ public sealed class ServiceBusSource(
             if (!match.Success) continue;
             var service = match.Groups["service"].Value;
             var pillars = registry.Groups.Where(g => !g.IsHub).ToList();
-            if (match.Groups["pillar"] is { Success: true } named) pillars = pillars.Where(g => Is(g, named.Value)).ToList();
+            if (GroupWords.Captured(match, GroupWords.Group) is { Success: true } named) pillars = pillars.Where(g => Is(g, named.Value)).ToList();
             var found = pillars.SelectMany(g => g.Nodes)
                 .Where(n => n.Kind.ToString().Equals(consumer, StringComparison.OrdinalIgnoreCase) && (n.ServiceCode ?? n.Service)?.Equals(service, StringComparison.OrdinalIgnoreCase) == true).ToList();
             if (found.Count != 1) return null; // none, or the code is shared by several pillars: not claimed rather than guessed

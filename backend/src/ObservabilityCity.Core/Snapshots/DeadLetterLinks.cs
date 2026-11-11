@@ -7,8 +7,8 @@ namespace ObservabilityCity.Core.Snapshots;
 /// <summary>Where the dead letters of one queue open in the support tool the environment names (in the settings of its broker source, see <see cref="IDeadLetterLinkSettings"/>).</summary>
 public static class DeadLetterLinks
 {
-    /// <summary>The variables a dead-letter link's URL may use.</summary>
-    public static readonly string[] Variables = ["pillar", "service", "system", "environment", "queue"];
+    /// <summary>The variables a dead-letter link's URL may use. {group} is the group's code; {pillar} is its older name.</summary>
+    public static readonly string[] Variables = [GroupWords.Group, GroupWords.Pillar, "service", "system", "environment", "queue"];
 
     /// <summary>
     /// The link for a queue a consumer reads, or null: the environment names no tool, or the address needs a word the system has none of (a pillar or service
@@ -25,7 +25,8 @@ public static class DeadLetterLinks
         var group = registry.Groups.FirstOrDefault(g => g.Id == node.GroupId);
         var words = new Dictionary<string, string?>
         {
-            ["pillar"] = group?.Code ?? group?.Id,
+            [GroupWords.Group] = group?.Code ?? group?.Id,
+            [GroupWords.Pillar] = group?.Code ?? group?.Id,
             ["service"] = node.ServiceCode ?? node.Service,
             ["system"] = node.Id,
             ["environment"] = env.Id,
