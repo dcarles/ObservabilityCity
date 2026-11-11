@@ -36,7 +36,7 @@ public sealed class ResourceGraphWorkspaceLookup(HttpClient http, ITokenProvider
             {
                 1 => new WorkspaceAnswer(found[0].Id, $"workspace '{found[0].Name}' found by its name"),
                 0 => new WorkspaceAnswer(null, $"no workspace is named '{pattern}'"),
-                _ => new WorkspaceAnswer(null, $"{found.Count} workspaces match '{pattern}' ({string.Join(", ", found.Select(w => w.Name).Order(StringComparer.Ordinal))}); make scope.workspace narrower or give scope.workspaceId"),
+                _ => new WorkspaceAnswer(null, $"{found.Count} workspaces match '{pattern}' ({string.Join(", ", found.Select(w => w.Name).Order(StringComparer.Ordinal))}); make scope.telemetryStore (Azure name workspace) narrower or give scope.telemetryStoreId (workspaceId)"),
             };
         }
         catch (Exception e) when (e is HttpRequestException or JsonException or KeyNotFoundException or Azure.Identity.CredentialUnavailableException or Azure.Identity.AuthenticationFailedException)

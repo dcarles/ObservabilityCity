@@ -516,8 +516,10 @@ public sealed record SystemDetail(
 
 /// <summary>
 /// Where a system lives and what its telemetry calls it, as the environment's scope rules resolve it. Null on a system when the environment has no
-/// scope rules. Subscription and Workspace are null when the rules do not give one (WorkspaceVia: "id" when it was given as an id, "name" when it was found by its name); InventoryState is "none" (no inventory source), "waiting" (not read yet),
-/// "read" or "failed". Problems are things the rules could not settle for this system.
+/// scope rules. Subscription is the pillar's account (an Azure subscription, an AWS account, a GCP project) and Workspace the telemetry store (on Azure, a
+/// Log Analytics workspace); both are null when the rules do not give one (WorkspaceVia: "id" when it was given as an id, "name" when it was found by its
+/// name). They keep the names they first had, which are the wire format the browser reads, while the registry and the core say account and telemetry store.
+/// InventoryState is "none" (no inventory source), "waiting" (not read yet), "read" or "failed". Problems are things the rules could not settle for this system.
 /// </summary>
 public sealed record ScopeInfo(
     string? Subscription,

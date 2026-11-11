@@ -16,7 +16,7 @@ using TownRegistry = ObservabilityCity.Core.Registry.Registry;
 namespace ObservabilityCity.Tests;
 
 /// <summary>
-/// Phase 2, slice 2: an environment's scope rules say which subscription each pillar lives in, which workspace the telemetry is in, which resources
+/// Phase 2, slice 2: an environment's scope rules say which account each pillar lives in, which telemetry store the telemetry is in, which resources
 /// belong to a service and what the telemetry calls each system. Two towns with the same pillars and systems but opposite conventions (names against
 /// tags, other resource types, other telemetry naming) resolve to the same logical town, which is the proof that no convention is in the core.
 /// </summary>
@@ -34,7 +34,7 @@ public class ScopeResolutionTests
     /// <summary>What a town is, without how it is spelt: for each system whether it was placed, its tenants' names and whether the telemetry knows it (a database has no telemetry of its own).</summary>
     private static Dictionary<string, string> LogicalTown(Resolution r) =>
         r.Systems.Where(s => !s.SystemId.StartsWith("hub.")).ToDictionary(s => s.SystemId, s =>
-            $"placed={s.SubscriptionId is not null} resources={s.Resources.Count > 0} tenants=[{string.Join("|", s.Resources.Where(x => x.Tenant is not null).Select(x => r.TenantNames.First(t => t.Id == x.Tenant).Name).Order())}] role={s.SystemId.EndsWith("-db") || s.TelemetryRole is not null} workspace={s.Workspace is not null}");
+            $"placed={s.AccountId is not null} resources={s.Resources.Count > 0} tenants=[{string.Join("|", s.Resources.Where(x => x.Tenant is not null).Select(x => r.TenantNames.First(t => t.Id == x.Tenant).Name).Order())}] role={s.SystemId.EndsWith("-db") || s.TelemetryRole is not null} workspace={s.TelemetryStore is not null}");
 
     // ---- the proof ----
 
@@ -64,10 +64,10 @@ public class ScopeResolutionTests
         var r = Resolved(TownA);
 
         var alpha = r.Pillar("aa")!;
-        Assert.Equal("al-prd-eu", alpha.SubscriptionName);
+        Assert.Equal("al-prd-eu", alpha.AccountName);
         Assert.Equal("name", alpha.Via);
         Assert.Equal("al", alpha.Code);
-        Assert.Equal("be-prd-eu", r.Pillar("bb")!.SubscriptionName);
+        Assert.Equal("be-prd-eu", r.Pillar("bb")!.AccountName);
     }
 
     [Fact]
@@ -100,8 +100,8 @@ public class ScopeResolutionTests
         Assert.Equal("OrdersApi", r.System("aa.orders-api")!.TelemetryRole);
         Assert.Equal("telemetry.role", r.System("aa.orders-api")!.TelemetryRoleVia);
         Assert.Null(r.System("aa.orders-db")!.TelemetryRole);
-        Assert.Equal("ws-prd-main", r.Workspace);
-        Assert.All(r.Systems, s => Assert.Equal("ws-prd-main", s.Workspace));
+        Assert.Equal("ws-prd-main", r.TelemetryStore);
+        Assert.All(r.Systems, s => Assert.Equal("ws-prd-main", s.TelemetryStore));
     }
 
     // ---- town B: tags, other resource types, derived names ----
@@ -111,8 +111,8 @@ public class ScopeResolutionTests
     {
         var r = Resolved(TownB);
 
-        Assert.Equal(("Alpha Production", "tag"), (r.Pillar("aa")!.SubscriptionName, r.Pillar("aa")!.Via));
-        Assert.Equal(("Beta Production", "explicit"), (r.Pillar("bb")!.SubscriptionName, r.Pillar("bb")!.Via));
+        Assert.Equal(("Alpha Production", "tag"), (r.Pillar("aa")!.AccountName, r.Pillar("aa")!.Via));
+        Assert.Equal(("Beta Production", "explicit"), (r.Pillar("bb")!.AccountName, r.Pillar("bb")!.Via));
     }
 
     [Fact]
@@ -132,7 +132,7 @@ public class ScopeResolutionTests
 
         Assert.Equal(("OrdersAPI", "scope.telemetryRole"), (r.System("aa.orders-api")!.TelemetryRole, r.System("aa.orders-api")!.TelemetryRoleVia));
         Assert.Equal(("LedgerGateway", "telemetry.role"), (r.System("bb.ledger-api")!.TelemetryRole, r.System("bb.ledger-api")!.TelemetryRoleVia));
-        Assert.Equal("law-live-prod", r.Workspace); // a variable of its own and the environment's id
+        Assert.Equal("law-live-prod", r.TelemetryStore); // a variable of its own and the environment's id
     }
 
     // ---- what the rules cannot settle is said, not guessed ----
@@ -143,7 +143,7 @@ public class ScopeResolutionTests
         var r = ScopeResolver.Resolve(Prod(TownB), null);
 
         Assert.False(r.InventoryRead);
-        Assert.Null(r.Pillar("aa")!.SubscriptionId);
+        Assert.Null(r.Pillar("aa")!.AccountId);
         Assert.Equal("explicit", r.Pillar("bb")!.Via); // named, so known without asking
         Assert.Equal("OrdersAPI", r.System("aa.orders-api")!.TelemetryRole);
         Assert.Empty(r.System("aa.orders-api")!.Resources);
@@ -154,12 +154,12 @@ public class ScopeResolutionTests
     public void A_pillar_no_subscription_matches_is_a_problem_naming_the_rule()
     {
         var inventory = Recorded(TownA);
-        var without = inventory with { Subscriptions = inventory.Subscriptions.Where(s => s.Name != "be-prd-eu").ToList() };
+        var without = inventory with { Accounts = inventory.Accounts.Where(s => s.Name != "be-prd-eu").ToList() };
 
         var r = ScopeResolver.Resolve(Prod(TownA), without);
 
         Assert.Contains(r.Problems, p => p.Contains("Pillar 'bb'") && p.Contains("name like 'be-prd-*'"));
-        Assert.Null(r.Pillar("bb")!.SubscriptionId);
+        Assert.Null(r.Pillar("bb")!.AccountId);
         Assert.Empty(r.System("bb.ledger-db")!.Resources);
     }
 
@@ -167,19 +167,19 @@ public class ScopeResolutionTests
     public void A_pillar_two_subscriptions_match_is_a_problem_and_neither_is_taken()
     {
         var inventory = Recorded(TownA);
-        var twice = inventory with { Subscriptions = [.. inventory.Subscriptions, new InventorySubscription("x", "al-prd-us", new Dictionary<string, string>())] };
+        var twice = inventory with { Accounts = [.. inventory.Accounts, new InventoryAccount("x", "al-prd-us", new Dictionary<string, string>())] };
 
         var r = ScopeResolver.Resolve(Prod(TownA), twice);
 
-        Assert.Contains(r.Problems, p => p.Contains("Pillar 'aa'") && p.Contains("2 subscriptions") && p.Contains("al-prd-eu") && p.Contains("al-prd-us"));
-        Assert.Null(r.Pillar("aa")!.SubscriptionId);
+        Assert.Contains(r.Problems, p => p.Contains("Pillar 'aa'") && p.Contains("2 accounts") && p.Contains("al-prd-eu") && p.Contains("al-prd-us"));
+        Assert.Null(r.Pillar("aa")!.AccountId);
     }
 
     [Fact]
     public void A_named_subscription_the_inventory_does_not_list_is_a_problem()
     {
         var inventory = Recorded(TownB);
-        var without = inventory with { Subscriptions = inventory.Subscriptions.Where(s => s.Name != "Beta Production").ToList() };
+        var without = inventory with { Accounts = inventory.Accounts.Where(s => s.Name != "Beta Production").ToList() };
 
         var r = ScopeResolver.Resolve(Prod(TownB), without);
 
@@ -280,7 +280,7 @@ public class ScopeResolutionTests
     {
         var message = LoadError(Head + "  variables: { env: prd }\n  workspace: \"ws-{enviroment}-{stage}\"\n");
 
-        Assert.Contains("scope.workspace", message);
+        Assert.Contains("scope.telemetryStore", message);
         Assert.Contains("{enviroment} is not a variable here", message);
         Assert.Contains("{env}", message);
     }
@@ -311,7 +311,7 @@ public class ScopeResolutionTests
         var env = copy.FilePath("environments/prod.yaml");
         File.WriteAllText(env, File.ReadAllText(env).Replace("pillars: { bb:", "pillars: { zz: 00000000-0000-0000-0000-000000000099, bb:"));
 
-        Assert.Contains(RegistryLoader.Load(copy.Path).ForEnvironment("prod").Warnings, w => w.Contains("scope.pillars names 'zz'"));
+        Assert.Contains(RegistryLoader.Load(copy.Path).ForEnvironment("prod").Warnings, w => w.Contains("scope.pillarAccounts names 'zz'"));
     }
 
     [Fact]
@@ -351,8 +351,8 @@ public class ScopeResolutionTests
     }
 
     private static object Rows(Inventory inventory, bool subscriptions) => subscriptions
-        ? inventory.Subscriptions.Select(s => new { id = s.Id, name = s.Name, tags = s.Tags })
-        : inventory.Resources.Select(x => new { id = x.Id, name = x.Name, type = x.Type, subscriptionId = x.SubscriptionId, location = x.Region, tags = x.Tags });
+        ? inventory.Accounts.Select(s => new { id = s.Id, name = s.Name, tags = s.Tags })
+        : inventory.Resources.Select(x => new { id = x.Id, name = x.Name, type = x.Type, subscriptionId = x.AccountId, location = x.Region, tags = x.Tags });
 
     [Fact]
     public async Task The_adapter_asks_for_subscriptions_then_for_the_resources_of_the_ones_the_rules_chose()
@@ -392,7 +392,7 @@ public class ScopeResolutionTests
         var inventory = await reader.ReadAsync(Prod(TownA), CancellationToken.None);
 
         Assert.Equal(2, pages);
-        Assert.Equal(["a", "b"], inventory.Subscriptions.Select(s => s.Id));
+        Assert.Equal(["a", "b"], inventory.Accounts.Select(s => s.Id));
     }
 
     [Fact]

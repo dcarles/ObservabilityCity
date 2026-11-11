@@ -128,7 +128,7 @@ config/<town>/
 - **Ids** are `<pillar>.<system>`, and `aliases` keep old ids working. A system's `role` is required. A key, id, role or engine the loader does not know is an error with a "did you mean".
 - **Thresholds cascade** from `defaults.yaml` to the pillar's `defaults` to the system. The inspector's Config tab shows each value and where it came from.
 - **Links are declared** (`calls`, `gatewayCalls`, `messaging`) and can be added from dependency data by link discovery (`links:` in an environment file). Buildings, bridges and piers exist only for links and roles that are really there.
-- **Scope** in an environment file maps pillars and systems onto the cloud provider with rules and templates: the accounts (Azure subscriptions), the telemetry store (a Log Analytics workspace), which resources belong to a service, and what the telemetry calls a system.
+- **Scope** in an environment file maps pillars and systems onto the cloud provider with rules and templates: the account each pillar lives in (`account`; an Azure subscription, an AWS account, a GCP project), the telemetry store (`telemetryStore`; on Azure a Log Analytics workspace), which resources belong to a service, and what the telemetry calls a system.
 
 **Staying company-neutral.** Core knows only generic things: islands, systems, links, brokers and vendors. Every naming convention, tag and query is a rule or template in the town's own files, and core assumes none. The two sample towns are shaped differently to prove it: Galactic Credit is hub-and-spoke with a gateway, Service Bus, 16 pillars plus Lost & found and topics named `{pillar}-{service}-outbox`; Droid Shop has six teams that call each other directly, Kafka, no gateway, topics named `{service}.events` and non-Azure basic buildings (a secrets store, a config store, a media bucket). Both render with no code changes, and the scope tests run two towns with opposite conventions.
 
@@ -226,7 +226,6 @@ Current limits:
 
 - **The hub holds at most one gateway, broker, egress and database.** A town with two brokers or two gateways puts the extra one on an island or uses `topology: direct`.
 - **`legacyFrom` can list only `hub`.** Marking a route you are moving off works only for the hub's topics.
-- **The scope speaks in Azure's words.** The subscription and workspace keys of `scope` (`subscription`, `pillars`, `workspace`, `workspaceId`, `queries`) are Azure adapter settings the core registry still holds and checks. A source's own settings are its adapter's (each adapter checks them), but the scope has no neutral names for the account and the telemetry store yet.
 
 Open questions:
 

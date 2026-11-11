@@ -12,28 +12,30 @@ public static partial class RegistryLoader
         f is null ? ScopeRules.None : new ScopeRules
         {
             Inventory = f.Inventory,
-            Workspace = f.Workspace,
-            WorkspaceId = f.WorkspaceId,
+            TelemetryStore = f.TelemetryStore,
+            TelemetryStoreId = f.TelemetryStoreId,
             Variables = f.Variables,
-            Subscription = f.Subscription is null ? null : new SubscriptionRule(f.Subscription.NameLike, f.Subscription.Tag?.Key, f.Subscription.Tag?.Value),
-            PillarSubscriptions = f.Pillars,
+            Account = ToAccount(f.Account),
+            PillarAccounts = f.PillarAccounts,
             Resources = f.Resources.Select(r => new ResourceRule(r.Name, r.Types, r.Pattern, r.Roles.Select(x => x.ToLowerInvariant() == "cron" ? "function" : x.ToLowerInvariant()).ToList(), r.ServiceTag, r.TenantNameTag, string.IsNullOrWhiteSpace(r.Instances) ? null : r.Instances.Trim(),
                 string.IsNullOrWhiteSpace(r.State) ? null : r.State.Trim(), r.Running.Count == 0 ? null : r.Running)
             {
-                Subscription = r.Subscription is null ? null : new SubscriptionRule(r.Subscription.NameLike, r.Subscription.Tag?.Key, r.Subscription.Tag?.Value),
+                Account = ToAccount(r.Account),
             }).ToList(),
             Cloud = string.IsNullOrWhiteSpace(f.Cloud) ? null : f.Cloud.Trim(),
             Assets = f.Assets.Select(a => new AssetRule(a.Name, a.Label.Trim(), a.Shape.Trim().ToLowerInvariant(), a.Types, a.Pattern)
             {
                 Island = string.IsNullOrWhiteSpace(a.Island) ? null : a.Island.Trim().ToLowerInvariant(),
                 Group = string.IsNullOrWhiteSpace(a.Group) ? null : a.Group.Trim(),
-                Subscription = a.Subscription is null ? null : new SubscriptionRule(a.Subscription.NameLike, a.Subscription.Tag?.Key, a.Subscription.Tag?.Value),
+                Account = ToAccount(a.Account),
             }).ToList(),
             TelemetryRole = f.TelemetryRole,
             Links = f.Links.Select(l => new ResourceLinkRule(l.Name, l.Url.Trim(), l.Types)).ToList(),
             Regions = f.Regions is null ? RegionRules.Default : new RegionRules(string.IsNullOrWhiteSpace(f.Regions.Tag) ? null : f.Regions.Tag.Trim(), f.Regions.Names, f.Regions.Skew ?? RegionRules.DefaultSkew),
-            Queries = new ScopeQueries(f.Queries?.Subscriptions, f.Queries?.Resources, f.Queries?.Workspaces),
+            Queries = new ScopeQueries(f.Queries?.Accounts, f.Queries?.Resources, f.Queries?.TelemetryStores),
         };
+
+    private static AccountRule? ToAccount(AccountRuleFile? f) => f is null ? null : new AccountRule(f.NameLike, f.Tag?.Key, f.Tag?.Value);
 
     private static void CheckQuery(EnvironmentFile f, SourceFile def, string source, string name, List<string> errors)
     {
@@ -62,27 +64,27 @@ public static partial class RegistryLoader
             if (text is null) return;
             foreach (var problem in ScopeTemplate.Check(text, known)) errors.Add($"{at}.{where}: {problem}");
         }
-        Template(s.Workspace, "workspace", own);
-        Template(s.WorkspaceId, "workspaceId", own);
-        if (s.Workspace is { } named && named.Trim().Length == 0) errors.Add($"{at}.workspace is empty; give the workspace's name (or a pattern like law-*-prod), or leave it out");
-        if (s.WorkspaceId is { } given && given.Trim().Length == 0) errors.Add($"{at}.workspaceId is empty; give the workspace id (a GUID) or leave it out");
+        Template(s.TelemetryStore, "telemetryStore", own);
+        Template(s.TelemetryStoreId, "telemetryStoreId", own);
+        if (s.TelemetryStore is { } named && named.Trim().Length == 0) errors.Add($"{at}.telemetryStore is empty; give the telemetry store's name (or a pattern like logs-*-prod), or leave it out");
+        if (s.TelemetryStoreId is { } given && given.Trim().Length == 0) errors.Add($"{at}.telemetryStoreId is empty; give the telemetry store's id (for example a GUID) or leave it out");
         Template(s.TelemetryRole, "telemetryRole", own.Concat(ScopeRules.SystemVariables));
-        if (s.Subscription is { } sub)
+        if (s.Account is { } sub)
         {
             var hasName = sub.NameLike is not null;
             var hasTag = sub.Tag is not null;
-            if (hasName == hasTag) errors.Add($"{at}.subscription needs exactly one of nameLike or tag");
-            Template(sub.NameLike, "subscription.nameLike", own.Concat(ScopeRules.PillarVariables));
+            if (hasName == hasTag) errors.Add($"{at}.account needs exactly one of nameLike or tag");
+            Template(sub.NameLike, "account.nameLike", own.Concat(ScopeRules.PillarVariables));
             if (sub.Tag is { } tag)
             {
-                if (tag.Key.Length == 0) errors.Add($"{at}.subscription.tag needs a key");
-                Template(tag.Value, "subscription.tag.value", own.Concat(ScopeRules.PillarVariables));
+                if (tag.Key.Length == 0) errors.Add($"{at}.account.tag needs a key");
+                Template(tag.Value, "account.tag.value", own.Concat(ScopeRules.PillarVariables));
             }
         }
-        foreach (var (pillar, subscription) in s.Pillars)
+        foreach (var (pillar, account) in s.PillarAccounts)
         {
-            if (!KebabId.IsMatch(pillar)) errors.Add($"{at}.pillars: '{pillar}' must be a pillar id (lowercase kebab-case)");
-            if (subscription.Trim().Length == 0) errors.Add($"{at}.pillars.{pillar} is empty; name a subscription id or leave the pillar out");
+            if (!KebabId.IsMatch(pillar)) errors.Add($"{at}.pillarAccounts: '{pillar}' must be a pillar id (lowercase kebab-case)");
+            if (account.Trim().Length == 0) errors.Add($"{at}.pillarAccounts.{pillar} is empty; name an account id or leave the pillar out");
         }
         if (s.Regions is { } regions)
         {
@@ -116,15 +118,15 @@ public static partial class RegistryLoader
             if (!string.IsNullOrWhiteSpace(a.Island) && !onHub) errors.Add($"{rule}: island '{a.Island}'. The only island other than a pillar's own is '{AssetRule.HubIsland}'; leave island out for a pillar's resource");
             if (onHub && string.IsNullOrWhiteSpace(a.Group)) errors.Add($"{rule} stands on the hub, so it needs a group: the name of the cluster of buildings it stands in (for example Monitoring)");
             if (!onHub && !string.IsNullOrWhiteSpace(a.Group)) errors.Add($"{rule}: group only applies to a building on the hub (island: hub)");
-            if (!onHub && a.Subscription is not null) errors.Add($"{rule}: subscription only applies to a building on the hub (island: hub); a pillar's resources are looked for in the pillar's subscription");
-            if (a.Subscription is { } assetSub)
+            if (!onHub && a.Account is not null) errors.Add($"{rule}: account only applies to a building on the hub (island: hub); a pillar's resources are looked for in the pillar's account");
+            if (a.Account is { } assetSub)
             {
-                if ((assetSub.NameLike is not null) == (assetSub.Tag is not null)) errors.Add($"{rule}.subscription needs exactly one of nameLike or tag");
-                Template(assetSub.NameLike, $"assets '{a.Name}'.subscription.nameLike", own);
+                if ((assetSub.NameLike is not null) == (assetSub.Tag is not null)) errors.Add($"{rule}.account needs exactly one of nameLike or tag");
+                Template(assetSub.NameLike, $"assets '{a.Name}'.account.nameLike", own);
                 if (assetSub.Tag is { } assetTag)
                 {
-                    if (assetTag.Key.Length == 0) errors.Add($"{rule}.subscription.tag needs a key");
-                    Template(assetTag.Value, $"assets '{a.Name}'.subscription.tag.value", own);
+                    if (assetTag.Key.Length == 0) errors.Add($"{rule}.account.tag needs a key");
+                    Template(assetTag.Value, $"assets '{a.Name}'.account.tag.value", own);
                 }
             }
             try
@@ -143,14 +145,14 @@ public static partial class RegistryLoader
             if (!KebabId.IsMatch(r.Name)) errors.Add($"{at}.resources: name '{r.Name}' must be lowercase kebab-case");
             else if (!seen.Add(r.Name)) errors.Add($"{at}.resources: '{r.Name}' is listed twice");
             if (r.Types.Count == 0) errors.Add($"{rule} needs types (the resource types it applies to, for example a plan or an account type)");
-            if (r.Subscription is { } ruleSub)
+            if (r.Account is { } ruleSub)
             {
-                if ((ruleSub.NameLike is not null) == (ruleSub.Tag is not null)) errors.Add($"{rule}.subscription needs exactly one of nameLike or tag");
-                Template(ruleSub.NameLike, $"resources '{r.Name}'.subscription.nameLike", own);
+                if ((ruleSub.NameLike is not null) == (ruleSub.Tag is not null)) errors.Add($"{rule}.account needs exactly one of nameLike or tag");
+                Template(ruleSub.NameLike, $"resources '{r.Name}'.account.nameLike", own);
                 if (ruleSub.Tag is { } ruleTag)
                 {
-                    if (ruleTag.Key.Length == 0) errors.Add($"{rule}.subscription.tag needs a key");
-                    Template(ruleTag.Value, $"resources '{r.Name}'.subscription.tag.value", own);
+                    if (ruleTag.Key.Length == 0) errors.Add($"{rule}.account.tag needs a key");
+                    Template(ruleTag.Value, $"resources '{r.Name}'.account.tag.value", own);
                 }
             }
             if (r.Instances is { } counting && counting.Trim().Length == 0) errors.Add($"{rule}: instances is empty; give the expression that counts a resource's instances, or leave it out");

@@ -423,16 +423,72 @@ internal sealed class LinkRuleFile
     public bool Gateway { get; set; }
 }
 
-internal sealed class ScopeFile
+/// <summary>
+/// A block some of whose keys may also be written by an older name: the scope's keys once spoke in one cloud's words (an Azure subscription, a Log Analytics
+/// workspace), and a file written that way still reads the same. Each property is read under its own (neutral) name or an alias of it; both on one block are
+/// a mistake, since one of them would be ignored. Any other key is unknown, as in every other block.
+/// </summary>
+internal abstract class AliasedBlock : IYamlConvertible
 {
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<Type, Dictionary<string, System.Reflection.PropertyInfo>> Keys = new();
+
+    /// <summary>Alias to the key it stands for, for example subscription to account.</summary>
+    internal abstract IReadOnlyDictionary<string, string> Aliases { get; }
+
+    /// <summary>What the block is called in a message, for example scope.</summary>
+    protected abstract string Block { get; }
+
+    void IYamlConvertible.Read(IParser parser, Type expectedType, ObjectDeserializer nestedObjectDeserializer)
+    {
+        var properties = Keys.GetOrAdd(GetType(), t => t.GetProperties().Where(p => p.CanWrite && p.SetMethod!.IsPublic)
+            .ToDictionary(p => char.ToLowerInvariant(p.Name[0]) + p.Name[1..], StringComparer.Ordinal));
+        parser.Consume<MappingStart>();
+        var written = new Dictionary<string, string>(StringComparer.Ordinal); // the key a value is for, to the spelling it was written in
+        while (!parser.TryConsume<MappingEnd>(out _))
+        {
+            var key = parser.Consume<Scalar>();
+            var name = Aliases.GetValueOrDefault(key.Value, key.Value);
+            // the reader's own words for an unknown key, so the loader reports it as it reports any other
+            if (!properties.TryGetValue(name, out var property))
+                throw new YamlException(key.Start, key.End, $"Property '{key.Value}' not found on type '{GetType().FullName}'.");
+            if (written.TryGetValue(name, out var first) && first != key.Value)
+            {
+                var (current, alias) = first == name ? (first, key.Value) : (key.Value, first);
+                throw new YamlException(key.Start, key.End, $"{Block} sets both '{current}' and '{alias}', which are one setting ('{alias}' is the older name of '{current}'). Keep one of them");
+            }
+            written[name] = key.Value;
+            property.SetValue(this, nestedObjectDeserializer(property.PropertyType));
+        }
+    }
+
+    void IYamlConvertible.Write(IEmitter emitter, ObjectSerializer nestedObjectSerializer) => throw new NotSupportedException("registry files are only read");
+}
+
+/// <summary>An environment's <c>scope:</c> block. The account and telemetry store keys also read under their Azure names (see <see cref="Aliases"/>).</summary>
+internal sealed class ScopeFile : AliasedBlock
+{
+    /// <summary>The older (Azure) name of each key that has one.</summary>
+    internal static readonly IReadOnlyDictionary<string, string> Names = new Dictionary<string, string>
+    {
+        ["subscription"] = "account",
+        ["pillars"] = "pillarAccounts",
+        ["workspace"] = "telemetryStore",
+        ["workspaceId"] = "telemetryStoreId",
+    };
+
+    internal override IReadOnlyDictionary<string, string> Aliases => Names;
+    protected override string Block => "scope";
+
     public string? Inventory { get; set; }
-    /// <summary>The workspace by name or wildcard pattern (a template). A name is looked up in the inventory; an id or resource id is used as it is.</summary>
-    public string? Workspace { get; set; }
-    /// <summary>The workspace's id (a GUID or a resource id), a template. When it is set the name is not looked up.</summary>
-    public string? WorkspaceId { get; set; }
+    /// <summary>The telemetry store by name or wildcard pattern (a template). A name is looked up in the inventory; an id or resource id is used as it is. Alias: workspace.</summary>
+    public string? TelemetryStore { get; set; }
+    /// <summary>The telemetry store's id (a GUID or a resource id), a template. When it is set the name is not looked up. Alias: workspaceId.</summary>
+    public string? TelemetryStoreId { get; set; }
     public Dictionary<string, string> Variables { get; set; } = new();
-    public SubscriptionRuleFile? Subscription { get; set; }
-    public Dictionary<string, string> Pillars { get; set; } = new();
+    /// <summary>How a pillar finds its account. Alias: subscription.</summary>
+    public AccountRuleFile? Account { get; set; }
+    /// <summary>Pillar id to account id, for the pillars named instead of found. Alias: pillars.</summary>
+    public Dictionary<string, string> PillarAccounts { get; set; } = new();
     public List<ResourceRuleFile> Resources { get; set; } = [];
     /// <summary>Resources that are not systems but stand as basic buildings without health (a key vault, a storage account).</summary>
     public List<AssetRuleFile> Assets { get; set; } = [];
@@ -446,8 +502,11 @@ internal sealed class ScopeFile
     public RegionsFile? Regions { get; set; }
 }
 
-internal sealed class AssetRuleFile
+internal sealed class AssetRuleFile : AliasedBlock
 {
+    internal override IReadOnlyDictionary<string, string> Aliases => RuleAliases.Names;
+    protected override string Block => Name.Length > 0 ? $"scope.assets '{Name}'" : "a scope.assets rule";
+
     public string Name { get; set; } = "";
     public string Label { get; set; } = "";
     public string Shape { get; set; } = "box";
@@ -457,8 +516,8 @@ internal sealed class AssetRuleFile
     public string? Island { get; set; }
     /// <summary>For a hub building: the cluster it stands in, named on a sign (for example Monitoring).</summary>
     public string? Group { get; set; }
-    /// <summary>For a hub building: which subscriptions to look in. Without it, the pillars' subscriptions.</summary>
-    public SubscriptionRuleFile? Subscription { get; set; }
+    /// <summary>For a hub building: which accounts to look in. Without it, the pillars' accounts. Alias: subscription.</summary>
+    public AccountRuleFile? Account { get; set; }
 }
 
 internal sealed class RegionsFile
@@ -476,7 +535,14 @@ internal sealed class ResourceLinkFile
     public List<string> Types { get; set; } = [];
 }
 
-internal sealed class SubscriptionRuleFile
+/// <summary>The older (Azure) name of a resource or asset rule's account key.</summary>
+internal static class RuleAliases
+{
+    internal static readonly IReadOnlyDictionary<string, string> Names = new Dictionary<string, string> { ["subscription"] = "account" };
+}
+
+/// <summary>Finds accounts (an Azure subscription, an AWS account, a GCP project) by name pattern or by tag.</summary>
+internal sealed class AccountRuleFile
 {
     public string? NameLike { get; set; }
     public TagRuleFile? Tag { get; set; }
@@ -488,8 +554,11 @@ internal sealed class TagRuleFile
     public string? Value { get; set; }
 }
 
-internal sealed class ResourceRuleFile
+internal sealed class ResourceRuleFile : AliasedBlock
 {
+    internal override IReadOnlyDictionary<string, string> Aliases => RuleAliases.Names;
+    protected override string Block => Name.Length > 0 ? $"scope.resources '{Name}'" : "a scope.resources rule";
+
     public string Name { get; set; } = "";
     public List<string> Types { get; set; } = [];
     public string Pattern { get; set; } = "";
@@ -502,15 +571,21 @@ internal sealed class ResourceRuleFile
     public string? State { get; set; }
     /// <summary>The values of state that mean the app runs. Required with state; any other value means stopped.</summary>
     public List<string> Running { get; set; } = [];
-    /// <summary>Which subscriptions this rule looks in, instead of the system's pillar's: by name pattern or tag (templates over your variables and {environment}). For a resource that lives apart from its pillar, such as a hub system's.</summary>
-    public SubscriptionRuleFile? Subscription { get; set; }
+    /// <summary>Which accounts this rule looks in, instead of the system's pillar's: by name pattern or tag (templates over your variables and {environment}). For a resource that lives apart from its pillar, such as a hub system's. Alias: subscription.</summary>
+    public AccountRuleFile? Account { get; set; }
 }
 
-internal sealed class ScopeQueriesFile
+internal sealed class ScopeQueriesFile : AliasedBlock
 {
-    public string? Subscriptions { get; set; }
+    private static readonly IReadOnlyDictionary<string, string> Names = new Dictionary<string, string> { ["subscriptions"] = "accounts", ["workspaces"] = "telemetryStores" };
+    internal override IReadOnlyDictionary<string, string> Aliases => Names;
+    protected override string Block => "scope.queries";
+
+    /// <summary>Alias: subscriptions.</summary>
+    public string? Accounts { get; set; }
     public string? Resources { get; set; }
-    public string? Workspaces { get; set; }
+    /// <summary>Alias: workspaces.</summary>
+    public string? TelemetryStores { get; set; }
 }
 
 internal sealed class SourceFile : IYamlConvertible

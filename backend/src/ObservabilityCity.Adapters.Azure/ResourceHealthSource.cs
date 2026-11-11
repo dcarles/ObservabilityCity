@@ -220,7 +220,7 @@ public sealed class ResourceHealthSource(
         else
         {
             var resolution = store.Resolve(view);
-            var subscriptions = resolution.Systems.Select(s => s.SubscriptionId).Concat(resolution.Pillars.Select(p => p.SubscriptionId)).Concat(resolution.AssetList.Select(a => a.SubscriptionId))
+            var subscriptions = resolution.Systems.Select(s => s.AccountId).Concat(resolution.Pillars.Select(p => p.AccountId)).Concat(resolution.AssetList.Select(a => a.AccountId))
                 .Where(id => !string.IsNullOrEmpty(id)).Select(id => id!).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
             var asks = AsksOf(subscriptions, store.Inventory);
             reads = asks.Count;
@@ -268,7 +268,7 @@ public sealed class ResourceHealthSource(
     /// <summary>The subscription and provider pairs to read: a pair is asked only when the inventory has a resource of that provider in that subscription, since an empty one cannot have a report that lands on a building.</summary>
     public IReadOnlyList<(string Subscription, string Provider)> AsksOf(IReadOnlyList<string> subscriptions, Inventory? inventory)
     {
-        var has = inventory is null ? null : inventory.Resources.Select(r => (r.SubscriptionId.ToLowerInvariant(), ProviderOf(r.Type))).ToHashSet();
+        var has = inventory is null ? null : inventory.Resources.Select(r => (r.AccountId.ToLowerInvariant(), ProviderOf(r.Type))).ToHashSet();
         return subscriptions.SelectMany(s => _settings.Providers.Select(p => (Subscription: s, Provider: p)))
             .Where(a => has is null || has.Contains((a.Subscription.ToLowerInvariant(), a.Provider.ToLowerInvariant()))).ToList();
     }

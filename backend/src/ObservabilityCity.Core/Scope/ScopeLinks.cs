@@ -10,7 +10,7 @@ namespace ObservabilityCity.Core.Scope;
 /// </summary>
 public static class ScopeLinks
 {
-    public static IReadOnlyList<ResourceLink>? For(ScopeRules rules, string environment, ResolvedResource resource, string? subscriptionId, string? tenantName)
+    public static IReadOnlyList<ResourceLink>? For(ScopeRules rules, string environment, ResolvedResource resource, string? accountId, string? tenantName)
     {
         if (rules.Links.Count == 0) return null;
         string? Value(string name) => name switch
@@ -19,7 +19,7 @@ public static class ScopeLinks
             "name" => Uri.EscapeDataString(resource.Name),
             "type" => Uri.EscapeDataString(resource.Type),
             "region" => Encode(resource.Region),
-            "subscriptionId" => Encode(subscriptionId),
+            "accountId" or "subscriptionId" => Encode(accountId), // subscriptionId: the older (Azure) name
             "tenantId" => Encode(resource.Tenant),
             "tenantName" => Encode(tenantName),
             ScopeRules.EnvironmentVariable => Uri.EscapeDataString(environment),

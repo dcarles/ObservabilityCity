@@ -89,14 +89,14 @@ An adapter that reads per-service data (a workspace, a resource group, a role na
 
 ```csharp
 var scope = context.Scope!.Resolve(registry.ForEnvironment(context.EnvironmentId));
-var system = scope.System("aa.orders-api");   // SubscriptionId (the account), Workspace (the telemetry store), TelemetryRole, ServiceCode, Resources
+var system = scope.System("aa.orders-api");   // AccountId, TelemetryStore, TelemetryRole, ServiceCode, Resources
 ```
 
 Before the inventory is read it holds only what the rules say on their own (a named account, the telemetry store, a system's telemetry role); the rest appears after the first read. Handle both.
 
 The source that reads the inventory is any source whose kind declares `Inventory` (see "Say what a kind can do"); with the Azure adapter it is `resourcegraph`.
 
-Current limit: the account and telemetry store keys of `scope` (`subscription`, `pillars`, `workspace`, `workspaceId`, `queries`) are Azure adapter settings the core still holds (marked **Azure adapter setting** in [config-reference.md](config-reference.md)). See "Scope" in [connect-your-company.md](connect-your-company.md).
+The scope speaks in neutral words: a pillar's **account** (`account`, `pillarAccounts`; an Azure subscription, an AWS account, a GCP project) and the **telemetry store** (`telemetryStore`, `telemetryStoreId`; on Azure a Log Analytics workspace). In the core model they are `PillarScope.AccountId`, `SystemScope.AccountId`, `InventoryAccount`, `InventoryResource.AccountId`, `InventoryTelemetryStore` and `Resolution.TelemetryStoreId`. An inventory adapter fills `Inventory.Accounts` with what its cloud calls an account, and `Inventory.TelemetryStores` (with the id each is queried by) only when `scope.telemetryStore` names one to look up. The Azure names of the keys (`subscription`, `pillars`, `workspace`, `workspaceId`) still read; your adapter's docs and messages may use your cloud's words beside the neutral ones, as the Azure adapter's do. See "Scope" in [connect-your-company.md](connect-your-company.md).
 
 ## Build it
 
