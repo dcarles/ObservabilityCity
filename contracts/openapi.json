@@ -1985,8 +1985,7 @@
       },
       "TopicSnapshot": {
         "required": [
-          "name",
-          "service"
+          "name"
         ],
         "type": "object",
         "properties": {
@@ -1994,7 +1993,8 @@
             "type": "string"
           },
           "service": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           }
         }
       },

@@ -266,7 +266,7 @@ public sealed class FakeSource(
         foreach (var g in registry.Groups.Where(g => !g.IsHub && (registry.Topics.Any(x => x.GroupId == g.Id) || registry.Subscriptions.Any(x => x.ConsumerGroupId == g.Id))))
         {
             double Rate(IEnumerable<string> ids) => ids.Select(id => result.TryGetValue(id, out var r) ? r.RequestsPerSecond : 0).Sum();
-            var published = g.Nodes.Where(n => registry.Topics.Any(x => x.GroupId == g.Id && x.Service == n.Service)).Select(n => n.Id);
+            var published = g.Nodes.Where(n => registry.Topics.Any(x => x.GroupId == g.Id && x.Service is not null && x.Service == n.Service)).Select(n => n.Id);
             var read = registry.Subscriptions.Where(x => x.ConsumerGroupId == g.Id).Select(x => x.ConsumerId).Distinct();
             result[NodeReading.FlowKey(g.Id)] = new NodeReading(now, true, 0, 0, 0, 0, 0, 0, Flow: new PillarFlowReading(Math.Round(Rate(published), 3), Math.Round(Rate(read), 3), 300));
         }

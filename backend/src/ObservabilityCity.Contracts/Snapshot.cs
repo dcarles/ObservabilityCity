@@ -243,8 +243,11 @@ public sealed record HealthEventSnapshot(
     DateTimeOffset? ResolvedAt = null,
     string? Tenant = null);
 
-/// <summary>A message broker topic: Name is the full topic name, Service the service (or hub resource name) that publishes it.</summary>
-public sealed record TopicSnapshot(string Name, string Service);
+/// <summary>
+/// A message broker topic of the island it is listed under: Name is the full topic name, Service the service that publishes it (for a hub topic listed
+/// by a short name, that name), or null for a topic that belongs to the island as a whole.
+/// </summary>
+public sealed record TopicSnapshot(string Name, string? Service);
 
 /// <summary>
 /// A worker reading a topic. Publisher is the id of the island that owns the topic, Consumer the id of the worker. Legacy marks a pillar reading

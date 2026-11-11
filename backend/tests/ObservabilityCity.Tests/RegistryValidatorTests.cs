@@ -16,6 +16,7 @@ public class RegistryValidatorTests
     [InlineData("shared-test-data/registries/tenants-town")]
     [InlineData("shared-test-data/registries/live-town")]
     [InlineData("shared-test-data/registries/links-town")]
+    [InlineData("shared-test-data/registries/free-topics-town")]
     [InlineData("shared-test-data/registries/stress-23")]
     [InlineData("shared-test-data/registries/wide-town")]
     [InlineData("shared-test-data/registries/stress-35")]

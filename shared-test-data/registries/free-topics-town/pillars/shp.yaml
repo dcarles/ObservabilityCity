@@ -1,0 +1,12 @@
+# Reads only: a worker on topics of two other islands, and the hub's topic, the old route.
+pillar: shp
+displayName: Shipping
+color: "#4dc3c9"
+systems:
+  - { id: shp.shipping-worker, service: shipping, name: Shipping worker, role: worker, calls: [shp.shipping-db] }
+  - { id: shp.shipping-db, service: shipping, name: Shipping DB, role: db }
+messaging:
+  subscriptions:
+    - { topic: orders.created, consumer: shp.shipping-worker }
+    - { topic: billing.audit, consumer: shp.shipping-worker }
+    - { topic: platform.broadcast, consumer: shp.shipping-worker, legacy: true }

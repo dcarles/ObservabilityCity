@@ -12,6 +12,7 @@ import type { GroupSnapshot, NodeSnapshot, Snapshot } from '../../src/types'
 const fixture = (name: string) => JSON.parse(readFileSync(resolve(__dirname, `../../../shared-test-data/snapshots/${name}`), 'utf8')) as Snapshot
 const links = fixture('links-town.json')
 const sample = fixture('calm.json')
+const free = fixture('free-topics-town.json')
 const group = (s: Snapshot, id: string) => s.groups.find((g) => g.id === id)!
 const kinds = (g: GroupSnapshot) => planIsland(g).placed.map((p) => p.node.kind)
 
@@ -160,5 +161,31 @@ describe('the snapshot guard and messaging', () => {
     delete raw.totals.deadLetters
 
     expect(checkSnapshot(raw).snapshot!.totals.deadLetters).toBe(0)
+  })
+})
+
+// free-topics-town names its topics after events (orders.created), gives one service two topics and has one no service publishes. The renderer
+// works from the island that lists a topic and the publisher of each subscription, never from a topic's name, so it draws the same piers.
+describe('a town whose topics have names of their own (free-topics-town)', () => {
+  it.each([
+    ['ord', true, 'publishes two topics of one service and reads one'],
+    ['bil', true, 'publishes a topic of its service and one of the island as a whole'],
+    ['shp', true, 'reads only: a worker on two islands\' topics and the hub\'s'],
+  ])('%s has a pier: %s', (id, pier) => {
+    expect(connectorsOf(group(free, id)).pier).toBe(pier)
+  })
+
+  it('keeps a topic no service publishes, with no service', () => {
+    expect(group(free, 'bil').messaging.topics).toContainEqual({ name: 'billing.audit', service: null })
+    expect(checkSnapshot(free).snapshot?.groups.find((g) => g.id === 'bil')?.messaging.topics).toContainEqual({ name: 'billing.audit', service: null })
+  })
+
+  it('takes the publisher of a subscription from the snapshot, not from the topic name', () => {
+    expect(group(free, 'shp').messaging.subscriptions.map((s) => `${s.topic}>${s.publisher}`)).toEqual(['orders.created>ord', 'billing.audit>bil', 'platform.broadcast>hub'])
+  })
+
+  it('counts every topic and read on the broker\'s sign', () => {
+    expect(portSummary(free.groups)).toEqual({ topics: 5, subscriptions: 6, piers: 3, legacy: 1 })
+    expect(messagingOf(group(free, 'ord').nodes, group(free, 'ord').messaging)).toMatchObject({ topics: 2, subscriptions: 1, legacy: false })
   })
 })

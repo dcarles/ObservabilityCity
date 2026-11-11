@@ -1,0 +1,15 @@
+# A topic of its service, and one that belongs to the island as a whole (no service publishes it).
+pillar: bil
+displayName: Billing
+color: "#e0a23a"
+systems:
+  - { id: bil.billing-api, service: billing, name: Billing API, role: api, external: true, calls: [bil.billing-db] }
+  - { id: bil.billing-worker, service: billing, name: Billing worker, role: worker, calls: [bil.billing-db] }
+  - { id: bil.billing-db, service: billing, name: Billing DB, role: db }
+messaging:
+  topics:
+    - { topic: billing.invoice.paid, service: billing }
+    - { topic: billing.audit }
+  subscriptions:
+    - { topic: orders.created, consumer: bil.billing-worker }
+    - { topic: orders.cancelled, consumer: bil.billing-worker }
