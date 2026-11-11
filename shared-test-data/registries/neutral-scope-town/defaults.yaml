@@ -1,0 +1,4 @@
+api:      { slaP99Ms: 1000, errors: { amber: 0.01, red: 0.05 } }
+worker:   { slaP99Ms: 30000, errors: { amber: 0.01, red: 0.05 } }
+db:       { slaP99Ms: 100, errors: { amber: 0.005, red: 0.02 } }
+gateway:  { slaP99Ms: 500, errors: { amber: 0.01, red: 0.05 } }

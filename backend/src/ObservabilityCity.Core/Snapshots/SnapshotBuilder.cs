@@ -20,7 +20,7 @@ public sealed partial class SnapshotBuilder(IRegistryProvider registries, Latest
         if (ScopeSource is null || registry.ActiveEnvironment is not { } env || env.Scope.Assets.Count == 0) return [];
         return ScopeSource.Resolve(registry).AssetList.Where(a => a.PillarId == groupId)
             .Select(a => new AssetSnapshot(a.Id, a.Name, a.Label, a.Shape, a.Service, a.Region,
-                ObservabilityCity.Core.Scope.ScopeLinks.For(env.Scope, Environment, new Scope.ResolvedResource(a.ResourceId, a.Name, a.Type, a.Region, null, a.Rule), a.SubscriptionId, null), a.Group))
+                ObservabilityCity.Core.Scope.ScopeLinks.For(env.Scope, Environment, new Scope.ResolvedResource(a.ResourceId, a.Name, a.Type, a.Region, null, a.Rule), a.AccountId, null), a.Group))
             .ToList();
     }
 

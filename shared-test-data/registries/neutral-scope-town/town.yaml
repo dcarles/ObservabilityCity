@@ -1,0 +1,7 @@
+# Every scope key written by its neutral name (account, telemetry store). ScopeAliasTests writes the same town with the older (Azure) names and expects the
+# same scope, so this town is the reference for the aliases; it has no data sources besides a recorded inventory.
+id: neutral-scope-town
+name: Neutral Scope Town
+groupLabel: Team
+topology: hub-and-spoke
+islands: [aa, bb]

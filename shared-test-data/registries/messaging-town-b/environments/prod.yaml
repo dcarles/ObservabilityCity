@@ -47,19 +47,20 @@ sources:
         - { match: '^bus\.[a-z]+\.(?<pillar>[a-z]+)\.(?<service>[a-z]+)\.out$' }
 scope:
   variables: { stage: live }
-  # the workspace is written as a name for people, and its id is given outright, so nothing is looked up
-  workspace: "law-{stage}-{environment}"
-  workspaceId: "00000000-0000-0000-0000-00000000c0de"
-  subscription: { tag: { key: pillar, value: "{pillarId}" } }
-  pillars: { bb: 00000000-0000-0000-0000-0000000000b2 }
+  # this town writes the scope's neutral names (account, telemetry store); the other test towns write the Azure names, which read the same
+  # the telemetry store is written as a name for people, and its id is given outright, so nothing is looked up
+  telemetryStore: "law-{stage}-{environment}"
+  telemetryStoreId: "00000000-0000-0000-0000-00000000c0de"
+  account: { tag: { key: pillar, value: "{pillarId}" } }
+  pillarAccounts: { bb: 00000000-0000-0000-0000-0000000000b2 }
   telemetryRole: "{name|nospace}"
   resources:
-    - { name: broker, types: [microsoft.servicebus/namespaces], roles: [broker], pattern: '^(?<service>sb)-acme-(?<region>[a-z]+)', subscription: { nameLike: "hub-{stage}-*" } }
+    - { name: broker, types: [microsoft.servicebus/namespaces], roles: [broker], pattern: '^(?<service>sb)-acme-(?<region>[a-z]+)', account: { nameLike: "hub-{stage}-*" } }
     - { name: container-apps, types: [microsoft.app/containerapps], roles: [api, worker], pattern: '^(?<service>[a-z]+)-(?<role>api|worker)$', instances: "toint(properties.template.scale.minReplicas)" }
     - { name: accounts, types: [microsoft.documentdb/databaseaccounts], roles: [db], pattern: '^cosmos-(?<service>[a-z]+)-(?<tenant>[a-z0-9]+)$', tenantNameTag: customer }
   # other address shapes: one per resource type, built from names and ids instead of the resource id
   links:
-    - { name: Console, url: "https://console.example.test/subscriptions/{subscriptionId}/apps/{name}", types: [microsoft.app/containerapps] }
+    - { name: Console, url: "https://console.example.test/subscriptions/{accountId}/apps/{name}", types: [microsoft.app/containerapps] }
     - { name: Customer page, url: "https://admin.example.test/customers/{tenantId}?name={tenantName}&env={environment}", types: [microsoft.documentdb/databaseaccounts] }
 signals: { backlog: messaging, deadLetters: messaging, instances: inventory, requests: telemetry, errors: telemetry, latency: telemetry, cpu: platform, memory: platform, utilisation: platform, throttled: platform }
 exclude: [cc.notify-api, cc.notify-worker, cc.notify-db]

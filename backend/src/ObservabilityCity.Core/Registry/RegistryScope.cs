@@ -3,7 +3,8 @@ using System.Text.RegularExpressions;
 namespace ObservabilityCity.Core.Registry;
 
 /// <summary>
-/// How an environment maps its pillars and systems onto the cloud: which subscription a pillar lives in, which workspace the telemetry is in, which
+/// How an environment maps its pillars and systems onto the cloud: which account a pillar lives in (an Azure subscription, an AWS account, a GCP project),
+/// which telemetry store the telemetry is in (on Azure, a Log Analytics workspace), which
 /// resources belong to a service and what the telemetry calls a system. The core knows none of the conventions; every one is a rule or a template
 /// here, with variables, and an environment without a <c>scope:</c> block has none (<see cref="IsEmpty"/>).
 /// </summary>
@@ -14,20 +15,20 @@ public sealed record ScopeRules
     /// <summary>The name of the environment source that reads the inventory (a source whose kind can read an inventory). Without it, the only such source.</summary>
     public string? Inventory { get; init; }
 
-    /// <summary>The workspace the telemetry is in, a template over <see cref="Variables"/> and {environment}. Null: none is configured.</summary>
-    public string? Workspace { get; init; }
+    /// <summary>The telemetry store the telemetry is in, a template over <see cref="Variables"/> and {environment}. Null: none is configured.</summary>
+    public string? TelemetryStore { get; init; }
 
-    /// <summary>The workspace's id (a GUID, or a resource id), a template. When it is given it is used as it is and the name is not looked up.</summary>
-    public string? WorkspaceId { get; init; }
+    /// <summary>The telemetry store's id (a GUID, or a resource id), a template. When it is given it is used as it is and the name is not looked up.</summary>
+    public string? TelemetryStoreId { get; init; }
 
     /// <summary>Your own words for the templates: {env} and so on. Values are plain text.</summary>
     public IReadOnlyDictionary<string, string> Variables { get; init; } = new Dictionary<string, string>();
 
-    /// <summary>How a pillar finds its subscription when this file does not name it.</summary>
-    public SubscriptionRule? Subscription { get; init; }
+    /// <summary>How a pillar finds its account when this file does not name it.</summary>
+    public AccountRule? Account { get; init; }
 
-    /// <summary>Pillar id to subscription id, for the pillars that are named instead of found.</summary>
-    public IReadOnlyDictionary<string, string> PillarSubscriptions { get; init; } = new Dictionary<string, string>();
+    /// <summary>Pillar id to account id, for the pillars that are named instead of found.</summary>
+    public IReadOnlyDictionary<string, string> PillarAccounts { get; init; } = new Dictionary<string, string>();
 
     /// <summary>How resources are told to belong to a service.</summary>
     public IReadOnlyList<ResourceRule> Resources { get; init; } = [];
@@ -50,12 +51,12 @@ public sealed record ScopeRules
     /// <summary>Overrides for the queries the inventory source sends. Null: the adapter's own.</summary>
     public ScopeQueries Queries { get; init; } = new(null, null);
 
-    public bool IsEmpty => Inventory is null && Workspace is null && WorkspaceId is null && Subscription is null && PillarSubscriptions.Count == 0 && Resources.Count == 0 && Assets.Count == 0 && Cloud is null && TelemetryRole is null;
+    public bool IsEmpty => Inventory is null && TelemetryStore is null && TelemetryStoreId is null && Account is null && PillarAccounts.Count == 0 && Resources.Count == 0 && Assets.Count == 0 && Cloud is null && TelemetryRole is null;
 
     public const string EnvironmentVariable = "environment";
     public static readonly string[] PillarVariables = ["pillar", "pillarId"];
-    /// <summary>What a link template can use besides the environment's variables and {environment}: the resource's own words.</summary>
-    public static readonly string[] LinkVariables = ["resourceId", "name", "type", "region", "subscriptionId", "tenantId", "tenantName"];
+    /// <summary>What a link template can use besides the environment's variables and {environment}: the resource's own words. {subscriptionId} is the older (Azure) name of {accountId}.</summary>
+    public static readonly string[] LinkVariables = ["resourceId", "name", "type", "region", "accountId", "subscriptionId", "tenantId", "tenantName"];
     public static readonly string[] SystemVariables = ["system", "service", "name", "role", "pillar", "pillarId"];
 }
 
@@ -74,8 +75,8 @@ public sealed record RegionRules(string? Tag, IReadOnlyDictionary<string, string
     public string Label(string region) => Names.FirstOrDefault(kv => kv.Key.Equals(region, StringComparison.OrdinalIgnoreCase)).Value is { Length: > 0 } label ? label : region;
 }
 
-/// <summary>Finds a pillar's subscription by its display name (a wildcard pattern) or by a tag on the subscription. Both are templates over {pillar}, {pillarId} and the variables.</summary>
-public sealed record SubscriptionRule(string? NameLike, string? TagKey, string? TagValue);
+/// <summary>Finds a pillar's account by its display name (a wildcard pattern) or by a tag on the account. Both are templates over {pillar}, {pillarId} and the variables.</summary>
+public sealed record AccountRule(string? NameLike, string? TagKey, string? TagValue);
 
 /// <summary>
 /// One kind of resource that belongs to a service. <see cref="Pattern"/> is a regular expression over the resource's name with the named groups
@@ -86,14 +87,14 @@ public sealed record SubscriptionRule(string? NameLike, string? TagKey, string? 
 /// </summary>
 public sealed record ResourceRule(string Name, IReadOnlyList<string> Types, string Pattern, IReadOnlyList<string> Roles, string? ServiceTag, string? TenantNameTag, string? Instances = null, string? State = null, IReadOnlyList<string>? Running = null)
 {
-    /// <summary>The subscriptions this rule looks in instead of the system's pillar's (a template rule over the environment's variables). Null: the pillar's.</summary>
-    public SubscriptionRule? Subscription { get; init; }
+    /// <summary>The accounts this rule looks in instead of the system's pillar's (a template rule over the environment's variables). Null: the pillar's.</summary>
+    public AccountRule? Account { get; init; }
 }
 
 /// <summary>
 /// One kind of resource that stands in the town as a basic building without health. <see cref="Label"/> is what the drawer calls it ("Key vault"), <see cref="Shape"/> how it looks
 /// (one of <see cref="Shapes"/>). <see cref="Pattern"/> is a regular expression over the resource's name with the optional named groups <c>service</c> (the service it belongs to, matched with a
-/// system's serviceCode: without a match, or without the group, it belongs to the pillar), <c>pillar</c> and <c>region</c>. The resource is looked for in the pillar's subscription.
+/// system's serviceCode: without a match, or without the group, it belongs to the pillar), <c>pillar</c> and <c>region</c>. The resource is looked for in the pillar's account.
 /// </summary>
 public sealed record AssetRule(string Name, string Label, string Shape, IReadOnlyList<string> Types, string Pattern)
 {
@@ -111,8 +112,8 @@ public sealed record AssetRule(string Name, string Label, string Shape, IReadOnl
     /// <summary>For a hub building: the cluster it stands in, shown on a sign. Null for a pillar's building.</summary>
     public string? Group { get; init; }
 
-    /// <summary>For a hub building: which subscriptions it is looked for in (a template over the environment's variables and {environment}). Null: the pillars' subscriptions.</summary>
-    public SubscriptionRule? Subscription { get; init; }
+    /// <summary>For a hub building: which accounts it is looked for in (a template over the environment's variables and {environment}). Null: the pillars' accounts.</summary>
+    public AccountRule? Account { get; init; }
 
     public bool OnHub => Island == HubIsland;
 }
@@ -123,8 +124,8 @@ public sealed record AssetRule(string Name, string Label, string Shape, IReadOnl
 /// </summary>
 public sealed record ResourceLinkRule(string Name, string Url, IReadOnlyList<string> Types);
 
-/// <summary>Query templates for the inventory source. {types} stands for the quoted resource types the rules name; {instances} for the expression that counts the instances of each (from the rules' <c>instances</c>). The workspaces query returns id, name and customerId (the workspace id) of every workspace, and the name is matched here.</summary>
-public sealed record ScopeQueries(string? Subscriptions, string? Resources, string? Workspaces = null);
+/// <summary>Query templates for the inventory source. {types} stands for the quoted resource types the rules name; {instances} for the expression that counts the instances of each (from the rules' <c>instances</c>). The telemetry stores query returns each store's id, name and the id it is queried by, and the name is matched here. What the queries look like is the inventory adapter's.</summary>
+public sealed record ScopeQueries(string? Accounts, string? Resources, string? TelemetryStores = null);
 
 /// <summary>Templates with {variable} and {variable|filter} holes. Filters: nospace, lower, upper.</summary>
 public static partial class ScopeTemplate

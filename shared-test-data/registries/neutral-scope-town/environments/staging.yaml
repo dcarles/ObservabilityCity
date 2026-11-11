@@ -1,0 +1,12 @@
+# The telemetry store is named for people and its id is given outright, so nothing is looked up; the accounts are found by a tag.
+name: Staging
+sources:
+  inventory: { kind: resourcegraph, connection: "file:inventory.json" }
+scope:
+  variables: { env: stg }
+  telemetryStore: "logs-{env}-main"
+  telemetryStoreId: "00000000-0000-0000-0000-00000000cafe"
+  account: { tag: { key: unit, value: "{pillarId}" } }
+  resources:
+    - { name: apps, types: [example/apps], roles: [api, worker], pattern: '^(?<service>[a-z]+)-(?<role>api|worker)-(?<region>[a-z]+)$' }
+signals: { instances: inventory }

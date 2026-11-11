@@ -1,0 +1,21 @@
+{
+  "subscriptions": [
+    { "id": "00000000-0000-0000-0000-0000000000a1", "name": "aa-prd-main", "tags": {} },
+    { "id": "00000000-0000-0000-0000-0000000000a2", "name": "Ledger production", "tags": {} },
+    { "id": "00000000-0000-0000-0000-0000000000f1", "name": "platform-prd", "tags": { "unit": "platform" } }
+  ],
+  "resources": [
+    { "id": "/accounts/a1/apps/orders-api-east", "name": "orders-api-east", "type": "example/apps", "subscriptionId": "00000000-0000-0000-0000-0000000000a1", "location": "east", "tags": {}, "instances": 2 },
+    { "id": "/accounts/a1/apps/orders-api-west", "name": "orders-api-west", "type": "example/apps", "subscriptionId": "00000000-0000-0000-0000-0000000000a1", "location": "west", "tags": {}, "instances": 1 },
+    { "id": "/accounts/a1/databases/db-orders-tenant1", "name": "db-orders-tenant1", "type": "example/databases", "subscriptionId": "00000000-0000-0000-0000-0000000000a1", "location": "east", "tags": { "customer": "First customer" } },
+    { "id": "/accounts/a1/secrets/secrets-orders", "name": "secrets-orders", "type": "example/secrets", "subscriptionId": "00000000-0000-0000-0000-0000000000a1", "location": "east", "tags": {} },
+    { "id": "/accounts/a2/apps/ledger-api-east", "name": "ledger-api-east", "type": "example/apps", "subscriptionId": "00000000-0000-0000-0000-0000000000a2", "location": "east", "tags": {}, "instances": 3 },
+    { "id": "/accounts/a2/apps/ledger-worker-east", "name": "ledger-worker-east", "type": "example/apps", "subscriptionId": "00000000-0000-0000-0000-0000000000a2", "location": "east", "tags": {}, "instances": 1 },
+    { "id": "/accounts/a2/databases/db-ledger-tenant1", "name": "db-ledger-tenant1", "type": "example/databases", "subscriptionId": "00000000-0000-0000-0000-0000000000a2", "location": "east", "tags": { "customer": "First customer" } },
+    { "id": "/accounts/f1/gateways/gw-gateway", "name": "gw-gateway", "type": "example/gateways", "subscriptionId": "00000000-0000-0000-0000-0000000000f1", "location": "east", "tags": {} },
+    { "id": "/accounts/f1/logstores/logs-prd-main", "name": "logs-prd-main", "type": "example/logstores", "subscriptionId": "00000000-0000-0000-0000-0000000000f1", "location": "east", "tags": {} }
+  ],
+  "workspaces": [
+    { "id": "/accounts/f1/logstores/logs-prd-main", "name": "logs-prd-main", "customerId": "00000000-0000-0000-0000-00000000beef" }
+  ]
+}

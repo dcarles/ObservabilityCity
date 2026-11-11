@@ -321,11 +321,13 @@ A source block has two kinds of key. The keys in this table are the core's and m
 ### Azure adapter settings
 These keys of a source block belong to the Azure adapter, which checks them (`validate`, and the server when it loads a town) and reads them. Every Azure kind takes the same keys; each reads the ones it uses. Without the Azure adapter loaded they are not checked.
 
+With the Azure adapter the [scope](#scope)'s account is a subscription and its telemetry store a Log Analytics workspace, and the scope keys may be written by their Azure names: `subscription` for `account` (in `scope`, a resource rule and an asset rule), `pillars` for `pillarAccounts`, `workspace` for `telemetryStore`, `workspaceId` for `telemetryStoreId`, `queries.subscriptions` for `queries.accounts`, `queries.workspaces` for `queries.telemetryStores`, and `{subscriptionId}` for `{accountId}` in a link. Both spellings read the same; one block may use only one of the two for a key.
+
 <!-- file: AzureSourceFile -->
 | Key | Required | Default | Meaning |
 |---|---|---|---|
 | `regionQuery` | no | none | `loganalytics`: the query that says how a service's requests divide between regions: one row per telemetry name and region with the columns `role`, `region` and `calls`. Sampled counts are fine, only the proportions are used. Same template holes as `query`. With it each region shows its share of the requests. |
-| `typesQuery` | no | none | `servicebus`: a Log Analytics query that says which kinds of message each queue handled: one row per queue and message type with the columns `queue` (the entity's name, as the broker names it), `type` and `calls` (how many were handled over the window). Same template holes as `query`. With it each queue row of a reading system's drawer lists the kinds with their messages a second, highest first, up to 200 kinds per queue; the quietest beyond that are counted, not listed. The source needs the workspace the environment's scope gives (`scope.workspaceId`). Without it no kinds are shown. |
+| `typesQuery` | no | none | `servicebus`: a Log Analytics query that says which kinds of message each queue handled: one row per queue and message type with the columns `queue` (the entity's name, as the broker names it), `type` and `calls` (how many were handled over the window). Same template holes as `query`. With it each queue row of a reading system's drawer lists the kinds with their messages a second, highest first, up to 200 kinds per queue; the quietest beyond that are counted, not listed. The source needs the workspace the environment's scope gives (`scope.telemetryStoreId`, Azure name `workspaceId`). Without it no kinds are shown. |
 | `metrics` | no | none | `azuremonitor`: which metric of which resources fills which signal (see below). Required for an `azuremonitor` source. |
 | `providers` | no | none | `resourcehealth`: the resource providers whose health reports are read, as the cloud names them (`Namespace.Service`, for example the data store's). Required for a `resourcehealth` source. A subscription is asked for a provider only when the inventory has a resource of that provider in it. A resource's report is matched to the system that owns it by the resource's id, through `scope.resources`. |
 | `keepResolvedFor` | no | `4h` | `resourcehealth`: how long a report stays listed, in green, after the resource recovered (a number and a unit: `4h`, `90m`, `1d`). The marker on the building goes away at once; the list entry and the drawer lines say resolved. A report can be dismissed earlier (the Dismiss button); a dismissal lasts until the server restarts. |
@@ -558,29 +560,31 @@ logs:
 | `clientSecretEnv` | no | none | Name of the environment variable that holds a service principal's secret. The secret itself never goes in a file. |
 
 ### scope
-How pillars and systems map onto the cloud provider. `inventory`, `workspace`, `workspaceId`, `subscription`, `pillars` and `queries` are **Azure adapter settings** (on Azure the account is a subscription and the telemetry store a Log Analytics workspace); the core registry holds them for now.
+How pillars and systems map onto the cloud provider: the **account** a pillar lives in (an Azure subscription, an AWS account, a GCP project) and the **telemetry store** its telemetry is in (on Azure, a Log Analytics workspace). The keys use these neutral words. Each key that once had an Azure name still reads under it, so a file written with the Azure names loads unchanged; the Azure name is given beside each key below. Write one spelling of a key per block: a block that sets both (for example `account` and `subscription`) is an error that names both keys and the line.
 
 <!-- file: ScopeFile -->
 | Key | Required | Default | Meaning |
 |---|---|---|---|
 | `inventory` | no | none | Name of the source that lists resources: one whose kind can read an inventory (with the Azure adapter, a `resourcegraph` source). Without it, any such source of the file. |
-| `workspace` | no | none | **Azure adapter setting.** The telemetry store: a Log Analytics workspace by name or wildcard (a template), looked up in the inventory. An id or resource id is used as given. |
-| `workspaceId` | no | none | **Azure adapter setting.** The workspace's id (GUID or resource id), a template. Wins over `workspace`. |
+| `telemetryStore` | no | none | The telemetry store, by name or wildcard (a template), looked up in the inventory: exactly one must match. An id or resource id is used as given. Azure name: `workspace` (a Log Analytics workspace). |
+| `telemetryStoreId` | no | none | The telemetry store's id (a GUID or resource id), a template. Wins over `telemetryStore`, and nothing is looked up. Azure name: `workspaceId`. |
 | `variables` | no | none | Your own names for use in templates. |
-| `subscription` | no | none | **Azure adapter setting.** Which subscriptions (accounts) belong to the environment, by exactly one of `nameLike` or `tag`. |
-| `pillars` | no | none | **Azure adapter setting.** Pillar id → the id of the subscription that holds its resources. `hub` is accepted too, so the hub's gateway and broker find their resources and portal links. |
+| `account` | no | none | How a pillar finds its account, by exactly one of `nameLike` or `tag` (see below). Azure name: `subscription`. |
+| `pillarAccounts` | no | none | Pillar id → the id of the account that holds its resources, for pillars named instead of found. `hub` is accepted too, so the hub's gateway and broker find their resources and portal links. Azure name: `pillars`. |
 | `resources` | no | none | Rules that find a system's cloud resources. |
 | `telemetryRole` | no | none | Template for a system's telemetry name when it gives none. Holes: `{system}`, `{service}`, `{name}`, `{role}`, `{pillar}`, `{pillarId}`, your `variables` and `{environment}`. |
 | `links` | no | none | Addresses that open a resource in a portal or console, shown beside each resource in the Config tab. |
 | `cloud` | no | none | What the cloud is called in your words (for example `Azure`). A system whose app the inventory cannot find reads "not found in <cloud>"; without it, "not found in the inventory". A provider health report on the dashboard reads "<cloud> incident" ("Cloud incident" without it). |
 | `assets` | no | none | Resources that are not systems but stand as small buildings without health (a secrets store, a storage account). See below. |
 | `regions` | no | location, as is | How a service's region is read and named, and when a lopsided split of requests is flagged. |
-| `queries` | no | built-in | **Azure adapter setting.** Replace the inventory queries. |
+| `queries` | no | the adapter's own | Replace the inventory source's queries. What they look like is the inventory adapter's (for the Azure adapter, Resource Graph queries). |
 
-<!-- file: SubscriptionRuleFile -->
+An `account` rule (in `scope`, a resource rule or an asset rule):
+
+<!-- file: AccountRuleFile -->
 | Key | Required | Default | Meaning |
 |---|---|---|---|
-| `nameLike` | no | none | Subscription name pattern (a template, for example `{pillar}-{env}`). Give exactly one of `nameLike` and `tag`. |
+| `nameLike` | no | none | Account name pattern, a wildcard (a template, for example `{pillar}-{env}-*`). Give exactly one of `nameLike` and `tag`. |
 | `tag` | no | none | Match by tag instead. Give exactly one of `nameLike` and `tag`. |
 
 <!-- file: TagRuleFile -->
@@ -601,7 +605,7 @@ How pillars and systems map onto the cloud provider. `inventory`, `workspace`, `
 | `instances` | no | none | Query expression for how many instances a resource runs. |
 | `state` | no | none | Query expression that reads a resource's app state as text. A system whose rule has it shows Running, Stopped (a building under construction) or, when the inventory has no such app, Missing (grey, "not found in" the `cloud` you name). |
 | `running` | with `state` | | The values of `state` that mean the app runs; any other value is shown as stopped. The core knows no state words. |
-| `subscription` | no | the system's pillar's | Which subscriptions this rule looks in, by `nameLike` (a template over your `variables` and `{environment}`) or by `tag` (`key`, `value`), exactly one of the two. For resources that live apart from their pillar, such as the hub's gateway or message broker. |
+| `account` | no | the system's pillar's | Which accounts this rule looks in, by `nameLike` (a template over your `variables` and `{environment}`) or by `tag` (`key`, `value`), exactly one of the two. For resources that live apart from their pillar, such as the hub's gateway or message broker. Azure name: `subscription`. |
 
 <!-- file: AssetRuleFile -->
 | Key | Required | Default | Meaning |
@@ -609,11 +613,11 @@ How pillars and systems map onto the cloud provider. `inventory`, `workspace`, `
 | `name` | yes | | Names the rule (lowercase kebab-case). |
 | `label` | yes | | What the resource is, in the drawer's words (for example `Secrets store`). |
 | `shape` | no | `box` | How the building looks: `box`, `vault`, `store`, `settings` or `observatory`. |
-| `types` | yes | | The resource types it applies to. They are looked for in each pillar's subscription (or, with `island: hub`, in the subscriptions `subscription` names). |
+| `types` | yes | | The resource types it applies to. They are looked for in each pillar's account (or, with `island: hub`, in the accounts `account` names). |
 | `pattern` | yes | | Regular expression over the resource's name. Optional named groups: `service` (matched with a system's `serviceCode`; a match stands the building beside that service's pad, otherwise it stands in the pillar's back yard), `pillar` (another pillar's resource is left out) and `region`. On the hub only `region` is allowed. |
 | `island` | no | the pillar it is found in | `hub` stands the building on the hub island, in the cluster `group` names. It belongs to no pillar and no service. |
 | `group` | with `island: hub` | | The cluster of buildings it stands in on the hub, named on a sign (for example `Shared telemetry`). Rules with the same group share a cluster. |
-| `subscription` | no | the pillars' subscriptions | With `island: hub`: which subscriptions to look in, by `nameLike` (a template over your `variables` and `{environment}`) or by `tag` (`key`, `value`), exactly one of the two. Use it when the shared resources live in a subscription of their own. |
+| `account` | no | the pillars' accounts | With `island: hub`: which accounts to look in, by `nameLike` (a template over your `variables` and `{environment}`) or by `tag` (`key`, `value`), exactly one of the two. Use it when the shared resources live in an account of their own. Azure name: `subscription`. |
 
 <!-- file: RegionsFile -->
 | Key | Required | Default | Meaning |
@@ -626,15 +630,15 @@ How pillars and systems map onto the cloud provider. `inventory`, `workspace`, `
 | Key | Required | Default | Meaning |
 |---|---|---|---|
 | `name` | yes | | The words on the link, for example `Cloud portal`. |
-| `url` | yes | | A template that starts with `https://` (or `http://`) written out. Holes: `{resourceId}`, `{name}`, `{type}`, `{region}`, `{subscriptionId}`, `{tenantId}`, `{tenantName}`, `{environment}` and your `variables`. Values are percent-encoded (a resource id keeps its slashes). An address that does not come out as a valid `http`/`https` address is dropped for that resource. The app never calls it. |
+| `url` | yes | | A template that starts with `https://` (or `http://`) written out. Holes: `{resourceId}`, `{name}`, `{type}`, `{region}`, `{accountId}` (Azure name: `{subscriptionId}`), `{tenantId}`, `{tenantName}`, `{environment}` and your `variables`. Values are percent-encoded (a resource id keeps its slashes). An address that does not come out as a valid `http`/`https` address is dropped for that resource. The app never calls it. |
 | `types` | no | all types | Only resources of these types get the link. |
 
 <!-- file: ScopeQueriesFile -->
 | Key | Required | Default | Meaning |
 |---|---|---|---|
-| `subscriptions` | no | built-in | Query that lists subscriptions. |
-| `resources` | no | built-in | Query that lists resources. |
-| `workspaces` | no | built-in | Query that finds the workspace. |
+| `accounts` | no | the adapter's own | Query that lists the accounts. Azure name: `subscriptions`. |
+| `resources` | no | the adapter's own | Query that lists resources. |
+| `telemetryStores` | no | the adapter's own | Query that lists the telemetry stores, to find the one `telemetryStore` names. Azure name: `workspaces`. |
 
 ## fake.yaml and stories/
 Used only by a town with `mode: demo`; the validator rejects them in a live town. They script the fake source and the story bar (`fake.yaml` also takes `regions: { name: weight }` per service; `fake-assets.yaml` lists the basic buildings) and are described in the sample folders (`config/galactic-credit/fake.yaml`, `config/galactic-credit/stories/`).

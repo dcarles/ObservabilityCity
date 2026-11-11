@@ -161,7 +161,7 @@ public class AssetBuildingTests
         var registry = RegistryLoader.Load(folder).ForEnvironment("prod");
         var inventory = ObservabilityCity.Adapters.Azure.ResourceGraphInventory.FromRecording(File.ReadAllText(Path.Combine(folder, "inventory.json")));
 
-        var ids = ObservabilityCity.Core.Scope.ScopeResolver.HubAssetSubscriptions(registry, ObservabilityCity.Core.Scope.ScopeResolver.Resolve(registry, new ObservabilityCity.Core.Scope.Inventory(inventory.Subscriptions, [])).Pillars, inventory.Subscriptions);
+        var ids = ObservabilityCity.Core.Scope.ScopeResolver.HubAssetAccounts(registry, ObservabilityCity.Core.Scope.ScopeResolver.Resolve(registry, new ObservabilityCity.Core.Scope.Inventory(inventory.Accounts, [])).Pillars, inventory.Accounts);
 
         Assert.Equal(["00000000-0000-0000-0000-0000000000a9", "00000000-0000-0000-0000-0000000000e9"], ids.Order(StringComparer.Ordinal));
     }
@@ -204,7 +204,7 @@ public class AssetBuildingTests
             var problems = Assert.Throws<RegistryException>(() => RegistryLoader.Load(folder)).Message;
 
             Assert.Contains("group only applies to a building on the hub", problems);
-            Assert.Contains("subscription only applies to a building on the hub", problems);
+            Assert.Contains("account only applies to a building on the hub", problems); // written with the Azure name, subscription
         }
         finally { Directory.Delete(folder, true); }
     }
@@ -232,9 +232,9 @@ public class AssetBuildingTests
         var folder = Town("a");
         var registry = RegistryLoader.Load(folder).ForEnvironment("prod");
         var inventory = ObservabilityCity.Adapters.Azure.ResourceGraphInventory.FromRecording(File.ReadAllText(Path.Combine(folder, "inventory.json")));
-        var pillars = ObservabilityCity.Core.Scope.ScopeResolver.Resolve(registry, new ObservabilityCity.Core.Scope.Inventory(inventory.Subscriptions, [])).Pillars;
+        var pillars = ObservabilityCity.Core.Scope.ScopeResolver.Resolve(registry, new ObservabilityCity.Core.Scope.Inventory(inventory.Accounts, [])).Pillars;
 
-        var ids = ObservabilityCity.Core.Scope.ScopeResolver.HubAssetSubscriptions(registry, pillars, inventory.Subscriptions);
+        var ids = ObservabilityCity.Core.Scope.ScopeResolver.HubAssetAccounts(registry, pillars, inventory.Accounts);
 
         Assert.Contains("00000000-0000-0000-0000-0000000000e9", ids);
         Assert.Contains("00000000-0000-0000-0000-0000000000a9", ids);

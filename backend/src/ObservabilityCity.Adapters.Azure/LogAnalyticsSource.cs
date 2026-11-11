@@ -371,26 +371,26 @@ public sealed class LogAnalyticsSource(
     }
 
     /// <summary>
-    /// The workspace to query: the source's own connection, else the id the environment's scope settles (an explicit <c>workspaceId</c>, or the id of the
-    /// workspace found by its name). A name that has not been looked up yet is a wait, not a mistake in the files, and the message says so.
+    /// The workspace to query: the source's own connection, else the id the environment's scope settles for its telemetry store (an explicit
+    /// <c>telemetryStoreId</c>, Azure name <c>workspaceId</c>, or the id of the workspace found by its name). A name that has not been looked up yet is a wait, not a mistake in the files, and the message says so.
     /// </summary>
     private string Workspace(Resolution resolution) => Workspace(name, definition, resolution);
 
     internal static string Workspace(string name, RegistrySource definition, Resolution resolution)
     {
         var connection = definition.Connection;
-        var workspace = string.IsNullOrWhiteSpace(connection) ? resolution.WorkspaceId : connection.Trim();
+        var workspace = string.IsNullOrWhiteSpace(connection) ? resolution.TelemetryStoreId : connection.Trim();
         if (string.IsNullOrWhiteSpace(workspace))
         {
-            var named = resolution.Workspace;
+            var named = resolution.TelemetryStore;
             if (string.IsNullOrWhiteSpace(named))
-                throw new InvalidOperationException($"source '{name}' has no workspace. Set its connection, or scope.workspaceId (or scope.workspace, a name to look up) in the environment file");
-            var why = resolution.WorkspaceProblemList.FirstOrDefault() ??
+                throw new InvalidOperationException($"source '{name}' has no workspace. Set its connection, or scope.telemetryStoreId (Azure name workspaceId; or scope.telemetryStore, Azure name workspace, a name to look up) in the environment file");
+            var why = resolution.TelemetryStoreProblemList.FirstOrDefault() ??
                       (resolution.InventoryRead ? "the inventory has no workspace by that name" : "the inventory has not been read yet, so the name could not be looked up");
             throw new InvalidOperationException($"the workspace '{named}' is a name and has no workspace id yet: {why}. Log Analytics is queried by workspace id (a GUID) or by resource id (starting with /subscriptions)");
         }
-        if (!ScopeResolver.IsWorkspaceId(workspace))
-            throw new InvalidOperationException($"the workspace '{workspace}' is a name; Log Analytics is queried by workspace id (a GUID) or by resource id (starting with /subscriptions). Give the id under scope.workspaceId, or the name under scope.workspace to have it looked up");
+        if (!ScopeResolver.IsTelemetryStoreId(workspace))
+            throw new InvalidOperationException($"the workspace '{workspace}' is a name; Log Analytics is queried by workspace id (a GUID) or by resource id (starting with /subscriptions). Give the id under scope.telemetryStoreId (Azure name workspaceId), or the name under scope.telemetryStore (Azure name workspace) to have it looked up");
         return workspace;
     }
 

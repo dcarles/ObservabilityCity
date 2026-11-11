@@ -12,7 +12,7 @@ namespace ObservabilityCity.Adapters.Azure;
 /// <summary>
 /// Reads the inventory (subscriptions and the resources the scope rules name) from Azure Resource Graph. It asks twice: first for the subscriptions,
 /// so the rules can say which belong to which pillar, then for the resources of just those. Both queries are templates in the environment file
-/// (<c>scope.queries</c>); the ones here are only the generic defaults. Every page is read: nothing is cut off at a row count.
+/// (<c>scope.queries</c>: <c>accounts</c>, <c>resources</c> and <c>telemetryStores</c>, which the Azure names <c>subscriptions</c> and <c>workspaces</c> also set); the ones here are only the generic defaults. Every page is read: nothing is cut off at a row count.
 /// </summary>
 public sealed class ResourceGraphInventory(HttpClient http, ICredentialSource? credential, RegistrySource source, ScopeRules rules)
 {
@@ -36,10 +36,10 @@ public sealed class ResourceGraphInventory(HttpClient http, ICredentialSource? c
 
     public async Task<Inventory> ReadAsync(TownRegistry registry, CancellationToken ct)
     {
-        var subscriptions = (await Query(rules.Queries.Subscriptions ?? DefaultSubscriptionsQuery, Scope, ct)).Select(ToSubscription).ToList();
+        var subscriptions = (await Query(rules.Queries.Accounts ?? DefaultSubscriptionsQuery, Scope, ct)).Select(ToSubscription).ToList();
         var found = ScopeResolver.Resolve(registry, new Inventory(subscriptions, []));
-        var wanted = found.Pillars.Select(p => p.SubscriptionId).OfType<string>().Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-        wanted.AddRange(ScopeResolver.HubAssetSubscriptions(registry, found.Pillars, subscriptions).Where(id => !wanted.Contains(id, StringComparer.OrdinalIgnoreCase)));
+        var wanted = found.Pillars.Select(p => p.AccountId).OfType<string>().Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        wanted.AddRange(ScopeResolver.HubAssetAccounts(registry, found.Pillars, subscriptions).Where(id => !wanted.Contains(id, StringComparer.OrdinalIgnoreCase)));
         var types = rules.Resources.SelectMany(r => r.Types).Concat(rules.Assets.SelectMany(a => a.Types)).Select(t => t.ToLowerInvariant()).Distinct().ToList();
         var resources = new List<InventoryResource>();
         if (wanted.Count > 0 && types.Count > 0)
@@ -51,12 +51,15 @@ public sealed class ResourceGraphInventory(HttpClient http, ICredentialSource? c
             foreach (var batch in wanted.Chunk(MaxSubscriptionsPerCall))
                 resources.AddRange((await Query(query, batch, ct)).Select(ToResource));
         }
-        return new Inventory(subscriptions, resources, NeedsWorkspaceLookup(rules) ? (await Query(rules.Queries.Workspaces ?? DefaultWorkspacesQuery, Scope, ct)).Select(ToWorkspace).ToList() : null);
+        return new Inventory(subscriptions, resources, NeedsWorkspaceLookup(rules) ? (await Query(rules.Queries.TelemetryStores ?? DefaultWorkspacesQuery, Scope, ct)).Select(ToWorkspace).ToList() : null);
     }
 
-    /// <summary>A workspace is looked up by name only when it is given as a name and no explicit id is: an id is used as it is, so nothing is asked.</summary>
+    /// <summary>
+    /// The workspace (the scope's telemetry store) is looked up by name only when it is given as a name and no explicit id is: an id is used as it is, so
+    /// nothing is asked.
+    /// </summary>
     public static bool NeedsWorkspaceLookup(ScopeRules rules) =>
-        string.IsNullOrWhiteSpace(rules.WorkspaceId) && !string.IsNullOrWhiteSpace(rules.Workspace) && !ScopeResolver.IsWorkspaceId(rules.Workspace.Trim());
+        string.IsNullOrWhiteSpace(rules.TelemetryStoreId) && !string.IsNullOrWhiteSpace(rules.TelemetryStore) && !ScopeResolver.IsTelemetryStoreId(rules.TelemetryStore.Trim());
 
     private static string Quote(string text) => "'" + text.Replace("'", "''") + "'";
 
@@ -112,9 +115,9 @@ public sealed class ResourceGraphInventory(HttpClient http, ICredentialSource? c
 
     private static string Trim(string text) => text.Length <= 300 ? text : text[..300] + "...";
 
-    private static InventorySubscription ToSubscription(JsonElement e) => new(Text(e, "id") ?? "", Text(e, "name") ?? "", Tags(e));
+    private static InventoryAccount ToSubscription(JsonElement e) => new(Text(e, "id") ?? "", Text(e, "name") ?? "", Tags(e));
 
-    private static InventoryWorkspace ToWorkspace(JsonElement e) => new(Text(e, "id") ?? "", Text(e, "name") ?? "", Text(e, "customerId") is { Length: > 0 } c ? c : null);
+    private static InventoryTelemetryStore ToWorkspace(JsonElement e) => new(Text(e, "id") ?? "", Text(e, "name") ?? "", Text(e, "customerId") is { Length: > 0 } c ? c : null);
 
     private static InventoryResource ToResource(JsonElement e) =>
         new(Text(e, "id") ?? "", Text(e, "name") ?? "", Text(e, "type") ?? "", Text(e, "subscriptionId") ?? "", Text(e, "location"), Tags(e), Count(e, "instances"), Text(e, "state") is { Length: > 0 } st ? st : null);

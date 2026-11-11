@@ -1,0 +1,28 @@
+# A team's account is found by a name pattern (Beta's is named instead), the telemetry store by its name in the inventory, and the hub's gateway and shared
+# telemetry live in a platform account of their own. Every key that also has an older name is written here by its neutral one.
+name: Production
+default: true
+sources:
+  inventory: { kind: resourcegraph, connection: "file:inventory.json" }
+scope:
+  inventory: inventory
+  cloud: Example cloud
+  variables: { env: prd }
+  telemetryStore: "logs-{env}-*"
+  account: { nameLike: "{pillar}-{env}-*" }
+  pillarAccounts: { bb: 00000000-0000-0000-0000-0000000000a2 }
+  telemetryRole: "{service}-{role}"
+  resources:
+    - { name: gateways, types: [example/gateways], roles: [gateway], pattern: '^gw-(?<service>[a-z]+)$', account: { tag: { key: unit, value: platform } } }
+    - { name: apps, types: [example/apps], roles: [api, worker], pattern: '^(?<service>[a-z]+)-(?<role>api|worker)-(?<region>[a-z]+)$', instances: "toint(properties.replicas)" }
+    - { name: databases, types: [example/databases], roles: [db], pattern: '^db-(?<service>[a-z]+)-(?<tenant>[a-z0-9]+)$', tenantNameTag: customer }
+  assets:
+    - { name: secrets, label: Secrets store, shape: vault, types: [example/secrets], pattern: '^secrets-(?<service>[a-z]+)$' }
+    - { name: shared-logs, island: hub, group: Telemetry, account: { tag: { key: unit, value: platform } }, label: Log store, shape: observatory, types: [example/logstores], pattern: '^logs-' }
+  links:
+    - { name: Console, url: "https://console.example.test/accounts/{accountId}/resources/{name}?env={environment}" }
+  queries:
+    accounts: "accounts | project id, name, tags"
+    resources: "resources | where type in~ ({types}) | extend instances = {instances}, state = {state}"
+    telemetryStores: "stores | project id, name, customerId"
+signals: { instances: inventory }

@@ -39,9 +39,9 @@ public class WorkspaceLookupTests
     {
         var (resolution, _, _) = await Resolved(TownA); // scope.workspace: "ws-{env}-main"
 
-        Assert.Equal("ws-prd-main", resolution.Workspace);
-        Assert.Equal(ProdWorkspace, resolution.WorkspaceId);
-        Assert.Equal("name", resolution.WorkspaceVia);
+        Assert.Equal("ws-prd-main", resolution.TelemetryStore);
+        Assert.Equal(ProdWorkspace, resolution.TelemetryStoreId);
+        Assert.Equal("name", resolution.TelemetryStoreVia);
         Assert.DoesNotContain(resolution.Problems, p => p.Contains("workspace"));
     }
 
@@ -53,8 +53,8 @@ public class WorkspaceLookupTests
 
         var (resolution, _, _) = await Resolved(copy.Path);
 
-        Assert.Equal(ProdWorkspace, resolution.WorkspaceId);
-        Assert.Equal("name", resolution.WorkspaceVia);
+        Assert.Equal(ProdWorkspace, resolution.TelemetryStoreId);
+        Assert.Equal("name", resolution.TelemetryStoreVia);
     }
 
     [Fact]
@@ -65,10 +65,10 @@ public class WorkspaceLookupTests
 
         var (resolution, _, _) = await Resolved(copy.Path);
 
-        Assert.Null(resolution.WorkspaceId);
-        var problem = Assert.Single(resolution.Problems, p => p.Contains("telemetry workspaces match"));
-        Assert.Contains("2 telemetry workspaces match 'ws-*-main' (ws-prd-main, ws-stg-main)", problem);
-        Assert.Contains("scope.workspaceId", problem);
+        Assert.Null(resolution.TelemetryStoreId);
+        var problem = Assert.Single(resolution.Problems, p => p.Contains("telemetry stores match"));
+        Assert.Contains("2 telemetry stores match 'ws-*-main' (ws-prd-main, ws-stg-main)", problem);
+        Assert.Contains("scope.telemetryStoreId", problem);
     }
 
     [Fact]
@@ -79,9 +79,9 @@ public class WorkspaceLookupTests
 
         var (resolution, _, _) = await Resolved(copy.Path);
 
-        Assert.Null(resolution.WorkspaceId);
-        Assert.Contains("No telemetry workspace is named 'ws-prd-missing'", Assert.Single(resolution.Problems, p => p.Contains("workspace")));
-        Assert.DoesNotContain("Log Analytics", Assert.Single(resolution.WorkspaceProblemList));
+        Assert.Null(resolution.TelemetryStoreId);
+        Assert.Contains("No telemetry store is named 'ws-prd-missing'", Assert.Single(resolution.Problems, p => p.Contains("telemetry store")));
+        Assert.DoesNotContain("Log Analytics", Assert.Single(resolution.TelemetryStoreProblemList));
     }
 
     [Fact]
@@ -92,7 +92,7 @@ public class WorkspaceLookupTests
 
         var (resolution, store, registry) = await Resolved(copy.Path);
 
-        var problem = Assert.Single(resolution.WorkspaceProblemList);
+        var problem = Assert.Single(resolution.TelemetryStoreProblemList);
         Assert.Contains(problem, resolution.Problems);
         foreach (var id in new[] { "aa.orders-api", "bb.ledger-api" })
             Assert.Contains(problem, ScopeInfos.Of(registry, store, id)!.Problems);
@@ -106,10 +106,10 @@ public class WorkspaceLookupTests
 
         var (resolution, _, _) = await Resolved(copy.Path);
 
-        Assert.Equal(Pinned, resolution.WorkspaceId);
-        Assert.Equal("id", resolution.WorkspaceVia);
-        Assert.Equal("ws-prd-main", resolution.Workspace); // the name is still what people read
-        Assert.All(resolution.Systems, s => Assert.Equal("ws-prd-main", s.Workspace));
+        Assert.Equal(Pinned, resolution.TelemetryStoreId);
+        Assert.Equal("id", resolution.TelemetryStoreVia);
+        Assert.Equal("ws-prd-main", resolution.TelemetryStore); // the name is still what people read
+        Assert.All(resolution.Systems, s => Assert.Equal("ws-prd-main", s.TelemetryStore));
     }
 
     [Fact]
@@ -120,8 +120,8 @@ public class WorkspaceLookupTests
 
         var (resolution, _, _) = await Resolved(copy.Path);
 
-        Assert.Equal(Pinned, resolution.WorkspaceId);
-        Assert.Equal("id", resolution.WorkspaceVia);
+        Assert.Equal(Pinned, resolution.TelemetryStoreId);
+        Assert.Equal("id", resolution.TelemetryStoreVia);
     }
 
     [Fact]
@@ -129,9 +129,9 @@ public class WorkspaceLookupTests
     {
         var (resolution, _, _) = await Resolved(TownB);
 
-        Assert.Equal("law-live-prod", resolution.Workspace);
-        Assert.Equal(ProdWorkspace, resolution.WorkspaceId);
-        Assert.Equal("id", resolution.WorkspaceVia);
+        Assert.Equal("law-live-prod", resolution.TelemetryStore);
+        Assert.Equal(ProdWorkspace, resolution.TelemetryStoreId);
+        Assert.Equal("id", resolution.TelemetryStoreVia);
     }
 
     [Fact]
@@ -189,7 +189,7 @@ public class WorkspaceLookupTests
 
         var e = await Assert.ThrowsAsync<InvalidOperationException>(() => source.PollAsync(registry, CancellationToken.None));
 
-        Assert.Contains("No telemetry workspace is named 'ws-prd-missing'", e.Message);
+        Assert.Contains("No telemetry store is named 'ws-prd-missing'", e.Message);
         Assert.Empty(http.Sent);
     }
 
@@ -221,8 +221,8 @@ public class WorkspaceLookupTests
         var inventory = await reader.ReadAsync(Prod(TownA), CancellationToken.None);
 
         Assert.Equal(ResourceGraphInventory.DefaultWorkspacesQuery, queries.Single(q => q.Contains("operationalinsights")));
-        var workspace = Assert.Single(inventory.Workspaces!);
-        Assert.Equal(("ws-prd-main", ProdWorkspace), (workspace.Name, workspace.CustomerId));
+        var workspace = Assert.Single(inventory.TelemetryStores!);
+        Assert.Equal(("ws-prd-main", ProdWorkspace), (workspace.Name, workspace.QueryId));
     }
 
     [Theory]
@@ -231,13 +231,13 @@ public class WorkspaceLookupTests
     public async Task The_inventory_does_not_ask_for_workspaces_when_an_id_is_all_there_is_to_know(string how)
     {
         var rules = Prod(TownA).ActiveEnvironment!.Scope;
-        rules = how == "id" ? rules with { WorkspaceId = Pinned } : rules with { Workspace = Pinned };
+        rules = how == "id" ? rules with { TelemetryStoreId = Pinned } : rules with { TelemetryStore = Pinned };
         var (reader, queries) = Reading(rules, Answer);
 
         var inventory = await reader.ReadAsync(Prod(TownA), CancellationToken.None);
 
         Assert.DoesNotContain(queries, q => q.Contains("operationalinsights"));
-        Assert.Null(inventory.Workspaces); // not asked is not the same as none found
+        Assert.Null(inventory.TelemetryStores); // not asked is not the same as none found
         Assert.False(ResourceGraphInventory.NeedsWorkspaceLookup(rules));
     }
 
@@ -250,19 +250,19 @@ public class WorkspaceLookupTests
         var inventory = await reader.ReadAsync(Prod(TownA), CancellationToken.None);
 
         Assert.Contains(queries, q => q.Contains("properties.workspaceId"));
-        Assert.Equal(Pinned, Assert.Single(inventory.Workspaces!).CustomerId);
+        Assert.Equal(Pinned, Assert.Single(inventory.TelemetryStores!).QueryId);
     }
 
     [Fact]
     public async Task A_workspace_the_answer_gives_no_workspace_id_for_is_queried_by_its_resource_id()
     {
-        var inventory = new Inventory([], [], [new InventoryWorkspace("/subscriptions/s/resourceGroups/rg/providers/microsoft.operationalinsights/workspaces/ws-prd-main", "ws-prd-main", null)]);
+        var inventory = new Inventory([], [], [new InventoryTelemetryStore("/subscriptions/s/resourceGroups/rg/providers/microsoft.operationalinsights/workspaces/ws-prd-main", "ws-prd-main", null)]);
         var (_, store, registry) = await Resolved(TownA);
         store.Update(inventory, T0);
 
         var resolution = store.Resolve(registry);
 
-        Assert.Equal("/subscriptions/s/resourceGroups/rg/providers/microsoft.operationalinsights/workspaces/ws-prd-main", resolution.WorkspaceId);
+        Assert.Equal("/subscriptions/s/resourceGroups/rg/providers/microsoft.operationalinsights/workspaces/ws-prd-main", resolution.TelemetryStoreId);
     }
 
     // ---- the files ----
@@ -276,7 +276,8 @@ public class WorkspaceLookupTests
         copy.Replace("environments/prod.yaml", "workspaceId: \"{nope}\"", "workspaceId: \" \"");
         var empty = Assert.Throws<RegistryException>(() => RegistryLoader.Load(copy.Path)).Message;
 
-        Assert.Contains("scope.workspaceId: {nope} is not a variable here", unknown);
-        Assert.Contains("scope.workspaceId is empty", empty);
+        // written with the Azure name, reported with the neutral one, which the file may use as well
+        Assert.Contains("scope.telemetryStoreId: {nope} is not a variable here", unknown);
+        Assert.Contains("scope.telemetryStoreId is empty", empty);
     }
 }

@@ -302,7 +302,7 @@ public class LogsTabTests
     public async Task Opening_the_tab_puts_the_links_in_the_answer_and_a_town_with_no_links_has_none()
     {
         using var rig = new Rig(TownA, LogsA, _ => []);
-        rig.Scope.Update(new Inventory([new InventorySubscription("0000", "hub-monitor", new Dictionary<string, string>())], [new InventoryResource("/subscriptions/0000/resourceGroups/rg/providers/microsoft.insights/components/appi-z", "appi-z", "microsoft.insights/components", "0000", "northeurope", new Dictionary<string, string>(), null)]), Now);
+        rig.Scope.Update(new Inventory([new InventoryAccount("0000", "hub-monitor", new Dictionary<string, string>())], [new InventoryResource("/subscriptions/0000/resourceGroups/rg/providers/microsoft.insights/components/appi-z", "appi-z", "microsoft.insights/components", "0000", "northeurope", new Dictionary<string, string>(), null)]), Now);
 
         var logs = await rig.Logs.RecentAsync(rig.Node(NodeKind.Api), TestContext.Current.CancellationToken);
 

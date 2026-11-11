@@ -52,10 +52,13 @@ public class AzureSettingsMigrationTests
     private static readonly JsonSerializerOptions Indented = new() { WriteIndented = true };
     private static readonly AdapterCatalog Azure = new([new AzureAdapters()]);
 
-    /// <summary>Every town with environments: the shared test towns and the sample towns.</summary>
+    /// <summary>Every town with environments that was recorded before the move: the shared test towns and the sample towns.</summary>
     private static IEnumerable<string> Towns() =>
         Directory.GetDirectories(Registries).Concat(Directory.GetDirectories(Path.Combine(TestPaths.RepoRoot, "config")))
-            .Where(t => Directory.Exists(Path.Combine(t, "environments"))).OrderBy(d => d, StringComparer.Ordinal);
+            .Where(t => Directory.Exists(Path.Combine(t, "environments")) && !AddedLater.Contains(Path.GetFileName(t))).OrderBy(d => d, StringComparer.Ordinal);
+
+    /// <summary>Towns added after the recording, which it cannot hold: the fixture for the scope's neutral names (see <see cref="ScopeAliasTests"/>).</summary>
+    private static readonly string[] AddedLater = ["neutral-scope-town"];
 
     [Fact]
     public void Every_source_in_the_test_and_sample_towns_is_read_into_the_same_settings_as_the_core_read_it()

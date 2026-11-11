@@ -88,8 +88,8 @@ public sealed partial record Registry
     /// <summary>Things worth fixing about an environment that do not stop it: tenant databases but no tenants listed or found by the scope.</summary>
     internal static IEnumerable<string> EnvironmentWarnings(RegistryEnvironment env, Registry view)
     {
-        foreach (var pillar in env.Scope.PillarSubscriptions.Keys.Where(p => view.Groups.All(g => g.Id != p)))
-            yield return $"Environment '{env.Id}': scope.pillars names '{pillar}', which is not a pillar of this town (or is not deployed here).{DidYouMean.Hint(pillar, view.Groups.Select(g => g.Id))}";
+        foreach (var pillar in env.Scope.PillarAccounts.Keys.Where(p => view.Groups.All(g => g.Id != p)))
+            yield return $"Environment '{env.Id}': scope.pillarAccounts names '{pillar}', which is not a pillar of this town (or is not deployed here).{DidYouMean.Hint(pillar, view.Groups.Select(g => g.Id))}";
         var tenanted = view.AllNodes.Where(n => n.TenantPattern is not null).ToList();
         // a scope rule with a tenant group finds the tenants in the cloud, so the list may stay empty
         var found = env.Scope.Resources.Any(r => r.Pattern.Contains("(?<tenant>", StringComparison.Ordinal));

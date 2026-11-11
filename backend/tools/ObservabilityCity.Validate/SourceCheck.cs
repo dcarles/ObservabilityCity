@@ -75,8 +75,9 @@ public static class SourceCheck
     }
 
     /// <summary>
-    /// The workspace an environment's scope names, for a source that gives no connection: scope.workspaceId as it is, else scope.workspace (an id as it is, a name or
-    /// wildcard looked up through Resource Graph). Nothing is looked up when the scope names no workspace.
+    /// The telemetry store an environment's scope names, for a source that gives no connection: scope.telemetryStoreId as it is, else scope.telemetryStore (an id as
+    /// it is, a name or wildcard looked up through Resource Graph). Each is read under its Azure name (workspaceId, workspace) too, as the loader reads it.
+    /// Nothing is looked up when the scope names no telemetry store.
     /// </summary>
     private static async Task<(string Connection, string Note)> ScopeWorkspace(string file, string env, IWorkspaceLookup lookup, CancellationToken ct)
     {
@@ -84,11 +85,11 @@ public static class SourceCheck
         var variables = new Dictionary<string, string?> { ["environment"] = env };
         if (RawYaml.Get(scope, "variables") is YamlMappingNode vars)
             foreach (var (k, v) in vars.Children) variables[((YamlScalarNode)k).Value ?? ""] = (v as YamlScalarNode)?.Value;
-        string? Render(string key) => RawYaml.Str(RawYaml.Get(scope, key)) is { } text ? ScopeTemplate.Render(text, name => variables.GetValueOrDefault(name)).Trim() : null;
+        string? Render(string key, string alias) => RawYaml.Str(RawYaml.Get(scope, key) ?? RawYaml.Get(scope, alias)) is { } text ? ScopeTemplate.Render(text, name => variables.GetValueOrDefault(name)).Trim() : null;
 
-        if (Render("workspaceId") is { Length: > 0 } id) return (id, "the workspace id from scope.workspaceId");
-        if (Render("workspace") is not { Length: > 0 } workspace) return ("", "");
-        if (ScopeResolver.IsWorkspaceId(workspace)) return (workspace, "the workspace id from scope.workspace");
+        if (Render("telemetryStoreId", "workspaceId") is { Length: > 0 } id) return (id, "the telemetry store id from scope.telemetryStoreId");
+        if (Render("telemetryStore", "workspace") is not { Length: > 0 } workspace) return ("", "");
+        if (ScopeResolver.IsTelemetryStoreId(workspace)) return (workspace, "the telemetry store id from scope.telemetryStore");
         var answer = await lookup.FindAsync(workspace, ct);
         return (answer.Id ?? "", answer.Detail);
     }

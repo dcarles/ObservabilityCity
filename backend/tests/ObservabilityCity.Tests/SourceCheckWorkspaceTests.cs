@@ -84,6 +84,27 @@ public class SourceCheckWorkspaceTests
     }
 
     [Fact]
+    public async Task The_neutral_names_of_the_telemetry_store_are_read_as_the_azure_ones_are()
+    {
+        var (byName, _) = await Run("""
+            scope:
+              variables: { env: prod }
+              telemetryStore: "log-*-{env}"
+            """);
+        var (byId, http) = await Run("""
+            scope:
+              telemetryStoreId: "00000000-0000-0000-0000-0000000000cc"
+              telemetryStore: "log-*"
+            """);
+
+        Assert.Equal(ProbeStatus.Connected, byName.Result.Status);
+        Assert.Contains("log-example-prod", byName.Result.Detail);
+        Assert.Equal(ProbeStatus.Connected, byId.Result.Status);
+        Assert.DoesNotContain(http.Requests, r => r.RequestUri!.Host == "management.azure.com");
+        Assert.Contains(http.Requests, r => r.RequestUri!.AbsolutePath.Contains("00000000-0000-0000-0000-0000000000cc"));
+    }
+
+    [Fact]
     public async Task A_pattern_that_matches_several_workspaces_is_reported_with_their_names()
     {
         var (finding, _) = await Run("""
