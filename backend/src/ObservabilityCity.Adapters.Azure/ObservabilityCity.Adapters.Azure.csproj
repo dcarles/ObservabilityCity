@@ -4,6 +4,9 @@
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
   </PropertyGroup>
   <ItemGroup>
+    <EmbeddedResource Include="Settings\azure-source.schema.json" LogicalName="ObservabilityCity.Adapters.Azure.Settings.azure-source.schema.json" />
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="Azure.Identity" />
     <ProjectReference Include="..\ObservabilityCity.Core\ObservabilityCity.Core.csproj" />
   </ItemGroup>

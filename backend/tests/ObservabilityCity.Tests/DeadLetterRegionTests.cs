@@ -49,7 +49,7 @@ public class DeadLetterRegionTests
 
     private static async Task<Snapshot> Poll(string folder, double north, double west)
     {
-        var registry = RegistryLoader.Load(folder).ForEnvironment("prod");
+        var registry = RegistryLoader.Load(folder, TestAdapters.Azure).ForEnvironment("prod");
         var env = registry.ActiveEnvironment!;
         var set = new AdapterCatalog([new AzureAdapters()]).Build(env, folder);
         Assert.Empty(set.Problems);
@@ -152,7 +152,7 @@ public class DeadLetterRegionTests
         var folder = Copy("northeurope", "westeurope", yaml => yaml.Replace("deadLetterLink:", $"deadLetterLinks:\n        - {entry}\n      deadLetterLink:"));
         try
         {
-            var error = Assert.Throws<RegistryException>(() => RegistryLoader.Load(folder));
+            var error = Assert.Throws<RegistryException>(() => RegistryLoader.Load(folder, TestAdapters.Azure));
             Assert.Contains(expected, error.Message);
         }
         finally { Directory.Delete(folder, true); }

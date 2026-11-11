@@ -1,0 +1,1614 @@
+{
+  "discovery-town/prod/inventory": {
+    "Kind": "resourcegraph",
+    "Connection": "file:inventory.json",
+    "Credential": null,
+    "PollSeconds": null,
+    "TimeoutSeconds": null,
+    "LateAfterSeconds": null,
+    "Query": null,
+    "Window": null,
+    "RegionQuery": null,
+    "TypesQuery": null,
+    "Metrics": [],
+    "Entities": null,
+    "Providers": [],
+    "KeepResolvedFor": null
+  },
+  "discovery-town/prod/platform": {
+    "Kind": "azuremonitor",
+    "Connection": "file:platform.json",
+    "Credential": null,
+    "PollSeconds": null,
+    "TimeoutSeconds": null,
+    "LateAfterSeconds": null,
+    "Query": null,
+    "Window": "5m",
+    "RegionQuery": null,
+    "TypesQuery": null,
+    "Metrics": [
+      {
+        "Resources": "plans",
+        "Namespace": null,
+        "Signals": {
+          "cpu": {
+            "Metric": "CpuPercentage",
+            "Aggregation": "average",
+            "Filter": null,
+            "Scale": 0.01,
+            "PerSecond": false,
+            "Over": null,
+            "OrElse": null,
+            "EmptyIsIdle": false
+          },
+          "memory": {
+            "Metric": "MemoryPercentage",
+            "Aggregation": "average",
+            "Filter": null,
+            "Scale": 0.01,
+            "PerSecond": false,
+            "Over": null,
+            "OrElse": null,
+            "EmptyIsIdle": false
+          }
+        },
+        "Interval": null,
+        "Window": null
+      },
+      {
+        "Resources": "accounts",
+        "Namespace": null,
+        "Signals": {
+          "utilisation": {
+            "Metric": "TotalRequestUnits",
+            "Aggregation": "total",
+            "Filter": null,
+            "Scale": 1,
+            "PerSecond": true,
+            "Over": {
+              "Metric": "ProvisionedThroughput",
+              "Aggregation": "maximum",
+              "Filter": null,
+              "Scale": 1,
+              "PerSecond": false,
+              "Over": null,
+              "OrElse": null,
+              "EmptyIsIdle": false
+            },
+            "OrElse": null,
+            "EmptyIsIdle": false
+          },
+          "throttled": {
+            "Metric": "TotalRequests",
+            "Aggregation": "count",
+            "Filter": "StatusCode eq \u0027429\u0027",
+            "Scale": 1,
+            "PerSecond": false,
+            "Over": {
+              "Metric": "TotalRequests",
+              "Aggregation": "count",
+              "Filter": null,
+              "Scale": 1,
+              "PerSecond": false,
+              "Over": null,
+              "OrElse": null,
+              "EmptyIsIdle": false
+            },
+            "OrElse": null,
+            "EmptyIsIdle": false
+          },
+          "requests": {
+            "Metric": "TotalRequests",
+            "Aggregation": "count",
+            "Filter": null,
+            "Scale": 1,
+            "PerSecond": true,
+            "Over": null,
+            "OrElse": null,
+            "EmptyIsIdle": false
+          },
+          "limit": {
+            "Metric": "ProvisionedThroughput",
+            "Aggregation": "maximum",
+            "Filter": null,
+            "Scale": 1,
+            "PerSecond": false,
+            "Over": null,
+            "OrElse": null,
+            "EmptyIsIdle": false
+          }
+        },
+        "Interval": null,
+        "Window": null
+      }
+    ],
+    "Entities": null,
+    "Providers": [],
+    "KeepResolvedFor": null
+  },
+  "discovery-town/prod/telemetry": {
+    "Kind": "loganalytics",
+    "Connection": "file:telemetry.json",
+    "Credential": null,
+    "PollSeconds": null,
+    "TimeoutSeconds": null,
+    "LateAfterSeconds": null,
+    "Query": "AppMetrics\n| where TimeGenerated \u003E ago({window}) and AppRoleName in ({roles})\n| where Name in (\u0022request.calls\u0022, \u0022request.duration\u0022)\n| extend status = toint(Properties[\u0022status.code\u0022])\n| summarize calls = sumif(Sum, Name == \u0022request.calls\u0022), errors = sumif(Sum, Name == \u0022request.calls\u0022 and status \u003E= 500),\n            total = sumif(Sum, Name == \u0022request.duration\u0022), n = sumif(ItemCount, Name == \u0022request.duration\u0022) by role = AppRoleName\n| project role, calls, errors, latencyMs = iff(n \u003E 0, total / n, 0.0)\n",
+    "Window": "5m",
+    "RegionQuery": null,
+    "TypesQuery": null,
+    "Metrics": [],
+    "Entities": null,
+    "Providers": [],
+    "KeepResolvedFor": null
+  },
+  "function-town-a/prod/inventory": {
+    "Kind": "resourcegraph",
+    "Connection": "file:inventory.json",
+    "Credential": null,
+    "PollSeconds": null,
+    "TimeoutSeconds": null,
+    "LateAfterSeconds": null,
+    "Query": null,
+    "Window": null,
+    "RegionQuery": null,
+    "TypesQuery": null,
+    "Metrics": [],
+    "Entities": null,
+    "Providers": [],
+    "KeepResolvedFor": null
+  },
+  "function-town-a/prod/jobs": {
+    "Kind": "functionjobs",
+    "Connection": "file:jobs.json",
+    "Credential": null,
+    "PollSeconds": null,
+    "TimeoutSeconds": null,
+    "LateAfterSeconds": null,
+    "Query": "FunctionAppLogs\n| where TimeGenerated \u003E ago({window}) and Message startswith \u0022Executed\u0022\n| summarize arg_max(TimeGenerated, Message) by resourceId = _ResourceId, job = FunctionName\n| project resourceId, job, lastRun = TimeGenerated, succeeded = Message has \u0022Succeeded\u0022\n",
+    "Window": "1d",
+    "RegionQuery": null,
+    "TypesQuery": null,
+    "Metrics": [],
+    "Entities": null,
+    "Providers": [],
+    "KeepResolvedFor": null
+  },
+  "function-town-a/prod/platform": {
+    "Kind": "azuremonitor",
+    "Connection": "file:platform.json",
+    "Credential": null,
+    "PollSeconds": null,
+    "TimeoutSeconds": null,
+    "LateAfterSeconds": null,
+    "Query": null,
+    "Window": "5m",
+    "RegionQuery": null,
+    "TypesQuery": null,
+    "Metrics": [
+      {
+        "Resources": "plans",
+        "Namespace": null,
+        "Signals": {
+          "cpu": {
+            "Metric": "CpuPercentage",
+            "Aggregation": "average",
+            "Filter": null,
+            "Scale": 0.01,
+            "PerSecond": false,
+            "Over": null,
+            "OrElse": null,
+            "EmptyIsIdle": false
+          },
+          "memory": {
+            "Metric": "MemoryPercentage",
+            "Aggregation": "average",
+            "Filter": null,
+            "Scale": 0.01,
+            "PerSecond": false,
+            "Over": null,
+            "OrElse": null,
+            "EmptyIsIdle": false
+          }
+        },
+        "Interval": null,
+        "Window": null
+      }
+    ],
+    "Entities": null,
+    "Providers": [],
+    "KeepResolvedFor": null
+  },
+  "function-town-a/prod/telemetry": {
+    "Kind": "loganalytics",
+    "Connection": "file:telemetry.json",
+    "Credential": null,
+    "PollSeconds": null,
+    "TimeoutSeconds": null,
+    "LateAfterSeconds": null,
+    "Query": "AppMetrics\n| where TimeGenerated \u003E ago({window}) and AppRoleName in ({roles}) and Name == \u0022request.calls\u0022\n| summarize calls = sum(Sum) by role = AppRoleName\n",
+    "Window": "5m",
+    "RegionQuery": "AppRequests\n| where TimeGenerated \u003E ago({window}) and AppRoleName in ({roles})\n| summarize calls = sum(ItemCount) by role = AppRoleName, region = tostring(Properties[\u0022cloud.region\u0022])\n",
+    "TypesQuery": null,
+    "Metrics": [],
+    "Entities": null,
+    "Providers": [],
+    "KeepResolvedFor": null
+  },
+  "function-town-b/prod/inventory": {
+    "Kind": "resourcegraph",
+    "Connection": "file:inventory.json",
+    "Credential": null,
+    "PollSeconds": null,
+    "TimeoutSeconds": null,
+    "LateAfterSeconds": null,
+    "Query": null,
+    "Window": null,
+    "RegionQuery": null,
+    "TypesQuery": null,
+    "Metrics": [],
+    "Entities": null,
+    "Providers": [],
+    "KeepResolvedFor": null
+  },
+  "function-town-b/prod/jobs": {
+    "Kind": "functionjobs",
+    "Connection": "file:jobs.json",
+    "Credential": null,
+    "PollSeconds": null,
+    "TimeoutSeconds": null,
+    "LateAfterSeconds": null,
+    "Query": "ContainerLog_CL | where TimeGenerated \u003E ago({window}) and Line_s startswith \u0022job finished\u0022 | summarize lastRun = max(TimeGenerated), succeeded = countif(Line_s has \u0022ok\u0022) \u003E 0 by resourceId = ResourceId, job = JobName_s",
+    "Window": "1d",
+    "RegionQuery": null,
+    "TypesQuery": null,
+    "Metrics": [],
+    "Entities": null,
+    "Providers": [],
+    "KeepResolvedFor": null
+  },
+  "function-town-b/prod/platform": {
+    "Kind": "azuremonitor",
+    "Connection": "file:platform.json",
+    "Credential": null,
+    "PollSeconds": null,
+    "TimeoutSeconds": null,
+    "LateAfterSeconds": null,
+    "Query": null,
+    "Window": "300s",
+    "RegionQuery": null,
+    "TypesQuery": null,
+    "Metrics": [
+      {
+        "Resources": "apps",
+        "Namespace": "microsoft.app/containerapps",
+        "Signals": {
+          "cpu": {
+            "Metric": "UsageNanoCores",
+            "Aggregation": "average",
+            "Filter": null,
+            "Scale": 1,
+            "PerSecond": false,
+            "Over": {
+              "Metric": "CpuLimitNanoCores",
+              "Aggregation": "average",
+              "Filter": null,
+              "Scale": 1,
+              "PerSecond": false,
+              "Over": null,
+              "OrElse": null,
+              "EmptyIsIdle": false
+            },
+            "OrElse": null,
+            "EmptyIsIdle": false
+          },
+          "memory": {
+            "Metric": "WorkingSetBytes",
+            "Aggregation": "maximum",
+            "Filter": null,
+            "Scale": 1,
+            "PerSecond": false,
+            "Over": {
+              "Metric": "MemoryLimitBytes",
+              "Aggregation": "maximum",
+              "Filter": null,
+              "Scale": 1,
+              "PerSecond": false,
+              "Over": null,
+              "OrElse": null,
+              "EmptyIsIdle": false
+            },
+            "OrElse": null,
+            "EmptyIsIdle": false
+          }
+        },
+        "Interval": null,
+        "Window": null
+      }
+    ],
+    "Entities": null,
+    "Providers": [],
+    "KeepResolvedFor": null
+  },
+  "function-town-b/prod/telemetry": {
+    "Kind": "loganalytics",
+    "Connection": "file:telemetry.json",
+    "Credential": null,
+    "PollSeconds": null,
+    "TimeoutSeconds": null,
+    "LateAfterSeconds": null,
+    "Query": "ContainerLog_CL | where TimeGenerated \u003E ago({window}) and App_s in ({roles}) | summarize calls = count() by role = App_s",
+    "Window": "5m",
+    "RegionQuery": "ContainerLog_CL | where TimeGenerated \u003E ago({window}) and App_s in ({roles}) | summarize calls = count() by role = App_s, region = Dc_s",
+    "TypesQuery": null,
+    "Metrics": [],
+    "Entities": null,
+    "Providers": [],
+    "KeepResolvedFor": null
+  },
+  "galactic-credit/dev/incidents": {
+    "Kind": "fake",
+    "Connection": null,
+    "Credential": null,
+    "PollSeconds": null,
+    "TimeoutSeconds": null,
+    "LateAfterSeconds": null,
+    "Query": null,
+    "Window": null,
+    "RegionQuery": null,
+    "TypesQuery": null,
+    "Metrics": [],
+    "Entities": null,
+    "Providers": [],
+    "KeepResolvedFor": null
+  },
+  "galactic-credit/dev/metrics": {
+    "Kind": "fake",
+    "Connection": null,
+    "Credential": null,
+    "PollSeconds": null,
+    "TimeoutSeconds": null,
+    "LateAfterSeconds": null,
+    "Query": null,
+    "Window": null,
+    "RegionQuery": null,
+    "TypesQuery": null,
+    "Metrics": [],
+    "Entities": null,
+    "Providers": [],
+    "KeepResolvedFor": null
+  },
+  "galactic-credit/prod/incidents": {
+    "Kind": "fake",
+    "Connection": null,
+    "Credential": null,
+    "PollSeconds": null,
+    "TimeoutSeconds": null,
+    "LateAfterSeconds": null,
+    "Query": null,
+    "Window": null,
+    "RegionQuery": null,
+    "TypesQuery": null,
+    "Metrics": [],
+    "Entities": null,
+    "Providers": [],
+    "KeepResolvedFor": null
+  },
+  "galactic-credit/prod/metrics": {
+    "Kind": "fake",
+    "Connection": null,
+    "Credential": null,
+    "PollSeconds": null,
+    "TimeoutSeconds": null,
+    "LateAfterSeconds": null,
+    "Query": null,
+    "Window": null,
+    "RegionQuery": null,
+    "TypesQuery": null,
+    "Metrics": [],
+    "Entities": null,
+    "Providers": [],
+    "KeepResolvedFor": null
+  },
+  "galactic-credit/staging/incidents": {
+    "Kind": "fake",
+    "Connection": null,
+    "Credential": null,
+    "PollSeconds": null,
+    "TimeoutSeconds": null,
+    "LateAfterSeconds": null,
+    "Query": null,
+    "Window": null,
+    "RegionQuery": null,
+    "TypesQuery": null,
+    "Metrics": [],
+    "Entities": null,
+    "Providers": [],
+    "KeepResolvedFor": null
+  },
+  "galactic-credit/staging/metrics": {
+    "Kind": "fake",
+    "Connection": null,
+    "Credential": null,
+    "PollSeconds": null,
+    "TimeoutSeconds": null,
+    "LateAfterSeconds": null,
+    "Query": null,
+    "Window": null,
+    "RegionQuery": null,
+    "TypesQuery": null,
+    "Metrics": [],
+    "Entities": null,
+    "Providers": [],
+    "KeepResolvedFor": null
+  },
+  "health-town-a/prod/health": {
+    "Kind": "resourcehealth",
+    "Connection": "file:health.json",
+    "Credential": null,
+    "PollSeconds": 60,
+    "TimeoutSeconds": null,
+    "LateAfterSeconds": null,
+    "Query": null,
+    "Window": null,
+    "RegionQuery": null,
+    "TypesQuery": null,
+    "Metrics": [],
+    "Entities": null,
+    "Providers": [
+      "Microsoft.DocumentDB"
+    ],
+    "KeepResolvedFor": null
+  },
+  "health-town-a/prod/inventory": {
+    "Kind": "resourcegraph",
+    "Connection": "file:inventory.json",
+    "Credential": null,
+    "PollSeconds": null,
+    "TimeoutSeconds": null,
+    "LateAfterSeconds": null,
+    "Query": null,
+    "Window": null,
+    "RegionQuery": null,
+    "TypesQuery": null,
+    "Metrics": [],
+    "Entities": null,
+    "Providers": [],
+    "KeepResolvedFor": null
+  },
+  "health-town-a/prod/platform": {
+    "Kind": "azuremonitor",
+    "Connection": "file:platform.json",
+    "Credential": null,
+    "PollSeconds": null,
+    "TimeoutSeconds": null,
+    "LateAfterSeconds": null,
+    "Query": null,
+    "Window": "5m",
+    "RegionQuery": null,
+    "TypesQuery": null,
+    "Metrics": [
+      {
+        "Resources": "plans",
+        "Namespace": null,
+        "Signals": {
+          "cpu": {
+            "Metric": "CpuPercentage",
+            "Aggregation": "average",
+            "Filter": null,
+            "Scale": 0.01,
+            "PerSecond": false,
+            "Over": null,
+            "OrElse": null,
+            "EmptyIsIdle": false
+          },
+          "memory": {
+            "Metric": "MemoryPercentage",
+            "Aggregation": "average",
+            "Filter": null,
+            "Scale": 0.01,
+            "PerSecond": false,
+            "Over": null,
+            "OrElse": null,
+            "EmptyIsIdle": false
+          }
+        },
+        "Interval": null,
+        "Window": null
+      },
+      {
+        "Resources": "accounts",
+        "Namespace": null,
+        "Signals": {
+          "utilisation": {
+            "Metric": "TotalRequestUnits",
+            "Aggregation": "total",
+            "Filter": null,
+            "Scale": 1,
+            "PerSecond": true,
+            "Over": {
+              "Metric": "ProvisionedThroughput",
+              "Aggregation": "maximum",
+              "Filter": null,
+              "Scale": 1,
+              "PerSecond": false,
+              "Over": null,
+              "OrElse": null,
+              "EmptyIsIdle": false
+            },
+            "OrElse": null,
+            "EmptyIsIdle": false
+          },
+          "throttled": {
+            "Metric": "TotalRequests",
+            "Aggregation": "count",
+            "Filter": "StatusCode eq \u0027429\u0027",
+            "Scale": 1,
+            "PerSecond": false,
+            "Over": {
+              "Metric": "TotalRequests",
+              "Aggregation": "count",
+              "Filter": null,
+              "Scale": 1,
+              "PerSecond": false,
+              "Over": null,
+              "OrElse": null,
+              "EmptyIsIdle": false
+            },
+            "OrElse": null,
+            "EmptyIsIdle": false
+          },
+          "requests": {
+            "Metric": "TotalRequests",
+            "Aggregation": "count",
+            "Filter": null,
+            "Scale": 1,
+            "PerSecond": true,
+            "Over": null,
+            "OrElse": null,
+            "EmptyIsIdle": false
+          },
+          "limit": {
+            "Metric": "ProvisionedThroughput",
+            "Aggregation": "maximum",
+            "Filter": null,
+            "Scale": 1,
+            "PerSecond": false,
+            "Over": null,
+            "OrElse": null,
+            "EmptyIsIdle": false
+          }
+        },
+        "Interval": null,
+        "Window": null
+      }
+    ],
+    "Entities": null,
+    "Providers": [],
+    "KeepResolvedFor": null
+  },
+  "health-town-a/prod/telemetry": {
+    "Kind": "loganalytics",
+    "Connection": "file:telemetry.json",
+    "Credential": null,
+    "PollSeconds": null,
+    "TimeoutSeconds": null,
+    "LateAfterSeconds": null,
+    "Query": "AppMetrics\n| where TimeGenerated \u003E ago({window}) and AppRoleName in ({roles})\n| where Name in (\u0022request.calls\u0022, \u0022request.duration\u0022)\n| extend status = toint(Properties[\u0022status.code\u0022])\n| summarize calls = sumif(Sum, Name == \u0022request.calls\u0022), errors = sumif(Sum, Name == \u0022request.calls\u0022 and status \u003E= 500),\n            total = sumif(Sum, Name == \u0022request.duration\u0022), n = sumif(ItemCount, Name == \u0022request.duration\u0022) by role = AppRoleName\n| project role, calls, errors, latencyMs = iff(n \u003E 0, total / n, 0.0)\n",
+    "Window": "5m",
+    "RegionQuery": null,
+    "TypesQuery": null,
+    "Metrics": [],
+    "Entities": null,
+    "Providers": [],
+    "KeepResolvedFor": null
+  },
+  "health-town-b/prod/azure-health": {
+    "Kind": "resourcehealth",
+    "Connection": "file:health.json",
+    "Credential": null,
+    "PollSeconds": 120,
+    "TimeoutSeconds": null,
+    "LateAfterSeconds": null,
+    "Query": null,
+    "Window": "7d",
+    "RegionQuery": null,
+    "TypesQuery": null,
+    "Metrics": [],
+    "Entities": null,
+    "Providers": [
+      "Microsoft.DocumentDB"
+    ],
+    "KeepResolvedFor": null
+  },
+  "health-town-b/prod/inventory": {
+    "Kind": "resourcegraph",
+    "Connection": "file:inventory.json",
+    "Credential": null,
+    "PollSeconds": null,
+    "TimeoutSeconds": null,
+    "LateAfterSeconds": null,
+    "Query": null,
+    "Window": null,
+    "RegionQuery": null,
+    "TypesQuery": null,
+    "Metrics": [],
+    "Entities": null,
+    "Providers": [],
+    "KeepResolvedFor": null
+  },
+  "health-town-b/prod/platform": {
+    "Kind": "azuremonitor",
+    "Connection": "file:platform.json",
+    "Credential": null,
+    "PollSeconds": null,
+    "TimeoutSeconds": null,
+    "LateAfterSeconds": null,
+    "Query": null,
+    "Window": "300s",
+    "RegionQuery": null,
+    "TypesQuery": null,
+    "Metrics": [
+      {
+        "Resources": "container-apps",
+        "Namespace": "microsoft.app/containerapps",
+        "Signals": {
+          "cpu": {
+            "Metric": "UsageNanoCores",
+            "Aggregation": "average",
+            "Filter": null,
+            "Scale": 1,
+            "PerSecond": false,
+            "Over": {
+              "Metric": "CpuLimitNanoCores",
+              "Aggregation": "average",
+              "Filter": null,
+              "Scale": 1,
+              "PerSecond": false,
+              "Over": null,
+              "OrElse": null,
+              "EmptyIsIdle": false
+            },
+            "OrElse": null,
+            "EmptyIsIdle": false
+          },
+          "memory": {
+            "Metric": "WorkingSetBytes",
+            "Aggregation": "maximum",
+            "Filter": null,
+            "Scale": 1,
+            "PerSecond": false,
+            "Over": {
+              "Metric": "MemoryLimitBytes",
+              "Aggregation": "maximum",
+              "Filter": null,
+              "Scale": 1,
+              "PerSecond": false,
+              "Over": null,
+              "OrElse": null,
+              "EmptyIsIdle": false
+            },
+            "OrElse": null,
+            "EmptyIsIdle": false
+          }
+        },
+        "Interval": null,
+        "Window": null
+      },
+      {
+        "Resources": "accounts",
+        "Namespace": null,
+        "Signals": {
+          "utilisation": {
+            "Metric": "NormalizedRUConsumption",
+            "Aggregation": "maximum",
+            "Filter": null,
+            "Scale": 0.01,
+            "PerSecond": false,
+            "Over": null,
+            "OrElse": null,
+            "EmptyIsIdle": false
+          },
+          "throttled": {
+            "Metric": "Http429",
+            "Aggregation": "count",
+            "Filter": null,
+            "Scale": 1,
+            "PerSecond": false,
+            "Over": {
+              "Metric": "HttpRequests",
+              "Aggregation": "count",
+              "Filter": null,
+              "Scale": 1,
+              "PerSecond": false,
+              "Over": null,
+              "OrElse": null,
+              "EmptyIsIdle": false
+            },
+            "OrElse": null,
+            "EmptyIsIdle": false
+          }
+        },
+        "Interval": null,
+        "Window": null
+      }
+    ],
+    "Entities": null,
+    "Providers": [],
+    "KeepResolvedFor": null
+  },
+  "health-town-b/prod/telemetry": {
+    "Kind": "loganalytics",
+    "Connection": "file:telemetry.json",
+    "Credential": null,
+    "PollSeconds": null,
+    "TimeoutSeconds": null,
+    "LateAfterSeconds": null,
+    "Query": "Telemetry_CL | where TimeGenerated \u003E ago({windowSeconds}s) and service_s in ({roles}) | summarize calls = sum(requests_d), errors = sum(failed_d), latencyMs = avg(latency_ms_d) by role = service_s",
+    "Window": "300s",
+    "RegionQuery": null,
+    "TypesQuery": null,
+    "Metrics": [],
+    "Entities": null,
+    "Providers": [],
+    "KeepResolvedFor": null
+  },
+  "live-sources-town/prod/telemetry": {
+    "Kind": "prometheus",
+    "Connection": "https://prom.example.test",
+    "Credential": null,
+    "PollSeconds": 15,
+    "TimeoutSeconds": 5,
+    "LateAfterSeconds": null,
+    "Query": null,
+    "Window": null,
+    "RegionQuery": null,
+    "TypesQuery": null,
+    "Metrics": [],
+    "Entities": null,
+    "Providers": [],
+    "KeepResolvedFor": null
+  },
+  "messaging-town-a/prod/inventory": {
+    "Kind": "resourcegraph",
+    "Connection": "file:inventory.json",
+    "Credential": null,
+    "PollSeconds": null,
+    "TimeoutSeconds": null,
+    "LateAfterSeconds": null,
+    "Query": null,
+    "Window": null,
+    "RegionQuery": null,
+    "TypesQuery": null,
+    "Metrics": [],
+    "Entities": null,
+    "Providers": [],
+    "KeepResolvedFor": null
+  },
+  "messaging-town-a/prod/messaging": {
+    "Kind": "servicebus",
+    "Connection": "file:servicebus.json",
+    "Credential": null,
+    "PollSeconds": null,
+    "TimeoutSeconds": null,
+    "LateAfterSeconds": null,
+    "Query": null,
+    "Window": "5m",
+    "RegionQuery": null,
+    "TypesQuery": null,
+    "Metrics": [],
+    "Entities": {
+      "Resources": "broker",
+      "Dimension": "EntityName",
+      "Backlog": {
+        "Metric": "ActiveMessages",
+        "Aggregation": "average"
+      },
+      "DeadLetter": {
+        "Metric": "DeadletteredMessages",
+        "Aggregation": "maximum"
+      },
+      "Patterns": [
+        {
+          "Match": "^q-(?\u003Cpillar\u003E[a-z]\u002B)-(?\u003Cservice\u003E[a-z]\u002B)-(?:in|feed)$",
+          "Consumer": "worker"
+        },
+        {
+          "Match": "^q-[a-z]\u002B-[a-z]\u002B-to-(?\u003Cservice\u003E[a-z]\u002B)$",
+          "Consumer": "worker"
+        }
+      ],
+      "Interval": null,
+      "DeadLetterLink": {
+        "Name": "Open in queue explorer",
+        "Url": "https://support.example.test/queues/{queue}?team={pillar}\u0026service={service}"
+      },
+      "Throughput": {
+        "Metric": "IncomingMessages",
+        "Aggregation": "total"
+      },
+      "DeadLetterLinks": null,
+      "Flows": null
+    },
+    "Providers": [],
+    "KeepResolvedFor": null
+  },
+  "messaging-town-a/prod/platform": {
+    "Kind": "azuremonitor",
+    "Connection": "file:platform.json",
+    "Credential": null,
+    "PollSeconds": null,
+    "TimeoutSeconds": null,
+    "LateAfterSeconds": null,
+    "Query": null,
+    "Window": "5m",
+    "RegionQuery": null,
+    "TypesQuery": null,
+    "Metrics": [
+      {
+        "Resources": "plans",
+        "Namespace": null,
+        "Signals": {
+          "cpu": {
+            "Metric": "CpuPercentage",
+            "Aggregation": "average",
+            "Filter": null,
+            "Scale": 0.01,
+            "PerSecond": false,
+            "Over": null,
+            "OrElse": null,
+            "EmptyIsIdle": false
+          },
+          "memory": {
+            "Metric": "MemoryPercentage",
+            "Aggregation": "average",
+            "Filter": null,
+            "Scale": 0.01,
+            "PerSecond": false,
+            "Over": null,
+            "OrElse": null,
+            "EmptyIsIdle": false
+          }
+        },
+        "Interval": null,
+        "Window": null
+      },
+      {
+        "Resources": "accounts",
+        "Namespace": null,
+        "Signals": {
+          "utilisation": {
+            "Metric": "TotalRequestUnits",
+            "Aggregation": "total",
+            "Filter": null,
+            "Scale": 1,
+            "PerSecond": true,
+            "Over": {
+              "Metric": "ProvisionedThroughput",
+              "Aggregation": "maximum",
+              "Filter": null,
+              "Scale": 1,
+              "PerSecond": false,
+              "Over": null,
+              "OrElse": null,
+              "EmptyIsIdle": false
+            },
+            "OrElse": null,
+            "EmptyIsIdle": false
+          },
+          "throttled": {
+            "Metric": "TotalRequests",
+            "Aggregation": "count",
+            "Filter": "StatusCode eq \u0027429\u0027",
+            "Scale": 1,
+            "PerSecond": false,
+            "Over": {
+              "Metric": "TotalRequests",
+              "Aggregation": "count",
+              "Filter": null,
+              "Scale": 1,
+              "PerSecond": false,
+              "Over": null,
+              "OrElse": null,
+              "EmptyIsIdle": false
+            },
+            "OrElse": null,
+            "EmptyIsIdle": false
+          },
+          "requests": {
+            "Metric": "TotalRequests",
+            "Aggregation": "count",
+            "Filter": null,
+            "Scale": 1,
+            "PerSecond": true,
+            "Over": null,
+            "OrElse": null,
+            "EmptyIsIdle": false
+          },
+          "limit": {
+            "Metric": "ProvisionedThroughput",
+            "Aggregation": "maximum",
+            "Filter": null,
+            "Scale": 1,
+            "PerSecond": false,
+            "Over": null,
+            "OrElse": null,
+            "EmptyIsIdle": false
+          }
+        },
+        "Interval": null,
+        "Window": null
+      }
+    ],
+    "Entities": null,
+    "Providers": [],
+    "KeepResolvedFor": null
+  },
+  "messaging-town-a/prod/telemetry": {
+    "Kind": "loganalytics",
+    "Connection": "file:telemetry.json",
+    "Credential": null,
+    "PollSeconds": null,
+    "TimeoutSeconds": null,
+    "LateAfterSeconds": null,
+    "Query": "AppMetrics\n| where TimeGenerated \u003E ago({window}) and AppRoleName in ({roles})\n| where Name in (\u0022request.calls\u0022, \u0022request.duration\u0022)\n| extend status = toint(Properties[\u0022status.code\u0022])\n| summarize calls = sumif(Sum, Name == \u0022request.calls\u0022), errors = sumif(Sum, Name == \u0022request.calls\u0022 and status \u003E= 500),\n            total = sumif(Sum, Name == \u0022request.duration\u0022), n = sumif(ItemCount, Name == \u0022request.duration\u0022) by role = AppRoleName\n| project role, calls, errors, latencyMs = iff(n \u003E 0, total / n, 0.0)\n",
+    "Window": "5m",
+    "RegionQuery": null,
+    "TypesQuery": null,
+    "Metrics": [],
+    "Entities": null,
+    "Providers": [],
+    "KeepResolvedFor": null
+  },
+  "messaging-town-b/prod/inventory": {
+    "Kind": "resourcegraph",
+    "Connection": "file:inventory.json",
+    "Credential": null,
+    "PollSeconds": null,
+    "TimeoutSeconds": null,
+    "LateAfterSeconds": null,
+    "Query": null,
+    "Window": null,
+    "RegionQuery": null,
+    "TypesQuery": null,
+    "Metrics": [],
+    "Entities": null,
+    "Providers": [],
+    "KeepResolvedFor": null
+  },
+  "messaging-town-b/prod/messaging": {
+    "Kind": "servicebus",
+    "Connection": "file:servicebus.json",
+    "Credential": null,
+    "PollSeconds": null,
+    "TimeoutSeconds": null,
+    "LateAfterSeconds": null,
+    "Query": null,
+    "Window": "300s",
+    "RegionQuery": null,
+    "TypesQuery": "AppMetrics\n| where TimeGenerated \u003E ago({window}) and Name == \u0022messaging.process.duration\u0022\n| summarize calls = sum(ItemCount) by queue = tostring(Properties[\u0022messaging.destination.name\u0022]), type = tostring(Properties[\u0022messaging.message.type\u0022])\n",
+    "Metrics": [],
+    "Entities": {
+      "Resources": "broker",
+      "Dimension": "EntityName",
+      "Backlog": {
+        "Metric": "ActiveMessages",
+        "Aggregation": "maximum"
+      },
+      "DeadLetter": {
+        "Metric": "DeadletteredMessages",
+        "Aggregation": "total"
+      },
+      "Patterns": [
+        {
+          "Match": "^bus\\.(?\u003Cpillar\u003E[a-z]\u002B)\\.(?\u003Cservice\u003E[a-z]\u002B)\\.(?:in|feed)$",
+          "Consumer": "worker"
+        },
+        {
+          "Match": "^bus\\.[a-z]\u002B\\.(?\u003Cpillar\u003E[a-z]\u002B)\\.(?\u003Cservice\u003E[a-z]\u002B)\\.out$",
+          "Consumer": "worker"
+        }
+      ],
+      "Interval": null,
+      "DeadLetterLink": {
+        "Name": "Parked messages",
+        "Url": "https://parked.example.test/{environment}/{system}/{queue}"
+      },
+      "Throughput": {
+        "Metric": "IncomingMessages",
+        "Aggregation": "total"
+      },
+      "DeadLetterLinks": null,
+      "Flows": null
+    },
+    "Providers": [],
+    "KeepResolvedFor": null
+  },
+  "messaging-town-b/prod/platform": {
+    "Kind": "azuremonitor",
+    "Connection": "file:platform.json",
+    "Credential": null,
+    "PollSeconds": null,
+    "TimeoutSeconds": null,
+    "LateAfterSeconds": null,
+    "Query": null,
+    "Window": "300s",
+    "RegionQuery": null,
+    "TypesQuery": null,
+    "Metrics": [
+      {
+        "Resources": "container-apps",
+        "Namespace": "microsoft.app/containerapps",
+        "Signals": {
+          "cpu": {
+            "Metric": "UsageNanoCores",
+            "Aggregation": "average",
+            "Filter": null,
+            "Scale": 1,
+            "PerSecond": false,
+            "Over": {
+              "Metric": "CpuLimitNanoCores",
+              "Aggregation": "average",
+              "Filter": null,
+              "Scale": 1,
+              "PerSecond": false,
+              "Over": null,
+              "OrElse": null,
+              "EmptyIsIdle": false
+            },
+            "OrElse": null,
+            "EmptyIsIdle": false
+          },
+          "memory": {
+            "Metric": "WorkingSetBytes",
+            "Aggregation": "maximum",
+            "Filter": null,
+            "Scale": 1,
+            "PerSecond": false,
+            "Over": {
+              "Metric": "MemoryLimitBytes",
+              "Aggregation": "maximum",
+              "Filter": null,
+              "Scale": 1,
+              "PerSecond": false,
+              "Over": null,
+              "OrElse": null,
+              "EmptyIsIdle": false
+            },
+            "OrElse": null,
+            "EmptyIsIdle": false
+          }
+        },
+        "Interval": null,
+        "Window": null
+      },
+      {
+        "Resources": "accounts",
+        "Namespace": null,
+        "Signals": {
+          "utilisation": {
+            "Metric": "NormalizedRUConsumption",
+            "Aggregation": "maximum",
+            "Filter": null,
+            "Scale": 0.01,
+            "PerSecond": false,
+            "Over": null,
+            "OrElse": null,
+            "EmptyIsIdle": false
+          },
+          "throttled": {
+            "Metric": "Http429",
+            "Aggregation": "count",
+            "Filter": null,
+            "Scale": 1,
+            "PerSecond": false,
+            "Over": {
+              "Metric": "HttpRequests",
+              "Aggregation": "count",
+              "Filter": null,
+              "Scale": 1,
+              "PerSecond": false,
+              "Over": null,
+              "OrElse": null,
+              "EmptyIsIdle": false
+            },
+            "OrElse": null,
+            "EmptyIsIdle": false
+          }
+        },
+        "Interval": null,
+        "Window": null
+      }
+    ],
+    "Entities": null,
+    "Providers": [],
+    "KeepResolvedFor": null
+  },
+  "messaging-town-b/prod/telemetry": {
+    "Kind": "loganalytics",
+    "Connection": "file:telemetry.json",
+    "Credential": null,
+    "PollSeconds": null,
+    "TimeoutSeconds": null,
+    "LateAfterSeconds": null,
+    "Query": "Telemetry_CL | where TimeGenerated \u003E ago({windowSeconds}s) and service_s in ({roles}) | summarize calls = sum(requests_d), errors = sum(failed_d), latencyMs = avg(latency_ms_d) by role = service_s",
+    "Window": "300s",
+    "RegionQuery": null,
+    "TypesQuery": null,
+    "Metrics": [],
+    "Entities": null,
+    "Providers": [],
+    "KeepResolvedFor": null
+  },
+  "routes-town/prod/inventory": {
+    "Kind": "resourcegraph",
+    "Connection": "file:inventory.json",
+    "Credential": null,
+    "PollSeconds": null,
+    "TimeoutSeconds": null,
+    "LateAfterSeconds": null,
+    "Query": null,
+    "Window": null,
+    "RegionQuery": null,
+    "TypesQuery": null,
+    "Metrics": [],
+    "Entities": null,
+    "Providers": [],
+    "KeepResolvedFor": null
+  },
+  "routes-town/prod/messaging": {
+    "Kind": "servicebus",
+    "Connection": "file:servicebus.json",
+    "Credential": null,
+    "PollSeconds": null,
+    "TimeoutSeconds": null,
+    "LateAfterSeconds": null,
+    "Query": null,
+    "Window": "300s",
+    "RegionQuery": null,
+    "TypesQuery": "Telemetry_CL | where TimeGenerated \u003E ago({windowSeconds}s) and kind_s == \u0022queue\u0022 | summarize calls = sum(handled_d) by queue = queue_s, type = message_s",
+    "Metrics": [],
+    "Entities": {
+      "Resources": "broker",
+      "Dimension": "EntityName",
+      "Backlog": {
+        "Metric": "ActiveMessages",
+        "Aggregation": "maximum"
+      },
+      "DeadLetter": {
+        "Metric": "DeadletteredMessages",
+        "Aggregation": "total"
+      },
+      "Patterns": [
+        {
+          "Match": "^bus\\.(?\u003Cpillar\u003E[a-z]\u002B)\\.(?\u003Cservice\u003E[a-z]\u002B)\\.in$",
+          "Consumer": "worker"
+        },
+        {
+          "Match": "^bus\\.(?\u003CproducerPillar\u003E[a-z]\u002B)\\.(?\u003Cproducer\u003E[a-z]\u002B)\\.(?\u003Cservice\u003E[a-z]\u002B)\\.out$",
+          "Consumer": "worker"
+        }
+      ],
+      "Interval": null,
+      "DeadLetterLink": {
+        "Name": "Parked messages",
+        "Url": "https://parked.example.test/{environment}/{system}/{queue}"
+      },
+      "Throughput": {
+        "Metric": "IncomingMessages",
+        "Aggregation": "total"
+      },
+      "DeadLetterLinks": null,
+      "Flows": null
+    },
+    "Providers": [],
+    "KeepResolvedFor": null
+  },
+  "routes-town/prod/platform": {
+    "Kind": "azuremonitor",
+    "Connection": "file:platform.json",
+    "Credential": null,
+    "PollSeconds": null,
+    "TimeoutSeconds": null,
+    "LateAfterSeconds": null,
+    "Query": null,
+    "Window": "300s",
+    "RegionQuery": null,
+    "TypesQuery": null,
+    "Metrics": [
+      {
+        "Resources": "container-apps",
+        "Namespace": "microsoft.app/containerapps",
+        "Signals": {
+          "cpu": {
+            "Metric": "UsageNanoCores",
+            "Aggregation": "average",
+            "Filter": null,
+            "Scale": 1,
+            "PerSecond": false,
+            "Over": {
+              "Metric": "CpuLimitNanoCores",
+              "Aggregation": "average",
+              "Filter": null,
+              "Scale": 1,
+              "PerSecond": false,
+              "Over": null,
+              "OrElse": null,
+              "EmptyIsIdle": false
+            },
+            "OrElse": null,
+            "EmptyIsIdle": false
+          },
+          "memory": {
+            "Metric": "WorkingSetBytes",
+            "Aggregation": "maximum",
+            "Filter": null,
+            "Scale": 1,
+            "PerSecond": false,
+            "Over": {
+              "Metric": "MemoryLimitBytes",
+              "Aggregation": "maximum",
+              "Filter": null,
+              "Scale": 1,
+              "PerSecond": false,
+              "Over": null,
+              "OrElse": null,
+              "EmptyIsIdle": false
+            },
+            "OrElse": null,
+            "EmptyIsIdle": false
+          }
+        },
+        "Interval": null,
+        "Window": null
+      },
+      {
+        "Resources": "accounts",
+        "Namespace": null,
+        "Signals": {
+          "utilisation": {
+            "Metric": "NormalizedRUConsumption",
+            "Aggregation": "maximum",
+            "Filter": null,
+            "Scale": 0.01,
+            "PerSecond": false,
+            "Over": null,
+            "OrElse": null,
+            "EmptyIsIdle": false
+          },
+          "throttled": {
+            "Metric": "Http429",
+            "Aggregation": "count",
+            "Filter": null,
+            "Scale": 1,
+            "PerSecond": false,
+            "Over": {
+              "Metric": "HttpRequests",
+              "Aggregation": "count",
+              "Filter": null,
+              "Scale": 1,
+              "PerSecond": false,
+              "Over": null,
+              "OrElse": null,
+              "EmptyIsIdle": false
+            },
+            "OrElse": null,
+            "EmptyIsIdle": false
+          }
+        },
+        "Interval": null,
+        "Window": null
+      }
+    ],
+    "Entities": null,
+    "Providers": [],
+    "KeepResolvedFor": null
+  },
+  "routes-town/prod/telemetry": {
+    "Kind": "loganalytics",
+    "Connection": "file:telemetry.json",
+    "Credential": null,
+    "PollSeconds": null,
+    "TimeoutSeconds": null,
+    "LateAfterSeconds": null,
+    "Query": "Telemetry_CL | where TimeGenerated \u003E ago({windowSeconds}s) and service_s in ({roles}) | summarize calls = sum(requests_d), errors = sum(failed_d), latencyMs = avg(latency_ms_d) by role = service_s",
+    "Window": "300s",
+    "RegionQuery": null,
+    "TypesQuery": null,
+    "Metrics": [],
+    "Entities": null,
+    "Providers": [],
+    "KeepResolvedFor": null
+  },
+  "scope-town-a/prod/inventory": {
+    "Kind": "resourcegraph",
+    "Connection": "file:inventory.json",
+    "Credential": null,
+    "PollSeconds": null,
+    "TimeoutSeconds": null,
+    "LateAfterSeconds": null,
+    "Query": null,
+    "Window": null,
+    "RegionQuery": null,
+    "TypesQuery": null,
+    "Metrics": [],
+    "Entities": null,
+    "Providers": [],
+    "KeepResolvedFor": null
+  },
+  "scope-town-a/prod/platform": {
+    "Kind": "azuremonitor",
+    "Connection": "file:platform.json",
+    "Credential": null,
+    "PollSeconds": null,
+    "TimeoutSeconds": null,
+    "LateAfterSeconds": null,
+    "Query": null,
+    "Window": "5m",
+    "RegionQuery": null,
+    "TypesQuery": null,
+    "Metrics": [
+      {
+        "Resources": "plans",
+        "Namespace": null,
+        "Signals": {
+          "cpu": {
+            "Metric": "CpuPercentage",
+            "Aggregation": "average",
+            "Filter": null,
+            "Scale": 0.01,
+            "PerSecond": false,
+            "Over": null,
+            "OrElse": null,
+            "EmptyIsIdle": false
+          },
+          "memory": {
+            "Metric": "MemoryPercentage",
+            "Aggregation": "average",
+            "Filter": null,
+            "Scale": 0.01,
+            "PerSecond": false,
+            "Over": null,
+            "OrElse": null,
+            "EmptyIsIdle": false
+          }
+        },
+        "Interval": null,
+        "Window": null
+      },
+      {
+        "Resources": "accounts",
+        "Namespace": null,
+        "Signals": {
+          "utilisation": {
+            "Metric": "TotalRequestUnits",
+            "Aggregation": "total",
+            "Filter": null,
+            "Scale": 1,
+            "PerSecond": true,
+            "Over": {
+              "Metric": "ProvisionedThroughput",
+              "Aggregation": "maximum",
+              "Filter": null,
+              "Scale": 1,
+              "PerSecond": false,
+              "Over": null,
+              "OrElse": null,
+              "EmptyIsIdle": false
+            },
+            "OrElse": null,
+            "EmptyIsIdle": false
+          },
+          "throttled": {
+            "Metric": "TotalRequests",
+            "Aggregation": "count",
+            "Filter": "StatusCode eq \u0027429\u0027",
+            "Scale": 1,
+            "PerSecond": false,
+            "Over": {
+              "Metric": "TotalRequests",
+              "Aggregation": "count",
+              "Filter": null,
+              "Scale": 1,
+              "PerSecond": false,
+              "Over": null,
+              "OrElse": null,
+              "EmptyIsIdle": false
+            },
+            "OrElse": null,
+            "EmptyIsIdle": false
+          },
+          "requests": {
+            "Metric": "TotalRequests",
+            "Aggregation": "count",
+            "Filter": null,
+            "Scale": 1,
+            "PerSecond": true,
+            "Over": null,
+            "OrElse": null,
+            "EmptyIsIdle": false
+          },
+          "limit": {
+            "Metric": "ProvisionedThroughput",
+            "Aggregation": "maximum",
+            "Filter": null,
+            "Scale": 1,
+            "PerSecond": false,
+            "Over": null,
+            "OrElse": null,
+            "EmptyIsIdle": false
+          }
+        },
+        "Interval": null,
+        "Window": null
+      }
+    ],
+    "Entities": null,
+    "Providers": [],
+    "KeepResolvedFor": null
+  },
+  "scope-town-a/prod/telemetry": {
+    "Kind": "loganalytics",
+    "Connection": "file:telemetry.json",
+    "Credential": null,
+    "PollSeconds": null,
+    "TimeoutSeconds": null,
+    "LateAfterSeconds": null,
+    "Query": "AppMetrics\n| where TimeGenerated \u003E ago({window}) and AppRoleName in ({roles})\n| where Name in (\u0022request.calls\u0022, \u0022request.duration\u0022)\n| extend status = toint(Properties[\u0022status.code\u0022])\n| summarize calls = sumif(Sum, Name == \u0022request.calls\u0022), errors = sumif(Sum, Name == \u0022request.calls\u0022 and status \u003E= 500),\n            total = sumif(Sum, Name == \u0022request.duration\u0022), n = sumif(ItemCount, Name == \u0022request.duration\u0022) by role = AppRoleName\n| project role, calls, errors, latencyMs = iff(n \u003E 0, total / n, 0.0)\n",
+    "Window": "5m",
+    "RegionQuery": null,
+    "TypesQuery": null,
+    "Metrics": [],
+    "Entities": null,
+    "Providers": [],
+    "KeepResolvedFor": null
+  },
+  "scope-town-b/prod/inventory": {
+    "Kind": "resourcegraph",
+    "Connection": "file:inventory.json",
+    "Credential": null,
+    "PollSeconds": null,
+    "TimeoutSeconds": null,
+    "LateAfterSeconds": null,
+    "Query": null,
+    "Window": null,
+    "RegionQuery": null,
+    "TypesQuery": null,
+    "Metrics": [],
+    "Entities": null,
+    "Providers": [],
+    "KeepResolvedFor": null
+  },
+  "scope-town-b/prod/platform": {
+    "Kind": "azuremonitor",
+    "Connection": "file:platform.json",
+    "Credential": null,
+    "PollSeconds": null,
+    "TimeoutSeconds": null,
+    "LateAfterSeconds": null,
+    "Query": null,
+    "Window": "300s",
+    "RegionQuery": null,
+    "TypesQuery": null,
+    "Metrics": [
+      {
+        "Resources": "container-apps",
+        "Namespace": "microsoft.app/containerapps",
+        "Signals": {
+          "cpu": {
+            "Metric": "UsageNanoCores",
+            "Aggregation": "average",
+            "Filter": null,
+            "Scale": 1,
+            "PerSecond": false,
+            "Over": {
+              "Metric": "CpuLimitNanoCores",
+              "Aggregation": "average",
+              "Filter": null,
+              "Scale": 1,
+              "PerSecond": false,
+              "Over": null,
+              "OrElse": null,
+              "EmptyIsIdle": false
+            },
+            "OrElse": null,
+            "EmptyIsIdle": false
+          },
+          "memory": {
+            "Metric": "WorkingSetBytes",
+            "Aggregation": "maximum",
+            "Filter": null,
+            "Scale": 1,
+            "PerSecond": false,
+            "Over": {
+              "Metric": "MemoryLimitBytes",
+              "Aggregation": "maximum",
+              "Filter": null,
+              "Scale": 1,
+              "PerSecond": false,
+              "Over": null,
+              "OrElse": null,
+              "EmptyIsIdle": false
+            },
+            "OrElse": null,
+            "EmptyIsIdle": false
+          }
+        },
+        "Interval": null,
+        "Window": null
+      },
+      {
+        "Resources": "accounts",
+        "Namespace": null,
+        "Signals": {
+          "utilisation": {
+            "Metric": "NormalizedRUConsumption",
+            "Aggregation": "maximum",
+            "Filter": null,
+            "Scale": 0.01,
+            "PerSecond": false,
+            "Over": null,
+            "OrElse": null,
+            "EmptyIsIdle": false
+          },
+          "throttled": {
+            "Metric": "Http429",
+            "Aggregation": "count",
+            "Filter": null,
+            "Scale": 1,
+            "PerSecond": false,
+            "Over": {
+              "Metric": "HttpRequests",
+              "Aggregation": "count",
+              "Filter": null,
+              "Scale": 1,
+              "PerSecond": false,
+              "Over": null,
+              "OrElse": null,
+              "EmptyIsIdle": false
+            },
+            "OrElse": null,
+            "EmptyIsIdle": false
+          }
+        },
+        "Interval": null,
+        "Window": null
+      }
+    ],
+    "Entities": null,
+    "Providers": [],
+    "KeepResolvedFor": null
+  },
+  "scope-town-b/prod/telemetry": {
+    "Kind": "loganalytics",
+    "Connection": "file:telemetry.json",
+    "Credential": null,
+    "PollSeconds": null,
+    "TimeoutSeconds": null,
+    "LateAfterSeconds": null,
+    "Query": "Telemetry_CL | where TimeGenerated \u003E ago({windowSeconds}s) and service_s in ({roles}) | summarize calls = sum(requests_d), errors = sum(failed_d), latencyMs = avg(latency_ms_d) by role = service_s",
+    "Window": "300s",
+    "RegionQuery": null,
+    "TypesQuery": null,
+    "Metrics": [],
+    "Entities": null,
+    "Providers": [],
+    "KeepResolvedFor": null
+  },
+  "tenants-town/staging/metrics": {
+    "Kind": "fake",
+    "Connection": null,
+    "Credential": null,
+    "PollSeconds": null,
+    "TimeoutSeconds": null,
+    "LateAfterSeconds": null,
+    "Query": null,
+    "Window": null,
+    "RegionQuery": null,
+    "TypesQuery": null,
+    "Metrics": [],
+    "Entities": null,
+    "Providers": [],
+    "KeepResolvedFor": null
+  }
+}

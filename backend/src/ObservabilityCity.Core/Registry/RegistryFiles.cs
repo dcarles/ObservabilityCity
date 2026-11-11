@@ -1,3 +1,8 @@
+using ObservabilityCity.Core.Sources;
+using YamlDotNet.Core;
+using YamlDotNet.Core.Events;
+using YamlDotNet.Serialization;
+
 namespace ObservabilityCity.Core.Registry;
 
 // Shapes of the YAML files, as read from disk. RegistryLoader turns them into the Registry model.
@@ -446,9 +451,9 @@ internal sealed class ScopeQueriesFile
     public string? Workspaces { get; set; }
 }
 
-internal sealed class SourceFile
+internal sealed class SourceFile : IYamlConvertible
 {
-    /// <summary>The kind of source: fake, resourcegraph, loganalytics, azuremonitor, servicebus, prometheus or grafana-irm.</summary>
+    /// <summary>The kind of source. Which kinds exist depends on the adapter modules loaded; fake, prometheus and grafana-irm are the core's.</summary>
     public string Kind { get; set; } = "";
     /// <summary>How to reach it (a workspace, an endpoint). Not used by the fake source.</summary>
     public string? Connection { get; set; }
@@ -458,121 +463,41 @@ internal sealed class SourceFile
     public double? PollSeconds { get; set; }
     /// <summary>How long one ask may take before it is given up, in seconds.</summary>
     public double? TimeoutSeconds { get; set; }
-    /// <summary>Job sources only (functionjobs): how long after its schedule says it should run a job may stay without a newer run before it counts as late, in seconds.</summary>
+    /// <summary>Job sources only: how long after its schedule says it should run a job may stay without a newer run before it counts as late, in seconds.</summary>
     public double? LateAfterSeconds { get; set; }
-    /// <summary>Query sources only (loganalytics): the query to send, a template. {window} and {windowSeconds} stand for the window, {roles} for the telemetry names of the systems it is asked about, quoted and separated by commas; scope variables and {environment} work too.</summary>
+    /// <summary>Sources that send a query: the query to send, a template. {window} and {windowSeconds} stand for the window, {roles} for the telemetry names of the systems it is asked about, quoted and separated by commas; scope variables and {environment} work too.</summary>
     public string? Query { get; set; }
-    /// <summary>Request sources only (loganalytics): the query that says how a service's requests divide between regions, a template like query. Returns one row per telemetry name and region with the columns role, region and calls (sampling-corrected counts do: only the proportions are used).</summary>
-    public string? RegionQuery { get; set; }
-    /// <summary>Broker sources only (servicebus): the query that says which kinds of message each queue handled, a template like query. Returns one row per queue and message type with the columns queue, type and calls (counts over the window). Without it the types are not shown.</summary>
-    public string? TypesQuery { get; set; }
-    /// <summary>Query sources only: how far back one answer looks, for example 5m. Default 5m.</summary>
+    /// <summary>How far back one answer looks, for example 5m. Default 5m.</summary>
     public string? Window { get; set; }
-    /// <summary>Platform-metric sources only (azuremonitor): which metric of which resources fills which signal. Everything about the metrics is written here; the program knows none.</summary>
-    public List<MetricGroupFile> Metrics { get; set; } = [];
-    /// <summary>Message-broker sources only (servicebus): which namespaces to read, which metrics fill the backlog and the dead letters, and how an entity's name says whose it is.</summary>
-    public EntitiesFile? Entities { get; set; }
-    /// <summary>Resource-health sources only (resourcehealth): the resource providers whose health reports are read, for example the data store's. The program lists none; a source without any does not start.</summary>
-    public List<string> Providers { get; set; } = [];
 
-    /// <summary>Resource-health sources: how long a resolved report stays listed after the resource recovered, like 4h. Default 4h.</summary>
-    public string? KeepResolvedFor { get; set; }
-}
+    /// <summary>Every other key of the block, which the module of the source's kind reads and checks. Not a key of its own: the properties above are the core's keys.</summary>
+    internal SourceSettings Settings { get; private set; } = SourceSettings.None;
 
-/// <summary>How a broker's queues and topics are read: the namespaces come from a scope.resources rule, the metrics are split by the entity's name, and patterns say which system an entity belongs to.</summary>
-internal sealed class EntitiesFile
-{
-    /// <summary>The name of a scope.resources rule: the resources it finds (the broker's namespaces) are the ones asked.</summary>
-    public string Resources { get; set; } = "";
-    /// <summary>The metric dimension that carries the entity's name. Default EntityName.</summary>
-    public string? Dimension { get; set; }
-    /// <summary>The time grain the metrics are asked at, for example 5m. Default: one minute.</summary>
-    public string? Interval { get; set; }
-    /// <summary>The messages waiting in an entity, for example a metric of active messages added up by average.</summary>
-    public EntityMetricFile? Backlog { get; set; }
-    /// <summary>The dead-lettered messages of an entity, for example a metric of dead-lettered messages added up by maximum.</summary>
-    public EntityMetricFile? DeadLetter { get; set; }
-    /// <summary>An address that opens a consumer's dead letters in your support tool: a name and a URL template over {pillar}, {service}, {system} and {environment}. Without it, no link.</summary>
-    public EntityLinkFile? DeadLetterLink { get; set; }
-    /// <summary>One support-tool address for each region, when the regions have their own tool: each is a name, a URL template and the region it is for. A queue's dead letters in a region open the entry of that region; a region with no entry uses deadLetterLink.</summary>
-    public List<EntityLinkFile> DeadLetterLinks { get; set; } = [];
-    /// <summary>The messages that arrive in an entity, for example a metric of incoming messages added up by total. Their rate sets how many boats sail to the consumer.</summary>
-    public EntityMetricFile? Throughput { get; set; }
-    /// <summary>Entity name patterns, tried in order: the first that matches decides whose the entity is. An entity no pattern matches is left out.</summary>
-    public List<EntityPatternFile> Patterns { get; set; } = [];
-    /// <summary>Entities that stand for what a whole pillar sends to the others or receives from them (for example the topic the pillar publishes its events to, or the topic its incoming queues hang on). Each is a name pattern with the group pillar and a direction; the rate of its throughput metric is the pillar's rate.</summary>
-    public List<EntityFlowFile> Flows { get; set; } = [];
-}
+    private static readonly Dictionary<string, System.Reflection.PropertyInfo> CoreKeys = typeof(SourceFile).GetProperties()
+        .ToDictionary(p => char.ToLowerInvariant(p.Name[0]) + p.Name[1..], StringComparer.Ordinal);
 
-/// <summary>One shape of entity name that carries a pillar's traffic: a regular expression with the named group pillar, and whether what arrives in it is sent by that pillar or received by it.</summary>
-internal sealed class EntityFlowFile
-{
-    public string Match { get; set; } = "";
-    /// <summary>sent (what the pillar sends to other pillars) or received (what other pillars send to it).</summary>
-    public string Direction { get; set; } = "";
-}
+    /// <summary>The core's keys, in the order they are documented.</summary>
+    internal static IReadOnlyCollection<string> KeyNames => CoreKeys.Keys;
 
-internal sealed class EntityLinkFile
-{
-    public string Name { get; set; } = "";
-    public string Url { get; set; } = "";
-    /// <summary>Only in deadLetterLinks: the region the address is for, as the town names it (for example the region of the broker's namespace), matched ignoring case.</summary>
-    public string? Region { get; set; }
-}
+    // The core reads its own keys as it reads any file and keeps the rest, with their lines, for the module of the source's kind.
+    void IYamlConvertible.Read(IParser parser, Type expectedType, ObjectDeserializer nestedObjectDeserializer)
+    {
+        var start = parser.Consume<MappingStart>();
+        var rest = new List<(SettingsNode, SettingsNode)>();
+        MappingEnd end;
+        while (!parser.TryConsume(out end!))
+        {
+            if (parser.Current is Scalar key && CoreKeys.TryGetValue(key.Value, out var property))
+            {
+                parser.MoveNext();
+                property.SetValue(this, nestedObjectDeserializer(property.PropertyType));
+            }
+            else rest.Add((SettingsNode.Read(parser), SettingsNode.Read(parser)));
+        }
+        Settings = new SourceSettings(rest, start.Start, end.End); // with no keys of its own it still knows its line, for a key the kind needs and lacks
+    }
 
-internal sealed class EntityMetricFile
-{
-    public string Metric { get; set; } = "";
-    public string Aggregation { get; set; } = "average";
-}
-
-/// <summary>One shape of entity name: a regular expression with the named groups pillar and service, which pick the system that consumes the entity (the one of the given kind whose pillar and service code they name).</summary>
-internal sealed class EntityPatternFile
-{
-    public string Match { get; set; } = "";
-    /// <summary>The kind of system that reads the entity: worker (default), api, and so on.</summary>
-    public string? Consumer { get; set; }
-}
-
-/// <summary>The metrics of one kind of resource: <see cref="Resources"/> names a rule of scope.resources, and each signal says where its number comes from.</summary>
-internal sealed class MetricGroupFile
-{
-    /// <summary>The name of a scope.resources rule: the resources it finds for a system are the ones asked.</summary>
-    public string Resources { get; set; } = "";
-    /// <summary>The metric namespace, for a resource type that has more than one. Usually left out.</summary>
-    public string? Namespace { get; set; }
-    /// <summary>The time grain the metrics are asked at, for example 5m. Some metrics do not support a minute. Default: one minute.</summary>
-    public string? Interval { get; set; }
-    /// <summary>How far back this entry looks, for example 1h: the worst or total of that long. Without it the source's <c>window</c> applies. It must hold at least two points of the entry's interval.</summary>
-    public string? Window { get; set; }
-    public MetricSignalFile? Cpu { get; set; }
-    public MetricSignalFile? Memory { get; set; }
-    public MetricSignalFile? Utilisation { get; set; }
-    public MetricSignalFile? Throttled { get; set; }
-    /// <summary>The request rate of a store, shown per tenant database.</summary>
-    public MetricSignalFile? Requests { get; set; }
-    /// <summary>The provisioned capacity as a plain number (for Cosmos, the ProvisionedThroughput metric with maximum), shown beside each tenant database. Not a health signal.</summary>
-    public MetricSignalFile? Limit { get; set; }
-}
-
-internal sealed class MetricSignalFile
-{
-    /// <summary>The metric's name as the cloud spells it.</summary>
-    public string Metric { get; set; } = "";
-    /// <summary>average, total, count, maximum or minimum: how the points of the window are added up.</summary>
-    public string Aggregation { get; set; } = "average";
-    /// <summary>A dimension filter, for example <c>StatusCode eq '429'</c>.</summary>
-    public string? Filter { get; set; }
-    /// <summary>Multiplies the value. The town reads fractions (0.42 is 42%), so a percentage has scale 0.01.</summary>
-    public double Scale { get; set; } = 1;
-    /// <summary>Divide a total over the window by its seconds, to get a rate.</summary>
-    public bool PerSecond { get; set; }
-    /// <summary>Another metric the value is divided by (provisioned capacity, all requests), to give a share.</summary>
-    public MetricSignalFile? Over { get; set; }
-    /// <summary>Another metric to read in place of this one when it gives no number or 0 (for example the autoscale ceiling, then the fixed throughput of an account that has none). It cannot have an <c>over</c> or an <c>orElse</c> of its own.</summary>
-    public MetricSignalFile? OrElse { get; set; }
-    /// <summary>What a read that worked but returned no number means: <c>unknown</c> (the default, the system shows no data) or <c>idle</c> (nothing happened, so the signal is 0). A failed read is always unknown.</summary>
-    public string? WhenEmpty { get; set; }
+    void IYamlConvertible.Write(IEmitter emitter, ObjectSerializer nestedObjectSerializer) => throw new NotSupportedException("registry files are only read");
 }
 
 internal sealed class CredentialFile

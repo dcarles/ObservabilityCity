@@ -1,4 +1,5 @@
 using ObservabilityCity.Core.Registry;
+using ObservabilityCity.Core.Sources;
 
 namespace ObservabilityCity.AdapterKit;
 
@@ -28,6 +29,9 @@ public sealed class TownFiles : IDisposable
 
     /// <summary>The town as one environment sees it, loaded strictly: a mistake in a file throws a <see cref="RegistryException"/> naming it.</summary>
     public Registry Load(string environment) => RegistryLoader.Load(Path).ForEnvironment(environment);
+
+    /// <summary>The town as one environment sees it, loaded with <paramref name="modules"/>: each reads and checks the settings of its kinds' sources, as the host has it do.</summary>
+    public Registry Load(string environment, params IAdapterModule[] modules) => RegistryLoader.Load(Path, new AdapterCatalog(modules)).ForEnvironment(environment);
 
     public void Dispose()
     {

@@ -23,7 +23,7 @@ public class MessagingSourceTests
     private static string TownRoutes => Path.Combine(TestPaths.RepoRoot, "shared-test-data", "registries", "routes-town");
     private static readonly DateTimeOffset T0 = DateTimeOffset.Parse("2026-01-01T00:00:00Z");
 
-    private static TownRegistry Prod(string folder) => RegistryLoader.Load(folder).ForEnvironment("prod");
+    private static TownRegistry Prod(string folder) => RegistryLoader.Load(folder, TestAdapters.Azure).ForEnvironment("prod");
     private static NodeSnapshot Node(Snapshot s, string id) => s.Groups.SelectMany(g => g.Nodes).First(n => n.Id == id);
 
     private static async Task<(IMetricSource Source, TownRegistry Registry)> Messaging(string folder, CannedHttp? http = null)
@@ -92,7 +92,7 @@ public class MessagingSourceTests
         var file = copy.FilePath(Path.Combine("environments", "prod.yaml"));
         File.WriteAllText(file, File.ReadAllText(file).Replace("(?<pillar>[a-z]+)-(?<service>[a-z]+)-(?:in|feed)", "(?<pillar>[a-z]+)-[a-z]+-(?:in|feed)"));
 
-        var ex = Assert.Throws<RegistryException>(() => RegistryLoader.Load(copy.Path));
+        var ex = Assert.Throws<RegistryException>(() => RegistryLoader.Load(copy.Path, TestAdapters.Azure));
 
         Assert.Contains("no group named 'service'", ex.Message);
     }
@@ -104,7 +104,7 @@ public class MessagingSourceTests
         var file = copy.FilePath(Path.Combine("environments", "prod.yaml"));
         File.WriteAllText(file, File.ReadAllText(file).Replace("resources: broker", "resources: brokr"));
 
-        var ex = Assert.Throws<RegistryException>(() => RegistryLoader.Load(copy.Path));
+        var ex = Assert.Throws<RegistryException>(() => RegistryLoader.Load(copy.Path, TestAdapters.Azure));
 
         Assert.Contains("'brokr' is not a rule of scope.resources", ex.Message);
         Assert.Contains("broker", ex.Message); // and says what it meant
@@ -171,8 +171,8 @@ public class MessagingSourceTests
         var folder = CopyWith(yaml => yaml.Replace(from, to));
         try
         {
-            if (allowed) { RegistryLoader.Load(folder); return; }
-            var error = Assert.Throws<RegistryException>(() => RegistryLoader.Load(folder));
+            if (allowed) { RegistryLoader.Load(folder, TestAdapters.Azure); return; }
+            var error = Assert.Throws<RegistryException>(() => RegistryLoader.Load(folder, TestAdapters.Azure));
             Assert.Contains("aggregation 'last'", error.Message);
         }
         finally { Directory.Delete(folder, true); }
@@ -301,7 +301,7 @@ public class MessagingSourceTests
         var folder = CopyOf(TownRoutes, yaml => yaml.Replace("(?<producer>[a-z]+)", "[a-z]+"));
         try
         {
-            var ex = Assert.ThrowsAny<Exception>(() => RegistryLoader.Load(folder));
+            var ex = Assert.ThrowsAny<Exception>(() => RegistryLoader.Load(folder, TestAdapters.Azure));
             Assert.Contains("a route needs both groups", ex.Message);
         }
         finally { Directory.Delete(folder, true); }

@@ -16,7 +16,8 @@ public interface IRegistryProvider
 }
 
 /// <summary>Holds the registry in use. A reload that fails leaves the last good one in place and only adds a notice.</summary>
-public sealed class RegistryHolder(Registry initial) : IRegistryProvider
+/// <remarks><c>kinds</c> are the source kinds of the adapter modules loaded, which a reload hands the loader so each module checks its sources' settings again.</remarks>
+public sealed class RegistryHolder(Registry initial, Sources.ISourceKindCatalog? kinds = null) : IRegistryProvider
 {
     private volatile Registry _current = initial;
     private volatile string? _reloadFailure;
@@ -40,7 +41,7 @@ public sealed class RegistryHolder(Registry initial) : IRegistryProvider
     {
         try
         {
-            Replace(RegistryLoader.LoadResilient(folder));
+            Replace(RegistryLoader.LoadResilient(folder, kinds));
             log?.LogInformation("Registry reloaded from {Folder}", folder);
             return true;
         }

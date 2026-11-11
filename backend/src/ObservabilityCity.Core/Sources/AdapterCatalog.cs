@@ -44,6 +44,12 @@ public interface ICredentialKind
 public sealed record SourceKindInfo(string Kind, string? DefaultCredentialKind = null)
 {
     public SourceCapabilities Capabilities { get; init; }
+
+    /// <summary>
+    /// How the module reads and checks a source of this kind's own keys (everything but the core's kind, connection, credential, pollSeconds,
+    /// timeoutSeconds, lateAfterSeconds, query and window), and makes the settings its source reads. Null: the kind takes no other key.
+    /// </summary>
+    public ISourceSettingsReader? Settings { get; init; }
 }
 
 /// <summary>What an adapter module adds to the town.</summary>
@@ -108,6 +114,12 @@ public sealed class AdapterCatalog : IAdapterRegistry, ISourceKindCatalog
     public bool Knows(string kind) => _kinds.ContainsKey(kind);
 
     public SourceCapabilities CapabilitiesOf(string kind) => _kinds.GetValueOrDefault(kind)?.Capabilities ?? SourceCapabilities.None;
+
+    public ISourceSettingsReader? SettingsOf(string kind) => _kinds.GetValueOrDefault(kind)?.Settings;
+
+    /// <summary>The settings readers of the loaded modules, each with the kinds that use it, in the order they were registered. A kind that takes no settings is listed under null.</summary>
+    public IReadOnlyList<(ISourceSettingsReader? Reader, IReadOnlyList<string> Kinds)> SettingsReaders() =>
+        _kinds.Values.GroupBy(k => k.Settings).Select(g => (g.Key, (IReadOnlyList<string>)g.Select(k => k.Kind).ToList())).ToList();
 
     /// <summary>The kinds whose sources can do all of <paramref name="capability"/>, in the order they were registered.</summary>
     public IReadOnlyList<string> KindsThatCan(SourceCapabilities capability) =>

@@ -31,4 +31,7 @@ public interface ISourceKindCatalog
 
     /// <summary>What a source of the kind can do; <see cref="SourceCapabilities.None"/> for a kind nobody knows.</summary>
     SourceCapabilities CapabilitiesOf(string kind);
+
+    /// <summary>How the module of the kind reads its sources' own settings; null for a kind that takes none, or that nobody knows.</summary>
+    ISourceSettingsReader? SettingsOf(string kind) => null;
 }

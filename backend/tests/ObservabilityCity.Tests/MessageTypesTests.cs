@@ -19,7 +19,7 @@ public class MessageTypesTests
 
     private static async Task<IReadOnlyDictionary<string, NodeReading>> Read(string folder)
     {
-        var registry = RegistryLoader.Load(folder).ForEnvironment("prod");
+        var registry = RegistryLoader.Load(folder, TestAdapters.Azure).ForEnvironment("prod");
         var set = new AdapterCatalog([new AzureAdapters()]).Build(registry.ActiveEnvironment!, folder);
         Assert.Empty(set.Problems);
         await set.Sources.Single(s => s.Name == "inventory").PollAsync(registry, CancellationToken.None);
@@ -67,7 +67,7 @@ public class MessageTypesTests
     public async Task The_kinds_reach_the_snapshot_on_the_system_that_reads_the_queue()
     {
         var folder = Town("routes-town");
-        var registry = RegistryLoader.Load(folder).ForEnvironment("prod");
+        var registry = RegistryLoader.Load(folder, TestAdapters.Azure).ForEnvironment("prod");
         var set = new AdapterCatalog([new AzureAdapters()]).Build(registry.ActiveEnvironment!, folder);
         var state = new LatestState();
         foreach (var source in set.Sources) state.Update(source.Name, await source.PollAsync(registry, CancellationToken.None));
@@ -118,7 +118,7 @@ public class MessageTypesTests
         var file = copy.FilePath(Path.Combine("environments", "prod.yaml"));
         File.WriteAllText(file, File.ReadAllText(file).Replace("Name == \"messaging.process.duration\"", "Name == \"{nonsense}\""));
 
-        var ex = Assert.Throws<RegistryException>(() => RegistryLoader.Load(copy.Path));
+        var ex = Assert.Throws<RegistryException>(() => RegistryLoader.Load(copy.Path, TestAdapters.Azure));
 
         Assert.Contains("typesQuery", ex.Message);
     }

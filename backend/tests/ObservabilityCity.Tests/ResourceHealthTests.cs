@@ -29,7 +29,7 @@ public class ResourceHealthTests
     /// <summary>A town as the host runs it: the inventory read once, then the health source polled, then a builder over both.</summary>
     private static async Task<Rig> Run(string folder, string sourceName, IReadOnlyCollection<IHealthEventSource>? healthSources = null, TownRegistry? registry = null)
     {
-        registry ??= RegistryLoader.Load(folder).ForEnvironment("prod");
+        registry ??= RegistryLoader.Load(folder, TestAdapters.Azure).ForEnvironment("prod");
         var set = new AdapterCatalog([new AzureAdapters()]).Build(registry.ActiveEnvironment!, folder);
         Assert.Empty(set.Problems);
         foreach (var source in set.Sources.Where(s => s.Name == "inventory" || s.Name == sourceName)) await source.PollAsync(registry, CancellationToken.None);
@@ -239,7 +239,7 @@ public class ResourceHealthTests
     [Fact]
     public async Task A_town_with_no_health_source_has_none_and_is_not_changed()
     {
-        var registry = RegistryLoader.Load(Path.Combine(TestPaths.RepoRoot, "shared-test-data", "registries", "scope-town-a")).ForEnvironment("prod");
+        var registry = RegistryLoader.Load(Path.Combine(TestPaths.RepoRoot, "shared-test-data", "registries", "scope-town-a"), TestAdapters.Azure).ForEnvironment("prod");
         var builder = new SnapshotBuilder(registry, new LatestState(), new FakeTimeProvider(T1)) { Environment = "prod" };
 
         var snapshot = builder.Build();
@@ -283,7 +283,7 @@ public class ResourceHealthTests
     private static async Task<(ResourceHealthSource Source, TownRegistry Registry, SourceSet Set)> Live(CannedHttp http, StaticLogin? login = null, TownRegistry? registry = null, string? folder = null)
     {
         folder ??= TownA;
-        registry ??= RegistryLoader.Load(folder).ForEnvironment("prod");
+        registry ??= RegistryLoader.Load(folder, TestAdapters.Azure).ForEnvironment("prod");
         var env = registry.ActiveEnvironment!;
         var set = new AdapterCatalog([new AzureAdapters()]).Build(env, folder);
         await set.Sources.Single(s => s.Name == "inventory").PollAsync(registry, CancellationToken.None);
@@ -386,7 +386,7 @@ public class ResourceHealthTests
     [Fact]
     public async Task It_waits_for_the_inventory_and_asks_nothing_until_it_knows_where_to_look()
     {
-        var registry = RegistryLoader.Load(TownA).ForEnvironment("prod");
+        var registry = RegistryLoader.Load(TownA, TestAdapters.Azure).ForEnvironment("prod");
         var env = registry.ActiveEnvironment!;
         var http = new CannedHttp().Answer(Page());
         var definition = env.Sources.Single(s => s.Name == "health") with { Connection = null, TimeoutSeconds = 0.05 };
@@ -416,9 +416,10 @@ public class ResourceHealthTests
     [Fact]
     public void Only_the_subscription_and_provider_pairs_the_inventory_has_resources_for_are_read()
     {
-        var registry = RegistryLoader.Load(TownA).ForEnvironment("prod");
+        var registry = RegistryLoader.Load(TownA, TestAdapters.Azure).ForEnvironment("prod");
         var env = registry.ActiveEnvironment!;
-        var definition = env.Sources.Single(s => s.Name == "health") with { Connection = null, Providers = ["Microsoft.DocumentDB", "Microsoft.Web", "Microsoft.KeyVault"] };
+        var health = env.Sources.Single(s => s.Name == "health");
+        var definition = health with { Connection = null, Typed = AzureSettings.Of(health) with { Providers = ["Microsoft.DocumentDB", "Microsoft.Web", "Microsoft.KeyVault"] } };
         var source = (ResourceHealthSource)new ResourceHealthSourceFactory(new HttpClient(new CannedHttp()), new FakeTimeProvider(T1))
             .Create(new SourceContext("prod", definition, null, env.Scope, new ObservabilityCity.Core.Scope.ScopeStore(), TownA));
         static ObservabilityCity.Core.Scope.InventoryResource R(string sub, string type) => new($"/subscriptions/{sub}/x", "x", type, sub, null, new Dictionary<string, string>());
@@ -490,8 +491,8 @@ public class ResourceHealthTests
     [Fact]
     public void A_source_naming_no_provider_cannot_start_and_says_so()
     {
-        var env = RegistryLoader.Load(TownA).Environments.Single();
-        var bare = env with { Sources = env.Sources.Select(s => s.Name == "health" ? s with { Providers = [] } : s).ToList() };
+        var env = RegistryLoader.Load(TownA, TestAdapters.Azure).Environments.Single();
+        var bare = env with { Sources = env.Sources.Select(s => s.Name == "health" ? s with { Typed = AzureSettings.Of(s) with { Providers = [] } } : s).ToList() };
 
         var set = new AdapterCatalog([new AzureAdapters()]).Build(bare, TownA);
 
@@ -505,7 +506,7 @@ public class ResourceHealthTests
         using var copy = new TownFiles(TownA);
         copy.Write("environments/prod.yaml", File.ReadAllText(copy.FilePath("environments/prod.yaml")).Replace("providers: [Microsoft.DocumentDB]", "providers: [documentdb]"));
 
-        var ex = Assert.Throws<RegistryException>(() => RegistryLoader.Load(copy.Path));
+        var ex = Assert.Throws<RegistryException>(() => RegistryLoader.Load(copy.Path, TestAdapters.Azure));
 
         Assert.Contains("source 'health' has the provider 'documentdb'", ex.Message);
     }
@@ -516,7 +517,7 @@ public class ResourceHealthTests
     public void A_health_source_fills_no_signal_and_is_not_reported_as_unused(string town)
     {
         // that its kind fills no signal is the module's word (it declares HealthEvents), so the view is made with the loaded modules, as the host makes it
-        var registry = RegistryLoader.Load(Folder(town)).ForEnvironment("prod", null, new AdapterCatalog([new AzureAdapters()]));
+        var registry = RegistryLoader.Load(Folder(town), TestAdapters.Azure).ForEnvironment("prod", null, new AdapterCatalog([new AzureAdapters()]));
 
         Assert.DoesNotContain(registry.Warnings, w => w.Contains(SourceName(town)));
         Assert.Equal("resourcehealth", registry.ActiveEnvironment!.Sources.Single(s => s.Name == SourceName(town)).Kind);
@@ -525,8 +526,8 @@ public class ResourceHealthTests
     [Fact]
     public void A_health_source_has_its_own_defaults_and_a_window_in_days_is_understood()
     {
-        var a = RegistryLoader.Load(TownA).ForEnvironment("prod").ActiveEnvironment!.Sources.Single(s => s.Name == "health");
-        var b = RegistryLoader.Load(TownB).ForEnvironment("prod").ActiveEnvironment!.Sources.Single(s => s.Name == "azure-health");
+        var a = RegistryLoader.Load(TownA, TestAdapters.Azure).ForEnvironment("prod").ActiveEnvironment!.Sources.Single(s => s.Name == "health");
+        var b = RegistryLoader.Load(TownB, TestAdapters.Azure).ForEnvironment("prod").ActiveEnvironment!.Sources.Single(s => s.Name == "azure-health");
 
         Assert.Equal(TimeSpan.FromDays(3), SourceQuery.WindowOf(a with { Window = ResourceHealthSource.DefaultWindow }));
         Assert.Equal("7d", b.Window);
@@ -716,7 +717,7 @@ public class ResourceHealthTests
         using var copy = new TownFiles(TownA);
         copy.Write("environments/prod.yaml", File.ReadAllText(copy.FilePath("environments/prod.yaml")).Replace("providers: [Microsoft.DocumentDB]", "providers: [Microsoft.DocumentDB], keepResolvedFor: soon"));
 
-        var ex = Assert.Throws<RegistryException>(() => RegistryLoader.Load(copy.Path));
+        var ex = Assert.Throws<RegistryException>(() => RegistryLoader.Load(copy.Path, TestAdapters.Azure));
 
         Assert.Contains("keepResolvedFor 'soon'", ex.Message);
     }

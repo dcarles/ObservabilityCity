@@ -16,7 +16,8 @@ public sealed class TemplateAdapters : IAdapterModule
         // the kind an environment file writes: sources: { telemetry: { kind: example-http, connection: "https://..." } }
         // Say what a source of it can serve besides signals. This one fills signals only. A kind that can also answer the Logs tab, find links, read the
         // inventory or report the cloud's health declares Logs, Links, Inventory or HealthEvents here, and its source implements the matching interface.
-        registry.AddSourceKind(new SourceKindInfo(ExampleHttpSourceFactory.SourceKind) { Capabilities = SourceCapabilities.None });
+        // Settings reads and checks the keys a source of this kind has beyond the core's (here: field). A kind without it takes no other key.
+        registry.AddSourceKind(new SourceKindInfo(ExampleHttpSourceFactory.SourceKind) { Capabilities = SourceCapabilities.None, Settings = ExampleHttpSettings.Reader });
         registry.AddSource(new ExampleHttpSourceFactory());
     }
 }

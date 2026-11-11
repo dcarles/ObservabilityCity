@@ -43,7 +43,7 @@ public class SourceCapabilityTests
     }
 
     /// <summary>
-    /// A module whose sources are the Azure ones on a fixed clock, under the names it is given, with the capabilities the Azure module declares for them. With
+    /// A module whose sources are the Azure ones on a fixed clock, under the names it is given, with the capabilities and settings the Azure module declares for them. With
     /// the Azure names it is the Azure town; with the other names it is a cloud the core has never heard of.
     /// </summary>
     private sealed class FixedClockCloud(string name, Func<string, string> rename, TimeProvider time) : IAdapterModule
@@ -55,7 +55,7 @@ public class SourceCapabilityTests
             foreach (var inner in new IMetricSourceFactory[] { new ResourceGraphSourceFactory(time: time), new LogAnalyticsSourceFactory(time: time), new AzureMonitorSourceFactory(time: time), new ResourceHealthSourceFactory(time: time) })
             {
                 var kind = rename(inner.Kind);
-                registry.AddSourceKind(new SourceKindInfo(kind) { Capabilities = AdapterContract.CapabilitiesOf(new AzureAdapters(), inner.Kind) });
+                registry.AddSourceKind(new SourceKindInfo(kind) { Capabilities = AdapterContract.CapabilitiesOf(new AzureAdapters(), inner.Kind), Settings = AdapterContract.SettingsOf(new AzureAdapters(), inner.Kind) });
                 registry.AddSource(new RenamedFactory(kind, inner));
             }
         }

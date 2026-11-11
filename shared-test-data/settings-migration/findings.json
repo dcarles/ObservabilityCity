@@ -1,0 +1,427 @@
+{
+  "entities-aggregation-and-interval": [
+    {
+      "Severity": "Error",
+      "File": "environments/prod.yaml",
+      "Line": 68,
+      "Rule": "registry",
+      "Message": "environments/prod.yaml: source \u0027messaging\u0027 entities.backlog: aggregation \u0027avg\u0027. Use average, total, count, maximum, minimum, last."
+    },
+    {
+      "Severity": "Error",
+      "File": "environments/prod.yaml",
+      "Line": 68,
+      "Rule": "registry",
+      "Message": "environments/prod.yaml: source \u0027messaging\u0027 entities: interval \u00272m\u0027 is not a time grain the metrics API offers. Use one of 1m, 5m, 15m, 30m, 1h, 6h, 12h, 1d"
+    },
+    {
+      "Severity": "Warning",
+      "File": "pillars/aa.yaml",
+      "Line": 8,
+      "Rule": "tenants",
+      "Message": "\u0027aa.orders-db\u0027 has a tenantPattern, but the town has no environments folder, so there are no tenants to draw. Add environments/{env}.yaml with a tenants list."
+    }
+  ],
+  "entities-bad-pattern": [
+    {
+      "Severity": "Error",
+      "File": "environments/prod.yaml",
+      "Line": 67,
+      "Rule": "registry",
+      "Message": "environments/prod.yaml: source \u0027messaging\u0027 entities.patterns[1]: the match is not a valid regular expression: Invalid pattern \u0027^q-([\u0027 at offset 5. Unterminated [] set."
+    },
+    {
+      "Severity": "Warning",
+      "File": "pillars/aa.yaml",
+      "Line": 8,
+      "Rule": "tenants",
+      "Message": "\u0027aa.orders-db\u0027 has a tenantPattern, but the town has no environments folder, so there are no tenants to draw. Add environments/{env}.yaml with a tenants list."
+    }
+  ],
+  "entities-dead-letter-link": [
+    {
+      "Severity": "Error",
+      "File": "environments/prod.yaml",
+      "Line": 67,
+      "Rule": "registry",
+      "Message": "environments/prod.yaml: source \u0027messaging\u0027 entities.deadLetterLink: url must start with http:// or https://"
+    },
+    {
+      "Severity": "Error",
+      "File": "environments/prod.yaml",
+      "Line": 67,
+      "Rule": "registry",
+      "Message": "environments/prod.yaml: source \u0027messaging\u0027 entities.deadLetterLink: {queu} is not a variable of the url. Use {pillar}, {service}, {system}, {environment}, {queue}. Did you mean \u0027queue\u0027?"
+    },
+    {
+      "Severity": "Warning",
+      "File": "pillars/aa.yaml",
+      "Line": 8,
+      "Rule": "tenants",
+      "Message": "\u0027aa.orders-db\u0027 has a tenantPattern, but the town has no environments folder, so there are no tenants to draw. Add environments/{env}.yaml with a tenants list."
+    }
+  ],
+  "entities-flows": [
+    {
+      "Severity": "Error",
+      "File": "environments/prod.yaml",
+      "Line": 69,
+      "Rule": "registry",
+      "Message": "environments/prod.yaml: source \u0027messaging\u0027 entities.flows[0]: direction \u0027out\u0027. Use sent or received."
+    },
+    {
+      "Severity": "Error",
+      "File": "environments/prod.yaml",
+      "Line": 69,
+      "Rule": "registry",
+      "Message": "environments/prod.yaml: source \u0027messaging\u0027 entities.flows[0]: the match has no group named \u0027pillar\u0027. Write it as (?\u003Cpillar\u003E...)"
+    },
+    {
+      "Severity": "Warning",
+      "File": "pillars/aa.yaml",
+      "Line": 8,
+      "Rule": "tenants",
+      "Message": "\u0027aa.orders-db\u0027 has a tenantPattern, but the town has no environments folder, so there are no tenants to draw. Add environments/{env}.yaml with a tenants list."
+    }
+  ],
+  "entities-no-metric": [
+    {
+      "Severity": "Error",
+      "File": "environments/prod.yaml",
+      "Line": 64,
+      "Rule": "registry",
+      "Message": "environments/prod.yaml: source \u0027messaging\u0027 entities: it asks for no metric. Give backlog, deadLetter, throughput or any of them"
+    },
+    {
+      "Severity": "Warning",
+      "File": "pillars/aa.yaml",
+      "Line": 8,
+      "Rule": "tenants",
+      "Message": "\u0027aa.orders-db\u0027 has a tenantPattern, but the town has no environments folder, so there are no tenants to draw. Add environments/{env}.yaml with a tenants list."
+    }
+  ],
+  "entities-no-patterns": [
+    {
+      "Severity": "Error",
+      "File": "environments/prod.yaml",
+      "Line": 63,
+      "Rule": "registry",
+      "Message": "environments/prod.yaml: source \u0027messaging\u0027 entities: patterns is empty. Give at least one pattern: a regular expression with the named group service (and pillar when the name says it)"
+    },
+    {
+      "Severity": "Warning",
+      "File": "pillars/aa.yaml",
+      "Line": 8,
+      "Rule": "tenants",
+      "Message": "\u0027aa.orders-db\u0027 has a tenantPattern, but the town has no environments folder, so there are no tenants to draw. Add environments/{env}.yaml with a tenants list."
+    }
+  ],
+  "entities-pattern-groups": [
+    {
+      "Severity": "Error",
+      "File": "environments/prod.yaml",
+      "Line": 67,
+      "Rule": "registry",
+      "Message": "environments/prod.yaml: source \u0027messaging\u0027 entities.patterns[1]: the match has no group named \u0027service\u0027. Write it as (?\u003Cservice\u003E...)"
+    },
+    {
+      "Severity": "Error",
+      "File": "environments/prod.yaml",
+      "Line": 67,
+      "Rule": "registry",
+      "Message": "environments/prod.yaml: source \u0027messaging\u0027 entities.patterns[1]: a route needs both groups, (?\u003CproducerPillar\u003E...) and (?\u003Cproducer\u003E...); this match has only producer"
+    },
+    {
+      "Severity": "Warning",
+      "File": "pillars/aa.yaml",
+      "Line": 8,
+      "Rule": "tenants",
+      "Message": "\u0027aa.orders-db\u0027 has a tenantPattern, but the town has no environments folder, so there are no tenants to draw. Add environments/{env}.yaml with a tenants list."
+    }
+  ],
+  "entities-unknown-rule": [
+    {
+      "Severity": "Error",
+      "File": "environments/prod.yaml",
+      "Line": 67,
+      "Rule": "registry",
+      "Message": "environments/prod.yaml: source \u0027messaging\u0027 entities: resources \u0027brokr\u0027 is not a rule of scope.resources. Use broker, plans, apps, accounts. Did you mean \u0027broker\u0027?"
+    },
+    {
+      "Severity": "Warning",
+      "File": "pillars/aa.yaml",
+      "Line": 8,
+      "Rule": "tenants",
+      "Message": "\u0027aa.orders-db\u0027 has a tenantPattern, but the town has no environments folder, so there are no tenants to draw. Add environments/{env}.yaml with a tenants list."
+    }
+  ],
+  "keep-resolved-for": [
+    {
+      "Severity": "Error",
+      "File": "environments/prod.yaml",
+      "Line": 38,
+      "Rule": "registry",
+      "Message": "environments/prod.yaml: source \u0027health\u0027 has keepResolvedFor \u0027soon\u0027, which is not a number and a unit like 4h or 90m"
+    },
+    {
+      "Severity": "Warning",
+      "File": "pillars/aa.yaml",
+      "Line": 8,
+      "Rule": "tenants",
+      "Message": "\u0027aa.orders-db\u0027 has a tenantPattern, but the town has no environments folder, so there are no tenants to draw. Add environments/{env}.yaml with a tenants list."
+    }
+  ],
+  "metrics-aggregation-and-scale": [
+    {
+      "Severity": "Error",
+      "File": "environments/prod.yaml",
+      "Line": 67,
+      "Rule": "registry",
+      "Message": "environments/prod.yaml: source \u0027platform\u0027 metrics[0].cpu: aggregation \u0027avrage\u0027. Use average, total, count, maximum, minimum. Did you mean \u0027average\u0027?"
+    },
+    {
+      "Severity": "Error",
+      "File": "environments/prod.yaml",
+      "Line": 67,
+      "Rule": "registry",
+      "Message": "environments/prod.yaml: source \u0027platform\u0027 metrics[0].cpu: scale must be above 0 (0.01 turns a percentage into a fraction)"
+    },
+    {
+      "Severity": "Warning",
+      "File": "pillars/aa.yaml",
+      "Line": 8,
+      "Rule": "tenants",
+      "Message": "\u0027aa.orders-db\u0027 has a tenantPattern, but the town has no environments folder, so there are no tenants to draw. Add environments/{env}.yaml with a tenants list."
+    }
+  ],
+  "metrics-empty-metric": [
+    {
+      "Severity": "Error",
+      "File": "environments/prod.yaml",
+      "Line": 57,
+      "Rule": "registry",
+      "Message": "environments/prod.yaml: source \u0027platform\u0027 metrics[0].cpu: metric is empty; give the metric\u0027s name"
+    }
+  ],
+  "metrics-filter-variable": [
+    {
+      "Severity": "Error",
+      "File": "environments/prod.yaml",
+      "Line": 67,
+      "Rule": "registry",
+      "Message": "environments/prod.yaml: source \u0027platform\u0027 metrics[1].throttled.filter: {code} is not a variable here. Use {directory}, {env}, {environment}."
+    },
+    {
+      "Severity": "Warning",
+      "File": "pillars/aa.yaml",
+      "Line": 8,
+      "Rule": "tenants",
+      "Message": "\u0027aa.orders-db\u0027 has a tenantPattern, but the town has no environments folder, so there are no tenants to draw. Add environments/{env}.yaml with a tenants list."
+    }
+  ],
+  "metrics-interval-and-window": [
+    {
+      "Severity": "Error",
+      "File": "environments/prod.yaml",
+      "Line": 69,
+      "Rule": "registry",
+      "Message": "environments/prod.yaml: source \u0027platform\u0027 metrics[1]: interval \u00277m\u0027 is not a time grain the metrics API offers. Use one of 1m, 5m, 15m, 30m, 1h, 6h, 12h, 1d"
+    },
+    {
+      "Severity": "Error",
+      "File": "environments/prod.yaml",
+      "Line": 69,
+      "Rule": "registry",
+      "Message": "environments/prod.yaml: source \u0027platform\u0027 metrics[1]: window \u00271m\u0027 holds fewer than two points of its 7m interval; make it at least 14m"
+    },
+    {
+      "Severity": "Warning",
+      "File": "pillars/aa.yaml",
+      "Line": 8,
+      "Rule": "tenants",
+      "Message": "\u0027aa.orders-db\u0027 has a tenantPattern, but the town has no environments folder, so there are no tenants to draw. Add environments/{env}.yaml with a tenants list."
+    }
+  ],
+  "metrics-no-signal": [
+    {
+      "Severity": "Error",
+      "File": "environments/prod.yaml",
+      "Line": 55,
+      "Rule": "registry",
+      "Message": "environments/prod.yaml: source \u0027platform\u0027 metrics[0]: it asks for no signal. Give at least one of cpu, memory, utilisation, throttled, requests"
+    }
+  ],
+  "metrics-or-else-with-over": [
+    {
+      "Severity": "Error",
+      "File": "environments/prod.yaml",
+      "Line": 67,
+      "Rule": "registry",
+      "Message": "environments/prod.yaml: source \u0027platform\u0027 metrics[1].limit.orElse: it is only another metric to read in place; it cannot have an over or an orElse of its own"
+    },
+    {
+      "Severity": "Warning",
+      "File": "pillars/aa.yaml",
+      "Line": 8,
+      "Rule": "tenants",
+      "Message": "\u0027aa.orders-db\u0027 has a tenantPattern, but the town has no environments folder, so there are no tenants to draw. Add environments/{env}.yaml with a tenants list."
+    }
+  ],
+  "metrics-over-of-over": [
+    {
+      "Severity": "Error",
+      "File": "environments/prod.yaml",
+      "Line": 67,
+      "Rule": "registry",
+      "Message": "environments/prod.yaml: source \u0027platform\u0027 metrics[1].utilisation.over: over cannot have an over of its own"
+    },
+    {
+      "Severity": "Error",
+      "File": "environments/prod.yaml",
+      "Line": 67,
+      "Rule": "registry",
+      "Message": "environments/prod.yaml: source \u0027platform\u0027 metrics[1].utilisation.over: the divisor is used as it is; put scale and perSecond on the metric itself"
+    },
+    {
+      "Severity": "Warning",
+      "File": "pillars/aa.yaml",
+      "Line": 8,
+      "Rule": "tenants",
+      "Message": "\u0027aa.orders-db\u0027 has a tenantPattern, but the town has no environments folder, so there are no tenants to draw. Add environments/{env}.yaml with a tenants list."
+    }
+  ],
+  "metrics-unknown-rule": [
+    {
+      "Severity": "Error",
+      "File": "environments/prod.yaml",
+      "Line": 67,
+      "Rule": "registry",
+      "Message": "environments/prod.yaml: source \u0027platform\u0027 metrics[0]: resources \u0027planz\u0027 is not a rule of scope.resources. Use broker, plans, apps, accounts. Did you mean \u0027plans\u0027?"
+    },
+    {
+      "Severity": "Warning",
+      "File": "pillars/aa.yaml",
+      "Line": 8,
+      "Rule": "tenants",
+      "Message": "\u0027aa.orders-db\u0027 has a tenantPattern, but the town has no environments folder, so there are no tenants to draw. Add environments/{env}.yaml with a tenants list."
+    }
+  ],
+  "metrics-when-empty": [
+    {
+      "Severity": "Error",
+      "File": "environments/prod.yaml",
+      "Line": 67,
+      "Rule": "registry",
+      "Message": "environments/prod.yaml: source \u0027platform\u0027 metrics[1].requests.whenEmpty: \u0027zero\u0027. Use unknown, idle."
+    },
+    {
+      "Severity": "Warning",
+      "File": "pillars/aa.yaml",
+      "Line": 8,
+      "Rule": "tenants",
+      "Message": "\u0027aa.orders-db\u0027 has a tenantPattern, but the town has no environments folder, so there are no tenants to draw. Add environments/{env}.yaml with a tenants list."
+    }
+  ],
+  "poll-core": [
+    {
+      "Severity": "Error",
+      "File": "environments/prod.yaml",
+      "Line": 1,
+      "Rule": "registry",
+      "Message": "environments/prod.yaml: source \u0027health\u0027 has pollSeconds 0; it must be above 0"
+    },
+    {
+      "Severity": "Warning",
+      "File": "pillars/aa.yaml",
+      "Line": 8,
+      "Rule": "tenants",
+      "Message": "\u0027aa.orders-db\u0027 has a tenantPattern, but the town has no environments folder, so there are no tenants to draw. Add environments/{env}.yaml with a tenants list."
+    }
+  ],
+  "provider-spelling": [
+    {
+      "Severity": "Error",
+      "File": "environments/prod.yaml",
+      "Line": 38,
+      "Rule": "registry",
+      "Message": "environments/prod.yaml: source \u0027health\u0027 has the provider \u0027documentdb\u0027. Write a resource provider the way the cloud names it, for example Namespace.Service"
+    },
+    {
+      "Severity": "Warning",
+      "File": "pillars/aa.yaml",
+      "Line": 8,
+      "Rule": "tenants",
+      "Message": "\u0027aa.orders-db\u0027 has a tenantPattern, but the town has no environments folder, so there are no tenants to draw. Add environments/{env}.yaml with a tenants list."
+    }
+  ],
+  "region-query-empty": [
+    {
+      "Severity": "Error",
+      "File": "environments/prod.yaml",
+      "Line": 54,
+      "Rule": "registry",
+      "Message": "environments/prod.yaml: source \u0027telemetry\u0027 has an empty regionQuery; give the query that returns role, region and calls, or leave it out"
+    }
+  ],
+  "region-query-variable": [
+    {
+      "Severity": "Error",
+      "File": "environments/prod.yaml",
+      "Line": 57,
+      "Rule": "registry",
+      "Message": "environments/prod.yaml: source \u0027telemetry\u0027 regionQuery: {nonsense} is not a variable here. Use {env}, {environment}, {roles}, {window}, {windowSeconds}."
+    }
+  ],
+  "types-query-variable": [
+    {
+      "Severity": "Error",
+      "File": "environments/prod.yaml",
+      "Line": 64,
+      "Rule": "registry",
+      "Message": "environments/prod.yaml: source \u0027messaging\u0027 typesQuery: {nonsense} is not a variable here. Use {environment}, {roles}, {stage}, {window}, {windowSeconds}."
+    }
+  ],
+  "unknown-key": [
+    {
+      "Severity": "Error",
+      "File": "environments/prod.yaml",
+      "Line": 23,
+      "Rule": "registry",
+      "Message": "environments/prod.yaml (line 23): unknown key \u0027regoinQuery\u0027."
+    }
+  ],
+  "unknown-key-in-metrics": [
+    {
+      "Severity": "Error",
+      "File": "environments/prod.yaml",
+      "Line": 12,
+      "Rule": "registry",
+      "Message": "environments/prod.yaml (line 12): unknown key \u0027cpus\u0027."
+    }
+  ],
+  "window-core": [
+    {
+      "Severity": "Error",
+      "File": "environments/prod.yaml",
+      "Line": 57,
+      "Rule": "registry",
+      "Message": "environments/prod.yaml: source \u0027jobs\u0027 has window \u0027soon\u0027. Write a number and a unit: 30s, 5m or 1h"
+    }
+  ],
+  "wrong-type": [
+    {
+      "Severity": "Error",
+      "File": "environments/prod.yaml",
+      "Line": 38,
+      "Rule": "registry",
+      "Message": "environments/prod.yaml (line 38): Expected \u0027SequenceStart\u0027, got \u0027MappingStart\u0027 (at Line: 38, Col: 78, Idx: 2575)."
+    },
+    {
+      "Severity": "Warning",
+      "File": "pillars/aa.yaml",
+      "Line": 8,
+      "Rule": "tenants",
+      "Message": "\u0027aa.orders-db\u0027 has a tenantPattern, but the town has no environments folder, so there are no tenants to draw. Add environments/{env}.yaml with a tenants list."
+    }
+  ]
+}

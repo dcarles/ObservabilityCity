@@ -32,7 +32,7 @@ public class ThemeContractTests
     public void The_sample_towns_use_every_kind_of_building_so_a_theme_is_tried_on_all_of_them()
     {
         var used = new[] { TestPaths.Registry, TestPaths.DroidShop }
-            .Select(RegistryLoader.Load)
+            .Select(f => RegistryLoader.Load(f))
             .SelectMany(r => r.AllNodes.Select(n => n.Kind).Concat(r.Vendors.Select(v => v.Node.Kind)))
             .Distinct()
             .Select(k => k.ToString())

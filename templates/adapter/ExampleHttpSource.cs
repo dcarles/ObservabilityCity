@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using ObservabilityCity.Core.Registry;
 using ObservabilityCity.Core.Sources;
@@ -20,7 +21,9 @@ public sealed class ExampleHttpSourceFactory(HttpClient? http = null, TimeProvid
         // Say what is wrong in words: the host reports it at start-up and leaves this source out, and the rest of the town carries on.
         if (!Uri.TryCreate(context.Source.Connection, UriKind.Absolute, out var address))
             throw new InvalidOperationException("connection must be the address to read, for example https://metrics.example.test/readings");
-        return new ExampleHttpSource(context.Source, context.EnvironmentId, address, http ?? Shared, time ?? TimeProvider.System);
+        // the source's own keys, as the module read and checked them (see ExampleHttpSettings)
+        var options = ExampleHttpSettings.Reader.For(context.Source);
+        return new ExampleHttpSource(context.Source, context.EnvironmentId, address, options, http ?? Shared, time ?? TimeProvider.System);
     }
 }
 
@@ -30,7 +33,7 @@ public sealed class ExampleHttpSourceFactory(HttpClient? http = null, TimeProvid
 /// answer only for systems the registry has; leave out a system you know nothing about (the town then shows it as having no data);
 /// pass the cancellation token to every call; throw when the source cannot be read, so the readings go stale instead of looking fresh.
 /// </summary>
-public sealed class ExampleHttpSource(RegistrySource definition, string environmentId, Uri address, HttpClient http, TimeProvider time) : IMetricSource
+public sealed class ExampleHttpSource(RegistrySource definition, string environmentId, Uri address, ExampleHttpOptions options, HttpClient http, TimeProvider time) : IMetricSource
 {
     public string Name => definition.Name;
 
@@ -42,12 +45,15 @@ public sealed class ExampleHttpSource(RegistrySource definition, string environm
     {
         // the poller hands over the whole town; this environment sees only the systems deployed in it
         var view = registry.ForEnvironment(environmentId);
-        var answer = await http.GetFromJsonAsync<Answer>(address, ct) ?? throw new InvalidOperationException($"{address} answered with nothing");
+        var answer = await http.GetFromJsonAsync<JsonElement>(address, ct);
+        if (answer.ValueKind != JsonValueKind.Object || !answer.TryGetProperty(options.Field, out var field))
+            throw new InvalidOperationException($"{address} answered without '{options.Field}'");
+        var systems = field.Deserialize<Dictionary<string, Reading>>() ?? throw new InvalidOperationException($"{address} answered with no systems");
         var now = time.GetUtcNow();
         var readings = new Dictionary<string, NodeReading>();
         foreach (var node in view.AllNodes)
         {
-            if (!answer.Systems.TryGetValue(node.Id, out var s)) continue;
+            if (!systems.TryGetValue(node.Id, out var s)) continue;
             readings[node.Id] = new NodeReading(
                 At: now,
                 Up: s.InstancesHealthy > 0,
@@ -61,8 +67,6 @@ public sealed class ExampleHttpSource(RegistrySource definition, string environm
         }
         return readings;
     }
-
-    private sealed record Answer([property: JsonPropertyName("systems")] Dictionary<string, Reading> Systems);
 
     private sealed record Reading(
         [property: JsonPropertyName("requestsPerSecond")] double RequestsPerSecond,

@@ -1,7 +1,7 @@
 namespace ObservabilityCity.Core.Registry;
 
-/// <summary>Finds the closest known name to a mistyped one, for error messages.</summary>
-internal static class DidYouMean
+/// <summary>Finds the closest known name to a mistyped one, for error messages. Adapters use it for their own settings too.</summary>
+public static class DidYouMean
 {
     public static string? Closest(string typed, IEnumerable<string> known)
     {

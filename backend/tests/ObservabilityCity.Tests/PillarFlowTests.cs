@@ -19,7 +19,7 @@ public class PillarFlowTests
     private static readonly DateTimeOffset T0 = DateTimeOffset.Parse("2026-01-01T00:00:00Z");
     private static readonly TimeSpan Window = TimeSpan.FromMinutes(10);
 
-    private static TownRegistry Prod(string folder) => RegistryLoader.Load(folder).ForEnvironment("prod");
+    private static TownRegistry Prod(string folder) => RegistryLoader.Load(folder, TestAdapters.Azure).ForEnvironment("prod");
 
     private static readonly IReadOnlyList<EntityFlow> ShapeA = [new(@"^(?<pillar>[a-z]+)-out$", "sent"), new(@"^(?<pillar>[a-z]+)-in$", "received")];
     private static readonly IReadOnlyList<EntityFlow> ShapeB = [new(@"^out\.(?<pillar>[a-z]+)$", "sent"), new(@"^in\.(?<pillar>[a-z]+)\.all$", "received")];
@@ -78,7 +78,7 @@ public class PillarFlowTests
     {
         var path = WithFlows("      flows:\n        - { match: '^(?<pillar>[a-z]+)-out$', direction: sent }\n        - { match: '^(?<pillar>[a-z]+)-in$', direction: Received }\n");
 
-        var flows = RegistryLoader.Load(path).ForEnvironment("prod").ActiveEnvironment!.Sources.Single(s => s.Name == "messaging").Entities!.Flows!;
+        var flows = AzureSettings.Of(RegistryLoader.Load(path, TestAdapters.Azure).ForEnvironment("prod").ActiveEnvironment!.Sources.Single(s => s.Name == "messaging")).Entities!.Flows!;
 
         Assert.Equal(["sent", "received"], flows.Select(f => f.Direction));
     }
@@ -91,7 +91,7 @@ public class PillarFlowTests
     {
         var path = WithFlows(flows);
 
-        var ex = Assert.Throws<RegistryException>(() => RegistryLoader.Load(path));
+        var ex = Assert.Throws<RegistryException>(() => RegistryLoader.Load(path, TestAdapters.Azure));
 
         Assert.Contains(message, ex.Message);
     }
@@ -104,7 +104,7 @@ public class PillarFlowTests
         File.WriteAllText(file, File.ReadAllText(file).Replace("      throughput: { metric: IncomingMessages, aggregation: total }\n", "      flows:\n        - { match: '^(?<pillar>[a-z]+)-out$', direction: sent }\n"));
         _copies.Add(copy);
 
-        var ex = Assert.Throws<RegistryException>(() => RegistryLoader.Load(copy.Path));
+        var ex = Assert.Throws<RegistryException>(() => RegistryLoader.Load(copy.Path, TestAdapters.Azure));
 
         Assert.Contains("flows need a throughput metric", ex.Message);
     }
