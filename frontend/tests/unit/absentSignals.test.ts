@@ -52,23 +52,23 @@ describe('which signals a system has', () => {
 describe('reading the list from the server', () => {
   it('keeps the signals it knows and drops the ones it does not', () => {
     const raw = town()
-    ;(nodeOf(raw, 'cl.ledger-api') as unknown as Record<string, unknown>).absent = ['cpu', 'telepathy', 7]
+    ;(nodeOf(raw, 'ldg.ledger-api') as unknown as Record<string, unknown>).absent = ['cpu', 'telepathy', 7]
 
     const { snapshot } = checkSnapshot(raw)
 
-    expect(nodeOf(snapshot!, 'cl.ledger-api').absent).toEqual(['cpu'])
+    expect(nodeOf(snapshot!, 'ldg.ledger-api').absent).toEqual(['cpu'])
   })
 
   it('gives a server that sends none an empty list, so everything shows', () => {
     const raw = town()
-    delete (nodeOf(raw, 'cl.ledger-api') as unknown as Record<string, unknown>).absent
+    delete (nodeOf(raw, 'ldg.ledger-api') as unknown as Record<string, unknown>).absent
 
-    expect(nodeOf(checkSnapshot(raw).snapshot!, 'cl.ledger-api').absent).toEqual([])
+    expect(nodeOf(checkSnapshot(raw).snapshot!, 'ldg.ledger-api').absent).toEqual([])
   })
 })
 
 describe('the beacon', () => {
-  const n = nodeOf(town(), 'cl.ledger-api')
+  const n = nodeOf(town(), 'ldg.ledger-api')
 
   it('is dark when nothing that would colour it is measured: not grey, not green', () => {
     expect(beaconLevel({ ...n, state: 'Stale', absent: ALL })).toBe('off')
@@ -86,7 +86,7 @@ describe('the beacon', () => {
 })
 
 describe('the plaque', () => {
-  const n = nodeOf(town(), 'cl.ledger-api')
+  const n = nodeOf(town(), 'ldg.ledger-api')
 
   it('says not monitored for a system with no source, and not "no data"', () => {
     expect(plaqueText({ ...n, state: 'Stale', absent: ALL })).toBe('not monitored')
@@ -108,34 +108,34 @@ describe('the plaque', () => {
 
 describe('the inspector', () => {
   it('says there is no source for a system with none, and gives no reason to worry', () => {
-    const n = nodeOf(unmonitored(town(), 'cl.ledger-api'), 'cl.ledger-api')
+    const n = nodeOf(unmonitored(town(), 'ldg.ledger-api'), 'ldg.ledger-api')
 
     expect(overviewRows(n)).toEqual([{ label: 'Data', value: 'no source configured', tone: '' }])
     expect(reasons(n)).toEqual([])
   })
 
   it('leaves out a row for each absent signal and shows the rest', () => {
-    const n = nodeOf(partly(town(), 'cl.ledger-api'), 'cl.ledger-api')
+    const n = nodeOf(partly(town(), 'ldg.ledger-api'), 'ldg.ledger-api')
 
     expect(overviewRows(n).map((r) => r.label)).toEqual(['Requests', 'Errors', 'p99 / SLA'])
   })
 
   it('shows no errors row and no error reason when errors are not measured, whatever the number says', () => {
-    const n = nodeOf(partly(town(), 'cl.ledger-api', { absent: ['errors', 'instances'], errorRate: 0.9, instancesTotal: 0, instancesHealthy: 0 }), 'cl.ledger-api')
+    const n = nodeOf(partly(town(), 'ldg.ledger-api', { absent: ['errors', 'instances'], errorRate: 0.9, instancesTotal: 0, instancesHealthy: 0 }), 'ldg.ledger-api')
 
     expect(overviewRows(n).map((r) => r.label)).not.toContain('Errors')
     expect(reasons(n).join(' ')).not.toContain('Errors are at')
   })
 
   it('ignores a stray number for a signal that is absent', () => {
-    const n = nodeOf(partly(town(), 'cl.ledger-api', { cpu: 0.99, resourceAmber: 0.8, resourceRed: 0.95, errorRate: 0 }), 'cl.ledger-api')
+    const n = nodeOf(partly(town(), 'ldg.ledger-api', { cpu: 0.99, resourceAmber: 0.8, resourceRed: 0.95, errorRate: 0 }), 'ldg.ledger-api')
 
     expect(reasons(n)).toEqual([])
     expect(overviewRows(n).map((r) => r.label)).not.toContain('CPU')
   })
 
   it('shows every row for a system with every signal, as before', () => {
-    const n = nodeOf(town(), 'cl.ledger-api')
+    const n = nodeOf(town(), 'ldg.ledger-api')
 
     expect(overviewRows(n).map((r) => r.label)).toEqual(expect.arrayContaining(['Instances', 'Requests', 'Errors', 'p99 / SLA', 'Load']))
   })
@@ -143,44 +143,44 @@ describe('the inspector', () => {
 
 describe('what counts as missing data', () => {
   it('does not count a system with no source, but counts one whose source is silent', () => {
-    let s = unmonitored(town(), 'cl.ledger-api')
+    let s = unmonitored(town(), 'ldg.ledger-api')
     expect(staleCount(s)).toBe(0)
-    s = withState(s, 'cl.statements-api', 'Stale', { absent: ['cpu'] })
+    s = withState(s, 'ldg.statements-api', 'Stale', { absent: ['cpu'] })
     expect(staleCount(s)).toBe(1)
   })
 
   it('does not ask the wall to look at a system with no source', () => {
-    const s = unmonitored(town(), 'cl.ledger-api')
+    const s = unmonitored(town(), 'ldg.ledger-api')
 
     expect(attentionOf(s)).toEqual([])
   })
 
   it('still asks it to look at a silent source', () => {
-    const s = withState(town(), 'cl.ledger-api', 'Stale', { absent: [] })
+    const s = withState(town(), 'ldg.ledger-api', 'Stale', { absent: [] })
 
     expect(attentionOf(s).map((a) => a.kind)).toEqual(['stale'])
   })
 })
 
 describe('a service', () => {
-  const pad = () => ({ key: 'cl.ledger', name: 'Ledger', nodes: [{ id: 'cl.ledger-api' }, { id: 'cl.ledger-db' }] as never })
+  const pad = () => ({ key: 'ldg.ledger', name: 'Ledger', nodes: [{ id: 'ldg.ledger-api' }, { id: 'ldg.ledger-db' }] as never })
   const byId = (s: Snapshot) => new Map(s.groups.flatMap((g) => g.nodes).map((n) => [n.id, n]))
 
   it('takes its state from the systems that have a source', () => {
-    let s = unmonitored(town(), 'cl.ledger-api')
-    s = withState(s, 'cl.ledger-db', 'Degraded')
+    let s = unmonitored(town(), 'ldg.ledger-api')
+    s = withState(s, 'ldg.ledger-db', 'Degraded')
 
-    const sv = summariseService(pad(), 'cl', 'Core Ledger', byId(s))
+    const sv = summariseService(pad(), 'ldg', 'Core Ledger', byId(s))
 
     expect(sv.state).toBe('Degraded')
     expect(sv.monitored).toBe(true)
   })
 
   it('is not monitored when none of its systems has a source, and is not stale either', () => {
-    let s = unmonitored(town(), 'cl.ledger-api')
-    s = unmonitored(s, 'cl.ledger-db')
+    let s = unmonitored(town(), 'ldg.ledger-api')
+    s = unmonitored(s, 'ldg.ledger-db')
 
-    const sv = summariseService(pad(), 'cl', 'Core Ledger', byId(s))
+    const sv = summariseService(pad(), 'ldg', 'Core Ledger', byId(s))
 
     expect(sv.monitored).toBe(false)
     expect(sv.systems.every((x) => x.unmonitored)).toBe(true)

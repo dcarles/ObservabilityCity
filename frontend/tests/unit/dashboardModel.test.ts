@@ -85,16 +85,16 @@ describe('pillar cards', () => {
 describe('groups and rows', () => {
   it('sorts groups worst first, opens a group with a problem by itself and starts the others closed', () => {
     const d = buildDashboard(golden('bad-day'), ALL_TENANTS)
-    const frd = d.pillars.find((p) => p.id === 'frd')!
-    const levels = frd.groups.map((g) => g.level)
+    const fra = d.pillars.find((p) => p.id === 'fra')!
+    const levels = fra.groups.map((g) => g.level)
     expect(levels).toEqual([...levels].sort((a, b) => ['none', 'ok', 'warn', 'bad'].indexOf(b) - ['none', 'ok', 'warn', 'bad'].indexOf(a)))
-    for (const g of frd.groups) expect(groupIsOpen(g, ui())).toBe(g.level === 'warn' || g.level === 'bad')
+    for (const g of fra.groups) expect(groupIsOpen(g, ui())).toBe(g.level === 'warn' || g.level === 'bad')
     const calm = buildDashboard(golden('calm'), ALL_TENANTS)
     expect(calm.pillars.flatMap((p) => p.groups).some((g) => groupIsOpen(g, ui()))).toBe(false)
   })
 
   it('what the viewer chose beats the default', () => {
-    const g = buildDashboard(golden('bad-day'), ALL_TENANTS).pillars.find((p) => p.id === 'frd')!.groups[0]
+    const g = buildDashboard(golden('bad-day'), ALL_TENANTS).pillars.find((p) => p.id === 'fra')!.groups[0]
     expect(groupIsOpen(g, ui({ groups: new Map([[g.key, false]]) }))).toBe(false)
   })
 

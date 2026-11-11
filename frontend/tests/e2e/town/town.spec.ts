@@ -12,7 +12,7 @@ test('the sample town renders, calm and on a bad day', async ({ town, page }, in
   expect(islands).toBe(17)
   expect((await town.allBuildings()).filter((b) => b.state !== 'Healthy')).toEqual([])
 
-  // the two islands that show the link rule: a worker-only pillar with a pier and no bridge, a pillar with no messaging that has a bridge and no pier
+  // the two islands that show the link rule: a worker-only domain with a pier and no bridge, a domain with no messaging that has a bridge and no pier
   expect(await town.island('rcn')).toMatchObject({ bridge: false, pier: true, lane: true })
   expect(await town.island('reg')).toMatchObject({ bridge: true, pier: false, lane: false })
   expect(await town.hub()).toMatchObject({ piers: 16, legacy: 1 })
@@ -23,7 +23,7 @@ test('the sample town renders, calm and on a bad day', async ({ town, page }, in
   await info.attach('calm-town', { body: await page.screenshot(), contentType: 'image/png' })
 
   await town.effect('pay.payments-api', 'Errors', 0.6)
-  await town.effect('frd', 'Latency', 0.7)
+  await town.effect('fra', 'Latency', 0.7)
   await town.effect('obk.data-db', 'Saturate')
   await town.effect('col.cases-worker', 'Poison')
   await town.effect('dsp', 'Down')

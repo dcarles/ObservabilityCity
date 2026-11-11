@@ -25,30 +25,30 @@ public class SystemDetailsTests
     [Fact]
     public void A_value_in_the_systems_own_entry_comes_from_the_system()
     {
-        // cl.ledger-api: slaP99Ms: 800 in its own entry
-        var d = SystemDetails.Of(Galactic, "cl.ledger-api")!;
+        // ldg.ledger-api: slaP99Ms: 800 in its own entry
+        var d = SystemDetails.Of(Galactic, "ldg.ledger-api")!;
 
         var sla = Setting(d, "slaP99Ms");
         Assert.Equal("800 ms", sla.Value);
         Assert.Equal(SettingLayer.System, sla.Layer);
-        Assert.Equal("pillars/cl.yaml, this system", sla.Source);
+        Assert.Equal("pillars/ldg.yaml, this system", sla.Source);
     }
 
     [Fact]
     public void A_value_the_system_leaves_out_comes_from_its_pillars_defaults_for_its_role()
     {
-        // cl.statements-api has no slaP99Ms; pillars/cl.yaml says defaults: api: { slaP99Ms: 300 }
-        var sla = Setting(SystemDetails.Of(Galactic, "cl.statements-api")!, "slaP99Ms");
+        // ldg.statements-api has no slaP99Ms; pillars/ldg.yaml says defaults: api: { slaP99Ms: 300 }
+        var sla = Setting(SystemDetails.Of(Galactic, "ldg.statements-api")!, "slaP99Ms");
 
         Assert.Equal("300 ms", sla.Value);
         Assert.Equal(SettingLayer.Pillar, sla.Layer);
-        Assert.Equal("pillars/cl.yaml, pillar defaults for api", sla.Source);
+        Assert.Equal("pillars/ldg.yaml, pillar defaults for api", sla.Source);
     }
 
     [Fact]
     public void A_value_neither_names_comes_from_defaults_yaml()
     {
-        var amber = Setting(SystemDetails.Of(Galactic, "cl.ledger-api")!, "errors.amber");
+        var amber = Setting(SystemDetails.Of(Galactic, "ldg.ledger-api")!, "errors.amber");
 
         Assert.Equal("1%", amber.Value);
         Assert.Equal(SettingLayer.App, amber.Layer);
@@ -59,7 +59,7 @@ public class SystemDetailsTests
     public void A_value_nothing_names_is_the_built_in_default()
     {
         // defaults.yaml has no resources block, so the 80% and 95% are the built-in ones
-        var amber = Setting(SystemDetails.Of(Galactic, "cl.ledger-api")!, "resources.amber");
+        var amber = Setting(SystemDetails.Of(Galactic, "ldg.ledger-api")!, "resources.amber");
 
         Assert.Equal("80%", amber.Value);
         Assert.Equal(SettingLayer.BuiltIn, amber.Layer);
@@ -69,7 +69,7 @@ public class SystemDetailsTests
     [Fact]
     public void The_layers_are_told_apart_for_every_setting_of_one_system()
     {
-        var layers = SystemDetails.Of(Galactic, "cl.ledger-api")!.Config.ToDictionary(c => c.Key, c => c.Layer);
+        var layers = SystemDetails.Of(Galactic, "ldg.ledger-api")!.Config.ToDictionary(c => c.Key, c => c.Layer);
 
         Assert.Equal(SettingLayer.System, layers["role"]);
         Assert.Equal(SettingLayer.System, layers["external"]); // external: true on the system
@@ -81,9 +81,9 @@ public class SystemDetailsTests
     [Fact]
     public void Only_the_settings_that_apply_to_the_kind_of_system_are_listed()
     {
-        var api = SystemDetails.Of(Galactic, "cl.ledger-api")!.Config.Select(c => c.Key).ToList();
-        var worker = SystemDetails.Of(Galactic, "cl.ledger-worker")!.Config.Select(c => c.Key).ToList();
-        var db = SystemDetails.Of(Galactic, "cl.ledger-db")!.Config.Select(c => c.Key).ToList();
+        var api = SystemDetails.Of(Galactic, "ldg.ledger-api")!.Config.Select(c => c.Key).ToList();
+        var worker = SystemDetails.Of(Galactic, "ldg.ledger-worker")!.Config.Select(c => c.Key).ToList();
+        var db = SystemDetails.Of(Galactic, "ldg.ledger-db")!.Config.Select(c => c.Key).ToList();
 
         Assert.DoesNotContain("backlog.amber", api);
         Assert.DoesNotContain("throttle.amber", api);
@@ -96,8 +96,8 @@ public class SystemDetailsTests
     [Fact]
     public void A_backlog_is_told_in_seconds_and_a_tenant_pattern_as_written()
     {
-        var worker = SystemDetails.Of(Galactic, "cl.ledger-worker")!;
-        var db = SystemDetails.Of(Galactic, "cl.ledger-db")!;
+        var worker = SystemDetails.Of(Galactic, "ldg.ledger-worker")!;
+        var db = SystemDetails.Of(Galactic, "ldg.ledger-db")!;
 
         Assert.Equal("60 s", Setting(worker, "backlog.amber").Value);
         Assert.Equal("merchant-{tenant}-db", Setting(db, "tenantPattern").Value);
@@ -107,11 +107,11 @@ public class SystemDetailsTests
     [Fact]
     public void The_detail_names_the_file_the_island_and_the_service()
     {
-        var d = SystemDetails.Of(Galactic, "cl.ledger-api")!;
+        var d = SystemDetails.Of(Galactic, "ldg.ledger-api")!;
 
-        Assert.Equal("pillars/cl.yaml", d.File);
+        Assert.Equal("pillars/ldg.yaml", d.File);
         Assert.Equal("Core Ledger", d.IslandName);
-        Assert.Equal("cl", d.IslandId);
+        Assert.Equal("ldg", d.IslandId);
         Assert.Equal("ledger", d.Service);
         Assert.Equal(NodeKind.Api, d.Kind);
         Assert.Equal("hub.yaml", SystemDetails.Of(Mini, "hub.apim")!.File);
@@ -121,10 +121,10 @@ public class SystemDetailsTests
     [Fact]
     public void Links_are_read_in_both_directions()
     {
-        var d = SystemDetails.Of(Galactic, "cl.ledger-api")!;
+        var d = SystemDetails.Of(Galactic, "ldg.ledger-api")!;
 
-        Assert.Equal(["cl.ledger-db", "cl.session-cache", "cl.posting-api"], d.Calls.Select(l => l.Id));
-        Assert.Contains(d.CalledBy, l => l.Id == "cl.statements-api"); // calls: [cl.statements-db, cl.ledger-api]
+        Assert.Equal(["ldg.ledger-db", "ldg.session-cache", "ldg.posting-api"], d.Calls.Select(l => l.Id));
+        Assert.Contains(d.CalledBy, l => l.Id == "ldg.statements-api"); // calls: [ldg.statements-db, ldg.ledger-api]
         Assert.All(d.Calls, l => Assert.Equal(LinkKind.System, l.Kind));
         Assert.Equal("Core Ledger", d.Calls[0].IslandName);
     }
@@ -132,13 +132,13 @@ public class SystemDetailsTests
     [Fact]
     public void Calls_through_the_gateway_are_listed_apart_from_direct_ones()
     {
-        var caller = SystemDetails.Of(Galactic, "cl.statements-api")!;
+        var caller = SystemDetails.Of(Galactic, "ldg.statements-api")!;
         var callee = SystemDetails.Of(Galactic, "ntf.dispatch-api")!;
 
         Assert.Equal(["ntf.dispatch-api"], caller.GatewayCalls.Select(l => l.Id));
         Assert.DoesNotContain(caller.Calls, l => l.Id == "ntf.dispatch-api");
-        Assert.Contains(callee.GatewayCalledBy, l => l.Id == "cl.statements-api");
-        Assert.Equal("Core Ledger", callee.GatewayCalledBy.Single(l => l.Id == "cl.statements-api").IslandName);
+        Assert.Contains(callee.GatewayCalledBy, l => l.Id == "ldg.statements-api");
+        Assert.Equal("Core Ledger", callee.GatewayCalledBy.Single(l => l.Id == "ldg.statements-api").IslandName);
     }
 
     [Fact]

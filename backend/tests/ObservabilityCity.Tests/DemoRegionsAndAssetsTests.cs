@@ -28,7 +28,7 @@ public class DemoRegionsAndAssetsTests
     private static NodeSnapshot Node(Snapshot s, string id) => s.Groups.SelectMany(g => g.Nodes).Single(n => n.Id == id);
 
     [Theory]
-    [InlineData("galactic-credit", "cl.ledger-api")]
+    [InlineData("galactic-credit", "ldg.ledger-api")]
     [InlineData("droid-shop", "web.catalog-api")]
     public async Task A_service_with_regions_in_fake_yaml_shows_each_with_its_instances_and_share(string town, string id)
     {
@@ -45,17 +45,17 @@ public class DemoRegionsAndAssetsTests
         var snapshot = await Run(Path.Combine(TestPaths.RepoRoot, "config", "galactic-credit"));
 
         Assert.Single(Node(snapshot, "pay.payments-api").Regions!, r => r.Skewed);
-        Assert.DoesNotContain(Node(snapshot, "cl.ledger-api").Regions!, r => r.Skewed);
+        Assert.DoesNotContain(Node(snapshot, "ldg.ledger-api").Regions!, r => r.Skewed);
     }
 
     [Fact]
     public async Task A_service_without_regions_stays_one_set_of_numbers()
     {
-        Assert.Null(Node(await Run(Path.Combine(TestPaths.RepoRoot, "config", "galactic-credit")), "cl.statements-api").Regions);
+        Assert.Null(Node(await Run(Path.Combine(TestPaths.RepoRoot, "config", "galactic-credit")), "ldg.statements-api").Regions);
     }
 
     [Theory]
-    [InlineData("galactic-credit", "cl", "ledger")]
+    [InlineData("galactic-credit", "ldg", "ledger")]
     [InlineData("droid-shop", "web", "catalog")]
     public async Task The_demo_towns_have_basic_buildings_behind_a_service_and_in_the_back_yard(string town, string pillar, string service)
     {

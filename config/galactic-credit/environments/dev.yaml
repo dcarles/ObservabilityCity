@@ -21,4 +21,4 @@ exclude:
   - lost-found.batch-gateway-worker
   - lost-found.batch-gateway-db
   - lost-found.legacy-ftp-api
-  - cl.statement-cron
+  - ldg.statement-cron

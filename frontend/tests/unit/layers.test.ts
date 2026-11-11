@@ -71,7 +71,7 @@ describe('what a layer covers', () => {
 
 describe('parseFocus', () => {
   it('reads the island or vendor from the address, and is empty without one', () => {
-    expect(parseFocus('?focus=cl')).toBe('cl')
+    expect(parseFocus('?focus=ldg')).toBe('ldg')
     expect(parseFocus('?env=prod&focus=ext.payco')).toBe('ext.payco')
     expect(parseFocus('')).toBe('')
   })

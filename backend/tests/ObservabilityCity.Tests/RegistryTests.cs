@@ -12,7 +12,7 @@ public class RegistryTests
 
         Assert.Equal("Galactic Credit", registry.Town.Name);
         Assert.True(registry.Groups[0].IsHub);
-        Assert.Contains(registry.AllNodes, n => n.Id == "cl.ledger-api");
+        Assert.Contains(registry.AllNodes, n => n.Id == "ldg.ledger-api");
     }
 
     [Fact]
@@ -22,7 +22,7 @@ public class RegistryTests
         var ledger = registry.AllNodes.Where(n => n.Service == "ledger").Select(n => n.Kind).ToList();
 
         Assert.Equal([NodeKind.Api, NodeKind.Worker, NodeKind.Database], ledger);
-        Assert.Null(registry.AllNodes.Single(n => n.Id == "cl.session-cache").Service);
+        Assert.Null(registry.AllNodes.Single(n => n.Id == "ldg.session-cache").Service);
     }
 
     [Fact]
@@ -31,10 +31,10 @@ public class RegistryTests
         var registry = RegistryLoader.Load(TestPaths.Registry);
         RegistryNode Node(string id) => registry.AllNodes.Single(n => n.Id == id);
 
-        Assert.Equal(800, Node("cl.ledger-api").SlaP99Ms); // system override
-        Assert.Equal(300, Node("cl.posting-api").SlaP99Ms);  // pillar default for api
-        Assert.Equal(30000, Node("cl.posting-worker").SlaP99Ms); // app default for worker
-        Assert.Equal(0.005, Node("cl.ledger-db").ErrorAmber); // app default for db
+        Assert.Equal(800, Node("ldg.ledger-api").SlaP99Ms); // system override
+        Assert.Equal(300, Node("ldg.posting-api").SlaP99Ms);  // pillar default for api
+        Assert.Equal(30000, Node("ldg.posting-worker").SlaP99Ms); // app default for worker
+        Assert.Equal(0.005, Node("ldg.ledger-db").ErrorAmber); // app default for db
     }
 
     [Fact]
@@ -78,10 +78,10 @@ public class RegistryTests
     public void Declared_calls_are_read_from_the_pillar_file()
     {
         var registry = RegistryLoader.Load(TestPaths.Registry);
-        var calls = registry.AllNodes.Single(n => n.Id == "cl.ledger-api").Calls;
+        var calls = registry.AllNodes.Single(n => n.Id == "ldg.ledger-api").Calls;
 
-        Assert.Contains("cl.ledger-db", calls);
-        Assert.Empty(registry.AllNodes.Single(n => n.Id == "cl.ledger-db").Calls);
+        Assert.Contains("ldg.ledger-db", calls);
+        Assert.Empty(registry.AllNodes.Single(n => n.Id == "ldg.ledger-db").Calls);
     }
 
     [Fact]

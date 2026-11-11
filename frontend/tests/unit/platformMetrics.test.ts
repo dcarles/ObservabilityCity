@@ -9,7 +9,7 @@ import { healthyTown, withState } from './wall.testutil'
 // the metrics did not give.
 
 const nodeOf = (s: Snapshot, id: string): NodeSnapshot => s.groups.flatMap((g) => g.nodes).find((n) => n.id === id)!
-const town = (patch: Partial<NodeSnapshot>, id = 'cl.ledger-api'): NodeSnapshot => nodeOf(withState(healthyTown(), id, 'Healthy', patch), id)
+const town = (patch: Partial<NodeSnapshot>, id = 'ldg.ledger-api'): NodeSnapshot => nodeOf(withState(healthyTown(), id, 'Healthy', patch), id)
 const row = (n: NodeSnapshot, label: string) => overviewRows(n).find((r) => r.label === label)
 
 describe('lights from platform metrics', () => {
@@ -36,7 +36,7 @@ describe('lights from platform metrics', () => {
   })
 
   it('shows a data store at 95% and throttling 10% of its requests as red, with both rows', () => {
-    const db = town({ utilisation: 0.95, throttled: 0.1, resourceAmber: 0.8, resourceRed: 0.95, throttleAmber: 0.001, throttleRed: 0.02 }, 'cl.ledger-db')
+    const db = town({ utilisation: 0.95, throttled: 0.1, resourceAmber: 0.8, resourceRed: 0.95, throttleAmber: 0.001, throttleRed: 0.02 }, 'ldg.ledger-db')
 
     expect(row(db, 'Capacity used')).toMatchObject({ value: '95%', tone: 'bad' })
     expect(row(db, 'Throttled')).toMatchObject({ value: '10.0%', tone: 'bad' })
@@ -44,7 +44,7 @@ describe('lights from platform metrics', () => {
   })
 
   it('shows no throttling as a plain 0%, not a missing row: a filter that matches nothing is zero', () => {
-    const db = town({ utilisation: 0.5, throttled: 0, throttleAmber: 0.001, throttleRed: 0.02 }, 'cl.ledger-db')
+    const db = town({ utilisation: 0.5, throttled: 0, throttleAmber: 0.001, throttleRed: 0.02 }, 'ldg.ledger-db')
 
     expect(row(db, 'Throttled')).toMatchObject({ value: '0.0%', tone: '' })
   })

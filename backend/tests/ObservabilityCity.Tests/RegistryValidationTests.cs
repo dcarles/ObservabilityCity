@@ -37,7 +37,7 @@ public class RegistryValidationTests
         Assert.Equal(17, pillars.Count);
         Assert.Equal(16, pillars.Count(p => !p.IsLostFound));
         Assert.True(pillars[^1].IsLostFound);
-        Assert.Equal("cl", pillars[0].Id); // town.yaml islands order, not file-name order
+        Assert.Equal("ldg", pillars[0].Id); // town.yaml islands order, not file-name order
         Assert.True(registry.AllNodes.Count() >= 100);
     }
 

@@ -18,7 +18,7 @@ public enum FakeEffectKind
     HighMemory,
     /// <summary>
     /// A data store's utilisation pushed up by up to 60 points, so it starts throttling. On a store with a database for each tenant it hits every tenant's
-    /// database, unless the target names one tenant: "cl.ledger-db#acme" (or "*#acme" for that tenant in every store).
+    /// database, unless the target names one tenant: "ldg.ledger-db#acme" (or "*#acme" for that tenant in every store).
     /// </summary>
     Saturate,
     /// <summary>A consumer slows to a crawl, so its queue grows and its oldest message ages.</summary>

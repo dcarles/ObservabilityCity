@@ -41,10 +41,10 @@ describe('tenant scenarios', () => {
   })
 
   it('aim at one store for one tenant, never the whole town', () => {
-    expect(targetFor(scenario('tenant-db'), 'cl.ledger-db', 'acme')).toBe('cl.ledger-db#acme')
+    expect(targetFor(scenario('tenant-db'), 'ldg.ledger-db', 'acme')).toBe('ldg.ledger-db#acme')
     expect(targetFor(scenario('tenant-db'), '*', 'acme')).toBeNull()
-    expect(targetFor(scenario('tenant-db'), 'cl.ledger-db', undefined)).toBeNull()
-    expect(targetFor(scenario('errors'), 'cl.ledger-api', undefined)).toBe('cl.ledger-api')
+    expect(targetFor(scenario('tenant-db'), 'ldg.ledger-db', undefined)).toBeNull()
+    expect(targetFor(scenario('errors'), 'ldg.ledger-api', undefined)).toBe('ldg.ledger-api')
   })
 })
 
@@ -55,9 +55,9 @@ describe('picking a scenario and then a target', () => {
     expect(aim.arm(scenario('errors'), undefined)).toBeNull()
     expect(aim.scenario?.id).toBe('errors')
 
-    expect(aim.aim('cl.ledger-api', undefined)).toEqual({ target: 'cl.ledger-api', kind: 'Errors', intensity: 0.4 })
+    expect(aim.aim('ldg.ledger-api', undefined)).toEqual({ target: 'ldg.ledger-api', kind: 'Errors', intensity: 0.4 })
     expect(aim.scenario).toBeNull()
-    expect(aim.aim('cl.ledger-api', undefined)).toBeNull() // nothing is waiting any more: the target is only remembered
+    expect(aim.aim('ldg.ledger-api', undefined)).toBeNull() // nothing is waiting any more: the target is only remembered
   })
 
   it('fires at once when the target was chosen first, then forgets it', () => {
@@ -97,6 +97,6 @@ describe('picking a scenario and then a target', () => {
 
     expect(aim.aim('*', 'acme')).toBeNull()
     expect(aim.scenario?.id).toBe('tenant-db')
-    expect(aim.aim('cl.ledger-db', 'acme')).toEqual({ target: 'cl.ledger-db#acme', kind: 'Saturate', intensity: 1 })
+    expect(aim.aim('ldg.ledger-db', 'acme')).toEqual({ target: 'ldg.ledger-db#acme', kind: 'Saturate', intensity: 1 })
   })
 })

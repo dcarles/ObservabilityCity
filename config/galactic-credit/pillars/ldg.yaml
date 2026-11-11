@@ -1,0 +1,34 @@
+# yaml-language-server: $schema=../schema/pillar.schema.json
+pillar: ldg
+displayName: Core Ledger
+color: "#5aa9ff"
+defaults:
+  api: { slaP99Ms: 300 }
+systems:
+  # Each service here is one API, one worker and one database. Systems that share a
+  # service name are drawn side by side as one block. `calls` lists the systems one calls directly,
+  # and cars drive along those links only.
+  - { id: ldg.ledger-api, service: ledger, name: Ledger API, role: api, external: true, slaP99Ms: 800, calls: [ldg.ledger-db, ldg.session-cache, ldg.posting-api] }
+  - { id: ldg.ledger-worker, service: ledger, name: Ledger worker, role: worker, calls: [ldg.ledger-db] }
+  - { id: ldg.ledger-db, service: ledger, tenantPattern: "merchant-{tenant}-db", name: Ledger DB, role: db, engine: cosmos }
+  - { id: ldg.posting-api, service: posting, name: Posting API, role: api, calls: [ldg.posting-db, ldg.session-cache] }
+  - { id: ldg.posting-worker, service: posting, name: Posting worker, role: worker, calls: [ldg.posting-db, ldg.statements-api] }
+  - { id: ldg.posting-db, service: posting, tenantPattern: "merchant-{tenant}-db", name: Posting DB, role: db, engine: cosmos }
+  - { id: ldg.statements-api, service: statements, name: Statements API, role: api, calls: [ldg.statements-db, ldg.ledger-api], gatewayCalls: [ntf.dispatch-api] }
+  - { id: ldg.statements-worker, service: statements, name: Statements worker, role: worker, calls: [ldg.statements-db] }
+  - { id: ldg.statements-db, service: statements, tenantPattern: "merchant-{tenant}-db", name: Statements DB, role: db, engine: cosmos }
+  - { id: ldg.statement-cron, name: Statement run, role: function, calls: [ldg.statements-api] }
+  - { id: ldg.session-cache, name: Session cache, role: cache }
+
+# Messaging: the outboxes this pillar publishes (ldg-<service>-outbox) and the topics its workers consume.
+messaging:
+  topics: [ledger, posting, statements]
+  subscriptions:
+    - { topic: pay-payments-outbox, consumer: ldg.ledger-worker }
+    - { topic: bil-invoices-outbox, consumer: ldg.ledger-worker }
+    - { topic: pay-payments-outbox, consumer: ldg.posting-worker }
+    - { topic: pay-refunds-outbox, consumer: ldg.posting-worker }
+    - { topic: ldg-ledger-outbox, consumer: ldg.statements-worker }
+scheduler:
+  - system: ldg.statement-cron
+    jobs: { daily: [statements], hourly: [statements] }

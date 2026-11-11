@@ -1,5 +1,5 @@
 // The island filter, as pure functions. The viewer picks which islands to show; the backend sends a town with only those (and the hub), and
-// counts only what is on screen. The choice lives in the address (?islands=cl,pay). An empty choice means every island.
+// counts only what is on screen. The choice lives in the address (?islands=ldg,pay). An empty choice means every island.
 
 import type { Snapshot } from './types'
 

@@ -1,0 +1,24 @@
+# yaml-language-server: $schema=../schema/pillar.schema.json
+pillar: cst
+displayName: Customers
+color: "#3fb68b"
+systems:
+  - { id: cst.profile-api, service: profile, name: Profile API, role: api, external: true, calls: [cst.profile-db, cst.consent-api, cst.kyc-api], gatewayCalls: [ntf.dispatch-api] }
+  - { id: cst.profile-worker, service: profile, name: Profile worker, role: worker, calls: [cst.profile-db] }
+  - { id: cst.profile-db, service: profile, tenantPattern: "merchant-{tenant}-db", name: Profile DB, role: db, engine: cosmos }
+  - { id: cst.consent-api, service: consent, name: Consent API, role: api, calls: [cst.consent-db] }
+  - { id: cst.consent-worker, service: consent, name: Consent worker, role: worker, calls: [cst.consent-db] }
+  - { id: cst.consent-db, service: consent, name: Consent DB, role: db, engine: postgres }
+  - { id: cst.kyc-api, service: kyc, name: KYC API, role: api, calls: [cst.kyc-db] }
+  - { id: cst.kyc-db, service: kyc, name: KYC DB, role: db, engine: mongodb }
+  - { id: cst.archive-cron, name: Archive run, role: function, calls: [cst.profile-api] }
+
+# Messaging: the outboxes this pillar publishes (cst-<service>-outbox) and the topics its workers consume.
+messaging:
+  topics: [profile, consent]
+  subscriptions:
+    - { topic: acq-applications-outbox, consumer: cst.profile-worker }
+    - { topic: obk-data-outbox, consumer: cst.consent-worker }
+scheduler:
+  - system: cst.archive-cron
+    jobs: { daily: [profile], hourly: [profile] }

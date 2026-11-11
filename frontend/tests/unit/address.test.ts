@@ -11,7 +11,7 @@ describe('the view in the address', () => {
 
   it('writes islands sorted, and layers that differ from the usual', () => {
     const layers = { ...DEFAULT_LAYERS, traffic: false, workers: false, dependencies: true }
-    expect(withView('?env=prod', { islands: ['pay', 'cl'], layers })).toBe('?env=prod&islands=cl,pay&hide=traffic,workers&show=dependencies')
+    expect(withView('?env=prod', { islands: ['pay', 'ldg'], layers })).toBe('?env=prod&islands=ldg,pay&hide=traffic,workers&show=dependencies')
   })
 
   it('replaces an older choice and keeps everything else', () => {
@@ -27,7 +27,7 @@ describe('the view in the address', () => {
   })
 
   it('keeps the dependency focus in the address and drops it when there is none', () => {
-    expect(withView('?env=prod', { islands: [], layers: DEFAULT_LAYERS, focus: 'cl' })).toBe('?env=prod&focus=cl')
-    expect(withView('?focus=cl', { islands: [], layers: DEFAULT_LAYERS, focus: '' })).toBe('')
+    expect(withView('?env=prod', { islands: [], layers: DEFAULT_LAYERS, focus: 'ldg' })).toBe('?env=prod&focus=ldg')
+    expect(withView('?focus=ldg', { islands: [], layers: DEFAULT_LAYERS, focus: '' })).toBe('')
   })
 })

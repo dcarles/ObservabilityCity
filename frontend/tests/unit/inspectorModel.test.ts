@@ -246,7 +246,7 @@ describe('the links tab', () => {
   it('shows a third-party building what it calls through the gateway, as seen in the telemetry', () => {
     const vendor: SystemDetail = {
       ...detail, id: 'ext.pyd', name: 'Payment disbursement service', kind: 'Api', calls: [], gatewayCalledBy: [], outsideCallers: [], serviceTopics: [], subscriptions: [],
-      calledBy: [{ id: 'cl.ledger-api', name: 'Ledger API', kind: 'System', islandId: 'cl', islandName: 'Core Ledger', found: false, lastSeen: null }],
+      calledBy: [{ id: 'ldg.ledger-api', name: 'Ledger API', kind: 'System', islandId: 'ldg', islandName: 'Core Ledger', found: false, lastSeen: null }],
       gatewayCalls: [{ id: 'shp.orders-api', name: 'Orders API', kind: 'System', islandId: 'shp', islandName: 'Shipping', found: true, lastSeen: null }],
     }
     const sections = linkSections(vendor)
