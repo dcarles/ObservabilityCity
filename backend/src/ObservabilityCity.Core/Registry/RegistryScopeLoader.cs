@@ -85,8 +85,8 @@ public static partial class RegistryLoader
         }
         foreach (var (pillar, account) in s.PillarAccounts)
         {
-            if (!KebabId.IsMatch(pillar)) errors.Add($"{at}.pillarAccounts: '{pillar}' must be a pillar id (lowercase kebab-case)");
-            if (account.Trim().Length == 0) errors.Add($"{at}.pillarAccounts.{pillar} is empty; name an account id or leave the pillar out");
+            if (!KebabId.IsMatch(pillar)) errors.Add($"{at}.groupAccounts: '{pillar}' must be a group id (lowercase kebab-case)");
+            if (account.Trim().Length == 0) errors.Add($"{at}.groupAccounts.{pillar} is empty; name an account id or leave the group out");
         }
         if (s.Regions is { } regions)
         {

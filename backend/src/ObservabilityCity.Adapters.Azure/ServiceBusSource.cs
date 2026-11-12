@@ -186,8 +186,8 @@ public sealed class ServiceBusSource(
 
     /// <summary>
     /// Whose an entity is: the first pattern that matches its name decides. The consumer is the system of the pattern's kind whose service code the group <c>service</c> names, in the
-    /// pillar the group <c>pillar</c> names, or in any pillar when the pattern has no such group (then the code must belong to one system only). The groups <c>producerPillar</c>
-    /// and <c>producer</c> name the publisher the same way, and the entity is then a route from that service to the consumer.
+    /// pillar the group <c>group</c> (older name <c>pillar</c>) names, or in any pillar when the pattern has no such group (then the code must belong to one system only).
+    /// The groups <c>producerGroup</c> (older name <c>producerPillar</c>) and <c>producer</c> name the publisher the same way, and the entity is then a route from that service to the consumer.
     /// </summary>
     private static EntityClaim? Claim(TownRegistry registry, List<(Regex Regex, string Consumer)> patterns, string entity)
     {
@@ -202,8 +202,8 @@ public sealed class ServiceBusSource(
                 .Where(n => n.Kind.ToString().Equals(consumer, StringComparison.OrdinalIgnoreCase) && (n.ServiceCode ?? n.Service)?.Equals(service, StringComparison.OrdinalIgnoreCase) == true).ToList();
             if (found.Count != 1) return null; // none, or the code is shared by several pillars: not claimed rather than guessed
             string? group = null, publisher = null;
-            if (match.Groups["producerPillar"] is { Success: true } producerPillar && match.Groups["producer"] is { Success: true } producer
-                && registry.Groups.FirstOrDefault(g => !g.IsHub && Is(g, producerPillar.Value)) is { } from
+            if (GroupWords.Captured(match, GroupWords.ProducerGroup) is { Success: true } producerGroup && match.Groups["producer"] is { Success: true } producer
+                && registry.Groups.FirstOrDefault(g => !g.IsHub && Is(g, producerGroup.Value)) is { } from
                 && from.Nodes.FirstOrDefault(n => (n.ServiceCode ?? n.Service)?.Equals(producer.Value, StringComparison.OrdinalIgnoreCase) == true)?.Service is { } name)
                 (group, publisher) = (from.Id, name);
             return new EntityClaim(found[0], group, publisher);

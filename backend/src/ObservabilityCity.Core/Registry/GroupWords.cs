@@ -6,7 +6,8 @@ namespace ObservabilityCity.Core.Registry;
 /// "group" is the neutral word for an island's group of systems; older files say "pillar", and both read the same. The town's <c>groupLabel</c> is what the
 /// interface calls a group; these are only the words of the files: the folder (<c>groups/</c> or <c>pillars/</c>), the key of a group file (<c>group:</c> or
 /// <c>pillar:</c>), the template variables (<c>{group}</c> or <c>{pillar}</c>, <c>{groupId}</c> or <c>{pillarId}</c>, <c>{callerGroup}</c> or
-/// <c>{callerPillar}</c>) and the named group of a pattern (<c>(?&lt;group&gt;...)</c> or <c>(?&lt;pillar&gt;...)</c>).
+/// <c>{callerPillar}</c>), the named groups of a pattern (<c>(?&lt;group&gt;...)</c> or <c>(?&lt;pillar&gt;...)</c>, <c>(?&lt;producerGroup&gt;...)</c> or
+/// <c>(?&lt;producerPillar&gt;...)</c>) and the scope key that names a group's account (<c>groupAccounts</c>, or <c>pillarAccounts</c> and its Azure name <c>pillars</c>).
 /// </summary>
 public static class GroupWords
 {
@@ -30,7 +31,21 @@ public static class GroupWords
         ["callerGroup"] = "callerPillar",
     };
 
-    private static readonly Dictionary<string, string> Twins = OlderNames.Concat(OlderNames.Select(kv => KeyValuePair.Create(kv.Value, kv.Key))).ToDictionary(StringComparer.Ordinal);
+    /// <summary>The named group of a broker entity pattern that says the group of the entity's publisher.</summary>
+    public const string ProducerGroup = "producerGroup";
+
+    /// <summary>The older name of <see cref="ProducerGroup"/>. It is a pattern group only, never a template variable, so it is not in <see cref="OlderNames"/>.</summary>
+    public const string OlderProducerGroup = "producerPillar";
+
+    /// <summary>The scope key that names a group's account outright.</summary>
+    public const string GroupAccounts = "groupAccounts";
+
+    /// <summary>The older name of <see cref="GroupAccounts"/>. Its Azure name, <c>pillars</c>, reads too.</summary>
+    public const string OlderGroupAccounts = "pillarAccounts";
+
+    private static readonly KeyValuePair<string, string>[] Pairs = [.. OlderNames, KeyValuePair.Create(ProducerGroup, OlderProducerGroup)];
+
+    private static readonly Dictionary<string, string> Twins = Pairs.Concat(Pairs.Select(kv => KeyValuePair.Create(kv.Value, kv.Key))).ToDictionary(StringComparer.Ordinal);
 
     /// <summary>The other spelling of a variable or pattern group (group for pillar, pillar for group), or null for a name that has none.</summary>
     public static string? Twin(string name) => Twins.GetValueOrDefault(name);

@@ -311,7 +311,7 @@ public class ScopeResolutionTests
         var env = copy.FilePath("environments/prod.yaml");
         File.WriteAllText(env, File.ReadAllText(env).Replace("pillars: { bb:", "pillars: { zz: 00000000-0000-0000-0000-000000000099, bb:"));
 
-        Assert.Contains(RegistryLoader.Load(copy.Path).ForEnvironment("prod").Warnings, w => w.Contains("scope.pillarAccounts names 'zz'"));
+        Assert.Contains(RegistryLoader.Load(copy.Path).ForEnvironment("prod").Warnings, w => w.Contains("scope.groupAccounts names 'zz'"));
     }
 
     [Fact]

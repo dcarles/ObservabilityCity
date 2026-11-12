@@ -77,7 +77,7 @@ public sealed partial class AzureSourceSettings : SourceSettingsReader<AzureSour
 
     private static EntityMetric? ToEntityMetric(EntityMetricFile? f) => f is null ? null : new EntityMetric(f.Metric.Trim(), f.Aggregation.Trim().ToLowerInvariant());
 
-    /// <summary>A broker source's entities: the rule must exist, the metrics must be named, and each pattern must be a regular expression with the group service (and group or its older name pillar, producerPillar and producer when the name says them).</summary>
+    /// <summary>A broker source's entities: the rule must exist, the metrics must be named, and each pattern must be a regular expression with the group service (and group or its older name pillar, producerGroup or its older name producerPillar, and producer when the name says them).</summary>
     private static void CheckEntities(AzureSourceFile def, SourceSettingsContext context, SettingsReport report)
     {
         var errors = new Placed(report);
@@ -140,8 +140,8 @@ public sealed partial class AzureSourceSettings : SourceSettingsReader<AzureSour
                 var names = regex.GetGroupNames();
                 if (!names.Contains("service")) errors.Add($"{at}.patterns[{i}]: the match has no group named 'service'. Write it as (?<service>...)");
                 // the publisher is named by both groups or by neither
-                if (names.Contains("producer") != names.Contains("producerPillar"))
-                    errors.Add($"{at}.patterns[{i}]: a route needs both groups, (?<producerPillar>...) and (?<producer>...); this match has only {(names.Contains("producer") ? "producer" : "producerPillar")}");
+                if (names.Contains("producer") != GroupWords.HasGroup(names, GroupWords.ProducerGroup))
+                    errors.Add($"{at}.patterns[{i}]: a route needs both groups, (?<producerGroup>...) (older name producerPillar) and (?<producer>...); this match has only {(names.Contains("producer") ? "producer" : names.Contains(GroupWords.ProducerGroup) ? GroupWords.ProducerGroup : GroupWords.OlderProducerGroup)}");
             }
             catch (ArgumentException ex) { errors.Add($"{at}.patterns[{i}]: the match is not a valid regular expression: {ex.Message}"); }
         }

@@ -1185,7 +1185,7 @@
           "Consumer": "worker"
         },
         {
-          "Match": "^bus\\.(?\u003CproducerPillar\u003E[a-z]\u002B)\\.(?\u003Cproducer\u003E[a-z]\u002B)\\.(?\u003Cservice\u003E[a-z]\u002B)\\.out$",
+          "Match": "^bus\\.(?\u003CproducerGroup\u003E[a-z]\u002B)\\.(?\u003Cproducer\u003E[a-z]\u002B)\\.(?\u003Cservice\u003E[a-z]\u002B)\\.out$",
           "Consumer": "worker"
         }
       ],

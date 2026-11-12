@@ -161,8 +161,9 @@
           }
         },
         "subscription": { "$ref": "#/properties/scope/properties/account", "description": "The Azure name of account. Set one of the two." },
-        "pillarAccounts": { "type": "object", "description": "Pillars named instead of found: pillar id to account id. Azure name: pillars.", "additionalProperties": { "type": "string" } },
-        "pillars": { "type": "object", "description": "The Azure name of pillarAccounts. Set one of the two.", "additionalProperties": { "type": "string" } },
+        "groupAccounts": { "type": "object", "description": "Groups named instead of found: group id to account id. Older name: pillarAccounts. Azure name: pillars.", "additionalProperties": { "type": "string" } },
+        "pillarAccounts": { "type": "object", "description": "The older name of groupAccounts. Set one of groupAccounts, pillarAccounts and pillars.", "additionalProperties": { "type": "string" } },
+        "pillars": { "type": "object", "description": "The Azure name of groupAccounts. Set one of groupAccounts, pillarAccounts and pillars.", "additionalProperties": { "type": "string" } },
         "resources": {
           "type": "array",
           "description": "Which resources belong to a service.",
@@ -252,6 +253,8 @@
       },
       "allOf": [
         { "not": { "required": ["account", "subscription"] } },
+        { "not": { "required": ["groupAccounts", "pillarAccounts"] } },
+        { "not": { "required": ["groupAccounts", "pillars"] } },
         { "not": { "required": ["pillarAccounts", "pillars"] } },
         { "not": { "required": ["telemetryStore", "workspace"] } },
         { "not": { "required": ["telemetryStoreId", "workspaceId"] } }

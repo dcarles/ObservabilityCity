@@ -456,6 +456,8 @@ internal abstract class AliasedBlock : IYamlConvertible
                 throw new YamlException(key.Start, key.End, $"Property '{key.Value}' not found on type '{GetType().FullName}'.");
             if (written.TryGetValue(name, out var first) && first != key.Value)
             {
+                if (first != name && key.Value != name) // two older names of one key, for example pillarAccounts and pillars
+                    throw new YamlException(key.Start, key.End, $"{Block} sets both '{first}' and '{key.Value}', which are one setting (both are older names of '{name}'). Keep one of them");
                 var (current, alias) = first == name ? (first, key.Value) : (key.Value, first);
                 throw new YamlException(key.Start, key.End, $"{Block} sets both '{current}' and '{alias}', which are one setting ('{alias}' is the older name of '{current}'). Keep one of them");
             }
@@ -471,14 +473,18 @@ internal abstract class AliasedBlock : IYamlConvertible
         p.GetCustomAttributes(typeof(YamlMemberAttribute), false) is [YamlMemberAttribute { Alias: { Length: > 0 } alias }] ? alias : char.ToLowerInvariant(p.Name[0]) + p.Name[1..];
 }
 
-/// <summary>An environment's <c>scope:</c> block. The account and telemetry store keys also read under their Azure names (see <see cref="Aliases"/>).</summary>
+/// <summary>
+/// An environment's <c>scope:</c> block. The account and telemetry store keys also read under their Azure names, and <c>groupAccounts</c> under its older name
+/// <c>pillarAccounts</c> (see <see cref="Aliases"/>).
+/// </summary>
 internal sealed class ScopeFile : AliasedBlock
 {
-    /// <summary>The older (Azure) name of each key that has one.</summary>
+    /// <summary>The older (Azure, or pillar) name of each key that has one.</summary>
     internal static readonly IReadOnlyDictionary<string, string> Names = new Dictionary<string, string>
     {
         ["subscription"] = "account",
-        ["pillars"] = "pillarAccounts",
+        [GroupWords.OlderGroupAccounts] = GroupWords.GroupAccounts,
+        ["pillars"] = GroupWords.GroupAccounts,
         ["workspace"] = "telemetryStore",
         ["workspaceId"] = "telemetryStoreId",
     };
@@ -494,7 +500,8 @@ internal sealed class ScopeFile : AliasedBlock
     public Dictionary<string, string> Variables { get; set; } = new();
     /// <summary>How a pillar finds its account. Alias: subscription.</summary>
     public AccountRuleFile? Account { get; set; }
-    /// <summary>Pillar id to account id, for the pillars named instead of found. Alias: pillars.</summary>
+    /// <summary>Group id to account id, for the groups named instead of found. Aliases: pillarAccounts, and its Azure name pillars.</summary>
+    [YamlMember(Alias = GroupWords.GroupAccounts)]
     public Dictionary<string, string> PillarAccounts { get; set; } = new();
     public List<ResourceRuleFile> Resources { get; set; } = [];
     /// <summary>Resources that are not systems but stand as basic buildings without health (a key vault, a storage account).</summary>

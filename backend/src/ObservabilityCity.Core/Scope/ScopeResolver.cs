@@ -207,10 +207,10 @@ public static class ScopeResolver
         {
             case 1: return new PillarScope(group.Id, code, found[0].Id, found[0].Name, rule.NameLike is not null ? "name" : "tag");
             case 0:
-                problems.Add($"Pillar '{group.Id}': no account has {how}. Check scope.account, or name the account under scope.pillarAccounts.");
+                problems.Add($"Pillar '{group.Id}': no account has {how}. Check scope.account, or name the account under scope.groupAccounts.");
                 break;
             default:
-                problems.Add($"Pillar '{group.Id}': {found.Count} accounts have {how} ({string.Join(", ", found.Select(s => s.Name).Order(StringComparer.Ordinal))}). Make the rule narrower, or name the account under scope.pillarAccounts.");
+                problems.Add($"Pillar '{group.Id}': {found.Count} accounts have {how} ({string.Join(", ", found.Select(s => s.Name).Order(StringComparer.Ordinal))}). Make the rule narrower, or name the account under scope.groupAccounts.");
                 break;
         }
         return new PillarScope(group.Id, code, null, null, "");
