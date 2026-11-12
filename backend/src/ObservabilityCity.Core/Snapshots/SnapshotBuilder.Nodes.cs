@@ -67,9 +67,11 @@ public sealed partial class SnapshotBuilder
         var throttled = r.Throttled;
         if (tenants is not null) (utilisation, throttled) = Aggregate(n, tenants, r);
 
+        // Down: no response, every job failed, or instances counted and not one healthy.
         // Degraded: errors, slow, unhealthy instances, a resource running hot, a data store turning requests away, or a consumer running late.
         var hot = Math.Max(Math.Max(r.Cpu ?? 0, r.Memory ?? 0), utilisation ?? 0) >= n.ResourceAmber;
-        var health = !r.Up || jobHealth == HealthState.Down ? HealthState.Down
+        var noneHealthy = r.InstancesTotal > 0 && r.InstancesHealthy == 0;
+        var health = !r.Up || jobHealth == HealthState.Down || noneHealthy ? HealthState.Down
             : jobHealth == HealthState.Degraded || r.ErrorRate >= n.ErrorAmber || r.P99Ms > n.SlaP99Ms || r.InstancesHealthy < r.InstancesTotal || hot || (throttled ?? 0) >= n.ThrottleAmber || (r.OldestMessageSeconds ?? 0) >= n.BacklogAmber || (n.BacklogCountAmber is { } waitingAmber && (r.QueueDepth ?? 0) >= waitingAmber)
                 ? HealthState.Degraded
                 : HealthState.Healthy;

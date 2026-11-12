@@ -128,6 +128,19 @@ public class PipelineTests
     }
 
     [Fact]
+    public async Task A_fleet_with_no_healthy_instance_is_down_and_says_so()
+    {
+        var rig = new Rig { Fake = { Calm = true } };
+        rig.Fake.Add("ldg.posting-api", FakeEffectKind.UnhealthyInstances, 1);
+        var n = Node(await rig.Tick(), "ldg.posting-api");
+
+        Assert.Equal(0, n.InstancesHealthy);
+        Assert.True(n.InstancesTotal > 0);
+        Assert.Equal(HealthState.Down, n.State);
+        Assert.Contains("no healthy instances", n.Reason);
+    }
+
+    [Fact]
     public async Task A_saturated_database_reports_utilisation_and_throttles()
     {
         var rig = new Rig { Fake = { Calm = true } };

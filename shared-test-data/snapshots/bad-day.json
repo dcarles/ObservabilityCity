@@ -4372,7 +4372,7 @@
           "jobs": null,
           "regions": null,
           "queues": null,
-          "reason": "no responses, 0 of 1 instances healthy",
+          "reason": "no responses, no healthy instances (0 of 1)",
           "sources": null,
           "engine": null
         },
@@ -4420,7 +4420,7 @@
           "jobs": null,
           "regions": null,
           "queues": null,
-          "reason": "no responses, 0 of 1 instances healthy",
+          "reason": "no responses, no healthy instances (0 of 1)",
           "sources": null,
           "engine": null
         },
@@ -4466,7 +4466,7 @@
           "jobs": null,
           "regions": null,
           "queues": null,
-          "reason": "no responses, 0 of 1 instances healthy",
+          "reason": "no responses, no healthy instances (0 of 1)",
           "sources": null,
           "engine": {
             "id": "sqlserver",
@@ -4519,7 +4519,7 @@
           "jobs": null,
           "regions": null,
           "queues": null,
-          "reason": "no responses, 0 of 1 instances healthy",
+          "reason": "no responses, no healthy instances (0 of 1)",
           "sources": null,
           "engine": null
         },
@@ -4565,7 +4565,7 @@
           "jobs": null,
           "regions": null,
           "queues": null,
-          "reason": "no responses, 0 of 1 instances healthy",
+          "reason": "no responses, no healthy instances (0 of 1)",
           "sources": null,
           "engine": {
             "id": "postgres",
