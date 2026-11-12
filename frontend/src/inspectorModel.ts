@@ -84,11 +84,13 @@ export function engineText(n: Pick<NodeSnapshot, 'engine'>): string | null {
   return n.engine ? `${n.engine.name} · ${n.engine.typeName}` : null
 }
 
-export function overviewRows(n: NodeSnapshot, nameOf: (id: string) => string = (id) => id, cloud?: string | null, townMessages?: number | null): Row[] {
+/** `brokers` is how many brokers the hub has: with more than one, the town's message total is not this broker's own, and its label says so. */
+export function overviewRows(n: NodeSnapshot, nameOf: (id: string) => string = (id) => id, cloud?: string | null, townMessages?: number | null, brokers = 1): Row[] {
   const engine = engineText(n)
   const rows = [...(engine ? [{ label: 'Engine', value: engine, tone: '' } as Row] : []), ...ownRows(n, nameOf, cloud)]
   // the broker's own building: what all the queues of the town take in, each queue counted where it is read. It comes from the systems that read the queues, so it is shown even when the broker itself has no fresh numbers.
-  return n.kind === 'Broker' && townMessages != null ? [{ label: 'Messages', value: `${messageRate(townMessages)} msg/s through the queues`, tone: '' }, ...rows] : rows
+  // A queue does not say which broker holds it, so with several brokers each shows the same town-wide number, labelled as the town's rather than as its own.
+  return n.kind === 'Broker' && townMessages != null ? [{ label: brokers > 1 ? 'Messages (town)' : 'Messages', value: `${messageRate(townMessages)} msg/s through the queues`, tone: '' }, ...rows] : rows
 }
 
 function ownRows(n: NodeSnapshot, nameOf: (id: string) => string, cloud?: string | null): Row[] {

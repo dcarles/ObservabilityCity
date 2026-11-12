@@ -244,25 +244,126 @@ export function placeHubClusters(
 
 export const HUB_CENTRE_Z = 2 // the plaza's centre sits a little south of the hub's
 
+/** The kinds of system that have a building of their own on the hub, each with a fixed place for its first building. */
+export const HUB_KINDS = ['Gateway', 'Broker', 'Egress', 'Database'] as const
+const HUB_PLOT = 12 // the side of a hub building's square plot
+
 /**
- * What stands on the hub island and so keeps a cluster of resource buildings away: the plaza, the road to the gateway, the main buildings that exist (one each of
- * Gateway, Broker, Egress and Database, on the axes) and a strip along each spoke road. Hub-local coordinates; `f` is the hub's scale.
+ * The fixed places of the first building of each hub kind: on the axes round the plaza, each turned so its door faces the plaza. Hub-local; `f` is the hub's scale.
+ * `exit` is the direction (radians clockwise from north, round the plaza) where its street leaves the ring road.
  */
-export function hubReserved(f: number, kinds: readonly string[], spokeAngles: readonly number[]): { x: number; z: number; w: number; d: number }[] {
+export function hubMainSpots(f: number): Record<string, { x: number; z: number; yaw: number; exit: number }> {
   const CZ = HUB_CENTRE_Z
-  const spots: Record<string, { x: number; z: number }> = { Gateway: { x: 0, z: CZ - 13.5 * f }, Broker: { x: 14.5 * f, z: CZ }, Egress: { x: -14.5 * f, z: CZ }, Database: { x: 0, z: CZ + 14 * f } }
-  const out = [{ x: 0, z: CZ, w: 20 * f, d: 20 * f }, { x: 0, z: CZ - 15 * f, w: 6, d: 14 }]
-  for (const kind of new Set(kinds)) if (spots[kind]) out.push({ ...spots[kind], w: 12, d: 12 })
+  return {
+    Gateway: { x: 0, z: CZ - 13.5 * f, yaw: 0, exit: 0 },
+    Broker: { x: 14.5 * f, z: CZ, yaw: Math.PI / 2, exit: Math.PI / 2 },
+    Egress: { x: -14.5 * f, z: CZ, yaw: Math.PI / 2, exit: -Math.PI / 2 },
+    Database: { x: 0, z: CZ + 14 * f, yaw: Math.PI, exit: Math.PI },
+  }
+}
+
+type Rect = { x: number; z: number; w: number; d: number }
+
+/**
+ * What stands on the hub island and so keeps a cluster of resource buildings away: the plaza, the road to the gateway, the main buildings that exist (the first of each of
+ * Gateway, Broker, Egress and Database, on the axes), a strip along each spoke road, and `also` (the further buildings of a kind and their streets, see `placeHubBuildings`).
+ * Hub-local coordinates; `f` is the hub's scale.
+ */
+export function hubReserved(f: number, kinds: readonly string[], spokeAngles: readonly number[], also: readonly Rect[] = []): Rect[] {
+  const CZ = HUB_CENTRE_Z
+  const spots = hubMainSpots(f)
+  const out: Rect[] = [{ x: 0, z: CZ, w: 20 * f, d: 20 * f }, { x: 0, z: CZ - 15 * f, w: 6, d: 14 }]
+  for (const kind of new Set(kinds)) if (spots[kind]) out.push({ x: spots[kind].x, z: spots[kind].z, w: HUB_PLOT, d: HUB_PLOT })
   for (const a of spokeAngles) for (let r = 9 * f; r < 30 * f; r += 3) out.push({ x: Math.sin(a) * r, z: CZ - Math.cos(a) * r, w: 8, d: 8 })
+  out.push(...also)
   return out
 }
 
 /** Whether a cluster's footprint is a free place on the hub: clear of everything reserved, and with all four corners on land (3 in from the coast). */
-export function hubFree(geo: { rx: number; rz: number; scale: number }, kinds: readonly string[], spokeAngles: readonly number[]): (rect: { x: number; z: number; w: number; d: number }) => boolean {
-  const reserved = hubReserved(geo.scale, kinds, spokeAngles)
+export function hubFree(
+  geo: { rx: number; rz: number; scale: number }, kinds: readonly string[], spokeAngles: readonly number[], also: readonly Rect[] = [],
+): (rect: Rect) => boolean {
+  const reserved = hubReserved(geo.scale, kinds, spokeAngles, also)
   const outline = makeOutline(hashString('hub'), geo.rx, geo.rz, 0.05)
   return (rect) => !reserved.some((a) => rectsTouch(rect, a, 0.5)) && [[-1, -1], [1, -1], [-1, 1], [1, 1]].every(([sx, sz]) => outline.contains(rect.x + (sx! * rect.w) / 2, rect.z + (sz! * rect.d) / 2, 3))
 }
+
+/** Where one hub system's building stands. Hub-local coordinates. */
+export interface HubSlot {
+  id: string
+  kind: string
+  x: number
+  z: number
+  /** The first building of its kind, on its fixed place (`hubMainSpots`); a further one of the kind stands wherever the hub has room. */
+  main: boolean
+  /** How a main building is turned; null for a further one, which is turned so its door faces the plaza. */
+  yaw: number | null
+  /** Direction round the plaza (radians clockwise from north) where the building's street leaves the ring road. */
+  exit: number
+  /** For a further building: the footprint of its plot and of its street from the ring road, which nothing else may stand on. Empty for a main one. */
+  reserved: Rect[]
+}
+
+/**
+ * Where the hub's own buildings stand. The first of each kind takes its fixed place on the axes, exactly as a hub with one of each always had. Every further one of a kind
+ * (a second broker, a second gateway) is its own building: it takes the free place nearest the first of its kind, from rings at 55%, 68% and 80% of the hub's half sizes a
+ * step of 15 degrees apart, where its plot and its straight street from the ring road keep clear of the plaza, the main buildings, the spoke roads and the buildings already
+ * placed. A system of a kind the hub has no place for is in `skipped`; one that finds no room is in `left`, and the hub grows until `left` is empty (see layoutWithHubRoom).
+ * Pure and in the hub's order, so the same snapshot gives the same hub.
+ */
+export function placeHubBuildings(
+  nodes: readonly { id: string; kind: string }[], geo: { rx: number; rz: number; scale: number; ringR: number }, spokeAngles: readonly number[],
+): { slots: HubSlot[]; left: string[]; skipped: string[]; reserved: Rect[] } {
+  const f = geo.scale
+  const CZ = HUB_CENTRE_Z
+  const mains = hubMainSpots(f)
+  const slots: HubSlot[] = []
+  const left: string[] = []
+  const skipped: string[] = []
+  const extras: { id: string; kind: string }[] = []
+  const seen = new Set<string>()
+  for (const n of nodes) {
+    const spot = mains[n.kind]
+    if (!spot) { skipped.push(n.id); continue }
+    if (seen.has(n.kind)) { extras.push(n); continue }
+    seen.add(n.kind)
+    slots.push({ id: n.id, kind: n.kind, x: spot.x, z: spot.z, main: true, yaw: spot.yaw, exit: spot.exit, reserved: [] })
+  }
+  if (extras.length === 0) return { slots, left, skipped, reserved: [] }
+  const kinds = [...seen]
+  const reserved: Rect[] = []
+  // the plaza is left out of what a street must clear: every street starts on the ring road inside it
+  const mainsAndSpokes = hubReserved(f, kinds, spokeAngles).slice(1)
+  const onLand = hubFree(geo, kinds, spokeAngles)
+  const candidates: { x: number; z: number; angle: number }[] = []
+  for (const k of [0.55, 0.68, 0.8]) for (let step = 0; step < 24; step++) {
+    const angle = wrap(step * (Math.PI / 12))
+    candidates.push({ x: Math.sin(angle) * geo.rx * k, z: CZ - Math.cos(angle) * geo.rz * k, angle })
+  }
+  const ringEdge = geo.ringR + 2.1
+  for (const n of extras) {
+    const near = mains[n.kind]
+    const order = candidates.map((c, i) => ({ c, i, d: Math.hypot(c.x - near.x, c.z - near.z) })).sort((a, b) => a.d - b.d || a.i - b.i)
+    let placed: HubSlot | null = null
+    for (const { c } of order) {
+      const plot = { x: c.x, z: c.z, w: HUB_PLOT, d: HUB_PLOT }
+      if (!onLand(plot) || reserved.some((r) => rectsTouch(plot, r, 0.5))) continue
+      // the street: from the ring road straight out to the front of the plot
+      const dist = Math.hypot(c.x, c.z - CZ)
+      const street: Rect[] = []
+      for (let r = ringEdge; r < dist - HUB_PLOT / 2; r += 2.5) street.push({ x: Math.sin(c.angle) * r, z: CZ - Math.cos(c.angle) * r, w: 4, d: 4 })
+      if (street.some((s) => mainsAndSpokes.some((r) => rectsTouch(s, r, 0.3)) || reserved.some((r) => rectsTouch(s, r, 0.3)))) continue
+      placed = { id: n.id, kind: n.kind, x: c.x, z: c.z, main: false, yaw: null, exit: c.angle, reserved: [plot, ...street] }
+      break
+    }
+    if (!placed) { left.push(n.id); continue }
+    slots.push(placed)
+    reserved.push(...placed.reserved)
+  }
+  return { slots, left, skipped, reserved }
+}
+
+const wrap = (a: number) => Math.atan2(Math.sin(a), Math.cos(a))
 
 /** Distance from the spine to the outer edge of the outermost pad, which is as far as the row roads reach. */
 export function rowEdge(pads: { ring: number }[]): number {
