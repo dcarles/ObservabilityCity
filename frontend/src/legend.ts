@@ -59,11 +59,11 @@ export const LEGEND: readonly LegendSection[] = [
     title: 'Failing or down',
     tab: 'problems',
     entries: [
-      { id: 'beacon-red', sees: 'Red beacon', means: 'Requests are failing', more: 'A steady red light and a closed sign mean it is down.', tone: 'red', icon: 'svg:beacon-red' },
+      { id: 'beacon-red', sees: 'Red beacon', means: 'Requests are failing', more: 'A steady red light and a closed sign mean it is down: it does not respond, or none of its instances is healthy.', tone: 'red', icon: 'svg:beacon-red' },
       { id: 'health-sign', sees: 'Red exclamation mark above a building', means: 'Your cloud provider reports a problem with its resource', more: 'It stays up while the provider\'s resource health report is open, and for a few hours after it is resolved. Open the building to read it or dismiss it.', tone: 'red', icon: 'svg:health-sign' },
       { id: 'flag', sees: 'Red flag on a car', means: 'A failed request, turned back at the door', tone: 'red', icon: 'svg:flag' },
       { id: 'pen', sees: 'Broken crates in a pen, a red beam and a count', means: 'Dead letters', more: 'Messages that could not be handled. The count is on the pen; the top bar DLQ number adds them all up.', tone: 'red', icon: 'svg:pen' },
-      { id: 'dark', sees: 'Dark, cracked floors', means: 'Instances that are not healthy', more: 'The share of dark floors is the share of unhealthy instances, at least one floor if any is unhealthy.', tone: 'amber', icon: '🧱' },
+      { id: 'dark', sees: 'Dark, cracked floors', means: 'Instances that are not healthy', more: 'The share of dark floors is the share of unhealthy instances, at least one floor if any is unhealthy. When none is healthy the service is down.', tone: 'amber', icon: '🧱' },
     ],
   },
   {

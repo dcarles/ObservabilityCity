@@ -23,7 +23,7 @@ It is for the people who run the systems: a team looking at its own islands, som
 
 Each signal has exactly one visual meaning, and it reads the same in every theme. The words below are the harbour-town theme's; the other themes change the look, not the meaning.
 
-**Colours.** Red means something is failing: errors or throttling past the red threshold, a system that is down, dead letters in a pen, or a health report from the cloud provider. Amber is a warning. Grey means a signal is configured but has no fresh data, and is never shown as healthy. A signal with no source configured is absent (its beacon is off), which is not the same as grey.
+**Colours.** Red means something is failing: errors or throttling past the red threshold, a system that is down (no response, every job failed, or instances counted and none healthy), dead letters in a pen, or a health report from the cloud provider. Amber is a warning. Grey means a signal is configured but has no fresh data, and is never shown as healthy. A signal with no source configured is absent (its beacon is off), which is not the same as grey.
 
 | Signal | What you see |
 | --- | --- |
@@ -34,7 +34,7 @@ Each signal has exactly one visual meaning, and it reads the same in every theme
 | Database engine | A database's sign names its engine (from `databaseEngines` in `town.yaml`), with its type underneath |
 | Basic resources | Secrets stores, storage, config stores and other resources with no health of their own stand as simple buildings behind their service or in the island's back yard |
 | Instances | Floors on a doubling scale (1, 2, 3-4, 5-8 ... 65+ gives 1 to 8 floors), with the count on the name board |
-| Instance health | Dark, cracked floors for the share of unhealthy instances, and "5/10 healthy" on the plaque |
+| Instance health | Dark, cracked floors for the share of unhealthy instances, and "5/10 healthy" on the plaque. With instances counted and none healthy, the system is Down |
 | Load | Lit windows, floor by floor from the ground: CPU for apps and workers, capacity used for a database. Chimney smoke thickens with CPU |
 | Errors | The rooftop beacon: green, amber or red against the system's own thresholds (red pulses). High CPU, memory or database utilisation, a failed or overdue scheduled job and dead letters in a queue it reads make it amber |
 | Throttling | A lowered barrier gate at a database. Throttling past the red threshold turns the beacon red |

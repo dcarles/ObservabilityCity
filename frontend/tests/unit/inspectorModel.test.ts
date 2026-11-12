@@ -35,6 +35,10 @@ describe('what a database runs on', () => {
 })
 
 describe('why a system is not healthy', () => {
+  it('says so when no instance is healthy', () => {
+    expect(reasons(node({ instancesTotal: 4, instancesHealthy: 0 }))).toContain('None of the 4 instances is healthy, so it counts as down.')
+  })
+
   it('says nothing about a healthy one', () => {
     expect(reasons(node({ errorRate: 0, p99Ms: 1, instancesHealthy: 3, instancesTotal: 3, cpu: 0.1, memory: 0.1, utilisation: null, throttled: null }))).toEqual([])
   })

@@ -55,7 +55,7 @@ export function reasons(n: NodeSnapshot, cloud?: string | null): string[] {
   else if (n.errorRate >= n.errorRed) out.push(`Errors are at ${pct(n.errorRate, 1)}, past the red line of ${pct(n.errorRed, 1)}.`)
   else if (n.errorRate >= n.errorAmber) out.push(`Errors are at ${pct(n.errorRate, 1)}, past the amber line of ${pct(n.errorAmber, 1)}.`)
   if (!isAbsent(n, 'latency') && n.p99Ms > n.slaP99Ms) out.push(`p99 is ${formatMs(n.p99Ms)}, over the SLA of ${formatMs(n.slaP99Ms)}.`)
-  if (!isAbsent(n, 'instances') && n.instancesHealthy < n.instancesTotal) out.push(`${n.instancesTotal - n.instancesHealthy} of ${n.instancesTotal} instances are unhealthy.`)
+  if (!isAbsent(n, 'instances') && n.instancesHealthy < n.instancesTotal) out.push(n.instancesHealthy === 0 && n.instancesTotal > 0 ? `None of the ${n.instancesTotal} instances is healthy, so it counts as down.` : `${n.instancesTotal - n.instancesHealthy} of ${n.instancesTotal} instances are unhealthy.`)
   const use = resourceUse(n)
   if (use >= n.resourceAmber) {
     const line = use >= n.resourceRed ? 'red' : 'amber'
