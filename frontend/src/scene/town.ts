@@ -9,7 +9,7 @@ import { palette } from '../themes/active'
 import { blockPad, bench, bridge, crates, fountain, junction, lamp, pier, prop, ring, roadBetween, ROAD_W, serviceLane, street, streetX } from './props'
 import { buildIslandBody, GROUND, makeOutline, scatterNature, type Outline, type Rect } from './island'
 import { layoutWithHubRoom } from './hubRoom'
-import { CURB, DOCK_X, LANE_Z, PAD_D, PAD_W, coastScan, coastScanZ, hubFree, laneStart, padX, placeHubBuildings, placeHubClusters, planIsland, rectsTouch, rowEdge, type HubCluster, type Placed, type Plan } from './plan'
+import { CURB, DOCK_X, HUB_PLOT, LANE_Z, PAD_D, PAD_W, coastScan, coastScanZ, hubBenches, hubFree, laneStart, padX, placeHubBuildings, placeHubClusters, planIsland, rectsTouch, rowEdge, type HubCluster, type Placed, type Plan } from './plan'
 import { hashString } from './random'
 import { boatRate, clamp, formatRate, speedFactor } from '../visuals'
 import { CarSystem, type Route } from './cars'
@@ -146,8 +146,8 @@ export class Town {
   /** The resource buildings on the hub island (shared monitoring and the like), by id, and the clusters they stand in. */
   private hubAssets = new Map<string, AssetBuilding>()
   private hubClusters: HubCluster[] = []
-  /** Where each hub building's street leaves the plaza's ring road (see placeHubBuildings). */
-  private hubExits = new Map<Building, number>()
+  /** Where each hub building's street leaves the plaza's ring road, and for a further one where its street meets a road (see placeHubBuildings). */
+  private hubExits = new Map<Building, { exit: number; front: THREE.Vector3 | null }>()
   /** Extent used to frame the camera. */
   readonly bounds = new THREE.Box3()
   /** Points along every coast, for working out how far back the camera must stand to show the whole town. */
@@ -871,7 +871,7 @@ export class Town {
     const ringR = this.hubGeo.ringR
     const CZ = 2 // the plaza's centre sits a little south of the hub's
     // The first building of each kind stands on its axis, scaled out with the hub; a further one of a kind (a second broker, a second gateway) is its own building
-    // where the hub has room, with its own street from the ring road (see placeHubBuildings: the hub has grown so it fits).
+    // where the hub has room, with its own street from the ring road or, a little smaller, beside a spoke road (see placeHubBuildings: the hub has grown so it fits).
     const avoid: Rect[] = [{ x: 0, z: CZ, w: 20 * f, d: 20 * f }, { x: 0, z: CZ - 15 * f, w: 6, d: 14 }]
     // every spoke the layout knows, bridged or not, as layoutWithHubRoom made room with them all
     const placed = placeHubBuildings(hub?.nodes ?? [], this.hubGeo, allPorts)
@@ -881,16 +881,18 @@ export class Town {
       const n = hub!.nodes.find((x) => x.id === slot.id)!
       const b = new Building(n.id, n.kind, hub?.color ?? palette.flagFallback, false, n.name, n.engine)
       b.root.position.set(slot.x, GROUND, slot.z)
-      // a further building is turned so its door faces the plaza, whichever side of its model the door is on
-      b.root.rotation.y = slot.yaw ?? Math.atan2(-slot.x, CZ - slot.z) - Math.atan2(b.model.doorDir.x, b.model.doorDir.z)
+      b.root.scale.setScalar(slot.scale)
+      // a further building is turned so its door faces the road its street meets, whichever side of its model the door is on
+      const front = slot.front ? new THREE.Vector3(slot.front.x, GROUND, slot.front.z) : null
+      b.root.rotation.y = slot.yaw ?? Math.atan2(front!.x - slot.x, front!.z - slot.z) - Math.atan2(b.model.doorDir.x, b.model.doorDir.z)
       hubRoot.add(b.root)
       this.buildings.set(n.id, b)
-      this.hubExits.set(b, slot.exit)
+      this.hubExits.set(b, { exit: slot.exit, front })
       out.push(b)
-      avoid.push({ x: slot.x, z: slot.z, w: 12, d: 12 })
-      if (!slot.main) {
-        const dir = new THREE.Vector3(Math.sin(slot.exit), 0, -Math.cos(slot.exit))
-        decor.add(roadBetween(new THREE.Vector3(0, GROUND, CZ).addScaledVector(dir, ringR + 2.1), b.doorWorld().setY(GROUND)))
+      avoid.push({ x: slot.x, z: slot.z, w: HUB_PLOT * slot.scale, d: HUB_PLOT * slot.scale })
+      if (front) {
+        // its street, from the ring road's edge or from the edge of the spoke road beside it to the door
+        decor.add(roadBetween(front, b.doorWorld().setY(GROUND)))
         avoid.push(...slot.reserved.slice(1).map((r) => ({ ...r, w: r.w + 3, d: r.d + 3 })))
       }
     }
@@ -940,7 +942,7 @@ export class Town {
       decor.add(lamp(Math.sin(a) * (ringR + 2.9), CZ - Math.cos(a) * (ringR + 2.9), Math.sin(a)))
     }
     // the benches, unless a further building's street runs where one would stand
-    for (const [x, z, ry] of [[-6.0 * f, CZ - 8.2 * f, 0.6], [6.0 * f, CZ + 7.6 * f, 3.6], [-9.4 * f, CZ + 6.2 * f, 1.3]]) {
+    for (const [x, z, ry] of hubBenches(f)) {
       if (!placed.reserved.some((r) => rectsTouch({ x, z, w: 3, d: 3 }, r))) decor.add(bench(x, z, ry))
     }
     hubRoot.add(scatterNature(this.hubOutline, avoid, hashString('hub-trees'), { trees: Math.round(26 * f * f), rocks: Math.round(12 * f) }))
@@ -1021,8 +1023,8 @@ export class Town {
     const routes: Route[] = []
     for (const b of hubBuildings) {
       // every hub building, the further ones of a kind too, has its own street off the ring road
-      const exit = this.hubExits.get(b)
-      if (exit === undefined) continue
+      const street = this.hubExits.get(b)
+      if (street === undefined) continue
       const door = b.doorWorld().setY(GROUND)
       for (const g of gates) {
         const from = this.callerOf(g.plan)
@@ -1031,7 +1033,7 @@ export class Town {
         this.cross(g.island.group.id)
         routes.push({
           dest: b, source, origin: b.kind === 'Egress' ? 'external' : 'internal', share: 1 / gates.length,
-          path: [...this.outbound(g, from), ...this.ringArc(g.angle, exit), door],
+          path: [...this.outbound(g, from), ...this.ringArc(g.angle, street.exit), ...(street.front ? [street.front.clone()] : []), door],
         })
       }
     }
