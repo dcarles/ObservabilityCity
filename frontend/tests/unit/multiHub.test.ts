@@ -9,7 +9,6 @@ import { connectorsOf, portSummary } from '../../src/scene/links'
 import { flowsOf } from '../../src/dashboard/flows'
 import { calmScenes } from '../../src/wall/calm'
 import type { NodeSnapshot, Snapshot } from '../../src/types'
-import { healthyTown } from './wall.testutil'
 
 // A hub with several systems of one kind (multi-hub-town: two gateways, two brokers, two databases, one egress). Each is its own building; what stands for the
 // kind as a whole adds them all up, and a hub with one of each reads exactly as it always did.
@@ -50,7 +49,8 @@ describe('the gateways together', () => {
 
 describe('the wall\'s caption for the hub', () => {
   it('names one broker and reads one gateway as it always did', () => {
-    const s = healthyTown()
+    // links-town has one of each kind on its hub (the sample town now has two gateways, two brokers and two databases)
+    const s = golden('links-town')
     const hub = hubOf(s)
     const broker = hub.nodes.find((n) => n.kind === 'Broker')!
     const rate = hub.nodes.find((n) => n.kind === 'Gateway')!.requestsPerSecond
