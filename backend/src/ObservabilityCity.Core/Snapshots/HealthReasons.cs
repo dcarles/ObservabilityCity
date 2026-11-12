@@ -21,7 +21,8 @@ internal static class HealthReasons
         foreach (var j in jobs?.Where(j => j.Status == JobStatus.Overdue) ?? []) parts.Add($"job {j.Name} late");
         if (r.ErrorRate >= n.ErrorAmber) parts.Add($"error rate {Pct(r.ErrorRate, 1)}");
         if (r.P99Ms > n.SlaP99Ms) parts.Add($"p99 {Math.Round(r.P99Ms).ToString(CultureInfo.InvariantCulture)} ms");
-        if (r.InstancesHealthy < r.InstancesTotal) parts.Add($"{r.InstancesHealthy} of {r.InstancesTotal} instances healthy");
+        if (r.InstancesTotal > 0 && r.InstancesHealthy == 0) parts.Add($"no healthy instances (0 of {r.InstancesTotal})");
+        else if (r.InstancesHealthy < r.InstancesTotal) parts.Add($"{r.InstancesHealthy} of {r.InstancesTotal} instances healthy");
         if ((r.Cpu ?? 0) >= n.ResourceAmber) parts.Add($"CPU {Pct(r.Cpu!.Value)}");
         if ((r.Memory ?? 0) >= n.ResourceAmber) parts.Add($"memory {Pct(r.Memory!.Value)}");
         if ((r.OldestMessageSeconds ?? 0) >= n.BacklogAmber) parts.Add($"oldest message {Math.Round(r.OldestMessageSeconds!.Value / 60).ToString(CultureInfo.InvariantCulture)} min");
