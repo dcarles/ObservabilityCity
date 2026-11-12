@@ -1,0 +1,12 @@
+group: stk
+displayName: Stock
+color: "#f2994a"
+systems:
+  - { id: stk.stock-api, service: stock, name: Stock API, role: api, external: true, calls: [stk.stock-db, hub.reference-db], gatewayCalls: [ord.orders-api] }
+  - { id: stk.stock-worker, service: stock, name: Stock worker, role: worker, calls: [stk.stock-db] }
+  - { id: stk.stock-db, service: stock, name: Stock DB, role: db }
+messaging:
+  topics: [stock]
+  subscriptions:
+    - { topic: ord.orders.events, consumer: stk.stock-worker }
+    - { topic: pay.payments.events, consumer: stk.stock-worker }

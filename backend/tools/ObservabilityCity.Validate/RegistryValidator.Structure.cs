@@ -81,17 +81,14 @@ public static partial class RegistryValidator
                 }
     }
 
+    // several of a kind may stand on the hub, each its own building: two brokers, two gateways. Only the roles the hub draws are allowed.
     private static void CheckHub(Context c, Registry registry)
     {
         var allowed = new[] { NodeKind.Gateway, NodeKind.Broker, NodeKind.Egress, NodeKind.Database };
-        var seen = new HashSet<NodeKind>();
-        foreach (var n in registry.Groups.Where(g => g.IsHub).SelectMany(g => g.Nodes))
+        foreach (var n in registry.Groups.Where(g => g.IsHub).SelectMany(g => g.Nodes).Where(n => !allowed.Contains(n.Kind)))
         {
             var at = c.Locate(n.Id);
-            if (!allowed.Contains(n.Kind))
-                c.Error(at.File, at.Line, "hub", $"'{n.Id}' has role {n.Kind.ToString().ToLowerInvariant()}, but the hub only draws a gateway, broker, egress and database.");
-            else if (!seen.Add(n.Kind))
-                c.Error(at.File, at.Line, "hub", $"'{n.Id}' is a second {n.Kind.ToString().ToLowerInvariant()} on the hub, which has room for one of each.");
+            c.Error(at.File, at.Line, "hub", $"'{n.Id}' has role {n.RoleName}, but the hub only holds gateways, brokers, egresses and databases (several of each may stand there).");
         }
     }
 

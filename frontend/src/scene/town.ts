@@ -9,7 +9,7 @@ import { palette } from '../themes/active'
 import { blockPad, bench, bridge, crates, fountain, junction, lamp, pier, prop, ring, roadBetween, ROAD_W, serviceLane, street, streetX } from './props'
 import { buildIslandBody, GROUND, makeOutline, scatterNature, type Outline, type Rect } from './island'
 import { layoutWithHubRoom } from './hubRoom'
-import { CURB, DOCK_X, LANE_Z, PAD_D, PAD_W, coastScan, coastScanZ, hubFree, laneStart, padX, placeHubClusters, planIsland, rowEdge, type HubCluster, type Placed, type Plan } from './plan'
+import { CURB, DOCK_X, HUB_PLOT, LANE_Z, PAD_D, PAD_W, coastScan, coastScanZ, hubBenches, hubFree, laneStart, padX, placeHubBuildings, placeHubClusters, planIsland, rectsTouch, rowEdge, type HubCluster, type Placed, type Plan } from './plan'
 import { hashString } from './random'
 import { boatRate, clamp, formatRate, speedFactor } from '../visuals'
 import { CarSystem, type Route } from './cars'
@@ -48,6 +48,7 @@ import { edgeLinks, edgeMode, signLines, type EdgeMode } from '../edgeTraffic'
 import { Signpost } from './signpost'
 import { eventsByNode } from '../healthEvents'
 import { portCountsLine, portSignText } from '../portSign'
+import { combinedGateways, type GatewayTotal } from '../hubSystems'
 import { regionLine, splitLine, validChoice, withRegion, WORST, type RegionChoice } from '../regions'
 
 const QUAY = 9
@@ -145,6 +146,8 @@ export class Town {
   /** The resource buildings on the hub island (shared monitoring and the like), by id, and the clusters they stand in. */
   private hubAssets = new Map<string, AssetBuilding>()
   private hubClusters: HubCluster[] = []
+  /** Where each hub building's street leaves the plaza's ring road, and for a further one where its street meets a road (see placeHubBuildings). */
+  private hubExits = new Map<Building, { exit: number; front: THREE.Vector3 | null }>()
   /** Extent used to frame the camera. */
   readonly bounds = new THREE.Box3()
   /** Points along every coast, for working out how far back the camera must stand to show the whole town. */
@@ -152,6 +155,8 @@ export class Town {
   private snapshotId = ''
   /** The hub's message broker by name (Service Bus, Kafka, ...), for the port's board. */
   private brokerName: string | null = null
+  private brokerCount = 0
+  private gateways: GatewayTotal | null = null
   private port: PortSummary = { topics: 0, subscriptions: 0, piers: 0 }
   /** The islands that have a sea lane for boats, and how many car routes cross each one's bridge. */
   private readonly boatLanes = new Set<string>()
@@ -227,7 +232,7 @@ export class Town {
     const plans = pillars.map((g) => planIsland(g))
     // a town whose broker reports what each pillar sends and receives sails its boats between each island and the hub, one lane out and one lane in beside the bridge
     const hubLanes = pillars.some((g) => g.flow != null)
-    // the hub grows until the clusters of resource buildings it holds have a place of their own
+    // the hub grows until the further buildings of a kind (a second broker, a second gateway) and the clusters of resource buildings it holds have a place of their own
     const layout = layoutWithHubRoom(plans.map((p) => ({ rx: p.rx, rz: p.rz })), s.ringCapacity, { rx: airport.rx, rz: airport.rz }, hub?.assets ?? [], (hub?.nodes ?? []).map((n) => n.kind), hubLanes)
     this.hubGeo = layout.hub
     const airportPlace = layout.airport!
@@ -300,11 +305,13 @@ export class Town {
     // a spoke road from the plaza only for an island that has a bridge (and for the airport, which always has one)
     // (a direct town's airport is on the ring road, not on a spoke)
     const hubPorts = ports.map((a, i) => ({ angle: a, coast: hubCoasts[i] })).filter((_p, i) => (i === pillars.length && !direct) || (i < pillars.length && connectors[i].bridge))
-    const hubBuildings = this.buildHub(hubRoot, hub, hubPorts)
+    const hubBuildings = this.buildHub(hubRoot, hub, hubPorts, ports)
     this.root.add(hubRoot)
     this.expandBounds(this.hubOutline, new THREE.Vector3(), 0)
-    const broker = hubBuildings.find((b) => b.kind === 'Broker')
-    this.brokerName = broker?.node?.name ?? null
+    // the port's board names the broker only when there is one: with several, each broker building has its own name sign and the board keeps the neutral words
+    const brokers = hubBuildings.filter((b) => b.kind === 'Broker')
+    this.brokerName = brokers.length === 1 ? brokers[0].node?.name ?? null : null
+    this.brokerCount = brokers.length
 
     // ── Islands ──────────────────────────────────────────────────────────────
     const bridgeDecor = new THREE.Group()
@@ -476,6 +483,7 @@ export class Town {
     // hub lanes: each island with a measured flow has one lane to the hub beside its bridge, straight and parallel to it, boats going out on one side and coming in on the other.
     // They carry what the broker says the pillar sends and receives, so they replace the lanes between islands, whose sender was only a guess from queue names.
     if (hubLanes) {
+      // one lane and one dock per island whatever the number of brokers: what it carries is the island's own flow. The boats' running and speed follow the first broker, the hub's port
       const broker = hubBuildings.find((b) => b.kind === 'Broker')
       const up = new THREE.Vector3(0, 1, 0)
       pillars.forEach((g, index) => {
@@ -519,6 +527,7 @@ export class Town {
       const loop = laneBetween(index, index)
       if (!loop) return
       const island = this.islands[index]
+      // the first broker stands for the hub's port, as on the hub lanes
       const broker = hubBuildings.find((b) => b.kind === 'Broker')
       boatRoutes.push({
         path: loop,
@@ -549,7 +558,8 @@ export class Town {
     mergeStatic(this.hubDecor)
     // Cars always start at a building's front and cross the bridges to get where they are going.
     this.root.updateMatrixWorld(true)
-    // islands do not go through a gateway in a direct town, whatever the hub has
+    // islands do not go through a gateway in a direct town, whatever the hub has. With several gateways the first is where the cars through "the gateway" stop and
+    // start (each gateway still has its own cars from the islands, see hubRoutes); how many go is worked out from every gateway's requests (see edgeRoutes)
     const gateway = direct ? undefined : hubBuildings.find((b) => b.kind === 'Gateway')
     this.outsideReach = new Set(s.externalCallers.flatMap((c) => c.calls))
     gates.forEach((_g, index) => routes.push(...this.islandRoutes(index, gates, gateway)))
@@ -569,14 +579,17 @@ export class Town {
 
   /** The words on the broker port: what the broker building's own sign says (its model is built knowing the broker's name). */
   private brokerSign(): string {
+    // with several brokers no one of them is the port's name: the neutral words of a nameless broker
+    if (this.brokerCount > 1) return portSignText(null)
     const broker = [...this.buildings.values()].find((b) => b.kind === 'Broker')
     return broker?.model.signText ?? portSignText(this.brokerName)
   }
 
   /** The broker's counts, as the last line of its billboard: nothing when nothing is configured or the Messaging layer is off. */
   private applyPortLine(): void {
+    // the counts are the town's, not one broker's (a topic does not say which broker holds it): they stand on the first broker, the hub's port, and with several brokers say they are the town's
     const broker = [...this.buildings.values()].find((b) => b.kind === 'Broker')
-    broker?.setExtra(this.layers.messaging ? portCountsLine(this.port) : null)
+    broker?.setExtra(this.layers.messaging ? portCountsLine(this.port, this.brokerCount > 1) : null)
   }
 
   /** Which region each service in several is shown as (see regions.ts); a service not listed shows its worst region. */
@@ -631,6 +644,7 @@ export class Town {
       for (const isl of this.islands) if (isl.signpost) this.guard(`signpost ${isl.group.id}`, () => isl.signpost!.set(signLines(links, isl.nodeIds)))
     }
     for (const v of s.vendors) this.guard(`apply ${v.node.id}`, () => this.buildings.get(v.node.id)?.setNode(v.node))
+    this.gateways = combinedGateways(s.groups.find((g) => g.isHub)?.nodes ?? [])
     this.guard('airport', () => this.airport?.setCallers(s.externalCallers, s.outsideRequestsPerSecond ?? null, trafficSplit(s, s.totals.requestsPerSecond)?.internal ?? null))
     this.guard('overlay', () => this.overlay.set(s.dependencies))
     // weather: each island's own open incidents, and nothing anywhere else
@@ -763,13 +777,17 @@ export class Town {
 
   /** What the Service Bus port shows: topics, subscriptions, piers and the old-route reads. For tests. */
   inspectHub(): PortSummary & { boats: number; sign: { board: string; model: string | null; counts: string | null } } {
+    // `model` and `counts` are the first broker's, where the counts stand; every broker's own sign is in its building's status
     const broker = [...this.buildings.values()].find((b) => b.kind === 'Broker')
     return { ...this.port, boats: this.boatLanes.size, sign: { board: this.brokerSign(), model: broker?.model.signText ?? null, counts: broker?.extraLine() ?? null } }
   }
 
-  /** What the airport shows right now. For tests. */
-  inspectAirport(): (AirportStatus & { bridge: boolean }) | null {
-    return this.airport ? { ...this.airport.status(), bridge: this.airportPath !== null } : null
+  /**
+   * What the airport shows right now, and `gateways`: what the hub's gateways add up to, which the cars through the gateway are scaled by (the airport's board itself
+   * shows the outside callers, not a gateway). For tests.
+   */
+  inspectAirport(): (AirportStatus & { bridge: boolean; gateways: GatewayTotal | null }) | null {
+    return this.airport ? { ...this.airport.status(), bridge: this.airportPath !== null, gateways: this.gateways } : null
   }
 
   /** Where the third parties stand (the island's centre and each building) and what is bridged to them, as plain values. For tests. */
@@ -844,7 +862,7 @@ export class Town {
 
   // ── hub ─────────────────────────────────────────────────────────────────
 
-  private buildHub(hubRoot: THREE.Group, hub: GroupSnapshot | undefined, ports: Port[]): Building[] {
+  private buildHub(hubRoot: THREE.Group, hub: GroupSnapshot | undefined, ports: Port[], allPorts: readonly number[]): Building[] {
     const out: Building[] = []
     const decor = new THREE.Group()
     hubRoot.add(decor)
@@ -852,34 +870,35 @@ export class Town {
     const f = this.hubGeo.scale
     const ringR = this.hubGeo.ringR
     const CZ = 2 // the plaza's centre sits a little south of the hub's
-    // The four main buildings stand on the axes, scaled out with the hub. Each is [distance from the centre, yaw].
-    const spots: Record<string, { x: number; z: number; yaw: number }> = {
-      Gateway: { x: 0, z: CZ - 13.5 * f, yaw: 0 },
-      Broker: { x: 14.5 * f, z: CZ, yaw: Math.PI / 2 },
-      Egress: { x: -14.5 * f, z: CZ, yaw: Math.PI / 2 },
-      Database: { x: 0, z: CZ + 14 * f, yaw: Math.PI },
-    }
+    // The first building of each kind stands on its axis, scaled out with the hub; a further one of a kind (a second broker, a second gateway) is its own building
+    // where the hub has room, with its own street from the ring road or, a little smaller, beside a spoke road (see placeHubBuildings: the hub has grown so it fits).
     const avoid: Rect[] = [{ x: 0, z: CZ, w: 20 * f, d: 20 * f }, { x: 0, z: CZ - 15 * f, w: 6, d: 14 }]
-    const seen = new Set<string>()
-    for (const n of hub?.nodes ?? []) {
-      const spot = spots[n.kind]
-      if (!spot || seen.has(n.kind)) {
-        // the hub has one slot for each of gateway, broker, egress and database
-        console.warn(`Hub resource ${n.id} has no free slot and is not drawn`)
-        continue
-      }
-      seen.add(n.kind)
+    // every spoke the layout knows, bridged or not, as layoutWithHubRoom made room with them all
+    const placed = placeHubBuildings(hub?.nodes ?? [], this.hubGeo, allPorts)
+    for (const id of [...placed.skipped, ...placed.left]) console.warn(`Hub resource ${id} has no free slot and is not drawn`)
+    this.hubExits = new Map()
+    for (const slot of placed.slots) {
+      const n = hub!.nodes.find((x) => x.id === slot.id)!
       const b = new Building(n.id, n.kind, hub?.color ?? palette.flagFallback, false, n.name, n.engine)
-      b.root.position.set(spot.x, GROUND, spot.z)
-      b.root.rotation.y = spot.yaw
+      b.root.position.set(slot.x, GROUND, slot.z)
+      b.root.scale.setScalar(slot.scale)
+      // a further building is turned so its door faces the road its street meets, whichever side of its model the door is on
+      const front = slot.front ? new THREE.Vector3(slot.front.x, GROUND, slot.front.z) : null
+      b.root.rotation.y = slot.yaw ?? Math.atan2(front!.x - slot.x, front!.z - slot.z) - Math.atan2(b.model.doorDir.x, b.model.doorDir.z)
       hubRoot.add(b.root)
       this.buildings.set(n.id, b)
+      this.hubExits.set(b, { exit: slot.exit, front })
       out.push(b)
-      avoid.push({ x: spot.x, z: spot.z, w: 12, d: 12 })
+      avoid.push({ x: slot.x, z: slot.z, w: HUB_PLOT * slot.scale, d: HUB_PLOT * slot.scale })
+      if (front) {
+        // its street, from the ring road's edge or from the edge of the spoke road beside it to the door
+        decor.add(roadBetween(front, b.doorWorld().setY(GROUND)))
+        avoid.push(...slot.reserved.slice(1).map((r) => ({ ...r, w: r.w + 3, d: r.d + 3 })))
+      }
     }
     // shared resources that are not systems (a log workspace, application insights...) stand in clusters, each with a sign, wherever the hub has room
     this.hubAssets = new Map()
-    const layout = placeHubClusters(hub?.assets ?? [], this.hubGeo.rx, this.hubGeo.rz, CZ, hubFree(this.hubGeo, (hub?.nodes ?? []).map((n) => n.kind), ports.map((p) => p.angle)))
+    const layout = placeHubClusters(hub?.assets ?? [], this.hubGeo.rx, this.hubGeo.rz, CZ, hubFree(this.hubGeo, (hub?.nodes ?? []).map((n) => n.kind), ports.map((p) => p.angle), placed.reserved))
     this.hubClusters = layout.clusters
     for (const name of layout.left) console.warn(`Hub cluster ${name} has no free place and is not drawn`)
     for (const c of layout.clusters) {
@@ -919,9 +938,13 @@ export class Town {
     for (let i = 0; i < lamps; i++) {
       const a = (i / lamps) * Math.PI * 2 + 0.4
       if (ports.some((p) => Math.abs(wrapAngle(a - p.angle)) < 0.3 / f)) continue
+      if (placed.slots.some((sl) => !sl.main && Math.abs(wrapAngle(a - sl.exit)) < 0.3 / f)) continue // nor on a further building's street
       decor.add(lamp(Math.sin(a) * (ringR + 2.9), CZ - Math.cos(a) * (ringR + 2.9), Math.sin(a)))
     }
-    decor.add(bench(-6.0 * f, CZ - 8.2 * f, 0.6), bench(6.0 * f, CZ + 7.6 * f, 3.6), bench(-9.4 * f, CZ + 6.2 * f, 1.3))
+    // the benches, unless a further building's street runs where one would stand
+    for (const [x, z, ry] of hubBenches(f)) {
+      if (!placed.reserved.some((r) => rectsTouch({ x, z, w: 3, d: 3 }, r))) decor.add(bench(x, z, ry))
+    }
     hubRoot.add(scatterNature(this.hubOutline, avoid, hashString('hub-trees'), { trees: Math.round(26 * f * f), rocks: Math.round(12 * f) }))
     return out
   }
@@ -998,10 +1021,10 @@ export class Town {
   /** Callers on every island drive to a hub building: out of the caller's door, over its bridge, and round the plaza to the building's street. */
   private hubRoutes(hubBuildings: Building[], gates: Gate[]): Route[] {
     const routes: Route[] = []
-    const exits: Partial<Record<Building['kind'], number>> = { Gateway: 0, Broker: Math.PI / 2, Egress: -Math.PI / 2, Database: Math.PI }
     for (const b of hubBuildings) {
-      const exit = exits[b.kind]
-      if (exit === undefined) continue
+      // every hub building, the further ones of a kind too, has its own street off the ring road
+      const street = this.hubExits.get(b)
+      if (street === undefined) continue
       const door = b.doorWorld().setY(GROUND)
       for (const g of gates) {
         const from = this.callerOf(g.plan)
@@ -1010,7 +1033,7 @@ export class Town {
         this.cross(g.island.group.id)
         routes.push({
           dest: b, source, origin: b.kind === 'Egress' ? 'external' : 'internal', share: 1 / gates.length,
-          path: [...this.outbound(g, from), ...this.ringArc(g.angle, exit), door],
+          path: [...this.outbound(g, from), ...this.ringArc(g.angle, street.exit), ...(street.front ? [street.front.clone()] : []), door],
         })
       }
     }
@@ -1292,6 +1315,7 @@ export class Town {
 
   /** A sea lane to an island's harbour, sailed there and back: its share (`weight`) of the island's messages is what these boats carry. */
   private boatRoute(island: Island, path: THREE.Vector3[], hubBuildings: Building[], weight: number, from: string | null): BoatRoute {
+    // the boats carry what this island's own consumers take in, from every broker; whether they sail and how fast follows the first broker, the hub's port
     const broker = hubBuildings.find((b) => b.kind === 'Broker')
     const workers = [...island.buildings.values()].filter((b) => b.kind === 'Worker' && island.consumers.has(b.id))
     return {
@@ -1447,7 +1471,8 @@ export class Town {
    */
   private edgeRoutes(s: Snapshot, gates: Gate[], gateway: Building | undefined): Route[] {
     if (this.edge.mode !== 'plaza' || !gateway) return []
-    const gatewayRate = gateway.node?.requestsPerSecond ?? s.groups.find((g) => g.isHub)?.nodes.find((n) => n.kind === 'Gateway')?.requestsPerSecond ?? 0
+    // every call between islands goes through one of the gateways: the share of the cars is of all of them together (one gateway: its own rate, as before)
+    const gatewayRate = combinedGateways(s.groups.find((g) => g.isHub)?.nodes ?? [])?.requestsPerSecond ?? gateway.node?.requestsPerSecond ?? 0
     const rates = new Map<string, number>()
     for (const l of edgeLinks(s)) if (!l.incoming) rates.set(l.nodeId, (rates.get(l.nodeId) ?? 0) + l.requestsPerSecond)
     const routes: Route[] = []

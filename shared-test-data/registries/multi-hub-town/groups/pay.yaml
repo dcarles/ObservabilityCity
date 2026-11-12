@@ -1,0 +1,11 @@
+group: pay
+displayName: Payments
+color: "#4dc3c9"
+systems:
+  - { id: pay.payments-api, service: payments, name: Payments API, role: api, external: true, calls: [pay.payments-db, hub.customer-db] }
+  - { id: pay.payments-worker, service: payments, name: Payments worker, role: worker, calls: [pay.payments-db] }
+  - { id: pay.payments-db, service: payments, name: Payments DB, role: db }
+messaging:
+  topics: [payments]
+  subscriptions:
+    - { topic: ord.orders.events, consumer: pay.payments-worker }

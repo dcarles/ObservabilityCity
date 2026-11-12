@@ -1,0 +1,14 @@
+# Several of each hub kind: two gateways, two brokers, two databases and one egress. Each is its own building on the hub.
+displayName: Platform hub
+color: "#f5c26b"
+resources:
+  - { id: hub.public-gateway, name: Public gateway, role: gateway }
+  - { id: hub.partner-gateway, name: Partner gateway, role: gateway }
+  - { id: hub.event-broker, name: Event broker, role: broker }
+  - { id: hub.task-broker, name: Task broker, role: broker }
+  - { id: hub.egress, name: Central egress, role: egress }
+  - { id: hub.customer-db, name: Shared customer DB, role: db }
+  - { id: hub.reference-db, name: Shared reference DB, role: db }
+externalCallers:
+  - { id: web-app, name: Web app, calls: [ord.orders-api, pay.payments-api] }
+  - { id: partner, name: Partner, calls: [stk.stock-api] }

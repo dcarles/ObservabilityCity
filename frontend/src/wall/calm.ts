@@ -1,6 +1,7 @@
 // The showcase loop for a healthy town: what the wall shows when nothing needs attention. Pure: a snapshot in, a list of scenes out.
 
 import type { NodeSnapshot, Snapshot } from '../types'
+import { andList, brokerNames, combinedGateways } from '../hubSystems'
 import { formatRate } from '../visuals'
 import type { Focus } from './attention'
 import { servicesText } from './servicesText'
@@ -30,11 +31,13 @@ export function calmScenes(s: Snapshot, busiestCount = 3): Scene[] {
   const hub = s.groups.find((g) => g.isHub)
   const islands = s.groups.filter((g) => !g.isHub && g.nodes.length > 0)
   if (hub) {
-    const broker = hub.nodes.find((n) => n.kind === 'Broker')
-    const rate = hub.nodes.find((n) => n.kind === 'Gateway')?.requestsPerSecond
+    // every broker is named and every gateway's requests are added up; a hub with one of each reads as it always did
+    const brokers = brokerNames(hub.nodes)
+    const gateways = combinedGateways(hub.nodes)
+    const rate = gateways?.requestsPerSecond
     scenes.push({
       key: 'hub', focus: { kind: 'island', id: hub.id },
-      caption: `${hub.displayName}: ${hub.nodes.length} shared systems${broker ? `, with ${broker.name} carrying the messages` : ''}${rate ? ` and ${formatRate(rate)} req/s through the gateway` : ''}`,
+      caption: `${hub.displayName}: ${hub.nodes.length} shared systems${brokers.length > 0 ? `, with ${andList(brokers)} carrying the messages` : ''}${rate ? ` and ${formatRate(rate)} req/s through the gateway${gateways!.count > 1 ? 's' : ''}` : ''}`,
     })
   }
   const visits = busiest(islands.flatMap((g) => g.nodes), busiestCount)

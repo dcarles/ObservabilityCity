@@ -17,6 +17,7 @@ public class RegistryValidatorTests
     [InlineData("shared-test-data/registries/live-town")]
     [InlineData("shared-test-data/registries/links-town")]
     [InlineData("shared-test-data/registries/free-topics-town")]
+    [InlineData("shared-test-data/registries/multi-hub-town")]
     [InlineData("shared-test-data/registries/stress-23")]
     [InlineData("shared-test-data/registries/wide-town")]
     [InlineData("shared-test-data/registries/stress-35")]
@@ -137,6 +138,7 @@ public class RegistryValidatorTests
         Assert.Contains("shared-test-data/registries/tenants-town", found);
         Assert.Contains("shared-test-data/registries/stress-23", found);
         Assert.Contains("shared-test-data/registries/stress-35", found);
+        Assert.Contains("shared-test-data/registries/multi-hub-town", found);
     }
 
     [Fact]
@@ -378,15 +380,27 @@ public class RegistryValidatorTests
     }
 
     [Fact]
-    public void The_hub_has_room_for_one_gateway_broker_egress_and_database()
+    public void The_hub_holds_only_gateways_brokers_egresses_and_databases()
     {
         using var f = new RegistryCopy(TestPaths.MiniTown);
-        f.Replace("hub.yaml", "resources:\n", "resources:\n  - { id: hub.second-gateway, name: Another gateway, role: gateway }\n  - { id: hub.web, name: Web, role: api }\n");
+        f.Replace("hub.yaml", "resources:\n", "resources:\n  - { id: hub.web, name: Web, role: api }\n");
 
-        var hits = Check(f).Findings.Where(x => x.Rule == "hub").ToList();
+        var hit = Single(Check(f), "hub");
 
-        Assert.Equal(2, hits.Count);
-        Assert.All(hits, h => Assert.Equal("hub.yaml", h.File));
+        Assert.Equal(Severity.Error, hit.Severity);
+        Assert.Equal("hub.yaml", hit.File);
+        Assert.Equal(f.LineOf("hub.yaml", "hub.web"), hit.Line);
+        Assert.Contains("role api", hit.Message);
+    }
+
+    [Fact]
+    public void The_hub_may_hold_several_gateways_brokers_egresses_and_databases()
+    {
+        using var f = new RegistryCopy(TestPaths.MiniTown);
+        f.Replace("hub.yaml", "resources:\n", "resources:\n  - { id: hub.second-gateway, name: Another gateway, role: gateway }\n  - { id: hub.second-broker, name: Another broker, role: broker }\n"
+            + "  - { id: hub.second-egress, name: Another egress, role: egress }\n  - { id: hub.second-db, name: Another store, role: db }\n");
+
+        Assert.DoesNotContain(Check(f).Findings, x => x.Rule == "hub");
     }
 
     [Fact]

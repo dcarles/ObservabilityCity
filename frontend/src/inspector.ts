@@ -4,6 +4,7 @@ import { scopeParams, type Scope } from './scope'
 import { tenantListOrder, tenantFigures, yardSummary, type TenantView } from './tenants'
 import { regionFigures, regionOptions, validChoice, WORST, type RegionChoice } from './regions'
 import { cloudHealthRows, dismissEvent, eventOfNode } from './healthEvents'
+import { brokerNames } from './hubSystems'
 import { ago, clockTime, configOrder, messagesPerSecond, messageRate, queueRows, groupDetail, incidentSummary, jobRows, layerWord, linkSections, logLinkLabel, logSectionEmpty, logSectionTitle, logTabLabel, pickLogSection, originLabel, type LinkItem, type QueueTypes, overviewLinks, overviewRows, reasons, repeatLabel, resourceLinks, scopeView, SEVERITY_WORD, sectionLinks, stateTone, vendorWhere } from './inspectorModel'
 
 export type InspectorTab = 'overview' | 'links' | 'logs' | 'config'
@@ -212,7 +213,7 @@ export class Inspector {
     const incidents = group?.incidents ?? []
     return `
       ${why.length === 0 ? '<p class="fine">Nothing to flag: every number is inside its lines.</p>' : `<ul class="why">${why.map((w) => `<li>${escapeHtml(w)}</li>`).join('')}</ul>`}
-      <div class="rows">${overviewRows(n, (id) => this.find(id)?.node.name ?? id, this.snap?.cloud, this.snap ? messagesPerSecond(this.snap.groups.flatMap((g) => g.nodes)) : null).map((r) => `<div class="row"><span>${r.label}</span><span class="${r.tone}">${escapeHtml(r.value)}</span></div>`).join('')}</div>
+      <div class="rows">${overviewRows(n, (id) => this.find(id)?.node.name ?? id, this.snap?.cloud, this.snap ? messagesPerSecond(this.snap.groups.flatMap((g) => g.nodes)) : null, brokerNames(this.snap?.groups.find((g) => g.isHub)?.nodes ?? []).length).map((r) => `<div class="row"><span>${r.label}</span><span class="${r.tone}">${escapeHtml(r.value)}</span></div>`).join('')}</div>
       ${this.cloudHealth(n)}
       ${this.jobs(n, group)}
       ${this.queues(n)}

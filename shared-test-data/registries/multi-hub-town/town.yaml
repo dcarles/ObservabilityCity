@@ -1,0 +1,8 @@
+id: multi-hub-town
+name: Multi Hub Town
+groupLabel: Pillar
+topology: hub-and-spoke
+mode: demo
+islands: [ord, pay, stk]
+messaging:
+  topicTemplate: "{group}.{service}.events"

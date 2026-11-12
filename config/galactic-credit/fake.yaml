@@ -1,8 +1,11 @@
 # Baseline numbers for the fake source only. Anything left out comes from the role.
 hub.apim:               { rps: 520, p99Ms: 80,  minInstances: 4 }
+hub.partner-apim:       { rps: 140, p99Ms: 110, minInstances: 2 }
 hub.service-bus:        { rps: 300, p99Ms: 10,  minInstances: 2 }
+hub.event-stream:       { rps: 450, p99Ms: 15,  minInstances: 2 }
 hub.egress:             { rps: 70,  p99Ms: 450 }
 hub.customer-db:        { rps: 260, p99Ms: 22,  minInstances: 3 }
+hub.reference-db:       { rps: 120, p99Ms: 18,  minInstances: 2 }
 ldg.ledger-api:          { rps: 180, p99Ms: 240, minInstances: 3, regions: { US East: 55, EU West: 45 } }
 ldg.ledger-worker:       { rps: 60,  p99Ms: 4500, minInstances: 2, regions: { US East: 50, EU West: 50 } }
 ldg.ledger-db:           { rps: 230, p99Ms: 28,  minInstances: 2 }

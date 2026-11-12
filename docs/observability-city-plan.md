@@ -28,7 +28,7 @@ Each signal has exactly one visual meaning, and it reads the same in every theme
 | Signal | What you see |
 | --- | --- |
 | Group | An island on a ring round the central hub (a pillar, team or domain: every part of the interface uses the town's `groupLabel`), in the order of `islands` in `town.yaml`. Up to `ringCapacity` islands (default 12) on the first ring, the rest on a staggered second ring |
-| Hub | The island in the middle. In a hub-and-spoke town it holds the shared resources, for example an API gateway and the message broker's port, and an egress point or shared databases if you have them. Today it holds at most one of each kind |
+| Hub | The island in the middle. In a hub-and-spoke town it holds the shared resources, for example an API gateway and the message broker's port, and an egress point or shared databases if you have them. It may hold several of each kind (two brokers, two gateways), each its own building; the traffic stays single: one pier per island, and the airport shows all gateways together |
 | System | A building shaped by its role: an office for an API, a factory for a worker, a storage unit for a database (a storage yard for one database per tenant), a water tower for a cache, a clock tower for a function, a gate house for the gateway, a port for the broker and a tower with a dish for egress (an outbound proxy, if you have one) |
 | Service | Systems that share a `service` stand together on one pad, with a low sign naming it and showing its worst state |
 | Database engine | A database's sign names its engine (from `databaseEngines` in `town.yaml`), with its type underneath |
@@ -129,7 +129,7 @@ config/<town>/
 - **Links are declared** (`calls`, `gatewayCalls`, `messaging`) and can be added from dependency data by link discovery (`links:` in an environment file). Buildings, bridges and piers exist only for links and roles that are really there.
 - **Scope** in an environment file maps pillars and systems onto the cloud provider with rules and templates: the account each pillar lives in (`account`; an Azure subscription, an AWS account, a GCP project), the telemetry store (`telemetryStore`; on Azure a Log Analytics workspace), which resources belong to a service, and what the telemetry calls a system.
 
-**Staying company-neutral.** Core knows only generic things: islands, systems, links, brokers and vendors. Every naming convention, tag and query is a rule or template in the town's own files, and core assumes none. The two sample towns are shaped differently to prove it: Galactic Credit is hub-and-spoke with a gateway, Service Bus, 16 pillars plus Lost & found and topics named `{pillar}-{service}-outbox`; Droid Shop has six teams that call each other directly, Kafka, no gateway, topics named `{service}.events` and non-Azure basic buildings (a secrets store, a config store, a media bucket). Both render with no code changes, and the scope tests run two towns with opposite conventions.
+**Staying company-neutral.** Core knows only generic things: islands, systems, links, brokers and vendors. Every naming convention, tag and query is a rule or template in the town's own files, and core assumes none. The two sample towns are shaped differently to prove it: Galactic Credit is hub-and-spoke with two gateways, two brokers (Service Bus and an event-streaming broker), two shared databases, 16 pillars plus Lost & found and topics named `{pillar}-{service}-outbox`; Droid Shop has six teams that call each other directly, Kafka, no gateway, topics named `{service}.events` and non-Azure basic buildings (a secrets store, a config store, a media bucket). Both render with no code changes, and the scope tests run two towns with opposite conventions.
 
 ## Rules and why
 
@@ -220,10 +220,6 @@ The biggest risk is the mapping, not the 3D. The same system has different names
 - **Visual noise.** Too many cars and effects hide the signal. Cars and boats are sampled and capped at 420 cars, but without hysteresis a value near a threshold can still make a beacon flicker.
 - **False green.** Missing data must render grey, never healthy, and a signal that is not configured must stay absent rather than look measured.
 - **Performance on ordinary laptops.** Instanced cars, merged scenery and quality that steps down by itself on slow frames. Bigger towns than the sample (17 islands, about 110 buildings) are tested only in the stress towns.
-
-Current limits:
-
-- **The hub holds at most one gateway, broker, egress and database.** A town with two brokers or two gateways puts the extra one on an island or uses `topology: direct`.
 
 Open questions:
 

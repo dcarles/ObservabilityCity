@@ -1,11 +1,15 @@
 # yaml-language-server: $schema=schema/hub.schema.json
 displayName: Platform hub
 color: "#f5c26b"
+# Two gateways, two brokers and two shared databases: each is its own building on the hub.
 resources:
   - { id: hub.apim, name: API gateway, role: gateway }
+  - { id: hub.partner-apim, name: Partner API gateway, role: gateway }
   - { id: hub.service-bus, name: Service Bus, role: broker }
+  - { id: hub.event-stream, name: Event streaming, role: broker }
   - { id: hub.egress, name: Central egress, role: egress }
   - { id: hub.customer-db, name: Shared customer DB, role: db, engine: sqlserver }
+  - { id: hub.reference-db, name: Shared reference DB, role: db, engine: sqlserver }
 # The exports topic: for external destinations (Snowflake) and pillars that read it. Published as hub-exports.
 messaging:
   topics: [exports]

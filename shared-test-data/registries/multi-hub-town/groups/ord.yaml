@@ -1,0 +1,11 @@
+group: ord
+displayName: Orders
+color: "#5aa9ff"
+systems:
+  - { id: ord.orders-api, service: orders, name: Orders API, role: api, external: true, calls: [ord.orders-db, hub.customer-db] }
+  - { id: ord.orders-worker, service: orders, name: Orders worker, role: worker, calls: [ord.orders-db] }
+  - { id: ord.orders-db, service: orders, name: Orders DB, role: db }
+messaging:
+  topics: [orders]
+  subscriptions:
+    - { topic: pay.payments.events, consumer: ord.orders-worker }

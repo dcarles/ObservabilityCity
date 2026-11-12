@@ -223,7 +223,7 @@ A function's jobs are found in its logs, and nothing in the logs says which serv
 |---|---|---|---|
 | `displayName` | no | `Hub` | Name of the middle island. |
 | `color` | no | `#f5c26b` | Its colour. |
-| `resources` | no | none | Shared systems (same shape as a pillar system), for example a gateway and a broker. Only the roles gateway, broker, egress (an outbound proxy, if you have one) and database, and today at most one of each (a current limit). |
+| `resources` | no | none | Shared systems (same shape as a pillar system), for example a gateway and a broker. Only the roles gateway, broker, egress (an outbound proxy, if you have one) and database. Several of a kind may stand there (for example two brokers, or a public and a partner gateway), each its own building. Traffic stays single: each island keeps one pier and one lane of boats whatever the number of brokers, and its messages, waiting crates and dead letters add up over all of them (a topic belongs to the island that lists it, never to a broker). The airport shows all gateways together: their rates added up and the worst health. |
 | `externalCallers` | no | none | Who calls in from outside, drawn at the airport. |
 | `messaging` | no | none | The hub's own topics, in lowercase kebab-case. The hub takes `topics` only: `subscriptions` here is an error. |
 

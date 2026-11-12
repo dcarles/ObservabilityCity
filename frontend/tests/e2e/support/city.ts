@@ -19,6 +19,8 @@ export interface Status {
   closedSign: boolean
   barrierDown: boolean | null
   plaque: string
+  /** The words on the building's own sign when it has some worth testing: a broker's name, a database's engine. */
+  sign: string | null
   bubble: { visible: boolean; honk: boolean; waiting: number } | null
   /** Only a data store with a database for each tenant. */
   tenants: TenantYard | null

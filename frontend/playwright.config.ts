@@ -19,6 +19,7 @@ import { fileURLToPath } from 'node:url'
 //   npm run e2e:tenants  environments, tenant yards, tenant traffic and service groups, on a town with two pillars and three environments
 //   npm run e2e:dashboard the plain dashboard view: switch, summary, pillar cards, service table, tenant rows, shared filters, no horizontal scroll, on the tenants town
 //   npm run e2e:towns    the town switcher and the second sample town (Droid Shop, on Kafka), on the server's own config folder with both sample towns
+//                        then a demo town whose hub has two gateways, two brokers and two databases: a building for each, one pier per island, the gateways added up
 //   npm run e2e:wide     islands of 2, 10, 15 and 27 services: how many pads a row, every building on land, nothing overlapping, on a town of four islands
 //   npm run e2e:themes   the themes suite for all three themes (a pull request runs it for the harbour theme only), including a bad day shown in the town and on the dashboard. Runs nightly.
 //   npm run e2e:slow     the slow set: the 23-island and 35-island stress towns and the full sample town, with screenshots. Runs on merge to main and nightly.
@@ -43,6 +44,7 @@ const registries: Record<string, string> = {
   messagingb: 'shared-test-data/registries/messaging-town-b',
   routes: 'shared-test-data/registries/routes-town',
   freetopics: 'shared-test-data/registries/free-topics-town',
+  multihub: 'shared-test-data/registries/multi-hub-town',
   health: 'shared-test-data/registries/health-town-a',
   healthb: 'shared-test-data/registries/health-town-b',
   scope: 'shared-test-data/registries/scope-town-a',
@@ -58,7 +60,7 @@ const fixture = registries[suite] ? resolve(repo, registries[suite]) : ''
 
 // The scenario tests edit registry files to check reloading, so they run against a copy. The main process makes the copy and
 // passes its path down in the environment, which the workers inherit, so there is only ever one.
-if (['scenarios', 'links', 'tenants', 'dashboard', 'ui', 'direct', 'live', 'sources', 'discovery', 'scope', 'scopeb', 'health', 'healthb', 'functions', 'functionsb', 'messaging', 'messagingb', 'routes', 'freetopics'].includes(suite) && !process.env.E2E_REGISTRY_COPY) {
+if (['scenarios', 'links', 'tenants', 'dashboard', 'ui', 'direct', 'live', 'sources', 'discovery', 'scope', 'scopeb', 'health', 'healthb', 'functions', 'functionsb', 'messaging', 'messagingb', 'routes', 'freetopics', 'multihub'].includes(suite) && !process.env.E2E_REGISTRY_COPY) {
   const copy = mkdtempSync(join(tmpdir(), 'oc-e2e-registry-'))
   cpSync(fixture, copy, { recursive: true })
   process.env.E2E_REGISTRY_COPY = copy
@@ -77,7 +79,7 @@ export default defineConfig({
   workers: 1,
   fullyParallel: false,
   retries: process.env.CI ? 1 : 0,
-  timeout: ['scenarios', 'links', 'tenants', 'dashboard', 'ui', 'direct', 'live', 'sources', 'scope', 'scopeb', 'health', 'healthb', 'functions', 'functionsb', 'messaging', 'messagingb', 'routes', 'freetopics', 'towns', 'wide'].includes(suite) ? 60_000 : 240_000,
+  timeout: ['scenarios', 'links', 'tenants', 'dashboard', 'ui', 'direct', 'live', 'sources', 'scope', 'scopeb', 'health', 'healthb', 'functions', 'functionsb', 'messaging', 'messagingb', 'routes', 'freetopics', 'multihub', 'towns', 'wide'].includes(suite) ? 60_000 : 240_000,
   expect: { timeout: 10_000 },
   reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
   outputDir: 'test-results',

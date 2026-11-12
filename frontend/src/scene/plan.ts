@@ -244,25 +244,238 @@ export function placeHubClusters(
 
 export const HUB_CENTRE_Z = 2 // the plaza's centre sits a little south of the hub's
 
+/** The kinds of system that have a building of their own on the hub, each with a fixed place for its first building. */
+export const HUB_KINDS = ['Gateway', 'Broker', 'Egress', 'Database'] as const
+export const HUB_PLOT = 12 // the side of a hub building's square plot
+
 /**
- * What stands on the hub island and so keeps a cluster of resource buildings away: the plaza, the road to the gateway, the main buildings that exist (one each of
- * Gateway, Broker, Egress and Database, on the axes) and a strip along each spoke road. Hub-local coordinates; `f` is the hub's scale.
+ * The fixed places of the first building of each hub kind: on the axes round the plaza, each turned so its door faces the plaza. Hub-local; `f` is the hub's scale.
+ * `exit` is the direction (radians clockwise from north, round the plaza) where its street leaves the ring road.
  */
-export function hubReserved(f: number, kinds: readonly string[], spokeAngles: readonly number[]): { x: number; z: number; w: number; d: number }[] {
+export function hubMainSpots(f: number): Record<string, { x: number; z: number; yaw: number; exit: number }> {
   const CZ = HUB_CENTRE_Z
-  const spots: Record<string, { x: number; z: number }> = { Gateway: { x: 0, z: CZ - 13.5 * f }, Broker: { x: 14.5 * f, z: CZ }, Egress: { x: -14.5 * f, z: CZ }, Database: { x: 0, z: CZ + 14 * f } }
-  const out = [{ x: 0, z: CZ, w: 20 * f, d: 20 * f }, { x: 0, z: CZ - 15 * f, w: 6, d: 14 }]
-  for (const kind of new Set(kinds)) if (spots[kind]) out.push({ ...spots[kind], w: 12, d: 12 })
+  return {
+    Gateway: { x: 0, z: CZ - 13.5 * f, yaw: 0, exit: 0 },
+    Broker: { x: 14.5 * f, z: CZ, yaw: Math.PI / 2, exit: Math.PI / 2 },
+    Egress: { x: -14.5 * f, z: CZ, yaw: Math.PI / 2, exit: -Math.PI / 2 },
+    Database: { x: 0, z: CZ + 14 * f, yaw: Math.PI, exit: Math.PI },
+  }
+}
+
+type Rect = { x: number; z: number; w: number; d: number }
+
+/**
+ * What stands on the hub island and so keeps a cluster of resource buildings away: the plaza, the road to the gateway, the main buildings that exist (the first of each of
+ * Gateway, Broker, Egress and Database, on the axes), a strip along each spoke road, and `also` (the further buildings of a kind and their streets, see `placeHubBuildings`).
+ * Hub-local coordinates; `f` is the hub's scale.
+ */
+export function hubReserved(f: number, kinds: readonly string[], spokeAngles: readonly number[], also: readonly Rect[] = []): Rect[] {
+  const CZ = HUB_CENTRE_Z
+  const spots = hubMainSpots(f)
+  const out: Rect[] = [{ x: 0, z: CZ, w: 20 * f, d: 20 * f }, { x: 0, z: CZ - 15 * f, w: 6, d: 14 }]
+  for (const kind of new Set(kinds)) if (spots[kind]) out.push({ x: spots[kind].x, z: spots[kind].z, w: HUB_PLOT, d: HUB_PLOT })
   for (const a of spokeAngles) for (let r = 9 * f; r < 30 * f; r += 3) out.push({ x: Math.sin(a) * r, z: CZ - Math.cos(a) * r, w: 8, d: 8 })
+  out.push(...also)
   return out
 }
 
 /** Whether a cluster's footprint is a free place on the hub: clear of everything reserved, and with all four corners on land (3 in from the coast). */
-export function hubFree(geo: { rx: number; rz: number; scale: number }, kinds: readonly string[], spokeAngles: readonly number[]): (rect: { x: number; z: number; w: number; d: number }) => boolean {
-  const reserved = hubReserved(geo.scale, kinds, spokeAngles)
+export function hubFree(
+  geo: { rx: number; rz: number; scale: number }, kinds: readonly string[], spokeAngles: readonly number[], also: readonly Rect[] = [],
+): (rect: Rect) => boolean {
+  const reserved = hubReserved(geo.scale, kinds, spokeAngles, also)
   const outline = makeOutline(hashString('hub'), geo.rx, geo.rz, 0.05)
   return (rect) => !reserved.some((a) => rectsTouch(rect, a, 0.5)) && [[-1, -1], [1, -1], [-1, 1], [1, 1]].every(([sx, sz]) => outline.contains(rect.x + (sx! * rect.w) / 2, rect.z + (sz! * rect.d) / 2, 3))
 }
+
+/** The benches on the plaza, as x, z and how each is turned. Hub-local; `f` is the hub's scale. */
+export function hubBenches(f: number): [number, number, number][] {
+  const CZ = HUB_CENTRE_Z
+  return [[-6.0 * f, CZ - 8.2 * f, 0.6], [6.0 * f, CZ + 7.6 * f, 3.6], [-9.4 * f, CZ + 6.2 * f, 1.3]]
+}
+
+/** Where one hub system's building stands. Hub-local coordinates. */
+export interface HubSlot {
+  id: string
+  kind: string
+  x: number
+  z: number
+  /** The first building of its kind, on its fixed place (`hubMainSpots`); a further one of the kind stands wherever the hub has room. */
+  main: boolean
+  /** How a main building is turned; null for a further one, which is turned so its door faces `front`. */
+  yaw: number | null
+  /** Direction round the plaza (radians clockwise from north) where the building's street leaves the ring road: for one beside a spoke road, that spoke's. */
+  exit: number
+  /** For a further building: where its street meets a road (the ring road's edge, or the edge of the spoke road beside it), which its door faces. Null for a main one. */
+  front: { x: number; z: number } | null
+  /** How big the building is drawn: 1, or `HUB_COMPACT` for a further one beside a spoke road, whose plot is that much smaller (`HUB_PLOT * scale` a side). */
+  scale: number
+  /** For a further building: the footprint of its plot and of its street, which nothing else may stand on. Empty for a main one. */
+  reserved: Rect[]
+}
+
+/** A further building that stands beside a spoke road is drawn this much smaller than the first of its kind, on a plot as much smaller: every hub model's footprint fits it turned any way. */
+export const HUB_COMPACT = 0.8
+const SPOKE_HALF = 3 // half a spoke road's width with its curbs
+const ROAD_EDGE = 2.1 // half a spoke road's width without them, where a street off it starts
+
+/**
+ * How far a hub building of a kind reaches behind its centre, away from its door, at full size, and how wide that part is: the broker stands at the head of a jetty, in every
+ * theme, that is longer than its plot.
+ */
+const HUB_JETTY: Record<string, { reach: number; width: number }> = { Broker: { reach: 14.8, width: 6.6 } }
+
+/** The ground a further building's jetty takes (none for a kind without one), from the edge of its plot out to its end, away from its door along (`ax`, `az`). */
+function jettyOf(kind: string, x: number, z: number, ax: number, az: number, scale: number): Rect[] {
+  const j = HUB_JETTY[kind]
+  if (!j) return []
+  const w = j.width * scale
+  const out: Rect[] = []
+  for (let r = (HUB_PLOT * scale) / 2; r < j.reach * scale; r += w / 2) {
+    const t = Math.min(r + w / 2, j.reach * scale - w / 2)
+    out.push({ x: x + ax * t, z: z + az * t, w, d: w })
+  }
+  return out
+}
+
+const segmentDistance = (px: number, pz: number, ax: number, az: number, bx: number, bz: number) => {
+  const dx = bx - ax, dz = bz - az
+  const t = Math.max(0, Math.min(1, ((px - ax) * dx + (pz - az) * dz) / (dx * dx + dz * dz)))
+  return Math.hypot(px - ax - t * dx, pz - az - t * dz)
+}
+
+/**
+ * Where the hub's own buildings stand. The first of each kind takes its fixed place on the axes, exactly as a hub with one of each always had. Every further one of a kind
+ * (a second broker, a second gateway) is its own building, nearest the first of its kind where there is room:
+ * - first on a free place from rings at 55%, 68% and 80% of the hub's half sizes a step of 15 degrees apart, where its plot and its straight street from the ring road keep
+ *   clear of the plaza, the main buildings, the spoke roads and the buildings already placed;
+ * - else, a little smaller (`HUB_COMPACT`), at the side of a spoke road with its door to the road, clear of the ring road, the lamps and benches, the main buildings and their
+ *   streets, every spoke road and the buildings already placed. A hub with many spokes has no room left between them for a street of its own from the ring road, but the
+ *   pockets beside the spoke roads next to each main building, toward the coast, hold a building each.
+ * A system of a kind the hub has no place for is in `skipped`; one that finds no room is in `left`, and the hub grows until `left` is empty (see layoutWithHubRoom).
+ * Pure and in the hub's order, so the same snapshot gives the same hub.
+ */
+export function placeHubBuildings(
+  nodes: readonly { id: string; kind: string }[], geo: { rx: number; rz: number; scale: number; ringR: number }, spokeAngles: readonly number[],
+): { slots: HubSlot[]; left: string[]; skipped: string[]; reserved: Rect[] } {
+  const f = geo.scale
+  const CZ = HUB_CENTRE_Z
+  const mains = hubMainSpots(f)
+  const slots: HubSlot[] = []
+  const left: string[] = []
+  const skipped: string[] = []
+  const extras: { id: string; kind: string }[] = []
+  const seen = new Set<string>()
+  for (const n of nodes) {
+    const spot = mains[n.kind]
+    if (!spot) { skipped.push(n.id); continue }
+    if (seen.has(n.kind)) { extras.push(n); continue }
+    seen.add(n.kind)
+    slots.push({ id: n.id, kind: n.kind, x: spot.x, z: spot.z, main: true, yaw: spot.yaw, exit: spot.exit, front: null, scale: 1, reserved: [] })
+  }
+  if (extras.length === 0) return { slots, left, skipped, reserved: [] }
+  const kinds = [...seen]
+  const reserved: Rect[] = []
+  // the plaza is left out of what a street must clear: every street starts on the ring road inside it
+  const mainsAndSpokes = hubReserved(f, kinds, spokeAngles).slice(1)
+  const onLand = hubFree(geo, kinds, spokeAngles)
+  const candidates: { x: number; z: number; angle: number }[] = []
+  for (const k of [0.55, 0.68, 0.8]) for (let step = 0; step < 24; step++) {
+    const angle = wrap(step * (Math.PI / 12))
+    candidates.push({ x: Math.sin(angle) * geo.rx * k, z: CZ - Math.cos(angle) * geo.rz * k, angle })
+  }
+  const ringEdge = geo.ringR + 2.1
+  const outline = makeOutline(hashString('hub'), geo.rx, geo.rz, 0.05)
+  const roadside = new Map<string, ReturnType<typeof roadsidePlaces>>()
+  for (const n of extras) {
+    const near = mains[n.kind]
+    const order = candidates.map((c, i) => ({ c, i, d: Math.hypot(c.x - near.x, c.z - near.z) })).sort((a, b) => a.d - b.d || a.i - b.i)
+    let placed: HubSlot | null = null
+    for (const { c } of order) {
+      const plot = { x: c.x, z: c.z, w: HUB_PLOT, d: HUB_PLOT }
+      if (!onLand(plot) || reserved.some((r) => rectsTouch(plot, r, 0.5))) continue
+      // the street: from the ring road straight out to the front of the plot
+      const dist = Math.hypot(c.x, c.z - CZ)
+      const street: Rect[] = []
+      for (let r = ringEdge; r < dist - HUB_PLOT / 2; r += 2.5) street.push({ x: Math.sin(c.angle) * r, z: CZ - Math.cos(c.angle) * r, w: 4, d: 4 })
+      if (street.some((s) => mainsAndSpokes.some((r) => rectsTouch(s, r, 0.3)) || reserved.some((r) => rectsTouch(s, r, 0.3)))) continue
+      // a jetty runs out behind it, away from the plaza
+      const jetty = jettyOf(n.kind, c.x, c.z, (c.x) / dist, (c.z - CZ) / dist, 1)
+      if (jetty.some((s) => !outline.contains(s.x, s.z, 1 + s.w / 2) || mainsAndSpokes.some((r) => rectsTouch(s, r, 0.3)) || reserved.some((r) => rectsTouch(s, r, 0.3)))) continue
+      const front = { x: Math.sin(c.angle) * ringEdge, z: CZ - Math.cos(c.angle) * ringEdge }
+      placed = { id: n.id, kind: n.kind, x: c.x, z: c.z, main: false, yaw: null, exit: c.angle, front, scale: 1, reserved: [plot, ...street, ...jetty] }
+      break
+    }
+    if (!placed) {
+      if (!roadside.has(n.kind)) roadside.set(n.kind, roadsidePlaces(n.kind, f, geo, kinds, spokeAngles))
+      const byNear = roadside.get(n.kind)!.map((c, i) => ({ c, i, d: Math.hypot(c.x - near.x, c.z - near.z) })).sort((a, b) => a.d - b.d || a.i - b.i)
+      const hit = byNear.find(({ c }) => !c.reserved.some((a) => reserved.some((r) => rectsTouch(a, r, 0.5))))
+      if (hit) placed = { id: n.id, kind: n.kind, x: hit.c.x, z: hit.c.z, main: false, yaw: null, exit: hit.c.exit, front: hit.c.front, scale: HUB_COMPACT, reserved: hit.c.reserved }
+    }
+    if (!placed) { left.push(n.id); continue }
+    slots.push(placed)
+    reserved.push(...placed.reserved)
+  }
+  return { slots, left, skipped, reserved }
+}
+
+/**
+ * The places beside the spoke roads where a further hub building can stand (see placeHubBuildings), before the other further buildings are taken into account: a compact plot
+ * on either side of each spoke road, every 2 along it, its edge half a unit from the curb, on land 3 in from the coast, and clear of the ring road and its lamps, the benches,
+ * the main buildings (and the first broker's jetty) and their streets and every other spoke road; a broker's jetty, behind it, as well. Each comes with the spoke it stands on,
+ * the point on the road's edge in front of its door, and its footprint, its short drive to the road and its jetty, which nothing else may stand on.
+ */
+function roadsidePlaces(
+  kind: string, f: number, geo: { rx: number; rz: number; ringR: number }, kinds: readonly string[], spokeAngles: readonly number[],
+): { x: number; z: number; exit: number; front: { x: number; z: number }; reserved: Rect[] }[] {
+  const CZ = HUB_CENTRE_Z
+  const plot = HUB_PLOT * HUB_COMPACT
+  const half = plot / 2
+  const off = SPOKE_HALF + 0.5 + half
+  const spots = hubMainSpots(f)
+  const mains = [...new Set(kinds)].filter((k) => spots[k]).map((k) => spots[k])
+  const rects: Rect[] = [
+    ...mains.map((m) => ({ x: m.x, z: m.z, w: HUB_PLOT, d: HUB_PLOT })),
+    { x: 0, z: CZ - 15 * f, w: 6, d: 14 },
+    ...hubBenches(f).map(([x, z]) => ({ x, z, w: 3, d: 3 })),
+    // the first broker's jetty runs out east behind it (its door faces the plaza)
+    ...(spots.Broker && kinds.includes('Broker') ? [{ x: spots.Broker.x + (HUB_PLOT / 2 + HUB_JETTY.Broker.reach) / 2, z: spots.Broker.z, w: HUB_JETTY.Broker.reach - HUB_PLOT / 2, d: HUB_JETTY.Broker.width }] : []),
+  ]
+  // the ring road with its lamps, the streets to the main buildings, and the spoke roads (as far as the coast and beyond)
+  const plaza = geo.ringR + 4
+  const far = 2 * Math.max(geo.rx, geo.rz)
+  const lines = [
+    ...mains.map((m) => ({ ax: 0, az: CZ, bx: m.x, bz: m.z, clear: 3 + 0.5 + half })),
+    ...spokeAngles.map((a) => ({ ax: Math.sin(a) * geo.ringR, az: CZ - Math.cos(a) * geo.ringR, bx: Math.sin(a) * far, bz: CZ - Math.cos(a) * far, clear: off - 1e-6 })),
+  ]
+  const outline = makeOutline(hashString('hub'), geo.rx, geo.rz, 0.05)
+  const out: { x: number; z: number; exit: number; front: { x: number; z: number }; reserved: Rect[] }[] = []
+  for (const a of spokeAngles) {
+    const dx = Math.sin(a), dz = -Math.cos(a)
+    for (const side of [-1, 1]) {
+      // the normal to the road, toward this side
+      const nx = -dz * side, nz = dx * side
+      for (let t = geo.ringR + 2.1 + half; t < Math.max(geo.rx, geo.rz); t += 2) {
+        const x = dx * t + nx * off, z = CZ + dz * t + nz * off
+        if (Math.hypot(x, z - CZ) < plaza + half) continue
+        if (lines.some((l) => segmentDistance(x, z, l.ax, l.az, l.bx, l.bz) < l.clear)) continue
+        const own = { x, z, w: plot, d: plot }
+        if (rects.some((r) => rectsTouch(own, r, 0.5))) continue
+        if (![[-1, -1], [1, -1], [-1, 1], [1, 1]].every(([sx, sz]) => outline.contains(x + sx! * half, z + sz! * half, 3))) continue
+        // a jetty runs out behind it, away from the road
+        const jetty = jettyOf(kind, x, z, nx, nz, HUB_COMPACT)
+        const jettyClear = (s: Rect) => outline.contains(s.x, s.z, 1 + s.w / 2) && !rects.some((r) => rectsTouch(s, r, 0.5)) && !lines.some((l) => segmentDistance(s.x, s.z, l.ax, l.az, l.bx, l.bz) < l.clear - half + (s.w / 2) * Math.SQRT2)
+        if (!jetty.every(jettyClear)) continue
+        // its drive: from the curb to the plot
+        const drive = { x: dx * t + nx * (SPOKE_HALF + 0.5), z: CZ + dz * t + nz * (SPOKE_HALF + 0.5), w: 4, d: 4 }
+        out.push({ x, z, exit: a, front: { x: dx * t + nx * ROAD_EDGE, z: CZ + dz * t + nz * ROAD_EDGE }, reserved: [own, drive, ...jetty] })
+      }
+    }
+  }
+  return out
+}
+
+const wrap = (a: number) => Math.atan2(Math.sin(a), Math.cos(a))
 
 /** Distance from the spine to the outer edge of the outermost pad, which is as far as the row roads reach. */
 export function rowEdge(pads: { ring: number }[]): number {
