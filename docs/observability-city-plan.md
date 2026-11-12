@@ -28,7 +28,7 @@ Each signal has exactly one visual meaning, and it reads the same in every theme
 | Signal | What you see |
 | --- | --- |
 | Group | An island on a ring round the central hub (a pillar, team or domain: every part of the interface uses the town's `groupLabel`), in the order of `islands` in `town.yaml`. Up to `ringCapacity` islands (default 12) on the first ring, the rest on a staggered second ring |
-| Hub | The island in the middle. In a hub-and-spoke town it holds the shared resources, for example an API gateway and the message broker's port, and an egress point or shared databases if you have them. Today it holds at most one of each kind |
+| Hub | The island in the middle. In a hub-and-spoke town it holds the shared resources, for example an API gateway and the message broker's port, and an egress point or shared databases if you have them. It may hold several of each kind (two brokers, two gateways), each its own building; the traffic stays single: one pier per island, and the airport shows all gateways together |
 | System | A building shaped by its role: an office for an API, a factory for a worker, a storage unit for a database (a storage yard for one database per tenant), a water tower for a cache, a clock tower for a function, a gate house for the gateway, a port for the broker and a tower with a dish for egress (an outbound proxy, if you have one) |
 | Service | Systems that share a `service` stand together on one pad, with a low sign naming it and showing its worst state |
 | Database engine | A database's sign names its engine (from `databaseEngines` in `town.yaml`), with its type underneath |
@@ -220,10 +220,6 @@ The biggest risk is the mapping, not the 3D. The same system has different names
 - **Visual noise.** Too many cars and effects hide the signal. Cars and boats are sampled and capped at 420 cars, but without hysteresis a value near a threshold can still make a beacon flicker.
 - **False green.** Missing data must render grey, never healthy, and a signal that is not configured must stay absent rather than look measured.
 - **Performance on ordinary laptops.** Instanced cars, merged scenery and quality that steps down by itself on slow frames. Bigger towns than the sample (17 islands, about 110 buildings) are tested only in the stress towns.
-
-Current limits:
-
-- **The hub holds at most one gateway, broker, egress and database.** A town with two brokers or two gateways puts the extra one on an island or uses `topology: direct`.
 
 Open questions:
 

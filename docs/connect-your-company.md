@@ -87,8 +87,8 @@ Create the folder outside the clone (the examples below call it `<company-config
   town.yaml                 the town: id, name, mode, topology, groupLabel, islands (their order), ringCapacity,
                             trafficDensity, databaseEngines, messaging (topic naming) and labels
   defaults.yaml
-  hub.yaml                  shared resources, for example a gateway and a message broker (today at most one
-                            gateway, broker, egress and database)
+  hub.yaml                  shared resources, for example a gateway and a message broker (several of a kind
+                            are allowed, each its own building)
   third-parties.yaml
   groups/<group>.yaml       one island per group (pillars/<pillar>.yaml, the older name, reads the same)
   environments/<env>.yaml   dev, staging, prod...
