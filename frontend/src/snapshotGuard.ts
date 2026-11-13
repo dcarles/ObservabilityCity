@@ -27,7 +27,7 @@ const SIGNAL_OF: Record<string, string> = {
 }
 
 /** Numbers a source may leave out. Anything that is not a finite number becomes null. */
-const OPTIONAL_NUMBERS = ['cpu', 'memory', 'utilisation', 'throttled', 'queueDepth', 'oldestMessageSeconds', 'deadLetters', 'outsideRequestsPerSecond'] as const
+const OPTIONAL_NUMBERS = ['cpu', 'memory', 'utilisation', 'throttled', 'queueDepth', 'oldestMessageSeconds', 'deadLetters', 'outsideRequestsPerSecond', 'backlogCountAmber', 'backlogCountRed'] as const
 
 export interface Checked {
   /** The repaired snapshot, or null when nothing in it can be drawn. */

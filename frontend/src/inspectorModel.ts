@@ -68,7 +68,10 @@ export function reasons(n: NodeSnapshot, cloud?: string | null): string[] {
     out.push(who ? `Turning away requests (throttled): ${who}.` : `Turning away ${pct(n.throttled!, 1)} of requests (throttled).`)
   }
   if (!isAbsent(n, 'backlog') && (n.oldestMessageSeconds ?? 0) >= n.backlogAmber && (n.oldestMessageSeconds ?? 0) > 0) out.push(`The oldest message has waited ${formatAge(n.oldestMessageSeconds!)}, past the ${formatAge(n.backlogAmber)} line.`)
+  if (!isAbsent(n, 'backlog') && n.backlogCountAmber != null && (n.queueDepth ?? 0) >= n.backlogCountAmber) out.push(`${formatCount(n.queueDepth!)} message${n.queueDepth === 1 ? ' is' : 's are'} waiting, past the line of ${formatCount(n.backlogCountAmber)}.`)
   if (!isAbsent(n, 'deadLetters') && (n.deadLetters ?? 0) > 0) out.push(`${formatCount(n.deadLetters!)} message${n.deadLetters === 1 ? ' is' : 's are'} in the dead-letter queue.`)
+  // a rule the server knows and this list does not must never leave an amber system "nothing to flag": say what the server says (tests/unit/degradedRules.test.ts keeps the lists in step)
+  if (out.length === 0 && n.state === 'Degraded' && n.reason) out.push(`${n.reason.charAt(0).toUpperCase()}${n.reason.slice(1)}.`)
   return out
 }
 
