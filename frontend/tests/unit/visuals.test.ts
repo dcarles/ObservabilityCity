@@ -38,6 +38,12 @@ describe('signals', () => {
     expect(beaconLevel({ ...base, errorRate: 0.002, state: 'Down' })).toBe('red')
   })
 
+  it('is amber for any system the server marks Degraded, even with every error number inside its line, and green only when it is healthy', () => {
+    expect(beaconLevel({ ...base, errorRate: 0, state: 'Degraded' })).toBe('amber')
+    expect(beaconLevel({ ...base, errorRate: 0, state: 'Healthy' })).toBe('green')
+    expect(beaconLevel({ ...base, errorRate: 0.2, state: 'Degraded' })).toBe('red') // failing requests stay red
+  })
+
   it('slows walkers as p99 nears the SLA', () => {
     expect(speedFactor(100, 1000)).toBeGreaterThan(speedFactor(900, 1000))
     expect(speedFactor(5000, 1000)).toBe(0.25)
