@@ -450,7 +450,9 @@ public class InstancesTests
         for (var i = 0; i < 100; i++)
         {
             var snapshot = await client.GetFromJsonAsync<Snapshot>("/api/snapshot/latest", Wire, TestContext.Current.CancellationToken);
-            if (snapshot is not null && Node(snapshot, "aa.orders-api").State != HealthState.Stale)
+            // The sources answer on their own polls: a system can stop being Stale before the instances source has answered, so wait for the counts too.
+            if (snapshot is not null && Node(snapshot, "aa.orders-api").State != HealthState.Stale
+                && Node(snapshot, "aa.orders-api").InstancesTotal > 0 && Node(snapshot, "bb.ledger-api").InstancesTotal > 0)
                 return (snapshot, (await client.GetFromJsonAsync<SystemDetail>("/api/systems/aa.orders-api", Wire, TestContext.Current.CancellationToken))!);
             await Task.Delay(100, TestContext.Current.CancellationToken);
         }
