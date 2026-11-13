@@ -224,6 +224,24 @@ test.describe(`the broker's backlog and dead letters (${B ? 'ids, a total' : 'co
     expect(await beacon('bb.ledger-worker')).not.toBe('amber')
   })
 
+  test('the roof beacon of a worker over its waiting-count line is amber, as its state says', async ({ page }) => {
+    await open(page)
+    await page.evaluate(() => (window as any).city.step(2)) // time only moves when a test moves it
+    const beacon = (id: string) => page.evaluate((want) => (window as any).city.inspect(want).beacon, id)
+    expect(await beacon('bb.ledger-worker')).not.toBe('amber') // no dead letters, no errors: green until the queue is long
+
+    await page.evaluate(() => {
+      const c = (window as any).city
+      const s = JSON.parse(JSON.stringify(c.seen.last))
+      const n = s.groups.flatMap((g: any) => g.nodes).find((x: any) => x.id === 'bb.ledger-worker')
+      Object.assign(n, { state: 'Degraded', queueDepth: 424, backlogCountAmber: 100, backlogCountRed: 1000, reason: '424 waiting (line 100)' })
+      c.hold(true)
+      c.feed(s)
+      c.step(2)
+    })
+    expect(await beacon('bb.ledger-worker')).toBe('amber')
+  })
+
   test('are not listed for a system that reads no queue', async ({ page }) => {
     await open(page)
     await page.evaluate(() => (window as any).city.openSystem('aa.orders-api'))

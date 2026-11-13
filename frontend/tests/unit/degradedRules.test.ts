@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { readdirSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { reasons } from '../../src/inspectorModel'
+import { beaconLevel } from '../../src/visuals'
 import type { NodeSnapshot } from '../../src/types'
 
 // The server decides amber with a list of named rules (DegradedRules.cs). Each rule has a case in shared-test-data/degraded-rules/<rule>.json, a system the real snapshot
@@ -24,6 +25,12 @@ describe('the cases of the degraded rules', () => {
 
     expect(own.length).toBeGreaterThan(0)
     expect(own.join(' ')).not.toMatch(/nothing to flag/i)
+  })
+})
+
+describe('the roof beacon of every degraded case', () => {
+  it.each(cases.map((c) => [c.rule, c.node] as const))('%s: is not green, so the light agrees with the state', (_rule, node) => {
+    expect(['amber', 'red']).toContain(beaconLevel(node))
   })
 })
 

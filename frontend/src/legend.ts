@@ -71,7 +71,7 @@ export const LEGEND: readonly LegendSection[] = [
     title: 'A warning',
     tab: 'problems',
     entries: [
-      { id: 'beacon-amber', sees: 'Amber beacon', means: 'A warning', more: 'Some errors, throttling, dead letters, or CPU, memory or storage running hot.', tone: 'amber', icon: 'svg:beacon-amber' },
+      { id: 'beacon-amber', sees: 'Amber beacon', means: 'A warning', more: 'The system is degraded: some errors, slow responses, unhealthy instances, throttling, CPU, memory or storage running hot, a failed or late job, or a long line of waiting messages. Dead letters in a queue it reads also turn it amber.', tone: 'amber', icon: 'svg:beacon-amber' },
       { id: 'hazard', sees: 'Amber hazard lights on a car', means: 'Stuck in a line of cars behind a slow service', more: 'The service\'s p99 is past its SLA.', tone: 'amber', icon: '🚧' },
       { id: 'bubble', sees: 'Bubble over a line of cars', means: 'A "!" or a "+N waiting"', more: 'The "!" shows when p99 is well past the SLA and a car is stuck behind it. "+N waiting" counts the requests in flight that the lane has no room to draw.', tone: 'amber', icon: '💬' },
       { id: 'crates', sees: 'Crates piling up on a pier', means: 'A backlog: messages waiting for a worker', tone: 'amber', icon: '📦' },
@@ -162,7 +162,7 @@ export const LEGEND: readonly LegendSection[] = [
       { id: 'floors', sees: 'Floors', means: 'How many instances', more: '1, 2, 3 to 4, 5 to 8 and so on, doubling up to 8 floors. The plaque has the exact count. For a service in several regions they are the shown region\'s instances, not the total.', tone: 'neutral', icon: '🪜' },
       { id: 'region', sees: 'Region line and split under a name', means: 'A service in several regions', more: 'Which region the numbers are, and how its requests divide between them. A warning sign means one region takes too much while another runs.', tone: 'amber', icon: '🌍' },
       { id: 'windows', sees: 'Lit windows', means: 'Load', more: 'More windows light up as requests and resources rise.', tone: 'neutral', icon: '💡' },
-      { id: 'beacon-green', sees: 'Green beacon on the roof', means: 'Errors are below the amber line', tone: 'green', icon: 'svg:beacon-green' },
+      { id: 'beacon-green', sees: 'Green beacon on the roof', means: 'Healthy: nothing is past an amber line', tone: 'green', icon: 'svg:beacon-green' },
     ],
   },
   {

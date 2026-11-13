@@ -41,8 +41,8 @@ type BeaconInput = Pick<NodeSnapshot, 'state' | 'errorRate' | 'errorAmber' | 'er
 
 /**
  * Rooftop beacon colour. Red means requests are failing: a system that is down (the beacon then stays on, steady), errors
- * past the red threshold, or a data store turning requests away past its throttle threshold. Amber is the warning: errors, throttling or CPU,
- * memory or utilisation past their amber thresholds, and dead letters in a queue it reads.
+ * past the red threshold, or a data store turning requests away past its throttle threshold. Amber is the warning: any system the server marks Degraded (by any of its
+ * rules, so the light cannot disagree with the state), and dead letters in a queue it reads, which the server does not count as degraded. Green only when neither applies.
  */
 export function beaconLevel(n: BeaconInput): BeaconLevel {
   if (!drivesBeacon(n)) return 'off' // nothing here is measured: not grey, there is no data to be missing
@@ -50,6 +50,7 @@ export function beaconLevel(n: BeaconInput): BeaconLevel {
   if (n.state === 'Down') return 'red' // a system that is down is red whatever its error rate or silence says
   const throttled = n.throttled ?? 0
   if (n.errorRate >= n.errorRed || (n.throttleRed !== undefined && throttled >= n.throttleRed)) return 'red'
+  if (n.state === 'Degraded') return 'amber' // whatever rule made it so: errors, slow, instances, a hot resource, a late job, a long queue
   if (n.errorRate >= n.errorAmber) return 'amber'
   // a function's scheduled jobs: one that failed its last run or did not run when it should have is amber (the app runs); every job failed is Down, red above
   if (n.jobs?.some((j) => j.status === 'Failed' || j.status === 'Overdue')) return 'amber'
