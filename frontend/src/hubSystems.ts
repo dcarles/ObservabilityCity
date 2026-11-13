@@ -3,7 +3,7 @@
 // kind adds up to, so one gateway or one broker reads exactly as it always did.
 
 import type { HealthState, NodeSnapshot } from './types'
-import { worstState } from './visuals'
+import { speedFactor, worstState } from './visuals'
 
 /** What the hub's gateways add up to: the requests of them all, the error rate weighted by requests, and the worst state of any. */
 export interface GatewayTotal {
@@ -36,4 +36,21 @@ export function brokerNames(nodes: readonly NodeSnapshot[]): string[] {
 /** Names as a list in words: "A", "A and B", "A, B and C". */
 export function andList(names: readonly string[]): string {
   return names.length <= 1 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`
+}
+
+/** What the boats follow: whether any broker is up, and the sailing speed of the slowest one that is. */
+export interface BrokerSea {
+  running: boolean
+  speed: number
+}
+
+/**
+ * The boats stand for the town's messaging as a whole, so they sail while at least one broker is up and sail as slowly as the slowest of those.
+ * A broker with no reading yet counts as up at normal speed, and a hub with no broker leaves the boats as they were. One broker gives its own answer.
+ */
+export function brokerSea(brokers: readonly (Pick<NodeSnapshot, 'state' | 'p99Ms' | 'slaP99Ms'> | null | undefined)[]): BrokerSea {
+  const up = brokers.filter((b) => b?.state !== 'Down')
+  if (brokers.length > 0 && up.length === 0) return { running: false, speed: 1 }
+  const speeds = up.map((b) => (b ? speedFactor(b.p99Ms, b.slaP99Ms) : 1))
+  return { running: true, speed: speeds.length > 0 ? Math.min(...speeds) : 1 }
 }

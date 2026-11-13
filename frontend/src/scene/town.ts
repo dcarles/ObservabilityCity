@@ -11,7 +11,7 @@ import { buildIslandBody, GROUND, makeOutline, scatterNature, type Outline, type
 import { layoutWithHubRoom } from './hubRoom'
 import { CURB, DOCK_X, HUB_PLOT, LANE_Z, PAD_D, PAD_W, coastScan, coastScanZ, hubBenches, hubFree, laneStart, padX, placeHubBuildings, placeHubClusters, planIsland, rectsTouch, rowEdge, type HubCluster, type Placed, type Plan } from './plan'
 import { hashString } from './random'
-import { boatRate, clamp, formatRate, speedFactor } from '../visuals'
+import { boatRate, clamp, formatRate } from '../visuals'
 import { CarSystem, type Route } from './cars'
 import { BoatSystem, type BoatRoute } from './boats'
 import { archCount, clearArches, deckAt } from './arches'
@@ -25,10 +25,6 @@ import { vendorCallersOf, vendorShare } from './vendorRing'
 // kept importable from here, where they used to be
 export { vendorCallersOf, vendorShare, wrapText }
 
-/** Whether the broker carries messages: boats sail unless it is down. A broker nothing measures is not a stopped one. */
-function brokerRunning(node?: { state: string } | null): boolean {
-  return node?.state !== 'Down'
-}
 import { mergeStatic } from './merge'
 import { bayTo } from './bay'
 import { islandSign } from './sign'
@@ -48,7 +44,7 @@ import { edgeLinks, edgeMode, signLines, type EdgeMode } from '../edgeTraffic'
 import { Signpost } from './signpost'
 import { eventsByNode } from '../healthEvents'
 import { portCountsLine, portSignText } from '../portSign'
-import { combinedGateways, type GatewayTotal } from '../hubSystems'
+import { brokerSea, combinedGateways, type GatewayTotal } from '../hubSystems'
 import { regionLine, splitLine, validChoice, withRegion, WORST, type RegionChoice } from '../regions'
 
 const QUAY = 9
@@ -483,8 +479,8 @@ export class Town {
     // hub lanes: each island with a measured flow has one lane to the hub beside its bridge, straight and parallel to it, boats going out on one side and coming in on the other.
     // They carry what the broker says the pillar sends and receives, so they replace the lanes between islands, whose sender was only a guess from queue names.
     if (hubLanes) {
-      // one lane and one dock per island whatever the number of brokers: what it carries is the island's own flow. The boats' running and speed follow the first broker, the hub's port
-      const broker = hubBuildings.find((b) => b.kind === 'Broker')
+      // one lane and one dock per island whatever the number of brokers: what it carries is the island's own flow. The boats' running and speed follow all the brokers (brokerSea)
+      const sea = () => brokerSea(hubBuildings.filter((b) => b.kind === 'Broker').map((b) => b.node))
       const up = new THREE.Vector3(0, 1, 0)
       pillars.forEach((g, index) => {
         if (!harbours[index] || !connectors[index].bridge || g.flow == null) return
@@ -493,8 +489,8 @@ export class Town {
         const beside = new THREE.Vector3(1, 0, 0).applyAxisAngle(up, island.root.rotation.y).multiplyScalar(DOCK_X) // the island's dock is this far to the side of its bridge, and so is the hub's
         const hubTip = this.hubDock(gates[index].coast.clone().setY(0).add(beside), toIsland)
         const pathOut = [harbours[index]!.clone(), hubTip]
-        const rate = (pick: (f: PillarFlowSnapshot) => number | null | undefined) => () => (brokerRunning(broker?.node) && island.flow ? boatRate(pick(island.flow) ?? 0, 1) : 0)
-        const speed = () => (broker?.node ? speedFactor(broker.node.p99Ms, broker.node.slaP99Ms) : 1)
+        const rate = (pick: (f: PillarFlowSnapshot) => number | null | undefined) => () => (sea().running && island.flow ? boatRate(pick(island.flow) ?? 0, 1) : 0)
+        const speed = () => sea().speed
         boatRoutes.push({ path: pathOut, from: g.id, to: 'hub', oneWay: true, rate: rate((f) => f.sentPerSecond), speed })
         boatRoutes.push({ path: [...pathOut].reverse(), from: null, to: g.id, oneWay: true, rate: rate((f) => f.receivedPerSecond), speed })
         this.boatLanes.add(g.id)
@@ -527,16 +523,16 @@ export class Town {
       const loop = laneBetween(index, index)
       if (!loop) return
       const island = this.islands[index]
-      // the first broker stands for the hub's port, as on the hub lanes
-      const broker = hubBuildings.find((b) => b.kind === 'Broker')
+      // the boats follow all the brokers, as on the hub lanes
+      const sea = () => brokerSea(hubBuildings.filter((b) => b.kind === 'Broker').map((b) => b.node))
       boatRoutes.push({
         path: loop,
         from: g.id,
         to: g.id,
         scheduler: true,
         circuit: loop.length > 2,
-        rate: () => (brokerRunning(broker?.node) ? schedulerRate(schedules, (id) => island.buildings.get(id)?.node) : 0),
-        speed: () => (broker?.node ? speedFactor(broker.node.p99Ms, broker.node.slaP99Ms) : 1),
+        rate: () => (sea().running ? schedulerRate(schedules, (id) => island.buildings.get(id)?.node) : 0),
+        speed: () => sea().speed,
       })
       this.boatLanes.add(g.id)
     })
@@ -1315,8 +1311,8 @@ export class Town {
 
   /** A sea lane to an island's harbour, sailed there and back: its share (`weight`) of the island's messages is what these boats carry. */
   private boatRoute(island: Island, path: THREE.Vector3[], hubBuildings: Building[], weight: number, from: string | null): BoatRoute {
-    // the boats carry what this island's own consumers take in, from every broker; whether they sail and how fast follows the first broker, the hub's port
-    const broker = hubBuildings.find((b) => b.kind === 'Broker')
+    // the boats carry what this island's own consumers take in, from every broker; whether they sail and how fast follows all the brokers (brokerSea)
+    const sea = () => brokerSea(hubBuildings.filter((b) => b.kind === 'Broker').map((b) => b.node))
     const workers = [...island.buildings.values()].filter((b) => b.kind === 'Worker' && island.consumers.has(b.id))
     return {
       path,
@@ -1324,14 +1320,14 @@ export class Town {
       to: island.group.id,
       circuit: from === island.group.id && path.length > 2,
       rate: () => {
-        if (!brokerRunning(broker?.node)) return 0
+        if (!sea().running) return 0
         // what really arrives in the queues its workers read; without that number, the workers' own request rate
         const live = workers.filter((w) => w.node && w.node.state !== 'Down')
         const queued = live.flatMap((w) => w.node?.queues ?? []).filter((q) => q.perSecond != null)
         const rps = queued.length > 0 ? queued.reduce((a, q) => a + (q.perSecond ?? 0), 0) : live.reduce((a, w) => a + (w.node && w.node.state !== 'Stale' ? w.node.requestsPerSecond : 0), 0)
         return boatRate(rps, weight)
       },
-      speed: () => (broker?.node ? speedFactor(broker.node.p99Ms, broker.node.slaP99Ms) : 1),
+      speed: () => sea().speed,
     }
   }
 
