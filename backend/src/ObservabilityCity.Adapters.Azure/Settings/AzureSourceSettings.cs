@@ -73,7 +73,8 @@ public sealed partial class AzureSourceSettings : SourceSettingsReader<AzureSour
             f.DeadLetterLink is { } l ? new EntityLink(l.Name.Trim(), l.Url.Trim()) : null,
             ToEntityMetric(f.Throughput),
             f.DeadLetterLinks.Count == 0 ? null : f.DeadLetterLinks.Select(l => new EntityRegionLink((l.Region ?? "").Trim(), new EntityLink(l.Name.Trim(), l.Url.Trim()))).ToList(),
-            f.Flows.Count == 0 ? null : f.Flows.Select(x => new EntityFlow(x.Match, (x.Direction ?? "").Trim().ToLowerInvariant())).ToList());
+            f.Flows.Count == 0 ? null : f.Flows.Select(x => new EntityFlow(x.Match, (x.Direction ?? "").Trim().ToLowerInvariant())).ToList(),
+            f.QueueLink is { } q ? new EntityLink(q.Name.Trim(), q.Url.Trim()) : null);
 
     private static EntityMetric? ToEntityMetric(EntityMetricFile? f) => f is null ? null : new EntityMetric(f.Metric.Trim(), f.Aggregation.Trim().ToLowerInvariant());
 
@@ -104,6 +105,15 @@ public sealed partial class AzureSourceSettings : SourceSettingsReader<AzureSour
             foreach (Match m in Regex.Matches(link.Url ?? "", @"\{([^{}]*)\}"))
                 if (!EntitiesConfig.LinkVariables.Contains(m.Groups[1].Value))
                     errors.Add($"{at}.deadLetterLink: {{{m.Groups[1].Value}}} is not a variable of the url. Use {string.Join(", ", EntitiesConfig.LinkVariables.Select(v => "{" + v + "}"))}.{DidYouMean.Hint(m.Groups[1].Value, EntitiesConfig.LinkVariables)}");
+        }
+        if (e.QueueLink is { } queueLink)
+        {
+            if (string.IsNullOrWhiteSpace(queueLink.Name)) errors.Add($"{at}.queueLink: name is empty; give the words the link shows");
+            if (!Regex.IsMatch(queueLink.Url ?? "", @"^https?://", RegexOptions.IgnoreCase)) errors.Add($"{at}.queueLink: url must start with http:// or https://");
+            var known = EntitiesConfig.QueueLinkVariables.Concat(context.Scope.Variables.Keys).ToList();
+            foreach (Match m in Regex.Matches(queueLink.Url ?? "", @"\{([^{}]*)\}"))
+                if (!known.Contains(m.Groups[1].Value))
+                    errors.Add($"{at}.queueLink: {{{m.Groups[1].Value}}} is not a variable of the url. Use {string.Join(", ", known.Select(v => "{" + v + "}"))}.{DidYouMean.Hint(m.Groups[1].Value, known)}");
         }
         var seenRegions = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         for (var i = 0; i < e.DeadLetterLinks.Count; i++)
@@ -265,6 +275,8 @@ public sealed class EntitiesFile
     public EntityLinkFile? DeadLetterLink { get; set; }
     /// <summary>One support-tool address for each region, when the regions have their own tool: each is a name, a URL template and the region it is for. A queue's dead letters in a region open the entry of that region; a region with no entry uses deadLetterLink.</summary>
     public List<EntityLinkFile> DeadLetterLinks { get; set; } = [];
+    /// <summary>An address that opens a queue's own page in the cloud portal (its counts, traffic and so on): a name and a URL template over {namespaceResourceId} (the id of the namespace that holds the queue), {queue}, {region}, {group} (older name {pillar}), {service}, {system}, {environment} and your scope variables. A queue in the namespaces of two regions gets one link for each. Without it, no link.</summary>
+    public EntityLinkFile? QueueLink { get; set; }
     /// <summary>The messages that arrive in an entity, for example a metric of incoming messages added up by total. Their rate sets how many boats sail to the consumer.</summary>
     public EntityMetricFile? Throughput { get; set; }
     /// <summary>Entity name patterns, tried in order: the first that matches decides whose the entity is. An entity no pattern matches is left out.</summary>

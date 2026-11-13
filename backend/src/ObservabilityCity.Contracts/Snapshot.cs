@@ -147,9 +147,13 @@ public sealed record SourceAgeSnapshot(string Source, int AgeSeconds, bool Fresh
 /// <summary>
 /// One queue a consumer reads: what waits in it and what is dead-lettered (each null when nothing measures it), and Link, the address that opens its dead letters in the
 /// support tool the environment names (entities.deadLetterLink), null when it names none. DeadLetterRegions says in which region the dead letters are, when the broker spans several.
+/// QueueLinks open the queue's own page in the cloud portal, one for each namespace that holds it (entities.queueLink), null when the environment names none.
 /// </summary>
 public sealed record QueueSnapshot(string Name, double? Backlog, double? DeadLetters, ResourceLink? Link = null, double? PerSecond = null,
-    IReadOnlyList<MessageTypeSnapshot>? Types = null, int? TypesCut = null, IReadOnlyList<DeadLetterRegionSnapshot>? DeadLetterRegions = null);
+    IReadOnlyList<MessageTypeSnapshot>? Types = null, int? TypesCut = null, IReadOnlyList<DeadLetterRegionSnapshot>? DeadLetterRegions = null, IReadOnlyList<QueueLinkSnapshot>? QueueLinks = null);
+
+/// <summary>The address of a queue's own page in the cloud portal, in one namespace. Label is the namespace's region as the environment calls it, null when the queue is in one namespace only.</summary>
+public sealed record QueueLinkSnapshot(string Name, string Url, string? Label = null);
 
 /// <summary>The dead letters of a queue in one region, with Link, the address that opens them in that region's support tool (null when the environment names none). Listed only for a broker that spans more than one region, and only for the regions that hold some. Label is the region as the environment's scope.regions.names calls it (the raw name when it names none).</summary>
 public sealed record DeadLetterRegionSnapshot(string Region, double Count, ResourceLink? Link = null, string? Label = null);

@@ -41,7 +41,10 @@ public sealed record PillarFlowReading(double? Sent, double? Received, int Windo
 
 /// <summary>One queue (or other broker entity) a consumer reads, with what waits in it and what is dead-lettered; a number the source cannot tell is null. ProducerGroup and ProducerService say whose outbox it is, when the entity's name does: the island and the service that publish what the consumer reads.</summary>
 public sealed record QueueReading(string Name, double? Backlog, double? DeadLetters, double? PerSecond = null, string? ProducerGroup = null, string? ProducerService = null,
-    IReadOnlyList<MessageTypeReading>? Types = null, int TypesCut = 0, IReadOnlyList<DeadLetterRegionReading>? DeadLetterRegions = null);
+    IReadOnlyList<MessageTypeReading>? Types = null, int TypesCut = 0, IReadOnlyList<DeadLetterRegionReading>? DeadLetterRegions = null, IReadOnlyList<QueueNamespaceReading>? Namespaces = null);
+
+/// <summary>A namespace of the broker that holds a queue: the id the cloud gives it (for a link to the queue's page) and its region, when it has one.</summary>
+public sealed record QueueNamespaceReading(string ResourceId, string? Region);
 
 /// <summary>The dead letters of a queue in one region (the region of the broker's namespace that holds them). Only regions that hold some are listed, and only when the broker spans more than one region.</summary>
 public sealed record DeadLetterRegionReading(string Region, double Count);

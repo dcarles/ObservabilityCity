@@ -58,10 +58,25 @@ test.describe(`the broker's backlog and dead letters (${B ? 'ids, a total' : 'co
 
     const row = page.locator(`#inspector .row.queue[data-queue="${inbox}"]`)
     await expect(row).toContainText('2 dead') // the dead letters sit in the inbox
-    const anchor = row.locator('a.out')
-    await expect(anchor).toContainText(tool)
+    const anchor = row.locator('a.out', { hasText: tool })
     await expect(anchor).toHaveAttribute('href', inboxLink)
     await expect(anchor).toHaveAttribute('target', '_blank')
+  })
+
+  test('a queue row links to the queue\'s own page in the portal for each namespace that holds it, when the town names a template', async ({ page }) => {
+    await open(page)
+    await page.evaluate(() => (window as any).city.openSystem('aa.orders-worker'))
+
+    const row = page.locator(`#inspector .row.queue[data-queue="${inbox}"]`)
+    await expect(row).toContainText('2 dead')
+    const pages = row.locator('a.out', { hasText: 'Azure queue' })
+    if (B) { await expect(pages).toHaveCount(0); return } // this town names no template: no link, and the support tool link stays
+    await expect(pages).toHaveCount(2) // the queue is in the namespace of each region
+    const hrefs = await pages.evaluateAll((els) => els.map((e) => e.getAttribute('href')))
+    expect(hrefs.some((h) => h!.includes('/namespaces/sb-acme-northeurope1x/queues/q-al-ord-in/overview'))).toBe(true)
+    expect(hrefs.some((h) => h!.includes('/namespaces/sb-acme-westeurope9z/queues/q-al-ord-in/overview'))).toBe(true)
+    expect(hrefs.every((h) => h!.startsWith('https://portal.example.test/#@example.test/resource/subscriptions/'))).toBe(true)
+    await expect(pages.first()).toHaveAttribute('target', '_blank')
   })
 
   test('the top bar DLQ number lists the queues with dead letters, and a click on a row opens the service that reads it', async ({ page }) => {
@@ -160,7 +175,7 @@ test.describe(`the broker's backlog and dead letters (${B ? 'ids, a total' : 'co
 
     await rows.nth(0).click()
     const row = page.locator(`#inspector .row.queue[data-queue="${inbox}"]`)
-    const links = row.locator('a.out')
+    const links = row.locator('a.out', { hasNotText: 'Azure queue' }) // the links to the queue's own page are another thing
     await expect(links).toHaveCount(2) // one for each region, and not the one tool for all
     await expect(row).toContainText('11 dead')
     await expect(links.nth(0)).toHaveAttribute('href', 'https://north.example.test/q')

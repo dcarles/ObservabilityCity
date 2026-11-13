@@ -1311,6 +1311,25 @@
           }
         }
       },
+      "QueueLinkSnapshot": {
+        "required": [
+          "name",
+          "url"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
       "QueueSnapshot": {
         "required": [
           "name"
@@ -1354,6 +1373,13 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/DeadLetterRegionSnapshot"
+            },
+            "nullable": true
+          },
+          "queueLinks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QueueLinkSnapshot"
             },
             "nullable": true
           }

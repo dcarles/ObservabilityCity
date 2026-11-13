@@ -324,6 +324,10 @@ function checkNode(n: unknown, groupId: string, ids: Set<string>, problems: stri
           ? q.deadLetterRegions.filter(isObject).filter((r) => typeof r.region === 'string' && r.region !== '' && isFiniteNumber(r.count) && r.count > 0)
             .map((r) => ({ region: r.region as string, label: optionalText(r.label) ?? (r.region as string), count: r.count as number, link: isObject(r.link) && typeof r.link.name === 'string' && r.link.name !== '' && typeof r.link.url === 'string' && /^https?:\/\//i.test(r.link.url) ? { name: r.link.name, url: r.link.url } : null }))
           : null,
+        // the queue's own page in the cloud portal, one for each namespace that holds it: a link must be a web address, or it is dropped
+        queueLinks: Array.isArray(q.queueLinks)
+          ? q.queueLinks.filter(isObject).filter((l) => typeof l.name === 'string' && l.name !== '' && typeof l.url === 'string' && /^https?:\/\//i.test(l.url)).map((l) => ({ name: l.name as string, url: l.url as string, label: optionalText(l.label) }))
+          : null,
       }))
     : null
   out.regions = Array.isArray(n.regions)

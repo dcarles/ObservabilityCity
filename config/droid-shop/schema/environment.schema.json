@@ -369,6 +369,10 @@
                       },
                       "description": "One support-tool address for each region that has its own; a region with none uses deadLetterLink."
                     },
+                    "queueLink": {
+                      "$ref": "#/$defs/entityLink",
+                      "description": "Where a queue's own page opens in your cloud portal, one link for each namespace that holds the queue. The url may also use {namespaceResourceId} and {region}, and your scope variables."
+                    },
                     "patterns": {
                       "type": "array",
                       "description": "Entity name patterns, tried in order: the first that matches says whose the entity is. An entity no pattern matches is left out.",

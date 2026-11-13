@@ -46,6 +46,8 @@ sources:
       throughput: { metric: IncomingMessages, aggregation: total }
       # where the support team looks at a consumer's dead letters
       deadLetterLink: { name: Open in queue explorer, url: "https://support.example.test/queues/{queue}?team={pillar}&service={service}" }
+      # the queue's own page in the cloud portal, one link for each namespace that holds the queue
+      queueLink: { name: Azure queue, url: "https://portal.example.test/#@{directory}/resource{namespaceResourceId}/queues/{queue}/overview" }
       patterns:
         # q-<pillar code>-<service code>-<in|feed>: read by that service's worker
         - { match: '^q-(?<pillar>[a-z]+)-(?<service>[a-z]+)-(?:in|feed)$' }

@@ -10,7 +10,7 @@ namespace ObservabilityCity.Adapters.Azure;
 /// (<see cref="RegionQuery"/> loganalytics, <see cref="TypesQuery"/> and <see cref="Entities"/> servicebus, <see cref="Metrics"/> azuremonitor,
 /// <see cref="Providers"/> and <see cref="KeepResolvedFor"/> resourcehealth).
 /// </summary>
-public sealed record AzureSettings : IDeadLetterLinkSettings
+public sealed record AzureSettings : IDeadLetterLinkSettings, IQueueLinkSettings
 {
     public static readonly AzureSettings None = new();
 
@@ -34,16 +34,20 @@ public sealed record AzureSettings : IDeadLetterLinkSettings
 
     EntityLink? IDeadLetterLinkSettings.DeadLetterLink => Entities?.DeadLetterLink;
     IReadOnlyList<EntityRegionLink>? IDeadLetterLinkSettings.DeadLetterLinks => Entities?.DeadLetterLinks;
+    EntityLink? IQueueLinkSettings.QueueLink => Entities?.QueueLink;
 
     /// <summary>The settings of a source as the Azure adapter reads them.</summary>
     public static AzureSettings Of(RegistrySource source) => AzureSourceSettings.Reader.For(source);
 }
 
 /// <summary>How a broker's entities are read: the rule that finds its namespaces, the dimension that names an entity, the metrics for the backlog and the dead letters, and the patterns that say whose an entity is.</summary>
-public sealed record EntitiesConfig(string Resources, string Dimension, EntityMetric? Backlog, EntityMetric? DeadLetter, IReadOnlyList<EntityPattern> Patterns, TimeSpan? Interval = null, EntityLink? DeadLetterLink = null, EntityMetric? Throughput = null, IReadOnlyList<EntityRegionLink>? DeadLetterLinks = null, IReadOnlyList<EntityFlow>? Flows = null)
+public sealed record EntitiesConfig(string Resources, string Dimension, EntityMetric? Backlog, EntityMetric? DeadLetter, IReadOnlyList<EntityPattern> Patterns, TimeSpan? Interval = null, EntityLink? DeadLetterLink = null, EntityMetric? Throughput = null, IReadOnlyList<EntityRegionLink>? DeadLetterLinks = null, IReadOnlyList<EntityFlow>? Flows = null, EntityLink? QueueLink = null)
 {
     /// <summary>The variables a dead-letter link's URL may use.</summary>
     public static readonly string[] LinkVariables = ObservabilityCity.Core.Snapshots.DeadLetterLinks.Variables;
+
+    /// <summary>The variables a queue link's URL may use, besides the environment's own variables.</summary>
+    public static readonly string[] QueueLinkVariables = ObservabilityCity.Core.Snapshots.QueueLinks.Variables;
 
     public const string DefaultDimension = "EntityName";
 }

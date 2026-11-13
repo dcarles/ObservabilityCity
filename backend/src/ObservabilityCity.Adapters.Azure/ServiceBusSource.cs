@@ -53,7 +53,7 @@ public sealed class ServiceBusSource(
             try
             {
                 var series = recorded is not null ? recorded.GetValueOrDefault(ns.Name) ?? [] : await ReadNamespace(config, ns, at, ct);
-                lock (read) read.AddRange(series.Select(s => s with { Region = ns.Region }));
+                lock (read) read.AddRange(series.Select(s => s with { Region = ns.Region, NamespaceId = ns.Id }));
             }
             catch (Exception e) when (e is not OperationCanceledException || !ct.IsCancellationRequested) { lock (errors) errors.Add(e.Message); }
             finally { gate.Release(); }
@@ -68,6 +68,9 @@ public sealed class ServiceBusSource(
         var spansRegions = namespaces.Select(n => n.Region).Where(r => !string.IsNullOrWhiteSpace(r)).Distinct(StringComparer.OrdinalIgnoreCase).Count() > 1;
         var deadByRegion = spansRegions ? ReducedByRegion(read, config.DeadLetter) : null;
         var arrived = Reduced(read, config.Throughput);
+        // the namespaces that hold each entity (the same name can be in the namespace of every region), for the link to the queue's own page
+        var held = read.Where(s => s.NamespaceId is not null).GroupBy(s => s.Entity, StringComparer.Ordinal)
+            .ToDictionary(g => g.Key, g => (IReadOnlyList<QueueNamespaceReading>)g.DistinctBy(s => s.NamespaceId, StringComparer.OrdinalIgnoreCase).Select(s => new QueueNamespaceReading(s.NamespaceId!, s.Region)).ToList(), StringComparer.Ordinal);
         var patterns = config.Patterns.Select(p => (Regex: new Regex(p.Match, RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1)), p.Consumer)).ToList();
         var byNode = new Dictionary<string, (double Waiting, double Dead, bool HasWaiting, bool HasDead)>();
         var queues = new Dictionary<string, List<QueueReading>>();
@@ -91,7 +94,8 @@ public sealed class ServiceBusSource(
             own.Add(new QueueReading(entity, backlog.TryGetValue(entity, out var qb) ? Math.Round(qb) : null, dead.TryGetValue(entity, out var qd) ? Math.Round(qd) : null,
                 arrived.TryGetValue(entity, out var qa) ? Math.Round(qa / Window.TotalSeconds, 3) : null, claim.ProducerGroup, claim.ProducerService,
                 types is null ? null : types.GetValueOrDefault(entity).Types ?? [], types?.GetValueOrDefault(entity).Cut ?? 0,
-                deadByRegion is null || !deadByRegion.TryGetValue(entity, out var regions) ? null : regions.Where(r => Math.Round(r.Value) > 0).OrderBy(r => r.Key, StringComparer.OrdinalIgnoreCase).Select(r => new DeadLetterRegionReading(r.Key, Math.Round(r.Value))).ToList()));
+                deadByRegion is null || !deadByRegion.TryGetValue(entity, out var regions) ? null : regions.Where(r => Math.Round(r.Value) > 0).OrderBy(r => r.Key, StringComparer.OrdinalIgnoreCase).Select(r => new DeadLetterRegionReading(r.Key, Math.Round(r.Value))).ToList(),
+                held.GetValueOrDefault(entity)));
         }
         Unclaimed = unclaimed;
         var result = byNode.ToDictionary(kv => kv.Key, kv => new NodeReading(at, true, 0, 0, 0, 0, 0, 0,

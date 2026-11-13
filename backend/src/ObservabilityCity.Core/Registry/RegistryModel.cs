@@ -338,6 +338,16 @@ public interface IDeadLetterLinkSettings
     IReadOnlyList<EntityRegionLink>? DeadLetterLinks { get; }
 }
 
+/// <summary>
+/// Settings of a broker source that name the address of a queue's own page in the cloud portal (the Azure adapter's <c>entities.queueLink</c>, say).
+/// The core builds a link for each namespace that holds the queue from it and never needs to know whose settings they are.
+/// </summary>
+public interface IQueueLinkSettings
+{
+    /// <summary>The address template of a queue's page, or null.</summary>
+    EntityLink? QueueLink { get; }
+}
+
 /// <summary>An address that opens a consumer's dead letters elsewhere (a support tool): its name and a URL template over <see cref="Snapshots.DeadLetterLinks.Variables"/>.</summary>
 public sealed record EntityLink(string Name, string Url);
 
