@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { andList, brokerNames, combinedGateways } from '../../src/hubSystems'
+import { andList, brokerNames, brokerSea, combinedGateways } from '../../src/hubSystems'
 import { overviewRows } from '../../src/inspectorModel'
 import { portCountsLine } from '../../src/portSign'
 import { messagingOf, pierLines } from '../../src/scene/harbour'
 import { connectorsOf, portSummary } from '../../src/scene/links'
+import { speedFactor } from '../../src/visuals'
 import { flowsOf } from '../../src/dashboard/flows'
 import { calmScenes } from '../../src/wall/calm'
 import type { NodeSnapshot, Snapshot } from '../../src/types'
@@ -130,5 +131,33 @@ describe('the piers and the port of the multi-hub town', () => {
   it('reads the town\'s counts on the port as the town\'s when there are several brokers, and as before with one', () => {
     expect(portCountsLine(portSummary(multi.groups), true)?.text).toBe('Town: 3 topics · 4 subscriptions · 3 piers')
     expect(portCountsLine(portSummary(multi.groups))?.text).toBe('3 topics · 4 subscriptions · 3 piers')
+  })
+})
+
+describe('what the boats follow with several brokers', () => {
+  const broker = (state: string, p99Ms = 50, slaP99Ms = 100) => ({ state: state as NodeSnapshot['state'], p99Ms, slaP99Ms })
+
+  it('gives one broker its own answer', () => {
+    expect(brokerSea([broker('Healthy')])).toEqual({ running: true, speed: speedFactor(50, 100) })
+    expect(brokerSea([broker('Down')]).running).toBe(false)
+  })
+
+  it('keeps the boats sailing while any broker is up, even when the first is down', () => {
+    expect(brokerSea([broker('Down'), broker('Healthy')])).toEqual({ running: true, speed: speedFactor(50, 100) })
+    expect(brokerSea([broker('Healthy'), broker('Down')]).running).toBe(true)
+  })
+
+  it('stops them only when every broker is down', () => {
+    expect(brokerSea([broker('Down'), broker('Down')]).running).toBe(false)
+  })
+
+  it('sails as slowly as the slowest running broker, and ignores a down one\'s latency', () => {
+    expect(brokerSea([broker('Healthy', 10), broker('Degraded', 200)]).speed).toBe(speedFactor(200, 100))
+    expect(brokerSea([broker('Down', 900), broker('Healthy', 10)]).speed).toBe(speedFactor(10, 100))
+  })
+
+  it('treats a broker with no reading as up at normal speed, and a hub with none as unchanged', () => {
+    expect(brokerSea([undefined])).toEqual({ running: true, speed: 1 })
+    expect(brokerSea([])).toEqual({ running: true, speed: 1 })
   })
 })

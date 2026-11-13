@@ -189,7 +189,7 @@ export const LEGEND: readonly LegendSection[] = [
       { id: 'taxi', sees: 'Yellow taxi', means: 'A request from outside', more: 'It arrives from the airport or the gateway.', tone: 'amber', icon: '🚕' },
       { id: 'queue', sees: 'Cars lined up at a door', means: 'Latency', more: 'The slower p99 is, the longer the line of cars.', tone: 'neutral', icon: '🚦' },
       { id: 'bridge', sees: 'Bridge', means: 'A synchronous call between islands', tone: 'neutral', icon: '🌉' },
-      { id: 'boat', sees: 'Boats from the port to a pier', means: 'Messages: async traffic from the message broker', more: 'Messages never use a road. They travel from the broker to the island that reads them.', tone: 'neutral', icon: '⛵' },
+      { id: 'boat', sees: 'Boats from the port to a pier', means: 'Messages: async traffic from the message broker', more: 'Messages never use a road. They travel from the broker to the island that reads them. With several brokers the boats stop only when every broker is down, and sail as slowly as the slowest one.', tone: 'neutral', icon: '⛵' },
       { id: 'arcs', sees: 'Dashed arcs between islands', means: 'Which islands call which', more: 'Thicker for more traffic. Off until you turn on Dependencies in Layers.', tone: 'neutral', icon: '🌈' },
     ],
   },
