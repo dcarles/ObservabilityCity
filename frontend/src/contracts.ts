@@ -413,6 +413,11 @@ export interface components {
             /** Format: int32 */
             windowSeconds: number;
         };
+        QueueLinkSnapshot: {
+            name: string;
+            url: string;
+            label?: string | null;
+        };
         QueueSnapshot: {
             name: string;
             /** Format: double */
@@ -426,6 +431,7 @@ export interface components {
             /** Format: int32 */
             typesCut?: number | null;
             deadLetterRegions?: components["schemas"]["DeadLetterRegionSnapshot"][] | null;
+            queueLinks?: components["schemas"]["QueueLinkSnapshot"][] | null;
         };
         RegionSnapshot: {
             region: string;

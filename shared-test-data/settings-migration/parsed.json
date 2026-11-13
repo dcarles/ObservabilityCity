@@ -828,7 +828,11 @@
         "Aggregation": "total"
       },
       "DeadLetterLinks": null,
-      "Flows": null
+      "Flows": null,
+      "QueueLink": {
+        "Name": "Azure queue",
+        "Url": "https://portal.example.test/#@{directory}/resource{namespaceResourceId}/queues/{queue}/overview"
+      }
     },
     "Providers": [],
     "KeepResolvedFor": null
@@ -1019,7 +1023,8 @@
         "Aggregation": "total"
       },
       "DeadLetterLinks": null,
-      "Flows": null
+      "Flows": null,
+      "QueueLink": null
     },
     "Providers": [],
     "KeepResolvedFor": null
@@ -1199,7 +1204,8 @@
         "Aggregation": "total"
       },
       "DeadLetterLinks": null,
-      "Flows": null
+      "Flows": null,
+      "QueueLink": null
     },
     "Providers": [],
     "KeepResolvedFor": null

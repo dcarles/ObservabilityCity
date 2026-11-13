@@ -425,7 +425,9 @@ export interface QueueTypes {
 
 /** One queue a consumer reads, as a row of the drawer: its name, what waits and what is dead-lettered in words, and the link to its dead letters. */
 export interface QueueRegionLink { region: string; count: number; link: ResourceLink | null }
-export interface QueueRow { name: string; text: string; tone: Tone; link: ResourceLink | null; types: QueueTypes | null; regions: QueueRegionLink[] }
+/** The queue's own page in the cloud portal, in one namespace; label is its region when the queue is in several namespaces. */
+export interface QueuePageLink { name: string; url: string; label: string | null }
+export interface QueueRow { name: string; text: string; tone: Tone; link: ResourceLink | null; types: QueueTypes | null; regions: QueueRegionLink[]; pages: QueuePageLink[] }
 
 /** A queue's kinds of message for the drawer. Null when the environment does not measure them (no list at all) or the queue handled none. */
 export function queueTypes(q: Pick<NonNullable<NodeSnapshot['queues']>[number], 'types' | 'typesCut'>): QueueTypes | null {
@@ -460,7 +462,8 @@ export function queueRows(n: Pick<NodeSnapshot, 'queues'>): QueueRow[] {
     // dead letters in several regions: each region has its own count and its own support tool, so the one link for all is not shown
     const regions = (q.deadLetterRegions ?? []).filter((r) => r.count > 0).map((r) => ({ region: regionLabel(r), count: Math.round(r.count), link: web(r.link) }))
     const link = regions.length > 0 ? null : web(q.link)
-    return { q, row: { name: q.name, text: parts.join(' · ') || 'no numbers', tone: ((q.deadLetters ?? 0) > 0 ? 'bad' : '') as Tone, link, types: queueTypes(q), regions } }
+    const pages = (q.queueLinks ?? []).filter((l) => web(l)).map((l) => ({ name: l.name, url: l.url, label: l.label ?? null }))
+    return { q, row: { name: q.name, text: parts.join(' · ') || 'no numbers', tone: ((q.deadLetters ?? 0) > 0 ? 'bad' : '') as Tone, link, types: queueTypes(q), regions, pages } }
   })
   return rows.sort((a, b) => (b.q.deadLetters ?? 0) - (a.q.deadLetters ?? 0) || (b.q.backlog ?? 0) - (a.q.backlog ?? 0) || a.q.name.localeCompare(b.q.name)).map((r) => r.row)
 }

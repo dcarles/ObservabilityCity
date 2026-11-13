@@ -11,7 +11,7 @@ const tool = { name: 'Open in queue explorer', url: 'https://support.example.tes
 
 describe('the queues of a consumer', () => {
   it('are rows with what waits, what is dead-lettered and the link', () => {
-    expect(queueRows({ queues: [q('q-a-in', 25, 2, tool)] })).toEqual([{ name: 'q-a-in', text: '25 waiting · 2 dead', tone: 'bad', link: tool, types: null, regions: [] }])
+    expect(queueRows({ queues: [q('q-a-in', 25, 2, tool)] })).toEqual([{ name: 'q-a-in', text: '25 waiting · 2 dead', tone: 'bad', link: tool, types: null, regions: [], pages: [] }])
   })
 
   it('put the queue with dead letters first, then the biggest backlog', () => {
@@ -96,11 +96,43 @@ describe('the snapshot guard and queues', () => {
     const t = healthyTown() as any
     nodeOf(t).queues = [{ name: 'a', backlog: 3, deadLetters: 1, perSecond: 2.5, link: { name: 'Tool', url: 'https://t.example.test/a' } }, { name: '', backlog: 1 }, { name: 'b', backlog: 'x', link: { name: 'Tool', url: 'javascript:1' } }, 'junk']
     expect(nodeOf(checkSnapshot(t).snapshot!).queues).toEqual([
-      { name: 'a', backlog: 3, deadLetters: 1, link: { name: 'Tool', url: 'https://t.example.test/a' }, perSecond: 2.5, types: null, typesCut: 0, deadLetterRegions: null },
-      { name: 'b', backlog: null, deadLetters: null, link: null, perSecond: null, types: null, typesCut: 0, deadLetterRegions: null },
+      { name: 'a', backlog: 3, deadLetters: 1, link: { name: 'Tool', url: 'https://t.example.test/a' }, perSecond: 2.5, types: null, typesCut: 0, deadLetterRegions: null, queueLinks: null },
+      { name: 'b', backlog: null, deadLetters: null, link: null, perSecond: null, types: null, typesCut: 0, deadLetterRegions: null, queueLinks: null },
     ])
 
     delete nodeOf(t).queues
     expect(nodeOf(checkSnapshot(t).snapshot!).queues).toBeNull()
+  })
+})
+
+describe('the links to a queue\'s own page in the cloud portal', () => {
+  const north = { name: 'Azure queue', url: 'https://portal.example.test/ns-north/queues/a', label: 'North' }
+  const west = { name: 'Azure queue', url: 'https://portal.example.test/ns-west/queues/a', label: 'West' }
+  const nodeOf = (t: any) => t.groups.flatMap((g: any) => g.nodes)[0]
+
+  it('are listed on the queue row, one for each namespace that holds the queue, beside the support tool link', () => {
+    const row = queueRows({ queues: [{ name: 'a', backlog: 4, deadLetters: 0, link: tool, queueLinks: [north, west] }] })[0]!
+    expect(row.pages).toEqual([north, west])
+    expect(row.link).toEqual(tool)
+  })
+
+  it('have no label when the queue is in one namespace only', () => {
+    const row = queueRows({ queues: [{ name: 'a', backlog: 4, deadLetters: 0, queueLinks: [{ name: 'Azure queue', url: 'https://portal.example.test/ns/queues/a' }] }] })[0]!
+    expect(row.pages).toEqual([{ name: 'Azure queue', url: 'https://portal.example.test/ns/queues/a', label: null }])
+  })
+
+  it('drop an address that is not a web address, so a link can never run a script', () => {
+    const row = queueRows({ queues: [{ name: 'a', backlog: 1, deadLetters: 0, queueLinks: [{ name: 'x', url: 'javascript:alert(1)' }, { name: 'y', url: '//evil.example.test' }, { name: '', url: 'https://ok.example.test' }, north] }] })[0]!
+    expect(row.pages).toEqual([north])
+  })
+
+  it('are none when the environment names no template', () => {
+    expect(queueRows({ queues: [{ name: 'a', backlog: 1, deadLetters: 0 }] })[0]!.pages).toEqual([])
+  })
+
+  it('pass the snapshot guard only as web addresses with a name', () => {
+    const t = healthyTown() as any
+    nodeOf(t).queues = [{ name: 'a', backlog: 3, queueLinks: [north, { name: 'Bad', url: 'javascript:1' }, { name: '', url: 'https://x.example.test' }, 'junk', { name: 'One', url: 'https://one.example.test/q' }] }]
+    expect(nodeOf(checkSnapshot(t).snapshot!).queues[0].queueLinks).toEqual([north, { name: 'One', url: 'https://one.example.test/q', label: null }])
   })
 })
