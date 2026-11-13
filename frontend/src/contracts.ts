@@ -396,6 +396,10 @@ export interface components {
             reason?: string | null;
             sources?: components["schemas"]["SourceAgeSnapshot"][] | null;
             engine?: components["schemas"]["DatabaseEngineSnapshot"];
+            /** Format: double */
+            backlogCountAmber?: number | null;
+            /** Format: double */
+            backlogCountRed?: number | null;
         };
         OffscreenLink: {
             nodeId: string;

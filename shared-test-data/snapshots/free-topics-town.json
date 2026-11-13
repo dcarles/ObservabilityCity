@@ -81,7 +81,9 @@
           "queues": null,
           "reason": null,
           "sources": null,
-          "engine": null
+          "engine": null,
+          "backlogCountAmber": null,
+          "backlogCountRed": null
         },
         {
           "id": "hub.broker",
@@ -127,7 +129,9 @@
           "queues": null,
           "reason": null,
           "sources": null,
-          "engine": null
+          "engine": null,
+          "backlogCountAmber": null,
+          "backlogCountRed": null
         }
       ],
       "assets": [],
@@ -210,7 +214,9 @@
           "queues": null,
           "reason": null,
           "sources": null,
-          "engine": null
+          "engine": null,
+          "backlogCountAmber": null,
+          "backlogCountRed": null
         },
         {
           "id": "ord.orders-worker",
@@ -258,7 +264,9 @@
           "queues": null,
           "reason": null,
           "sources": null,
-          "engine": null
+          "engine": null,
+          "backlogCountAmber": null,
+          "backlogCountRed": null
         },
         {
           "id": "ord.orders-db",
@@ -304,7 +312,9 @@
           "queues": null,
           "reason": null,
           "sources": null,
-          "engine": null
+          "engine": null,
+          "backlogCountAmber": null,
+          "backlogCountRed": null
         }
       ],
       "assets": [],
@@ -396,7 +406,9 @@
           "queues": null,
           "reason": null,
           "sources": null,
-          "engine": null
+          "engine": null,
+          "backlogCountAmber": null,
+          "backlogCountRed": null
         },
         {
           "id": "bil.billing-worker",
@@ -444,7 +456,9 @@
           "queues": null,
           "reason": null,
           "sources": null,
-          "engine": null
+          "engine": null,
+          "backlogCountAmber": null,
+          "backlogCountRed": null
         },
         {
           "id": "bil.billing-db",
@@ -490,7 +504,9 @@
           "queues": null,
           "reason": null,
           "sources": null,
-          "engine": null
+          "engine": null,
+          "backlogCountAmber": null,
+          "backlogCountRed": null
         }
       ],
       "assets": [],
@@ -578,7 +594,9 @@
           "queues": null,
           "reason": null,
           "sources": null,
-          "engine": null
+          "engine": null,
+          "backlogCountAmber": null,
+          "backlogCountRed": null
         },
         {
           "id": "shp.shipping-db",
@@ -624,7 +642,9 @@
           "queues": null,
           "reason": null,
           "sources": null,
-          "engine": null
+          "engine": null,
+          "backlogCountAmber": null,
+          "backlogCountRed": null
         }
       ],
       "assets": [],

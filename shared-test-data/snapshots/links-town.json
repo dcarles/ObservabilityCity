@@ -83,7 +83,9 @@
           "queues": null,
           "reason": null,
           "sources": null,
-          "engine": null
+          "engine": null,
+          "backlogCountAmber": null,
+          "backlogCountRed": null
         },
         {
           "id": "hub.service-bus",
@@ -129,7 +131,9 @@
           "queues": null,
           "reason": null,
           "sources": null,
-          "engine": null
+          "engine": null,
+          "backlogCountAmber": null,
+          "backlogCountRed": null
         },
         {
           "id": "hub.egress",
@@ -175,7 +179,9 @@
           "queues": null,
           "reason": null,
           "sources": null,
-          "engine": null
+          "engine": null,
+          "backlogCountAmber": null,
+          "backlogCountRed": null
         },
         {
           "id": "hub.customer-db",
@@ -221,7 +227,9 @@
           "queues": null,
           "reason": null,
           "sources": null,
-          "engine": null
+          "engine": null,
+          "backlogCountAmber": null,
+          "backlogCountRed": null
         }
       ],
       "assets": [],
@@ -300,7 +308,9 @@
           "queues": null,
           "reason": null,
           "sources": null,
-          "engine": null
+          "engine": null,
+          "backlogCountAmber": null,
+          "backlogCountRed": null
         },
         {
           "id": "ful.orders-worker",
@@ -348,7 +358,9 @@
           "queues": null,
           "reason": null,
           "sources": null,
-          "engine": null
+          "engine": null,
+          "backlogCountAmber": null,
+          "backlogCountRed": null
         },
         {
           "id": "ful.orders-db",
@@ -394,7 +406,9 @@
           "queues": null,
           "reason": null,
           "sources": null,
-          "engine": null
+          "engine": null,
+          "backlogCountAmber": null,
+          "backlogCountRed": null
         }
       ],
       "assets": [],
@@ -477,7 +491,9 @@
           "queues": null,
           "reason": null,
           "sources": null,
-          "engine": null
+          "engine": null,
+          "backlogCountAmber": null,
+          "backlogCountRed": null
         },
         {
           "id": "wrk.batch-db",
@@ -523,7 +539,9 @@
           "queues": null,
           "reason": null,
           "sources": null,
-          "engine": null
+          "engine": null,
+          "backlogCountAmber": null,
+          "backlogCountRed": null
         }
       ],
       "assets": [],
@@ -595,7 +613,9 @@
           "queues": null,
           "reason": null,
           "sources": null,
-          "engine": null
+          "engine": null,
+          "backlogCountAmber": null,
+          "backlogCountRed": null
         },
         {
           "id": "nom.catalog-cache",
@@ -641,7 +661,9 @@
           "queues": null,
           "reason": null,
           "sources": null,
-          "engine": null
+          "engine": null,
+          "backlogCountAmber": null,
+          "backlogCountRed": null
         }
       ],
       "assets": [],
@@ -739,7 +761,9 @@
           "queues": null,
           "reason": null,
           "sources": null,
-          "engine": null
+          "engine": null,
+          "backlogCountAmber": null,
+          "backlogCountRed": null
         }
       ],
       "assets": [],
@@ -813,7 +837,9 @@
           "queues": null,
           "reason": null,
           "sources": null,
-          "engine": null
+          "engine": null,
+          "backlogCountAmber": null,
+          "backlogCountRed": null
         },
         {
           "id": "leg.feed-worker",
@@ -861,7 +887,9 @@
           "queues": null,
           "reason": null,
           "sources": null,
-          "engine": null
+          "engine": null,
+          "backlogCountAmber": null,
+          "backlogCountRed": null
         },
         {
           "id": "leg.feed-db",
@@ -907,7 +935,9 @@
           "queues": null,
           "reason": null,
           "sources": null,
-          "engine": null
+          "engine": null,
+          "backlogCountAmber": null,
+          "backlogCountRed": null
         }
       ],
       "assets": [],
@@ -1007,7 +1037,9 @@
           "queues": null,
           "reason": null,
           "sources": null,
-          "engine": null
+          "engine": null,
+          "backlogCountAmber": null,
+          "backlogCountRed": null
         }
       ],
       "assets": [],
@@ -1060,7 +1092,9 @@
         "queues": null,
         "reason": null,
         "sources": null,
-        "engine": null
+        "engine": null,
+        "backlogCountAmber": null,
+        "backlogCountRed": null
       },
       "calledBy": [
         "ful.orders-api",
@@ -1116,7 +1150,9 @@
         "queues": null,
         "reason": null,
         "sources": null,
-        "engine": null
+        "engine": null,
+        "backlogCountAmber": null,
+        "backlogCountRed": null
       },
       "calledBy": [
         "nom.catalog-api"
@@ -1171,7 +1207,9 @@
         "queues": null,
         "reason": null,
         "sources": null,
-        "engine": null
+        "engine": null,
+        "backlogCountAmber": null,
+        "backlogCountRed": null
       },
       "calledBy": [
         "ful.orders-worker"

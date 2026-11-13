@@ -184,6 +184,23 @@ test.describe(`the broker's backlog and dead letters (${B ? 'ids, a total' : 'co
     await expect(row).toContainText('West 8 dead')
   })
 
+  test('a worker over its waiting-count line is amber and the drawer says why, instead of "nothing to flag"', async ({ page }) => {
+    await open(page)
+    await page.evaluate(() => {
+      const c = (window as any).city
+      const s = JSON.parse(JSON.stringify(c.seen.last))
+      const n = s.groups.flatMap((g: any) => g.nodes).find((x: any) => x.id === 'aa.orders-worker')
+      Object.assign(n, { state: 'Degraded', queueDepth: 424, backlogCountAmber: 100, backlogCountRed: 1000, oldestMessageSeconds: null, reason: '424 waiting (line 100)' })
+      c.hold(true)
+      c.feed(s)
+      c.openSystem('aa.orders-worker')
+    })
+
+    const why = page.locator('#inspector .why')
+    await expect(why).toContainText('424 messages are waiting, past the line of 100.')
+    await expect(page.locator('#inspector .fine', { hasText: 'Nothing to flag' })).toHaveCount(0)
+  })
+
   test('dead letters in two regions: the island pier lists a row for each region too', async ({ page }) => {
     await open(page)
     await page.evaluate(() => (window as any).city.framePier('aa'))

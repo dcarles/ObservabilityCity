@@ -81,7 +81,9 @@
           "queues": null,
           "reason": null,
           "sources": null,
-          "engine": null
+          "engine": null,
+          "backlogCountAmber": null,
+          "backlogCountRed": null
         },
         {
           "id": "hub.service-bus",
@@ -127,7 +129,9 @@
           "queues": null,
           "reason": null,
           "sources": null,
-          "engine": null
+          "engine": null,
+          "backlogCountAmber": null,
+          "backlogCountRed": null
         },
         {
           "id": "hub.egress",
@@ -173,7 +177,9 @@
           "queues": null,
           "reason": null,
           "sources": null,
-          "engine": null
+          "engine": null,
+          "backlogCountAmber": null,
+          "backlogCountRed": null
         },
         {
           "id": "hub.customer-db",
@@ -219,7 +225,9 @@
           "queues": null,
           "reason": null,
           "sources": null,
-          "engine": null
+          "engine": null,
+          "backlogCountAmber": null,
+          "backlogCountRed": null
         }
       ],
       "assets": [],
@@ -308,7 +316,9 @@
           "queues": null,
           "reason": null,
           "sources": null,
-          "engine": null
+          "engine": null,
+          "backlogCountAmber": null,
+          "backlogCountRed": null
         },
         {
           "id": "aa.audit-cache",
@@ -354,7 +364,9 @@
           "queues": null,
           "reason": null,
           "sources": null,
-          "engine": null
+          "engine": null,
+          "backlogCountAmber": null,
+          "backlogCountRed": null
         },
         {
           "id": "aa.orders-worker",
@@ -402,7 +414,9 @@
           "queues": null,
           "reason": null,
           "sources": null,
-          "engine": null
+          "engine": null,
+          "backlogCountAmber": null,
+          "backlogCountRed": null
         },
         {
           "id": "aa.tools-cron",
@@ -465,7 +479,9 @@
           "queues": null,
           "reason": null,
           "sources": null,
-          "engine": null
+          "engine": null,
+          "backlogCountAmber": null,
+          "backlogCountRed": null
         },
         {
           "id": "aa.orders-db",
@@ -572,7 +588,9 @@
           "queues": null,
           "reason": "error rate 6.4%, tenant Acme \u00B7 108% capacity \u00B7 31.2% throttled",
           "sources": null,
-          "engine": null
+          "engine": null,
+          "backlogCountAmber": null,
+          "backlogCountRed": null
         }
       ],
       "assets": [],
@@ -645,7 +663,9 @@
           "queues": null,
           "reason": null,
           "sources": null,
-          "engine": null
+          "engine": null,
+          "backlogCountAmber": null,
+          "backlogCountRed": null
         },
         {
           "id": "bb.billing-db",
@@ -752,7 +772,9 @@
           "queues": null,
           "reason": null,
           "sources": null,
-          "engine": null
+          "engine": null,
+          "backlogCountAmber": null,
+          "backlogCountRed": null
         },
         {
           "id": "bb.shared-db",
@@ -798,7 +820,9 @@
           "queues": null,
           "reason": null,
           "sources": null,
-          "engine": null
+          "engine": null,
+          "backlogCountAmber": null,
+          "backlogCountRed": null
         }
       ],
       "assets": [],

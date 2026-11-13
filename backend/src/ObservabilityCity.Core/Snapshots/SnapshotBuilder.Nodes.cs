@@ -69,12 +69,11 @@ public sealed partial class SnapshotBuilder
 
         // Down: no response, every job failed, or instances counted and not one healthy.
         // Degraded: errors, slow, unhealthy instances, a resource running hot, a data store turning requests away, or a consumer running late.
-        var hot = Math.Max(Math.Max(r.Cpu ?? 0, r.Memory ?? 0), utilisation ?? 0) >= n.ResourceAmber;
         var noneHealthy = r.InstancesTotal > 0 && r.InstancesHealthy == 0;
+        var rules = new RuleInput(n, r, jobs, utilisation, throttled, tenants);
         var health = !r.Up || jobHealth == HealthState.Down || noneHealthy ? HealthState.Down
-            : jobHealth == HealthState.Degraded || r.ErrorRate >= n.ErrorAmber || r.P99Ms > n.SlaP99Ms || r.InstancesHealthy < r.InstancesTotal || hot || (throttled ?? 0) >= n.ThrottleAmber || (r.OldestMessageSeconds ?? 0) >= n.BacklogAmber || (n.BacklogCountAmber is { } waitingAmber && (r.QueueDepth ?? 0) >= waitingAmber)
-                ? HealthState.Degraded
-                : HealthState.Healthy;
+            : DegradedRules.Tripped(rules) ? HealthState.Degraded
+            : HealthState.Healthy;
 
         return new NodeSnapshot(n.Id, n.Name, n.Kind, n.Service, n.External, health, r.InstancesTotal, r.InstancesHealthy,
             r.Load, r.Cpu, r.Memory, utilisation, throttled, r.QueueDepth, r.OldestMessageSeconds, r.DeadLetters, r.RequestsPerSecond, r.ErrorRate, r.P99Ms, n.SlaP99Ms, n.ErrorAmber, n.ErrorRed,
@@ -91,8 +90,10 @@ public sealed partial class SnapshotBuilder
             App = r.App,
             Jobs = jobs,
             Regions = regions?.Select(x => new RegionSnapshot(x.Region, Label(env, x.Region), x.Instances, x.Cpu, x.Memory, x.Share, Skewed(x, regions, env))).ToList(),
-            Reason = health == HealthState.Healthy ? null : HealthReasons.For(n, r, health, jobs, utilisation, throttled, tenants),
+            Reason = health == HealthState.Healthy ? null : HealthReasons.For(rules),
             Engine = EngineOf(registry, n),
+            BacklogCountAmber = n.BacklogCountAmber,
+            BacklogCountRed = n.BacklogCountRed,
         };
     }
 

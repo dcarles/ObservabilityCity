@@ -76,7 +76,9 @@
           "queues": null,
           "reason": null,
           "sources": null,
-          "engine": null
+          "engine": null,
+          "backlogCountAmber": null,
+          "backlogCountRed": null
         },
         {
           "id": "hub.partner-gateway",
@@ -122,7 +124,9 @@
           "queues": null,
           "reason": null,
           "sources": null,
-          "engine": null
+          "engine": null,
+          "backlogCountAmber": null,
+          "backlogCountRed": null
         },
         {
           "id": "hub.event-broker",
@@ -168,7 +172,9 @@
           "queues": null,
           "reason": null,
           "sources": null,
-          "engine": null
+          "engine": null,
+          "backlogCountAmber": null,
+          "backlogCountRed": null
         },
         {
           "id": "hub.task-broker",
@@ -214,7 +220,9 @@
           "queues": null,
           "reason": null,
           "sources": null,
-          "engine": null
+          "engine": null,
+          "backlogCountAmber": null,
+          "backlogCountRed": null
         },
         {
           "id": "hub.egress",
@@ -260,7 +268,9 @@
           "queues": null,
           "reason": null,
           "sources": null,
-          "engine": null
+          "engine": null,
+          "backlogCountAmber": null,
+          "backlogCountRed": null
         },
         {
           "id": "hub.customer-db",
@@ -306,7 +316,9 @@
           "queues": null,
           "reason": null,
           "sources": null,
-          "engine": null
+          "engine": null,
+          "backlogCountAmber": null,
+          "backlogCountRed": null
         },
         {
           "id": "hub.reference-db",
@@ -352,7 +364,9 @@
           "queues": null,
           "reason": null,
           "sources": null,
-          "engine": null
+          "engine": null,
+          "backlogCountAmber": null,
+          "backlogCountRed": null
         }
       ],
       "assets": [],
@@ -432,7 +446,9 @@
           "queues": null,
           "reason": null,
           "sources": null,
-          "engine": null
+          "engine": null,
+          "backlogCountAmber": null,
+          "backlogCountRed": null
         },
         {
           "id": "ord.orders-worker",
@@ -480,7 +496,9 @@
           "queues": null,
           "reason": null,
           "sources": null,
-          "engine": null
+          "engine": null,
+          "backlogCountAmber": null,
+          "backlogCountRed": null
         },
         {
           "id": "ord.orders-db",
@@ -526,7 +544,9 @@
           "queues": null,
           "reason": null,
           "sources": null,
-          "engine": null
+          "engine": null,
+          "backlogCountAmber": null,
+          "backlogCountRed": null
         }
       ],
       "assets": [],
@@ -610,7 +630,9 @@
           "queues": null,
           "reason": null,
           "sources": null,
-          "engine": null
+          "engine": null,
+          "backlogCountAmber": null,
+          "backlogCountRed": null
         },
         {
           "id": "pay.payments-worker",
@@ -658,7 +680,9 @@
           "queues": null,
           "reason": null,
           "sources": null,
-          "engine": null
+          "engine": null,
+          "backlogCountAmber": null,
+          "backlogCountRed": null
         },
         {
           "id": "pay.payments-db",
@@ -704,7 +728,9 @@
           "queues": null,
           "reason": null,
           "sources": null,
-          "engine": null
+          "engine": null,
+          "backlogCountAmber": null,
+          "backlogCountRed": null
         }
       ],
       "assets": [],
@@ -795,7 +821,9 @@
           "queues": null,
           "reason": null,
           "sources": null,
-          "engine": null
+          "engine": null,
+          "backlogCountAmber": null,
+          "backlogCountRed": null
         },
         {
           "id": "stk.stock-worker",
@@ -843,7 +871,9 @@
           "queues": null,
           "reason": null,
           "sources": null,
-          "engine": null
+          "engine": null,
+          "backlogCountAmber": null,
+          "backlogCountRed": null
         },
         {
           "id": "stk.stock-db",
@@ -889,7 +919,9 @@
           "queues": null,
           "reason": null,
           "sources": null,
-          "engine": null
+          "engine": null,
+          "backlogCountAmber": null,
+          "backlogCountRed": null
         }
       ],
       "assets": [],
@@ -946,7 +978,9 @@
         "queues": null,
         "reason": null,
         "sources": null,
-        "engine": null
+        "engine": null,
+        "backlogCountAmber": null,
+        "backlogCountRed": null
       },
       "calledBy": [
         "pay.payments-api"
