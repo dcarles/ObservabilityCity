@@ -11,6 +11,7 @@ Observability City shows system health as a living 3D town in the browser. The c
 5. **Live data only.** The renderer never knows which source produced a number. Sources fill `NodeReading`s; the snapshot builder applies the rules; the browser invents all motion from the snapshot.
 6. **A signal that is not configured is absent, not grey.** Grey means "configured but no fresh data". Never show stale or missing data as healthy.
 7. **No new third-party library, package, tool or GitHub Action without the maintainer's explicit approval first.** That covers runtime, dev and test dependencies, and anything not from Microsoft, GitHub or three.js. If a change seems to need one, stop and ask: what it is, who owns it, its licence, and why built-in or in-house code will not do. Version bumps of packages already in use are fine.
+8. **Stay on .NET 10 (LTS).** The target framework is `net10.0`, `global.json` pins SDK 10, and the Microsoft packages (`Microsoft.AspNetCore.*`, `Microsoft.Extensions.*`, `System.*`, `@microsoft/*`) stay on 10.x: minor and patch updates are fine, major 11 is not. Dependabot ignores those majors (`.github/dependabot.yml`) and CI fails on one (`.github/scripts/check-dotnet-lts.mjs`). Moving to a newer .NET is a decision for the maintainer, made in its own pull request that changes all of those together.
 
 ## Architecture in one minute
 
