@@ -23,6 +23,9 @@ updates:
       # Node 26 is the version the repo runs on: the type definitions follow it, not newer majors.
       - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
+      # The SignalR client follows the .NET release, and the repo stays on .NET 10 (LTS): no 11.x.
+      - dependency-name: "@microsoft/*"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: nuget
     directory: /backend
     schedule:
@@ -39,6 +42,16 @@ updates:
         patterns: ["Microsoft.AspNetCore.*", "Microsoft.Extensions.*"]
       nuget-minor-and-patch:
         update-types: [minor, patch]
+    ignore:
+      # The repo stays on .NET 10 (LTS): these packages follow the .NET release, so no 11.x. Minor and patch updates (10.x) still come.
+      # Moving to a newer .NET is done on purpose, in its own pull request, and these rules change with it (see AGENTS.md).
+      - dependency-name: "Microsoft.AspNetCore.*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "Microsoft.Extensions.*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "System.*"
+        update-types: ["version-update:semver-major"]
+  # setup-dotnet in the workflows asks for 10.0.x on purpose; Dependabot does not change that line.
   - package-ecosystem: github-actions
     directory: /
     schedule:

@@ -6,6 +6,7 @@ Read [AGENTS.md](../AGENTS.md) first: it has the architecture, the commands and 
 - **Tests on both sides.** Backend behaviour gets an xUnit test (`dotnet test --solution backend/ObservabilityCity.slnx -c Release`). Browser behaviour gets a Vitest unit test (`cd frontend && npm test`) and, when it shows in the town, a Playwright test (`npm run e2e`). If a change touches one side only, say so in the pull request.
 - **Branches and pull requests.** Never push to `main`; never force-push `main`.
 - **No new third-party dependencies without approval.** Do not add a library, package, tool or GitHub Action (runtime, dev or test; anything not from Microsoft, GitHub or three.js) until the maintainer has explicitly approved that package. Ask first: what it is, who owns it, its licence, and why built-in or in-house code will not do.
+- **Stay on .NET 10 (LTS).** Keep `net10.0` and the Microsoft packages (`Microsoft.AspNetCore.*`, `Microsoft.Extensions.*`, `System.*`, `@microsoft/*`) on 10.x; never suggest .NET 11 or an 11.x package. Minor and patch updates are fine.
 - **No secrets or company identifiers in the repo.** Use the adapter's own login (Azure adapter: `az login`), environment variables or your secret store. Docs and tests use generic example names.
 - **Tests use fakes and recorded fixtures, never live cloud services or tools.** Probes and adapters sit behind interfaces (`ISourceProbe`, `ITokenProvider`, `IMetricSource`).
 - **A signal that is not configured is absent, not grey.** Missing or stale data is never shown as healthy.
