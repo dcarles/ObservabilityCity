@@ -92,6 +92,7 @@ button.on { background: var(--accent); color: #fff; border-color: var(--accent);
 #topbar.fit-7 #wall-button, #topbar.fit-7 #view-switch, #topbar.fit-7 #lighting { display: none; }
 #topbar.fit-7 #more-button { display: block; }
 #more-button { display: none; }
+#topbar #view-switch { font: inherit; cursor: pointer; border: 1px solid var(--line); background: var(--field); color: var(--ink); border-radius: 8px; padding: 4px 2px; width: 5.4em; }
 #more-menu { position: fixed; z-index: 12; display: flex; flex-direction: column; gap: 2px; padding: 6px; border-radius: 10px; background: var(--panel, #fff); border: 1px solid rgba(128, 128, 128, 0.4); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25); }
 #more-menu[hidden] { display: none; }
 #more-menu button { text-align: left; white-space: nowrap; }

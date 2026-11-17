@@ -16,7 +16,7 @@
       <div id="topbar-right" class="dyn"></div>
       <div id="tools">
         <button id="more-button" title="More: Wall, Dashboard, Day or Dusk" aria-label="More" aria-expanded="false" hidden>⋯</button>
-        <button id="view-switch" title="Show the same data as a plain dashboard">Dashboard</button>
+        <select id="view-switch" class="view-select" aria-label="View" title="View: how to look at the data"><option value="town">Town</option><option value="dashboard">Dashboard</option><option value="architecture">Architecture</option></select>
         <button id="wall-button" title="Wall mode: full screen, a tour and a big status strip, for a screen nobody touches">Wall</button>
         <button id="lighting" title="Switch between Day and Dusk">Day</button>
         <button id="legend-button" title="What things mean" aria-label="Legend">?</button>
@@ -28,7 +28,7 @@
       <header id="dash-menu">
         <div class="wrap">
           <span class="brand" id="dash-brand"></span>
-          <span class="seg" role="group" aria-label="View"><button id="vs-town" aria-pressed="false">Town</button><button id="vs-dash" aria-pressed="true">Dashboard</button></span>
+          <select id="view-select" class="view-select" aria-label="View" title="How to look at the data"><option value="town">View: Town</option><option value="dashboard">View: Dashboard</option><option value="architecture">View: Architecture</option></select>
           <span id="dash-filters"></span>
           <span class="vb"><button class="btn" id="pillars-button" aria-expanded="false"><span id="pillars-button-label">Pillars</span> ▾</button><div id="pillar-menu" hidden></div></span>
           <span class="sp"></span>
@@ -39,6 +39,19 @@
           <span class="livepill wait" id="dash-status"><i class="dot"></i><span>Connecting…</span></span>
         </div>
       </header>
+      <div id="arch-root" hidden>
+        <div class="arch-sum" id="arch-sum"></div>
+        <div class="arch-stage" id="arch-stage">
+          <svg id="arch-svg" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Architecture diagram"></svg>
+          <div class="arch-empty" id="arch-empty" hidden>Nothing to show. Every pillar is hidden, or the town has none.</div>
+          <div class="arch-look min" id="arch-look">
+            <div class="lh"><button class="tog" id="arch-look-toggle" aria-expanded="false">Visualisation options</button><button class="lx" id="arch-look-x" aria-label="Hide options">×</button></div>
+            <div class="body"></div>
+          </div>
+          <div class="arch-zoom"><button id="arch-zoom-in" title="Zoom in" aria-label="Zoom in">+</button><button id="arch-zoom-out" title="Zoom out" aria-label="Zoom out">−</button><button id="arch-fit" title="Fit the whole diagram" aria-label="Fit">Fit</button></div>
+          <div class="arch-pick" id="arch-pick"></div>
+        </div>
+      </div>
       <div class="wrap">
         <div class="sum" id="dash-sum"></div>
         <h2 id="dash-pillars-title">Pillars</h2>

@@ -13,7 +13,7 @@ import { UnknownHostsPanel } from '../unknownHosts'
 import { browserStore, isLighting, LIGHTING_KEY, startLighting, saveLighting, type Lighting } from '../lighting'
 import { pruneTenants, type TenantView } from '../tenants'
 import { islandsParam, parseIslands, pruneIslands, islandChoices } from '../islands'
-import { loadTenantView, saveTenantView, viewSwitchAddress } from '../viewMode'
+import { isViewMode, loadTenantView, saveTenantView, viewSwitchAddress } from '../viewMode'
 import type { Snapshot } from '../types'
 import { buildDashboard, pillarSelection, type Dashboard } from './model'
 import { freshnessHtml, hiddenHtml, pillarMenuHtml, pillarsHtml, sectionsHtml, summaryHtml, type UiState } from './render'
@@ -23,15 +23,21 @@ import { enterWall, startWallControls } from '../wall/controls'
 import { WallMode } from '../wall/wall'
 import { dashPlaceOf, type DashPlace } from './wallPlace'
 import { feedLateAfter, marker, popupLeft, sourceLines } from './freshness'
+import type { PagePlug } from '../architecture/page'
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T
 
-/** The plain dashboard: the same snapshot and the same live feed as the town, as numbers and tables. It never loads three.js. */
-export function startDashboard(): void {
+/**
+ * The plain dashboard: the same snapshot and the same live feed as the town, as numbers and tables. It never loads three.js. The architecture view uses this page
+ * as its frame (the menu, the filters, the drawer, the feed marker) and puts its diagram in place of the tables: `plug` draws it from each snapshot.
+ */
+export function startDashboard(plug?: PagePlug): void {
   const store = browserStore()
   const scope = requestedScope()
   document.body.classList.add('dash')
+  if (plug) document.body.classList.add('arch')
   $('dash-root').hidden = false
+  $('wall-button-dash').hidden = !!plug
   // the drawer and the lists the town floats over its scene sit in the page here
   const filters = $('dash-filters')
   filters.appendChild($('view-bar'))
@@ -71,7 +77,12 @@ export function startDashboard(): void {
   measureMenu()
   new ResizeObserver(measureMenu).observe(menuBar)
 
-  $('vs-town').addEventListener('click', () => { window.location.href = viewSwitchAddress(window.location, 'town', store) })
+  const viewSelect = $<HTMLSelectElement>('view-select')
+  viewSelect.value = plug ? 'architecture' : 'dashboard'
+  viewSelect.addEventListener('change', () => {
+    const to = viewSelect.value
+    if (isViewMode(to)) window.location.href = viewSwitchAddress(window.location, to, store)
+  })
 
   const ui = { openPillars: new Set<string>(), groups: new Map<string, boolean>(), databases: new Map<string, boolean>(), connections: new Set<string>(), sections: new Set<string>(), flowsAll: false }
   let flowOrder: string[] = []
@@ -93,6 +104,7 @@ export function startDashboard(): void {
     closed: () => {},
   })
   const notices = new NoticesPanel()
+  plug?.start(inspector, store)
   const unknownHosts = new UnknownHostsPanel(scope, () => (last?.groups ?? []).flatMap((g) => g.nodes).filter((n) => n.kind === 'Api').map((n) => n.id).sort(), () => last?.internalVendorsLabel ?? 'Internal services')
   unknownHosts.start()
 
@@ -147,6 +159,7 @@ export function startDashboard(): void {
     put('dash-pillars', pillarsHtml(model, ui as UiState), 'pillars')
     put('hidden-pillars', hiddenHtml(model), 'hidden')
     put('pillar-menu', pillarMenuHtml(model), 'menu')
+    if (plug) { plug.draw(last, model, tenantView); fit(); return }
     put('dash-sections', sectionsHtml(model, ui as UiState), 'sections')
     if (window.scrollY !== y) window.scrollTo(0, y)
     fit()
@@ -213,7 +226,7 @@ export function startDashboard(): void {
   // the small legend: a "?" in the menu that opens a short list of what the colours mean
   const legendButton = $('dash-legend-button')
   const legendPop = $('dash-legend')
-  legendPop.innerHTML = dashLegendHtml()
+  legendPop.innerHTML = plug ? plug.legend : dashLegendHtml()
   const closeLegend = (): void => { legendPop.hidden = true; legendButton.setAttribute('aria-expanded', 'false') }
   legendButton.addEventListener('click', () => {
     legendPop.hidden = !legendPop.hidden
@@ -241,7 +254,7 @@ export function startDashboard(): void {
 
   // Wall mode: the same page for a screen nobody touches. Big text, no menu, a status strip, and a tour that opens one pillar at a time (what needs
   // attention first) and brings the service to the middle. The director and strip are the town wall's own.
-  const wallParams = parseWall(window.location.search, store)
+  const wallParams = plug ? { ...parseWall(window.location.search, store), on: false } : parseWall(window.location.search, store) // the diagram has no wall mode
   let wallSnapshot: Snapshot | null = null
   let wallFocus: string | null = null
   let skew = 0
@@ -353,6 +366,7 @@ export function startDashboard(): void {
     /** For tests: what the wall is doing (null when wall mode is off), and a way to move its clock. */
     wall: () => (wall ? { ...wall.status(), controls: wallControls?.state() ?? null, focus: wallFocus, open: [...ui.openPillars] } : null),
     wallStep: (seconds: number) => { skew += seconds; wall?.tick(wallNow()) },
+    ...(plug?.expose() ?? {}),
     threeLoaded: () => !!document.querySelector('script[src*="three"]') || 'THREE' in window,
   }
 }

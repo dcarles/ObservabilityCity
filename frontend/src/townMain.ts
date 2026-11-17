@@ -33,7 +33,7 @@ import { parseFocus, parseLayers, toggleLayer, type Layer } from './layers'
 import { IslandLabels } from './islandLabels'
 import { islandChoices, parseIslands, pruneIslands } from './islands'
 import { withView } from './address'
-import { loadTenantView, saveTenantView, viewSwitchAddress } from './viewMode'
+import { isViewMode, loadTenantView, saveTenantView, viewSwitchAddress } from './viewMode'
 import { stateFor, viewTotals } from './viewTotals'
 import type { PickItem } from './picker'
 import type { Snapshot, TenantInfo } from './types'
@@ -145,7 +145,8 @@ export async function startTown(): Promise<void> {
   document.getElementById('wall-button')?.addEventListener('click', () => enterWall(store))
   startMoreMenu()
   const wallControls = wallParams.on ? startWallControls(store, { offerFullscreen: !testMode }) : null
-  document.getElementById('view-switch')?.addEventListener('click', () => { window.location.href = viewSwitchAddress(window.location, 'dashboard', store) })
+  const viewSwitch = document.getElementById('view-switch') as HTMLSelectElement | null
+  viewSwitch?.addEventListener('change', () => { if (isViewMode(viewSwitch.value) && viewSwitch.value !== 'town') window.location.href = viewSwitchAddress(window.location, viewSwitch.value, store) })
   const notices = new NoticesPanel()
   const unknownHosts = new UnknownHostsPanel(requestedScope(), () => (seen.last?.groups ?? []).flatMap((g) => g.nodes).filter((n) => n.kind === 'Api').map((n) => n.id).sort(), () => seen.last?.internalVendorsLabel ?? 'Internal services')
   unknownHosts.start()

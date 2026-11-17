@@ -2,7 +2,7 @@
 
 A browser app that shows system health as a living, animated 3D town instead of a dashboard. Each group of systems (a pillar, a team, a domain: `groupLabel` in `town.yaml` picks the word) is an island, each system is a building, and what is going on shows in the town itself: floors for instances, lit windows for load, rooftop beacons for errors, cars for traffic.
 
-**Status:** the demo towns run on fake data, and a live town reads real sources through adapter modules. It ships an Azure adapter today (Resource Graph, Log Analytics, Azure Monitor, Service Bus, Function jobs and Resource Health); other clouds and tools plug in through adapters (see [docs/write-an-adapter.md](docs/write-an-adapter.md)). The 3D town, the dashboard and the wall screen all work; the sample town has the hub, 16 pillar islands and a Lost & found island, with messaging between them. Incidents from a live source and hosting are still to come. The plan is in [docs/](docs/observability-city-plan.md).
+**Status:** the demo towns run on fake data, and a live town reads real sources through adapter modules. It ships an Azure adapter today (Resource Graph, Log Analytics, Azure Monitor, Service Bus, Function jobs and Resource Health); other clouds and tools plug in through adapters (see [docs/write-an-adapter.md](docs/write-an-adapter.md)). The 3D town, the dashboard, the architecture diagram (its first level) and the wall screen all work; the sample town has the hub, 16 pillar islands and a Lost & found island, with messaging between them. Incidents from a live source and hosting are still to come. The plan is in [docs/](docs/observability-city-plan.md).
 
 ## What it looks like
 
