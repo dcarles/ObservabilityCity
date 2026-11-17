@@ -183,6 +183,39 @@ describe('architecture layout', () => {
     expect(routeAll(l, visible, [{ from: 'nope', to: 'pay' }], 'elbow').size).toBe(0)
   })
 
+  it('never runs a square line over a box, for calls forwards, backwards and inside one column', () => {
+    const p = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
+    const boxes = p.map((id) => ({ id, kind: 'pillar' as const }))
+    const calls = [['a', 'b'], ['b', 'c'], ['c', 'd'], ['d', 'a'], ['a', 'd'], ['e', 'f'], ['f', 'e'], ['g', 'a'], ['h', 'b'], ['c', 'a'], ['a', 'h'], ['e', 'a']]
+    const lines = calls.map(([from, to]) => ({ from, to }))
+    for (const [names, pairs] of [[boxes, lines], [slim, pairs_()]] as const) {
+      const l = layoutBoxes(names, pairs)
+      const visible = new Set(names.map((b) => b.id))
+      for (const [key, d] of routeAll(l, visible, pairs, 'elbow')) {
+        const [from, to] = key.split('>')
+        const nums = (d.match(/[MHV][\d.-]+(?: [\d.-]+)?/g) ?? [])
+        let x = 0
+        let y = 0
+        const segs: [number, number, number, number][] = []
+        for (const t of nums) {
+          const v = t.slice(1).split(' ').map(Number)
+          const [nx, ny] = t[0] === 'M' ? [v[0], v[1]] : t[0] === 'H' ? [v[0], y] : [x, v[0]]
+          if (t[0] !== 'M') segs.push([x, y, nx, ny])
+          x = nx
+          y = ny
+        }
+        for (const q of l.boxes.values()) {
+          if (q.id === from || q.id === to || q.id.startsWith('shared:')) continue
+          for (const [x0, y0, x1, y1] of segs) {
+            const inside = Math.max(x0, x1) > q.x + 1 && Math.min(x0, x1) < q.x + q.w - 1 && Math.max(y0, y1) > q.y + 1 && Math.min(y0, y1) < q.y + q.h - 1
+            expect(inside, `${key} over ${q.id}`).toBe(false)
+          }
+        }
+      }
+    }
+    function pairs_() { return pairs }
+  })
+
   it('handles a town with only pillars and nothing else', () => {
     const l = layoutBoxes([{ id: 'a', kind: 'pillar' }], [])
     expect(l.boxes.size).toBe(1)
