@@ -30,6 +30,8 @@ export interface ArchBox {
   dlq: number
   /** The system to open in the drawer when the box is one system; null for a box of many. */
   nodeId: string | null
+  /** Portal links of a box that is only links (Log Analytics, App Insights): nothing is measured, so it is grey and has no drawer. Empty for every other box. */
+  links: { name: string; url: string }[]
 }
 
 export interface ArchEdge {
@@ -39,6 +41,8 @@ export interface ArchEdge {
   rps: number | null
   /** Amber or red when either end is, else green; grey only when both ends have no data. */
   level: Level
+  /** The calling pillar's colour (else the called one's); null when neither end is a pillar. */
+  color: string | null
 }
 
 export interface ArchTotals {
@@ -102,7 +106,7 @@ export function buildArchitecture(s: Snapshot, view: TenantView, dashboard?: Das
       figure: p.traffic > 0 ? `${num(p.traffic)} rps` : null,
       msg: p.flow && (p.flow.sent != null || p.flow.received != null) ? { out: p.flow.sent, in: p.flow.received } : null,
       traffic: p.trafficSplit ? { out: p.trafficSplit.out, in: p.trafficSplit.in } : null,
-      dlq: p.dlq, nodeId: null,
+      dlq: p.dlq, nodeId: null, links: [],
     })
   }
 
@@ -114,7 +118,16 @@ export function buildArchitecture(s: Snapshot, view: TenantView, dashboard?: Das
     boxes.push({
       id: `shared:${r.id}`, kind: 'shared', name: r.name, level: r.level, color: null,
       sub: n ? TYPE[n.kind] ?? n.kind : 'shared', reason: r.level === 'warn' || r.level === 'bad' ? r.health : null, figure: figureOf([r]),
-      msg: null, traffic: null, dlq: n ? dlqCount(n) : 0, nodeId: r.id,
+      msg: null, traffic: null, dlq: n ? dlqCount(n) : 0, nodeId: r.id, links: [],
+    })
+  }
+  // shared resources that are only links (a log store, an application monitor) have no health to show: a grey box that lists its links when tapped
+  for (const r of d.sections.find((x) => x.id === 'hub')?.rows ?? []) {
+    if (r.id || r.drawer) continue
+    boxes.push({
+      id: `shared:link:${r.name}`, kind: 'shared', name: r.name, level: 'none', color: null,
+      sub: r.detail.split(' · ')[0] || 'links only', reason: 'links only', figure: null,
+      msg: null, traffic: null, dlq: 0, nodeId: null, links: r.links.map((l) => ({ name: l.name, url: l.url })),
     })
   }
 
@@ -136,12 +149,13 @@ export function buildArchitecture(s: Snapshot, view: TenantView, dashboard?: Das
       sub: e.internal ? d.sections.find((x) => x.id === 'digital')?.title.toLowerCase() ?? 'internal' : e.ids.length > 1 ? `third party · ${plural(e.ids.length, 'service')}` : 'third party',
       reason: reasonOf(bad, warn, level), figure: figureOf(rows),
       msg: null, traffic: null, dlq: e.ids.reduce((a, i) => a + (nodeById.has(i) ? dlqCount(nodeById.get(i)!) : 0), 0),
-      nodeId: e.ids.length === 1 ? e.ids[0] : null,
+      nodeId: e.ids.length === 1 ? e.ids[0] : null, links: [],
     })
   }
 
   // every call between two systems is a line between their boxes; calls inside one box and calls into the hub are left out
   const levelOf = new Map(boxes.map((b) => [b.id, b.level]))
+  const colorOf = new Map(boxes.filter((b) => b.color).map((b) => [b.id, b.color!]))
   const sums = new Map<string, number | null>()
   const addCalls = (id: string, calls: readonly { id: string; rps: number | null }[]): void => {
     const from = boxOf.get(id)
@@ -158,7 +172,7 @@ export function buildArchitecture(s: Snapshot, view: TenantView, dashboard?: Das
   for (const r of side.values()) if (r.id) addCalls(r.id, r.calls)
   const edges: ArchEdge[] = [...sums].map(([key, rps]) => {
     const [from, to] = key.split('\n')
-    return { from, to, rps, level: edgeLevel(levelOf.get(from) ?? 'none', levelOf.get(to) ?? 'none') }
+    return { from, to, rps, level: edgeLevel(levelOf.get(from) ?? 'none', levelOf.get(to) ?? 'none'), color: colorOf.get(from) ?? colorOf.get(to) ?? null }
   }).sort((a, b) => a.from.localeCompare(b.from) || a.to.localeCompare(b.to))
 
   return {

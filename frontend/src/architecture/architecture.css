@@ -14,12 +14,9 @@ body.arch #dash-menu { position: static; flex: none; }
 
 .view-select { background: var(--surface2, #eaeef2); color: var(--fg); border: 1px solid var(--dline, var(--line)); border-radius: 6px; padding: 5px 8px; font: inherit; font-size: 13px; }
 
-#arch-root .arch-sum { display: flex; gap: 10px; padding: 10px 16px; flex-wrap: wrap; flex: none; }
-#arch-root .arch-sum .kpi { background: var(--surface); border: 1px solid var(--dline); border-radius: 8px; padding: 6px 12px; min-width: 104px; }
-#arch-root .arch-sum .kpi > span:first-child { display: block; font-size: 11px; font-weight: 400; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; padding: 0; margin: 0; border: 0; }
-#arch-root .arch-sum .kpi b { font: 500 19px var(--mono); font-variant-numeric: tabular-nums; display: block; margin: 0; }
-#arch-root .arch-sum .kpi b.warn { color: var(--warn); } #arch-root .arch-sum .kpi b.bad { color: var(--bad); }
 
+#arch-root .arch-sum-wrap { flex: none; width: 100%; box-sizing: border-box; }
+#arch-root .sum { padding-block: 12px 12px; }
 .arch-stage { position: relative; flex: 1; min-height: 0; border-top: 1px solid var(--dline); overflow: hidden;
   background: radial-gradient(circle at 1px 1px, var(--dline) 1px, transparent 0) 0 0 / 24px 24px, var(--bg); }
 #arch-svg { width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; }
@@ -31,11 +28,15 @@ body.arch #dash-menu { position: static; flex: none; }
 .arch-zoom button { width: 36px; height: 36px; border-radius: 8px; border: 1px solid var(--dline); background: var(--surface); color: var(--fg); font-size: 18px; cursor: pointer; }
 .arch-zoom button#arch-fit { font-size: 13px; }
 
-#arch-svg .edge { fill: none; stroke: var(--edge); stroke-linecap: round; transition: opacity .15s, stroke .15s; }
-#arch-svg .edge.warn { stroke: var(--warn); } #arch-svg .edge.bad { stroke: var(--bad); }
+#arch-svg .edge { fill: none; stroke: var(--line, var(--edge)); stroke-linecap: round; transition: opacity .15s, stroke .15s; }
+/* a line keeps its pillar's colour; a problem at either end is a glow in amber or red around it (the whole line turns that colour when the colour is set to health) */
+#arch-svg .edge.warn { filter: drop-shadow(0 0 3px var(--warn)) drop-shadow(0 0 1px var(--warn)); } #arch-svg .edge.bad { filter: drop-shadow(0 0 3px var(--bad)) drop-shadow(0 0 1px var(--bad)); }
+#arch-svg.byhealth .edge { stroke: var(--edge); filter: none; }
+#arch-svg.byhealth .edge.warn { stroke: var(--warn); } #arch-svg.byhealth .edge.bad { stroke: var(--bad); }
 #arch-svg .edge.dim { opacity: .1; }
 #arch-svg.quiet .edge { stroke: var(--edge); opacity: .4; }
-#arch-svg.quiet .edge.warn.hot { stroke: var(--warn); } #arch-svg.quiet .edge.bad.hot { stroke: var(--bad); }
+#arch-svg.quiet .edge { stroke: var(--edge); }
+#arch-svg.quiet .edge.hot { stroke: var(--line, var(--edge)); } #arch-svg.byhealth.quiet .edge.warn.hot { stroke: var(--warn); } #arch-svg.byhealth.quiet .edge.bad.hot { stroke: var(--bad); }
 #arch-svg.quiet .edge.hot { opacity: 1; } #arch-svg.quiet .edge.dim { opacity: .1; }
 #arch-svg .box { cursor: pointer; transition: opacity .15s; }
 #arch-svg .box.dim { opacity: .22; }
@@ -74,10 +75,10 @@ body.arch #dash-menu { position: static; flex: none; }
   body.arch #dash-menu .brand { display: none; }
   body.arch #dash-menu .wrap { gap: 6px; padding-block: 6px; }
   body.arch #dash-menu .vb-btn, body.arch #dash-menu .btn, body.arch #dash-menu .view-select { padding: 4px 8px; font-size: 12px; }
-  #arch-root .arch-sum { flex-wrap: nowrap; overflow-x: auto; padding: 6px 10px; gap: 6px; }
-  #arch-root .arch-sum .kpi { min-width: auto; padding: 3px 9px; white-space: nowrap; }
-  #arch-root .arch-sum .kpi > span:first-child { font-size: 9px; } #arch-root .arch-sum .kpi b { font-size: 14px; }
+  #arch-root .sum { gap: 6px; padding-block: 6px; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); }
+  #arch-root .kpi { min-height: 0; padding: 6px 9px; } #arch-root .kpi b { font-size: 20px; } #arch-root .kpi small { display: none; }
   .arch-look { left: 8px; transform: none; bottom: 8px; min-width: 0; max-width: calc(100% - 70px); width: auto; }
   .arch-look.min { padding: 4px 10px; }
   .arch-zoom { right: 8px; bottom: 8px; }
 }
+.arch-pick a { pointer-events: auto; color: var(--daccent); }

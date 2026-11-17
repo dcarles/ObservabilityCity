@@ -19,6 +19,19 @@ describe('architecture boxes', () => {
     expect(a.totals.degraded).toBe(s.totals.degraded)
   })
 
+  it('shows a shared resource that is only links as a grey box that carries its links', () => {
+    const s = golden('calm')
+    const hub = s.groups.find((g) => g.isHub)!
+    hub.assets = [{ id: 'la', name: 'Log Analytics', label: 'Log store', shape: 'box', service: null, region: null, group: 'Monitoring', links: [{ name: 'Open in the portal', url: 'https://portal.example.test/la' }] } as never]
+    const a = buildArchitecture(s, ALL_TENANTS)
+    const box = a.boxes.find((b) => b.name === 'Log Analytics')!
+    expect(box.kind).toBe('shared')
+    expect(box.level).toBe('none')
+    expect(box.nodeId).toBeNull()
+    expect(box.links).toEqual([{ name: 'Open in the portal', url: 'https://portal.example.test/la' }])
+    expect(a.edges.some((e) => e.from === box.id || e.to === box.id)).toBe(false)
+  })
+
   it('colours a pillar by its worst system and a calm town is all green or grey', () => {
     const calm = buildArchitecture(golden('calm'), ALL_TENANTS)
     expect(calm.boxes.every((b) => b.level === 'ok' || b.level === 'none')).toBe(true)
@@ -48,6 +61,13 @@ describe('architecture boxes', () => {
       expect(a.boxes.some((b) => b.id === e.to)).toBe(true)
     }
     expect(new Set(a.edges.map((e) => `${e.from}>${e.to}`)).size).toBe(a.edges.length)
+  })
+
+  it('a line carries the colour of the pillar that calls', () => {
+    const a = buildArchitecture(golden('bad-day'), ALL_TENANTS)
+    const fromPillar = a.edges.filter((e) => a.boxes.find((b) => b.id === e.from)?.kind === 'pillar')
+    expect(fromPillar.length).toBeGreaterThan(0)
+    for (const e of fromPillar) expect(e.color).toBe(a.boxes.find((b) => b.id === e.from)!.color)
   })
 
   it('a line is amber or red as soon as one end is, and grey only when both ends have no data', () => {
@@ -120,6 +140,15 @@ describe('architecture layout', () => {
       return cols
     })()
     expect(crossings(l, pairs)).toBeLessThanOrEqual(naive)
+  })
+
+  it('keeps a busy town of ten pillars and five third parties to a few crossings', () => {
+    const p = ['mgr', 'ams', 'osh', 'crt', 'cus', 'rp', 'cl', 'tms', 'frd', 'dig']
+    const v = ['accesspay', 'fiserv', 'provenir', 'featurespace', 'threatmetrix']
+    const boxes = [...p.map((id) => ({ id, kind: (id === 'dig' ? 'internal' : 'pillar') as 'internal' | 'pillar' })), ...v.map((id) => ({ id: `vendor:${id}`, kind: 'vendor' as const }))]
+    const calls = [['dig', 'cl'], ['dig', 'ams'], ['dig', 'cus'], ['cl', 'ams'], ['cl', 'tms'], ['cl', 'fiserv'], ['cl', 'frd'], ['ams', 'tms'], ['ams', 'cus'], ['ams', 'osh'], ['ams', 'rp'], ['ams', 'crt'], ['mgr', 'ams'], ['mgr', 'tms'], ['mgr', 'cus'], ['osh', 'ams'], ['osh', 'cus'], ['osh', 'cl'], ['crt', 'provenir'], ['crt', 'cus'], ['crt', 'tms'], ['rp', 'accesspay'], ['rp', 'ams'], ['rp', 'tms'], ['frd', 'featurespace'], ['frd', 'threatmetrix'], ['frd', 'tms'], ['cus', 'tms'], ['tms', 'ams'], ['cl', 'rp']]
+    const lines = calls.map(([a, b]) => ({ from: a, to: v.includes(b) ? `vendor:${b}` : b }))
+    expect(crossings(layoutBoxes(boxes, lines), lines)).toBeLessThanOrEqual(4)
   })
 
   it('keeps every box where it was when a pillar is hidden, and moves them only for a box it has not seen', () => {

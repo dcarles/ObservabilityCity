@@ -43,12 +43,14 @@ test.describe('the architecture view', () => {
     await expect(page.locator('#arch-svg .frame-label')).toContainText(['SHARED PLATFORM SYSTEMS'])
   })
 
-  test('the totals are down, degraded, dead letters, traffic and messages, in that order', async ({ town, page }) => {
+  test('the totals are the dashboard\'s own boxes: down, degraded, dead letters, traffic, messages and incidents, in that order', async ({ town, page }) => {
     await open(town, page)
-    await expect(page.locator('#arch-sum .kpi > span:first-child')).toHaveText(['Down services', 'Degraded services', 'Dead letters', 'Traffic', 'Messages'])
+    // the dashboard's own boxes (one is left out when nothing measures it), so the two views cannot drift apart
+    const mine = (await page.locator('#arch-sum .kpi > span:first-child').allTextContents()).map((t) => t.toLowerCase())
+    expect(mine.slice(0, 4)).toEqual(['down', 'degraded', 'dead letters', 'total traffic'])
     await feed(page, `node('aa.orders-api').state = 'Down'`)
-    await expect(page.locator('#arch-down b')).toHaveText('1')
-    await expect(page.locator('#arch-down b')).toHaveClass(/bad/)
+    await expect(page.locator('#arch-kpi-down b')).toHaveText('1')
+    await expect(page.locator('#arch-kpi-down')).toHaveClass(/bad/)
   })
 
   test('the switch goes to the town and back, and the browser remembers the last view', async ({ town, page }) => {
@@ -98,6 +100,18 @@ test.describe('the architecture view', () => {
     await open(town, page)
     await feed(page, `${CALL}; node('bb.billing-api').state = 'Down'`)
     await expect(page.locator('#arch-svg .edge')).toHaveClass(/bad/)
+  })
+
+  test('a line takes the colour of the pillar that calls, and "by health" turns it amber or red instead', async ({ town, page }) => {
+    await open(town, page)
+    await feed(page, `${CALL}; node('bb.billing-api').state = 'Down'`)
+    const colour = await page.evaluate(() => (window as any).dash.architecture().boxes.find((b: any) => b.id === 'aa').color)
+    expect(colour).toBeTruthy()
+    await expect(page.locator('#arch-svg .edge')).toHaveAttribute('style', new RegExp(`--line:\\s*${colour.replace('#', '#?')}`, 'i'))
+    expect(await page.evaluate(() => (window as any).dash.options().colour)).toBe('pillar')
+    await page.locator('#arch-look-toggle').click()
+    await page.locator('#arch-o-colour button[data-v="health"]').click()
+    await expect(page.locator('#arch-svg')).toHaveClass(/byhealth/)
   })
 
   test('hiding a pillar takes its box and lines away without moving the other box, and showing it puts it back where it was', async ({ town, page }) => {

@@ -14,13 +14,15 @@ export interface DiagramOptions {
   line: LineStyle
   /** The pillar's own colour as a stripe on its box. */
   stripe: boolean
+  /** Lines take the calling pillar's colour, or the health colour of the worse end. */
+  colour: 'pillar' | 'health'
   /** Lines stay grey until one of their boxes is picked (red and amber ones keep their colour). */
   quiet: boolean
   /** A thicker line for more traffic. */
   width: boolean
 }
 
-export const DEFAULT_OPTIONS: DiagramOptions = { box: 'A', line: 'elbow', stripe: true, quiet: false, width: true }
+export const DEFAULT_OPTIONS: DiagramOptions = { box: 'A', line: 'elbow', stripe: true, colour: 'pillar', quiet: false, width: true }
 
 export interface DiagramHost {
   /** A box was tapped (null: empty space). */
@@ -73,7 +75,7 @@ export class Diagram {
     svg.innerHTML = ''
     const defs = el('defs', {}, svg)
     const marker = el('marker', { id: 'arch-arrow', viewBox: '0 0 10 10', refX: 9, refY: 5, markerWidth: 10, markerHeight: 10, markerUnits: 'userSpaceOnUse', orient: 'auto' }, defs)
-    el('path', { d: 'M0 0L10 5L0 10z', fill: 'var(--edge)' }, marker)
+    el('path', { d: 'M0 0L10 5L0 10z', fill: 'context-stroke' }, marker)
     this.scene = el('g', { class: 'scene' }, svg)
     this.frames = el('g', {}, this.scene)
     this.lines = el('g', {}, this.scene)
@@ -134,13 +136,14 @@ export class Diagram {
       const d = paths.get(key)
       if (!d) continue
       keep.add(key)
-      const sig = `${d}|${e.level}|${this.widthOf(e)}`
+      const sig = `${d}|${e.level}|${e.color}|${this.widthOf(e)}`
       let p = this.lines.querySelector<SVGPathElement>(`[data-edge="${CSS.escape(key)}"]`)
       if (!p) p = el('path', { 'data-edge': key, 'data-a': e.from, 'data-b': e.to, 'marker-end': 'url(#arch-arrow)' }, this.lines)
       if (this.lineSig.get(key) === sig) continue
       this.lineSig.set(key, sig)
       p.setAttribute('d', d)
       p.setAttribute('stroke-width', String(this.widthOf(e)))
+      if (e.color) p.style.setProperty('--line', e.color); else p.style.removeProperty('--line')
       p.setAttribute('class', e.level === 'warn' || e.level === 'bad' ? `edge ${e.level}` : 'edge') // hot and dim are put back by highlight()
     }
     for (const p of [...this.lines.children]) {
@@ -264,6 +267,7 @@ export class Diagram {
       g.querySelector('.shape')?.setAttribute('stroke-width', bid === this.selected ? '3.5' : this.options.box === 'C' ? '2.5' : '1.5')
     }
     this.svg.classList.toggle('quiet', this.options.quiet)
+    this.svg.classList.toggle('byhealth', this.options.colour === 'health')
   }
 
   // ---- the view ----------------------------------------------------------------------------------------------------

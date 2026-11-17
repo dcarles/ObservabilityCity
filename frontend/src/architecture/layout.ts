@@ -118,24 +118,20 @@ export function cost(plan: Plan, ids: Map<string, Slim>, pairs: readonly Pair[])
   return total
 }
 
-/** The columns of boxes for the pillars and the internal services, plus the third parties in the last one. */
-export function arrange(boxes: readonly Slim[], pairs: readonly Pair[]): string[][] {
-  const main = boxes.filter((b) => b.kind === 'pillar' || b.kind === 'internal').map((b) => b.id).sort()
-  const vendors = boxes.filter((b) => b.kind === 'vendor').map((b) => b.id).sort()
+/** One search for the best order with this many columns for the pillars and internal services (third parties go in one more at the end). */
+function search(main: readonly string[], vendors: readonly string[], boxes: readonly Slim[], pairs: readonly Pair[], count: number): { cols: string[][]; cost: number } {
   const ids = new Map(boxes.map((b) => [b.id, b]))
-  const count = main.length === 0 ? 0 : Math.max(1, Math.min(6, Math.ceil(Math.sqrt(main.length) * 1.1)))
   const layer = layers(main, pairs)
   const cols: string[][] = Array.from({ length: count }, () => [])
   for (const id of main) cols[Math.min(count - 1, layer.get(id)!)].push(id)
-  if (vendors.length) cols.push(vendors)
-  if (main.length + vendors.length < 3 || cols.length < 2) return cols.filter((c) => c.length > 0)
-
-  const rnd = random(hash([...main, '|', ...vendors, '|', ...pairs.map((p) => `${p.from}>${p.to}`).sort()].join(',')))
+  if (vendors.length) cols.push([...vendors])
   const plan: Plan = { cols }
   let now = cost(plan, ids, pairs)
+  if (main.length + vendors.length < 3 || cols.length < 2) return { cols: cols.filter((c) => c.length > 0), cost: now }
+
+  const rnd = random(hash([...main, '|', ...vendors, '|', count, '|', ...pairs.map((p) => `${p.from}>${p.to}`).sort()].join(',')))
   let best = now
   let bestCols = cols.map((c) => [...c])
-  const mainCols = count
   const rounds = Math.min(14000, 1500 + main.length * 500)
   for (let i = 0; i < rounds; i++) {
     const temp = 3 * (1 - i / rounds) + 0.02
@@ -145,7 +141,7 @@ export function arrange(boxes: readonly Slim[], pairs: readonly Pair[]): string[
     const from = Math.floor(rnd() * col.length)
     const isVendor = ids.get(col[from])!.kind === 'vendor'
     const wide = !isVendor && rnd() < 0.35 // sometimes to another column
-    const tj = wide ? Math.floor(rnd() * mainCols) : ci
+    const tj = wide ? Math.floor(rnd() * count) : ci
     const target = plan.cols[tj]
     const [id] = col.splice(from, 1)
     const ins = Math.floor(rnd() * (target.length + 1))
@@ -160,7 +156,25 @@ export function arrange(boxes: readonly Slim[], pairs: readonly Pair[]): string[
       col.splice(from, 0, id)
     }
   }
-  return bestCols.filter((c) => c.length > 0)
+  return { cols: bestCols.filter((c) => c.length > 0), cost: best }
+}
+
+/**
+ * The columns of boxes for the pillars and the internal services, plus the third parties in the last one. A town of many pillars is tried with a few
+ * different numbers of columns and the picture with the fewest crossings wins, so no fixed width is assumed.
+ */
+export function arrange(boxes: readonly Slim[], pairs: readonly Pair[]): string[][] {
+  const main = boxes.filter((b) => b.kind === 'pillar' || b.kind === 'internal').map((b) => b.id).sort()
+  const vendors = boxes.filter((b) => b.kind === 'vendor').map((b) => b.id).sort()
+  if (main.length === 0) return vendors.length ? [vendors] : []
+  const base = Math.max(1, Math.min(6, Math.ceil(Math.sqrt(main.length) * 1.1)))
+  const counts = main.length < 6 ? [base] : [...new Set([base - 1, base, base + 1, base + 2].map((n) => Math.max(2, Math.min(7, n))))]
+  let best: { cols: string[][]; cost: number } | null = null
+  for (const n of counts) {
+    const r = search(main, vendors, boxes, pairs, n)
+    if (!best || r.cost < best.cost - 1e-9) best = r
+  }
+  return best!.cols
 }
 
 /** Where every box stands. `known` is the picture drawn before: if it already has every box, it is kept, so hiding a pillar never moves the others. */
@@ -220,7 +234,7 @@ function via(layout: Layout, visible: ReadonlySet<string>, a: Placed, b: Placed,
   const bx = b.x
   const pts: [number, number][] = []
   for (const c of layout.columns.filter((x) => x > a.x && x < b.x)) {
-    const inColumn = [...layout.boxes.values()].filter((q) => q.x === c && visible.has(q.id))
+    const inColumn = [...layout.boxes.values()].filter((q) => q.x === c && visible.has(q.id) && !q.id.startsWith('shared:'))
     const cx = c + BOX_W / 2
     const t = (cx - ax) / (bx - ax)
     const yt = ay + (by - ay) * t
