@@ -95,12 +95,10 @@ test.describe(`the cloud's own health reports (${B ? 'tags, azure-health' : 'nam
     await page.locator('#search-results .hit', { hasText: 'Orders DB' }).first().click()
     await expect(page.locator('#inspector .cloud-health')).toHaveAttribute('data-cloud-health', 'Degraded')
 
-    // the next snapshot holds only the resolved report (a restart of the incident feed is not needed to see the drawer follow)
-    // the live feed may send its own snapshot (with the open report) between this one and the check, so the snapshot is fed again until the drawer follows
-    await expect(async () => {
-      await page.evaluate(() => { const c = (window as any).city; c.feed({ ...c.seen.last, healthEvents: c.seen.last.healthEvents.filter((e: any) => e.state === 'Resolved') }) })
-      await expect(page.locator('#inspector .cloud-health')).toHaveAttribute('data-cloud-health', 'Resolved', { timeout: 1_000 })
-    }).toPass({ timeout: 15_000 })
+    // the next snapshot holds only the resolved report. The page stops taking the live feed's own snapshots first: one with the open report arriving between
+    // the feed and the checks below put the open report back (the drawer said Degraded and the building had its mark again), which made this test fail now and then
+    await page.evaluate(() => { const c = (window as any).city; c.hold(true); c.feed({ ...c.seen.last, healthEvents: c.seen.last.healthEvents.filter((e: any) => e.state === 'Resolved') }) })
+    await expect(page.locator('#inspector .cloud-health')).toHaveAttribute('data-cloud-health', 'Resolved')
     await expect(page.locator('#inspector .cloud-health .ok').first()).toHaveText('Resolved')
     expect(await page.evaluate(() => (window as any).city.inspect('aa.orders-db').cloudHealth)).toBeNull() // no mark on the building
   })
