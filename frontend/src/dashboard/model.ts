@@ -451,9 +451,12 @@ export function buildDashboard(s: Snapshot, view: TenantView): Dashboard {
   }
 }
 
-/** The ids to ask the server for after one pillar is hidden or shown. Every pillar shown is the empty list (no filter). */
+/**
+ * The ids to ask the server for after one pillar is hidden or shown. Every pillar shown is the empty list (no filter). Third parties are never in the list:
+ * the server leaves one out by itself when every pillar that calls it is hidden, and shows it again with the first of them.
+ */
 export function pillarSelection(s: Pick<Snapshot, 'groups' | 'view' | 'vendors'>, id: string, show: boolean): string[] {
-  const all = islandChoices(s)
+  const all = islandChoices(s).filter((c) => !c.vendor)
   const shown = new Set(all.filter((c) => c.shown).map((c) => c.id))
   if (show) shown.add(id)
   else shown.delete(id)

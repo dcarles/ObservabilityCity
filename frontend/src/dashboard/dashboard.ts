@@ -13,6 +13,8 @@ import { browserStore, isLighting, LIGHTING_KEY, startLighting, saveLighting, ty
 import { pruneTenants, type TenantView } from '../tenants'
 import { islandsParam, parseIslands, pruneIslands, islandChoices } from '../islands'
 import { isViewMode, loadTenantView, saveTenantView, viewSwitchAddress } from '../viewMode'
+import { hiddenVendorsParam, parseHiddenVendors, toggleVendor, vendorChoices, withoutHiddenVendors } from '../vendorFilter'
+import { addressForTown, fetchTowns, type TownChoice } from '../scope'
 import type { Snapshot } from '../types'
 import { buildDashboard, pillarSelection, type Dashboard } from './model'
 import { freshnessHtml, hiddenHtml, pillarMenuHtml, pillarsHtml, sectionsHtml, summaryHtml, type UiState } from './render'
@@ -86,6 +88,9 @@ export function startDashboard(plug?: PagePlug): void {
   const ui = { openPillars: new Set<string>(), groups: new Map<string, boolean>(), databases: new Map<string, boolean>(), connections: new Set<string>(), sections: new Set<string>() }
   let tenantView: TenantView = loadTenantView(store)
   let islands: readonly string[] = parseIslands(window.location.search)
+  /** Third parties the viewer hid on their own; the server already drops one whose callers are all hidden. */
+  let hiddenVendors: readonly string[] = parseHiddenVendors(window.location.search)
+  let towns: TownChoice[] = []
   let last: Snapshot | null = null
   let model: Dashboard | null = null
   const seen = { snapshots: 0, rejected: 0 }
@@ -122,9 +127,20 @@ export function startDashboard(plug?: PagePlug): void {
     const text = q.toString().replace(/%2C/g, ',')
     window.history.replaceState(null, '', `${window.location.pathname}${text ? `?${text}` : ''}${window.location.hash}`)
   }
+  const setHiddenVendors = (ids: readonly string[]): void => {
+    hiddenVendors = ids
+    const q = new URLSearchParams(window.location.search)
+    const p = hiddenVendorsParam(ids)
+    if (p) q.set('hidevendors', p)
+    else q.delete('hidevendors')
+    const text = q.toString().replace(/%2C/g, ',')
+    window.history.replaceState(null, '', `${window.location.pathname}${text ? `?${text}` : ''}${window.location.hash}`)
+    draw()
+  }
   const viewBar = new ViewBar({
-    towns: () => [],
-    switchTown: () => {},
+    towns: () => towns,
+    // a different company is a different page: load it again, so nothing of the old one is left behind
+    switchTown: (town) => { window.location.href = `${window.location.pathname}${addressForTown(window.location.search, town)}${window.location.hash}` },
     quality: () => 'high',
     setQuality: () => {},
     view: () => tenantView,
@@ -138,12 +154,15 @@ export function startDashboard(plug?: PagePlug): void {
     setFocus: () => {},
     theme: () => ({ id: 'harbour-town', name: '', blurb: '' }) as never,
     setTheme: () => {},
-  }, ['env', 'tenant'])
+  }, ['town', 'env', 'tenant'])
+  viewBar.hostSelect(viewSelect)
+  void fetchTowns().then((list) => { towns = list; $('dash-brand').hidden = list.length > 1; viewBar.refresh() })
 
   /** Draws what changed. Open and closed things live in `ui`, so a new snapshot never undoes them, and the page keeps its scroll place. */
   function draw(): void {
     if (!last) return
-    model = buildDashboard(last, tenantView)
+    const shownSnapshot = withoutHiddenVendors(last, hiddenVendors)
+    model = buildDashboard(shownSnapshot, tenantView)
     const y = window.scrollY
     const active = (document.activeElement as HTMLElement | null)?.closest<HTMLElement>('[data-toggle],[data-hide],[data-show],[data-db],[data-group],[data-conn]')
     const key = active ? (['toggle', 'hide', 'show', 'db', 'group'] as const).map((k) => (active.dataset[k] !== undefined ? `[data-${k}="${CSS.escape(active.dataset[k]!)}"]` : '')).join('') : ''
@@ -155,8 +174,8 @@ export function startDashboard(plug?: PagePlug): void {
     put('dash-sum', summaryHtml(model), 'sum')
     put('dash-pillars', pillarsHtml(model, ui as UiState), 'pillars')
     put('hidden-pillars', hiddenHtml(model), 'hidden')
-    put('pillar-menu', pillarMenuHtml(model), 'menu')
-    if (plug) { plug.draw(last, model, tenantView); fit(); return }
+    put('pillar-menu', pillarMenuHtml(model, vendorChoices(last, hiddenVendors), last.internalVendorsLabel), 'menu')
+    if (plug) { plug.draw(shownSnapshot, model, tenantView); fit(); return }
     put('dash-sections', sectionsHtml(model, ui as UiState), 'sections')
     if (window.scrollY !== y) window.scrollTo(0, y)
     fit()
@@ -341,7 +360,14 @@ export function startDashboard(plug?: PagePlug): void {
   menu.addEventListener('change', (e) => {
     const box = e.target as HTMLInputElement
     const id = box.dataset.pillarBox
-    if (id && last) setIslands(pillarSelection(last, id, box.checked))
+    const vendor = box.dataset.vendorBox
+    if (box.dataset.pillarAll !== undefined) {
+      // every pillar and every third party again
+      setIslands([])
+      if (hiddenVendors.length) setHiddenVendors([])
+      else draw()
+    } else if (id && last) setIslands(pillarSelection(last, id, box.checked))
+    else if (vendor !== undefined) setHiddenVendors(toggleVendor(hiddenVendors, vendor, box.checked))
   })
 
   ;(window as unknown as { dash: unknown }).dash = {
@@ -357,6 +383,7 @@ export function startDashboard(plug?: PagePlug): void {
     ui,
     tenantView: () => tenantView,
     islands: () => islands,
+    hiddenVendors: () => hiddenVendors,
     /** For tests: what the wall is doing (null when wall mode is off), and a way to move its clock. */
     wall: () => (wall ? { ...wall.status(), controls: wallControls?.state() ?? null, focus: wallFocus, open: [...ui.openPillars] } : null),
     wallStep: (seconds: number) => { skew += seconds; wall?.tick(wallNow()) },

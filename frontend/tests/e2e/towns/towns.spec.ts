@@ -280,6 +280,31 @@ test.describe('the town switcher', () => {
     await expect(page.locator('#town-button')).toContainText('Galactic Credit')
   })
 
+  test('the list of views stands right after the town dropdown in the town view', async ({ town, page }) => {
+    town.townId = SHOP
+    await town.open()
+    await expect(page.locator('#view-bar > :nth-child(1) #town-button')).toHaveCount(1)
+    await expect(page.locator('#view-bar > #view-switch')).toBeVisible()
+    expect(await page.evaluate(() => document.getElementById('view-bar')!.children[1].id)).toBe('view-switch')
+  })
+
+  test('the dashboard and the diagram have the town dropdown too, with the list of views next to it, and it loads the other town', async ({ town, page }) => {
+    await town.reset()
+    for (const view of ['dashboard', 'architecture']) {
+      await page.goto(`/?view=${view}&town=${SHOP}`)
+      await page.waitForFunction(() => (window as any).dash?.model?.()?.townName === 'Droid Shop', null, { timeout: 55_000 })
+      await expect(page.locator('#town-button')).toContainText('Droid Shop')
+      expect(await page.evaluate(() => document.getElementById('dash-filters')!.querySelector('#view-bar, #town-button') !== null)).toBe(true)
+      expect(await page.evaluate(() => (document.querySelector('#town-button')!.closest('.vb')!.nextElementSibling as HTMLElement).id)).toBe('view-select')
+      await expect(page.locator('#dash-brand')).toBeHidden() // the dropdown says the name already
+      await page.locator('#town-button').click()
+      await page.locator('#town-list [data-id="galactic-credit"]').click()
+      await page.waitForFunction(() => (window as any).dash?.model?.()?.townName === 'Galactic Credit', null, { timeout: 55_000 })
+      expect(new URL(page.url()).searchParams.has('town')).toBe(false)
+      expect(new URL(page.url()).searchParams.get('view')).toBe(view)
+    }
+  })
+
   test('switching from the default town sets ?town= for the other', async ({ town, page }) => {
     // the first town of the server is Galactic Credit; go to Droid Shop from there
     await town.reset()

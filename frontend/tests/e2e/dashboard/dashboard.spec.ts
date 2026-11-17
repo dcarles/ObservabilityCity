@@ -115,7 +115,7 @@ test.describe('the dashboard view', () => {
     await page.locator('#hidden-pillars [data-show="bb"]').click()
     await expect(page.locator('[data-pillar="bb"]')).toBeVisible()
     await page.locator('#pillars-button').click()
-    await expect(page.locator('#pillar-menu input')).toHaveCount(2)
+    await expect(page.locator('#pillar-menu input[data-pillar-box]')).toHaveCount(2)
     await page.locator('#pillar-menu input[data-pillar-box="aa"]').uncheck()
     await expect(page.locator('[data-pillar="aa"]')).toHaveCount(0)
   })

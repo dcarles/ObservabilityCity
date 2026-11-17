@@ -7,7 +7,7 @@ body.dash #dash-root[hidden] { display: none; }
 #dash-menu { position: sticky; top: 0; z-index: 9; background: var(--surface); border-bottom: 1px solid var(--dline); }
 #dash-menu .wrap, #dash-root .wrap { max-width: 1600px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
 #dash-menu .wrap { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; padding-block: 10px; position: relative; }
-#dash-menu .brand { font-weight: 600; font-size: 16px; }
+#dash-menu .brand { font-weight: 600; font-size: 16px; } #dash-menu .brand[hidden] { display: none; }
 #dash-menu .sp { flex: 1; }
 .seg { display: inline-flex; border: 1px solid var(--dline); border-radius: 6px; overflow: hidden; }
 .seg button { background: transparent; border: 0; padding: 5px 12px; font: inherit; color: inherit; cursor: pointer; }
