@@ -110,7 +110,7 @@ test.describe('the ⋯ menu a full top bar keeps its buttons in', () => {
     for (const id of ['wall-button', 'view-switch', 'lighting']) await expect(page.locator(`#${id}`)).toBeHidden()
 
     await page.locator('#more-button').click()
-    await expect(page.locator('#more-menu button')).toHaveText(['Wall', 'Dashboard', /Day|Dusk/])
+    await expect(page.locator('#more-menu button')).toHaveText(['Wall', 'Dashboard', 'Architecture', /Day|Dusk/])
     await page.keyboard.press('Escape')
     await expect(page.locator('#more-menu')).toBeHidden()
 

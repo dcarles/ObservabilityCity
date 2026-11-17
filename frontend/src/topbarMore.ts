@@ -1,5 +1,5 @@
-// The "⋯" button in the top bar: when the bar is so full that it has to give up buttons (the last fit step), Wall, Dashboard and Day/Dusk move into this
-// menu instead of disappearing. The items press the real buttons, so nothing here knows what they do.
+// The "⋯" button in the top bar: when the bar is so full that it has to give up buttons (the last fit step), Wall, the other views and Day/Dusk move into this
+// menu instead of disappearing. The items press the real buttons (or pick the real choice of the view list), so nothing here knows what they do.
 
 /** The buttons the menu stands in for, in the order it lists them. */
 export const MORE_ITEMS = ['wall-button', 'view-switch', 'lighting'] as const
@@ -12,6 +12,19 @@ export function startMoreMenu(): { open(): void; close(): void } {
     menu.replaceChildren(...MORE_ITEMS.flatMap((id) => {
       const source = document.getElementById(id)
       if (!source) return []
+      if (source instanceof HTMLSelectElement) {
+        // the view list: one item for each view the page is not showing
+        return [...source.options].filter((o) => o.value !== source.value).map((o) => {
+          const item = document.createElement('button')
+          item.type = 'button'
+          item.dataset.for = id
+          item.dataset.view = o.value
+          item.textContent = o.text.replace(/^View:\s*/, '')
+          item.title = source.title
+          item.addEventListener('click', () => { close(); source.value = o.value; source.dispatchEvent(new Event('change')) })
+          return item
+        })
+      }
       const item = document.createElement('button')
       item.type = 'button'
       item.dataset.for = id

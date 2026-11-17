@@ -79,6 +79,13 @@ test.describe(`the broker's backlog and dead letters (${B ? 'ids, a total' : 'co
     await expect(pages.first()).toHaveAttribute('target', '_blank')
   })
 
+  test('the View list does not push the DLQ number off a 1600px bar, even in a wide font', async ({ page }) => {
+    await open(page)
+    await page.addStyleTag({ content: "* { font-family: 'DejaVu Sans', sans-serif !important; }" })
+    await expect(page.locator('#topbar .chip.dlq')).toBeVisible()
+    await expect(page.locator('#more-button')).toBeHidden()
+  })
+
   test('the top bar DLQ number lists the queues with dead letters, and a click on a row opens the service that reads it', async ({ page }) => {
     await open(page)
     await expect(page.locator('#topbar .chip.dlq b')).toHaveText('2') // a whole number, not 2.0
