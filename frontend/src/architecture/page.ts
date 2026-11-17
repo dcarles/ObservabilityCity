@@ -6,11 +6,12 @@ import type { Inspector } from '../inspector'
 import type { Store } from '../lighting'
 import type { Snapshot } from '../types'
 import type { TenantView } from '../tenants'
+import { summaryHtml } from '../dashboard/render'
 import { dashLegendHtml, type DashLegendLine } from '../dashboard/legend'
 import type { Dashboard } from '../dashboard/model'
 import { Diagram, DEFAULT_OPTIONS, type DiagramOptions } from './diagram'
 import { layoutBoxes, type Layout } from './layout'
-import { buildArchitecture, type ArchBox, type ArchTotals, type Architecture } from './model'
+import { buildArchitecture, type ArchBox, type Architecture } from './model'
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T
 const esc = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
@@ -32,7 +33,8 @@ export const OPTION_NAMES: { key: keyof DiagramOptions; label: string; choices: 
   { key: 'box', label: 'Box style', choices: [['A', 'A Tint'], ['B', 'B Solid'], ['C', 'C Outline']] },
   { key: 'line', label: 'Lines', choices: [['curve', 'Curved'], ['elbow', 'Square']] },
   { key: 'stripe', label: 'Pillar colour', choices: [['1', 'Top stripe'], ['0', 'Off']] },
-  { key: 'quiet', label: 'Line colour', choices: [['0', 'By health'], ['1', 'Quiet until hover']] },
+  { key: 'colour', label: 'Line colour', choices: [['pillar', 'Pillar colour'], ['health', 'By health']] },
+  { key: 'quiet', label: 'Line visibility', choices: [['0', 'Always'], ['1', 'Quiet until hover']] },
   { key: 'width', label: 'Line width = traffic', choices: [['1', 'On'], ['0', 'Off']] },
 ]
 
@@ -45,6 +47,7 @@ export function loadOptions(store: Store | null): DiagramOptions {
       box: raw.box === 'B' || raw.box === 'C' ? raw.box : 'A',
       line: raw.line === 'curve' ? 'curve' : 'elbow',
       stripe: raw.stripe !== false,
+      colour: raw.colour === 'health' ? 'health' : 'pillar',
       quiet: raw.quiet === true,
       width: raw.width !== false,
     }
@@ -53,22 +56,10 @@ export function loadOptions(store: Store | null): DiagramOptions {
   }
 }
 
-/** The totals along the top. A figure nobody measures is a dash, never a zero. */
-export function totalsHtml(t: ArchTotals): string {
-  const kpi = (label: string, value: string, tone: '' | 'warn' | 'bad', id: string): string => `<div class="kpi" id="arch-${id}"><span>${label}</span><b class="${tone}">${value}</b></div>`
-  const count = (n: number | null): string => (n == null ? '–' : n.toLocaleString('en-GB', { maximumFractionDigits: 0 }))
-  return [
-    kpi('Down services', count(t.down), t.down > 0 ? 'bad' : '', 'down'),
-    kpi('Degraded services', count(t.degraded), t.degraded > 0 ? 'warn' : '', 'degraded'),
-    kpi('Dead letters', count(t.deadLetters), (t.deadLetters ?? 0) > 0 ? 'warn' : '', 'dlq'),
-    kpi('Traffic', t.traffic == null ? '–' : `${count(Math.round(t.traffic))} rps`, '', 'traffic'),
-    kpi('Messages', t.messages == null ? '–' : `${count(Math.round(t.messages))} msg/s`, '', 'messages'),
-  ].join('')
-}
-
 export function pickHtml(b: ArchBox): string {
   const parts = [b.sub, b.reason, b.figure].filter(Boolean).map((x) => esc(x!))
-  return `<div><b>${esc(b.name)}</b><small>${parts.join(' · ')}</small></div><button class="x" id="arch-pick-x" aria-label="Clear">×</button>`
+  const links = b.links.filter((l) => /^https?:\/\//i.test(l.url)).map((l) => `<a href="${esc(l.url)}" target="_blank" rel="noopener noreferrer">${esc(l.name)}</a>`).join(' · ')
+  return `<div><b>${esc(b.name)}</b><small>${parts.join(' · ')}</small>${links ? `<small class="links">${links}</small>` : ''}</div><button class="x" id="arch-pick-x" aria-label="Clear">×</button>`
 }
 
 /** What dashboard.ts needs to host the view. */
@@ -138,7 +129,7 @@ export function architecturePlug(): PagePlug {
     },
     draw(s, d, view) {
       arch = buildArchitecture(s, view, d)
-      $('arch-sum').innerHTML = totalsHtml(arch.totals)
+      $('arch-sum').innerHTML = summaryHtml(arch.dashboard).replace(/id="kpi-/g, 'id="arch-kpi-')
       const slim = arch.boxes.map((b) => ({ id: b.id, kind: b.kind }))
       const key = JSON.stringify([slim.map((b) => b.id).sort(), arch.edges.map((e) => `${e.from}>${e.to}`)])
       if (key !== structure) { structure = key; layout = layoutBoxes(slim, arch.edges, layout) }
