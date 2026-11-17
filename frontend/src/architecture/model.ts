@@ -8,7 +8,7 @@ import { dlqCount } from '../deadLetters'
 import type { TenantView } from '../tenants'
 import type { NodeSnapshot, Snapshot } from '../types'
 
-export type BoxKind = 'pillar' | 'vendor' | 'internal' | 'shared'
+export type BoxKind = 'pillar' | 'vendor' | 'internal' | 'shared' | 'service'
 
 export interface ArchBox {
   id: string
@@ -30,6 +30,8 @@ export interface ArchBox {
   dlq: number
   /** The system to open in the drawer when the box is one system; null for a box of many. */
   nodeId: string | null
+  /** A box of another pillar, standing closed beside the one that is open; tap it, then Open, to go there. */
+  closed?: boolean
   /** Portal links of a box that is only links (Log Analytics, App Insights): nothing is measured, so it is grey and has no drawer. Empty for every other box. */
   links: { name: string; url: string }[]
 }
@@ -65,6 +67,8 @@ export interface Architecture {
   internalLabel: string
   /** The dashboard model the numbers came from, for the Pillars menu and the drawer. */
   dashboard: Dashboard
+  /** The pillar opened (its service groups are the boxes marked `service`; every other box is closed); null at the first level. */
+  open: { id: string; name: string } | null
 }
 
 const TYPE: Record<string, string> = { Api: 'API', Worker: 'Worker', Database: 'Database', Cache: 'Cache', Function: 'Function', Gateway: 'Gateway', Broker: 'Broker', Egress: 'Egress' }
@@ -184,5 +188,70 @@ export function buildArchitecture(s: Snapshot, view: TenantView, dashboard?: Das
     vendorsLabel: 'Third-party vendors',
     internalLabel: s.internalVendorsLabel,
     dashboard: d,
+    open: null,
   }
+}
+
+/**
+ * The inside of one pillar: a box for each of its service groups (the lines of the dashboard's table), a line for every call between two of them, and the
+ * third parties and other pillars it calls or is called by as closed boxes at the edge, each with the line that joins it. The shared systems and the link-only
+ * boxes are left out: nothing draws a line to them. Null when the town has no such pillar.
+ */
+export function buildPillarArchitecture(s: Snapshot, view: TenantView, pillarId: string, dashboard?: Dashboard): Architecture | null {
+  const d = dashboard ?? buildDashboard(s, view)
+  const pillar = d.pillars.find((p) => p.id === pillarId)
+  if (!pillar) return null
+  const whole = buildArchitecture(s, view, d)
+  const group = s.groups.find((g) => g.id === pillarId)
+  const color = group?.color ?? null
+
+  const boxOf = new Map<string, string>()
+  const boxes: ArchBox[] = []
+  for (const g of pillar.groups) {
+    const id = `svc:${g.key}`
+    for (const r of g.rows) boxOf.set(r.id, id)
+    const down = g.rows.filter((r) => r.level === 'bad').length
+    const degraded = g.rows.filter((r) => r.level === 'warn').length
+    boxes.push({
+      id, kind: 'service', name: g.name, level: g.level, color,
+      sub: plural(g.rows.length, 'system'), reason: reasonOf(down, degraded, g.level),
+      figure: g.rps != null && g.rps > 0 ? `${num(g.rps)} rps` : null,
+      msg: null, traffic: null, dlq: g.dlq ?? 0, nodeId: g.rows.length === 1 ? g.rows[0].id : null, links: [],
+    })
+  }
+  const inside = new Set(boxes.map((b) => b.id))
+  const outside = new Map(whole.boxes.filter((b) => b.kind !== 'shared' && b.id !== pillarId).map((b) => [b.id, b]))
+  for (const p of d.pillars) if (p.id !== pillarId) for (const g of p.groups) for (const r of g.rows) boxOf.set(r.id, p.id)
+  for (const v of s.vendors) boxOf.set(v.node.id, `vendor:${v.islandId ?? v.node.id}`)
+
+  const sums = new Map<string, number | null>()
+  const addCalls = (id: string, calls: readonly { id: string; rps: number | null }[]): void => {
+    const from = boxOf.get(id)
+    if (!from) return
+    for (const c of calls) {
+      const to = boxOf.get(c.id)
+      if (!to || to === from || !(inside.has(from) || inside.has(to))) continue
+      const key = `${from}\n${to}`
+      const before = sums.get(key)
+      sums.set(key, c.rps == null ? before ?? null : (before ?? 0) + c.rps)
+    }
+  }
+  for (const p of d.pillars) for (const g of p.groups) for (const r of g.rows) addCalls(r.id, r.calls)
+  const side = new Map(d.sections.flatMap((x) => x.rows).filter((r) => r.id).map((r) => [r.id!, r]))
+  for (const r of side.values()) if (r.id) addCalls(r.id, r.calls)
+
+  const linked = new Set<string>()
+  for (const key of sums.keys()) for (const id of key.split('\n')) if (!inside.has(id)) linked.add(id)
+  for (const id of [...linked].sort()) { const b = outside.get(id); if (b) boxes.push(b.kind === 'pillar' ? { ...b, closed: true } : b) }
+
+  const byId = new Map(boxes.map((b) => [b.id, b]))
+  const edges: ArchEdge[] = [...sums].flatMap(([key, rps]) => {
+    const [from, to] = key.split('\n')
+    const a = byId.get(from)
+    const b = byId.get(to)
+    if (!a || !b) return []
+    return [{ from, to, rps, level: edgeLevel(a.level, b.level), color: a.color ?? b.color }]
+  }).sort((x, y) => x.from.localeCompare(y.from) || x.to.localeCompare(y.to))
+
+  return { ...whole, boxes, edges, open: { id: pillar.id, name: pillar.name } }
 }

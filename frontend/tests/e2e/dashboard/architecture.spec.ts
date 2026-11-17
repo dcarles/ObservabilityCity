@@ -165,6 +165,74 @@ test.describe('the architecture view', () => {
     expect(new URL(page.url()).searchParams.has('hidevendors')).toBe(false)
   })
 
+  test('double-tapping a pillar opens it: its service groups, the other pillar closed beside it, and a way back that puts every box where it was', async ({ town, page }) => {
+    await open(town, page)
+    await feed(page, CALL)
+    const at = async (id: string) => box(page, id).getAttribute('transform')
+    const before = [await at('aa'), await at('bb')]
+    await box(page, 'aa').dblclick()
+    await expect(page.locator('#arch-crumb')).toContainText('Alpha')
+    await expect.poll(() => page.evaluate(() => (window as any).dash.opened())).toBe('aa')
+    expect(new URL(page.url()).searchParams.get('open')).toBe('aa')
+    const kinds = await page.evaluate(() => (window as any).dash.architecture().boxes.map((b: any) => [b.kind, !!b.closed]))
+    expect(kinds.filter((k: [string, boolean]) => k[0] === 'service').length).toBeGreaterThan(0)
+    expect(kinds).toContainEqual(['pillar', true]) // Bravo, closed, because Alpha calls it
+    await expect(box(page, 'aa')).toHaveCount(0)
+    await expect(box(page, 'bb')).toContainText('Bravo')
+    await expect(page.locator('#arch-svg .edge')).not.toHaveCount(0)
+    await page.locator('#arch-back').click()
+    await expect(page.locator('#arch-crumb')).toBeHidden()
+    expect(new URL(page.url()).searchParams.has('open')).toBe(false)
+    expect([await at('aa'), await at('bb')]).toEqual(before)
+  })
+
+  test('the Open button on the pick bar opens a pillar, Esc goes back, and tapping a closed pillar then Open jumps to it', async ({ town, page }) => {
+    await open(town, page)
+    await feed(page, CALL)
+    await box(page, 'aa').click()
+    await page.locator('#arch-pick-open').click()
+    await expect.poll(() => page.evaluate(() => (window as any).dash.opened())).toBe('aa')
+    await box(page, 'bb').click()
+    await expect(page.locator('#arch-pick')).toContainText('Bravo')
+    await page.locator('#arch-pick-open').click()
+    await expect.poll(() => page.evaluate(() => (window as any).dash.opened())).toBe('bb')
+    await page.keyboard.press('Escape') // first Esc lets go of the pick, if there is one
+    await page.keyboard.press('Escape')
+    await expect.poll(() => page.evaluate(() => (window as any).dash.opened())).toBeNull()
+    await expect(box(page, 'aa')).toBeVisible()
+  })
+
+  test('inside a pillar, a third party it calls is a closed box, and hiding it takes it away', async ({ town, page }) => {
+    await open(town, page)
+    await feed(page, `s.vendors = [{ node: { ...node('aa.orders-api'), id: 'pay', name: 'Pay Co', calls: [] }, calledBy: ['aa.orders-api'], islandId: 'pay', islandName: 'Pay Co', internal: false, calls: null }]; node('aa.orders-api').calls = [...node('aa.orders-api').calls, 'pay']`)
+    await page.evaluate(() => (window as any).dash.open('aa'))
+    await expect(box(page, 'vendor:pay')).toBeVisible()
+    await page.locator('#pillars-button').click()
+    await page.locator('#pillar-menu input[data-vendor-box="pay"]').uncheck()
+    await expect(box(page, 'vendor:pay')).toHaveCount(0)
+    expect(await page.evaluate(() => (window as any).dash.opened())).toBe('aa')
+  })
+
+  test('an address that opens a pillar the page does not show falls back to all of them', async ({ town, page }) => {
+    await town.reset()
+    await page.goto('/?view=architecture&open=nope')
+    await page.waitForFunction(() => (window as any).dash?.architecture?.()?.boxes.length > 0)
+    await expect(box(page, 'aa')).toBeVisible()
+    expect(new URL(page.url()).searchParams.has('open')).toBe(false)
+  })
+
+  test('a pillar opened by the address stays open when new snapshots arrive', async ({ town, page }) => {
+    await town.reset()
+    await page.goto('/?view=architecture&open=aa')
+    await page.waitForFunction(() => (window as any).dash?.opened?.() === 'aa' && (window as any).dash.architecture()?.boxes.length > 0)
+    await page.locator('#arch-zoom-in').click()
+    await page.waitForTimeout(300)
+    const view = await page.evaluate(() => (window as any).dash.diagram().view)
+    await feed(page, `node('aa.orders-api').state = 'Down'`)
+    expect(await page.evaluate(() => (window as any).dash.opened())).toBe('aa')
+    expect(await page.evaluate(() => (window as any).dash.diagram().view)).toEqual(view)
+  })
+
   test('zooms with the buttons and fits again', async ({ town, page }) => {
     await open(town, page)
     const width = () => page.evaluate(() => (window as any).dash.diagram().view.w)
