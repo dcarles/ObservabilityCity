@@ -6,6 +6,8 @@ import type { Chip, Dashboard, Group, Issue, JobRow, Level, Pillar, Row, Section
 import type { SourceLine } from './freshness'
 import { busiest, windowText, type Flow } from './flows'
 import { formatRate } from '../visuals'
+import { groupWords } from '../groupLabel'
+import type { VendorChoice } from '../vendorFilter'
 
 /** What the viewer has opened or closed. A group or a database that is not in the maps follows its own default. */
 export interface UiState {
@@ -220,8 +222,22 @@ export function hiddenHtml(d: Dashboard): string {
 }
 
 /** The Pillars dropdown: one checkbox for each pillar. */
-export function pillarMenuHtml(d: Dashboard): string {
-  return d.choices.map((c) => `<label class="vb-row"><input type="checkbox" data-pillar-box="${esc(c.id)}" ${c.shown ? 'checked' : ''} /><span>${esc(c.name)}</span></label>`).join('')
+/**
+ * The Pillars list: an "All pillars" row, a row for each pillar, then the third parties and the internal services outside the platform, each with a tick.
+ * Ticking "All" shows every pillar and every third party again.
+ */
+export function pillarMenuHtml(d: Dashboard, vendors: readonly VendorChoice[] = [], internalLabel = 'Internal services'): string {
+  const row = (attr: string, id: string, name: string, on: boolean): string => `<label class="vb-row"><input type="checkbox" ${attr}="${esc(id)}" ${on ? 'checked' : ''} /><span>${esc(name)}</span></label>`
+  const many = groupWords(d.groupLabel).many.toLowerCase()
+  const outside = vendors.filter((v) => !v.internal)
+  const internal = vendors.filter((v) => v.internal)
+  const allOn = d.choices.every((c) => c.shown) && vendors.every((v) => v.shown)
+  return [
+    row('data-pillar-all', 'all', `All ${many}`, allOn),
+    ...d.choices.map((c) => row('data-pillar-box', c.id, c.name, c.shown)),
+    ...(outside.length ? [`<div class="vb-group">Third parties</div>`, ...outside.map((v) => row('data-vendor-box', v.id, v.name, v.shown))] : []),
+    ...(internal.length ? [`<div class="vb-group">${esc(internalLabel)}</div>`, ...internal.map((v) => row('data-vendor-box', v.id, v.name, v.shown))] : []),
+  ].join('')
 }
 
 function sideRowHtml(r: SideRow, columns: 'hub' | 'list'): string {

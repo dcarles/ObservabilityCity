@@ -89,6 +89,21 @@ export class ViewBar {
     this.render()
   }
 
+  /** A control that stands in the bar right after the town's dropdown (the list of views), moved back in each time the bar is redrawn. */
+  private neighbour: HTMLElement | null = null
+
+  hostSelect(el: HTMLElement): void {
+    this.neighbour = el
+    this.place()
+  }
+
+  private place(): void {
+    if (!this.neighbour) return
+    const town = this.el.querySelector('.vb:has(#town-button)')
+    if (town) town.after(this.neighbour)
+    else this.el.prepend(this.neighbour)
+  }
+
   /** Redraws after the view was changed from outside. */
   refresh(): void {
     this.render()
@@ -181,6 +196,7 @@ export class ViewBar {
           ${this.open === 'quality' ? `<div class="vb-list" id="quality-list">${QUALITIES.map((q) => `<div class="vb-row ${q.id === quality ? 'sel' : ''}" data-act="quality" data-id="${q.id}"><span>${escapeHtml(q.name)}<br /><small class="hint">${escapeHtml(q.hint)}</small></span></div>`).join('')}</div>` : ''}</div>`
     const has = (k: Exclude<Open, null>) => !this.only || this.only.includes(k)
     this.el.innerHTML = (has('town') ? townBtn : '') + (has('env') ? envBtn : '') + (has('tenant') ? tenantBtn : '') + (has('islands') ? islandBtn : '') + (has('layers') ? layerBtn : '') + (has('theme') ? themeBtn : '') + (has('quality') ? qualityBtn : '')
+    this.place()
     // the dropdowns just changed width: see whether the bar still fits on its line
     const bar = document.getElementById('topbar')
     if (bar) fitTopBar(bar)

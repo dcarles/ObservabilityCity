@@ -222,6 +222,8 @@ export async function startTown(): Promise<void> {
       window.location.href = u.toString()
     },
   })
+  // the list of views stands next to the town's dropdown, where the dashboard and the diagram have it too
+  if (viewSwitch) viewBar.hostSelect(viewSwitch)
   const inspector = new Inspector({
     scope,
     onScreen: (id) => town.buildings.has(id),
