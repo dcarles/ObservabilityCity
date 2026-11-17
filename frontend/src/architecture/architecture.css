@@ -54,6 +54,8 @@ body.arch #dash-menu { position: static; flex: none; }
 .arch-pick { position: absolute; left: 50%; transform: translateX(-50%); top: 12px; z-index: 7; background: var(--surface); border: 1px solid var(--dline); border-radius: 12px; padding: 8px 10px 8px 14px; display: none; gap: 12px; align-items: center; box-shadow: 0 8px 24px rgba(0,0,0,.18); max-width: calc(100% - 24px); }
 .arch-pick.on { display: flex; }
 .arch-pick b { font-weight: 600; } .arch-pick small { color: var(--muted); display: block; font-size: 12px; }
+.arch-pick { pointer-events: none; } /* a tap goes through to the boxes under it; only the close button takes taps */
+.arch-pick .x { pointer-events: auto; }
 .arch-pick .x { background: none; border: 0; font-size: 20px; color: var(--muted); cursor: pointer; }
 
 .arch-look { position: absolute; left: 50%; transform: translateX(-50%); bottom: 12px; background: var(--surface); border: 1px solid var(--dline); border-radius: 10px; padding: 8px 12px; font-size: 12px; box-shadow: 0 6px 20px rgba(0,0,0,.12); z-index: 5; width: max-content; max-width: calc(100% - 140px); min-width: 280px; }
