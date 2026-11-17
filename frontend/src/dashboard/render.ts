@@ -202,7 +202,7 @@ export function pillarHtml(p: Pillar, ui: UiState): string {
   const affected = p.down + p.degraded
   const level = p.level === 'none' ? 'ok' : p.level
   return `<section class="card ${level}" data-pillar="${esc(p.id)}"><div class="head"><h3>${dot(p.level)}${esc(p.name)}</h3>
-    <div class="m"><span>Services</span><b>${p.services}</b>${affected ? `<small>${countsText(p.down, p.degraded)}</small>` : ''}</div>
+    <div class="m"><span class="sc"><b>${p.services}</b> ${p.services === 1 ? 'service' : 'services'}</span>${affected ? `<small>${countsText(p.down, p.degraded)}</small>` : ''}</div>
     ${p.dlq ? `<div class="m"><span>DLQ</span><b class="bad">${num(p.dlq)}</b></div>` : '<div></div>'}
     <div class="acts"><button class="btn" data-toggle="${esc(p.id)}" aria-expanded="${open}">${open ? 'Close' : 'Services'}</button><button class="btn" data-hide="${esc(p.id)}">Hide</button></div></div>
     ${p.configError ? `<div class="issues"><span class="chip bad">${esc(p.configError)}</span></div>` : ''}
