@@ -12,7 +12,7 @@ import { dashLegendHtml, type DashLegendLine } from '../dashboard/legend'
 import type { Dashboard } from '../dashboard/model'
 import { Diagram, DEFAULT_OPTIONS, type DiagramOptions } from './diagram'
 import { layoutBoxes, type Layout } from './layout'
-import { buildArchitecture, buildPillarArchitecture, type ArchBox, type Architecture } from './model'
+import { buildArchitecture, buildPillarArchitecture, buildSystemArchitecture, type ArchBox, type Architecture } from './model'
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T
 const esc = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
@@ -58,7 +58,7 @@ export function loadOptions(store: Store | null): DiagramOptions {
 export function pickHtml(b: ArchBox): string {
   const parts = [b.sub, b.reason, b.figure].filter(Boolean).map((x) => esc(x!))
   const links = b.links.filter((l) => /^https?:\/\//i.test(l.url)).map((l) => `<a href="${esc(l.url)}" target="_blank" rel="noopener noreferrer">${esc(l.name)}</a>`).join(' · ')
-  const open = b.kind === 'pillar' ? `<button class="open" id="arch-pick-open">Open ›</button>` : ''
+  const open = b.kind === 'pillar' || (b.kind === 'service' && !b.nodeId) ? `<button class="open" id="arch-pick-open">Open ›</button>` : ''
   return `<div><b>${esc(b.name)}</b><small>${parts.join(' · ')}</small>${links ? `<small class="links">${links}</small>` : ''}</div>${open}<button class="x" id="arch-pick-x" aria-label="Clear">×</button>`
 }
 
@@ -105,22 +105,36 @@ export function architecturePlug(): PagePlug {
   /** Zooms in on the box, then shows the inside of the pillar. */
   const dive = (id: string): void => {
     const box = arch?.boxes.find((b) => b.id === id)
-    if (!box || box.kind !== 'pillar') return
+    if (!box || !(box.kind === 'pillar' || (box.kind === 'service' && !box.nodeId))) return
+    const target = box.kind === 'pillar' ? box.id : `${arch!.open!.id}/${box.id.slice('svc:'.length)}`
     diagram.focus(id)
-    window.setTimeout(() => setOpen(id), 320)
+    window.setTimeout(() => setOpen(target), 320)
   }
 
+  /** One step up: from the systems of a service group to its pillar, from a pillar to all of them. */
+  const up = (): void => setOpen(openId?.includes('/') ? openId.slice(0, openId.indexOf('/')) : null)
+
   const render = (s: Snapshot, d: Dashboard, view: TenantView): void => {
-    let next = openId ? buildPillarArchitecture(s, view, openId, d) : null
-    if (openId && !next) { openId = null; setOpen(null); return } // the pillar is hidden or gone: all of them again
+    const slash = openId ? openId.indexOf('/') : -1
+    let next = !openId ? null : slash > 0 ? buildSystemArchitecture(s, view, openId.slice(0, slash), openId.slice(slash + 1), d) : buildPillarArchitecture(s, view, openId, d)
+    if (openId && !next) { // the pillar or service is hidden or gone: one step up, the pillar if it is still there, else all of them
+      if (slash > 0 && buildPillarArchitecture(s, view, openId.slice(0, slash), d)) up()
+      else setOpen(null)
+      return
+    }
     next ??= buildArchitecture(s, view, d)
     arch = next
-    const mode = next.open?.id ?? ''
+    const mode = next.openService?.id ?? next.open?.id ?? ''
     if (shown !== mode) { diagram.reset(); shown = mode; structure = ''; layout = layouts.get(mode) ?? null }
     $('arch-sum').innerHTML = summaryHtml(next.dashboard).replace(/id="kpi-/g, 'id="arch-kpi-')
     const crumb = $('arch-crumb')
     crumb.hidden = !next.open
-    if (next.open) crumb.innerHTML = `<button id="arch-back" title="Back to all (Esc)">‹ All ${esc(groupWords(next.dashboard.groupLabel).many.toLowerCase())}</button><span aria-hidden="true">›</span><b>${esc(next.open.name)}</b>`
+    if (next.open) {
+      const all = `<button id="arch-back" title="Back to all (Esc)">‹ All ${esc(groupWords(next.dashboard.groupLabel).many.toLowerCase())}</button><span aria-hidden="true">›</span>`
+      crumb.innerHTML = next.openService
+        ? `${all}<button id="arch-back-pillar" title="Back to ${esc(next.open.name)} (Esc)">${esc(next.open.name)}</button><span aria-hidden="true">›</span><b>${esc(next.openService.name)}</b>`
+        : `${all}<b>${esc(next.open.name)}</b>`
+    }
     const slim = next.boxes.map((b) => ({ id: b.id, kind: b.kind }))
     const key = JSON.stringify([mode, slim.map((b) => b.id).sort(), next.edges.map((e) => `${e.from}>${e.to}`)])
     if (key !== structure) { structure = key; layout = layoutBoxes(slim, next.edges, layout); layouts.set(mode, layout) }
@@ -150,7 +164,11 @@ export function architecturePlug(): PagePlug {
         if (t.closest('#arch-pick-x')) diagram.pick(null)
         else if (t.closest('#arch-pick-open') && diagram.selection) dive(diagram.selection)
       })
-      $('arch-crumb').addEventListener('click', (e) => { if ((e.target as HTMLElement).closest('#arch-back')) setOpen(null) })
+      $('arch-crumb').addEventListener('click', (e) => {
+        const t = e.target as HTMLElement
+        if (t.closest('#arch-back-pillar')) up()
+        else if (t.closest('#arch-back')) setOpen(null)
+      })
       $('arch-zoom-in').addEventListener('click', () => diagram.zoom(1.4, undefined, undefined, true))
       $('arch-zoom-out').addEventListener('click', () => diagram.zoom(1 / 1.4, undefined, undefined, true))
       $('arch-fit').addEventListener('click', () => diagram.home())
@@ -175,7 +193,7 @@ export function architecturePlug(): PagePlug {
       window.addEventListener('keydown', (e) => {
         if (e.key !== 'Escape' || document.querySelector('#inspector:not([hidden])')) return
         if (diagram.selection) diagram.pick(null)
-        else if (openId) setOpen(null)
+        else if (openId) up()
       })
     },
     draw(s, d, view) {

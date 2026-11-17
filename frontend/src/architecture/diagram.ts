@@ -246,7 +246,7 @@ export class Diagram {
     g.addEventListener('dblclick', (e) => {
       e.stopPropagation()
       const box = this.arch?.boxes.find((b) => b.id === id)
-      if (box?.kind === 'pillar') this.host.dive(box)
+      if (box && (box.kind === 'pillar' || (box.kind === 'service' && !box.nodeId))) this.host.dive(box)
     })
     g.addEventListener('click', (e) => {
       if (this.moved > 12) return
