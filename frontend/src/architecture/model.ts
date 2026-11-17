@@ -8,7 +8,7 @@ import { dlqCount } from '../deadLetters'
 import type { TenantView } from '../tenants'
 import type { NodeSnapshot, Snapshot } from '../types'
 
-export type BoxKind = 'pillar' | 'vendor' | 'internal' | 'shared' | 'service'
+export type BoxKind = 'pillar' | 'vendor' | 'internal' | 'shared' | 'service' | 'system'
 
 export interface ArchBox {
   id: string
@@ -30,7 +30,7 @@ export interface ArchBox {
   dlq: number
   /** The system to open in the drawer when the box is one system; null for a box of many. */
   nodeId: string | null
-  /** A box of another pillar, standing closed beside the one that is open; tap it, then Open, to go there. */
+  /** A box of another pillar or service group, standing closed beside the one that is open; tap it, then Open, to go there. */
   closed?: boolean
   /** Portal links of a box that is only links (Log Analytics, App Insights): nothing is measured, so it is grey and has no drawer. Empty for every other box. */
   links: { name: string; url: string }[]
@@ -69,6 +69,8 @@ export interface Architecture {
   dashboard: Dashboard
   /** The pillar opened (its service groups are the boxes marked `service`; every other box is closed); null at the first level. */
   open: { id: string; name: string } | null
+  /** The service group opened inside that pillar (its systems are the boxes marked `system`); null above the third level. */
+  openService: { id: string; name: string } | null
 }
 
 const TYPE: Record<string, string> = { Api: 'API', Worker: 'Worker', Database: 'Database', Cache: 'Cache', Function: 'Function', Gateway: 'Gateway', Broker: 'Broker', Egress: 'Egress' }
@@ -189,6 +191,7 @@ export function buildArchitecture(s: Snapshot, view: TenantView, dashboard?: Das
     internalLabel: s.internalVendorsLabel,
     dashboard: d,
     open: null,
+    openService: null,
   }
 }
 
@@ -253,5 +256,70 @@ export function buildPillarArchitecture(s: Snapshot, view: TenantView, pillarId:
     return [{ from, to, rps, level: edgeLevel(a.level, b.level), color: a.color ?? b.color }]
   }).sort((x, y) => x.from.localeCompare(y.from) || x.to.localeCompare(y.to))
 
-  return { ...whole, boxes, edges, open: { id: pillar.id, name: pillar.name } }
+  return { ...whole, boxes, edges, open: { id: pillar.id, name: pillar.name }, openService: null }
+}
+
+/**
+ * The inside of one service group: a box for each of its systems (apis, workers, databases, functions), a line for every call between two of them or
+ * between one of them and anything outside, which stands closed at the edge: the pillar's other service groups, other pillars, third parties. Null when the
+ * town has no such pillar or group.
+ */
+export function buildSystemArchitecture(s: Snapshot, view: TenantView, pillarId: string, key: string, dashboard?: Dashboard): Architecture | null {
+  const d = dashboard ?? buildDashboard(s, view)
+  const pillar = d.pillars.find((p) => p.id === pillarId)
+  const group = pillar?.groups.find((g) => g.key === key)
+  if (!pillar || !group) return null
+  const level2 = buildPillarArchitecture(s, view, pillarId, d)!
+  const color = level2.boxes.find((b) => b.id === `svc:${key}`)?.color ?? null
+
+  const boxOf = new Map<string, string>()
+  const boxes: ArchBox[] = []
+  for (const r of group.rows) {
+    const id = `sys:${r.id}`
+    boxOf.set(r.id, id)
+    boxes.push({
+      id, kind: 'system', name: r.name, level: r.level, color,
+      sub: [r.type, r.instancesText].filter(Boolean).join(' · '), reason: r.reason ?? (r.level === 'none' ? 'no fresh data' : null),
+      figure: r.rps != null && r.rps > 0 ? `${num(r.rps)} rps` : null,
+      msg: null, traffic: null, dlq: r.dlq ?? 0, nodeId: r.id, links: [],
+    })
+  }
+  const inside = new Set(boxes.map((b) => b.id))
+  const outside = new Map(level2.boxes.filter((b) => !inside.has(b.id) && b.id !== `svc:${key}`).map((b) => [b.id, b]))
+  for (const g of pillar.groups) if (g.key !== key) for (const r of g.rows) boxOf.set(r.id, `svc:${g.key}`)
+  for (const p of d.pillars) if (p.id !== pillarId) for (const g of p.groups) for (const r of g.rows) boxOf.set(r.id, p.id)
+  for (const v of s.vendors) boxOf.set(v.node.id, `vendor:${v.islandId ?? v.node.id}`)
+
+  const sums = new Map<string, number | null>()
+  const addCalls = (id: string, calls: readonly { id: string; rps: number | null }[]): void => {
+    const from = boxOf.get(id)
+    if (!from) return
+    for (const c of calls) {
+      const to = boxOf.get(c.id)
+      if (!to || to === from || !(inside.has(from) || inside.has(to))) continue
+      const k = `${from}\n${to}`
+      const before = sums.get(k)
+      sums.set(k, c.rps == null ? before ?? null : (before ?? 0) + c.rps)
+    }
+  }
+  for (const p of d.pillars) for (const g of p.groups) for (const r of g.rows) addCalls(r.id, r.calls)
+  for (const r of d.sections.flatMap((x) => x.rows)) if (r.id) addCalls(r.id, r.calls)
+
+  const linked = new Set<string>()
+  for (const k of sums.keys()) for (const id of k.split('\n')) if (!inside.has(id)) linked.add(id)
+  for (const id of [...linked].sort()) {
+    const b = outside.get(id)
+    if (b) boxes.push(b.kind === 'pillar' ? { ...b, closed: true } : b.kind === 'service' ? { ...b, closed: true, nodeId: null } : b)
+  }
+
+  const byId = new Map(boxes.map((b) => [b.id, b]))
+  const edges: ArchEdge[] = [...sums].flatMap(([k, rps]) => {
+    const [from, to] = k.split('\n')
+    const a = byId.get(from)
+    const b = byId.get(to)
+    if (!a || !b) return []
+    return [{ from, to, rps, level: edgeLevel(a.level, b.level), color: a.color ?? b.color }]
+  }).sort((x, y) => x.from.localeCompare(y.from) || x.to.localeCompare(y.to))
+
+  return { ...level2, boxes, edges, open: { id: pillar.id, name: pillar.name }, openService: { id: `${pillar.id}/${group.key}`, name: group.name } }
 }

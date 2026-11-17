@@ -202,6 +202,40 @@ test.describe('the architecture view', () => {
     await expect(box(page, 'aa')).toBeVisible()
   })
 
+  test('a service group opens to its systems, a system opens the drawer, and the crumb, Esc and the address take you back a step at a time', async ({ town, page }) => {
+    await open(town, page)
+    await page.evaluate(() => (window as any).dash.open('aa'))
+    const key = await page.evaluate(() => (window as any).dash.architecture().boxes.filter((b: any) => b.kind === 'service').map((b: any) => [b.id.slice(4), b.nodeId]).sort((x: any, y: any) => Number(!!x[1]) - Number(!!y[1]))[0][0])
+    await page.locator(`#arch-svg .box[data-id="svc:${key}"]`).dblclick({ force: true }) // a group of one system is that system: it has no inside
+    const many = await page.evaluate(() => (window as any).dash.architecture().boxes.some((b: any) => b.kind === 'service' && !b.nodeId))
+    if (!many) await page.evaluate((k) => (window as any).dash.open(`aa/${k}`), key)
+    await expect.poll(() => page.evaluate(() => (window as any).dash.opened())).toBe(`aa/${key}`)
+    expect(new URL(page.url()).searchParams.get('open')).toBe(`aa/${key}`)
+    await expect(page.locator('#arch-crumb')).toContainText('Alpha')
+    const systems = await page.evaluate(() => (window as any).dash.architecture().boxes.filter((b: any) => b.kind === 'system').map((b: any) => b.id))
+    expect(systems.length).toBeGreaterThan(0)
+    await box(page, systems[0]).click()
+    await expect(page.locator('#inspector')).toBeVisible()
+    await page.keyboard.press('Escape') // closes the drawer
+    await expect(page.locator('#inspector')).toBeHidden()
+    if (await page.evaluate(() => (window as any).dash.diagram().selected)) await page.keyboard.press('Escape') // lets go of the pick
+    await page.keyboard.press('Escape') // one step up: the pillar
+    await expect.poll(() => page.evaluate(() => (window as any).dash.opened())).toBe('aa')
+    await page.evaluate((k) => (window as any).dash.open(`aa/${k}`), key)
+    await page.locator('#arch-back-pillar').click()
+    await expect.poll(() => page.evaluate(() => (window as any).dash.opened())).toBe('aa')
+    await page.evaluate((k) => (window as any).dash.open(`aa/${k}`), key)
+    await page.locator('#arch-back').click()
+    await expect.poll(() => page.evaluate(() => (window as any).dash.opened())).toBeNull()
+  })
+
+  test('an address that opens a service group the page does not show falls back to its pillar', async ({ town, page }) => {
+    await town.reset()
+    await page.goto('/?view=architecture&open=aa/nope')
+    await page.waitForFunction(() => (window as any).dash?.opened?.() === 'aa' && (window as any).dash.architecture()?.boxes.length > 0)
+    expect(new URL(page.url()).searchParams.get('open')).toBe('aa')
+  })
+
   test('inside a pillar, a third party it calls is a closed box, and hiding it takes it away', async ({ town, page }) => {
     await open(town, page)
     await feed(page, `s.vendors = [{ node: { ...node('aa.orders-api'), id: 'pay', name: 'Pay Co', calls: [] }, calledBy: ['aa.orders-api'], islandId: 'pay', islandName: 'Pay Co', internal: false, calls: null }]; node('aa.orders-api').calls = [...node('aa.orders-api').calls, 'pay']`)

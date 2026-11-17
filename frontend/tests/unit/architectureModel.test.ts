@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { buildArchitecture, buildPillarArchitecture, edgeLevel } from '../../src/architecture/model'
+import { buildArchitecture, buildPillarArchitecture, buildSystemArchitecture, edgeLevel } from '../../src/architecture/model'
 import { arrange, crossings, layers, layoutBoxes, routeAll } from '../../src/architecture/layout'
 import { ALL_TENANTS } from '../../src/tenants'
 import type { Snapshot } from '../../src/types'
@@ -111,6 +111,36 @@ describe('the inside of a pillar', () => {
 
   it('is null for a pillar the town does not show', () => {
     expect(buildPillarArchitecture(golden('calm'), ALL_TENANTS, 'nope')).toBeNull()
+  })
+})
+
+describe('architecture inside a service group', () => {
+  const s = golden('bad-day')
+  const whole = buildArchitecture(s, ALL_TENANTS)
+  const pillar = whole.dashboard.pillars.find((p) => p.groups.length > 1 && p.groups.some((g) => g.rows.length > 1)) ?? whole.dashboard.pillars[0]
+  const group = pillar.groups.find((g) => g.rows.length > 1) ?? pillar.groups[0]
+
+  it('has a box for each system of the group, with the drawer to open, and everything else closed at the edge', () => {
+    const a = buildSystemArchitecture(s, ALL_TENANTS, pillar.id, group.key, whole.dashboard)!
+    expect(a.openService).toEqual({ id: `${pillar.id}/${group.key}`, name: group.name })
+    const systems = a.boxes.filter((b) => b.kind === 'system')
+    expect(systems.map((b) => b.nodeId).sort()).toEqual(group.rows.map((r) => r.id).sort())
+    for (const b of a.boxes.filter((x) => x.kind === 'service' || x.kind === 'pillar')) expect(b.closed, b.id).toBe(true)
+    for (const b of a.boxes.filter((x) => x.kind === 'service')) expect(b.nodeId).toBeNull()
+    expect(a.boxes.some((b) => b.id === `svc:${group.key}`)).toBe(false)
+    expect(a.boxes.some((b) => b.kind === 'shared')).toBe(false)
+  })
+
+  it('draws only lines with a system at one end, and gives every closed box a line', () => {
+    const a = buildSystemArchitecture(s, ALL_TENANTS, pillar.id, group.key, whole.dashboard)!
+    for (const e of a.edges) expect(e.from.startsWith('sys:') || e.to.startsWith('sys:'), `${e.from}>${e.to}`).toBe(true)
+    for (const b of a.boxes.filter((x) => x.kind !== 'system')) expect(a.edges.some((e) => e.from === b.id || e.to === b.id), b.id).toBe(true)
+    expect(new Set(a.edges.map((e) => `${e.from}>${e.to}`)).size).toBe(a.edges.length)
+  })
+
+  it('is null for a group or a pillar the town does not show', () => {
+    expect(buildSystemArchitecture(s, ALL_TENANTS, pillar.id, 'nope')).toBeNull()
+    expect(buildSystemArchitecture(s, ALL_TENANTS, 'nope', group.key)).toBeNull()
   })
 })
 
