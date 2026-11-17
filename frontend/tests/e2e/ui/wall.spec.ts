@@ -504,6 +504,16 @@ test.describe('the overview of the whole town', () => {
     expect(sameSide(await side(page), await frontOf(page, 'bb'))).toBeLessThan(0.05)
   })
 
+  test('a stop on a building shows it from its front (the side of its door), whichever side the camera was on', async ({ town, page }) => {
+    await openOn(town, page, '&wall=1&hold=2&overview=0')
+    await page.evaluate(() => { const c = (window as any).city; c.stage.focus(c.town.islandFocusOf('cc').target, 90, true, 2.5) }) // standing on some other side
+    await town.effect('aa.orders-api', 'Down')
+    await page.waitForFunction(() => (window as any).city.wall().stop?.key === 'down:aa.orders-api')
+    await town.step(1.5)
+    const front = await page.evaluate(() => (window as any).city.town.frontOf('aa.orders-api') as number)
+    expect(sameSide(await side(page), front)).toBeLessThan(0.05)
+  })
+
   test('opens a tour of several stops before the first one, and again after the last', async ({ town, page }) => {
     await openOn(town, page, OVERVIEW)
     await town.effect('aa.orders-api', 'Down')

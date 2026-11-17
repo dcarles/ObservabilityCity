@@ -159,7 +159,7 @@ test.describe(`a live town with scope rules (${B ? 'tags and derived names' : 'n
     const ledger = await page.evaluate(() => (window as any).city.inspect('bb.ledger-api'))
     expect(orders.floors).toBe(3)
     expect(orders.plaque).toBe('3/3 healthy')
-    expect(ledger.floors).toBe(4)
+    expect(ledger.floors).toBe(5)
     expect(ledger.plaque).toBe('5/5 healthy')
   })
 

@@ -384,10 +384,16 @@ export async function startTown(): Promise<void> {
   const nowSeconds = (): number => (testMode ? simTime : clock.getElapsed())
   const wall = wallParams.on
     ? new WallMode(wallParams.hold, {
-        focusOf: (f) => (f.kind === 'building' ? town.focusOf(f.id) : town.islandFocusOf(f.id)),
+        // on the wall a building with a problem is looked at from the front (the side of its door), as an island is
+        focusOf: (f) => {
+          if (f.kind !== 'building') return town.islandFocusOf(f.id)
+          const place = town.focusOf(f.id)
+          const front = town.frontOf(f.id)
+          return place && front !== null ? { ...place, azimuth: front } : place
+        },
         go: (f, cut) => {
-          // an island on the wall is stood further back and lifted above the status strip, which covers the bottom of the screen
-          const strip = f.azimuth !== undefined ? document.getElementById('wall-strip') : null
+          // an island, or a tall building, on the wall is stood further back and lifted above the status strip, which covers the bottom of the screen
+          const strip = f.tall !== undefined ? (f.tall ? document.getElementById('wall-strip') : null) : f.azimuth !== undefined ? document.getElementById('wall-strip') : null
           const fit = strip && !strip.hidden ? wallFraming(strip.getBoundingClientRect().height + 16, window.innerHeight) : { zoom: 1, lift: 0 }
           stage.focus(f.target, f.distance * fit.zoom, cut, f.azimuth, fit.lift)
         },
