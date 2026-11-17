@@ -62,7 +62,8 @@ describe('pillar cards', () => {
     const d = buildDashboard(golden('calm'), ALL_TENANTS)
     const html = pillarHtml(d.pillars[0], ui())
     expect(html).toContain('card ok')
-    expect(html).toContain(`<span>Services</span><b>${d.pillars[0].services}</b></div>`) // the count, and nothing under it
+    expect(html).toContain(`<span class="sc"><b>${d.pillars[0].services}</b> ${d.pillars[0].services === 1 ? 'service' : 'services'}</span></div>`) // the count on one line, and nothing under it
+    expect(d.pillars[0].services).toBe(d.pillars[0].groups.length) // services are the table's groups, not every api, worker and database
     expect(html).not.toContain('<small>')
     expect(html).not.toContain('class="issues"')
   })
