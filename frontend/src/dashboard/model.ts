@@ -125,7 +125,7 @@ export interface Pillar {
   dlq: number
   issues: Issue[]
   groups: Group[]
-  /** How many services the pillar has. */
+  /** How many services the pillar has: its service groups (the lines of the table), not the apis, workers and databases inside them. */
   services: number
   configError: string | null
   /** The messages a second this pillar sends to other pillars and receives from them; null when the environment does not measure it. */
@@ -408,6 +408,7 @@ export function buildDashboard(s: Snapshot, view: TenantView): Dashboard {
   const pillars: Pillar[] = s.groups.filter((g) => !g.isHub).map((g) => {
     const rows = g.nodes.map((n) => rowOf(n, s, view, links))
     const groupIssues = issues(g.nodes, g.displayName).sort(worstFirst)
+    const groups = groupsOf(g, rows, g.nodes)
     return {
       id: g.id,
       name: g.displayName,
@@ -416,8 +417,8 @@ export function buildDashboard(s: Snapshot, view: TenantView): Dashboard {
       degraded: groupIssues.filter((i) => i.level === 'warn').length,
       dlq: rows.reduce((a, r) => a + (r.dlq ?? 0), 0),
       issues: groupIssues,
-      groups: groupsOf(g, rows, g.nodes),
-      services: rows.length,
+      groups,
+      services: groups.length,
       configError: g.configError ?? null,
       flow: pillarFlow(flows, g.id),
       traffic: rows.reduce((a, r) => a + (r.rps ?? 0), 0),
