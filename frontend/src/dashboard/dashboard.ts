@@ -5,7 +5,6 @@ import '../dashboard.css'
 import { Connection, markFeed, SILENT_WORDS, type ConnectionState } from '../connection'
 import { checkSnapshot } from '../snapshotGuard'
 import { Inspector } from '../inspector'
-import { dismissEvent } from '../healthEvents'
 import { requestedScope } from '../scope'
 import { ViewBar } from '../viewbar'
 import { NoticesPanel } from '../noticesPanel'
@@ -84,8 +83,7 @@ export function startDashboard(plug?: PagePlug): void {
     if (isViewMode(to)) window.location.href = viewSwitchAddress(window.location, to, store)
   })
 
-  const ui = { openPillars: new Set<string>(), groups: new Map<string, boolean>(), databases: new Map<string, boolean>(), connections: new Set<string>(), sections: new Set<string>(), flowsAll: false }
-  let flowOrder: string[] = []
+  const ui = { openPillars: new Set<string>(), groups: new Map<string, boolean>(), databases: new Map<string, boolean>(), connections: new Set<string>(), sections: new Set<string>() }
   let tenantView: TenantView = loadTenantView(store)
   let islands: readonly string[] = parseIslands(window.location.search)
   let last: Snapshot | null = null
@@ -145,8 +143,7 @@ export function startDashboard(plug?: PagePlug): void {
   /** Draws what changed. Open and closed things live in `ui`, so a new snapshot never undoes them, and the page keeps its scroll place. */
   function draw(): void {
     if (!last) return
-    model = buildDashboard(last, tenantView, flowOrder)
-    flowOrder = model.summary.flows?.all.map((f) => f.id) ?? []
+    model = buildDashboard(last, tenantView)
     const y = window.scrollY
     const active = (document.activeElement as HTMLElement | null)?.closest<HTMLElement>('[data-toggle],[data-hide],[data-show],[data-db],[data-group],[data-conn]')
     const key = active ? (['toggle', 'hide', 'show', 'db', 'group'] as const).map((k) => (active.dataset[k] !== undefined ? `[data-${k}="${CSS.escape(active.dataset[k]!)}"]` : '')).join('') : ''
@@ -155,7 +152,7 @@ export function startDashboard(plug?: PagePlug): void {
     // the town's own word for an island (groupLabel) on the menu button and the heading; the page's own words (Pillars) until the first snapshot
     const groups = groupWords(model.groupLabel).many
     if (shown.group !== groups) { shown.group = groups; $('pillars-button-label').textContent = groups; $('dash-pillars-title').textContent = groups }
-    put('dash-sum', summaryHtml(model, ui), 'sum')
+    put('dash-sum', summaryHtml(model), 'sum')
     put('dash-pillars', pillarsHtml(model, ui as UiState), 'pillars')
     put('hidden-pillars', hiddenHtml(model), 'hidden')
     put('pillar-menu', pillarMenuHtml(model), 'menu')
@@ -314,9 +311,6 @@ export function startDashboard(plug?: PagePlug): void {
     const details = attr('data-details')
     const conn = attr('data-conn')
     const group = attr('data-group')
-    const dismiss = attr('data-dismiss')
-    if (t.closest('[data-flows-all]')) { ui.flowsAll = !ui.flowsAll; draw(); return }
-    if (dismiss !== undefined) { void dismissEvent(dismiss); return }
     const system = t.closest<HTMLElement>('[data-system]')?.dataset.system
     if (toggle !== undefined) { if (ui.openPillars.has(toggle)) ui.openPillars.delete(toggle); else ui.openPillars.add(toggle); draw(); return }
     if (hide !== undefined && last) { setIslands(pillarSelection(last, hide, false)); return }

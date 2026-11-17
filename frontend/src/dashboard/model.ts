@@ -1,16 +1,16 @@
 // What the dashboard shows, worked out from a snapshot as plain data. Nothing here touches the page, so every rule is unit tested.
 // The numbers are the snapshot's own; the dashboard invents nothing, and a signal nobody measures is null (shown as a dash), never a zero.
 
-import { dayTime, messagesPerSecond } from '../inspectorModel'
+import { messagesPerSecond } from '../inspectorModel'
 import { eventOfNode, healthEventsOf, isResolved } from '../healthEvents'
 import { absentEverywhere, isAbsent, isUnmonitored } from '../signals'
 import { isFollowed, isFollowing, isShown, isThrottled, tenantLevel, type TenantView } from '../tenants'
 import { islandChoices } from '../islands'
-import { deadLetterItems, dlqCount, type DeadLetterItem } from '../deadLetters'
+import { dlqCount } from '../deadLetters'
 import { stateFor, viewTotals } from '../viewTotals'
 import { trafficSplit } from '../trafficSplit'
 import { pillarTraffic } from '../trafficFlow'
-import { flowsOf, flowTile, pillarFlow, trafficByPillar, type Flow, type FlowTile, type TrafficRow } from './flows'
+import { flowsOf, pillarFlow, type Flow } from './flows'
 import type { GroupSnapshot, HealthState, JobSnapshot, NodeSnapshot, Snapshot } from '../types'
 
 /** ok / warn / bad are the three colours; none is grey: no fresh data, or no source at all. */
@@ -99,6 +99,8 @@ export interface Row {
   tenantsOpenByDefault: boolean
   /** The cloud's open health report for this system's resource ("Degraded", "Unavailable"), with since when and the cloud's name; null when the cloud reports nothing. */
   cloudHealth: { state: string; since: string; cloud: string } | null
+  /** The scheduled jobs of a function (the Scheduler), shown under its row; empty for everything else. A failed or late job already makes the row amber. */
+  jobs: JobRow[]
 }
 
 export interface Group {
@@ -123,7 +125,8 @@ export interface Pillar {
   dlq: number
   issues: Issue[]
   groups: Group[]
-  jobs: JobRow[]
+  /** How many services the pillar has. */
+  services: number
   configError: string | null
   /** The messages a second this pillar sends to other pillars and receives from them; null when the environment does not measure it. */
   flow: Flow | null
@@ -157,23 +160,6 @@ export interface Section {
   rows: SideRow[]
 }
 
-/** One line of the Incidents card: an cloud health report or an incident of the incident tool, with what it is about and its status. */
-export interface IncidentRow {
-  source: string
-  what: string
-  status: string
-  /** Red while unresolved, green once resolved. */
-  tone: 'bad' | 'ok'
-  /** The system to open on a click; null when the report belongs to no system of the town. */
-  nodeId: string | null
-  /** When it was declared and, once resolved, when it ended ("declared 16:21 · resolved 18:17"); empty when the source gives no times. */
-  times: string
-  /** The id of the cloud report, for its Dismiss button; null for an incident of the incident tool. */
-  dismiss: string | null
-  /** Why, as the cloud said it; null when it gave none or the line is not a cloud report. */
-  cause: string | null
-}
-
 export interface Dashboard {
   townName: string
   /** What the town calls an island (town.yaml groupLabel), for the words of the page. */
@@ -181,18 +167,12 @@ export interface Dashboard {
   summary: {
     down: number
     degraded: number
-    affected: Issue[]
     traffic: { total: number; external: number; internal: number } | null
-    /** The requests a second of each pillar, busiest first, for the Traffic card. Empty when nothing reports requests. */
-    trafficPillars: TrafficRow[]
     deadLetters: number | null
-    backlog: number | null
-    /** The queues with dead letters, worst first, for the Dead letters card. */
-    deadQueues: DeadLetterItem[]
-    /** The Message flow tile: the busiest pillars by what they send and receive. Null when no pillar moves any message. */
-    flows: FlowTile | null
-    /** The Incidents card: how many are open, and every line, open ones first. Null when nothing reports incidents (no health source, no incident tool with an incident). */
-    incidents: { open: number; rows: IncidentRow[] } | null
+    /** Messages a second the whole platform takes in through its queues (the town top bar's number); null when no queue is measured. */
+    messageFlow: number | null
+    /** How many incidents are open; null when nothing reports incidents (no health source, no incident tool with an incident). */
+    incidents: number | null
   }
   pillars: Pillar[]
   sections: Section[]
@@ -319,25 +299,17 @@ function rowOf(n: NodeSnapshot, s: Snapshot, view: TenantView, links: ReturnType
     tenants,
     tenantsOpenByDefault: tenants?.some((t) => t.hot) ?? false,
     cloudHealth: cloudHealthOf(n.id, s),
+    jobs: (n.jobs ?? []).map((j) => ({ name: j.name, where: n.name, region: j.region ?? null, status: j.status, lastRun: j.lastRun ?? null })),
   }
 }
 
-function incidentsOf(s: Snapshot): Dashboard['summary']['incidents'] {
-  const tool: IncidentRow[] = s.groups.flatMap((g) => g.incidents.map<IncidentRow>((i) => ({ source: 'Incident', what: `${i.title} · ${g.displayName}`, status: `sev ${i.severity}`, tone: 'bad', nodeId: null, times: i.startedAt ? `declared ${dayTime(i.startedAt, Date.now())}` : '', dismiss: null, cause: null })))
-  const nameOf = new Map(s.groups.flatMap((g) => g.nodes.map((n) => [n.id, n.name] as const)))
-  const cloudReports = healthEventsOf(s.healthEvents).map<IncidentRow>((e) => ({ source: s.cloud ?? 'Cloud', what: incidentName(e, nameOf), status: e.state, tone: isResolved(e) ? 'ok' : 'bad', nodeId: e.nodeId ?? null, times: [`declared ${dayTime(e.since, Date.now())}`, isResolved(e) && e.resolvedAt ? `resolved ${dayTime(e.resolvedAt, Date.now())}` : null].filter(Boolean).join(' · '), dismiss: e.id, cause: e.cause ?? null }))
-  if (s.healthEvents == null && tool.length === 0) return null
-  const rows = [...tool, ...cloudReports].sort((a, b) => Number(a.tone === 'ok') - Number(b.tone === 'ok'))
-  return { open: rows.filter((r) => r.tone === 'bad').length, rows }
+function incidentsOf(s: Snapshot): number | null {
+  const tool = s.groups.reduce((a, g) => a + g.incidents.length, 0)
+  if (s.healthEvents == null && tool === 0) return null
+  return tool + healthEventsOf(s.healthEvents).filter((e) => !isResolved(e)).length
 }
 
-/** The name a report goes by in the card: the system's own name, as the service table shows it, and for a resource kept per tenant (a database) the tenant too; a resource no system owns keeps the cloud's name. */
-export function incidentName(e: { resource: string; nodeId?: string | null; tenant?: string | null }, nameOf: ReadonlyMap<string, string>): string {
-  const own = e.nodeId ? nameOf.get(e.nodeId) : undefined
-  return own ? (e.tenant ? `${own} · ${e.tenant}` : own) : e.resource
-}
-
-/** Only an open report marks a row: once resolved it is left to the Incidents card. */
+/** Only an open report marks a row: once resolved it is not counted as open. */
 function cloudHealthOf(id: string, s: Snapshot): Row['cloudHealth'] {
   const e = eventOfNode(s.healthEvents, id)
   return e && !isResolved(e) ? { state: e.state, since: e.since, cloud: s.cloud ?? 'Cloud' } : null
@@ -420,7 +392,7 @@ function sectionsOf(s: Snapshot, view: TenantView, links: ReturnType<typeof link
 }
 
 /** Everything the dashboard draws, for the tenants the viewer chose. */
-export function buildDashboard(s: Snapshot, view: TenantView, flowOrder: readonly string[] = []): Dashboard {
+export function buildDashboard(s: Snapshot, view: TenantView): Dashboard {
   const links = linkIndex(s)
   const issues = (nodes: NodeSnapshot[], where: string): Issue[] =>
     nodes.flatMap((n) => {
@@ -436,7 +408,6 @@ export function buildDashboard(s: Snapshot, view: TenantView, flowOrder: readonl
   const pillars: Pillar[] = s.groups.filter((g) => !g.isHub).map((g) => {
     const rows = g.nodes.map((n) => rowOf(n, s, view, links))
     const groupIssues = issues(g.nodes, g.displayName).sort(worstFirst)
-    const jobs = g.nodes.flatMap((n) => (n.jobs ?? []).map((j) => ({ name: j.name, where: n.name, region: j.region ?? null, status: j.status, lastRun: j.lastRun ?? null })))
     return {
       id: g.id,
       name: g.displayName,
@@ -446,7 +417,7 @@ export function buildDashboard(s: Snapshot, view: TenantView, flowOrder: readonl
       dlq: rows.reduce((a, r) => a + (r.dlq ?? 0), 0),
       issues: groupIssues,
       groups: groupsOf(g, rows, g.nodes),
-      jobs,
+      services: rows.length,
       configError: g.configError ?? null,
       flow: pillarFlow(flows, g.id),
       traffic: rows.reduce((a, r) => a + (r.rps ?? 0), 0),
@@ -459,7 +430,6 @@ export function buildDashboard(s: Snapshot, view: TenantView, flowOrder: readonl
     ...s.vendors.flatMap((v) => issues([v.node], v.islandName ?? v.node.name)),
   ].sort(worstFirst)
 
-  const queued = s.groups.flatMap((g) => g.nodes).filter((n) => n.state !== 'Stale' && !isAbsent(n, 'backlog'))
   const choices = islandChoices(s).filter((c) => !c.vendor)
 
   return {
@@ -468,13 +438,9 @@ export function buildDashboard(s: Snapshot, view: TenantView, flowOrder: readonl
     summary: {
       down: affected.filter((i) => i.level === 'bad').length,
       degraded: affected.filter((i) => i.level === 'warn').length,
-      affected,
       traffic: trafficSplit(s, totals.requestsPerSecond, totals.tenantShare),
-      trafficPillars: trafficByPillar(pillars.map((p) => ({ id: p.id, name: p.name, rps: p.traffic * totals.tenantShare, split: p.trafficSplit }))),
       deadLetters: absentEverywhere(s, 'deadLetters') ? null : totals.deadLetters,
-      backlog: absentEverywhere(s, 'backlog') ? null : queued.reduce((a, n) => a + (n.queueDepth ?? 0), 0),
-      deadQueues: deadLetterItems(s.groups),
-      flows: flowTile(flows, flowOrder, messagesPerSecond(s.groups.flatMap((g) => g.nodes))),
+      messageFlow: messagesPerSecond(s.groups.flatMap((g) => g.nodes)),
       incidents: incidentsOf(s),
     },
     pillars,

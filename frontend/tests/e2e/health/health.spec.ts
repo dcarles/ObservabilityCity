@@ -130,32 +130,27 @@ test.describe(`the cloud's own health reports (${B ? 'tags, azure-health' : 'nam
     await expect(page.locator('#inspector .cloud-health')).toHaveAttribute('data-cloud-health', 'Unavailable')
   })
 
-  test('the dashboard has an Incidents card next to the dead letters, four cards in one row, red while unresolved with each report listed', async ({ page }) => {
+  test('the dashboard has an Incidents box in the top row, red while a report is open, and with no list', async ({ page }) => {
     await page.setViewportSize({ width: 1600, height: 900 })
     await page.goto('/?view=dashboard')
     const card = page.locator('#kpi-incidents')
     await expect(card).toBeVisible({ timeout: 30_000 })
     await expect(card.locator('> b')).toHaveText('3')
-    await expect(card.locator('> b')).toHaveClass(/bad/)
-    await expect(card.locator('.il')).toHaveCount(4)
-    await expect(card.locator('.il.ok')).toHaveCount(1)
-    await expect(card.locator('.il.bad').first()).toContainText('Azure')
-    await expect(card.locator('.il.bad').first()).toContainText('Unavailable')
-    await expect(card.locator('.il.bad').first().locator('.cs')).toContainText('cause UserInitiated') // why, as the cloud said it
-    // the name is the system's own, as the service table shows it, and not cut off
-    const names = await card.locator('.il .what').allTextContents()
-    expect(names.some((n) => /DB/.test(n))).toBe(true)
-    expect(await card.locator('.il .what').evaluateAll((els) => els.every((e) => e.scrollWidth <= e.clientWidth + 1))).toBe(true)
-    await expect(card.locator('.il.ok .tm')).toContainText(/declared .* · resolved /) // when it was declared and when it ended
-    await expect(card.locator('.il.bad .tm').first()).toContainText('declared')
-    await expect(card.locator('.il.bad .tm').first()).not.toContainText('resolved')
+    await expect(card).toHaveClass(/bad/)
+    await expect(card.locator('.il')).toHaveCount(0)
 
-    const tops = await page.locator('#dash-sum .kpi').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().top)))
-    expect(tops.length).toBeGreaterThanOrEqual(3)
-    expect(new Set(tops).size).toBe(1) // all in one row
+    const got = await page.locator('#dash-sum .kpi').evaluateAll((els) => ({ tops: els.map((e) => Math.round(e.getBoundingClientRect().top)), heights: els.map((e) => Math.round(e.getBoundingClientRect().height)) }))
+    expect(got.tops.length).toBeGreaterThanOrEqual(3)
+    expect(new Set(got.tops).size).toBe(1) // all in one row
+    expect(new Set(got.heights).size).toBe(1) // all one height
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
 
-    await card.locator('.il.bad[data-system]').first().click() // goes to the building's drawer
+    // the row of the resource with an open report says so, and its drawer has the details
+    const toggle = page.locator('[data-pillar="bb"] [data-toggle]')
+    if ((await toggle.getAttribute('aria-expanded')) === 'false') await toggle.click()
+    const group = page.locator('[data-pillar="bb"] tr.g', { hasText: 'Ledger' })
+    if ((await group.getAttribute('aria-expanded')) === 'false') await group.click()
+    await page.locator('tr.row[data-system="bb.ledger-db"] .det').click()
     await expect(page.locator('#inspector .cloud-health')).toBeVisible()
   })
 

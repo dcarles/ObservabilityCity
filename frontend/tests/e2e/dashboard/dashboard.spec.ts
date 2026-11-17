@@ -54,11 +54,13 @@ test.describe('the dashboard view', () => {
 
   test('a healthy pillar card shows only its name; the summary says everything is healthy', async ({ town, page }) => {
     await open(town, page)
-    await expect(page.locator('#kpi-services')).toContainText('0 down · 0 degraded')
-    await expect(page.locator('#kpi-services')).toContainText('All services are healthy')
+    await expect(page.locator('#kpi-down')).toHaveClass(/ok/)
+    await expect(page.locator('#kpi-down b')).toHaveText('0')
+    await expect(page.locator('#kpi-degraded')).toHaveClass(/ok/)
     const card = page.locator('[data-pillar="aa"]')
     await expect(card.locator('h3')).toContainText('Alpha')
-    await expect(card.locator('.m')).toHaveCount(0)
+    await expect(card.locator('.m')).toHaveCount(1) // the service count, nothing under it
+    await expect(card.locator('.m small')).toHaveCount(0)
     await expect(card.locator('.issues')).toHaveCount(0)
     await expect(card).not.toHaveClass(/warn|bad/)
     // nothing below the menu speaks of towns, cities, buildings or islands
@@ -69,11 +71,11 @@ test.describe('the dashboard view', () => {
   test('a failing service shows counts, a chip with its reason, and opens its group by itself', async ({ town, page }) => {
     await open(town, page)
     await town.effect('aa.orders-api', 'Errors', 1)
-    await expect(page.locator('#kpi-services')).not.toContainText('0 down · 0 degraded', { timeout: 30_000 })
+    await expect(page.locator('#kpi-down b, #kpi-degraded b').filter({ hasNotText: /^0$/ }).first()).toBeVisible({ timeout: 30_000 })
     const card = page.locator('[data-pillar="aa"]')
     await expect(card).toHaveClass(/warn|bad/)
     await expect(card.locator('.issues .chip', { hasText: 'Orders API' })).toContainText('error rate')
-    await expect(page.locator('#kpi-services .ch', { hasText: 'Orders API' })).toContainText('Alpha')
+    await expect(card.locator('.m small')).toContainText(/[01] down · [01] degraded/)
     await card.locator('[data-toggle]').click()
     const group = card.locator('tr.g', { hasText: 'orders' })
     await expect(group).toHaveAttribute('aria-expanded', 'true') // the group with the problem opens by itself
@@ -219,40 +221,44 @@ test.describe('the dashboard view', () => {
     expect(got.head).toBe('3')
   })
 
-  test('the Dead letters card lists each queue with dead letters, worst first, and a row opens that service', async ({ town, page }) => {
+  test('the scheduled jobs sit under the Scheduler row, which carries a tag when one is late, and the group row says systems', async ({ town, page }) => {
+    await open(town, page)
+    const edit = `const a = node('aa.orders-api'); a.jobs = [{ name: 'NightlyJob', region: 'North', status: 'Overdue', lastRun: null }, { name: 'MorningJob', region: null, status: 'Ok', lastRun: '2026-11-17T00:00:00Z' }]`
+    await withSnapshot<number>(page, edit, 'return 1')
+    const card = page.locator('[data-pillar="aa"]')
+    if ((await card.locator('[data-toggle]').getAttribute('aria-expanded')) === 'false') await card.locator('[data-toggle]').click()
+    const group = card.locator('tr.g', { hasText: 'orders' })
+    if ((await group.getAttribute('aria-expanded')) === 'false') await group.click()
+    await expect(group).toContainText(/\d+ systems?/)
+    await expect(group).not.toContainText('service')
+    await expect(card.locator('tr.row[data-system="aa.orders-api"] .jobtag')).toContainText('1 job late')
+    await expect(card.locator('tr.jobrow')).toHaveCount(2)
+    await expect(card.locator('tr.jobrow', { hasText: 'NightlyJob' })).toContainText('Late')
+    await expect(card.locator('tr.jobrow', { hasText: 'MorningJob' })).toContainText('Succeeded')
+    await expect(card.locator('table.jobs')).toHaveCount(0) // no separate table under the pillar
+  })
+
+  test('the Dead letters box shows only the count, crimson above zero and green at zero', async ({ town, page }) => {
     await open(town, page)
     const edit = `for (const m of s.groups.flatMap(g => g.nodes)) { m.deadLetters = 0; m.queues = [] }
       const a = node('aa.orders-api'); a.absent = a.absent.filter(x => x !== 'deadLetters'); a.state = 'Healthy'; a.deadLetters = 9; s.totals.deadLetters = 9; a.queues = [{ name: 'q-small', backlog: 0, deadLetters: 2 }, { name: 'q-big', backlog: 0, deadLetters: 7 }]`
-    const read = `const c = document.querySelector('#kpi-dlq'); return { total: c.querySelector('b').textContent, head: c.querySelector('.dh')?.textContent, rows: [...c.querySelectorAll('.dl')].map(r => r.textContent) }`
-    const got = await withSnapshot<{ total: string; head: string; rows: string[] }>(page, edit, read)
-    expect(got.total).toBe('9')
-    expect(got.head).toBe('2 queues with dead letters')
-    expect(got.rows).toHaveLength(2)
-    expect(got.rows[0]).toContain('q-big · 7 dead')
-    expect(got.rows[1]).toContain('q-small · 2 dead')
-    // small text and no scroll bar: the card grows with the list
-    const look = await page.locator('#kpi-dlq').evaluate((c) => ({ size: getComputedStyle(c.querySelector('.dl .what')!).fontSize, scrolls: [...c.querySelectorAll('*')].some((e) => e.scrollHeight > e.clientHeight + 1 && /auto|scroll/.test(getComputedStyle(e).overflowY)) }))
-    expect(look).toEqual({ size: '12px', scrolls: false })
-    await page.locator('#kpi-dlq .dl').first().click()
-    await expect(page.locator('#inspector')).toBeVisible()
+    const read = `const c = document.querySelector('#kpi-dlq'); return { total: c.querySelector('b').textContent, cls: c.className, lists: c.querySelectorAll('.dl, .dlist, .dh').length }`
+    const got = await withSnapshot<{ total: string; cls: string; lists: number }>(page, edit, read)
+    expect(got).toMatchObject({ total: '9', lists: 0 })
+    expect(got.cls).toContain('dlq')
+    const zero = await withSnapshot<{ total: string; cls: string }>(page, `for (const m of s.groups.flatMap(g => g.nodes)) { m.deadLetters = 0; m.queues = [] }; s.totals.deadLetters = 0`, read)
+    expect(zero.total).toBe('0')
+    expect(zero.cls).toContain('ok')
   })
 
-  test('dead letters in two regions: the Dead letters card has a row for each region with its tag, counts one queue, and the drawer links each region to its own tool', async ({ town, page }) => {
+  test('dead letters in two regions: the drawer links each region to its own tool, and counts one queue', async ({ town, page }) => {
     await open(town, page)
     const edit = `for (const m of s.groups.flatMap(g => g.nodes)) { m.deadLetters = 0; m.queues = [] }
       const a = node('aa.orders-api'); a.absent = a.absent.filter(x => x !== 'deadLetters'); a.state = 'Healthy'; a.deadLetters = 11; s.totals.deadLetters = 11
       a.queues = [{ name: 'q-split', backlog: 0, deadLetters: 11, deadLetterRegions: [{ region: 'northeurope', label: 'North', count: 3, link: { name: 'Support North', url: 'https://north.example.test/q' } }, { region: 'westeurope', label: 'West', count: 8, link: { name: 'Support West', url: 'https://west.example.test/q' } }] }]`
-    // the tag is small text on the same line as the queue and the count, not a big number on a line of its own (read in the same breath as the feed)
-    const read = `const c = document.querySelector('#kpi-dlq'); const r = c.querySelector('.dl'); const tag = r.querySelector('.qreg'); const box = tag.getBoundingClientRect(); const line = r.querySelector('.q').getBoundingClientRect()
-      return { head: c.querySelector('.dh').textContent, rows: [...c.querySelectorAll('.dl')].map(r => r.textContent), look: { size: getComputedStyle(tag).fontSize, display: getComputedStyle(tag).display, inside: box.top >= line.top - 1 && box.bottom <= line.bottom + 1, oneLine: line.height < 20 } }`
-    const got = await withSnapshot<{ head: string; rows: string[]; look: object }>(page, edit, read)
-    expect(got.look).toEqual({ size: '12px', display: 'inline', inside: true, oneLine: true })
-    expect(got.head).toBe('1 queue with dead letters')
-    expect(got.rows).toHaveLength(2)
-    expect(got.rows[0]).toContain('q-split · West · 8 dead') // worst first
-    expect(got.rows[1]).toContain('q-split · North · 3 dead')
-
-    await page.locator('#kpi-dlq .dl').first().click()
+    await withSnapshot<number>(page, edit, 'return 1')
+    await page.locator('[data-pillar="aa"] [data-toggle]').click()
+    await page.locator('tr.row[data-system="aa.orders-api"] .det').click()
     const row = page.locator('#inspector .row.queue[data-queue="q-split"]')
     await expect(row).toContainText('North 3 dead')
     await expect(row).toContainText('West 8 dead')
@@ -267,17 +273,9 @@ test.describe('the dashboard view', () => {
     const edit = `for (const m of s.groups.flatMap(g => g.nodes)) { m.deadLetters = 0; m.queues = [] }
       const a = node('aa.orders-api'); a.absent = a.absent.filter(x => x !== 'deadLetters'); a.state = 'Healthy'; a.deadLetters = 4; s.totals.deadLetters = 4
       a.queues = [{ name: 'q-held', backlog: 0, deadLetters: 4 }]`
-    await withSnapshot<string[]>(page, edit, `return [...document.querySelectorAll('#kpi-dlq .dl')].map(r => r.textContent)`)
+    await withSnapshot<string>(page, edit, `return document.querySelector('#kpi-dlq b').textContent`)
     await page.waitForTimeout(3000) // long enough for the server to have sent several of its own
-    await expect(page.locator('#kpi-dlq .dl')).toHaveCount(1)
-    await expect(page.locator('#kpi-dlq .dl')).toContainText('q-held')
-  })
-
-  test('the Dead letters card says so when no queue has dead letters', async ({ town, page }) => {
-    await open(town, page)
-    const read = `return document.querySelector('#kpi-dlq .dlist').textContent`
-    const text = await withSnapshot<string>(page, `for (const m of s.groups.flatMap(g => g.nodes)) { m.deadLetters = 0; m.queues = [] }`, read)
-    expect(text).toBe('No queue has dead letters right now.')
+    await expect(page.locator('#kpi-dlq b')).toHaveText('4')
   })
 
   const FLOW = `const aa = s.groups.find(g => g.id === 'aa'); const bb = s.groups.find(g => g.id === 'bb')
@@ -285,17 +283,16 @@ test.describe('the dashboard view', () => {
       aa.flow = { sentPerSecond: 3200, receivedPerSecond: 0, windowSeconds: 900 }
       bb.flow = { sentPerSecond: null, receivedPerSecond: 40, windowSeconds: 900 }`
 
-  test('the Message flow tile lists the pillars by what they send and receive, and the cards say the same', async ({ town, page }) => {
+  const WITH_QUEUE = `${FLOW}
+      const q = node('aa.orders-api'); q.absent = q.absent.filter(x => x !== 'backlog'); q.queues = [{ name: 'q-in', backlog: 0, perSecond: 12 }]`
+
+  test('the Message flow box is one number, and the pillar cards still say what each sends and receives', async ({ town, page }) => {
     await open(town, page)
-    const read = `const t = document.querySelector('#kpi-flow'); return { lines: [...t.querySelectorAll('.fl')].map(l => l.textContent), bar: t.querySelector('.fbar i').style.width, button: !!t.querySelector('[data-flows-all]'), window: t.querySelector('.fwin')?.textContent ?? null, alpha: document.querySelector('[data-pillar="aa"] .pflow [data-flow]')?.textContent ?? null, billing: document.querySelector('[data-pillar="bb"] .pflow [data-flow]')?.textContent ?? null }`
-    const got = await withSnapshot<{ lines: string[]; bar: string; button: boolean; window: string | null; alpha: string | null; billing: string | null }>(page, FLOW, read)
-    expect(got.lines).toHaveLength(2)
-    expect(got.lines[0]).toMatch(/sends ext3\.2k msg\/s/)
-    expect(got.lines[0]).toContain('no messages received')
-    expect(got.lines[1]).toContain('receives40 msg/s')
-    expect(got.bar).toBe('100%')
-    expect(got.button).toBe(false)
-    expect(got.window).toBe('Average over the last 15 min')
+    const read = `const t = document.querySelector('#kpi-flow'); return { total: t.querySelector('b').textContent, cls: t.className, lists: t.querySelectorAll('.fl, .flist, button').length, alpha: document.querySelector('[data-pillar="aa"] .pflow [data-flow]')?.textContent ?? null, billing: document.querySelector('[data-pillar="bb"] .pflow [data-flow]')?.textContent ?? null }`
+    const got = await withSnapshot<{ total: string; cls: string; lists: number; alpha: string | null; billing: string | null }>(page, WITH_QUEUE, read)
+    expect(got.total).toMatch(/^12\s+msg\/s$/)
+    expect(got.cls).toContain('flow')
+    expect(got.lists).toBe(0)
     expect(got.alpha).toMatch(/^sends ext 3\.2k msg\/s · no messages received$/)
     expect(got.billing).toMatch(/^receives 40 msg\/s$/)
     await page.locator('[data-pillar="aa"] [data-toggle]').click()
@@ -306,39 +303,39 @@ test.describe('the dashboard view', () => {
     await expect(page.locator('[data-pillar="bb"] .pflowx')).toContainText('Receives')
   })
 
-  test('the Message flow tile is absent when no pillar moves a message', async ({ town, page }) => {
+  test('the Message flow box is absent when no queue is measured', async ({ town, page }) => {
     await open(town, page)
     const present = await withSnapshot<boolean>(page, `for (const g of s.groups) { g.flow = g.isHub ? undefined : { sentPerSecond: 0, receivedPerSecond: 0, windowSeconds: 900 }; for (const n of g.nodes) n.queues = [] }`, `return !!document.querySelector('#kpi-flow')`)
     expect(present).toBe(false)
   })
 
-  test('the summary cards share one row on a big screen and the Total traffic card lists the pillars', async ({ town, page }) => {
+  test('the six boxes share one row at one height on a big screen', async ({ town, page }) => {
     await page.setViewportSize({ width: 1920, height: 1000 })
     await open(town, page)
-    const got = await withSnapshot<{ tops: number[]; rows: number; total: string | null; over: number }>(page, FLOW, `const k = [...document.querySelectorAll('#dash-root .sum .kpi')]; return { tops: k.map(x => Math.round(x.getBoundingClientRect().top)), rows: document.querySelectorAll('#kpi-traffic [data-pillar-traffic]').length, total: document.querySelector('#kpi-flow > b')?.textContent ?? null, over: document.documentElement.scrollWidth - document.documentElement.clientWidth }`)
-    expect(got.tops.length).toBeGreaterThanOrEqual(3)
+    const got = await withSnapshot<{ tops: number[]; heights: number[]; over: number }>(page, WITH_QUEUE, `const k = [...document.querySelectorAll('#dash-root .sum .kpi')]; return { tops: k.map(x => Math.round(x.getBoundingClientRect().top)), heights: k.map(x => Math.round(x.getBoundingClientRect().height)), over: document.documentElement.scrollWidth - document.documentElement.clientWidth }`)
+    expect(got.tops.length).toBeGreaterThanOrEqual(5)
     expect(new Set(got.tops).size).toBe(1)
-    expect(got.rows).toBeGreaterThan(0)
+    expect(new Set(got.heights).size).toBe(1)
     expect(got.over).toBeLessThanOrEqual(0)
   })
 
-  test('the Message flow tile fits a phone screen without sideways scrolling', async ({ town, page }) => {
+  test('the boxes fit a phone screen without sideways scrolling', async ({ town, page }) => {
     await page.setViewportSize({ width: 390, height: 800 })
     await open(town, page)
-    const over = await withSnapshot<number>(page, FLOW, `return document.documentElement.scrollWidth - document.documentElement.clientWidth`)
+    const over = await withSnapshot<number>(page, WITH_QUEUE, `return document.documentElement.scrollWidth - document.documentElement.clientWidth`)
     expect(over).toBeLessThanOrEqual(0)
     await expect(page.locator('#kpi-flow')).toBeVisible()
   })
 
-  test('a queue whose dead letters were replayed leaves the Dead letters card on the next snapshot', async ({ town, page }) => {
+  test('a queue whose dead letters were replayed brings the Dead letters box back to zero on the next snapshot', async ({ town, page }) => {
     await open(town, page)
     const base = `for (const m of s.groups.flatMap(g => g.nodes)) { m.deadLetters = 0; m.queues = [] }
       const a = node('aa.orders-api'); a.absent = a.absent.filter(x => x !== 'deadLetters'); a.state = 'Healthy'; `
-    const read = `return [...document.querySelectorAll('#kpi-dlq .dl')].map(r => r.textContent)`
+    const read = `return [...document.querySelectorAll('#kpi-dlq b')].map(r => r.textContent)`
     const before = await withSnapshot<string[]>(page, `${base}a.deadLetters = 12; s.totals.deadLetters = 12; a.queues = [{ name: 'q-replayed', backlog: 0, deadLetters: 12 }]`, read)
-    expect(before).toHaveLength(1)
+    expect(before).toEqual(['12'])
     const after = await withSnapshot<string[]>(page, `${base}a.deadLetters = 0; s.totals.deadLetters = 0; a.queues = [{ name: 'q-replayed', backlog: 0, deadLetters: 0 }]`, read)
-    expect(after).toEqual([])
+    expect(after).toEqual(['0'])
   })
 
   test('Details on a service row opens the drawer on the Overview tab', async ({ town, page }) => {
@@ -553,16 +550,6 @@ test.describe('the dashboard view', () => {
     expect(box.y + box.height).toBeLessThanOrEqual(420)
   })
 
-  test('the status dot sits level with the text in the Services chips', async ({ town, page }) => {
-    await open(town, page)
-    await town.effect('aa.orders-api', 'Errors', 1)
-    const chip = page.locator('#kpi-services .ch').first()
-    await expect(chip).toBeVisible({ timeout: 30_000 })
-    const [dot, box] = await Promise.all([chip.locator('.dot').boundingBox(), chip.boundingBox()])
-    expect(Math.abs(dot!.y + dot!.height / 2 - (box!.y + box!.height / 2))).toBeLessThanOrEqual(3)
-    expect(box!.height).toBeLessThan(40) // one line, the dot is not on a line of its own
-  })
-
   test('the environment and tenant lists sit side by side, and each opens under its own button', async ({ town, page }) => {
     await open(town, page)
     const boxes = await page.evaluate(() => [...document.querySelectorAll('#dash-filters .vb')].map((e) => { const b = e.getBoundingClientRect(); return { l: b.left, r: b.right, t: b.top, b: b.bottom } }))
@@ -720,7 +707,7 @@ test.describe('the dashboard view', () => {
       expect(w.focus).toBe('aa.orders-api')
       await expect(page.locator('#wall-caption')).toContainText('has 130 dead letters in q-orders')
       await expect(page.locator('#wall-headline')).not.toContainText('DEGRADED')
-      await expect(page.locator('#kpi-services')).toContainText('0 down · 0 degraded')
+      await expect(page.locator('#kpi-degraded b')).toHaveText('0')
       await expect(page.locator('#dash-pillars tr.row.wall-focus')).toHaveAttribute('data-system', 'aa.orders-api')
     })
 

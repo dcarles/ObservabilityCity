@@ -164,7 +164,7 @@ export function buildArchitecture(s: Snapshot, view: TenantView, dashboard?: Das
   return {
     townName: d.townName,
     groupLabel: d.groupLabel,
-    totals: { down: d.summary.down, degraded: d.summary.degraded, deadLetters: d.summary.deadLetters, traffic: d.summary.traffic?.total ?? null, messages: d.summary.flows?.total ?? null },
+    totals: { down: d.summary.down, degraded: d.summary.degraded, deadLetters: d.summary.deadLetters, traffic: d.summary.traffic?.total ?? null, messages: d.summary.messageFlow },
     boxes,
     edges,
     vendorsLabel: 'Third-party vendors',

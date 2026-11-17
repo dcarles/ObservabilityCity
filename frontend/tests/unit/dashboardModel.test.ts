@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { buildDashboard, incidentName, pillarSelection, worstOf } from '../../src/dashboard/model'
-import { deadQueuesHtml, databaseIsOpen, groupIsOpen, hiddenHtml, pillarHtml, summaryHtml, type UiState } from '../../src/dashboard/render'
+import { buildDashboard, pillarSelection, worstOf } from '../../src/dashboard/model'
+import { databaseIsOpen, groupIsOpen, hiddenHtml, pillarHtml, summaryHtml, type UiState } from '../../src/dashboard/render'
 import { trafficSplit } from '../../src/trafficSplit'
 import { ALL_TENANTS } from '../../src/tenants'
 import { checkSnapshot } from '../../src/snapshotGuard'
@@ -17,20 +17,30 @@ describe('summary counts', () => {
     const d = buildDashboard(golden('calm'), ALL_TENANTS)
     expect(d.summary.down).toBe(0)
     expect(d.summary.degraded).toBe(0)
-    expect(summaryHtml(d)).toContain('All services are healthy')
-    expect(summaryHtml(d)).toContain('0 down · 0 degraded')
+    expect(summaryHtml(d)).toMatch(/kpi ok" id="kpi-down"><span>Down<\/span><b>0<\/b>/) // zero is green
+    expect(summaryHtml(d)).toMatch(/kpi ok" id="kpi-degraded"><span>Degraded<\/span><b>0<\/b>/)
   })
 
-  it('counts down and degraded services, names each with its pillar, and never uses an overall health word', () => {
+  it('counts down and degraded services in two boxes with no lists, coloured while above zero, and never uses an overall health word', () => {
     const s = golden('bad-day')
     const d = buildDashboard(s, ALL_TENANTS)
     expect(d.summary.down).toBe(s.totals.down)
     expect(d.summary.degraded).toBe(s.totals.degraded)
-    expect(d.summary.affected).toHaveLength(d.summary.down + d.summary.degraded)
-    expect(d.summary.affected[0].level).toBe('bad') // worst first
     const html = summaryHtml(d)
-    expect(html).toContain('Payments API')
+    expect(html).toContain(`kpi ${d.summary.down > 0 ? 'bad' : 'ok'}" id="kpi-down"`)
+    expect(html).toContain(`kpi ${d.summary.degraded > 0 ? 'warn' : 'ok'}" id="kpi-degraded"`)
+    expect(html).not.toContain('Payments API') // no names: the pillar cards say which
     expect(html).not.toMatch(/\b(unhealthy|critical|outage)\b/i)
+  })
+
+  it('draws six boxes of one kind, each with its own colour rule', () => {
+    const calm = golden('calm')
+    calm.groups.flatMap((g) => g.nodes)[0].queues = [{ name: 'q', perSecond: 3 } as never]
+    const html = summaryHtml(buildDashboard({ ...calm, healthEvents: [] }, ALL_TENANTS))
+    expect([...html.matchAll(/id="kpi-([a-z]+)"/g)].map((m) => m[1])).toEqual(['down', 'degraded', 'dlq', 'traffic', 'flow', 'incidents'])
+    expect(html).toContain('kpi traffic"')
+    expect(html).toContain('kpi flow"')
+    expect(html).not.toMatch(/class="(lst|dlist|ilist|flist|plist)"/)
   })
 
   it('splits traffic into external and internal, and leaves a tile out when no one measures it', () => {
@@ -52,7 +62,8 @@ describe('pillar cards', () => {
     const d = buildDashboard(golden('calm'), ALL_TENANTS)
     const html = pillarHtml(d.pillars[0], ui())
     expect(html).toContain('card ok')
-    expect(html).not.toContain('class="m"')
+    expect(html).toContain(`<span>Services</span><b>${d.pillars[0].services}</b></div>`) // the count, and nothing under it
+    expect(html).not.toContain('<small>')
     expect(html).not.toContain('class="issues"')
   })
 
@@ -61,7 +72,7 @@ describe('pillar cards', () => {
     const pay = d.pillars.find((p) => p.id === 'pay')!
     expect(pay.level).toBe('warn')
     const html = pillarHtml(pay, ui())
-    expect(html).toContain('0 down · 1 degraded')
+    expect(html).toContain('<small>0 down · 1 degraded</small>')
     expect(html).toContain('error rate 21.2%')
     const dsp = d.pillars.find((p) => p.id === 'dsp')!
     expect(dsp.level).toBe('bad')
@@ -231,8 +242,12 @@ describe('no convention is built in', () => {
     expect(p.name).toBe('Ünïcode Pillar')
     expect(p.groups.map((g) => g.name).sort()).toEqual(['Lone thing', 'Other'])
     expect(p.issues).toEqual([expect.objectContaining({ name: 'Lone thing', level: 'warn', reason: 'job nightly late' })])
-    expect(p.jobs).toEqual([expect.objectContaining({ name: 'nightly', status: 'Overdue' })])
-    expect(pillarHtml(p, ui({ openPillars: new Set(['x-1']) }))).toContain('Late')
+    const row = p.groups.flatMap((g) => g.rows).find((r) => r.jobs.length > 0)!
+    expect(row.jobs).toEqual([expect.objectContaining({ name: 'nightly', status: 'Overdue' })])
+    const html = pillarHtml(p, ui({ openPillars: new Set(['x-1']), groups: new Map(p.groups.map((g) => [g.key, true])) }))
+    expect(html).toContain('Late')
+    expect(html).toContain('1 job late') // the tag on the row
+    expect(html).not.toContain('class="jobs"') // no separate table under the pillar
   })
 
   it('has no company words in the dashboard code', () => {
@@ -252,49 +267,32 @@ describe('worstOf', () => {
   })
 })
 
-describe('the Dead letters card list', () => {
-  const withQueues = (): Snapshot => {
+describe('the Dead letters box', () => {
+  const withDead = (n: number): Snapshot => {
     const s = golden('calm')
-    const nodes = s.groups.flatMap((g) => g.nodes)
-    for (const n of nodes) n.queues = []
-    nodes[0].absent = []
-    nodes[0].queues = [{ name: 'orders<small>', backlog: 0, deadLetters: 2 }, { name: 'orders-big', backlog: 0, deadLetters: 40 }, { name: 'clean', backlog: 3, deadLetters: 0 }]
+    for (const g of s.groups) for (const x of g.nodes) x.queues = []
+    const first = s.groups.flatMap((g) => g.nodes)[0]
+    first.absent = []
+    first.queues = [{ name: 'orders', backlog: 0, deadLetters: n }]
+    first.deadLetters = n
+    s.totals.deadLetters = n
     return s
   }
 
-  it('lists only queues with dead letters, worst first, with the service and its pillar, like the town list', () => {
-    const d = buildDashboard(withQueues(), ALL_TENANTS)
-    expect(d.summary.deadQueues.map((q) => [q.queue, q.count])).toEqual([['orders-big', 40], ['orders<small>', 2]])
-    const html = deadQueuesHtml(d.summary.deadQueues)
-    expect(html).toContain('2 queues with dead letters')
-    expect(html).toContain('orders-big · <i>40</i> dead')
-    expect(html).toContain('orders&lt;small&gt;') // escaped
-    expect(html).toContain(`data-system="${d.summary.deadQueues[0].nodeId}"`)
+  it('is green at zero and crimson above, and only counts, with no queue list', () => {
+    const zero = summaryHtml(buildDashboard(withDead(0), ALL_TENANTS))
+    expect(zero).toMatch(/kpi ok" id="kpi-dlq"><span>Dead letters<\/span><b>0<\/b>/)
+    const some = summaryHtml(buildDashboard(withDead(7), ALL_TENANTS))
+    expect(some).toMatch(/kpi dlq" id="kpi-dlq"><span>Dead letters<\/span><b>7<\/b>/)
+    expect(some).not.toContain('orders')
   })
 
-  it('leaves out a service with no fresh data, and says so when nothing is left', () => {
-    const s = withQueues()
-    s.groups.flatMap((g) => g.nodes)[0].state = 'Stale'
-    const d = buildDashboard(s, ALL_TENANTS)
-    expect(d.summary.deadQueues).toEqual([])
-    expect(deadQueuesHtml(d.summary.deadQueues)).toContain('No queue has dead letters right now.')
-  })
-
-  it('uses a singular for one queue', () => {
-    expect(deadQueuesHtml([{ nodeId: 'a.b', nodeName: 'B', groupId: 'a', groupName: 'A', queue: 'q', count: 1, region: null }])).toContain('1 queue with dead letters')
-  })
-
-  it('card shows the region of each row and counts a queue in two regions once', () => {
-    const base = { nodeId: 'a.b', nodeName: 'B', groupId: 'a', groupName: 'A', queue: 'q' }
-    const html = deadQueuesHtml([{ ...base, count: 8, region: 'West' }, { ...base, count: 3, region: 'North' }])
-    expect(html).toContain('1 queue with dead letters')
-    expect(html).toContain('<span class="qreg">West</span> · <i>8</i> dead')
-    expect(html).toContain('<span class="qreg">North</span> · <i>3</i> dead')
-    expect(deadQueuesHtml([{ ...base, count: 1, region: null }])).not.toContain('class="qreg"')
+  it('does not count dead letters as degraded', () => {
+    expect(buildDashboard(withDead(7), ALL_TENANTS).summary.degraded).toBe(0)
   })
 })
 
-describe('the Incidents card', () => {
+describe('the Incidents box', () => {
   const event = (o: object) => ({ id: 'e', resource: 'orders-db', state: 'Degraded', previous: null, cause: null, since: '2026-11-05T16:00:00Z', resolvedAt: null, nodeId: 'aa.orders-db', groupId: 'aa', summary: null, ...o })
 
   it('is not there when no health source is configured and no incident is open', () => {
@@ -303,33 +301,16 @@ describe('the Incidents card', () => {
     expect(summaryHtml(d)).not.toContain('kpi-incidents')
   })
 
-  it('counts the open reports in red, lists them first and the resolved ones in green, and says what and where', () => {
+  it('counts only the open reports, red above zero, with no list', () => {
     const s = { ...golden('calm'), healthEvents: [event({ id: 'r', state: 'Resolved', resolvedAt: '2026-11-05T17:00:00Z' }), event({ id: 'o', state: 'Unavailable', resource: 'ledger-db', nodeId: null })] }
     const d = buildDashboard(s, ALL_TENANTS)
-    expect(d.summary.incidents?.open).toBe(1)
-    expect(d.summary.incidents?.rows.map((r) => [r.source, r.status, r.tone])).toEqual([['Cloud', 'Unavailable', 'bad'], ['Cloud', 'Resolved', 'ok']])
+    expect(d.summary.incidents).toBe(1)
     const html = summaryHtml(d)
-    expect(html).toContain('<b class="bad">1</b>')
-    expect(html).toContain('class="il bad"')
-    expect(html).toContain('class="il ok" data-system="aa.orders-db"')
-    expect(html).toContain('data-dismiss="r"')
-    expect(d.summary.incidents?.rows[1].times).toMatch(/^declared .* · resolved /)
-    expect(d.summary.incidents?.rows[0].times).not.toContain('resolved')
+    expect(html).toMatch(/kpi bad" id="kpi-incidents"><span>Incidents<\/span><b>1<\/b>/)
+    expect(html).not.toContain('ledger-db')
   })
 
-  it('names a report by the system as the service table does, adds the tenant for a store kept per tenant, and says the cause', () => {
-    const calm = golden('calm')
-    const node = calm.groups.find((g) => !g.isHub)!.nodes[0]
-    const s = { ...calm, healthEvents: [event({ id: 'o', state: 'Degraded', resource: '2222-al-ord', nodeId: node.id, tenant: 'Acme Bank', cause: 'PlatformInitiated' })] }
-    const row = buildDashboard(s, ALL_TENANTS).summary.incidents!.rows[0]
-    expect(row.what).toBe(`${node.name} · Acme Bank`)
-    expect(row.cause).toBe('PlatformInitiated')
-    expect(summaryHtml(buildDashboard(s, ALL_TENANTS))).toContain('cause PlatformInitiated')
-    expect(incidentName({ resource: 'raw-name', nodeId: node.id }, new Map([[node.id, node.name]]))).toBe(node.name) // no tenant: the name alone
-    expect(incidentName({ resource: 'raw-name', nodeId: null, tenant: null }, new Map())).toBe('raw-name') // no system owns it: the cloud's name
-  })
-
-  it('marks a service row only while its report is open: a resolved one is left to the card', () => {
+  it('marks a service row only while its report is open: a resolved one is left out', () => {
     const calm = golden('calm')
     const node = calm.groups.find((g) => !g.isHub)!.nodes[0]
     const open = JSON.stringify(buildDashboard({ ...calm, healthEvents: [event({ nodeId: node.id })] as never }, ALL_TENANTS))
@@ -338,9 +319,9 @@ describe('the Incidents card', () => {
     expect(resolved).not.toContain('"cloudHealth":{')
   })
 
-  it('turns the number green when everything listed is resolved, and shows the card with no reports at all', () => {
+  it('shows green zero when everything is resolved, and the box with no reports at all', () => {
     const resolved = buildDashboard({ ...golden('calm'), healthEvents: [event({ state: 'Resolved', resolvedAt: '2026-11-05T17:00:00Z' })] }, ALL_TENANTS)
-    expect(summaryHtml(resolved)).toContain('<b class="ok">0</b>')
-    expect(summaryHtml(buildDashboard({ ...golden('calm'), healthEvents: [] }, ALL_TENANTS))).toContain('No incidents')
+    expect(summaryHtml(resolved)).toMatch(/kpi ok" id="kpi-incidents"><span>Incidents<\/span><b>0<\/b>/)
+    expect(summaryHtml(buildDashboard({ ...golden('calm'), healthEvents: [] }, ALL_TENANTS))).toMatch(/kpi ok" id="kpi-incidents"/)
   })
 })
