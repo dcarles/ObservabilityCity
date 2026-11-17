@@ -133,6 +133,38 @@ test.describe('the architecture view', () => {
     expect(await at('aa')).toBe(aa)
   })
 
+  test('the Pillars list has an All pillars row that shows every pillar again', async ({ town, page }) => {
+    await open(town, page)
+    await page.locator('#pillars-button').click()
+    await expect(page.locator('#pillar-menu input[data-pillar-all]')).toBeChecked()
+    await page.locator('#pillar-menu input[data-pillar-box="aa"]').uncheck()
+    await expect(box(page, 'aa')).toHaveCount(0)
+    await expect(page.locator('#pillar-menu input[data-pillar-all]')).not.toBeChecked()
+    await page.locator('#pillar-menu input[data-pillar-all]').check()
+    await expect(box(page, 'aa')).toBeVisible()
+    await expect(box(page, 'bb')).toBeVisible()
+    expect(new URL(page.url()).searchParams.has('islands')).toBe(false)
+  })
+
+  test('a third party and an internal service can be hidden on their own, and come back with All pillars', async ({ town, page }) => {
+    await open(town, page)
+    await feed(page, `${CALL}; const v = (id, name, internal) => ({ node: { ...node('aa.orders-api'), id, name, calls: [] }, calledBy: ['aa.orders-api'], islandId: id, islandName: name, internal, calls: null }); s.vendors = [v('pay', 'Pay Co', false), v('dig', 'Digital Thing', true)]`)
+    await expect(box(page, 'vendor:pay')).toBeVisible()
+    await expect(box(page, 'vendor:dig')).toBeVisible()
+    await page.locator('#pillars-button').click()
+    await expect(page.locator('#pillar-menu .vb-group')).toHaveCount(2)
+    await page.locator('#pillar-menu input[data-vendor-box="pay"]').uncheck()
+    await expect(box(page, 'vendor:pay')).toHaveCount(0)
+    await expect(box(page, 'vendor:dig')).toBeVisible()
+    expect(new URL(page.url()).searchParams.get('hidevendors')).toBe('pay')
+    await page.locator('#pillar-menu input[data-vendor-box="dig"]').uncheck()
+    await expect(box(page, 'vendor:dig')).toHaveCount(0)
+    await page.locator('#pillar-menu input[data-pillar-all]').check()
+    await expect(box(page, 'vendor:pay')).toBeVisible()
+    await expect(box(page, 'vendor:dig')).toBeVisible()
+    expect(new URL(page.url()).searchParams.has('hidevendors')).toBe(false)
+  })
+
   test('zooms with the buttons and fits again', async ({ town, page }) => {
     await open(town, page)
     const width = () => page.evaluate(() => (window as any).dash.diagram().view.w)
