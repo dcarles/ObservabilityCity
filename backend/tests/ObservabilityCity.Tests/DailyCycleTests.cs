@@ -20,7 +20,7 @@ public class DailyCycleTests
 
         public Rig(double dayLength = 120)
         {
-            // the orders API is given room to scale: at 200 requests a second it needs from 4 floors at night to 8 at the peak
+            // the orders API is given room to scale: at 200 requests a second it needs from 4 or 5 instances (floors) at night to 8 at the peak
             var profiles = FakeProfiles.Load(TestPaths.MiniTown).ToDictionary(p => p.Key, p => p.Value);
             profiles["aa.orders-api"] = new FakeProfile { Rps = 200, PerInstanceRps = 40, MinInstances = 1, MaxInstances = 24, P99Ms = 200 };
             Fake = new FakeSource(profiles, new FakeOptions { DayLengthSeconds = dayLength }, Clock);
@@ -119,6 +119,27 @@ public class DailyCycleTests
         var night = floors.Where(f => f.Day is > 0.0 and < 0.15).Min(f => f.Instances);
         var peak = floors.Where(f => f.Day is > 0.6 and < 0.85).Max(f => f.Instances);
         Assert.True(peak >= night + 2, $"{night} floors at night, {peak} at the peak");
+    }
+
+    [Fact]
+    public async Task The_sample_town_has_a_service_that_grows_a_tall_building_at_the_peak_and_never_past_20_floors()
+    {
+        // Core Ledger's Posting API is given room to scale: a floor for each instance, so the demo shows a tower at the peak
+        var registry = RegistryLoader.Load(TestPaths.Registry);
+        var clock = new FakeTimeProvider(new DateTimeOffset(2026, 10, 26, 8, 0, 0, TimeSpan.Zero));
+        var fake = new FakeSource(FakeProfiles.Load(TestPaths.Registry), new FakeOptions { DayLengthSeconds = 120 }, clock);
+        var state = new LatestState();
+        var builder = new SnapshotBuilder(registry, state, clock) { StaleAfter = TimeSpan.FromSeconds(3), DayFraction = () => fake.DayFraction };
+        var instances = new List<int>();
+        for (var i = 0; i < 240; i++)
+        {
+            clock.Advance(TimeSpan.FromSeconds(1));
+            state.Update(await fake.PollAsync(registry, TestContext.Current.CancellationToken));
+            instances.Add(Node(builder.Build(), "ldg.posting-api").InstancesTotal);
+        }
+
+        Assert.InRange(instances.Max(), 15, 20);
+        Assert.True(instances.Min() < instances.Max() - 4, $"{instances.Min()} at night, {instances.Max()} at the peak");
     }
 
     [Fact]

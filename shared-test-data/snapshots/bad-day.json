@@ -6,9 +6,9 @@
   "generatedAt": "2026-10-24T12:00:01+00:00",
   "dayFraction": 0.5,
   "totals": {
-    "requestsPerSecond": 11647.999999999998,
-    "errorRate": 0.005523351648351647,
-    "p99Ms": 279.7353433345531,
+    "requestsPerSecond": 11855.999999999998,
+    "errorRate": 0.00546153846153846,
+    "p99Ms": 269.2460603695031,
     "degraded": 5,
     "down": 5,
     "incidents": 0,
@@ -657,19 +657,19 @@
           "service": "posting",
           "external": false,
           "state": "Healthy",
-          "instancesTotal": 5,
-          "instancesHealthy": 5,
-          "load": 0.64,
-          "cpu": 0.42000000000000004,
+          "instancesTotal": 15,
+          "instancesHealthy": 15,
+          "load": 0.6095238095238096,
+          "cpu": 0.40476190476190477,
           "memory": 0.38,
           "utilisation": null,
           "throttled": null,
           "queueDepth": null,
           "oldestMessageSeconds": null,
           "deadLetters": null,
-          "requestsPerSecond": 112,
+          "requestsPerSecond": 320,
           "errorRate": 0.002,
-          "p99Ms": 123.36,
+          "p99Ms": 122.62857142857142,
           "slaP99Ms": 300,
           "errorAmber": 0.01,
           "errorRed": 0.05,
@@ -1077,7 +1077,7 @@
       ],
       "assets": [],
       "flow": {
-        "sentPerSecond": 750.4,
+        "sentPerSecond": 958.4,
         "receivedPerSecond": 126.4,
         "windowSeconds": 300
       }
@@ -7301,6 +7301,11 @@
       "requestsPerSecond": 304
     },
     {
+      "from": "pay",
+      "to": "ldg",
+      "requestsPerSecond": 213.33333333333334
+    },
+    {
       "from": "dec",
       "to": "fra",
       "requestsPerSecond": 128
@@ -7319,11 +7324,6 @@
       "from": "pay",
       "to": "ext.card-network",
       "requestsPerSecond": 76
-    },
-    {
-      "from": "pay",
-      "to": "ldg",
-      "requestsPerSecond": 74.66666666666667
     },
     {
       "from": "bil",
