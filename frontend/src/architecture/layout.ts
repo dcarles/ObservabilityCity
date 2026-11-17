@@ -112,6 +112,10 @@ export function cost(plan: Plan, ids: Map<string, Slim>, pairs: readonly Pair[])
       if (cross(at.get(p.from)!, at.get(p.to)!, at.get(q.from)!, at.get(q.to)!)) total += 10
     }
   }
+  // a picture much taller than wide needs zooming out to see it all: the tallest column should not be far above the width of the columns
+  const heights = plan.cols.map((c) => c.reduce((a, id) => a + sizeOf(ids.get(id)!.kind).h + GAP_Y, -GAP_Y))
+  const widthPx = plan.cols.length * (BOX_W + GAP_X) - GAP_X
+  total += Math.max(0, Math.max(0, ...heights) - widthPx * 0.55) / 12
   // a very tall column makes a poor picture
   const cap = Math.ceil(ids.size / Math.max(1, plan.cols.length)) + 2
   for (const c of plan.cols) total += Math.max(0, c.length - cap) * 4
@@ -124,6 +128,15 @@ function search(main: readonly string[], vendors: readonly string[], boxes: read
   const layer = layers(main, pairs)
   const cols: string[][] = Array.from({ length: count }, () => [])
   for (const id of main) cols[Math.min(count - 1, layer.get(id)!)].push(id)
+  // a town with few calls between its pillars would otherwise start as one tall column: spill the overflow into the columns on its right
+  const room = Math.ceil(main.length / count)
+  for (let ci = 0; ci < count; ci++) {
+    while (cols[ci].length > room) {
+      const to = cols.slice(ci + 1, count).findIndex((c) => c.length < room)
+      if (to < 0) break
+      cols[ci + 1 + to].push(cols[ci].pop()!)
+    }
+  }
   if (vendors.length) cols.push([...vendors])
   const plan: Plan = { cols }
   let now = cost(plan, ids, pairs)
@@ -168,9 +181,9 @@ export function arrange(boxes: readonly Slim[], pairs: readonly Pair[]): string[
   const vendors = boxes.filter((b) => b.kind === 'vendor').map((b) => b.id).sort()
   if (main.length === 0) return vendors.length ? [vendors] : []
   const base = Math.max(1, Math.min(6, Math.ceil(Math.sqrt(main.length) * 1.1)))
-  const counts = main.length < 6 ? [base] : [...new Set([base - 1, base, base + 1, base + 2].map((n) => Math.max(2, Math.min(7, n))))]
+  const counts = main.length < 6 ? [base] : [...new Set([base - 1, base, base + 1, base + 2, base + 3].map((n) => Math.max(2, Math.min(8, n))))]
   let best: { cols: string[][]; cost: number } | null = null
-  for (const n of counts) {
+  for (const n of [...counts].sort((a, b) => Math.abs(a - base) - Math.abs(b - base) || b - a)) {
     const r = search(main, vendors, boxes, pairs, n)
     if (!best || r.cost < best.cost - 1e-9) best = r
   }
@@ -275,6 +288,8 @@ export function routeAll(layout: Layout, visible: ReadonlySet<string>, edges: re
   }
   for (const list of outs.values()) list.sort((p, q) => cy(p.to) - cy(q.to) || p.to.localeCompare(q.to))
   for (const list of ins.values()) list.sort((p, q) => cy(p.from) - cy(q.from) || p.from.localeCompare(q.from))
+  const order = new Map(live.map((e, i) => [e, i]))
+  const lane = (e: Pair): number => order.get(e)!
   const out = new Map<string, string>()
   for (const e of live) {
     const a = layout.boxes.get(e.from)!
@@ -299,15 +314,25 @@ export function routeAll(layout: Layout, visible: ReadonlySet<string>, edges: re
           d += `H${mx}V${qy}H${qx}`
         } else { const dx = (qx - px) * 0.5; d += `C${px + dx} ${py},${qx - dx} ${qy},${qx} ${qy}` }
       }
+    } else if (b.x === a.x) {
+      // a call between two boxes of one column goes out of the right side and back into the right side, in the gap beside the column, never over a box
+      const gx = a.x + a.w + 16 + (lane(e) % 6) * 8
+      const sy = a.y + a.h / 2 + (oi - (mine.length - 1) / 2) * 8
+      const ey = b.y + b.h / 2 + (ii - (theirs.length - 1) / 2) * 8
+      d = style === 'elbow' ? `M${ax} ${sy}H${gx}V${ey}H${b.x + b.w}` : `M${ax} ${sy}C${gx + 30} ${sy},${gx + 30} ${ey},${b.x + b.w} ${ey}`
     } else {
-      const down = b.y > a.y
-      const sx = a.x + a.w / 2 + (oi - (mine.length - 1) / 2) * 8
-      const sy = down ? a.y + a.h : a.y
-      const ex = b.x + b.w / 2 + (ii - (theirs.length - 1) / 2) * 8
-      const ey = down ? b.y : b.y + b.h
-      if (style === 'elbow') { const my = (sy + ey) / 2; d = `M${sx} ${sy}V${my}H${ex}V${ey}` } else {
-        const dy = Math.max(30, Math.abs(ey - sy) / 2) * (down ? 1 : -1)
-        d = `M${sx} ${sy}C${sx} ${sy + dy},${ex} ${ey - dy},${ex} ${ey}`
+      // a call that goes back to an earlier column leaves the left side and comes in on the right side of the box it calls, through the free gaps in between
+      const lx = a.x
+      const rx = b.x + b.w
+      const pts: [number, number][] = [[lx, ay], ...via(layout, visible, b, a, by, ay).reverse(), [rx, by]]
+      d = `M${lx} ${ay}`
+      for (let i = 1; i < pts.length; i++) {
+        const [px, py] = pts[i - 1]
+        const [qx, qy] = pts[i]
+        if (style === 'elbow') {
+          const mx = i === 1 ? px - 18 - (lane(e) % 6) * 8 : i === pts.length - 1 ? qx + 18 + (lane(e) % 6) * 8 : (px + qx) / 2
+          d += `H${mx}V${qy}H${qx}`
+        } else { const dx = (qx - px) * 0.5; d += `C${px + dx} ${py},${qx - dx} ${qy},${qx} ${qy}` }
       }
     }
     out.set(`${e.from}>${e.to}`, d)

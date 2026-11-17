@@ -125,7 +125,7 @@ export class Diagram {
   }
 
   private widthOf(e: ArchEdge): number {
-    return this.options.width ? 1.5 + Math.sqrt(Math.max(0, e.rps ?? 0)) / 12 : 2
+    return this.options.width ? Math.min(4, 1.5 + Math.sqrt(Math.max(0, e.rps ?? 0)) / 20) : 2
   }
 
   private drawLines(arch: Architecture, layout: Layout): void {
