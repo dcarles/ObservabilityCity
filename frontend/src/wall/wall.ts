@@ -9,8 +9,8 @@ import { stripModel } from './stripModel'
 import { WallStrip } from './strip'
 
 /** Where the town's camera stands to look at something. */
-/** `azimuth` (radians round the target) is the side to look from: an island's front. Without it the camera keeps the side it is on. */
-export interface TownPlace { target: THREE.Vector3; distance: number; azimuth?: number }
+/** `azimuth` (radians round the target) is the side to look from: an island's or a building's front. Without it the camera keeps the side it is on. `tall` marks a building taller than the camera was first set for: on the wall it is stood back and lifted above the status strip, as an island is. */
+export interface TownPlace { target: THREE.Vector3; distance: number; azimuth?: number; tall?: boolean }
 
 /** What the wall moves: the town's camera, or the dashboard's scroll position. `P` says where it can go. */
 export interface WallCamera<P = TownPlace> {

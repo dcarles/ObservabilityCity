@@ -216,6 +216,11 @@ export class Stage {
     sph.radius = THREE.MathUtils.clamp(distance, this.controls.minDistance, this.controls.maxDistance)
     sph.phi = THREE.MathUtils.clamp(sph.phi, THREE.MathUtils.degToRad(40), THREE.MathUtils.degToRad(62))
     if (azimuth !== undefined) sph.theta = azimuth
+    if (target.y > 2) {
+      // a point high above the ground (the middle of a tower): the camera always looks at the ground, so look at the spot behind it where a line from the camera through that point lands, and the point sits in the middle of the screen
+      const away = new THREE.Vector3(-Math.sin(sph.theta), 0, -Math.cos(sph.theta)).multiplyScalar((target.y - 2) * Math.tan(sph.phi))
+      target = target.clone().setY(2).add(away)
+    }
     if (lift > 0) {
       // `lift` is a fraction of the screen height to move the point up by: look at a spot nearer the camera, along the ground, so the point rises on the screen
       const height = 2 * sph.radius * Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2))

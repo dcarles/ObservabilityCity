@@ -159,7 +159,7 @@ export const LEGEND: readonly LegendSection[] = [
     title: 'Reading a building',
     tab: 'buildings',
     entries: [
-      { id: 'floors', sees: 'Floors', means: 'How many instances', more: '1, 2, 3 to 4, 5 to 8 and so on, doubling up to 8 floors. The plaque has the exact count. For a service in several regions they are the shown region\'s instances, not the total.', tone: 'neutral', icon: '🪜' },
+      { id: 'floors', sees: 'Floors', means: 'How many instances', more: 'One floor for each instance, up to 20 floors (21 or more look the same as 20). The plaque has the exact count. For a service in several regions they are the shown region\'s instances, not the total.', tone: 'neutral', icon: '🪜' },
       { id: 'region', sees: 'Region line and split under a name', means: 'A service in several regions', more: 'Which region the numbers are, and how its requests divide between them. A warning sign means one region takes too much while another runs.', tone: 'amber', icon: '🌍' },
       { id: 'windows', sees: 'Lit windows', means: 'Load', more: 'More windows light up as requests and resources rise.', tone: 'neutral', icon: '💡' },
       { id: 'beacon-green', sees: 'Green beacon on the roof', means: 'Healthy: nothing is past an amber line', tone: 'green', icon: 'svg:beacon-green' },

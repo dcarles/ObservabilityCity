@@ -203,6 +203,11 @@ export class Building {
     this.alert.visible = e !== null
   }
 
+  /** How tall the building stands once its floors have risen: its base plus the floors it wants. The camera reads it to stand back far enough. */
+  standingHeight(): number {
+    return this.model.baseHeight + this.model.floorHeight * this.floorsWanted
+  }
+
   /** `region` is the line that says which region the numbers are (see regionLine); empty for a service in one region. */
   setNode(n: NodeSnapshot, region = '', split: { text: string; hot: boolean } | null = null): void {
     const first = this.node === null

@@ -4,14 +4,11 @@
 import { drivesBeacon, isAbsent, isUnmonitored } from './signals'
 import type { HealthState, NodeSnapshot } from './types'
 
-export const MAX_FLOORS = 8
+export const MAX_FLOORS = 20
 
-/** Floors on a doubling scale: 1, 2, 3-4, 5-8, 9-16, 17-32, 33-64, 65+ instances give 1 to 8 floors. */
+/** One floor for each instance, from 1 up to MAX_FLOORS: 21 or more instances look the same as 20 (the plaque has the exact count). */
 export function floorsFor(instances: number): number {
-  if (instances <= 1) return 1
-  if (instances === 2) return 2
-  const tier = Math.ceil(Math.log2(instances)) + 1
-  return Math.min(MAX_FLOORS, tier)
+  return Math.max(1, Math.min(MAX_FLOORS, Math.floor(instances)))
 }
 
 /** Dark, cracked floors: the share of unhealthy instances, at least one floor if any are unhealthy. */

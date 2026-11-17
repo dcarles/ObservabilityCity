@@ -30,6 +30,7 @@ import { bayTo } from './bay'
 import { islandSign } from './sign'
 import { flowsOf } from '../dashboard/flows'
 import { pillarTraffic } from '../trafficFlow'
+import { buildingFraming, islandFraming } from './tallFraming'
 import { backBridgeClear, groupVendors, hubGeometry, loopArc, placeVendorsOnRing, ringRoadRadius, wrapAngle, type Disc, type HubGeometry, type VendorSpec } from './layout'
 import { Weather, type SkyStatus } from './weather'
 import { Airport, type AirportStatus } from './airport'
@@ -1580,11 +1581,21 @@ export class Town {
   }
 
   /** What the camera should look at to show one building: its place in the world and how far back to stand. */
-  focusOf(id: string): { target: THREE.Vector3; distance: number; azimuth?: number } | null {
+  focusOf(id: string): { target: THREE.Vector3; distance: number; azimuth?: number; tall?: boolean } | null {
     const b = this.buildings.get(id)
     if (!b) return null
     b.root.updateWorldMatrix(true, false)
-    return { target: b.root.getWorldPosition(new THREE.Vector3()).setY(2), distance: 46 }
+    // a tower taller than the buildings the camera was set for is looked at higher up and from further back, so its roof stays on the screen; anything shorter is framed as it always was
+    const f = buildingFraming(b.standingHeight())
+    return { target: b.root.getWorldPosition(new THREE.Vector3()).setY(f.aim), distance: f.distance, tall: f.tall }
+  }
+
+  /** The side a building's door faces, as an azimuth (radians round the building) for the camera to stand on: its front. Null for a building that is not on screen. */
+  frontOf(id: string): number | null {
+    const b = this.buildings.get(id)
+    if (!b) return null
+    const d = b.doorDirWorld()
+    return Math.atan2(d.x, d.z)
   }
 
   /**
@@ -1657,7 +1668,7 @@ export class Town {
    * faces the hub (a third party's faces the ring road), so it is always seen from the same side whichever way the camera was looking. The hub and the airport
    * have no front: the camera keeps its side.
    */
-  islandFocusOf(groupId: string): { target: THREE.Vector3; distance: number; azimuth?: number } | null {
+  islandFocusOf(groupId: string): { target: THREE.Vector3; distance: number; azimuth?: number; tall?: boolean } | null {
     if (groupId === 'hub') return { target: new THREE.Vector3(0, 0, 0), distance: Math.max(this.hubGeo.rx, this.hubGeo.rz) * 2.6 }
     if (groupId === 'airport' && this.airport) return { target: this.airport.root.getWorldPosition(new THREE.Vector3()).setY(0), distance: this.airport.rx * 2.2 }
     // a pillar's island, or a third party's (the id of the vendor, or the shared island of its services)
@@ -1666,7 +1677,11 @@ export class Town {
     let reach = 0
     for (const p of isl.outline.points) reach = Math.max(reach, Math.hypot(p.x, p.y))
     // local +z is the island's front (see buildIsland: the gate, sign and pier are on that side), so the camera stands that way from the island's middle
-    return { target: isl.root.getWorldPosition(new THREE.Vector3()).setY(0), distance: reach * 2.1, azimuth: isl.root.rotation.y }
+    // the tallest building on it: a tower over TALL_FROM raises what the camera looks at and backs it off a little, so the towers at the back are not cut off
+    let tallest = 0
+    for (const b of isl.buildings.values()) tallest = Math.max(tallest, b.standingHeight())
+    const f = islandFraming(tallest, reach * 2.1)
+    return { target: isl.root.getWorldPosition(new THREE.Vector3()).setY(f.aim), distance: f.distance, azimuth: isl.root.rotation.y }
   }
 
   /** Marks one building as selected, so its name board stays visible. */

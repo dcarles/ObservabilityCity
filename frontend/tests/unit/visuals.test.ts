@@ -1,20 +1,25 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { boatRate, MIN_BOAT_RATE, MAX_BOAT_RATE, carRate, MIN_CAR_RATE, beaconLevel, darkFloorsFor, floorsFor, formatAge, formatCount, formatRate, litFraction, speedFactor, spawnRate } from '../../src/visuals'
+import { boatRate, MAX_FLOORS, MIN_BOAT_RATE, MAX_BOAT_RATE, carRate, MIN_CAR_RATE, beaconLevel, darkFloorsFor, floorsFor, formatAge, formatCount, formatRate, litFraction, speedFactor, spawnRate } from '../../src/visuals'
 import type { Snapshot } from '../../src/types'
 
 describe('floors', () => {
-  it('follow the counted instances: 3 plans and 5 plans give 3 and 4 floors, and an uncounted system keeps one', () => {
+  it('follow the counted instances: 3 plans and 5 plans give 3 and 5 floors, and an uncounted system keeps one', () => {
     expect(floorsFor(3)).toBe(3)
-    expect(floorsFor(5)).toBe(4)
+    expect(floorsFor(5)).toBe(5)
     expect(floorsFor(0 || 1)).toBe(1)
   })
 
 
-  it('follows the doubling scale', () => {
-    const expected: Record<number, number> = { 1: 1, 2: 2, 3: 3, 4: 3, 5: 4, 8: 4, 9: 5, 16: 5, 17: 6, 32: 6, 33: 7, 64: 7, 65: 8, 500: 8 }
+  it('gives one floor to each instance up to 20, and 21 or more look the same as 20', () => {
+    const expected: Record<number, number> = { 1: 1, 2: 2, 3: 3, 4: 4, 8: 8, 9: 9, 15: 15, 16: 16, 20: 20, 21: 20, 65: 20, 500: 20 }
     for (const [instances, floors] of Object.entries(expected)) expect(floorsFor(Number(instances))).toBe(floors)
+    expect(MAX_FLOORS).toBe(20)
+  })
+
+  it('never gives a building less than one floor, whatever the count', () => {
+    for (const n of [0, -3, 0.4]) expect(floorsFor(n)).toBe(1)
   })
 
   it('darkens the share of unhealthy instances, at least one floor', () => {
