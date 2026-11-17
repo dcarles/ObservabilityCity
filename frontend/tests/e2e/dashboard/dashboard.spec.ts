@@ -35,17 +35,17 @@ test.describe('the dashboard view', () => {
     expect(await page.evaluate(() => (window as any).city)).toBeUndefined()
     await expect(page.locator('#town')).toBeHidden()
     await expect(page.locator('#dash-brand')).toHaveText('Tenants Town')
-    await expect(page.locator('#vs-dash')).toHaveAttribute('aria-pressed', 'true')
+    await expect(page.locator('#view-select')).toHaveValue('dashboard')
   })
 
   test('the switch goes to the town and back, and the browser remembers the last view', async ({ town, page }) => {
     await open(town, page)
-    await page.locator('#vs-town').click()
+    await page.locator('#view-select').selectOption('town')
     await page.waitForFunction(() => (window as any).city?.seen.snapshots > 0)
     expect(new URL(page.url()).searchParams.get('view')).toBe('town')
     await page.goto('/') // no ?view=: this browser last chose the town
     await page.waitForFunction(() => (window as any).city?.seen.snapshots > 0)
-    await page.locator('#view-switch').click()
+    await page.locator('#view-switch').selectOption('dashboard')
     await page.waitForFunction(() => (window as any).dash?.seen.snapshots > 0)
     await page.goto('/') // now the dashboard is what it remembers
     await page.waitForFunction(() => (window as any).dash?.seen.snapshots > 0)
@@ -105,10 +105,10 @@ test.describe('the dashboard view', () => {
     await expect(page.locator('[data-pillar="bb"]')).toHaveCount(0)
     await expect(page.locator('#hidden-pillars [data-show="bb"]')).toBeVisible()
     expect(new URL(page.url()).searchParams.get('islands')).toBe('aa')
-    await page.locator('#vs-town').click()
+    await page.locator('#view-select').selectOption('town')
     await page.waitForFunction(() => (window as any).city?.seen.snapshots > 0)
     expect(await page.evaluate(() => (window as any).city.islands())).toEqual(['aa'])
-    await page.locator('#view-switch').click()
+    await page.locator('#view-switch').selectOption('dashboard')
     await page.waitForFunction(() => (window as any).dash?.seen.snapshots > 0)
     await page.locator('#hidden-pillars [data-show="bb"]').click()
     await expect(page.locator('[data-pillar="bb"]')).toBeVisible()

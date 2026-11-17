@@ -1,15 +1,15 @@
-// Which way to look at the data: the 3D town or the plain dashboard. The choice is in the address (?view=dashboard), else what this browser last chose,
+// Which way to look at the data: the 3D town, the plain dashboard or the architecture diagram. The choice is in the address (?view=dashboard), else what this browser last chose,
 // else the town. The tenant choice is remembered here too, so both views start from the same one.
 
 import type { Store } from './lighting'
 import { ALL_TENANTS, type TenantView } from './tenants'
 
-export type ViewMode = 'town' | 'dashboard'
+export type ViewMode = 'town' | 'dashboard' | 'architecture'
 
 export const VIEW_KEY = 'oc.view'
 export const TENANT_VIEW_KEY = 'oc.tenantView'
 
-export const isViewMode = (v: unknown): v is ViewMode => v === 'town' || v === 'dashboard'
+export const isViewMode = (v: unknown): v is ViewMode => v === 'town' || v === 'dashboard' || v === 'architecture'
 
 /** The view the page opens with: the address, else this browser's last choice, else the town. A wall address (?wall=1) with no view in it is the town; ?wall=1&view=dashboard is the wall dashboard. */
 export function startView(search: string, store: Store | null): ViewMode {

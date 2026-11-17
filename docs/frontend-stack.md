@@ -37,6 +37,10 @@ They refresh two different things:
 - **Keeping both sides in step:** the C# `Snapshot` records are the source of truth. The backend publishes their shape as `contracts/openapi.json` (ASP.NET Core's built-in OpenAPI generator; it is off in a normal build, and `npm run gen:contracts` builds the Host with OpenAPI output on), and the same command generates `frontend/src/contracts.ts` from it with a small script in the repo (`scripts/openapi-to-ts.mjs`, which refuses any OpenAPI construct it does not know). No third-party tool is involved. If a C# field is renamed, the frontend stops compiling until it is updated. `npm run check:contracts` fails the build if the committed files have drifted.
 - **Drawing:** the TypeScript code takes each snapshot and updates the Three.js scene (floors, lights, beacons, cars). The browser invents all motion from the numbers in the snapshot and never knows which source produced them.
 
+## The architecture diagram
+
+The architecture view is plain TypeScript and inline SVG, with no charting library. The roll-ups and the layout are pure functions of the snapshot (`frontend/src/architecture/model.ts` and `layout.ts`, unit tested), the renderer keeps one element for each box and line and only patches what changed on each SignalR push, and a small camera (`camera.ts`) moves the SVG's `viewBox` for the wheel, pinch, drag and the +, - and Fit buttons. The page borrows the dashboard's menu and drawer, so it adds no second copy of the filters.
+
 ## Tests
 
 Vitest runs the unit tests (`frontend/tests/unit`) and Playwright runs the browser tests (`frontend/tests/e2e`). See the Tests section of the main README.
