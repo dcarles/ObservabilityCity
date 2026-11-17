@@ -96,22 +96,22 @@ test.describe('the architecture view', () => {
     await expect(page.locator('#arch-pick')).toBeHidden()
   })
 
-  test('a line follows the call: amber or red when a box at either end is', async ({ town, page }) => {
-    await open(town, page)
-    await feed(page, `${CALL}; node('bb.billing-api').state = 'Down'`)
-    await expect(page.locator('#arch-svg .edge')).toHaveClass(/bad/)
-  })
-
-  test('a line takes the colour of the pillar that calls, and "by health" turns it amber or red instead', async ({ town, page }) => {
+  test('a line takes the colour of the pillar that calls, and no option or glow changes that', async ({ town, page }) => {
     await open(town, page)
     await feed(page, `${CALL}; node('bb.billing-api').state = 'Down'`)
     const colour = await page.evaluate(() => (window as any).dash.architecture().boxes.find((b: any) => b.id === 'aa').color)
     expect(colour).toBeTruthy()
     await expect(page.locator('#arch-svg .edge')).toHaveAttribute('style', new RegExp(`--line:\\s*${colour.replace('#', '#?')}`, 'i'))
-    expect(await page.evaluate(() => (window as any).dash.options().colour)).toBe('pillar')
+    await expect(page.locator('#arch-svg .edge')).toHaveCSS('filter', 'none')
     await page.locator('#arch-look-toggle').click()
-    await page.locator('#arch-o-colour button[data-v="health"]').click()
-    await expect(page.locator('#arch-svg')).toHaveClass(/byhealth/)
+    await expect(page.locator('#arch-o-colour')).toHaveCount(0)
+  })
+
+  test('line width follows traffic only when asked to', async ({ town, page }) => {
+    await open(town, page)
+    await feed(page, CALL)
+    expect(await page.evaluate(() => (window as any).dash.options().width)).toBe(false)
+    await expect(page.locator('#arch-svg .edge')).toHaveAttribute('stroke-width', '2')
   })
 
   test('hiding a pillar takes its box and lines away without moving the other box, and showing it puts it back where it was', async ({ town, page }) => {

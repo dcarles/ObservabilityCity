@@ -34,14 +34,10 @@ body.arch #dash-menu { position: static; flex: none; }
 .arch-zoom button#arch-fit { font-size: 13px; }
 
 #arch-svg .edge { fill: none; stroke: var(--line, var(--edge)); stroke-linecap: round; transition: opacity .15s, stroke .15s; }
-/* a line keeps its pillar's colour; a problem at either end is a glow in amber or red around it (the whole line turns that colour when the colour is set to health) */
-#arch-svg .edge.warn { filter: drop-shadow(0 0 3px var(--warn)) drop-shadow(0 0 1px var(--warn)); } #arch-svg .edge.bad { filter: drop-shadow(0 0 3px var(--bad)) drop-shadow(0 0 1px var(--bad)); }
-#arch-svg.byhealth .edge { stroke: var(--edge); filter: none; }
-#arch-svg.byhealth .edge.warn { stroke: var(--warn); } #arch-svg.byhealth .edge.bad { stroke: var(--bad); }
 #arch-svg .edge.dim { opacity: .1; }
 #arch-svg.quiet .edge { stroke: var(--edge); opacity: .4; }
 #arch-svg.quiet .edge { stroke: var(--edge); }
-#arch-svg.quiet .edge.hot { stroke: var(--line, var(--edge)); } #arch-svg.byhealth.quiet .edge.warn.hot { stroke: var(--warn); } #arch-svg.byhealth.quiet .edge.bad.hot { stroke: var(--bad); }
+#arch-svg.quiet .edge.hot { stroke: var(--line, var(--edge)); }
 #arch-svg.quiet .edge.hot { opacity: 1; } #arch-svg.quiet .edge.dim { opacity: .1; }
 #arch-svg .box { cursor: pointer; transition: opacity .15s; }
 #arch-svg .box.dim { opacity: .22; }

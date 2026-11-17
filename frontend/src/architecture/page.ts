@@ -33,7 +33,6 @@ export const OPTION_NAMES: { key: keyof DiagramOptions; label: string; choices: 
   { key: 'box', label: 'Box style', choices: [['A', 'A Tint'], ['B', 'B Solid'], ['C', 'C Outline']] },
   { key: 'line', label: 'Lines', choices: [['curve', 'Curved'], ['elbow', 'Square']] },
   { key: 'stripe', label: 'Pillar colour', choices: [['1', 'Top stripe'], ['0', 'Off']] },
-  { key: 'colour', label: 'Line colour', choices: [['pillar', 'Pillar colour'], ['health', 'By health']] },
   { key: 'quiet', label: 'Line visibility', choices: [['0', 'Always'], ['1', 'Quiet until hover']] },
   { key: 'width', label: 'Line width = traffic', choices: [['1', 'On'], ['0', 'Off']] },
 ]
@@ -47,9 +46,8 @@ export function loadOptions(store: Store | null): DiagramOptions {
       box: raw.box === 'B' || raw.box === 'C' ? raw.box : 'A',
       line: raw.line === 'curve' ? 'curve' : 'elbow',
       stripe: raw.stripe !== false,
-      colour: raw.colour === 'health' ? 'health' : 'pillar',
       quiet: raw.quiet === true,
-      width: raw.width !== false,
+      width: raw.width === true,
     }
   } catch {
     return DEFAULT_OPTIONS
