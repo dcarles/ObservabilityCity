@@ -194,7 +194,7 @@ const jobStatus = (j: JobRow): 'bad' | 'warn' | 'ok' => (j.status === 'Failed' ?
 /** The Scheduler's jobs under its row: name, last run and result. The row itself turns amber when one is late or failed. */
 function jobLines(jobs: readonly JobRow[], id: string): string {
   const when = (iso: string | null): string => (iso ? new Date(iso).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'no run seen')
-  return jobs.map((j) => `<tr class="sub jobrow" data-system="${esc(id)}"><td class="ind2">${dot(jobStatus(j))}${esc(j.name)}${j.region ? ` <span class="dim">${esc(j.region)}</span>` : ''}</td><td colspan="3">${when(j.lastRun)}</td><td colspan="3" class="${jobStatus(j) === 'ok' ? '' : jobStatus(j)}">${j.status === 'Ok' ? 'Succeeded' : j.status === 'Failed' ? 'Failed' : 'Late'}</td></tr>`).join('')
+  return jobs.map((j) => `<tr class="sub jobrow" data-system="${esc(id)}"><td colspan="7"><div class="jl">${dot(jobStatus(j))}<span class="jn">${esc(j.name)}${j.region ? ` <span class="dim">${esc(j.region)}</span>` : ''}</span><span class="jw">${when(j.lastRun)}</span><span class="jr ${jobStatus(j) === 'ok' ? '' : jobStatus(j)}">${j.status === 'Ok' ? 'Succeeded' : j.status === 'Failed' ? 'Failed' : 'Late'}</span></div></td></tr>`).join('')
 }
 
 export function pillarHtml(p: Pillar, ui: UiState): string {

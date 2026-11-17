@@ -162,4 +162,4 @@ body.dash.wall tr.row.wall-focus > td { background: var(--warnbg); outline: 2px 
 .pflow .ch i, .pflowx .ch i { font-style: normal; color: var(--muted); }
 
 /* the Scheduler's jobs under its row */
-.jobrow td { font-size: 13px; } .jobtag { margin-left: 8px; font-size: 12px; font-weight: 500; color: var(--warn); background: var(--warnbg); border-radius: 10px; padding: 1px 9px; }
+.jobrow td { font-size: 13px; padding-left: 28px; } .jl { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 18px; } .jl .dot { align-self: center; margin-right: -10px; } .jl .jn { flex: 1 1 14em; min-width: 0; overflow-wrap: anywhere; } .jl .jw { flex: none; color: var(--muted); } .jl .jr { flex: none; min-width: 5em; } .jl .jr.warn { color: var(--warn); } .jl .jr.bad { color: var(--bad); } .jobtag { margin-left: 8px; font-size: 12px; font-weight: 500; color: var(--warn); background: var(--warnbg); border-radius: 10px; padding: 1px 9px; }
