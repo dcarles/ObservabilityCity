@@ -319,6 +319,14 @@ test.describe('the dashboard view', () => {
     expect(got.over).toBeLessThanOrEqual(0)
   })
 
+  test('a phone screen still does not scroll sideways when the town dropdown is there, with a long town name', async ({ town, page }) => {
+    await page.route('**/api/towns', (r) => r.fulfill({ json: [{ id: 'one', name: 'A Very Long Company Name Multitenant Core Credit Platform', isDefault: true }, { id: 'two', name: 'Second', isDefault: false }] }))
+    await page.setViewportSize({ width: 390, height: 800 })
+    await open(town, page)
+    await expect(page.locator('#town-button')).toBeVisible()
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0)
+  })
+
   test('the boxes fit a phone screen without sideways scrolling', async ({ town, page }) => {
     await page.setViewportSize({ width: 390, height: 800 })
     await open(town, page)

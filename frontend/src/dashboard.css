@@ -163,3 +163,6 @@ body.dash.wall tr.row.wall-focus > td { background: var(--warnbg); outline: 2px 
 
 /* the Scheduler's jobs under its row */
 .jobrow td { font-size: 13px; padding-left: 28px; } .jl { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 18px; } .jl .dot { align-self: center; margin-right: -10px; } .jl .jn { flex: 1 1 14em; min-width: 0; overflow-wrap: anywhere; } .jl .jw { flex: none; color: var(--muted); } .jl .jr { flex: none; min-width: 5em; } .jl .jr.warn { color: var(--warn); } .jl .jr.bad { color: var(--bad); } .jobtag { margin-left: 8px; font-size: 12px; font-weight: 500; color: var(--warn); background: var(--warnbg); border-radius: 10px; padding: 1px 9px; }
+/* the town's dropdown joined the filters: on a narrow screen they wrap onto more rows instead of pushing the page sideways, and a long name is cut short */
+#dash-menu #town-button { max-width: 60vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 760px) { #dash-menu #dash-filters { flex-wrap: wrap; max-width: 100%; } }
