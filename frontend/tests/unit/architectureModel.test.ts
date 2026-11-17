@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { buildArchitecture, edgeLevel } from '../../src/architecture/model'
+import { buildArchitecture, buildPillarArchitecture, edgeLevel } from '../../src/architecture/model'
 import { arrange, crossings, layers, layoutBoxes, routeAll } from '../../src/architecture/layout'
 import { ALL_TENANTS } from '../../src/tenants'
 import type { Snapshot } from '../../src/types'
@@ -82,6 +82,35 @@ describe('architecture boxes', () => {
     for (const g of s.groups) g.flow = undefined
     const a = buildArchitecture(s, ALL_TENANTS)
     expect(a.boxes.filter((b) => b.kind === 'pillar').every((b) => b.msg === null)).toBe(true)
+  })
+})
+
+describe('the inside of a pillar', () => {
+  it('has a box for each service group of the pillar, and every other box closed and joined to it by a line', () => {
+    const s = golden('bad-day')
+    const whole = buildArchitecture(s, ALL_TENANTS)
+    const pillar = whole.dashboard.pillars.find((p) => p.groups.length > 1 && p.id === 'pay') ?? whole.dashboard.pillars.find((p) => p.groups.length > 1)!
+    const a = buildPillarArchitecture(s, ALL_TENANTS, pillar.id, whole.dashboard)!
+    expect(a.open).toEqual({ id: pillar.id, name: pillar.name })
+    expect(a.boxes.filter((b) => b.kind === 'service')).toHaveLength(pillar.groups.length)
+    const inside = new Set(a.boxes.filter((b) => b.kind === 'service').map((b) => b.id))
+    expect(a.boxes.some((b) => b.kind === 'shared')).toBe(false)
+    for (const b of a.boxes.filter((x) => x.kind === 'pillar')) expect(b.closed).toBe(true)
+    for (const e of a.edges) expect(inside.has(e.from) || inside.has(e.to), `${e.from}>${e.to}`).toBe(true)
+    for (const b of a.boxes.filter((x) => !inside.has(x.id))) expect(a.edges.some((e) => e.from === b.id || e.to === b.id), b.id).toBe(true)
+    expect(new Set(a.edges.map((e) => `${e.from}>${e.to}`)).size).toBe(a.edges.length)
+  })
+
+  it('draws the lines between two groups of the pillar and takes the pillar colour', () => {
+    const s = golden('bad-day')
+    for (const p of buildArchitecture(s, ALL_TENANTS).dashboard.pillars) {
+      const a = buildPillarArchitecture(s, ALL_TENANTS, p.id)!
+      for (const e of a.edges.filter((x) => x.from.startsWith('svc:'))) expect(e.color).toBe(a.boxes.find((b) => b.id === e.from)!.color)
+    }
+  })
+
+  it('is null for a pillar the town does not show', () => {
+    expect(buildPillarArchitecture(golden('calm'), ALL_TENANTS, 'nope')).toBeNull()
   })
 })
 

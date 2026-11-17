@@ -83,3 +83,9 @@ body.arch #dash-menu { position: static; flex: none; }
   .arch-zoom { right: 8px; bottom: 8px; }
 }
 .arch-pick a { pointer-events: auto; color: var(--daccent); }
+
+.arch-crumb { flex: none; align-self: flex-start; margin: 0 16px 8px; display: flex; gap: 8px; align-items: center; background: var(--surface); border: 1px solid var(--dline); border-radius: 10px; padding: 4px 12px 4px 6px; font-size: 13px; max-width: calc(100% - 32px); }
+.arch-crumb[hidden] { display: none; }
+.arch-crumb button { background: none; border: 0; color: var(--daccent); cursor: pointer; font: inherit; padding: 2px 6px; white-space: nowrap; }
+.arch-crumb span { color: var(--muted); } .arch-crumb b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.arch-pick .open { pointer-events: auto; background: var(--surface2); color: var(--fg); border: 1px solid var(--dline); border-radius: 8px; padding: 4px 10px; font: inherit; font-size: 13px; cursor: pointer; }

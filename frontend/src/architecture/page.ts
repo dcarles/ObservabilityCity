@@ -7,11 +7,12 @@ import type { Store } from '../lighting'
 import type { Snapshot } from '../types'
 import type { TenantView } from '../tenants'
 import { summaryHtml } from '../dashboard/render'
+import { groupWords } from '../groupLabel'
 import { dashLegendHtml, type DashLegendLine } from '../dashboard/legend'
 import type { Dashboard } from '../dashboard/model'
 import { Diagram, DEFAULT_OPTIONS, type DiagramOptions } from './diagram'
 import { layoutBoxes, type Layout } from './layout'
-import { buildArchitecture, type ArchBox, type Architecture } from './model'
+import { buildArchitecture, buildPillarArchitecture, type ArchBox, type Architecture } from './model'
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T
 const esc = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
@@ -57,7 +58,8 @@ export function loadOptions(store: Store | null): DiagramOptions {
 export function pickHtml(b: ArchBox): string {
   const parts = [b.sub, b.reason, b.figure].filter(Boolean).map((x) => esc(x!))
   const links = b.links.filter((l) => /^https?:\/\//i.test(l.url)).map((l) => `<a href="${esc(l.url)}" target="_blank" rel="noopener noreferrer">${esc(l.name)}</a>`).join(' · ')
-  return `<div><b>${esc(b.name)}</b><small>${parts.join(' · ')}</small>${links ? `<small class="links">${links}</small>` : ''}</div><button class="x" id="arch-pick-x" aria-label="Clear">×</button>`
+  const open = b.kind === 'pillar' ? `<button class="open" id="arch-pick-open">Open ›</button>` : ''
+  return `<div><b>${esc(b.name)}</b><small>${parts.join(' · ')}</small>${links ? `<small class="links">${links}</small>` : ''}</div>${open}<button class="x" id="arch-pick-x" aria-label="Clear">×</button>`
 }
 
 /** What dashboard.ts needs to host the view. */
@@ -77,12 +79,53 @@ export function architecturePlug(): PagePlug {
   let layout: Layout | null = null
   let arch: Architecture | null = null
   let structure = ''
+  /** The pillar opened (?open=), or null for all of them; each picture keeps its own layout, so going back puts every box where it was. */
+  let openId: string | null = new URLSearchParams(window.location.search).get('open') || null
+  const layouts = new Map<string, Layout>()
+  let shown: string | undefined
+  let inputs: { s: Snapshot; d: Dashboard; view: TenantView } | null = null
+
+  const setOpen = (id: string | null): void => {
+    openId = id
+    const q = new URLSearchParams(window.location.search)
+    if (id) q.set('open', id)
+    else q.delete('open')
+    const text = q.toString().replace(/%2C/g, ',')
+    window.history.replaceState(null, '', `${window.location.pathname}${text ? `?${text}` : ''}${window.location.hash}`)
+    if (inputs) render(inputs.s, inputs.d, inputs.view)
+  }
 
   const showOptions = (): void => {
     for (const o of OPTION_NAMES) {
       const now = String(options[o.key] === true ? '1' : options[o.key] === false ? '0' : options[o.key])
       document.querySelectorAll<HTMLButtonElement>(`#arch-o-${o.key} button`).forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === now)))
     }
+  }
+
+  /** Zooms in on the box, then shows the inside of the pillar. */
+  const dive = (id: string): void => {
+    const box = arch?.boxes.find((b) => b.id === id)
+    if (!box || box.kind !== 'pillar') return
+    diagram.focus(id)
+    window.setTimeout(() => setOpen(id), 320)
+  }
+
+  const render = (s: Snapshot, d: Dashboard, view: TenantView): void => {
+    let next = openId ? buildPillarArchitecture(s, view, openId, d) : null
+    if (openId && !next) { openId = null; setOpen(null); return } // the pillar is hidden or gone: all of them again
+    next ??= buildArchitecture(s, view, d)
+    arch = next
+    const mode = next.open?.id ?? ''
+    if (shown !== mode) { diagram.reset(); shown = mode; structure = ''; layout = layouts.get(mode) ?? null }
+    $('arch-sum').innerHTML = summaryHtml(next.dashboard).replace(/id="kpi-/g, 'id="arch-kpi-')
+    const crumb = $('arch-crumb')
+    crumb.hidden = !next.open
+    if (next.open) crumb.innerHTML = `<button id="arch-back" title="Back to all (Esc)">‹ All ${esc(groupWords(next.dashboard.groupLabel).many.toLowerCase())}</button><span aria-hidden="true">›</span><b>${esc(next.open.name)}</b>`
+    const slim = next.boxes.map((b) => ({ id: b.id, kind: b.kind }))
+    const key = JSON.stringify([mode, slim.map((b) => b.id).sort(), next.edges.map((e) => `${e.from}>${e.to}`)])
+    if (key !== structure) { structure = key; layout = layoutBoxes(slim, next.edges, layout); layouts.set(mode, layout) }
+    $('arch-empty').hidden = next.boxes.length > 0
+    diagram.update(next, layout!)
   }
 
   return {
@@ -99,9 +142,15 @@ export function architecturePlug(): PagePlug {
           if (b) pick.innerHTML = pickHtml(b)
         },
         open: (b) => { if (b.nodeId) inspector.open(b.nodeId) },
+        dive: (b) => dive(b.id),
       })
       diagram.setOptions(options)
-      pick.addEventListener('click', (e) => { if ((e.target as HTMLElement).closest('#arch-pick-x')) diagram.pick(null) })
+      pick.addEventListener('click', (e) => {
+        const t = e.target as HTMLElement
+        if (t.closest('#arch-pick-x')) diagram.pick(null)
+        else if (t.closest('#arch-pick-open') && diagram.selection) dive(diagram.selection)
+      })
+      $('arch-crumb').addEventListener('click', (e) => { if ((e.target as HTMLElement).closest('#arch-back')) setOpen(null) })
       $('arch-zoom-in').addEventListener('click', () => diagram.zoom(1.4, undefined, undefined, true))
       $('arch-zoom-out').addEventListener('click', () => diagram.zoom(1 / 1.4, undefined, undefined, true))
       $('arch-fit').addEventListener('click', () => diagram.home())
@@ -123,16 +172,15 @@ export function architecturePlug(): PagePlug {
       $('arch-look-toggle').addEventListener('click', () => toggle(!look.classList.contains('min')))
       $('arch-look-x').addEventListener('click', () => toggle(true))
       document.addEventListener('pointerdown', (e) => { if (!(e.target as HTMLElement).closest('#arch-look')) toggle(true) })
-      window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && diagram.selection && !document.querySelector('#inspector:not([hidden])')) diagram.pick(null) })
+      window.addEventListener('keydown', (e) => {
+        if (e.key !== 'Escape' || document.querySelector('#inspector:not([hidden])')) return
+        if (diagram.selection) diagram.pick(null)
+        else if (openId) setOpen(null)
+      })
     },
     draw(s, d, view) {
-      arch = buildArchitecture(s, view, d)
-      $('arch-sum').innerHTML = summaryHtml(arch.dashboard).replace(/id="kpi-/g, 'id="arch-kpi-')
-      const slim = arch.boxes.map((b) => ({ id: b.id, kind: b.kind }))
-      const key = JSON.stringify([slim.map((b) => b.id).sort(), arch.edges.map((e) => `${e.from}>${e.to}`)])
-      if (key !== structure) { structure = key; layout = layoutBoxes(slim, arch.edges, layout) }
-      $('arch-empty').hidden = arch.boxes.length > 0
-      diagram.update(arch, layout!)
+      inputs = { s, d, view }
+      render(s, d, view)
     },
     expose() {
       return {
@@ -142,6 +190,9 @@ export function architecturePlug(): PagePlug {
         pick: (id: string | null) => diagram.pick(id),
         zoom: (f: number) => diagram.zoom(f),
         options: () => options,
+        /** For tests: open a pillar (null: all of them) without the dive. */
+        open: (id: string | null) => setOpen(id),
+        opened: () => openId,
       }
     },
   }

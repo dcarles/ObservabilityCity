@@ -27,6 +27,8 @@ export interface DiagramHost {
   select(box: ArchBox | null): void
   /** The box stands for one system: open its drawer. */
   open(box: ArchBox): void
+  /** A pillar's box was double-tapped: open the pillar. */
+  dive(box: ArchBox): void
 }
 
 const COLOR: Record<Level, string> = { ok: 'var(--ok)', warn: 'var(--warn)', bad: 'var(--bad)', none: 'var(--stale)' }
@@ -88,6 +90,21 @@ export class Diagram {
   }
 
   get selection(): string | null { return this.selected }
+
+  /** Forgets what is drawn (and the zoom), for a different picture altogether: the inside of a pillar, or all of them again. */
+  reset(): void {
+    cancelAnimationFrame(this.anim) // the dive that was zooming in on the box must not go on over the new picture
+    this.selected = null
+    this.hovered = null
+    this.boxSig.clear()
+    this.lineSig.clear()
+    this.frames.replaceChildren()
+    this.lines.replaceChildren()
+    this.boxes.replaceChildren()
+    this.layout = null
+    this.touched = false
+    this.host.select(null)
+  }
 
   setOptions(o: DiagramOptions): void {
     this.options = o
@@ -192,7 +209,8 @@ export class Diagram {
       if (solid) t.setAttribute('style', 'fill:#fff')
       return t
     }
-    text(fitName(b.name), 't', px, ty)
+    text(fitName(b.name, b.closed ? 19 : 21), 't', px, ty)
+    if (b.closed) text('↗', 'm', w - 14, ty, 'end')
     text(b.sub, 's', px, ty + 20)
     const chip = (x: number, y: number, label: string, kind: '' | 'dlq warn' | 'dlq bad'): number => {
       const cw = label.length * 6.4 + 14
@@ -225,6 +243,11 @@ export class Diagram {
   private listen(g: SVGGElement, id: string): void {
     g.addEventListener('mouseenter', () => { this.hovered = id; this.highlight() })
     g.addEventListener('mouseleave', () => { this.hovered = null; this.highlight() })
+    g.addEventListener('dblclick', (e) => {
+      e.stopPropagation()
+      const box = this.arch?.boxes.find((b) => b.id === id)
+      if (box?.kind === 'pillar') this.host.dive(box)
+    })
     g.addEventListener('click', (e) => {
       if (this.moved > 12) return
       e.stopPropagation()

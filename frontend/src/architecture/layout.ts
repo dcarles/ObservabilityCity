@@ -177,7 +177,7 @@ function search(main: readonly string[], vendors: readonly string[], boxes: read
  * different numbers of columns and the picture with the fewest crossings wins, so no fixed width is assumed.
  */
 export function arrange(boxes: readonly Slim[], pairs: readonly Pair[]): string[][] {
-  const main = boxes.filter((b) => b.kind === 'pillar' || b.kind === 'internal').map((b) => b.id).sort()
+  const main = boxes.filter((b) => b.kind === 'pillar' || b.kind === 'internal' || b.kind === 'service').map((b) => b.id).sort()
   const vendors = boxes.filter((b) => b.kind === 'vendor').map((b) => b.id).sort()
   if (main.length === 0) return vendors.length ? [vendors] : []
   const base = Math.max(1, Math.min(6, Math.ceil(Math.sqrt(main.length) * 1.1)))
