@@ -5,7 +5,7 @@ import { groupWords, withGroupWords } from '../../src/groupLabel'
 import { forTown, LEGEND } from '../../src/legend'
 import { layerWord } from '../../src/inspectorModel'
 import { buildDashboard } from '../../src/dashboard/model'
-import { flowTileHtml, summaryHtml } from '../../src/dashboard/render'
+import { summaryHtml } from '../../src/dashboard/render'
 import { ALL_TENANTS } from '../../src/tenants'
 import type { Snapshot } from '../../src/types'
 
@@ -40,12 +40,6 @@ describe('what a town calls an island (groupLabel)', () => {
     expect(layerWord('Pillar', 'Team')).toBe('team defaults')
     expect(layerWord('Pillar')).toBe('pillar defaults')
     expect(layerWord('System', 'Team')).toBe('this system')
-  })
-
-  it('says no team moves messages on the dashboard of a town of teams', () => {
-    const tile = { top: [], all: [], max: 0, windowSeconds: 300, total: null }
-    expect(flowTileHtml(tile, false, 'Team')).toContain('No team sends or receives')
-    expect(flowTileHtml(tile, false)).toContain('No pillar sends or receives')
   })
 
   it('carries the town\'s label into the dashboard model and its summary', () => {

@@ -141,11 +141,9 @@ for (const theme of themesUnderTest) {
       await expect(page.locator('#dash-pillars .card').first()).toBeVisible()
       expect(await page.evaluate(() => (window as any).city)).toBeUndefined() // the dashboard never loads the town
       // a system is down, so the summary counts it and is not the all-healthy line
-      await expect(page.locator('#kpi-services')).not.toContainText('0 down')
-      await expect(page.locator('#kpi-services')).not.toContainText('All services are healthy')
-      // dead letters and the backlog
+      await expect(page.locator('#kpi-down b')).not.toHaveText('0')
+      // dead letters
       await expect(page.locator('#kpi-dlq b')).not.toHaveText('0')
-      await expect(page.locator('#kpi-dlq')).toContainText('Backlog')
       // an incident is open
       await expect(page.locator('#kpi-incidents b')).not.toHaveText('0')
       await town.removeEffects()
