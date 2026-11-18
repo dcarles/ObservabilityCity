@@ -83,7 +83,7 @@ test.describe(`a live town with scope rules (${B ? 'tags and derived names' : 'n
     for (const h of hrefs) expect(h).toMatch(town.dbLink[1] as RegExp)
   })
 
-  test('the Overview tab says where to open the system, and points a tenant database to the Config tab', async ({ page }) => {
+  test('the Overview tab says where to open the system, and lists the link of each tenant database', async ({ page }) => {
     await page.goto('/?test=1&quality=low')
     await page.waitForFunction(() => (window as any).city?.seen.snapshots > 0)
     await page.locator('#search-input').fill('Orders API')
@@ -93,8 +93,9 @@ test.describe(`a live town with scope rules (${B ? 'tags and derived names' : 'n
     await page.locator('#search-input').fill('Orders DB')
     await page.locator('#search-results .hit').first().click()
     await expect(page.locator('#inspector h4', { hasText: 'Open in' })).toBeVisible()
-    await expect(page.locator('#inspector .row.open-in')).toHaveCount(0)
-    await expect(page.locator('#inspector')).toContainText('3 tenant resources have their own links on the Config tab')
+    const rows = page.locator('#inspector .row.open-in a.out')
+    await expect(rows).toHaveCount(town.dbResources)
+    for (const h of await rows.evaluateAll((els) => els.map((e) => (e as HTMLAnchorElement).getAttribute('href')!))) expect(h).toMatch(town.dbLink[1] as RegExp)
   })
 
   // Nobody listed these tenants. The accounts' tag names them, so they stand in the yard as customers under those names, not as unknown "?" pods.
@@ -107,7 +108,8 @@ test.describe(`a live town with scope rules (${B ? 'tags and derived names' : 'n
     expect(await page.evaluate(() => (window as any).city.seen.last.tenants.every((t: any) => t.kind === 'Customer'))).toBe(true)
     await page.locator('#search-input').fill('Orders DB')
     await page.locator('#search-results .hit').first().click()
-    const list = page.locator('#inspector h4', { hasText: 'Tenants' }).locator('~ .row')
+    // the "Open in" rows follow the tenant rows, so they are left out
+    const list = page.locator('#inspector h4', { hasText: 'Tenants' }).locator('~ .row:not(.open-in)')
     await expect(list).toHaveCount(3)
     const text = (await list.allTextContents()).join(' ')
     for (const customer of ['Acme Bank', 'Borealis Credit Union', 'Cygnus Finance']) expect(text).toContain(customer)

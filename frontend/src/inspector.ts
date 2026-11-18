@@ -281,10 +281,9 @@ export class Inspector {
   private openIn(): string {
     const v = overviewLinks(this.detail?.scope)
     if (!v) return ''
-    const rows = v.items.map((i) => `<div class="row open-in" data-resource="${escapeHtml(i.resource)}"><span>${escapeHtml(i.resource)}</span><span>${this.anchor(i.link.name, i.link.url)}</span></div>`).join('')
-    const tenants = v.tenantResources === 0 ? '' : `<p class="note">${v.tenantResources} tenant ${v.tenantResources === 1 ? 'resource has its' : 'resources have their'} own link${v.tenantResources === 1 ? '' : 's'} on the Config tab.</p>`
+    const rows = v.items.map((i) => `<div class="row open-in" data-resource="${escapeHtml(i.resource)}"><span>${escapeHtml(i.resource)}${i.tenant ? ` <small>${escapeHtml(i.tenant)}</small>` : ''}</span><span>${this.anchor(i.link.name, i.link.url)}</span></div>`).join('')
     const more = v.more === 0 ? '' : `<p class="note">${v.more} more on the Config tab.</p>`
-    return `<h4>Open in</h4>${rows}${more}${tenants}`
+    return `<h4>Open in</h4>${rows}${more}`
   }
 
   private anchor(name: string, url: string, title?: string): string {

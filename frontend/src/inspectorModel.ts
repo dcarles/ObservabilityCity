@@ -385,11 +385,9 @@ export function resourceLinks(r: ScopeResource): ResourceLink[] {
 }
 
 export interface OverviewLinks {
-  /** One entry per link of a resource that does not belong to a tenant, in resource order. */
-  items: { resource: string; link: ResourceLink }[]
-  /** How many tenant resources have links; their links are on the Config tab, one row each. */
-  tenantResources: number
-  /** Links beyond the ones listed. */
+  /** One entry per link, in resource order: a resource of the system first, then each tenant's resource (its database account). */
+  items: { resource: string; tenant: string | null; link: ResourceLink }[]
+  /** Links of the system's own resources beyond the ones listed. Tenant resources are always all listed. */
   more: number
 }
 
@@ -398,10 +396,11 @@ const OVERVIEW_LINK_LIMIT = 6
 /** The "open in" part of the Overview tab. Null when no resource has a link, so a town without link rules shows nothing. */
 export function overviewLinks(s: ScopeInfo | null | undefined): OverviewLinks | null {
   if (!s) return null
-  const own = s.resources.filter((r) => !r.tenant).flatMap((r) => resourceLinks(r).map((link) => ({ resource: r.name, link })))
-  const tenantResources = s.resources.filter((r) => r.tenant && resourceLinks(r).length > 0).length
-  if (own.length === 0 && tenantResources === 0) return null
-  return { items: own.slice(0, OVERVIEW_LINK_LIMIT), tenantResources, more: Math.max(0, own.length - OVERVIEW_LINK_LIMIT) }
+  const pick = (tenantOnes: boolean) => s.resources.filter((r) => !!r.tenant === tenantOnes).flatMap((r) => resourceLinks(r).map((link) => ({ resource: r.name, tenant: r.tenant ?? null, link })))
+  const own = pick(false)
+  const tenants = pick(true)
+  if (own.length === 0 && tenants.length === 0) return null
+  return { items: [...own.slice(0, OVERVIEW_LINK_LIMIT), ...tenants], more: Math.max(0, own.length - OVERVIEW_LINK_LIMIT) }
 }
 
 /** Messages a second in as few digits as say something: 120, 3.4, 0.05. */
