@@ -108,7 +108,8 @@ test.describe(`a live town with scope rules (${B ? 'tags and derived names' : 'n
     expect(await page.evaluate(() => (window as any).city.seen.last.tenants.every((t: any) => t.kind === 'Customer'))).toBe(true)
     await page.locator('#search-input').fill('Orders DB')
     await page.locator('#search-results .hit').first().click()
-    const list = page.locator('#inspector h4', { hasText: 'Tenants' }).locator('~ .row')
+    // the "Open in" rows follow the tenant rows, so they are left out
+    const list = page.locator('#inspector h4', { hasText: 'Tenants' }).locator('~ .row:not(.open-in)')
     await expect(list).toHaveCount(3)
     const text = (await list.allTextContents()).join(' ')
     for (const customer of ['Acme Bank', 'Borealis Credit Union', 'Cygnus Finance']) expect(text).toContain(customer)
