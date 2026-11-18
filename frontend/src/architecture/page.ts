@@ -27,6 +27,7 @@ const LEGEND: readonly DashLegendLine[] = [
   { id: 'traffic', level: null, title: '⇄ ↑ out ↓ in', text: 'Requests a second a pillar sends to other pillars and takes in from them' },
   { id: 'messages', level: null, title: '✉ ↑ out ↓ in', text: 'Messages a second a pillar sends to other pillars and receives. A dash means nobody measures it' },
   { id: 'dlq', level: null, title: 'DLQ', text: 'Dead letters waiting in the pillar or system' },
+  { id: 'open', level: null, title: 'Frame · ↗', text: 'Double-tap a pillar or service (or tap it, then Open) to look inside: its boxes stand in a frame and everything else stays outside as closed boxes marked ↗. Back, the crumb or Esc go up one step' },
   { id: 'frames', level: null, title: 'Dashed frames', text: 'Third-party vendors, and the shared systems every pillar uses. A dashed box is an internal service outside the platform' },
 ]
 
