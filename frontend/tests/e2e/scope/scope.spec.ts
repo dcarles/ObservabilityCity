@@ -92,7 +92,6 @@ test.describe(`a live town with scope rules (${B ? 'tags and derived names' : 'n
     await expect(page.locator('#inspector .row.open-in a.out').first()).toHaveAttribute('href', town.apiLink[1] as RegExp)
     await page.locator('#search-input').fill('Orders DB')
     await page.locator('#search-results .hit').first().click()
-    await expect(page.locator('#inspector h4', { hasText: 'Open in' })).toBeVisible()
     // a tenant database's link sits on its Tenants row, or under Open in when that tenant has no row; either way there is one for each
     const rows = page.locator('#inspector .tenant-link a.out, #inspector .row.open-in a.out')
     await expect(rows).toHaveCount(town.dbResources)
