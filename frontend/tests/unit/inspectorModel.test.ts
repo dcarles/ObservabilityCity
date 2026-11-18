@@ -371,10 +371,9 @@ describe('the links to a system\'s resources', () => {
     expect(overviewLinks(scope([res('a'), res('b', { tenant: 'Acme' })]))).toBeNull()
   })
 
-  it('lists the links of resources without a tenant and counts the tenant ones', () => {
+  it('lists the links of resources without a tenant, then each tenant resource with its tenant', () => {
     const v = overviewLinks(scope([res('a', { links: [portal('a')] }), res('t1', { tenant: 'Acme', links: [portal('t1')] }), res('t2', { tenant: 'Borealis', links: [portal('t2')] })]))!
-    expect(v.items).toEqual([{ resource: 'a', link: portal('a') }])
-    expect(v.tenantResources).toBe(2)
+    expect(v.items).toEqual([{ resource: 'a', tenant: null, link: portal('a') }, { resource: 't1', tenant: 'Acme', link: portal('t1') }, { resource: 't2', tenant: 'Borealis', link: portal('t2') }])
     expect(v.more).toBe(0)
   })
 
@@ -383,6 +382,13 @@ describe('the links to a system\'s resources', () => {
     const v = overviewLinks(scope(many))!
     expect(v.items).toHaveLength(6)
     expect(v.more).toBe(3)
+  })
+
+  it('lists every tenant resource, with no limit', () => {
+    const dbs = Array.from({ length: 9 }, (_, i) => res(`d${i}`, { tenant: `T${i}`, links: [portal(`d${i}`)] }))
+    const v = overviewLinks(scope(dbs))!
+    expect(v.items).toHaveLength(9)
+    expect(v.more).toBe(0)
   })
 })
 
