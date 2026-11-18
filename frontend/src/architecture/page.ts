@@ -135,7 +135,7 @@ export function architecturePlug(): PagePlug {
         ? `${all}<button id="arch-back-pillar" title="Back to ${esc(next.open.name)} (Esc)">${esc(next.open.name)}</button><span aria-hidden="true">›</span><b>${esc(next.openService.name)}</b>`
         : `${all}<b>${esc(next.open.name)}</b>`
     }
-    const slim = next.boxes.map((b) => ({ id: b.id, kind: b.kind }))
+    const slim = next.boxes.map((b) => ({ id: b.id, kind: b.kind, inside: (b.kind === 'service' && !b.closed) || b.kind === 'system' }))
     const key = JSON.stringify([mode, slim.map((b) => b.id).sort(), next.edges.map((e) => `${e.from}>${e.to}`)])
     if (key !== structure) { structure = key; layout = layoutBoxes(slim, next.edges, layout); layouts.set(mode, layout) }
     $('arch-empty').hidden = next.boxes.length > 0

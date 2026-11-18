@@ -5,7 +5,7 @@
 import type { ArchBox } from './model'
 
 export interface Placed { id: string; x: number; y: number; w: number; h: number }
-export interface Frame { id: 'vendors' | 'shared'; x: number; y: number; w: number; h: number }
+export interface Frame { id: 'vendors' | 'shared' | 'inside'; x: number; y: number; w: number; h: number }
 
 export interface Layout {
   width: number
@@ -25,7 +25,8 @@ const MARGIN = 30
 const SHARED_GAP = 40
 const FRAME_TOP = 46
 
-type Slim = Pick<ArchBox, 'id' | 'kind'>
+/** `inside`: a box of the pillar or service that is open; it stands in a frame of its own with everything else outside it. */
+type Slim = Pick<ArchBox, 'id' | 'kind'> & { inside?: boolean }
 interface Pair { from: string; to: string }
 
 /** A small seeded random generator (mulberry32), so the same input always gives the same picture. */
@@ -172,29 +173,65 @@ function search(main: readonly string[], vendors: readonly string[], boxes: read
   return { cols: bestCols.filter((c) => c.length > 0), cost: best }
 }
 
+/** The best number of columns for these boxes (a few are tried, the fewest crossings wins); `wide` aims for a landscape picture. */
+function best(main: readonly string[], vendors: readonly string[], boxes: readonly Slim[], pairs: readonly Pair[], wide = false): { cols: string[][]; cost: number } {
+  const base = Math.max(1, Math.min(wide ? 8 : 6, Math.ceil(Math.sqrt(main.length) * (wide ? 1.5 : 1.1))))
+  const counts = main.length < 6 ? [base] : [...new Set([base - 1, base, base + 1, base + 2, base + 3].map((n) => Math.max(2, Math.min(8, n))))]
+  let top: { cols: string[][]; cost: number } | null = null
+  for (const n of [...counts].sort((a, b) => Math.abs(a - base) - Math.abs(b - base) || b - a)) {
+    const r = search(main, vendors, boxes, pairs, n)
+    if (!top || r.cost < top.cost - 1e-9) top = r
+  }
+  return top!
+}
+
 /**
- * The columns of boxes for the pillars and the internal services, plus the third parties in the last one. A town of many pillars is tried with a few
- * different numbers of columns and the picture with the fewest crossings wins, so no fixed width is assumed.
+ * The columns of boxes, and which of them stand inside the frame of the open pillar or service (null at the first level). A town of many pillars is tried
+ * with a few different numbers of columns and the picture with the fewest crossings wins, so no fixed width is assumed. Inside a frame the boxes of the open
+ * one are laid out wide on their own; what calls into them stands in short columns on the left, what they call on the right, then the third parties.
  */
+export function arrangeFrame(boxes: readonly Slim[], pairs: readonly Pair[]): { cols: string[][]; inside: [number, number] | null } {
+  const inner = boxes.filter((b) => b.inside)
+  if (inner.length === 0) return { cols: arrange(boxes, pairs), inside: null }
+  const inIds = new Set(inner.map((b) => b.id))
+  const innerPairs = pairs.filter((p) => inIds.has(p.from) && inIds.has(p.to))
+  const core = best(inner.map((b) => b.id).sort(), [], inner, innerPairs, true).cols
+  const rowOf = new Map<string, number>()
+  core.forEach((c) => c.forEach((id, i) => rowOf.set(id, c.length > 1 ? i / (c.length - 1) : 0.5)))
+  const rows = Math.max(3, ...core.map((c) => c.length))
+  const outside = boxes.filter((b) => !b.inside && b.kind !== 'vendor' && b.kind !== 'shared')
+  const vendors = boxes.filter((b) => b.kind === 'vendor').map((b) => b.id).sort()
+  const callers = new Set(pairs.filter((p) => inIds.has(p.to) && !inIds.has(p.from)).map((p) => p.from))
+  // each outside box stands level with the boxes inside that it talks to
+  const level = (id: string): number => {
+    const ys = pairs.filter((p) => (p.from === id && inIds.has(p.to)) || (p.to === id && inIds.has(p.from))).map((p) => rowOf.get(p.from === id ? p.to : p.from)!)
+    return ys.length ? ys.reduce((a, y) => a + y, 0) / ys.length : 0.5
+  }
+  const stack = (ids: string[]): string[][] => {
+    const sorted = [...ids].sort((a, b) => level(a) - level(b) || a.localeCompare(b))
+    const per = Math.max(1, Math.ceil(sorted.length / Math.ceil(sorted.length / rows)))
+    const cols: string[][] = []
+    for (let i = 0; i < sorted.length; i += per) cols.push(sorted.slice(i, i + per))
+    return cols
+  }
+  const left = stack(outside.filter((b) => callers.has(b.id)).map((b) => b.id)).reverse()
+  const right = stack(outside.filter((b) => !callers.has(b.id)).map((b) => b.id))
+  const cols = [...left, ...core, ...right, ...(vendors.length ? [vendors] : [])]
+  return { cols, inside: [left.length, left.length + core.length - 1] }
+}
+
 export function arrange(boxes: readonly Slim[], pairs: readonly Pair[]): string[][] {
   const main = boxes.filter((b) => b.kind === 'pillar' || b.kind === 'internal' || b.kind === 'service' || b.kind === 'system').map((b) => b.id).sort()
   const vendors = boxes.filter((b) => b.kind === 'vendor').map((b) => b.id).sort()
   if (main.length === 0) return vendors.length ? [vendors] : []
-  const base = Math.max(1, Math.min(6, Math.ceil(Math.sqrt(main.length) * 1.1)))
-  const counts = main.length < 6 ? [base] : [...new Set([base - 1, base, base + 1, base + 2, base + 3].map((n) => Math.max(2, Math.min(8, n))))]
-  let best: { cols: string[][]; cost: number } | null = null
-  for (const n of [...counts].sort((a, b) => Math.abs(a - base) - Math.abs(b - base) || b - a)) {
-    const r = search(main, vendors, boxes, pairs, n)
-    if (!best || r.cost < best.cost - 1e-9) best = r
-  }
-  return best!.cols
+  return best(main, vendors, boxes, pairs).cols
 }
 
 /** Where every box stands. `known` is the picture drawn before: if it already has every box, it is kept, so hiding a pillar never moves the others. */
 export function layoutBoxes(boxes: readonly Slim[], pairs: readonly Pair[], known: Layout | null = null): Layout {
   if (known && boxes.every((b) => known.boxes.has(b.id))) return known
   const ids = new Map(boxes.map((b) => [b.id, b]))
-  const cols = arrange(boxes, pairs)
+  const { cols, inside } = arrangeFrame(boxes, pairs)
   const shared = boxes.filter((b) => b.kind === 'shared').map((b) => b.id).sort()
   const at = coordinates({ cols }, ids)
   const placed = new Map<string, Placed>()
@@ -216,7 +253,7 @@ export function layoutBoxes(boxes: readonly Slim[], pairs: readonly Pair[], know
   cols.forEach((col, ci) => {
     const x = MARGIN + ci * (BOX_W + GAP_X)
     colX.push(x)
-    const vendorCol = col.length > 0 && ids.get(col[0])!.kind === 'vendor'
+    const vendorCol = (col.length > 0 && ids.get(col[0])!.kind === 'vendor') || (!!inside && ci >= inside[0] && ci <= inside[1])
     for (const id of col) {
       const { w, h } = sizeOf(ids.get(id)!.kind)
       const y = top + at.get(id)!.cy - h / 2 + (vendorCol ? FRAME_TOP - 20 : 0)
@@ -230,6 +267,13 @@ export function layoutBoxes(boxes: readonly Slim[], pairs: readonly Pair[], know
     const y0 = Math.min(...ps.map((p) => p.y)) - FRAME_TOP
     const y1 = Math.max(...ps.map((p) => p.y + p.h)) + 20
     frames.push({ id: 'vendors', x: colX[colX.length - 1] - 20, y: Math.max(top - 10, y0), w: BOX_W + 40, h: y1 - Math.max(top - 10, y0) })
+    bottom = Math.max(bottom, y1)
+  }
+  if (inside) {
+    const ps = cols.slice(inside[0], inside[1] + 1).flat().map((id) => placed.get(id)!)
+    const y0 = Math.max(top - 10, Math.min(...ps.map((p) => p.y)) - FRAME_TOP)
+    const y1 = Math.max(...ps.map((p) => p.y + p.h)) + 20
+    frames.push({ id: 'inside', x: colX[inside[0]] - 20, y: y0, w: colX[inside[1]] + BOX_W + 20 - (colX[inside[0]] - 20), h: y1 - y0 })
     bottom = Math.max(bottom, y1)
   }
   if (shared.length) frames.unshift({ id: 'shared', x: 10, y: 6, w: Math.max(mainW, width) - 20, h: sharedH })

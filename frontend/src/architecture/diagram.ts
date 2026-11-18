@@ -132,10 +132,10 @@ export class Diagram {
     this.frames.replaceChildren()
     for (const f of layout.frames) {
       const kind = f.id === 'vendors' ? 'vendor' : 'shared'
-      if (!arch.boxes.some((b) => b.kind === kind)) continue
-      el('rect', { x: f.x, y: f.y, width: f.w, height: f.h, rx: 14, fill: 'none', stroke: 'var(--edge)', 'stroke-width': 1.5, 'stroke-dasharray': '8 6', class: 'frame', 'data-frame': f.id }, this.frames)
+      if (f.id !== 'inside' && !arch.boxes.some((b) => b.kind === kind)) continue
+      el('rect', { x: f.x, y: f.y, width: f.w, height: f.h, rx: 14, fill: 'none', stroke: 'var(--edge)', 'stroke-width': 1.5, 'stroke-dasharray': f.id === 'inside' ? '' : '8 6', class: 'frame', 'data-frame': f.id }, this.frames)
       const t = el('text', { x: f.x + 16, y: f.y + 26, class: 'frame-label' }, this.frames)
-      t.textContent = (f.id === 'vendors' ? arch.vendorsLabel : 'Shared platform systems').toUpperCase()
+      t.textContent = (f.id === 'vendors' ? arch.vendorsLabel : f.id === 'inside' ? arch.openService?.name ?? arch.open?.name ?? '' : 'Shared platform systems').toUpperCase()
     }
   }
 
@@ -228,9 +228,10 @@ export class Diagram {
     } else if (b.figure) text(b.figure, 'm', w - 14, ty + 20, 'end')
     if (b.dlq > 0) chip(w - 12 - (`DLQ ${rate(b.dlq)}`.length * 6.4 + 14), ty - 20, `DLQ ${rate(b.dlq)}`, b.dlq >= 10 ? 'dlq bad' : 'dlq warn')
     // the state, as words, bottom left
-    const label = b.reason ?? STATE_TEXT[b.level]
-    const bw = label.length * 6.4 + 26
     const bx = px - 4
+    // a long reason (a tenant's capacity and throttling) is cut to the box; the whole of it is in the hover title and the pick bar
+    const label = fitName(b.reason ?? STATE_TEXT[b.level], Math.floor((w - bx - 10 - 26) / 6.4))
+    const bw = label.length * 6.4 + 26
     const by = h - 30
     el('rect', { x: bx, y: by, width: bw, height: 20, rx: 10, fill: solid ? 'rgba(255,255,255,.22)' : TINT[b.level], stroke: solid ? 'none' : c, 'stroke-width': 1 }, g)
     el('circle', { cx: bx + 11, cy: by + 10, r: 4, fill: solid ? '#fff' : c }, g)

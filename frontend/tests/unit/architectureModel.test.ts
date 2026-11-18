@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { buildArchitecture, buildPillarArchitecture, buildSystemArchitecture, edgeLevel } from '../../src/architecture/model'
-import { arrange, crossings, layers, layoutBoxes, routeAll } from '../../src/architecture/layout'
+import { arrange, arrangeFrame, crossings, layers, layoutBoxes, routeAll } from '../../src/architecture/layout'
 import { ALL_TENANTS } from '../../src/tenants'
 import type { Snapshot } from '../../src/types'
 
@@ -289,4 +289,35 @@ describe('architecture layout', () => {
     expect(cols.flat().length).toBe(slim.filter((b) => b.kind !== 'shared').length)
     return crossings(l, pairs)
   }
+})
+
+describe('architecture frames', () => {
+  const s = golden('bad-day')
+  const whole = buildArchitecture(s, ALL_TENANTS)
+  const slimOf = (a: NonNullable<ReturnType<typeof buildPillarArchitecture>>) => a.boxes.map((b) => ({ id: b.id, kind: b.kind, inside: (b.kind === 'service' && !b.closed) || b.kind === 'system' }))
+
+  it('keeps the open pillar in a frame of its own, wide, with every other box outside it', () => {
+    for (const p of whole.dashboard.pillars.filter((x) => x.groups.length > 1)) {
+      const a = buildPillarArchitecture(s, ALL_TENANTS, p.id, whole.dashboard)!
+      const slim = slimOf(a)
+      const l = layoutBoxes(slim, a.edges)
+      const frame = l.frames.find((f) => f.id === 'inside')!
+      expect(frame, p.id).toBeTruthy()
+      for (const b of slim) {
+        const q = l.boxes.get(b.id)!
+        const within = q.x >= frame.x && q.x + q.w <= frame.x + frame.w && q.y >= frame.y && q.y + q.h <= frame.y + frame.h
+        expect(within, `${p.id} ${b.id}`).toBe(!!b.inside)
+      }
+      expect(l.height, p.id).toBeLessThan(l.width * 1.6)
+    }
+  })
+
+  it('has no frame at the first level, and puts what is outside beside the frame, never above it', () => {
+    expect(layoutBoxes(whole.boxes.map((b) => ({ id: b.id, kind: b.kind })), whole.edges).frames.some((f) => f.id === 'inside')).toBe(false)
+    const p = whole.dashboard.pillars.find((x) => x.groups.length > 1)!
+    const a = buildPillarArchitecture(s, ALL_TENANTS, p.id, whole.dashboard)!
+    const { cols, inside } = arrangeFrame(slimOf(a), a.edges)
+    expect(inside).not.toBeNull()
+    cols.forEach((c, i) => { if (i < inside![0] || i > inside![1]) for (const id of c) expect(a.boxes.find((b) => b.id === id)!.kind === 'service' && !a.boxes.find((b) => b.id === id)!.closed).toBe(false) })
+  })
 })
