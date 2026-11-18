@@ -20,6 +20,10 @@ The same town as a dashboard, for when you want the list rather than the picture
 
 ![The dashboard view](docs/screenshots/dashboard.png)
 
+And as an architecture diagram (`?view=architecture`): a box for each pillar, third party and shared system, a line for every call, live from the same data. Double-tap a pillar to look inside it, then a service to see its systems.
+
+![The architecture view](docs/screenshots/architecture.png)
+
 ## What you need installed
 
 | Tool | Version | Why |
