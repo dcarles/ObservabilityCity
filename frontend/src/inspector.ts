@@ -219,7 +219,7 @@ export class Inspector {
       ${this.queues(n)}
       ${this.regions(n)}
       ${tenants}
-      ${this.openIn()}
+      ${this.openIn(n)}
       ${incidents.length === 0 ? '' : `<h4>Incidents on this island <small>${escapeHtml(incidentSummary(incidents))}</small></h4>
         ${incidents.map((i) => `<div class="row"><span>${escapeHtml(i.title)}</span><span class="warn">sev ${i.severity}${SEVERITY_WORD[i.severity] ? ` · ${SEVERITY_WORD[i.severity]}` : ''} · since ${escapeHtml(clockTime(i.startedAt))}</span></div>`).join('')}`}`
   }
@@ -278,9 +278,9 @@ export class Inspector {
   }
 
   /** Links that open the system's resources in a portal or console, from the environment's link rules. Nothing without them. */
-  private openIn(): string {
-    const v = overviewLinks(this.detail?.scope)
-    if (!v) return ''
+  private openIn(n: NodeSnapshot): string {
+    const v = overviewLinks(this.detail?.scope, this.tenantsShown(n).map((u) => u.name))
+    if (!v || v.items.length === 0) return ''
     const rows = v.items.map((i) => `<div class="row open-in" data-resource="${escapeHtml(i.resource)}"><span>${escapeHtml(i.resource)}${i.tenant ? ` <small>${escapeHtml(i.tenant)}</small>` : ''}</span><span>${this.anchor(i.link.name, i.link.url)}</span></div>`).join('')
     const more = v.more === 0 ? '' : `<p class="note">${v.more} more on the Config tab.</p>`
     return `<h4>Open in</h4>${rows}${more}`
@@ -290,14 +290,23 @@ export class Inspector {
     return `<a class="out" href="${escapeHtml(url)}"${title ? ` title="${escapeHtml(title)}"` : ''} target="_blank" rel="noopener noreferrer">${escapeHtml(name)} ↗</a>`
   }
 
+  /** The tenants the Overview has a row for: the worst few, without the test ones when the view hides them. */
+  private tenantsShown(n: NodeSnapshot) {
+    if (!n.tenants) return []
+    const view = this.host.view()
+    return tenantListOrder(n.tenants.filter((u) => !(view.hideTest && u.kind === 'Test'))).slice(0, 8)
+  }
+
   private tenantBlock(n: NodeSnapshot): string {
     if (!n.tenants) return ''
-    const view = this.host.view()
-    const sum = yardSummary(n.tenants, view, n.throttleAmber)
-    const shown = n.tenants.filter((u) => !(view.hideTest && u.kind === 'Test'))
-    const worst = tenantListOrder(shown).slice(0, 8)
+    const sum = yardSummary(n.tenants, this.host.view(), n.throttleAmber)
+    const onRows = overviewLinks(this.detail?.scope, this.tenantsShown(n).map((u) => u.name))?.onRows
     return `<h4>Tenants <small>${escapeHtml(sum.text)}${sum.note ? ` · ${escapeHtml(sum.note)}` : ''}</small></h4>` +
-      worst.map((u) => `<div class="row"><span>${escapeHtml(u.name)}${u.kind === 'Test' ? ' (test)' : u.kind === 'Unknown' ? ' (unknown)' : ''}</span><span class="${u.state === 'Down' ? 'bad' : u.state === 'Degraded' ? 'warn' : ''}">${tenantFigures(u)}</span></div>`).join('')
+      this.tenantsShown(n).map((u) => {
+        const links = onRows?.get(u.name.toLowerCase()) ?? []
+        const own = links.length === 0 ? '' : `<span class="rlinks tenant-link">${links.map((l) => this.anchor(l.name, l.url)).join(' ')}</span>`
+        return `<div class="row"><span>${escapeHtml(u.name)}${u.kind === 'Test' ? ' (test)' : u.kind === 'Unknown' ? ' (unknown)' : ''}${own}</span><span class="${u.state === 'Down' ? 'bad' : u.state === 'Degraded' ? 'warn' : ''}">${tenantFigures(u)}</span></div>`
+      }).join('')
   }
 
   private links(): string {

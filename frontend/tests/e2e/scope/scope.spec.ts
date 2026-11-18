@@ -83,7 +83,7 @@ test.describe(`a live town with scope rules (${B ? 'tags and derived names' : 'n
     for (const h of hrefs) expect(h).toMatch(town.dbLink[1] as RegExp)
   })
 
-  test('the Overview tab says where to open the system, and lists the link of each tenant database', async ({ page }) => {
+  test('the Overview tab says where to open the system, and puts the link of each tenant database on its tenant row', async ({ page }) => {
     await page.goto('/?test=1&quality=low')
     await page.waitForFunction(() => (window as any).city?.seen.snapshots > 0)
     await page.locator('#search-input').fill('Orders API')
@@ -92,8 +92,8 @@ test.describe(`a live town with scope rules (${B ? 'tags and derived names' : 'n
     await expect(page.locator('#inspector .row.open-in a.out').first()).toHaveAttribute('href', town.apiLink[1] as RegExp)
     await page.locator('#search-input').fill('Orders DB')
     await page.locator('#search-results .hit').first().click()
-    await expect(page.locator('#inspector h4', { hasText: 'Open in' })).toBeVisible()
-    const rows = page.locator('#inspector .row.open-in a.out')
+    // a tenant database's link sits on its Tenants row, or under Open in when that tenant has no row; either way there is one for each
+    const rows = page.locator('#inspector .tenant-link a.out, #inspector .row.open-in a.out')
     await expect(rows).toHaveCount(town.dbResources)
     for (const h of await rows.evaluateAll((els) => els.map((e) => (e as HTMLAnchorElement).getAttribute('href')!))) expect(h).toMatch(town.dbLink[1] as RegExp)
   })

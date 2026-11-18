@@ -385,22 +385,35 @@ export function resourceLinks(r: ScopeResource): ResourceLink[] {
 }
 
 export interface OverviewLinks {
-  /** One entry per link, in resource order: a resource of the system first, then each tenant's resource (its database account). */
+  /** Links that sit in the "Open in" section: a system's own resources, then any tenant resource with no Tenants row on the Overview. */
   items: { resource: string; tenant: string | null; link: ResourceLink }[]
+  /** Links of a tenant's resource, by the lower-cased tenant name, for the tenant's own row. */
+  onRows: Map<string, ResourceLink[]>
   /** Links of the system's own resources beyond the ones listed. Tenant resources are always all listed. */
   more: number
 }
 
 const OVERVIEW_LINK_LIMIT = 6
 
-/** The "open in" part of the Overview tab. Null when no resource has a link, so a town without link rules shows nothing. */
-export function overviewLinks(s: ScopeInfo | null | undefined): OverviewLinks | null {
+/**
+ * The links of the Overview tab. A tenant resource whose tenant has a row there (`rowTenants`, the names that row shows) goes on that row; every other link
+ * goes under "Open in". Null when no resource has a link, so a town without link rules shows nothing.
+ */
+export function overviewLinks(s: ScopeInfo | null | undefined, rowTenants: Iterable<string> = []): OverviewLinks | null {
   if (!s) return null
-  const pick = (tenantOnes: boolean) => s.resources.filter((r) => !!r.tenant === tenantOnes).flatMap((r) => resourceLinks(r).map((link) => ({ resource: r.name, tenant: r.tenant ?? null, link })))
-  const own = pick(false)
-  const tenants = pick(true)
-  if (own.length === 0 && tenants.length === 0) return null
-  return { items: [...own.slice(0, OVERVIEW_LINK_LIMIT), ...tenants], more: Math.max(0, own.length - OVERVIEW_LINK_LIMIT) }
+  const rows = new Set([...rowTenants].map((t) => t.toLowerCase()))
+  const own: OverviewLinks['items'] = []
+  const rest: OverviewLinks['items'] = []
+  const onRows = new Map<string, ResourceLink[]>()
+  for (const r of s.resources) {
+    for (const link of resourceLinks(r)) {
+      if (!r.tenant) own.push({ resource: r.name, tenant: null, link })
+      else if (rows.has(r.tenant.toLowerCase())) onRows.set(r.tenant.toLowerCase(), [...(onRows.get(r.tenant.toLowerCase()) ?? []), link])
+      else rest.push({ resource: r.name, tenant: r.tenant, link })
+    }
+  }
+  if (own.length === 0 && rest.length === 0 && onRows.size === 0) return null
+  return { items: [...own.slice(0, OVERVIEW_LINK_LIMIT), ...rest], onRows, more: Math.max(0, own.length - OVERVIEW_LINK_LIMIT) }
 }
 
 /** Messages a second in as few digits as say something: 120, 3.4, 0.05. */
