@@ -135,11 +135,12 @@ export function planPads(nodes: NodeSnapshot[], groupId = '', perRowOverride?: n
       continue
     }
     const parts = Math.ceil(e.nodes.length / 3)
+    const code = e.nodes.find((n) => n.serviceCode)?.serviceCode // the service's short code, when config gives one: it goes on the pad's sign
     for (let part = 0; part < parts; part++)
       pads.push({
         nodes: e.nodes.slice(part * 3, part * 3 + 3), service: e.service,
         key: `${groupId}/${e.service}${part > 0 ? `#${part + 1}` : ''}`,
-        name: serviceName(e.service) + (parts > 1 ? ` (${part + 1})` : ''),
+        name: serviceName(e.service) + (code ? ` (${code})` : '') + (parts > 1 ? ` (${part + 1})` : ''),
       })
   }
   const perRow = perRowOverride ?? padsPerRow(pads.length)

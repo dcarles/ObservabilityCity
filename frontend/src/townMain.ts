@@ -155,8 +155,8 @@ export async function startTown(): Promise<void> {
   const buildingItems = (): SearchItem[] => {
     const items: SearchItem[] = []
     for (const isl of town.islands)
-      for (const [id, b] of isl.buildings) items.push({ kind: 'building', id, name: b.node?.name ?? id, where: isl.group.displayName })
-    for (const [id, b] of town.buildings) if (id.startsWith('hub.')) items.push({ kind: 'building', id, name: b.node?.name ?? id, where: 'Platform hub' })
+      for (const [id, b] of isl.buildings) items.push({ kind: 'building', id, name: b.node?.name ?? id, where: isl.group.displayName, code: b.node?.serviceCode ?? undefined })
+    for (const [id, b] of town.buildings) if (id.startsWith('hub.')) items.push({ kind: 'building', id, name: b.node?.name ?? id, where: 'Platform hub', code: b.node?.serviceCode ?? undefined })
     for (const [id, v] of town.vendors) items.push({ kind: 'building', id, name: v.buildings.get(id)?.node?.name ?? id, where: vendorWhere(seen.last?.vendors.find((x) => x.node.id === id)) })
     return items
   }

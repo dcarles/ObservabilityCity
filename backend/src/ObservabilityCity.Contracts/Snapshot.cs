@@ -84,6 +84,8 @@ public enum HealthState
 /// Reason is a short plain-text line saying why the state is Degraded or Down ("error rate 2.4%, p99 640 ms"), built with the same thresholds that decided the state; null for a healthy or grey system.
 /// BacklogCountAmber and BacklogCountRed are the number of waiting messages that turns the system amber (and the line past it), null when the system has no such rule: the reason
 /// the browser gives for an amber system has to name the same line.
+/// ServiceCode is the short code config gives the system's service (<c>serviceCode</c>), null when it has none or it is the service's own name: the town shows it on the service's sign and
+/// search finds the system by it.
 /// Absent lists the signals no source is configured for (requests, errors, latency, instances, cpu, memory, utilisation, throttled, backlog, deadLetters). They are not
 /// zero and not grey: the number in the matching field means nothing, health ignores it and the renderer shows nothing for it. A system whose signals are all absent has no
 /// source at all; it is Stale in State, but it is not grey and it is not counted as missing data.
@@ -134,7 +136,8 @@ public sealed record NodeSnapshot(
     IReadOnlyList<SourceAgeSnapshot>? Sources = null,
     DatabaseEngineSnapshot? Engine = null,
     double? BacklogCountAmber = null,
-    double? BacklogCountRed = null);
+    double? BacklogCountRed = null,
+    string? ServiceCode = null);
 
 /// <summary>
 /// What a database runs on, from town.yaml databaseEngines: Id as pillar files write it, Name as shown (Cosmos DB), Type the id of its family (document)

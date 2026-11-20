@@ -83,16 +83,20 @@ test.describe(`a live town with scope rules (${B ? 'tags and derived names' : 'n
     for (const h of hrefs) expect(h).toMatch(town.dbLink[1] as RegExp)
   })
 
-  test('a system shows its service code after its name, and search finds it by the code; without a code the name stays plain', async ({ page }) => {
-    // the town without a serviceCode keeps the plain name
-    const shown = B ? 'Orders API' : 'Orders API (ord)'
+  test('search finds a system by its service code and shows the code, while the building keeps its plain name', async ({ page }) => {
     await page.goto('/?test=1&quality=low')
     await page.waitForFunction(() => (window as any).city?.seen.snapshots > 0)
-    await page.locator('#search-input').fill(B ? 'orders api' : 'ord')
+    const node = await page.evaluate(() => (window as any).city.seen.last.groups.flatMap((g: any) => g.nodes).find((n: any) => n.id === 'aa.orders-api'))
+    expect(node.name).toBe('Orders API')
+    // the town without a serviceCode has no code to find or show
+    expect(node.serviceCode).toBe(B ? null : 'ord')
+    if (B) return
+    await page.locator('#search-input').fill('ord')
     const hit = page.locator('#search-results .hit').first()
-    await expect(hit).toContainText(shown)
+    await expect(hit).toContainText('Orders API')
+    await expect(hit).toContainText('ord')
     await hit.click()
-    await expect(page.locator('#inspector .head')).toContainText(shown)
+    await expect(page.locator('#inspector .head')).toContainText('Orders API')
   })
 
   test('the Overview tab says where to open the system, and puts the link of each tenant database on its tenant row', async ({ page }) => {

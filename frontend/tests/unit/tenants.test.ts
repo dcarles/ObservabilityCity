@@ -145,6 +145,11 @@ describe('service pads', () => {
     expect(pads.map((p) => p.name)).toEqual(['Fraud cases (1)', 'Fraud cases (2)'])
     expect(new Set(pads.map((p) => p.key)).size).toBe(2)
   })
+  it('puts the service code on the pad sign, after the service name, and not on a service with none', () => {
+    const coded = (id: string, service: string, serviceCode: string | null): NodeSnapshot => ({ ...n(id, service), serviceCode })
+    expect(planPads([coded('a1', 'orders', null), coded('a2', 'orders', 'ord'), coded('b1', 'billing', null)], 'g').map((p) => p.name)).toEqual(['Orders (ord)', 'Billing'])
+    expect(planPads(['1', '2', '3', '4'].map((i) => coded(i, 'fraud-cases', 'frc')), 'g').map((p) => p.name)).toEqual(['Fraud cases (frc) (1)', 'Fraud cases (frc) (2)'])
+  })
   it('keeps the keys unique across islands', () => {
     expect(planPads([n('a', 'orders')], 'x')[0].key).not.toBe(planPads([n('a', 'orders')], 'y')[0].key)
   })
