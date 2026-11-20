@@ -177,8 +177,9 @@ test.describe('going to a building', () => {
 
   test('clicking a building shows it from its front too', async ({ town, page }) => {
     await town.open()
-    await stand(page)
-    await town.step(2)
+    // close up, on the far side from its door, so the click lands on it
+    await page.evaluate(() => { const c = (window as any).city; c.stage.focus(c.town.focusOf('aa.orders-api').target, 22, true, c.town.frontOf('aa.orders-api') + Math.PI) })
+    await town.step(4)
     const at = await page.evaluate(() => (window as any).city.screenOf('aa.orders-api') as { x: number; y: number })
     await page.mouse.click(at.x, at.y)
     await town.step(2)
