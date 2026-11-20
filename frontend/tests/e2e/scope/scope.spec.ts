@@ -83,6 +83,18 @@ test.describe(`a live town with scope rules (${B ? 'tags and derived names' : 'n
     for (const h of hrefs) expect(h).toMatch(town.dbLink[1] as RegExp)
   })
 
+  test('a system shows its service code after its name, and search finds it by the code; without a code the name stays plain', async ({ page }) => {
+    // the town without a serviceCode keeps the plain name
+    const shown = B ? 'Orders API' : 'Orders API (ord)'
+    await page.goto('/?test=1&quality=low')
+    await page.waitForFunction(() => (window as any).city?.seen.snapshots > 0)
+    await page.locator('#search-input').fill(B ? 'orders api' : 'ord')
+    const hit = page.locator('#search-results .hit').first()
+    await expect(hit).toContainText(shown)
+    await hit.click()
+    await expect(page.locator('#inspector .head')).toContainText(shown)
+  })
+
   test('the Overview tab says where to open the system, and puts the link of each tenant database on its tenant row', async ({ page }) => {
     await page.goto('/?test=1&quality=low')
     await page.waitForFunction(() => (window as any).city?.seen.snapshots > 0)

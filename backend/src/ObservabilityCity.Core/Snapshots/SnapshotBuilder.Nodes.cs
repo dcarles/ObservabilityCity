@@ -75,7 +75,7 @@ public sealed partial class SnapshotBuilder
             : DegradedRules.Tripped(rules) ? HealthState.Degraded
             : HealthState.Healthy;
 
-        return new NodeSnapshot(n.Id, n.Name, n.Kind, n.Service, n.External, health, r.InstancesTotal, r.InstancesHealthy,
+        return new NodeSnapshot(n.Id, n.DisplayName, n.Kind, n.Service, n.External, health, r.InstancesTotal, r.InstancesHealthy,
             r.Load, r.Cpu, r.Memory, utilisation, throttled, r.QueueDepth, r.OldestMessageSeconds, r.DeadLetters, r.RequestsPerSecond, r.ErrorRate, r.P99Ms, n.SlaP99Ms, n.ErrorAmber, n.ErrorRed,
             n.ResourceAmber, n.ResourceRed, n.ThrottleAmber, n.ThrottleRed, n.BacklogAmber, n.BacklogRed, n.Calls, n.GatewayCalls, r.At, tenants, absent, quiet)
         {
@@ -102,7 +102,7 @@ public sealed partial class SnapshotBuilder
         registry.EngineOf(n) is { } e ? new DatabaseEngineSnapshot(e.Id, e.Name, e.Type, DatabaseTypes.Names[e.Type]) : null;
 
     private static NodeSnapshot Stale(RegistryNode n, NodeReading? r, IReadOnlyList<string> absent, RegistryEnvironment? env) =>
-        new(n.Id, n.Name, n.Kind, n.Service, n.External, HealthState.Stale, 0, 0, 0, null, null, null, null, null, null, null, 0, 0, 0,
+        new(n.Id, n.DisplayName, n.Kind, n.Service, n.External, HealthState.Stale, 0, 0, 0, null, null, null, null, null, null, null, 0, 0, 0,
             n.SlaP99Ms, n.ErrorAmber, n.ErrorRed, n.ResourceAmber, n.ResourceRed, n.ThrottleAmber, n.ThrottleRed, n.BacklogAmber, n.BacklogRed, n.Calls, n.GatewayCalls, r?.At,
             n.TenantPattern is null ? null : StaleUnits(n, env), absent);
 
