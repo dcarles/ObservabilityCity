@@ -9,6 +9,7 @@ import { requestedScope } from '../scope'
 import { ViewBar } from '../viewbar'
 import { NoticesPanel } from '../noticesPanel'
 import { UnknownHostsPanel } from '../unknownHosts'
+import { LoadingGate } from '../loadingGate'
 import { browserStore, isLighting, LIGHTING_KEY, startLighting, saveLighting, type Lighting } from '../lighting'
 import { pruneTenants, type TenantView } from '../tenants'
 import { islandsParam, parseIslands, pruneIslands, islandChoices } from '../islands'
@@ -107,6 +108,7 @@ export function startDashboard(plug?: PagePlug): void {
     closed: () => {},
   })
   const notices = new NoticesPanel()
+  const loadingGate = new LoadingGate()
   plug?.start(inspector, store)
   const unknownHosts = new UnknownHostsPanel(scope, () => (last?.groups ?? []).flatMap((g) => g.nodes).filter((n) => n.kind === 'Api').map((n) => n.id).sort(), () => last?.internalVendorsLabel ?? 'Internal services')
   unknownHosts.start()
@@ -200,6 +202,7 @@ export function startDashboard(plug?: PagePlug): void {
     viewBar.update(s)
     inspector.update(s)
     notices.show(s.notices, s.notes ?? [])
+    loadingGate.update(s)
     draw()
     wall?.setTimings(wallTimings(wallParams, s.wall))
     wall?.onSnapshot(s, wallNow())
@@ -374,6 +377,8 @@ export function startDashboard(plug?: PagePlug): void {
     seen,
     muteFeed: (muted: boolean, silentAfterMs?: number) => connection.mute(muted, silentAfterMs),
     feed: (raw: unknown) => onSnapshot(raw),
+    /** For tests: let the page wait for its sources again, as it does when it has just opened. */
+    resetLoading: () => loadingGate.reset(),
     /** For tests: stop (or resume) showing the server's snapshots; `feed` still works. */
     hold: (on: boolean) => { held = on },
     freshnessOpen: () => !freshPop.hidden,

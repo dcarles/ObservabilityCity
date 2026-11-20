@@ -414,9 +414,9 @@ public sealed record WallSettingsSnapshot(double? HoldSeconds, double? OverviewS
 
 /// <summary>
 /// How fresh one configured source is: Name is the source's name in the environment file, LastRead when it last reported anything (null: not yet since the server started),
-/// IntervalSeconds how often it is asked, and Overdue says it has not reported within the limit that greys a building (see StaleAfter). Null on the snapshot when no source is configured.
+/// IntervalSeconds how often it is asked, and Overdue says it has not reported within the limit that greys a building (see StaleAfter). FirstRoundDone says the source has finished at least one round of asking since the server started, whether it worked or not (readings saved from before the restart do not count); the page keeps the town greyed until every source says so. Null on the snapshot when no source is configured.
 /// </summary>
-public sealed record SourceFreshnessSnapshot(string Name, DateTimeOffset? LastRead, double IntervalSeconds, bool Overdue);
+public sealed record SourceFreshnessSnapshot(string Name, DateTimeOffset? LastRead, double IntervalSeconds, bool Overdue, bool FirstRoundDone = true);
 
 /// <summary>An island the island filter left out. Vendor is true for a third party's island (the vendor id, or the shared island id of a group of its services).</summary>
 public sealed record HiddenIsland(string Id, string DisplayName, bool Vendor = false);

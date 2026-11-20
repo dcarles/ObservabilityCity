@@ -16,6 +16,7 @@ import { startMoreMenu } from './topbarMore'
 import { WallMode } from './wall/wall'
 import { wallFraming } from './wall/framing'
 import { UnknownHostsPanel } from './unknownHosts'
+import { LoadingGate } from './loadingGate'
 import { NoticesPanel, Search, ServicePanel, showIslandTooltip, showTooltip, StateList, TopBar, type SearchItem } from './ui'
 import { pruneTenants, type TenantView } from './tenants'
 import { ViewBar } from './viewbar'
@@ -148,6 +149,7 @@ export async function startTown(): Promise<void> {
   const viewSwitch = document.getElementById('view-switch') as HTMLSelectElement | null
   viewSwitch?.addEventListener('change', () => { if (isViewMode(viewSwitch.value) && viewSwitch.value !== 'town') window.location.href = viewSwitchAddress(window.location, viewSwitch.value, store) })
   const notices = new NoticesPanel()
+  const loadingGate = new LoadingGate()
   const unknownHosts = new UnknownHostsPanel(requestedScope(), () => (seen.last?.groups ?? []).flatMap((g) => g.nodes).filter((n) => n.kind === 'Api').map((n) => n.id).sort(), () => seen.last?.internalVendorsLabel ?? 'Internal services')
   unknownHosts.start()
   const buildingItems = (): SearchItem[] => {
@@ -369,6 +371,7 @@ export async function startTown(): Promise<void> {
     legend.setGroupLabel(s.groupLabel)
     stateList.refresh()
     notices.show(s.notices, s.notes ?? [])
+    loadingGate.update(s)
   }
 
   let held = false // for tests: while true, the snapshots from the server are ignored, so one fed by hand stays on screen
@@ -522,6 +525,8 @@ export async function startTown(): Promise<void> {
     },
     /** Hand the page a snapshot as if the server had sent it. */
     feed: (raw: unknown) => onSnapshot(raw),
+    /** For tests: let the page wait for its sources again, as it does when it has just opened. */
+    resetLoading: () => loadingGate.reset(),
     /** For tests: while on, the server's own snapshots are ignored so a fed one cannot be undone by a newer one. */
     hold: (on: boolean) => { held = on },
     unknownHosts,

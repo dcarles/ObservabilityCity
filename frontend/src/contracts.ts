@@ -535,6 +535,7 @@ export interface components {
             /** Format: double */
             intervalSeconds: number;
             overdue: boolean;
+            firstRoundDone: boolean;
         };
         SubscriptionSnapshot: {
             topic: string;

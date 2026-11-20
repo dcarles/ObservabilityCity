@@ -34,6 +34,14 @@ public sealed class LatestState
         return last;
     }
 
+    private readonly ConcurrentDictionary<string, bool> _rounds = new(StringComparer.Ordinal);
+
+    /// <summary>Notes that the source finished a round of asking, whatever came of it. Readings loaded from disk at start do not count as one.</summary>
+    public void RoundDone(string source) => _rounds[source] = true;
+
+    /// <summary>Whether the source has finished at least one round since this server started.</summary>
+    public bool HasFinishedARound(string source) => _rounds.ContainsKey(source);
+
     /// <summary>The newest reading of the node from any source, or null.</summary>
     public NodeReading? Get(string id) =>
         _readings.TryGetValue(id, out var bySource) ? bySource.Values.MaxBy(r => r.At) : null;

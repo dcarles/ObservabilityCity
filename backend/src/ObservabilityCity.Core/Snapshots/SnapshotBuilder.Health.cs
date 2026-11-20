@@ -41,7 +41,7 @@ public sealed partial class SnapshotBuilder
         {
             var last = state.LastReadOf(kv.Key);
             var overdue = now - (last ?? _startedAt) > FreshFor(kv.Key);
-            return new SourceFreshnessSnapshot(kv.Key, last, kv.Value.TotalSeconds, overdue);
+            return new SourceFreshnessSnapshot(kv.Key, last, kv.Value.TotalSeconds, overdue, state.HasFinishedARound(kv.Key));
         }).ToList();
     }
 
