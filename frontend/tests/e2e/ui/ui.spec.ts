@@ -156,6 +156,36 @@ test.describe('finding an island from the top bar', () => {
   })
 })
 
+test.describe('going to a building', () => {
+  const stand = (page: import('@playwright/test').Page) => page.evaluate(() => { const c = (window as any).city; c.stage.focus(c.town.islandFocusOf('cc').target, 90, true, 2.5) })
+  const offFront = (page: import('@playwright/test').Page) => page.evaluate(() => {
+    const c = (window as any).city
+    const s = c.stage
+    const side = Math.atan2(s.camera.position.x - s.controls.target.x, s.camera.position.z - s.controls.target.z)
+    const front = c.town.frontOf('aa.orders-api') as number
+    return Math.abs(Math.atan2(Math.sin(side - front), Math.cos(side - front)))
+  })
+
+  test('search shows a building from its front (the side of its door), whichever side the camera was on', async ({ town, page }) => {
+    await town.open()
+    await stand(page)
+    await page.locator('#search-input').fill('orders-api')
+    await page.locator('#search-results .hit').first().click()
+    await town.step(2)
+    expect(await offFront(page)).toBeLessThan(0.05)
+  })
+
+  test('clicking a building shows it from its front too', async ({ town, page }) => {
+    await town.open()
+    await stand(page)
+    await town.step(2)
+    const at = await page.evaluate(() => (window as any).city.screenOf('aa.orders-api') as { x: number; y: number })
+    await page.mouse.click(at.x, at.y)
+    await town.step(2)
+    expect(await offFront(page)).toBeLessThan(0.05)
+  })
+})
+
 test.describe('the layers', () => {
   test('all are on but Dependencies, and the button says nothing is off', async ({ town, page }) => {
     await town.open()
