@@ -17,6 +17,13 @@ describe('a good snapshot', () => {
   })
 })
 
+describe('the sources a snapshot lists', () => {
+  it('keep whether each has finished a first round, and read a server that does not say as finished', () => {
+    const raw = { ...calm(), sources: [{ name: 'a', lastRead: null, intervalSeconds: 10, overdue: false, firstRoundDone: false }, { name: 'b', lastRead: null, intervalSeconds: 10, overdue: false }] }
+    expect(checkSnapshot(structuredClone(raw)).snapshot?.sources?.map((x) => [x.name, x.firstRoundDone])).toEqual([['a', false], ['b', true]])
+  })
+})
+
 describe("the town's wall defaults", () => {
   it('pass through when they are usable', () => {
     const raw = { ...calm(), wall: { holdSeconds: 30, overviewSeconds: 0, overviewIslandSeconds: 4, light: 'day' } }

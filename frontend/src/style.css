@@ -437,6 +437,16 @@ body.event-playing #island-labels { display: none; }
 /* The feed has gone quiet: grey everything, so numbers that may be old are never read as current. */
 body.feed-silent #town, body.feed-silent #dash-sum, body.feed-silent #dash-pillars, body.feed-silent #dash-sections { filter: grayscale(1) brightness(0.85); transition: filter 0.6s; }
 
+/* The first sources have not all answered yet: grey the town (not the top bar) under a card, and hide what is wrong until they have: notices and unknown hosts. */
+body.loading-data #town, body.loading-data #dash-sum, body.loading-data #dash-pillars, body.loading-data #dash-sections { filter: grayscale(1) brightness(0.85); transition: filter 0.6s; }
+body.loading-data #notices, body.loading-data #unknown-hosts { display: none !important; }
+#loading-card { position: fixed; left: 50%; top: 45%; transform: translate(-50%, -50%); z-index: 7; width: min(420px, 90vw); padding: 18px 22px; border-radius: 12px; background: rgba(20, 24, 33, 0.92); color: #fff; border: 1px solid rgba(255, 255, 255, 0.18); box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45); text-align: center; pointer-events: none; }
+#loading-card b { font-size: 18px; }
+#loading-card p { margin: 8px 0; font-size: 14px; line-height: 1.45; opacity: 0.85; }
+#loading-card .progress { font-size: 13px; font-weight: 700; opacity: 0.95; }
+#loading-card.late { top: auto; bottom: 18px; transform: translateX(-50%); width: auto; max-width: 90vw; padding: 8px 14px; font-size: 13px; pointer-events: auto; }
+#loading-card.late button { margin-left: 8px; background: none; border: 0; color: inherit; font-size: 16px; cursor: pointer; }
+
 /* what a database runs on: a clear badge under the name in the inspector, a plain row in the tooltip */
 #inspector .engine { display: inline-flex; align-items: baseline; gap: 6px; margin-top: 6px; padding: 3px 9px; border: 1px solid var(--line); border-radius: 999px; background: rgba(255, 255, 255, 0.08); }
 #inspector .engine b { font-size: 14px; }

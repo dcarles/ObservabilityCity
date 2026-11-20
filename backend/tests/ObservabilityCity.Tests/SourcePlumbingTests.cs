@@ -620,6 +620,39 @@ public class SourcePlumbingTests
     }
 
     [Fact]
+    public async Task A_source_counts_as_having_done_its_first_round_when_the_round_fails_or_runs_out_of_time_but_not_for_readings_saved_before_the_restart()
+    {
+        var state = new LatestState();
+        state.Update("saved", new Dictionary<string, NodeReading> { ["a.one"] = new NodeReading(DateTimeOffset.UtcNow, true, 0, 0, 0, 0, 0, 0) }); // what the reading cache puts back at start
+        var poller = new SourcePoller([new ThrowsOnPoll("broken", new InvalidOperationException("boom")), new Stuck(TimeSpan.FromMilliseconds(60))], new RegistryHolder(RegistryLoader.Load(TestPaths.LiveTown)), state, NullLogger<SourcePoller>.Instance);
+
+        Assert.False(state.HasFinishedARound("saved"));
+        await poller.StartAsync(TestContext.Current.CancellationToken);
+        await Task.Delay(600, TestContext.Current.CancellationToken);
+        await poller.StopAsync(TestContext.Current.CancellationToken);
+
+        Assert.True(state.HasFinishedARound("broken"));
+        Assert.True(state.HasFinishedARound("stuck"));
+        Assert.False(state.HasFinishedARound("saved"));
+    }
+
+    [Fact]
+    public void The_snapshot_says_for_each_source_whether_it_has_finished_a_first_round_since_the_server_started()
+    {
+        var state = new LatestState();
+        state.RoundDone("fast");
+        var builder = new SnapshotBuilder(RegistryLoader.Load(TestPaths.LiveTown), state, TimeProvider.System)
+        {
+            SourceIntervals = new Dictionary<string, TimeSpan> { ["fast"] = TimeSpan.FromSeconds(10), ["slow"] = TimeSpan.FromSeconds(10) },
+        };
+
+        var sources = builder.Build().Sources!;
+
+        Assert.True(sources.Single(x => x.Name == "fast").FirstRoundDone);
+        Assert.False(sources.Single(x => x.Name == "slow").FirstRoundDone);
+    }
+
+    [Fact]
     public void A_source_that_says_nothing_about_its_timeout_gets_ten_seconds()
     {
         Assert.Equal(TimeSpan.FromSeconds(10), ((IMetricSource)new Stub()).Timeout);

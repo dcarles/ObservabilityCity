@@ -113,7 +113,7 @@ export function checkSnapshot(raw: unknown): Checked {
     notes: Array.isArray(raw.notes) ? raw.notes.filter((n): n is string => typeof n === 'string') : null,
     // how fresh each configured source is; one that cannot be read is left out
     sources: Array.isArray(raw.sources)
-      ? raw.sources.filter(isObject).filter((x) => typeof x.name === 'string' && isFiniteNumber(x.intervalSeconds)).map((x) => ({ name: x.name as string, lastRead: typeof x.lastRead === 'string' ? x.lastRead : null, intervalSeconds: x.intervalSeconds as number, overdue: x.overdue === true }))
+      ? raw.sources.filter(isObject).filter((x) => typeof x.name === 'string' && isFiniteNumber(x.intervalSeconds)).map((x) => ({ name: x.name as string, lastRead: typeof x.lastRead === 'string' ? x.lastRead : null, intervalSeconds: x.intervalSeconds as number, overdue: x.overdue === true, firstRoundDone: x.firstRoundDone !== false }))
       : null,
     // the cloud's own health reports; one without an id, a resource or a state cannot be listed and is dropped
     healthEvents: Array.isArray(raw.healthEvents)

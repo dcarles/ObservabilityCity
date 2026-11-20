@@ -84,6 +84,7 @@ public sealed class SourcePoller(
                     detail = e;
                 }
 
+                state.RoundDone(source.Name);
                 var now = _time.GetUtcNow();
                 if (problem is null)
                 {

@@ -30,9 +30,9 @@ describe('the freshness marker', () => {
 describe('the freshness popup', () => {
   const now = Date.parse('2026-11-02T12:00:00Z')
   const sources = [
-    { name: 'health', lastRead: '2026-11-02T11:59:48Z', intervalSeconds: 60, overdue: false },
-    { name: 'jobs', lastRead: '2026-11-02T11:53:00Z', intervalSeconds: 300, overdue: true },
-    { name: 'links', lastRead: null, intervalSeconds: 3600, overdue: false },
+    { name: 'health', lastRead: '2026-11-02T11:59:48Z', intervalSeconds: 60, overdue: false, firstRoundDone: true },
+    { name: 'jobs', lastRead: '2026-11-02T11:53:00Z', intervalSeconds: 300, overdue: true, firstRoundDone: true },
+    { name: 'links', lastRead: null, intervalSeconds: 3600, overdue: false, firstRoundDone: true },
   ]
 
   it('has one line per configured source with last read and interval, and marks the overdue ones', () => {
@@ -65,7 +65,7 @@ describe('the freshness popup', () => {
   it('the snapshot guard keeps the sources and drops a broken line', () => {
     const s = golden('calm') as unknown as Record<string, unknown>
     s.sources = [{ name: 'a', lastRead: null, intervalSeconds: 5, overdue: true }, { name: 7 }, null]
-    expect(checkSnapshot(s).snapshot!.sources).toEqual([{ name: 'a', lastRead: null, intervalSeconds: 5, overdue: true }])
+    expect(checkSnapshot(s).snapshot!.sources).toEqual([{ name: 'a', lastRead: null, intervalSeconds: 5, overdue: true, firstRoundDone: true }])
   })
 })
 
