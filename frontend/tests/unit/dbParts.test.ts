@@ -19,7 +19,12 @@ const PARTS = [
 const unit = (parts: PartSnapshot[] | undefined, state: TenantUnitSnapshot['state'] = 'Degraded'): TenantUnitSnapshot =>
   ({ id: 'acme', name: 'Acme', kind: 'Customer', database: 'merchant-acme-db', state, utilisation: 1, throttled: 0.5, requestsPerSecond: 5, limit: 2000, ...(parts ? { parts } : {}) })
 
-const fixture = (): Snapshot => structuredClone(JSON.parse(readFileSync(resolve(__dirname, '../../../shared-test-data/snapshots/tenants-town.json'), 'utf8')) as Snapshot)
+/** The golden town, with the parts its units carry taken off: each test puts back only the ones it needs. */
+const fixture = (): Snapshot => {
+  const s = structuredClone(JSON.parse(readFileSync(resolve(__dirname, '../../../shared-test-data/snapshots/tenants-town.json'), 'utf8')) as Snapshot)
+  for (const n of s.groups.flatMap((g) => g.nodes)) for (const u of n.tenants ?? []) delete (u as { parts?: unknown }).parts
+  return s
+}
 const topOf = (db: NodeSnapshot): TenantUnitSnapshot => db.tenants!.find((t) => t.parts)!
 const dbOf = (s: Snapshot): NodeSnapshot => s.groups.flatMap((g) => g.nodes).find((n) => n.id === 'aa.orders-db')!
 
