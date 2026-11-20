@@ -27,8 +27,12 @@ test('the town greys under a loading card until every source has answered, with 
   expect(await page.locator('#topbar').evaluate((el) => getComputedStyle(el).filter)).toBe('none')
   expect(await page.locator('#town').evaluate((el) => getComputedStyle(el).filter)).toContain('grayscale')
 
+  // the unknown hosts are read again as the loading ends, so the list from before the sources answered is never shown
+  let reads = 0
+  page.on('request', (r) => { if (r.url().includes('/api/unknown-hosts')) reads++ })
   await feed(page, [{ name: 'metrics', done: true }, { name: 'jobs', done: true }])
   await expect(page.locator('body')).not.toHaveClass(/loading-data/)
+  expect(reads).toBeGreaterThan(0)
   await expect(page.locator('#loading-card')).toHaveCount(0)
   await expect(page.locator('#notices')).toBeVisible()
 })
