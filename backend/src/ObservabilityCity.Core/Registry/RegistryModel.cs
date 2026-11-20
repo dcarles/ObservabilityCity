@@ -270,6 +270,13 @@ public sealed record RegistryNode(
     /// <summary>The name this system's resources carry for its service (<c>serviceCode</c>). Null: the service name, else none.</summary>
     public string? ServiceCode { get; init; }
 
+    /// <summary>
+    /// The name the interface shows: the name, then the service code in brackets when the system has one that the name does not already say
+    /// (case-insensitive, so a name written as "Merchant Gateway (mgs)" stays as it is). <c>Name</c> itself stays plain: scope templates read it.
+    /// </summary>
+    public string DisplayName => ServiceCode is { Length: > 0 } code && !Name.Equals(code, StringComparison.OrdinalIgnoreCase) && !Name.Contains($"({code})", StringComparison.OrdinalIgnoreCase)
+        ? $"{Name} ({code})" : Name;
+
     /// <summary>What the telemetry calls this system (<c>telemetry.role</c>). Null: derived from the environment's template, if it has one.</summary>
     public string? TelemetryRole { get; init; }
 

@@ -27,6 +27,12 @@ describe('rankItems', () => {
     expect(rankItems(items, 'core', 8).map((i) => i.id)).toEqual(['ldg', 'ldg.ledger-api'])
     expect(rankItems(items, 'pay', 8)[0].id).toBe('pay.payments-api')
   })
+
+  it('finds a system by the service code its name carries', () => {
+    const coded = [...items, { kind: 'building' as const, id: 'pay.merchant-gateway', name: 'Merchant Gateway (mgs)', where: 'Payments' }]
+    expect(rankItems(coded, 'mgs', 8).map((i) => i.id)).toEqual(['pay.merchant-gateway'])
+    expect(rankItems(coded, 'MGS', 8).map((i) => i.id)).toEqual(['pay.merchant-gateway'])
+  })
 })
 
 describe('escapeHtml', () => {
