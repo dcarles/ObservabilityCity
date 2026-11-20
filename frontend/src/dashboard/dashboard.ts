@@ -108,10 +108,10 @@ export function startDashboard(plug?: PagePlug): void {
     closed: () => {},
   })
   const notices = new NoticesPanel()
-  const loadingGate = new LoadingGate()
   plug?.start(inspector, store)
   const unknownHosts = new UnknownHostsPanel(scope, () => (last?.groups ?? []).flatMap((g) => g.nodes).filter((n) => n.kind === 'Api').map((n) => n.id).sort(), () => last?.internalVendorsLabel ?? 'Internal services')
   unknownHosts.start()
+  const loadingGate = new LoadingGate(undefined, () => unknownHosts.refresh())
 
   const setTenantView = (v: TenantView): void => {
     tenantView = v

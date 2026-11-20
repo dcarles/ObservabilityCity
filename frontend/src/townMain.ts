@@ -149,9 +149,9 @@ export async function startTown(): Promise<void> {
   const viewSwitch = document.getElementById('view-switch') as HTMLSelectElement | null
   viewSwitch?.addEventListener('change', () => { if (isViewMode(viewSwitch.value) && viewSwitch.value !== 'town') window.location.href = viewSwitchAddress(window.location, viewSwitch.value, store) })
   const notices = new NoticesPanel()
-  const loadingGate = new LoadingGate()
   const unknownHosts = new UnknownHostsPanel(requestedScope(), () => (seen.last?.groups ?? []).flatMap((g) => g.nodes).filter((n) => n.kind === 'Api').map((n) => n.id).sort(), () => seen.last?.internalVendorsLabel ?? 'Internal services')
   unknownHosts.start()
+  const loadingGate = new LoadingGate(undefined, () => unknownHosts.refresh())
   const buildingItems = (): SearchItem[] => {
     const items: SearchItem[] = []
     for (const isl of town.islands)

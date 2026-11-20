@@ -66,7 +66,8 @@ export class LoadingGate {
   private card: HTMLElement | null = null
   private timer: number | undefined
 
-  constructor(private readonly giveUpMs = LOADING_GIVE_UP_MS) { this.rule = new LoadingProgress(giveUpMs) }
+  /** `beforeClear` runs as loading ends and the page stays grey until it is done (the unknown hosts are read again, so the list from before the sources answered is never seen). */
+  constructor(private readonly giveUpMs = LOADING_GIVE_UP_MS, private readonly beforeClear: () => Promise<void> | void = () => {}) { this.rule = new LoadingProgress(giveUpMs) }
 
   /** For tests: forget that loading ever ended, as a page that has just opened would be. */
   reset(): void {
@@ -100,12 +101,17 @@ export class LoadingGate {
   private finish(late: boolean): void {
     if (this.timer !== undefined) window.clearTimeout(this.timer)
     this.timer = undefined
-    document.body.classList.remove('loading-data')
-    if (!this.card) return
-    if (!late) { this.card.remove(); this.card = null; return }
-    // time is up: the town shows what it has and the card turns into a small note that can be closed
-    this.card.classList.add('late')
-    this.card.innerHTML = `<span>${LOADING_LATE_TEXT}</span> <button type="button" aria-label="Close">×</button>`
-    this.card.querySelector('button')!.addEventListener('click', () => { this.card?.remove(); this.card = null })
+    const card = this.card
+    if (!card) { document.body.classList.remove('loading-data'); return }
+    if (!late) this.card = null
+    const clear = (): void => {
+      document.body.classList.remove('loading-data')
+      if (!late) { card.remove(); return }
+      // time is up: the town shows what it has and the card turns into a small note that can be closed
+      card.classList.add('late')
+      card.innerHTML = `<span>${LOADING_LATE_TEXT}</span> <button type="button" aria-label="Close">×</button>`
+      card.querySelector('button')!.addEventListener('click', () => { card.remove(); if (this.card === card) this.card = null })
+    }
+    void Promise.resolve().then(() => this.beforeClear()).catch(() => {}).finally(clear)
   }
 }
