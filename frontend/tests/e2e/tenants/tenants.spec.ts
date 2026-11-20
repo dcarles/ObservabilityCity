@@ -121,6 +121,20 @@ test.describe('the tenant yard', () => {
     expect((await town.yard('bb.billing-db')).sign.text).toBe('5 tenants, 0 throttled')
   })
 
+  test('one container throttling is named in the inspector and the other containers are said to be fine', async ({ town, page }) => {
+    await town.effect(`${DB}#acme/audit-log`, 'Saturate')
+    await town.until(DB, (n) => (n.throttled ?? 0) > 0)
+    await town.step(8)
+    await page.locator('#search-input').fill('Orders DB')
+    await page.locator('#search-results .hit').first().click()
+    const part = page.locator('#inspector .row.part')
+    await expect(part.first()).toContainText('audit-log')
+    await expect(page.locator('#inspector')).toContainText(/other .* fine/)
+    // the database is only partly affected: not red
+    const st = await town.inspect(DB)
+    expect(st.beacon).not.toBe('red')
+  })
+
   test('the inspector lists the tenant that is turning requests away first, with its own figure', async ({ town, page }) => {
     await town.effect(`${DB}#borealis`, 'Saturate')
     await town.until(DB, (n) => (n.throttled ?? 0) > 0)

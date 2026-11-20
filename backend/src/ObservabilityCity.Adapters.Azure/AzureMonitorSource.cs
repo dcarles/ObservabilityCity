@@ -19,8 +19,8 @@ public sealed record MetricCall(string? Namespace, string Aggregation, string? F
 /// <summary>The points one metric gave for one entity (the value of the dimension the answer was split by) over the window.</summary>
 public sealed record EntitySeries(string Entity, string Metric, string Aggregation, IReadOnlyList<double> Points, string? Region = null, string? NamespaceId = null);
 
-/// <summary>The points one metric gave over the window, as asked: this metric, added up this way, with this filter. No point is a gap the cloud left, not a zero.</summary>
-public sealed record MetricSeries(string Metric, string Aggregation, string? Filter, IReadOnlyList<double> Points);
+/// <summary>The points one metric gave over the window, as asked: this metric, added up this way, with this filter. No point is a gap the cloud left, not a zero. Part is the value of the dimension a split read was split by (see <c>parts</c>): the piece of the resource the points are for.</summary>
+public sealed record MetricSeries(string Metric, string Aggregation, string? Filter, IReadOnlyList<double> Points, string? Part = null);
 
 /// <summary>
 /// Reads platform metrics of single resources from the Azure Monitor metrics API. The adapter knows no metric: which ones to ask for, for which
@@ -69,6 +69,16 @@ public sealed class AzureMonitorReader(HttpClient http, ICredentialSource? crede
     }
 
     /// <summary>
+    /// Like <see cref="ReadAsync"/>, but split by a dimension, one series for each value of it, as <see cref="MetricSeries"/> that say which value (<c>Part</c>). The call's own filter stays,
+    /// joined to the split with <c>and</c>, and the series keep the call's filter so they match the signals that asked for it. A series with no value for the dimension has an empty Part.
+    /// </summary>
+    public async Task<IReadOnlyList<MetricSeries>> ReadByPartAsync(string resourceId, MetricCall call, IReadOnlyList<string> metrics, string dimension, DateTimeOffset end, TimeSpan window, CancellationToken ct)
+    {
+        var split = call with { Filter = call.Filter is null ? $"{dimension} eq '*'" : $"{call.Filter} and {dimension} eq '*'" };
+        return ParseByPart(await GetAsync(resourceId, Url(resourceId, split, metrics, end, window) + $"&top={MaxSeries}", ct), call, dimension);
+    }
+
+    /// <summary>
     /// The answer's text. A hiccup of Azure's (too many requests, busy, unavailable, a connection that drops) is tried again a couple of times a moment later, since it
     /// nearly always passes; any other answer, such as a refusal, fails at once.
     /// </summary>
@@ -94,7 +104,7 @@ public sealed class AzureMonitorReader(HttpClient http, ICredentialSource? crede
                 {
                     if (response.IsSuccessStatusCode) return text;
                     if (attempt >= Attempts || !IsHiccup(response.StatusCode))
-                        throw new HttpRequestException($"{service} answered {(int)response.StatusCode} {response.ReasonPhrase} for {Last(resourceId)}: {Trim(text)}");
+                        throw new HttpRequestException($"{service} answered {(int)response.StatusCode} {response.ReasonPhrase} for {Last(resourceId)}: {Trim(text)}", null, response.StatusCode);
                     told = RetryWait.For(response.Headers, attempt, retryDelay, DateTimeOffset.UtcNow, Random.Shared.NextDouble());
                 }
             }
@@ -130,6 +140,36 @@ public sealed class AzureMonitorReader(HttpClient http, ICredentialSource? crede
                         if (point.TryGetProperty(field, out var number) && number.ValueKind == JsonValueKind.Number && number.TryGetDouble(out var d) && double.IsFinite(d))
                             points.Add(d);
                 all.Add(new EntitySeries(entity, name, call.Aggregation, points));
+            }
+        }
+        return all;
+    }
+
+    /// <summary>The series of an answer split by a dimension, as <see cref="MetricSeries"/> with the value of the dimension as Part (empty when a series has none).</summary>
+    public static IReadOnlyList<MetricSeries> ParseByPart(string json, MetricCall call, string dimension)
+    {
+        using var doc = JsonDocument.Parse(json);
+        if (!doc.RootElement.TryGetProperty("value", out var value) || value.ValueKind != JsonValueKind.Array)
+            throw new InvalidOperationException("the answer has no list of metrics; was it an Azure Monitor metrics answer?");
+        var field = call.Aggregation.ToLowerInvariant();
+        var all = new List<MetricSeries>();
+        foreach (var metric in value.EnumerateArray())
+        {
+            var name = metric.TryGetProperty("name", out var n) && n.TryGetProperty("value", out var v) ? v.GetString() : null;
+            if (name is null || !metric.TryGetProperty("timeseries", out var series) || series.ValueKind != JsonValueKind.Array) continue;
+            foreach (var one in series.EnumerateArray())
+            {
+                var part = "";
+                if (one.TryGetProperty("metadatavalues", out var meta) && meta.ValueKind == JsonValueKind.Array)
+                    foreach (var m in meta.EnumerateArray())
+                        if (m.TryGetProperty("name", out var mn) && mn.TryGetProperty("value", out var mv) && string.Equals(mv.GetString(), dimension, StringComparison.OrdinalIgnoreCase) && m.TryGetProperty("value", out var ev))
+                            part = ev.GetString() ?? "";
+                var points = new List<double>();
+                if (one.TryGetProperty("data", out var data) && data.ValueKind == JsonValueKind.Array)
+                    foreach (var point in data.EnumerateArray())
+                        if (point.TryGetProperty(field, out var number) && number.ValueKind == JsonValueKind.Number && number.TryGetDouble(out var d) && double.IsFinite(d))
+                            points.Add(d);
+                all.Add(new MetricSeries(name, call.Aggregation, call.Filter, points, part));
             }
         }
         return all;
@@ -280,11 +320,26 @@ public sealed class AzureMonitorSource(
         var throttled = Worst("throttled");
         if (cpu is null && memory is null && utilisation is null && throttled is null) return null;
         var tenants = values.Where(v => v.Tenant is not null).GroupBy(v => v.Tenant!)
-            .Select(g => new TenantReading(g.Key, Max(g, "utilisation"), Max(g, "throttled"), g.Sum(v => v.Signals.GetValueOrDefault("requests") ?? 0), names.GetValueOrDefault(g.Key), Max(g, "limit"), g.Any(v => v.Idle?.Contains("utilisation") == true) ? true : null)).ToList();
+            .Select(g => new TenantReading(g.Key, Max(g, "utilisation"), Max(g, "throttled"), g.Sum(v => v.Signals.GetValueOrDefault("requests") ?? 0), names.GetValueOrDefault(g.Key), Max(g, "limit"), g.Any(v => v.Idle?.Contains("utilisation") == true) ? true : null, PartsOf(g))).ToList();
         // each region's own CPU and memory, for the resources that report them and say where they are
         var regions = values.Where(v => v.Region is not null && (v.Signals.ContainsKey("cpu") || v.Signals.ContainsKey("memory"))).GroupBy(v => v.Region!, StringComparer.OrdinalIgnoreCase)
             .Select(g => new RegionReading(g.Key, null, Max(g, "cpu"), Max(g, "memory"))).OrderBy(r => r.Region, StringComparer.Ordinal).ToList();
         return new NodeReading(at, true, 0, 0, 0, 0, 0, 0, cpu, memory, utilisation, throttled, Tenants: tenants.Count == 0 ? null : tenants, Regions: regions.Count == 0 ? null : regions);
+    }
+
+    /// <summary>A tenant's parts from its resources' (usually one): a part of the same kind and name in several of them is as busy as its busiest. Null when no resource was split.</summary>
+    private static IReadOnlyList<PartReading>? PartsOf(IEnumerable<ResourceValues> resources)
+    {
+        var parts = resources.SelectMany(r => r.Parts ?? []).GroupBy(p => (p.Kind, Name: p.Name.ToLowerInvariant()))
+            .Select(g => new PartReading(g.First().Name, g.Key.Kind, MaxOf(g, "utilisation"), MaxOf(g, "throttled"), g.Sum(p => p.Signals.GetValueOrDefault("requests") ?? 0), MaxOf(g, "limit"),
+                g.Any(p => p.Idle?.Contains("utilisation") == true) ? true : null)).ToList();
+        return parts.Count == 0 ? null : parts;
+    }
+
+    private static double? MaxOf(IEnumerable<PartValues> parts, string signal)
+    {
+        var asked = parts.Where(p => p.Signals.ContainsKey(signal)).Select(p => p.Signals[signal]).ToList();
+        return asked.Count == 0 || asked.Any(x => x is null) ? null : asked.Max(x => x!.Value);
     }
 
     /// <summary>
@@ -298,11 +353,14 @@ public sealed class AzureMonitorSource(
     }
 
     /// <summary>One resource's numbers. Idle names the signals that had no number but are set to count as 0 then (<c>whenEmpty: idle</c>).</summary>
-    private sealed record ResourceValues(string? Tenant, IReadOnlyDictionary<string, double?> Signals, string? Region = null, IReadOnlySet<string>? Idle = null);
+    private sealed record ResourceValues(string? Tenant, IReadOnlyDictionary<string, double?> Signals, string? Region = null, IReadOnlySet<string>? Idle = null, IReadOnlyList<PartValues>? Parts = null);
+
+    /// <summary>One part of a resource: the shared pool (empty name) or one piece with capacity of its own, with the same signals a whole resource has.</summary>
+    private sealed record PartValues(string Name, PartKind Kind, IReadOnlyDictionary<string, double?> Signals, IReadOnlySet<string>? Idle);
 
     /// <summary>The metric specs of an entry with the call each needs. Specs that agree on namespace, aggregation and filter are asked together.</summary>
     private static IEnumerable<(MetricCall Call, IReadOnlyList<string> Metrics)> Calls(MetricGroup group) =>
-        group.Signals.Values.SelectMany(Flatten)
+        group.Signals.Values.SelectMany(Flatten).Concat(group.Parts is null ? [] : [group.Parts.Own])
             .GroupBy(s => MetricCall.Of(group.Namespace, s, group.Interval))
             .Select(g => (g.Key, (IReadOnlyList<string>)g.Select(s => s.Metric).Distinct(StringComparer.OrdinalIgnoreCase).ToList()));
 
@@ -313,12 +371,32 @@ public sealed class AzureMonitorSource(
     private async Task<IReadOnlyList<MetricSeries>> ReadResource(Target target, DateTimeOffset at, CancellationToken ct)
     {
         var all = new List<MetricSeries>();
+        var window = target.Group.Window ?? Window;
         foreach (var (call, metrics) in Calls(target.Group))
-            all.AddRange(await reader.ReadAsync(target.Resource.Id, call, metrics, at, target.Group.Window ?? Window, ct));
+        {
+            if (target.Group.Parts is not { } parts) { all.AddRange(await reader.ReadAsync(target.Resource.Id, call, metrics, at, window, ct)); continue; }
+            try { all.AddRange(await reader.ReadByPartAsync(target.Resource.Id, call, metrics, parts.By, at, window, ct)); }
+            // a metric that has no such dimension is refused: read it as a whole, so the resource is shown without parts rather than not at all
+            catch (HttpRequestException e) when (e.StatusCode == System.Net.HttpStatusCode.BadRequest)
+            {
+                all.AddRange(await reader.ReadAsync(target.Resource.Id, call, metrics, at, window, ct));
+            }
+        }
         return all;
     }
 
     private static ResourceValues Values(Target target, IReadOnlyList<MetricSeries> series, TimeSpan window)
+    {
+        var (signals, idle) = Compute(target.Group, series, window);
+        var parts = target.Group.Parts is { } config ? PartsOf(target.Group, config, series, window) : null;
+        // a database split into parts turns away what its worst part turns away: as a share of all its requests one throttling part would hide among the busy ones
+        if (parts is { Count: > 0 } && signals.ContainsKey("throttled") && parts.Select(p => p.Signals.GetValueOrDefault("throttled")).Where(x => x is not null).Select(x => x!.Value).DefaultIfEmpty(-1).Max() is var worst and >= 0)
+            signals["throttled"] = Math.Max(signals["throttled"] ?? 0, worst);
+        return new ResourceValues(target.Resource.Tenant, signals, target.Resource.Region, idle.Count == 0 ? null : idle, parts is { Count: > 0 } ? parts : null);
+    }
+
+    /// <summary>The numbers of every signal of an entry from the series that were read for it (all of a resource's, or those of one part).</summary>
+    private static (Dictionary<string, double?> Signals, HashSet<string> Idle) Compute(MetricGroup group, IReadOnlyList<MetricSeries> series, TimeSpan window)
     {
         double? Own(MetricSignal spec) =>
             AzureMonitorReader.Reduce(series.Where(s => Same(s, spec)).SelectMany(s => s.Points).ToList(), spec.Aggregation);
@@ -327,7 +405,7 @@ public sealed class AzureMonitorSource(
 
         var signals = new Dictionary<string, double?>();
         var idle = new HashSet<string>();
-        foreach (var (signal, spec) in target.Group.Signals)
+        foreach (var (signal, spec) in group.Signals)
         {
             var value = Of(spec);
             // a filter that matches nothing (no 429 at all) gives no points, which is none of them, not a gap: when the whole it is a share of has points, the share is zero
@@ -341,7 +419,31 @@ public sealed class AzureMonitorSource(
             if (value is null && spec.EmptyIsIdle) { value = 0; idle.Add(signal); }
             signals[signal] = value is null ? null : Math.Max(0, value.Value);
         }
-        return new ResourceValues(target.Resource.Tenant, signals, target.Resource.Region, idle.Count == 0 ? null : idle);
+        return (signals, idle);
+    }
+
+    /// <summary>
+    /// The parts of a resource from its split series: each piece that has a value of its own in the ownThroughput metric (and is not the pool's own series) is a dedicated part;
+    /// every other named piece draws on the shared pool and is merged into one shared part. A series with no name (traffic of the account as a whole) belongs to no part.
+    /// </summary>
+    private static List<PartValues> PartsOf(MetricGroup group, PartsConfig config, IReadOnlyList<MetricSeries> series, TimeSpan window)
+    {
+        var named = series.Where(s => !string.IsNullOrEmpty(s.Part)).ToList();
+        bool IsPool(string name) => config.Pool is not null && string.Equals(name, config.Pool, StringComparison.OrdinalIgnoreCase);
+        var dedicated = named.Where(s => !IsPool(s.Part!) && Same(s, config.Own) && s.Points.Count > 0).Select(s => s.Part!).Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.Ordinal).ToList();
+        var result = new List<PartValues>();
+        var shared = named.Where(s => !dedicated.Contains(s.Part!, StringComparer.OrdinalIgnoreCase)).ToList();
+        if (shared.Count > 0)
+        {
+            var (signals, idle) = Compute(group, shared, window);
+            result.Add(new PartValues("", PartKind.Shared, signals, idle.Count == 0 ? null : idle));
+        }
+        foreach (var name in dedicated)
+        {
+            var (signals, idle) = Compute(group, named.Where(s => string.Equals(s.Part, name, StringComparison.OrdinalIgnoreCase)).ToList(), window);
+            result.Add(new PartValues(name, PartKind.Dedicated, signals, idle.Count == 0 ? null : idle));
+        }
+        return result;
     }
 
     private static bool Same(MetricSeries s, MetricSignal spec) =>

@@ -1,7 +1,7 @@
 // How tenants look, as pure functions: units from a snapshot in, colours, heights, counts and sign text out.
 // Nothing here touches three.js, so it is unit tested against the same golden fixture as the backend.
 
-import type { NodeSnapshot, TenantInfo, TenantUnitSnapshot } from './types'
+import type { NodeSnapshot, PartSnapshot, TenantInfo, TenantUnitSnapshot } from './types'
 import { clamp } from './visuals'
 
 /** The colour of a tenant's unit. Grey is a database that was not found or has no fresh data. */
@@ -66,11 +66,61 @@ export function throttledUnits(units: readonly TenantUnitSnapshot[], throttleAmb
 export function throttleWho(units: readonly TenantUnitSnapshot[], throttleAmber: number): string | null {
   const t = throttledUnits(units, throttleAmber)
   if (t.length === 0) return null
-  return `${(t[0].throttled! * 100).toFixed(1)}% · ${t[0].name}${t.length > 1 ? ` +${t.length - 1} more` : ''}`
+  const part = worstPart(t[0])
+  return `${(t[0].throttled! * 100).toFixed(1)}% · ${t[0].name}${part ? ` · ${partName(part)}` : ''}${t.length > 1 ? ` +${t.length - 1} more` : ''}`
 }
 
 /** A tenant's own throttled figure, always shown (0% included): "0% throttled". */
 export const throttledText = (u: Pick<TenantUnitSnapshot, 'throttled'>): string => `${((u.throttled ?? 0) * 100).toFixed(u.throttled != null && u.throttled > 0 && u.throttled < 0.1 ? 1 : 0)}% throttled`
+
+/**
+ * Parts of a database (its shared pool and the pieces with capacity of their own): which ones are in trouble is the server's word (their state), the words for them are here.
+ * `label` is what the engine calls a piece (town.yaml partLabel, for example container); without one the words say "part".
+ */
+export const partLabel = (n: Pick<NodeSnapshot, 'engine'>): string => n.engine?.partLabel ?? 'part'
+
+/** A part as it is named in a sentence: the shared pool, or the piece by its own name. */
+export const partName = (p: Pick<PartSnapshot, 'kind' | 'name'>): string => (p.kind === 'Shared' ? 'shared throughput' : p.name)
+
+/** The parts of a unit that are in trouble (amber or red), the shared pool first. */
+export const hotParts = (u: Pick<TenantUnitSnapshot, 'parts'>): PartSnapshot[] => (u.parts ?? []).filter((p) => p.state === 'Degraded' || p.state === 'Down')
+
+/** The part turning away the most requests, then using the most capacity, of the parts in trouble. Null when none is. */
+export function worstPart(u: Pick<TenantUnitSnapshot, 'parts'>): PartSnapshot | null {
+  return [...hotParts(u)].sort((a, b) => (b.throttled ?? 0) - (a.throttled ?? 0) || (b.utilisation ?? 0) - (a.utilisation ?? 0))[0] ?? null
+}
+
+/** How many of a unit's parts are fine, for "3 other containers fine". Zero when the unit has no parts. */
+export const partsFine = (u: Pick<TenantUnitSnapshot, 'parts'>): number => (u.parts ?? []).filter((p) => p.state === 'Healthy').length
+
+/** The words under a tenant that has parts in trouble: "3 other containers fine" (the shared pool counts as one), or null when every part is in trouble or the unit has none. */
+export function partsFineText(u: Pick<TenantUnitSnapshot, 'parts'>, label: string): string | null {
+  const fine = partsFine(u)
+  if (fine === 0 || hotParts(u).length === 0) return null
+  return `${fine} other ${label}${fine === 1 ? '' : 's'} fine`
+}
+
+/** One line under a tenant for a part in trouble, and the note that the others are fine. */
+export interface PartLines {
+  lines: { name: string; kind: PartSnapshot['kind']; figures: string; tone: 'warn' | 'bad' }[]
+  /** "3 other containers fine", or null. */
+  note: string | null
+}
+
+/** What the inspector shows under a tenant whose database is split into parts: only the parts in trouble, then how many are fine. Null when the unit has none in trouble. */
+export function partLines(u: Pick<TenantUnitSnapshot, 'parts'>, label: string): PartLines | null {
+  const hot = hotParts(u)
+  if (hot.length === 0) return null
+  return {
+    lines: hot.map((p) => ({ name: partName(p), kind: p.kind, figures: partFigures(p), tone: p.state === 'Down' ? 'bad' : 'warn' })),
+    note: partsFineText(u, label),
+  }
+}
+
+/** A part's figures, like a tenant's row: what it has, how much of it is used and how much it turns away. */
+export function partFigures(p: Pick<PartSnapshot, 'limit' | 'utilisation' | 'throttled' | 'idle'>): string {
+  return tenantFigures(p)
+}
 
 /** A provisioned size as a plain number in the store's own unit ("20,000"): the source sends no unit, so none is made up. */
 const sizeText = (limit: number): string => Math.round(limit).toLocaleString('en-US')

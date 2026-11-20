@@ -305,7 +305,7 @@ public class StoryTests
         foreach (var story in stories)
         {
             var targets = story.Steps.SelectMany(s => s.Apply.Select(a => a.Target).Concat(s.Ramp.Select(r => r.Target)).Concat(s.Clear.Select(c => c.Target)).Concat([s.Camera]))
-                .Where(t => t is not null).Select(t => t!.Split('#')[0]);
+                .Where(t => t is not null).Select(t => t!.Split('#', '/')[0]); // a target may add #tenant and /part
             Assert.All(targets, t => Assert.True(known.Contains(t), $"{story.Id}: '{t}' is not a system, island or vendor of the town"));
         }
     }

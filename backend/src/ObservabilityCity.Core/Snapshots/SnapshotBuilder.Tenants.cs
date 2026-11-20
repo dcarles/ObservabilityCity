@@ -66,11 +66,15 @@ public sealed partial class SnapshotBuilder
     {
         var u = t.Utilisation ?? 0;
         var th = t.Throttled ?? 0;
-        var state = !r.Up || u >= n.ResourceRed || th >= n.ThrottleRed ? HealthState.Down
+        // a database the source splits into parts is judged by its parts: red when its shared pool is red or every part is, amber when only dedicated parts are in trouble
+        var parts = t.Parts is { Count: > 0 } ? DatabaseParts.Snapshots(n, t.Parts, kind == TenantKind.Test) : null;
+        var state = !r.Up ? HealthState.Down
+            : parts is not null ? DatabaseParts.StateOf(parts)
+            : u >= n.ResourceRed || th >= n.ThrottleRed ? HealthState.Down
             : u >= n.ResourceAmber || th >= n.ThrottleAmber ? HealthState.Degraded
             : HealthState.Healthy;
         if (kind == TenantKind.Test && state == HealthState.Down) state = HealthState.Degraded; // test tenants raise amber at most
-        return new TenantUnitSnapshot(t.TenantId, name, kind, RegistryEnvironment.DatabaseName(n.TenantPattern!, t.TenantId), state, t.Utilisation, t.Throttled, t.RequestsPerSecond, t.Limit, t.Idle);
+        return new TenantUnitSnapshot(t.TenantId, name, kind, RegistryEnvironment.DatabaseName(n.TenantPattern!, t.TenantId), state, t.Utilisation, t.Throttled, t.RequestsPerSecond, t.Limit, t.Idle, parts);
     }
 
     /// <summary>
@@ -83,8 +87,10 @@ public sealed partial class SnapshotBuilder
         if (live.Count == 0) return (r.Utilisation, r.Throttled); // no tenant database reported: the store's own numbers stand
         var real = live.Where(u => u.Kind != TenantKind.Test).ToList();
         var from = real.Count > 0 ? real : live;
-        var utilisation = from.Max(u => u.Utilisation ?? 0);
-        var throttled = from.Max(u => u.Throttled ?? 0);
+        // a database that is amber only because dedicated parts are in trouble counts below the red line, so the store is not red for it
+        double Under(double value, double red, TenantUnitSnapshot u) => u.Parts is not null && u.State == HealthState.Degraded ? Math.Min(value, red * 0.999) : value;
+        var utilisation = from.Max(u => Under(u.Utilisation ?? 0, n.ResourceRed, u));
+        var throttled = from.Max(u => Under(u.Throttled ?? 0, n.ThrottleRed, u));
         if (real.Count == 0)
         {
             utilisation = Math.Min(utilisation, n.ResourceRed * 0.999);

@@ -49,8 +49,19 @@ internal static class DegradedRules
         var worst = i.Tenants?.Where(t => t.State is HealthState.Degraded or HealthState.Down).OrderByDescending(t => t.Utilisation ?? 0).FirstOrDefault();
         var text = new List<string>();
         if (worst is not null) text.Add($"tenant {worst.Name}");
-        if ((i.Utilisation ?? 0) >= n.ResourceAmber) text.Add($"{Pct((worst?.Utilisation ?? i.Utilisation)!.Value)} capacity");
-        if ((i.Throttled ?? 0) >= n.ThrottleAmber) text.Add($"{Pct((worst?.Throttled ?? i.Throttled)!.Value, 1)} throttled");
+        // a database split into parts names the part in trouble and uses that part's own numbers
+        var part = DatabaseParts.Worst(worst?.Parts);
+        if (part is not null)
+        {
+            text.Add(part.Kind == PartKind.Shared ? "shared throughput" : part.Name);
+            if ((part.Utilisation ?? 0) >= n.ResourceAmber) text.Add($"{Pct(part.Utilisation!.Value)} capacity");
+            if ((part.Throttled ?? 0) >= n.ThrottleAmber) text.Add($"{Pct(part.Throttled!.Value, 1)} throttled");
+        }
+        else
+        {
+            if ((i.Utilisation ?? 0) >= n.ResourceAmber) text.Add($"{Pct((worst?.Utilisation ?? i.Utilisation)!.Value)} capacity");
+            if ((i.Throttled ?? 0) >= n.ThrottleAmber) text.Add($"{Pct((worst?.Throttled ?? i.Throttled)!.Value, 1)} throttled");
+        }
         return string.Join(" · ", text);
     }
 }

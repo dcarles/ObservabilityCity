@@ -534,7 +534,39 @@
               "throttled": 0.3120000000000003,
               "requestsPerSecond": 25.12029611351018,
               "limit": 4000,
-              "idle": null
+              "idle": null,
+              "parts": [
+                {
+                  "name": "",
+                  "kind": "Shared",
+                  "state": "Down",
+                  "utilisation": 1.08,
+                  "throttled": 0.3120000000000003,
+                  "requestsPerSecond": 17.584207279457125,
+                  "limit": 4000,
+                  "idle": null
+                },
+                {
+                  "name": "audit-log",
+                  "kind": "Dedicated",
+                  "state": "Degraded",
+                  "utilisation": 0.9359999999999999,
+                  "throttled": 0,
+                  "requestsPerSecond": 3.768044417026527,
+                  "limit": 4000,
+                  "idle": null
+                },
+                {
+                  "name": "entries",
+                  "kind": "Dedicated",
+                  "state": "Degraded",
+                  "utilisation": 0.9359999999999999,
+                  "throttled": 0,
+                  "requestsPerSecond": 3.768044417026527,
+                  "limit": 4000,
+                  "idle": null
+                }
+              ]
             },
             {
               "id": "borealis",
@@ -546,7 +578,39 @@
               "throttled": 0,
               "requestsPerSecond": 38.593460826650215,
               "limit": 20000,
-              "idle": null
+              "idle": null,
+              "parts": [
+                {
+                  "name": "",
+                  "kind": "Shared",
+                  "state": "Healthy",
+                  "utilisation": 0.41800000000000004,
+                  "throttled": 0,
+                  "requestsPerSecond": 27.015422578655148,
+                  "limit": 20000,
+                  "idle": null
+                },
+                {
+                  "name": "audit-log",
+                  "kind": "Dedicated",
+                  "state": "Healthy",
+                  "utilisation": 0.2926,
+                  "throttled": 0,
+                  "requestsPerSecond": 5.789019123997532,
+                  "limit": 20000,
+                  "idle": null
+                },
+                {
+                  "name": "entries",
+                  "kind": "Dedicated",
+                  "state": "Healthy",
+                  "utilisation": 0.2926,
+                  "throttled": 0,
+                  "requestsPerSecond": 5.789019123997532,
+                  "limit": 20000,
+                  "idle": null
+                }
+              ]
             },
             {
               "id": "qa",
@@ -558,7 +622,39 @@
               "throttled": 0.14880000000000013,
               "requestsPerSecond": 1.9740900678593463,
               "limit": 4000,
-              "idle": null
+              "idle": null,
+              "parts": [
+                {
+                  "name": "",
+                  "kind": "Shared",
+                  "state": "Degraded",
+                  "utilisation": 1.012,
+                  "throttled": 0.14880000000000013,
+                  "requestsPerSecond": 1.3818630475015423,
+                  "limit": 4000,
+                  "idle": null
+                },
+                {
+                  "name": "audit-log",
+                  "kind": "Dedicated",
+                  "state": "Degraded",
+                  "utilisation": 0.8884,
+                  "throttled": 0,
+                  "requestsPerSecond": 0.2961135101789019,
+                  "limit": 4000,
+                  "idle": null
+                },
+                {
+                  "name": "entries",
+                  "kind": "Dedicated",
+                  "state": "Degraded",
+                  "utilisation": 0.8884,
+                  "throttled": 0,
+                  "requestsPerSecond": 0.2961135101789019,
+                  "limit": 4000,
+                  "idle": null
+                }
+              ]
             },
             {
               "id": "smoke",
@@ -570,7 +666,39 @@
               "throttled": 0,
               "requestsPerSecond": 1.9740900678593463,
               "limit": 20000,
-              "idle": null
+              "idle": null,
+              "parts": [
+                {
+                  "name": "",
+                  "kind": "Shared",
+                  "state": "Healthy",
+                  "utilisation": 0.498,
+                  "throttled": 0,
+                  "requestsPerSecond": 1.3818630475015423,
+                  "limit": 20000,
+                  "idle": null
+                },
+                {
+                  "name": "audit-log",
+                  "kind": "Dedicated",
+                  "state": "Healthy",
+                  "utilisation": 0.34859999999999997,
+                  "throttled": 0,
+                  "requestsPerSecond": 0.2961135101789019,
+                  "limit": 20000,
+                  "idle": null
+                },
+                {
+                  "name": "entries",
+                  "kind": "Dedicated",
+                  "state": "Healthy",
+                  "utilisation": 0.34859999999999997,
+                  "throttled": 0,
+                  "requestsPerSecond": 0.2961135101789019,
+                  "limit": 20000,
+                  "idle": null
+                }
+              ]
             },
             {
               "id": "ghost-co",
@@ -582,7 +710,39 @@
               "throttled": 0,
               "requestsPerSecond": 12.338062924120914,
               "limit": 20000,
-              "idle": null
+              "idle": null,
+              "parts": [
+                {
+                  "name": "",
+                  "kind": "Shared",
+                  "state": "Healthy",
+                  "utilisation": 0.712,
+                  "throttled": 0,
+                  "requestsPerSecond": 8.636644046884639,
+                  "limit": 20000,
+                  "idle": null
+                },
+                {
+                  "name": "audit-log",
+                  "kind": "Dedicated",
+                  "state": "Healthy",
+                  "utilisation": 0.5704,
+                  "throttled": 0,
+                  "requestsPerSecond": 1.850709438618137,
+                  "limit": 20000,
+                  "idle": null
+                },
+                {
+                  "name": "entries",
+                  "kind": "Dedicated",
+                  "state": "Healthy",
+                  "utilisation": 0.5704,
+                  "throttled": 0,
+                  "requestsPerSecond": 1.850709438618137,
+                  "limit": 20000,
+                  "idle": null
+                }
+              ]
             }
           ],
           "absent": [],
@@ -594,7 +754,7 @@
           "jobs": null,
           "regions": null,
           "queues": null,
-          "reason": "error rate 6.4%, tenant Acme \u00B7 108% capacity \u00B7 31.2% throttled",
+          "reason": "error rate 6.4%, tenant Acme \u00B7 shared throughput \u00B7 108% capacity \u00B7 31.2% throttled",
           "sources": null,
           "engine": null,
           "backlogCountAmber": null,
@@ -720,7 +880,8 @@
               "throttled": 0,
               "requestsPerSecond": 15.072177668106109,
               "limit": 10000,
-              "idle": null
+              "idle": null,
+              "parts": null
             },
             {
               "id": "borealis",
@@ -732,7 +893,8 @@
               "throttled": 0,
               "requestsPerSecond": 23.15607649599013,
               "limit": 10000,
-              "idle": null
+              "idle": null,
+              "parts": null
             },
             {
               "id": "qa",
@@ -744,7 +906,8 @@
               "throttled": 0,
               "requestsPerSecond": 1.1844540407156077,
               "limit": 10000,
-              "idle": null
+              "idle": null,
+              "parts": null
             },
             {
               "id": "smoke",
@@ -756,7 +919,8 @@
               "throttled": 0,
               "requestsPerSecond": 1.1844540407156077,
               "limit": 10000,
-              "idle": null
+              "idle": null,
+              "parts": null
             },
             {
               "id": "ghost-co",
@@ -768,7 +932,8 @@
               "throttled": 0,
               "requestsPerSecond": 7.402837754472547,
               "limit": 4000,
-              "idle": null
+              "idle": null,
+              "parts": null
             }
           ],
           "absent": [],

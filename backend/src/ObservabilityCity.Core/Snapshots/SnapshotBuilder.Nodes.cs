@@ -99,7 +99,7 @@ public sealed partial class SnapshotBuilder
 
     /// <summary>The engine a database says it runs on, named from the town's list. Null for any other system, and for a database that says none.</summary>
     private static DatabaseEngineSnapshot? EngineOf(Registry.Registry registry, RegistryNode n) =>
-        registry.EngineOf(n) is { } e ? new DatabaseEngineSnapshot(e.Id, e.Name, e.Type, DatabaseTypes.Names[e.Type]) : null;
+        registry.EngineOf(n) is { } e ? new DatabaseEngineSnapshot(e.Id, e.Name, e.Type, DatabaseTypes.Names[e.Type], e.PartLabel) : null;
 
     private static NodeSnapshot Stale(RegistryNode n, NodeReading? r, IReadOnlyList<string> absent, RegistryEnvironment? env) =>
         new(n.Id, n.Name, n.Kind, n.Service, n.External, HealthState.Stale, 0, 0, 0, null, null, null, null, null, null, null, 0, 0, 0,

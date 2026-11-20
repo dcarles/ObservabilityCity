@@ -46,7 +46,7 @@ public static partial class RegistryLoader
                 errors.Add($"town.yaml: databaseEngines '{id}' has type '{e.Type}', which is not a database type. Use {string.Join(", ", DatabaseTypes.All)}.{DidYouMean.Hint(e.Type, DatabaseTypes.All)}");
                 continue;
             }
-            engines[id] = new DatabaseEngine(id, e.Name.Trim(), e.Type);
+            engines[id] = new DatabaseEngine(id, e.Name.Trim(), e.Type, string.IsNullOrWhiteSpace(e.PartLabel) ? null : e.PartLabel.Trim());
         }
         return engines;
     }

@@ -1,7 +1,7 @@
 import type { GroupSnapshot, NodeSnapshot, ScopeResource, Snapshot, SystemDetail, SystemLogs, VendorSnapshot } from './types'
 import { escapeHtml } from './picker'
 import { scopeParams, type Scope } from './scope'
-import { tenantListOrder, tenantFigures, yardSummary, type TenantView } from './tenants'
+import { partLabel, partLines, tenantListOrder, tenantFigures, yardSummary, type TenantView } from './tenants'
 import { regionFigures, regionOptions, validChoice, WORST, type RegionChoice } from './regions'
 import { cloudHealthRows, dismissEvent, eventOfNode } from './healthEvents'
 import { brokerNames } from './hubSystems'
@@ -305,7 +305,12 @@ export class Inspector {
       this.tenantsShown(n).map((u) => {
         const links = onRows?.get(u.name.toLowerCase()) ?? []
         const own = links.length === 0 ? '' : `<span class="rlinks tenant-link">${links.map((l) => this.anchor(l.name, l.url)).join(' ')}</span>`
-        return `<div class="row"><span>${escapeHtml(u.name)}${u.kind === 'Test' ? ' (test)' : u.kind === 'Unknown' ? ' (unknown)' : ''}${own}</span><span class="${u.state === 'Down' ? 'bad' : u.state === 'Degraded' ? 'warn' : ''}">${tenantFigures(u)}</span></div>`
+        const row = `<div class="row"><span>${escapeHtml(u.name)}${u.kind === 'Test' ? ' (test)' : u.kind === 'Unknown' ? ' (unknown)' : ''}${own}</span><span class="${u.state === 'Down' ? 'bad' : u.state === 'Degraded' ? 'warn' : ''}">${tenantFigures(u)}</span></div>`
+        // a database split into parts says which part is in trouble, so a throttling container does not look like the whole database
+        const parts = partLines(u, partLabel(n))
+        if (!parts) return row
+        const lines = parts.lines.map((p) => `<div class="row part"><span>${escapeHtml(p.name)}${p.kind === 'Dedicated' ? ` (${escapeHtml(partLabel(n))})` : ''}</span><span class="${p.tone}">${p.figures}</span></div>`).join('')
+        return row + lines + (parts.note ? `<div class="row part"><span>${escapeHtml(parts.note)}</span><span></span></div>` : '')
       }).join('')
   }
 

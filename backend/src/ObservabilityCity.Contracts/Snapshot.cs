@@ -143,7 +143,7 @@ public sealed record NodeSnapshot(
 /// What a database runs on, from town.yaml databaseEngines: Id as pillar files write it, Name as shown (Cosmos DB), Type the id of its family (document)
 /// and TypeName the family as shown (Document).
 /// </summary>
-public sealed record DatabaseEngineSnapshot(string Id, string Name, string Type, string TypeName);
+public sealed record DatabaseEngineSnapshot(string Id, string Name, string Type, string TypeName, string? PartLabel = null);
 
 /// <summary>
 /// A source that feeds a system: its name, how many seconds ago it last answered, whether that is fresh enough to show, and the signals it supplies. A source that is
@@ -199,12 +199,40 @@ public sealed record InboundLinkSnapshot(string From, double RequestsPerSecond);
 /// null for a serverless database or a source that is not asked for it.
 /// Idle is true when the source got no number for its utilisation and the town was told to read that as no use (whenEmpty: idle); the 0 shown is then an assumption.
 /// Kind Unknown is a tenant the data shows that the environment does not list.
+/// Parts is set when the source splits the database by the capacity its pieces draw on (see <see cref="PartSnapshot"/>); Utilisation and Throttled are then
+/// the worst of its parts. Null when the source does not split it.
 /// </summary>
 public sealed record TenantUnitSnapshot(
     string Id,
     string Name,
     TenantKind Kind,
     string Database,
+    HealthState State,
+    double? Utilisation,
+    double? Throttled,
+    double RequestsPerSecond,
+    double? Limit = null,
+    bool? Idle = null,
+    IReadOnlyList<PartSnapshot>? Parts = null);
+
+/// <summary>Whether a part of a database draws on capacity shared with other pieces (the database's shared pool) or on capacity of its own.</summary>
+[JsonConverter(typeof(JsonStringEnumConverter))]
+public enum PartKind
+{
+    /// <summary>The database's shared capacity: every piece that has none of its own draws on it, and they throttle together.</summary>
+    Shared,
+    /// <summary>A piece with capacity of its own (a container with its own throughput): it can throttle while everything else is fine.</summary>
+    Dedicated,
+}
+
+/// <summary>
+/// One piece of a database that has its own capacity to run out of: the shared pool, or one dedicated piece. Name is the piece's name as the engine calls it
+/// (empty for the shared pool). State is worked out from the part's own numbers with the database's thresholds. Utilisation and Throttled are this part's own
+/// share of its capacity in use and of its requests turned away; Limit is the capacity it has, in the engine's unit.
+/// </summary>
+public sealed record PartSnapshot(
+    string Name,
+    PartKind Kind,
     HealthState State,
     double? Utilisation,
     double? Throttled,

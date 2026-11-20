@@ -15,6 +15,8 @@ public sealed class FakeProfile
     public int? MaxInstances { get; set; }
     /// <summary>Regions the service runs in, with the weight of each in its requests. Two or more make the region view show.</summary>
     public Dictionary<string, double>? Regions { get; set; }
+    /// <summary>For a data store with a database for each tenant: the pieces of each database that have capacity of their own (containers, for example), by name. The database's shared pool is added. Without it the database has no parts.</summary>
+    public List<string>? Parts { get; set; }
 }
 
 /// <summary>Reads fake.yaml from a registry folder: node id to profile. The file is optional.</summary>
@@ -50,6 +52,7 @@ public static class FakeProfiles
             MinInstances = p?.MinInstances ?? min,
             MaxInstances = p?.MaxInstances ?? max,
             Regions = p?.Regions,
+            Parts = p?.Parts,
         };
     }
 }

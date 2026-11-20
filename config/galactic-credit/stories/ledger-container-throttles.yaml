@@ -1,0 +1,24 @@
+# yaml-language-server: $schema=../schema/story.schema.json
+id: ledger-container-throttles
+name: One ledger container throttles
+description: A bulk load fills one container of the ledger database that has its own capacity. It throttles while the shared capacity and the other container stay fine, so only the bulk load suffers.
+steps:
+  - at: 0
+    caption: The ledger database runs on shared capacity, with one container that has capacity of its own.
+    camera: ldg.ledger-db
+  - at: 8
+    caption: A bulk load starts writing to the audit-log container.
+    camera: ldg.ledger-db
+    ramp:
+      - { target: "ldg.ledger-db/audit-log", kind: Saturate, from: 0, to: 1, over: 15 }
+  - at: 26
+    caption: Only audit-log is throttling. The shared capacity and the entries container are fine, so the rest of the ledger keeps working.
+    camera: ldg.ledger-db
+  - at: 48
+    caption: The load ends and the container recovers.
+    camera: ldg.ledger-db
+    clear:
+      - { all: true }
+  - at: 58
+    caption: Back to normal.
+length: 62
