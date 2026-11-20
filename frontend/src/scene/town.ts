@@ -1580,14 +1580,15 @@ export class Town {
     this.crossings.set(islandId, (this.crossings.get(islandId) ?? 0) + 1)
   }
 
-  /** What the camera should look at to show one building: its place in the world and how far back to stand. */
+  /** What the camera should look at to show one building: its place in the world, how far back to stand, and `azimuth`, its front (the side of its door), so every way of going to a building arrives at the same side. */
   focusOf(id: string): { target: THREE.Vector3; distance: number; azimuth?: number; tall?: boolean } | null {
     const b = this.buildings.get(id)
     if (!b) return null
     b.root.updateWorldMatrix(true, false)
     // a tower taller than the buildings the camera was set for is looked at higher up and from further back, so its roof stays on the screen; anything shorter is framed as it always was
     const f = buildingFraming(b.standingHeight())
-    return { target: b.root.getWorldPosition(new THREE.Vector3()).setY(f.aim), distance: f.distance, tall: f.tall }
+    const d = b.doorDirWorld()
+    return { target: b.root.getWorldPosition(new THREE.Vector3()).setY(f.aim), distance: f.distance, azimuth: Math.atan2(d.x, d.z), tall: f.tall }
   }
 
   /** The side a building's door faces, as an azimuth (radians round the building) for the camera to stand on: its front. Null for a building that is not on screen. */

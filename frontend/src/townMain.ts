@@ -455,7 +455,7 @@ export async function startTown(): Promise<void> {
     else { servicePanel.close(); inspector.close() }
     town.select(b?.id ?? null)
     const focus = b ? town.focusOf(b.id) : null
-    if (focus) stage.focus(focus.target, focus.distance)
+    if (focus) stage.focus(focus.target, focus.distance, false, focus.azimuth)
   })
 
   const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -0.55)
