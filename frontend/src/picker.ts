@@ -6,6 +6,8 @@ export interface PickItem {
   /** The island's name, or the island a building stands on. */
   where: string
   state?: string
+  /** The short code config gives the system's service: search finds the system by it and the list shows it after the island. */
+  code?: string
   /** A second line under the name in a list, for example the dead-letter queue and its count. */
   detail?: string
   /** Listed but not clickable: it has nowhere to go (a cloud health report for a resource the town does not show). */
@@ -15,7 +17,7 @@ export interface PickItem {
 }
 
 /**
- * The items that match what was typed, best first. Every word has to appear in the name, id or island; names that start with
+ * The items that match what was typed, best first. Every word has to appear in the name, id, island or service code; names that start with
  * the text come first, then names that contain every word, then islands before buildings. With nothing typed, `all` decides
  * between everything (a dropdown) and nothing (a search box).
  */
@@ -24,10 +26,10 @@ export function rankItems<T extends PickItem>(items: T[], query: string, limit: 
   if (!q) return all ? items.slice(0, limit) : []
   const words = q.split(/\s+/)
   const score = (i: T) => {
-    const hay = `${i.name} ${i.id} ${i.where}`.toLowerCase()
+    const hay = `${i.name} ${i.id} ${i.where} ${i.code ?? ''}`.toLowerCase()
     if (!words.every((w) => hay.includes(w))) return -1
     const own = `${i.name} ${i.id}`.toLowerCase()
-    return (own.startsWith(q) ? 4 : 0) + (words.every((w) => own.includes(w)) ? 2 : 0) + (i.kind === 'island' ? 1 : 0)
+    return (own.startsWith(q) || i.code?.toLowerCase() === q ? 4 : 0) + (words.every((w) => `${own} ${i.code ?? ''}`.includes(w)) ? 2 : 0) + (i.kind === 'island' ? 1 : 0)
   }
   return items
     .map((i) => ({ i, s: score(i) }))
@@ -91,7 +93,7 @@ export class Picker<T extends PickItem> {
   private draw(): void {
     this.list.hidden = this.matches.length === 0
     this.list.innerHTML = this.matches
-      .map((m, i) => `<div class="hit ${i === this.active ? 'active' : ''}" data-i="${i}"><b>${escapeHtml(m.name)}</b><span>${escapeHtml(m.kind === 'island' ? 'island' : m.kind === 'town' ? '' : m.where)}</span></div>`)
+      .map((m, i) => `<div class="hit ${i === this.active ? 'active' : ''}" data-i="${i}"><b>${escapeHtml(m.name)}</b><span>${escapeHtml(m.kind === 'island' ? 'island' : m.kind === 'town' ? '' : m.code ? `${m.where} · ${m.code}` : m.where)}</span></div>`)
       .join('')
     this.list.querySelectorAll<HTMLElement>('.hit').forEach((el) =>
       el.addEventListener('mousedown', (e) => { e.preventDefault(); this.pick(this.matches[Number(el.dataset.i)]) }))

@@ -400,6 +400,7 @@ export interface components {
             backlogCountAmber?: number | null;
             /** Format: double */
             backlogCountRed?: number | null;
+            serviceCode?: string | null;
         };
         OffscreenLink: {
             nodeId: string;

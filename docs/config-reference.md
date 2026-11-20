@@ -164,7 +164,7 @@ One island. The file name is the group id. `pillars/` is the older name of the f
 | `minCalls` | no | role default | See above. |
 | `discoverLinks` | no | pillar or role default | See above. Set `false` on a system whose calls should only be the declared ones. |
 | `signals` | no | none | Signal → source name (or `none`) for this system alone. Signal names are listed under the environment's `signals`. |
-| `serviceCode` | no | the service | The name its cloud resources carry for the service. The interface also shows it after the system's name, as "Orders API (ord)", unless the name already says it; search finds a system by it. |
+| `serviceCode` | no | the service | The name its cloud resources carry for the service. The town shows it on the service's sign, as "Orders (ord)" (not when it is the service name), and search finds the service's systems by it. |
 | `environments` | no | all | Ids of the environments (the file names in `environments/`) this system is deployed in, for a service that exists only in some of them, such as a test simulator. In any other environment it is left out, with the calls that lead to it. Without it, the system is in every environment. |
 | `telemetry` | no | none | What the telemetry calls it. |
 | `calls` | no | none | Ids of the systems this one calls. Cars drive only along declared links. |

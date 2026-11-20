@@ -83,7 +83,8 @@
           "sources": null,
           "engine": null,
           "backlogCountAmber": null,
-          "backlogCountRed": null
+          "backlogCountRed": null,
+          "serviceCode": null
         },
         {
           "id": "hub.service-bus",
@@ -131,7 +132,8 @@
           "sources": null,
           "engine": null,
           "backlogCountAmber": null,
-          "backlogCountRed": null
+          "backlogCountRed": null,
+          "serviceCode": null
         },
         {
           "id": "hub.egress",
@@ -179,7 +181,8 @@
           "sources": null,
           "engine": null,
           "backlogCountAmber": null,
-          "backlogCountRed": null
+          "backlogCountRed": null,
+          "serviceCode": null
         },
         {
           "id": "hub.customer-db",
@@ -227,7 +230,8 @@
           "sources": null,
           "engine": null,
           "backlogCountAmber": null,
-          "backlogCountRed": null
+          "backlogCountRed": null,
+          "serviceCode": null
         }
       ],
       "assets": [],
@@ -318,7 +322,8 @@
           "sources": null,
           "engine": null,
           "backlogCountAmber": null,
-          "backlogCountRed": null
+          "backlogCountRed": null,
+          "serviceCode": null
         },
         {
           "id": "aa.audit-cache",
@@ -366,7 +371,8 @@
           "sources": null,
           "engine": null,
           "backlogCountAmber": null,
-          "backlogCountRed": null
+          "backlogCountRed": null,
+          "serviceCode": null
         },
         {
           "id": "aa.orders-worker",
@@ -416,7 +422,8 @@
           "sources": null,
           "engine": null,
           "backlogCountAmber": null,
-          "backlogCountRed": null
+          "backlogCountRed": null,
+          "serviceCode": null
         },
         {
           "id": "aa.tools-cron",
@@ -481,7 +488,8 @@
           "sources": null,
           "engine": null,
           "backlogCountAmber": null,
-          "backlogCountRed": null
+          "backlogCountRed": null,
+          "serviceCode": null
         },
         {
           "id": "aa.orders-db",
@@ -590,7 +598,8 @@
           "sources": null,
           "engine": null,
           "backlogCountAmber": null,
-          "backlogCountRed": null
+          "backlogCountRed": null,
+          "serviceCode": null
         }
       ],
       "assets": [],
@@ -665,7 +674,8 @@
           "sources": null,
           "engine": null,
           "backlogCountAmber": null,
-          "backlogCountRed": null
+          "backlogCountRed": null,
+          "serviceCode": null
         },
         {
           "id": "bb.billing-db",
@@ -774,7 +784,8 @@
           "sources": null,
           "engine": null,
           "backlogCountAmber": null,
-          "backlogCountRed": null
+          "backlogCountRed": null,
+          "serviceCode": null
         },
         {
           "id": "bb.shared-db",
@@ -822,7 +833,8 @@
           "sources": null,
           "engine": null,
           "backlogCountAmber": null,
-          "backlogCountRed": null
+          "backlogCountRed": null,
+          "serviceCode": null
         }
       ],
       "assets": [],

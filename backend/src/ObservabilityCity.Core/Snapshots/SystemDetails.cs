@@ -43,7 +43,7 @@ public static class SystemDetails
             .Select(s => new SubscriptionSnapshot(s.Topic, s.PublisherGroupId, s.ConsumerId)).ToList();
 
         var island2 = node.GroupId == RegistryVendor.GroupId ? "Third party" : groups.TryGetValue(node.GroupId, out var own) ? own.DisplayName : node.GroupId;
-        return new SystemDetail(node.Id, node.DisplayName, node.Kind, node.Service, node.GroupId, island2, FileOf(node, registry.GroupFolder),
+        return new SystemDetail(node.Id, node.Name, node.Kind, node.Service, node.GroupId, island2, FileOf(node, registry.GroupFolder),
             Config(node, registry.GroupFolder), calls, calledBy, gatewayCalls, gatewayCalledBy, outside, topics, subscriptions);
     }
 
