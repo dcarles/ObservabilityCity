@@ -86,6 +86,15 @@ describe('architecture boxes', () => {
 })
 
 describe('the inside of a pillar', () => {
+  it('names a service box with the service code when config gives one', () => {
+    const s = golden('bad-day')
+    const pillar = buildArchitecture(s, ALL_TENANTS).dashboard.pillars.find((p) => p.groups.some((g) => g.rows.length > 1))!
+    const node = s.groups.find((g) => g.id === pillar.id)!.nodes.find((n) => n.service)!
+    node.serviceCode = 'zz9'
+    const a = buildPillarArchitecture(s, ALL_TENANTS, pillar.id)!
+    expect(a.boxes.filter((b) => b.kind === 'service').some((b) => b.name.endsWith(' (zz9)'))).toBe(true)
+  })
+
   it('has a box for each service group of the pillar, and every other box closed and joined to it by a line', () => {
     const s = golden('bad-day')
     const whole = buildArchitecture(s, ALL_TENANTS)

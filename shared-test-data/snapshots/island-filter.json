@@ -78,7 +78,8 @@
           "sources": null,
           "engine": null,
           "backlogCountAmber": null,
-          "backlogCountRed": null
+          "backlogCountRed": null,
+          "serviceCode": null
         },
         {
           "id": "hub.service-bus",
@@ -126,7 +127,8 @@
           "sources": null,
           "engine": null,
           "backlogCountAmber": null,
-          "backlogCountRed": null
+          "backlogCountRed": null,
+          "serviceCode": null
         },
         {
           "id": "hub.egress",
@@ -174,7 +176,8 @@
           "sources": null,
           "engine": null,
           "backlogCountAmber": null,
-          "backlogCountRed": null
+          "backlogCountRed": null,
+          "serviceCode": null
         },
         {
           "id": "hub.customer-db",
@@ -222,7 +225,8 @@
           "sources": null,
           "engine": null,
           "backlogCountAmber": null,
-          "backlogCountRed": null
+          "backlogCountRed": null,
+          "serviceCode": null
         }
       ],
       "assets": [],
@@ -303,7 +307,8 @@
           "sources": null,
           "engine": null,
           "backlogCountAmber": null,
-          "backlogCountRed": null
+          "backlogCountRed": null,
+          "serviceCode": null
         },
         {
           "id": "aa.orders-worker",
@@ -353,7 +358,8 @@
           "sources": null,
           "engine": null,
           "backlogCountAmber": null,
-          "backlogCountRed": null
+          "backlogCountRed": null,
+          "serviceCode": null
         },
         {
           "id": "aa.orders-db",
@@ -401,7 +407,8 @@
           "sources": null,
           "engine": null,
           "backlogCountAmber": null,
-          "backlogCountRed": null
+          "backlogCountRed": null,
+          "serviceCode": null
         }
       ],
       "assets": [],
@@ -494,7 +501,8 @@
           "sources": null,
           "engine": null,
           "backlogCountAmber": null,
-          "backlogCountRed": null
+          "backlogCountRed": null,
+          "serviceCode": null
         },
         {
           "id": "cc.notify-worker",
@@ -544,7 +552,8 @@
           "sources": null,
           "engine": null,
           "backlogCountAmber": null,
-          "backlogCountRed": null
+          "backlogCountRed": null,
+          "serviceCode": null
         },
         {
           "id": "cc.notify-db",
@@ -592,7 +601,8 @@
           "sources": null,
           "engine": null,
           "backlogCountAmber": null,
-          "backlogCountRed": null
+          "backlogCountRed": null,
+          "serviceCode": null
         }
       ],
       "assets": [],
@@ -651,7 +661,8 @@
         "sources": null,
         "engine": null,
         "backlogCountAmber": null,
-        "backlogCountRed": null
+        "backlogCountRed": null,
+        "serviceCode": null
       },
       "calledBy": [
         "aa.orders-api"
@@ -708,7 +719,8 @@
         "sources": null,
         "engine": null,
         "backlogCountAmber": null,
-        "backlogCountRed": null
+        "backlogCountRed": null,
+        "serviceCode": null
       },
       "calledBy": [
         "cc.notify-worker"

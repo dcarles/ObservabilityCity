@@ -171,6 +171,19 @@ describe('names', () => {
   })
 })
 
+describe('service code in the group header', () => {
+  it('follows the service name when config gives the service a code, and is left out when it does not', () => {
+    const s = golden('calm')
+    const named = s.groups.flatMap((g) => g.nodes).filter((n) => n.service)
+    const target = named[0]
+    target.serviceCode = 'zz9'
+    const groups = buildDashboard(s, ALL_TENANTS).pillars.flatMap((p) => p.groups)
+    expect(groups.find((g) => g.name === `${groupTitle(target.service!)} (zz9)`)).toBeDefined()
+    target.serviceCode = null
+    expect(buildDashboard(s, ALL_TENANTS).pillars.flatMap((p) => p.groups).some((g) => /\(zz9\)/.test(g.name))).toBe(false)
+  })
+})
+
 describe('sticky column titles', () => {
   it('do not move while the last service row is below them, then leave with it', () => {
     expect(headShift(56, 52, 500)).toBe(0)

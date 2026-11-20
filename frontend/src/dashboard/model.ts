@@ -322,6 +322,8 @@ function groupsOf(g: GroupSnapshot, rows: Row[], nodes: NodeSnapshot[]): Group[]
     const key = `${g.id}/${name}`
     // a service id is turned into words; a system with no service keeps its own name
     const entry = byKey.get(key) ?? byKey.set(key, { name: n.service ? groupTitle(n.service) : n.name, rows: [] }).get(key)!
+    // the service's short code, when config gives one, goes after its name; the first system that has one decides
+    if (n.service && n.serviceCode && !entry.name.endsWith(`(${n.serviceCode})`) && !/\([^()]*\)$/.test(entry.name)) entry.name = `${entry.name} (${n.serviceCode})`
     entry.rows.push(rows[i])
   })
   const kindIndex = new Map(nodes.map((n, i) => [rows[i].id, KIND_ORDER.indexOf(n.kind)]))
