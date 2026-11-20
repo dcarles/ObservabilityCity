@@ -45,6 +45,7 @@ Thresholds cascade: `defaults.yaml` (per role) → the group's `defaults` → th
 |---|---|---|---|
 | `name` | yes | | The engine as it is shown, for example `Cosmos DB`. |
 | `type` | yes | | The kind of database it is: `relational`, `document`, `key-value`, `wide-column`, `graph`, `time-series`, `analytical` or `vector`. The list is fixed. Every engine belongs to exactly one type. |
+| `partLabel` | no | `part` | What a piece of a database that has capacity of its own is called here, for example `container`. Used where a source splits a database into parts (see `parts` in the metrics of the Azure source): "container audit-log is throttling", "2 other containers fine". |
 
 Each entry of `databaseEngines` is keyed by an id in lowercase kebab-case, for example `cosmos`:
 
@@ -346,8 +347,26 @@ With the Azure adapter the [scope](#scope)'s account is a subscription and its t
 | `throttled` | no | none | Share of requests refused for lack of capacity. |
 | `requests` | no | none | Request rate, shown per tenant database. |
 | `limit` | no | none | Provisioned capacity as a plain number, shown beside each tenant database. Not a health signal. |
+| `parts` | no | none | Splits each resource by the pieces of it that have capacity of their own, so a throttling piece is named (see below). |
 
 An entry needs at least one signal other than `limit`.
+
+<!-- file: MetricPartsFile -->
+| Key | Required | Default | Meaning |
+|---|---|---|---|
+| `by` | yes | | The metric dimension that carries a piece's name (for Cosmos DB, `CollectionName`). |
+| `ownThroughput` | yes | | A metric that has a value for a piece only when the piece has capacity of its own (for Cosmos DB, `ProvisionedThroughput` with `maximum`). It takes `metric` and `aggregation`. A piece with no value there draws on the shared pool. |
+| `pool` | no | none | The name the cloud gives the shared pool in that metric (for Cosmos DB, `__Empty`). Leave it out when the cloud names no such series. |
+
+With `parts`, the signals of the entry (`utilisation`, `throttled`, `requests`, `limit`) are read split by the dimension, in the same calls, and worked out for the shared pool (one part: every named piece that has no capacity of its own) and for each dedicated piece. No piece is listed: they come from the cloud. A part's throttled share is its own requests turned away over its own requests, so a small piece that is throttling is not hidden among the busy ones. A database's throttled figure is the worst of its parts. The database is red when its shared pool is red or every part is, and amber when only dedicated parts are in trouble. A series with no name in the dimension (traffic of the account as a whole) counts in the database's totals and belongs to no part. When the cloud refuses the split (a metric without that dimension), the resource is read as a whole instead, without parts.
+
+```yaml
+      - resources: accounts
+        utilisation: { metric: NormalizedRUConsumption, aggregation: maximum, scale: 0.01 }
+        throttled: { metric: TotalRequests, aggregation: count, filter: "StatusCode eq '429'", over: { metric: TotalRequests, aggregation: count } }
+        limit: { metric: ProvisionedThroughput, aggregation: maximum }
+        parts: { by: CollectionName, ownThroughput: { metric: ProvisionedThroughput, aggregation: maximum }, pool: "__Empty" }
+```
 
 <!-- file: MetricSignalFile -->
 | Key | Required | Default | Meaning |
@@ -641,4 +660,4 @@ An `account` rule (in `scope`, a resource rule or an asset rule):
 | `telemetryStores` | no | the adapter's own | Query that lists the telemetry stores, to find the one `telemetryStore` names. Azure name: `workspaces`. |
 
 ## fake.yaml and stories/
-Used only by a town with `mode: demo`; the validator rejects them in a live town. They script the fake source and the story bar (`fake.yaml` also takes `regions: { name: weight }` per service; `fake-assets.yaml` lists the basic buildings) and are described in the sample folders (`config/galactic-credit/fake.yaml`, `config/galactic-credit/stories/`).
+Used only by a town with `mode: demo`; the validator rejects them in a live town. They script the fake source and the story bar (`fake.yaml` also takes `regions: { name: weight }` per service, and `parts: [name, ...]` on a database with one database for each tenant, which gives each database those pieces with capacity of their own next to its shared pool; a story or the Break panel can saturate one with a target like `ldg.ledger-db/audit-log` or `ldg.ledger-db#acme/audit-log`; `fake-assets.yaml` lists the basic buildings) and are described in the sample folders (`config/galactic-credit/fake.yaml`, `config/galactic-credit/stories/`).

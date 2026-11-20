@@ -57,8 +57,8 @@ public sealed class FakeSource(
 
     public FakeEffect Add(string target, FakeEffectKind kind, double intensity)
     {
-        if (target.Contains('#') && (kind != FakeEffectKind.Saturate || target.EndsWith('#') || target.StartsWith('#')))
-            throw new ArgumentException($"'{target}': only DB saturated can be aimed at one tenant, as store#tenant", nameof(target));
+        if ((target.Contains('#') || target.Contains('/')) && (kind != FakeEffectKind.Saturate || target.EndsWith('#') || target.StartsWith('#') || target.EndsWith('/') || target.StartsWith('/')))
+            throw new ArgumentException($"'{target}': only DB saturated can be aimed at one tenant or part, as store#tenant, store/part or store#tenant/part", nameof(target));
         var e = new FakeEffect($"fx{Interlocked.Increment(ref _nextId)}", target, kind, Math.Clamp(intensity, 0, 1));
         lock (_gate) _effects.Add(e);
         if (kind == FakeEffectKind.Incident) _incidentStart[e.Id] = clock.GetUtcNow();
@@ -191,14 +191,14 @@ public sealed class FakeSource(
             var saturation = healthy > 0 ? Math.Min(2.0, rps / (healthy * perInstanceRps)) : 2.0;
             var p99 = p.P99Ms!.Value * (1 + latencyFx) * (0.9 + 0.2 * saturation) * (Calm ? 1 : 1 + 0.05 * Wobble(node.Id, t, 5));
 
-            double? cpu = null, memory = null, utilisation = null, throttled = null;
+            double? cpu = null, memory = null, utilisation = null, throttled = null, errorThrottle = null;
             double load = down ? 0 : saturation;
             List<TenantReading>? tenantReadings = null;
             if (!down && isStore)
             {
                 // A data store is provisioned for a ceiling, so what matters is how much of it is used and what gets turned away.
                 var provisioned = p.Rps!.Value * 1.6;
-                var saturate = fx.Where(e => e.Kind == FakeEffectKind.Saturate && e.Tenant is null).Sum(e => 0.6 * e.Intensity);
+                var saturate = fx.Where(e => e.Kind == FakeEffectKind.Saturate && e.Tenant is null && e.Part is null).Sum(e => 0.6 * e.Intensity);
                 utilisation = Math.Clamp(rps / provisioned + saturate, 0, 1.2);
                 throttled = utilisation > 0.95 ? Math.Min(0.6, (utilisation.Value - 0.95) * 2.4) : 0;
                 if (node.TenantPattern is not null && tenants.Count > 0)
@@ -210,10 +210,28 @@ public sealed class FakeSource(
                     foreach (var tn in tenants)
                     {
                         var skew = 0.8 + 0.4 * (StableHash(node.Id + "/" + tn.Id) % 100) / 100.0;
-                        var own = fx.Where(e => e.Kind == FakeEffectKind.Saturate && e.Tenant == tn.Id).Sum(e => 0.6 * e.Intensity);
+                        var own = fx.Where(e => e.Kind == FakeEffectKind.Saturate && e.Tenant == tn.Id && e.Part is null).Sum(e => 0.6 * e.Intensity);
                         var u = Math.Clamp(rps / provisioned * skew + saturate + own, 0, 1.2);
                         var th = u > 0.95 ? Math.Min(0.6, (u - 0.95) * 2.4) : 0;
-                        tenantReadings.Add(new TenantReading(tn.Id, u, th, rps * weights[tn.Id] / sum, Limit: FakeLimits[StableHash(node.Id + "/" + tn.Id + "/limit") % FakeLimits.Length]));
+                        var limit = FakeLimits[StableHash(node.Id + "/" + tn.Id + "/limit") % FakeLimits.Length];
+                        var tenantRps = rps * weights[tn.Id] / sum;
+                        List<PartReading>? parts = null;
+                        if (p.Parts is { Count: > 0 } names)
+                        {
+                            // the database's shared pool and each piece with capacity of its own: a part can run out while the others are fine
+                            double PartUse(string? name)
+                            {
+                                var hit = fx.Where(e => e.Kind == FakeEffectKind.Saturate && e.Part is not null && string.Equals(e.Part, name, StringComparison.OrdinalIgnoreCase) && (e.Tenant is null || e.Tenant == tn.Id)).Sum(e => 0.9 * e.Intensity);
+                                return Math.Clamp(rps / provisioned * skew * (name is null ? 1 : 0.7) + saturate + own + hit, 0, 1.2);
+                            }
+                            double Throttle(double use) => use > 0.95 ? Math.Min(0.6, (use - 0.95) * 2.4) : 0;
+                            parts = [new PartReading("", PartKind.Shared, PartUse(null), Throttle(PartUse(null)), tenantRps * 0.7, limit)];
+                            foreach (var name in names)
+                                parts.Add(new PartReading(name, PartKind.Dedicated, PartUse(name), Throttle(PartUse(name)), tenantRps * 0.3 / names.Count, limit));
+                            u = parts.Max(x => x.Utilisation!.Value);
+                            th = parts.Max(x => x.Throttled!.Value);
+                        }
+                        tenantReadings.Add(new TenantReading(tn.Id, u, th, tenantRps, Limit: limit, Parts: parts));
                     }
                     // the store's own numbers follow its customers; the snapshot builder works out the same from the units
                     var customers = tenantReadings.Where(r => tenants.First(tn => tn.Id == r.TenantId).Kind != TenantKind.Test).ToList();
@@ -221,10 +239,12 @@ public sealed class FakeSource(
                     {
                         utilisation = customers.Max(r => r.Utilisation);
                         throttled = customers.Max(r => r.Throttled);
+                        // a dedicated container turning requests away only fails the calls that use it: the shared pool's own figure drives the store's errors
+                        errorThrottle = customers.Max(r => r.Parts is { Count: > 0 } ps ? ps[0].Throttled ?? 0 : r.Throttled ?? 0);
                     }
                 }
                 load = utilisation!.Value;
-                errors = Math.Clamp(errors + throttled!.Value * 0.2, 0, 1);
+                errors = Math.Clamp(errors + (errorThrottle ?? throttled!.Value) * 0.2, 0, 1);
             }
             else if (!down && !isVendor)
             {

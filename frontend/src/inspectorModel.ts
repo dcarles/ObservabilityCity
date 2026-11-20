@@ -4,7 +4,7 @@ import { groupWords, withGroupWords } from './groupLabel'
 import { regionLabel } from './deadLetters'
 import type { ConfigValue, HealthState, ScheduleSnapshot, IncidentSnapshot, JobSnapshot, LinkRef, LogGroup, LogSection, NodeSnapshot, ResourceLink, ScopeInfo, ScopeResource, SettingLayer, SystemDetail } from './types'
 import { inboundSplitText } from './inbound'
-import { isThrottled, limitRange, throttleWho } from './tenants'
+import { isThrottled, limitRange, partLabel, partName, throttleWho, worstPart } from './tenants'
 import { isAbsent, isUnmonitored, QUIET_TEXT } from './signals'
 import { formatAge, formatCount, formatMs, formatRate, plaqueText, resourceUse } from './visuals'
 
@@ -38,6 +38,17 @@ export function tenantHot(n: NodeSnapshot, past: string): string | null {
   const sorted = [...live].sort((a, b) => b.utilisation! - a.utilisation!)
   const top = sorted[0]
   if (top.utilisation! < n.resourceAmber) return null
+  // a database split into parts says which part is in trouble, with that part's own numbers, and that the rest is fine
+  const part = worstPart(top)
+  if (part && part.utilisation != null) {
+    const word = part.kind === 'Shared' ? partName(part) : `${partLabel(n)} ${part.name}`
+    const turning = (part.throttled ?? 0) >= n.throttleAmber && (part.throttled ?? 0) > 0 ? `, turning away ${pct(part.throttled!, 1)} of its requests` : ''
+    const hotCount = (top.parts ?? []).filter((p) => p.state === 'Degraded' || p.state === 'Down').length
+    const rest = hotCount > 1 ? `; ${hotCount - 1} other ${partLabel(n)}${hotCount === 2 ? ' is' : 's are'} in trouble too` : (top.parts ?? []).length > 1 ? '; the rest of it is fine' : ''
+    const more = sorted.slice(1).filter((u) => u.utilisation! >= n.resourceAmber).length
+    const pastPart = part.utilisation >= n.resourceRed ? `past the red line of ${pct(n.resourceRed)}` : part.utilisation >= n.resourceAmber ? `past the amber line of ${pct(n.resourceAmber)}` : past
+    return `${top.name}: ${word} is at ${pct(part.utilisation)} of its capacity (${pastPart})${turning}${rest}${more > 0 ? `; ${more} more tenant${more === 1 ? ' is' : 's are'} over the line` : ''}.`
+  }
   const throttling = isThrottled(top, n.throttleAmber) ? `, turning away ${pct(top.throttled!, 1)} of its requests` : ''
   const others = sorted.slice(1).filter((u) => u.utilisation! >= n.resourceAmber).length
   return `${top.name} is at ${pct(top.utilisation!)} of its capacity (${past})${throttling}${others > 0 ? `; ${others} more tenant${others === 1 ? ' is' : 's are'} over the line` : ''}.`

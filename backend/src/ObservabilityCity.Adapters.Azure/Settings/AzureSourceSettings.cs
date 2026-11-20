@@ -63,7 +63,10 @@ public sealed partial class AzureSourceSettings : SourceSettingsReader<AzureSour
             new[] { ("cpu", g.Cpu), ("memory", g.Memory), ("utilisation", g.Utilisation), ("throttled", g.Throttled), ("requests", g.Requests), ("limit", g.Limit) }
                 .Where(x => x.Item2 is not null).ToDictionary(x => x.Item1, x => ToSignal(x.Item2)!),
             string.IsNullOrWhiteSpace(g.Interval) ? null : SourceQuery.TryParseWindow(g.Interval, out var interval) ? interval : null,
-            string.IsNullOrWhiteSpace(g.Window) ? null : SourceQuery.TryParseWindow(g.Window, out var window) ? window : null)).ToList();
+            string.IsNullOrWhiteSpace(g.Window) ? null : SourceQuery.TryParseWindow(g.Window, out var window) ? window : null,
+            g.Parts is { OwnThroughput: { } own } parts
+                ? new PartsConfig(parts.By.Trim(), new MetricSignal(own.Metric.Trim(), own.Aggregation.Trim().ToLowerInvariant(), null, 1, false, null), string.IsNullOrWhiteSpace(parts.Pool) ? null : parts.Pool.Trim())
+                : null)).ToList();
 
     internal static EntitiesConfig? ToEntities(EntitiesFile? f) =>
         f is null ? null : new EntitiesConfig(f.Resources, string.IsNullOrWhiteSpace(f.Dimension) ? EntitiesConfig.DefaultDimension : f.Dimension.Trim(),
@@ -182,6 +185,19 @@ public sealed partial class AzureSourceSettings : SourceSettingsReader<AzureSour
             foreach (var (signal, spec) in signals)
             {
                 CheckSignal(spec!, $"{at}.{signal}", false);
+            }
+            if (group.Parts is { } parts)
+            {
+                if (string.IsNullOrWhiteSpace(parts.By)) errors.Add($"{at}.parts: by is empty; give the metric dimension that carries a piece's name");
+                if (parts.OwnThroughput is not { } own) errors.Add($"{at}.parts: ownThroughput is missing; give the metric that has a value only for a piece with capacity of its own");
+                else
+                {
+                    if (string.IsNullOrWhiteSpace(own.Metric)) errors.Add($"{at}.parts.ownThroughput: metric is empty; give the metric's name");
+                    if (!MetricGroup.Aggregations.Contains(own.Aggregation.Trim().ToLowerInvariant()))
+                        errors.Add($"{at}.parts.ownThroughput: aggregation '{own.Aggregation}'. Use {string.Join(", ", MetricGroup.Aggregations)}.{DidYouMean.Hint(own.Aggregation, MetricGroup.Aggregations)}");
+                }
+                if (group.Utilisation is null && group.Throttled is null && group.Requests is null && group.Limit is null)
+                    errors.Add($"{at}.parts: there is nothing to split; give utilisation, throttled, requests or limit");
             }
         }
 
@@ -334,6 +350,19 @@ public sealed class MetricGroupFile
     public MetricSignalFile? Requests { get; set; }
     /// <summary>The provisioned capacity as a plain number (for Cosmos, the ProvisionedThroughput metric with maximum), shown beside each tenant database. Not a health signal.</summary>
     public MetricSignalFile? Limit { get; set; }
+    /// <summary>Splits each resource by the pieces of it that have capacity of their own, so one throttling piece is named. Optional: without it a resource is read as a whole.</summary>
+    public MetricPartsFile? Parts { get; set; }
+}
+
+/// <summary>How a resource is split into parts: the dimension that names a piece, the metric that says a piece has capacity of its own, and the name of the shared pool in it.</summary>
+public sealed class MetricPartsFile
+{
+    /// <summary>The metric dimension that carries a piece's name (Cosmos DB: CollectionName).</summary>
+    public string By { get; set; } = "";
+    /// <summary>A metric that has a value for a piece only when it has capacity of its own (Cosmos DB: ProvisionedThroughput, maximum).</summary>
+    public EntityMetricFile? OwnThroughput { get; set; }
+    /// <summary>The name the cloud gives the shared pool in that metric (Cosmos DB: __Empty). Optional.</summary>
+    public string? Pool { get; set; }
 }
 
 public sealed class MetricSignalFile

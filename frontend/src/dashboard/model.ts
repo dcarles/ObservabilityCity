@@ -4,7 +4,7 @@
 import { messagesPerSecond } from '../inspectorModel'
 import { eventOfNode, healthEventsOf, isResolved } from '../healthEvents'
 import { absentEverywhere, isAbsent, isUnmonitored } from '../signals'
-import { isFollowed, isFollowing, isShown, isThrottled, tenantLevel, type TenantView } from '../tenants'
+import { hotParts, partLabel, isFollowed, isFollowing, isShown, isThrottled, partName, partsFine, tenantLevel, type TenantView } from '../tenants'
 import { islandChoices } from '../islands'
 import { dlqCount } from '../deadLetters'
 import { stateFor, viewTotals } from '../viewTotals'
@@ -49,6 +49,22 @@ export interface TenantRow {
   level: Level
   /** Past its amber line or throttling. */
   hot: boolean
+  /** The parts of its database that are in trouble (the shared pool, or a piece with capacity of its own), when the database is split into parts. Empty otherwise. */
+  parts: PartRow[]
+  /** How many of its parts are fine, for "3 other containers fine". Zero when none is in trouble or it has no parts. */
+  partsFine: number
+}
+
+/** One part of a tenant's database that is in trouble: shown under the tenant line. */
+export interface PartRow {
+  name: string
+  shared: boolean
+  /** Share of the part's own capacity in use, in percent. */
+  ru: number | null
+  /** Share of the part's requests turned away, in percent. */
+  throttled: number | null
+  limit: number | null
+  level: Level
 }
 
 /** One region of a service that runs in two or more: its own instances, CPU, memory (percent) and share of the requests (percent). */
@@ -95,6 +111,8 @@ export interface Row {
   calls: Chip[]
   /** The tenant lines of a database with one database for each tenant; null for everything else. */
   tenants: TenantRow[] | null
+  /** What the engine calls a piece of a database with capacity of its own (container), for the parts shown under a tenant. */
+  partLabel: string
   /** The tenant lines show by themselves: a tenant is at its amber line or throttling. */
   tenantsOpenByDefault: boolean
   /** The cloud's open health report for this system's resource ("Degraded", "Unavailable"), with since when and the cloud's name; null when the cloud reports nothing. */
@@ -247,6 +265,15 @@ function tenantRows(n: NodeSnapshot, view: TenantView): TenantRow[] | null {
       limit: u.limit != null && u.limit > 0 ? u.limit : null,
       level: ({ green: 'ok', amber: 'warn', red: 'bad', grey: 'none' } as const)[tenantLevel(u)],
       hot: (u.utilisation ?? 0) >= n.resourceAmber || isThrottled(u, n.throttleAmber),
+      parts: hotParts(u).map((p) => ({
+        name: partName(p),
+        shared: p.kind === 'Shared',
+        ru: pct(p.utilisation),
+        throttled: pct(p.throttled),
+        limit: p.limit != null && p.limit > 0 ? p.limit : null,
+        level: p.state === 'Down' ? 'bad' : 'warn',
+      } satisfies PartRow)),
+      partsFine: hotParts(u).length > 0 ? partsFine(u) : 0,
     }))
     .sort((a, b) => (b.ru ?? 0) - (a.ru ?? 0))
 }
@@ -297,6 +324,7 @@ function rowOf(n: NodeSnapshot, s: Snapshot, view: TenantView, links: ReturnType
     calledBy: byRate(calledBy),
     calls: byRate(links.calls.get(n.id) ?? []),
     tenants,
+    partLabel: partLabel(n),
     tenantsOpenByDefault: tenants?.some((t) => t.hot) ?? false,
     cloudHealth: cloudHealthOf(n.id, s),
     jobs: (n.jobs ?? []).map((j) => ({ name: j.name, where: n.name, region: j.region ?? null, status: j.status, lastRun: j.lastRun ?? null })),

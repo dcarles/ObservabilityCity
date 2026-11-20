@@ -194,6 +194,7 @@ export interface components {
             name: string;
             type: string;
             typeName: string;
+            partLabel?: string | null;
         };
         DeadLetterRegionSnapshot: {
             region: string;
@@ -410,6 +411,22 @@ export interface components {
             /** Format: double */
             requestsPerSecond: number;
         };
+        /** @enum {string} */
+        PartKind: "Shared" | "Dedicated";
+        PartSnapshot: {
+            name: string;
+            kind: components["schemas"]["PartKind"];
+            state: components["schemas"]["HealthState"];
+            /** Format: double */
+            utilisation?: number | null;
+            /** Format: double */
+            throttled?: number | null;
+            /** Format: double */
+            requestsPerSecond: number;
+            /** Format: double */
+            limit?: number | null;
+            idle?: boolean | null;
+        };
         PillarFlowSnapshot: {
             /** Format: double */
             sentPerSecond?: number | null;
@@ -595,6 +612,7 @@ export interface components {
             /** Format: double */
             limit?: number | null;
             idle?: boolean | null;
+            parts?: components["schemas"]["PartSnapshot"][] | null;
         };
         TopicSnapshot: {
             name: string;

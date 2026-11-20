@@ -330,7 +330,8 @@
             "id": "sqlserver",
             "name": "SQL Server",
             "type": "relational",
-            "typeName": "Relational"
+            "typeName": "Relational",
+            "partLabel": null
           },
           "backlogCountAmber": null,
           "backlogCountRed": null,
@@ -384,7 +385,8 @@
             "id": "sqlserver",
             "name": "SQL Server",
             "type": "relational",
-            "typeName": "Relational"
+            "typeName": "Relational",
+            "partLabel": null
           },
           "backlogCountAmber": null,
           "backlogCountRed": null,
@@ -654,7 +656,8 @@
             "id": "cosmos",
             "name": "Cosmos DB",
             "type": "document",
-            "typeName": "Document"
+            "typeName": "Document",
+            "partLabel": null
           },
           "backlogCountAmber": null,
           "backlogCountRed": null,
@@ -812,7 +815,8 @@
             "id": "cosmos",
             "name": "Cosmos DB",
             "type": "document",
-            "typeName": "Document"
+            "typeName": "Document",
+            "partLabel": null
           },
           "backlogCountAmber": null,
           "backlogCountRed": null,
@@ -971,7 +975,8 @@
             "id": "cosmos",
             "name": "Cosmos DB",
             "type": "document",
-            "typeName": "Document"
+            "typeName": "Document",
+            "partLabel": null
           },
           "backlogCountAmber": null,
           "backlogCountRed": null,
@@ -1301,7 +1306,8 @@
             "id": "sqlserver",
             "name": "SQL Server",
             "type": "relational",
-            "typeName": "Relational"
+            "typeName": "Relational",
+            "partLabel": null
           },
           "backlogCountAmber": null,
           "backlogCountRed": null,
@@ -1407,7 +1413,8 @@
             "id": "postgres",
             "name": "PostgreSQL",
             "type": "relational",
-            "typeName": "Relational"
+            "typeName": "Relational",
+            "partLabel": null
           },
           "backlogCountAmber": null,
           "backlogCountRed": null,
@@ -1750,7 +1757,8 @@
             "id": "cosmos",
             "name": "Cosmos DB",
             "type": "document",
-            "typeName": "Document"
+            "typeName": "Document",
+            "partLabel": null
           },
           "backlogCountAmber": null,
           "backlogCountRed": null,
@@ -1908,7 +1916,8 @@
             "id": "cosmos",
             "name": "Cosmos DB",
             "type": "document",
-            "typeName": "Document"
+            "typeName": "Document",
+            "partLabel": null
           },
           "backlogCountAmber": null,
           "backlogCountRed": null,
@@ -2101,7 +2110,8 @@
             "id": "cosmos",
             "name": "Cosmos DB",
             "type": "document",
-            "typeName": "Document"
+            "typeName": "Document",
+            "partLabel": null
           },
           "backlogCountAmber": null,
           "backlogCountRed": null,
@@ -2208,7 +2218,8 @@
             "id": "postgres",
             "name": "PostgreSQL",
             "type": "relational",
-            "typeName": "Relational"
+            "typeName": "Relational",
+            "partLabel": null
           },
           "backlogCountAmber": null,
           "backlogCountRed": null,
@@ -2476,7 +2487,8 @@
             "id": "cosmos",
             "name": "Cosmos DB",
             "type": "document",
-            "typeName": "Document"
+            "typeName": "Document",
+            "partLabel": null
           },
           "backlogCountAmber": null,
           "backlogCountRed": null,
@@ -2632,7 +2644,8 @@
             "id": "postgres",
             "name": "PostgreSQL",
             "type": "relational",
-            "typeName": "Relational"
+            "typeName": "Relational",
+            "partLabel": null
           },
           "backlogCountAmber": null,
           "backlogCountRed": null,
@@ -2737,7 +2750,8 @@
             "id": "mongodb",
             "name": "MongoDB",
             "type": "document",
-            "typeName": "Document"
+            "typeName": "Document",
+            "partLabel": null
           },
           "backlogCountAmber": null,
           "backlogCountRed": null,
@@ -3003,7 +3017,8 @@
             "id": "sqlserver",
             "name": "SQL Server",
             "type": "relational",
-            "typeName": "Relational"
+            "typeName": "Relational",
+            "partLabel": null
           },
           "backlogCountAmber": null,
           "backlogCountRed": null,
@@ -3108,7 +3123,8 @@
             "id": "postgres",
             "name": "PostgreSQL",
             "type": "relational",
-            "typeName": "Relational"
+            "typeName": "Relational",
+            "partLabel": null
           },
           "backlogCountAmber": null,
           "backlogCountRed": null,
@@ -3267,7 +3283,8 @@
             "id": "mongodb",
             "name": "MongoDB",
             "type": "document",
-            "typeName": "Document"
+            "typeName": "Document",
+            "partLabel": null
           },
           "backlogCountAmber": null,
           "backlogCountRed": null,
@@ -3464,7 +3481,8 @@
             "id": "sqlserver",
             "name": "SQL Server",
             "type": "relational",
-            "typeName": "Relational"
+            "typeName": "Relational",
+            "partLabel": null
           },
           "backlogCountAmber": null,
           "backlogCountRed": null,
@@ -3569,7 +3587,8 @@
             "id": "postgres",
             "name": "PostgreSQL",
             "type": "relational",
-            "typeName": "Relational"
+            "typeName": "Relational",
+            "partLabel": null
           },
           "backlogCountAmber": null,
           "backlogCountRed": null,
@@ -3828,7 +3847,8 @@
             "id": "sqlserver",
             "name": "SQL Server",
             "type": "relational",
-            "typeName": "Relational"
+            "typeName": "Relational",
+            "partLabel": null
           },
           "backlogCountAmber": null,
           "backlogCountRed": null,
@@ -3933,7 +3953,8 @@
             "id": "postgres",
             "name": "PostgreSQL",
             "type": "relational",
-            "typeName": "Relational"
+            "typeName": "Relational",
+            "partLabel": null
           },
           "backlogCountAmber": null,
           "backlogCountRed": null,
@@ -4224,7 +4245,8 @@
             "id": "sqlserver",
             "name": "SQL Server",
             "type": "relational",
-            "typeName": "Relational"
+            "typeName": "Relational",
+            "partLabel": null
           },
           "backlogCountAmber": null,
           "backlogCountRed": null,
@@ -4384,7 +4406,8 @@
             "id": "postgres",
             "name": "PostgreSQL",
             "type": "relational",
-            "typeName": "Relational"
+            "typeName": "Relational",
+            "partLabel": null
           },
           "backlogCountAmber": null,
           "backlogCountRed": null,
@@ -4541,7 +4564,8 @@
             "id": "mongodb",
             "name": "MongoDB",
             "type": "document",
-            "typeName": "Document"
+            "typeName": "Document",
+            "partLabel": null
           },
           "backlogCountAmber": null,
           "backlogCountRed": null,
@@ -4852,7 +4876,8 @@
             "id": "sqlserver",
             "name": "SQL Server",
             "type": "relational",
-            "typeName": "Relational"
+            "typeName": "Relational",
+            "partLabel": null
           },
           "backlogCountAmber": null,
           "backlogCountRed": null,
@@ -4957,7 +4982,8 @@
             "id": "postgres",
             "name": "PostgreSQL",
             "type": "relational",
-            "typeName": "Relational"
+            "typeName": "Relational",
+            "partLabel": null
           },
           "backlogCountAmber": null,
           "backlogCountRed": null,
@@ -5152,7 +5178,8 @@
             "id": "sqlserver",
             "name": "SQL Server",
             "type": "relational",
-            "typeName": "Relational"
+            "typeName": "Relational",
+            "partLabel": null
           },
           "backlogCountAmber": null,
           "backlogCountRed": null,
@@ -5257,7 +5284,8 @@
             "id": "postgres",
             "name": "PostgreSQL",
             "type": "relational",
-            "typeName": "Relational"
+            "typeName": "Relational",
+            "partLabel": null
           },
           "backlogCountAmber": null,
           "backlogCountRed": null,
@@ -5447,7 +5475,8 @@
             "id": "sqlserver",
             "name": "SQL Server",
             "type": "relational",
-            "typeName": "Relational"
+            "typeName": "Relational",
+            "partLabel": null
           },
           "backlogCountAmber": null,
           "backlogCountRed": null,
@@ -5608,7 +5637,8 @@
             "id": "postgres",
             "name": "PostgreSQL",
             "type": "relational",
-            "typeName": "Relational"
+            "typeName": "Relational",
+            "partLabel": null
           },
           "backlogCountAmber": null,
           "backlogCountRed": null,
@@ -5874,7 +5904,8 @@
             "id": "sqlserver",
             "name": "SQL Server",
             "type": "relational",
-            "typeName": "Relational"
+            "typeName": "Relational",
+            "partLabel": null
           },
           "backlogCountAmber": null,
           "backlogCountRed": null,
@@ -5979,7 +6010,8 @@
             "id": "postgres",
             "name": "PostgreSQL",
             "type": "relational",
-            "typeName": "Relational"
+            "typeName": "Relational",
+            "partLabel": null
           },
           "backlogCountAmber": null,
           "backlogCountRed": null,
@@ -6269,7 +6301,8 @@
             "id": "sqlserver",
             "name": "SQL Server",
             "type": "relational",
-            "typeName": "Relational"
+            "typeName": "Relational",
+            "partLabel": null
           },
           "backlogCountAmber": null,
           "backlogCountRed": null,
@@ -6426,7 +6459,8 @@
             "id": "postgres",
             "name": "PostgreSQL",
             "type": "relational",
-            "typeName": "Relational"
+            "typeName": "Relational",
+            "partLabel": null
           },
           "backlogCountAmber": null,
           "backlogCountRed": null,
@@ -6701,7 +6735,8 @@
             "id": "sqlserver",
             "name": "SQL Server",
             "type": "relational",
-            "typeName": "Relational"
+            "typeName": "Relational",
+            "partLabel": null
           },
           "backlogCountAmber": null,
           "backlogCountRed": null,
@@ -7075,7 +7110,8 @@
             "id": "sqlserver",
             "name": "SQL Server",
             "type": "relational",
-            "typeName": "Relational"
+            "typeName": "Relational",
+            "partLabel": null
           },
           "backlogCountAmber": null,
           "backlogCountRed": null,

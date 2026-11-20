@@ -69,7 +69,7 @@ public sealed partial record Registry(
 }
 
 /// <summary>A database engine of the company: Id is what pillar files write, Name is what is shown, Type is one of <see cref="DatabaseTypes"/>.</summary>
-public sealed record DatabaseEngine(string Id, string Name, string Type);
+public sealed record DatabaseEngine(string Id, string Name, string Type, string? PartLabel = null);
 
 /// <summary>A scheduled job of a function and the services (of the same pillar) it starts work for. SystemId is the function's full id.</summary>
 public sealed record RegistrySchedule(string SystemId, string Job, IReadOnlyList<string> Services);

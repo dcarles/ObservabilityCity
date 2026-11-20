@@ -8,7 +8,7 @@ hub.customer-db:        { rps: 260, p99Ms: 22,  minInstances: 3 }
 hub.reference-db:       { rps: 120, p99Ms: 18,  minInstances: 2 }
 ldg.ledger-api:          { rps: 180, p99Ms: 240, minInstances: 3, regions: { US East: 55, EU West: 45 } }
 ldg.ledger-worker:       { rps: 60,  p99Ms: 4500, minInstances: 2, regions: { US East: 50, EU West: 50 } }
-ldg.ledger-db:           { rps: 230, p99Ms: 28,  minInstances: 2 }
+ldg.ledger-db:           { rps: 230, p99Ms: 28,  minInstances: 2, parts: [entries, audit-log] }
 ldg.posting-api:         { rps: 400, p99Ms: 120, minInstances: 4, maxInstances: 20, perInstanceRps: 35 }
 ldg.posting-worker:      { rps: 90,  p99Ms: 6000, minInstances: 2 }
 ldg.posting-db:          { rps: 160, p99Ms: 24,  minInstances: 2 }

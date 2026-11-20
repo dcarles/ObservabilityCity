@@ -5,7 +5,7 @@ hub.egress:             { rps: 10,  p99Ms: 300, minInstances: 2, perInstanceRps:
 hub.customer-db:        { rps: 80,  p99Ms: 20,  minInstances: 2, perInstanceRps: 120 }
 aa.orders-api:          { rps: 40, p99Ms: 200, minInstances: 2, perInstanceRps: 40 }
 aa.orders-worker:       { rps: 20, p99Ms: 3000, minInstances: 2, perInstanceRps: 12 }
-aa.orders-db:           { rps: 100, p99Ms: 20, minInstances: 2, perInstanceRps: 120 }
+aa.orders-db:           { rps: 100, p99Ms: 20, minInstances: 2, perInstanceRps: 120, parts: [entries, audit-log] }
 aa.audit-cache:         { rps: 120, p99Ms: 2, minInstances: 1, perInstanceRps: 400 }
 aa.tools-cron:          { rps: 0.2, p99Ms: 2000, minInstances: 1 }
 bb.billing-api:         { rps: 30, p99Ms: 150, minInstances: 2, perInstanceRps: 40 }

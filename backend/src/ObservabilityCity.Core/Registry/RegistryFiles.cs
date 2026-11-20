@@ -65,6 +65,8 @@ internal sealed class DatabaseEngineFile
     public string Name { get; set; } = "";
     /// <summary>One of the fixed database types (see <see cref="DatabaseTypes"/>).</summary>
     public string Type { get; set; } = "";
+    /// <summary>What a piece of a database with capacity of its own is called here, for example container. Optional: without it the interface says "part".</summary>
+    public string? PartLabel { get; set; }
 }
 
 internal sealed class ExpectedWarningFile

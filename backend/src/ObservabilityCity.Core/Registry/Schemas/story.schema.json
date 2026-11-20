@@ -28,7 +28,7 @@
               "additionalProperties": false,
               "required": ["target", "kind"],
               "properties": {
-                "target": { "type": "string", "description": "A system id, an island id, a vendor id or *. A data store with a database for each tenant takes store#tenant for Saturate." },
+                "target": { "type": "string", "description": "A system id, an island id, a vendor id or *. A data store with a database for each tenant takes store#tenant for Saturate, and a store whose fake.yaml lists parts takes store/part or store#tenant/part to saturate one part of the database." },
                 "kind": { "$ref": "#/$defs/kind" },
                 "intensity": { "type": "number", "minimum": 0, "maximum": 1, "default": 1 }
               }

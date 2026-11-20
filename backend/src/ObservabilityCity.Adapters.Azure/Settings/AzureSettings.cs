@@ -66,7 +66,7 @@ public sealed record EntityMetric(string Metric, string Aggregation);
 public sealed record EntityPattern(string Match, string Consumer);
 
 /// <summary>The metrics of the resources one rule of <c>scope.resources</c> finds, by signal (cpu, memory, utilisation, throttled, requests, and limit, the provisioned size shown as a number). <c>Interval</c> is the time grain they are asked at; none means the adapter's default (one minute). <c>Window</c> is how far back the entry looks; none means the source's own window.</summary>
-public sealed record MetricGroup(string Resources, string? Namespace, IReadOnlyDictionary<string, MetricSignal> Signals, TimeSpan? Interval = null, TimeSpan? Window = null)
+public sealed record MetricGroup(string Resources, string? Namespace, IReadOnlyDictionary<string, MetricSignal> Signals, TimeSpan? Interval = null, TimeSpan? Window = null, [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] PartsConfig? Parts = null)
 {
     /// <summary>The grains the metrics API offers. Which of them a metric supports depends on the metric: some allow a minute, some only five or more.</summary>
     public static readonly int[] IntervalMinutes = [1, 5, 15, 30, 60, 360, 720, 1440];
@@ -78,6 +78,12 @@ public sealed record MetricGroup(string Resources, string? Namespace, IReadOnlyD
     /// <summary>What a message broker's backlog and dead letters may use: those, and <c>last</c>, the newest point of the window (a count of what is there now, not the worst of the last minutes).</summary>
     public static readonly string[] BrokerLevelAggregations = [.. Aggregations, "last"];
 }
+
+/// <summary>
+/// How a resource is split into parts: <see cref="By"/> is the metric dimension that carries a piece's name, <see cref="Own"/> is the metric that has a value for a piece only when
+/// it has capacity of its own, and <see cref="Pool"/> is the name the cloud gives the shared pool in it (null when it names none). A piece with no value in <see cref="Own"/> is in the shared pool.
+/// </summary>
+public sealed record PartsConfig(string By, MetricSignal Own, string? Pool);
 
 /// <summary>
 /// Where one signal's number comes from: a metric, how its points are added up, an optional dimension filter, and how it becomes the fraction or rate the

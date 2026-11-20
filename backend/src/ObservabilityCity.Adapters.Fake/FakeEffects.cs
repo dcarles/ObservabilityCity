@@ -37,15 +37,30 @@ public enum FakeEffectKind
 
 /// <summary>
 /// A scenario effect layered on the baseline. Target is a node id, a group id (a whole island) or "*". A Saturate effect may add "#tenant" to
-/// hit one tenant's database only.
+/// hit one tenant's database only, and "/part" to hit one part of a database that has parts (see <c>parts</c> in fake.yaml): "ldg.ledger-db/audit-log" or
+/// "ldg.ledger-db#acme/audit-log".
 /// </summary>
 public sealed record FakeEffect(string Id, string Target, FakeEffectKind Kind, double Intensity)
 {
-    /// <summary>The node, group or "*" the effect is aimed at, without the tenant.</summary>
-    public string Scope => Target.Contains('#') ? Target[..Target.IndexOf('#')] : Target;
+    private int Cut => Target.IndexOfAny(['#', '/']);
+
+    /// <summary>The node, group or "*" the effect is aimed at, without the tenant and the part.</summary>
+    public string Scope => Cut < 0 ? Target : Target[..Cut];
 
     /// <summary>The one tenant it is aimed at, or null for all of them.</summary>
-    public string? Tenant => Target.Contains('#') ? Target[(Target.IndexOf('#') + 1)..] : null;
+    public string? Tenant
+    {
+        get
+        {
+            var at = Target.IndexOf('#');
+            if (at < 0) return null;
+            var end = Target.IndexOf('/', at);
+            return end < 0 ? Target[(at + 1)..] : Target[(at + 1)..end];
+        }
+    }
+
+    /// <summary>The one part of a database it is aimed at, or null for the whole database.</summary>
+    public string? Part => Target.IndexOf('/') is var at and >= 0 ? Target[(at + 1)..] : null;
 }
 
 /// <summary>How the app (the Break things panel and the story player) steers the generator.</summary>

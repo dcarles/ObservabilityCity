@@ -45,6 +45,22 @@ public class DatabaseEngineTests
     }
 
     [Fact]
+    public void An_engine_may_name_what_a_piece_of_its_databases_is_called_and_the_snapshot_carries_it()
+    {
+        using var f = new RegistryCopy(TestPaths.MiniTown);
+        f.Write("town.yaml", f.Read("town.yaml").TrimEnd() + "\ndatabaseEngines:\n  cosmos: { name: Cosmos DB, type: document, partLabel: container }\n  sqlserver: { name: SQL Server, type: relational }\n");
+        f.Replace("pillars/aa.yaml", "name: Orders DB, role: db", "name: Orders DB, role: db, engine: cosmos");
+
+        var registry = RegistryLoader.Load(f.Path);
+
+        Assert.Equal(new DatabaseEngine("cosmos", "Cosmos DB", "document", "container"), registry.EngineOf(registry.AllNodes.Single(n => n.Id == "aa.orders-db")));
+        Assert.Null(registry.DatabaseEngines.Single(e => e.Id == "sqlserver").PartLabel); // none given: the interface says "part"
+        var state = new ObservabilityCity.Core.Sources.LatestState();
+        var snapshot = new ObservabilityCity.Core.Snapshots.SnapshotBuilder(registry, state, TimeProvider.System).Build();
+        Assert.Equal("container", snapshot.Groups.SelectMany(g => g.Nodes).Single(n => n.Id == "aa.orders-db").Engine!.PartLabel);
+    }
+
+    [Fact]
     public void A_town_that_lists_no_engines_loads_as_before()
     {
         var registry = RegistryLoader.Load(TestPaths.MiniTown);

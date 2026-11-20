@@ -311,6 +311,29 @@
                       },
                       "limit": {
                         "$ref": "#/$defs/metricSignal"
+                      },
+                      "parts": {
+                        "type": "object",
+                        "required": [
+                          "by",
+                          "ownThroughput"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Splits each resource of this entry by the pieces of it that have capacity of their own (for Cosmos DB, the containers that have their own throughput next to the database's shared throughput). utilisation, throttled, requests and limit are then also read for each piece, so one throttling piece is named instead of looking like the whole database. Nothing is listed: the pieces come from the cloud. Leave it out and the resource is read as a whole.",
+                        "properties": {
+                          "by": {
+                            "type": "string",
+                            "description": "The metric dimension that carries a piece's name (for Cosmos DB, CollectionName)."
+                          },
+                          "ownThroughput": {
+                            "$ref": "#/$defs/entityMetric",
+                            "description": "A metric that has a value for a piece only when the piece has capacity of its own (for Cosmos DB, ProvisionedThroughput with maximum). A piece with no value there draws on the shared pool."
+                          },
+                          "pool": {
+                            "type": "string",
+                            "description": "The name the cloud gives the shared pool in that metric (for Cosmos DB, __Empty). Leave it out when the cloud names no such series."
+                          }
+                        }
                       }
                     }
                   }

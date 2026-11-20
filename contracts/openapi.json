@@ -530,6 +530,10 @@
           },
           "typeName": {
             "type": "string"
+          },
+          "partLabel": {
+            "type": "string",
+            "nullable": true
           }
         }
       },
@@ -1303,6 +1307,56 @@
           }
         }
       },
+      "PartKind": {
+        "enum": [
+          "Shared",
+          "Dedicated"
+        ],
+        "type": "string"
+      },
+      "PartSnapshot": {
+        "required": [
+          "name",
+          "kind",
+          "state",
+          "requestsPerSecond"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/PartKind"
+          },
+          "state": {
+            "$ref": "#/components/schemas/HealthState"
+          },
+          "utilisation": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "throttled": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "requestsPerSecond": {
+            "type": "number",
+            "format": "double"
+          },
+          "limit": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "idle": {
+            "type": "boolean",
+            "nullable": true
+          }
+        }
+      },
       "PillarFlowSnapshot": {
         "required": [
           "windowSeconds"
@@ -2019,6 +2073,13 @@
           },
           "idle": {
             "type": "boolean",
+            "nullable": true
+          },
+          "parts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PartSnapshot"
+            },
             "nullable": true
           }
         }

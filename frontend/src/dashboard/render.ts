@@ -2,7 +2,7 @@
 // overall verdict, and nothing about towns, islands or buildings.
 
 import { escapeHtml as esc } from '../picker'
-import type { Chip, Dashboard, Group, Issue, JobRow, Level, Pillar, Row, Section, SideRow, TenantRow } from './model'
+import type { Chip, Dashboard, Group, Issue, JobRow, Level, Pillar, PartRow, Row, Section, SideRow, TenantRow } from './model'
 import type { SourceLine } from './freshness'
 import { busiest, windowText, type Flow } from './flows'
 import { formatRate } from '../visuals'
@@ -112,11 +112,20 @@ const CPU_AMBER = 80
 const MEM_AMBER = 85
 const CAPACITY_AMBER = 85
 
-function tenantLine(t: TenantRow): string {
+/** A part of a tenant's database that is in trouble, under the tenant line: the shared pool or the piece by name, with its own capacity and throttling. */
+function partLine(p: PartRow, label: string): string {
+  const throttled = (p.throttled ?? 0) > 0
+  return `<tr class="sub part" data-part="${esc(p.name)}"><td class="ind3">${dot(p.level)}<span class="tn">${esc(p.name)}</span>${p.shared ? '' : `<span class="test">${esc(label)}</span>`}</td><td></td><td></td><td></td>
+    <td class="ld">${capacityRow(`${meter(p.ru, CAPACITY_AMBER)}${p.limit != null ? `<span class="mx">max ${num(p.limit)}</span>` : ''}`)}</td>
+    <td colspan="2">${throttled ? `<span class="thr">${num(p.throttled, 1)}% throttled</span>` : '<span class="dim">no throttling</span>'}</td></tr>`
+}
+
+function tenantLine(t: TenantRow, label: string): string {
   const throttled = (t.throttled ?? 0) > 0
+  const fine = t.partsFine > 0 && t.parts.length > 0 ? `<tr class="sub part"><td class="ind3"><span class="dim">${t.partsFine} other ${esc(label)}${t.partsFine === 1 ? '' : 's'} fine</span></td><td></td><td></td><td></td><td></td><td colspan="2"></td></tr>` : ''
   return `<tr class="sub" data-tenant="${esc(t.id)}"><td class="ind2">${dot(t.level)}<span class="tn">${esc(t.name)}</span>${t.test ? '<span class="test">test</span>' : ''}${t.unknown ? '<span class="test">unknown</span>' : ''}</td><td></td><td></td><td></td>
     <td class="ld">${capacityRow(`${meter(t.ru, CAPACITY_AMBER)}${t.limit != null ? `<span class="mx">max ${num(t.limit)}</span>` : ''}`)}</td>
-    <td colspan="2">${throttled ? `<span class="thr">${num(t.throttled, 1)}% throttled</span>` : '<span class="dim">no throttling</span>'}</td></tr>`
+    <td colspan="2">${throttled ? `<span class="thr">${num(t.throttled, 1)}% throttled</span>` : '<span class="dim">no throttling</span>'}</td></tr>${t.parts.map((p) => partLine(p, label)).join('')}${fine}`
 }
 
 function trafficCell(r: Row): string {
@@ -179,7 +188,7 @@ function rowHtml(r: Row, ui: UiState): string {
   const connRow = showConn && conn
     ? `<tr class="sub cxrow" data-system="${esc(r.id)}"><td></td><td colspan="6"><div class="cx"><div><span class="lbl">Called by</span>${chips(r.calledBy)}</div><div><span class="lbl">Calls</span>${chips(r.calls)}</div></div></td></tr>`
     : ''
-  return main + connRow + (tenants && open ? tenants.map(tenantLine).join('') : '') + jobLines(r.jobs, r.id)
+  return main + connRow + (tenants && open ? tenants.map((t) => tenantLine(t, r.partLabel)).join('') : '') + jobLines(r.jobs, r.id)
 }
 
 function groupHtml(g: Group, ui: UiState): string {

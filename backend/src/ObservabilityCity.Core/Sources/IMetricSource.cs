@@ -70,7 +70,16 @@ public sealed record JobReading(string Name, string? Region, DateTimeOffset? Las
 /// knows the tenant as (a tag on the database, say), so a tenant the environment does not list can still be shown by name. Limit is the capacity
 /// provisioned for the database as a plain number in the store's unit (request units per second), when the source is asked to read it.
 /// </summary>
-public sealed record TenantReading(string TenantId, double? Utilisation, double? Throttled, double RequestsPerSecond, string? Name = null, double? Limit = null, bool? Idle = null);
+public sealed record TenantReading(string TenantId, double? Utilisation, double? Throttled, double RequestsPerSecond, string? Name = null, double? Limit = null, bool? Idle = null,
+    IReadOnlyList<PartReading>? Parts = null);
+
+/// <summary>
+/// One piece of a database that has its own capacity to run out of, as a source reads it: the shared pool (Kind Shared, empty name) or one piece with capacity of
+/// its own (Kind Dedicated, named as the engine names it, for example a container). The numbers are the piece's own, not the database's: its share of its
+/// capacity in use, its share of requests turned away, its request rate and the capacity it has. A number the source cannot tell is null.
+/// A source that splits a database lists only the pieces it found; the database's own Utilisation and Throttled are then the worst of them.
+/// </summary>
+public sealed record PartReading(string Name, PartKind Kind, double? Utilisation, double? Throttled, double RequestsPerSecond, double? Limit = null, bool? Idle = null);
 
 /// <summary>
 /// One data source behind the town. The renderer never knows which one produced a number.

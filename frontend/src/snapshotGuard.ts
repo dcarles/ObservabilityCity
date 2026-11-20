@@ -4,7 +4,7 @@
 
 import { KNOWN_SIGNALS } from './signals'
 import { DEFAULT_RING_CAPACITY, MAX_RING_CAPACITY, MIN_RING_CAPACITY, maxPillars } from './scene/layout'
-import type { AssetSnapshot, DependencySnapshot, EnvironmentInfo, OffscreenLink, ViewInfo, ExternalCallerSnapshot, GroupSnapshot, IncidentSnapshot, MessagingSnapshot, NodeSnapshot, Snapshot, TenantInfo, TenantUnitSnapshot, VendorSnapshot } from './types'
+import type { AssetSnapshot, DependencySnapshot, EnvironmentInfo, OffscreenLink, ViewInfo, ExternalCallerSnapshot, GroupSnapshot, IncidentSnapshot, MessagingSnapshot, NodeSnapshot, PartSnapshot, Snapshot, TenantInfo, TenantUnitSnapshot, VendorSnapshot } from './types'
 
 const KINDS = ['Api', 'Worker', 'Database', 'Cache', 'Function', 'Gateway', 'Broker', 'Egress']
 const STATES = ['Healthy', 'Degraded', 'Down', 'Stale']
@@ -299,7 +299,7 @@ function checkNode(n: unknown, groupId: string, ids: Set<string>, problems: stri
   out.serviceCode = typeof n.serviceCode === 'string' && n.serviceCode !== '' ? n.serviceCode : null
   // what a database runs on; an older server, or a database that names none, has null, and a half-filled one cannot be shown
   out.engine = isObject(n.engine) && ['id', 'name', 'type', 'typeName'].every((k) => typeof (n.engine as Record<string, unknown>)[k] === 'string' && (n.engine as Record<string, unknown>)[k] !== '')
-    ? { id: n.engine.id, name: n.engine.name, type: n.engine.type, typeName: n.engine.typeName }
+    ? { id: n.engine.id, name: n.engine.name, type: n.engine.type, typeName: n.engine.typeName, partLabel: typeof n.engine.partLabel === 'string' && n.engine.partLabel !== '' ? n.engine.partLabel : null }
     : null
   // null: nothing says whether the app runs; a job or region list is only there for a function or a service in two regions
   out.app = APP_STATES.includes(n.app as string) ? n.app : null
@@ -361,6 +361,26 @@ function checkUnits(list: unknown[], nodeId: string, problems: string[]): Tenant
       requestsPerSecond: isFiniteNumber(u.requestsPerSecond) ? u.requestsPerSecond : 0,
       limit: isFiniteNumber(u.limit) && u.limit > 0 ? u.limit : null,
       ...(u.idle === true ? { idle: true } : {}),
+      ...(Array.isArray(u.parts) && u.parts.length > 0 ? { parts: checkParts(u.parts) } : {}),
+    })
+  }
+  return out
+}
+
+/** The parts of a database: one with an unknown kind or state is kept but never shown as healthy. */
+function checkParts(list: unknown[]): PartSnapshot[] {
+  const out: PartSnapshot[] = []
+  for (const p of list) {
+    if (!isObject(p)) continue
+    out.push({
+      name: str(p.name),
+      kind: p.kind === 'Dedicated' ? 'Dedicated' : 'Shared',
+      state: STATES.includes(p.state as string) ? (p.state as PartSnapshot['state']) : 'Stale',
+      utilisation: isFiniteNumber(p.utilisation) ? p.utilisation : null,
+      throttled: isFiniteNumber(p.throttled) ? p.throttled : null,
+      requestsPerSecond: isFiniteNumber(p.requestsPerSecond) ? p.requestsPerSecond : 0,
+      limit: isFiniteNumber(p.limit) && p.limit > 0 ? p.limit : null,
+      ...(p.idle === true ? { idle: true } : {}),
     })
   }
   return out

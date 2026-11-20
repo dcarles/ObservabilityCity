@@ -36,13 +36,13 @@ public static partial class RegistryLoader
     // Every key a registry file may use, for suggesting the right one when a key is misspelt.
     private static readonly string[] KnownKeys =
     [
-        "id", "name", "groupLabel", "topology", "expectedWarnings", "ringCapacity", "databaseEngines", "engine", "type", "rule", "file", "pillar", "displayName", "color", "external", "defaults", "systems", "resources",
+        "id", "name", "groupLabel", "topology", "expectedWarnings", "ringCapacity", "databaseEngines", "partLabel", "engine", "type", "rule", "file", "pillar", "displayName", "color", "external", "defaults", "systems", "resources",
         "externalCallers", "islands", "role", "service", "slaP99Ms", "errors", "resources", "throttle", "backlog", "calls", "aliases",
         "amber", "red", "vendors", "calledBy", "gatewayCalls", "messaging", "topics", "subscriptions", "topic", "consumer",
         "tenantPattern", "order", "default", "sources", "kind", "connection", "tenants", "exclude", "environments", "fake", "undeclaredTenants",
         "signals", "credentials", "credential", "pollSeconds", "timeoutSeconds", "lateAfterSeconds", "tenantId", "clientId", "clientSecretEnv",
         "scope", "inventory", "telemetryStore", "telemetryStoreId", "workspace", "workspaceId", "variables", "account", "subscription", "groupAccounts", "pillarAccounts", "pillars", "accounts", "telemetryStores", "workspaces", "assets", "cloud", "island", "group", "label", "shape", "instances", "types", "pattern", "roles", "serviceTag", "tenantNameTag",
-        "telemetryRole", "queries", "links", "url", "nameLike", "tag", "key", "value", "code", "serviceCode", "telemetry", "minCalls", "query", "window", "discoverLinks", "regions", "tag", "names", "skew", "state", "running", "minDays", "keepFor", "firstRead", "interval", "ignoreHosts", "rules", "host", "path", "target", "gateway", "domains", "services", "internal", "match", "traffic", "shareWindow", "logs", "section", "resources",
+        "parts", "by", "ownThroughput", "pool", "telemetryRole", "queries", "links", "url", "nameLike", "tag", "key", "value", "code", "serviceCode", "telemetry", "minCalls", "query", "window", "discoverLinks", "regions", "tag", "names", "skew", "state", "running", "minDays", "keepFor", "firstRead", "interval", "ignoreHosts", "rules", "host", "path", "target", "gateway", "domains", "services", "internal", "match", "traffic", "shareWindow", "logs", "section", "resources",
     ];
 
     // Last resort when defaults.yaml is missing or silent about a role.
