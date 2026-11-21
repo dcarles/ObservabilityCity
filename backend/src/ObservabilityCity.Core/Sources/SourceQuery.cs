@@ -43,6 +43,17 @@ public static class SourceQuery
         return $"{s}s";
     }
 
+    /// <summary>
+    /// A rendered query moved to a past time: <c>ago(x)</c> becomes <c>(datetime(at) - (x))</c> and <c>now()</c> becomes <c>datetime(at)</c>, so a query written for "the last window"
+    /// reads the window that ended at <paramref name="at"/>. Only those two ways of saying "now" are known; a query with another (a hard-coded time, or a time taken from a table) is read as written.
+    /// </summary>
+    public static string AtPast(string rendered, DateTimeOffset at)
+    {
+        var moment = $"datetime({at.UtcDateTime:yyyy-MM-dd'T'HH:mm:ss'Z'})";
+        var moved = System.Text.RegularExpressions.Regex.Replace(rendered, @"\bago\s*\(([^()]*)\)", m => $"({moment} - ({m.Groups[1].Value}))", System.Text.RegularExpressions.RegexOptions.IgnoreCase, TimeSpan.FromSeconds(1));
+        return System.Text.RegularExpressions.Regex.Replace(moved, @"\bnow\s*\(\s*\)", moment, System.Text.RegularExpressions.RegexOptions.IgnoreCase, TimeSpan.FromSeconds(1));
+    }
+
     public static TimeSpan WindowOf(RegistrySource source) =>
         TryParseWindow(source.Window ?? DefaultWindow, out var window) ? window : throw new InvalidOperationException($"the window '{source.Window}' is not a number and a unit like 5m");
 
