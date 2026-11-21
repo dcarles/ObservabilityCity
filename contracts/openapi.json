@@ -360,6 +360,35 @@
           }
         }
       }
+    },
+    "/api/history/range": {
+      "get": {
+        "tags": [
+          "ObservabilityCity.Host"
+        ],
+        "operationId": "GetHistoryRange",
+        "parameters": [
+          {
+            "name": "env",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HistoryRange"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -782,6 +811,76 @@
           },
           "vendor": {
             "type": "boolean"
+          }
+        }
+      },
+      "HistoryPointSnapshot": {
+        "required": [
+          "at",
+          "unhealthy",
+          "down"
+        ],
+        "type": "object",
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "unhealthy": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "down": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "HistoryRange": {
+        "required": [
+          "enabled",
+          "days",
+          "intervalSeconds",
+          "frames",
+          "bytes",
+          "points"
+        ],
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "days": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "intervalSeconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "oldest": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "newest": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "frames": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "bytes": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "points": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HistoryPointSnapshot"
+            }
           }
         }
       },

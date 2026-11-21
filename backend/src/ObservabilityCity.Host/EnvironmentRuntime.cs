@@ -1,5 +1,6 @@
 using ObservabilityCity.Adapters.Fake;
 using ObservabilityCity.Contracts;
+using ObservabilityCity.Core.History;
 using ObservabilityCity.Core.Links;
 using ObservabilityCity.Core.Registry;
 using ObservabilityCity.Core.Scope;
@@ -39,6 +40,8 @@ public sealed class EnvironmentRuntime(string townId, string id, EnvironmentRegi
     public ObservabilityCity.Core.Sources.Demand Demand { get; } = new();
     /// <summary>The demand the background work waits on: null (never waits) in a demo environment.</summary>
     public ObservabilityCity.Core.Sources.Demand? Gate => Fake is null ? Demand : null;
+    /// <summary>The frames this environment has recorded; null in a demo town and when history is switched off.</summary>
+    public FileHistoryStore? History { get; init; }
 }
 
 /// <summary>

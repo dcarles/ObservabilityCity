@@ -102,10 +102,17 @@ body.wall #more-menu, body.dash #more-menu { display: none !important; }
 #topbar.fit-4 { gap: 6px 4px; }
 #topbar.fit-4 #view-bar { gap: 4px; }
 #topbar.fit-4 #view-bar .vb-btn { padding: 6px 7px; }
-#topbar.fit-4 #tools { gap: 3px; }
+#topbar.fit-4 #tools { gap: 2px; }
+#topbar.fit-4 #history-button { padding: 4px 3px; }
 #topbar.fit-4 button { padding: 4px 5px; }
 #topbar.fit-4 .chip { padding: 2px 3px; }
 #topbar.fit-4 #search { min-width: 80px; }
+/* fifth: the town's messages a second go, and what is left is drawn tighter still before the dead-letter count has to go */
+#topbar.fit-5 { gap: 4px 3px; }
+#topbar.fit-5 #view-bar .vb-btn { padding: 6px 4px; }
+#topbar.fit-5 #tools { gap: 0; }
+#topbar.fit-5 button { padding: 4px 3px; }
+#topbar.fit-5 #search { min-width: 60px; }
 .chip { white-space: nowrap; }
 .status { white-space: nowrap; }
 .chip.stale b { color: #8d949e; }

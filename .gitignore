@@ -11,5 +11,7 @@ secrets.json
 themes-private/
 # What link discovery found in a running town (the fixture towns under shared-test-data keep theirs on purpose)
 config/**/_discovered/
+# What the history recorder saved for a running town (frames, one gzip file for each hour)
+**/_history/
 frontend/test-results/
 frontend/playwright-report/
