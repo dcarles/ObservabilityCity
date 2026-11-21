@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url'
 //   npm run e2e:ui       the top bar, island filter, layers, inspector drawer, legend and Day/Dusk, on the small town
 //   npm run e2e:direct   how a filtered island's traffic is shown in a town without a hub (signposts), on a small town with direct topology
 //   npm run e2e:live     a live town (no mode in town.yaml): no Break things panel, no story bar, no /api/fake, "Live" in the top bar
+//   npm run e2e:history  a live town that records frames every 10 seconds: the time bar, the strip, travelling to a recorded moment, playing back to live, no data, links
 //   npm run e2e:sources  a live town whose environment configures some signals and not others: absent signals are not shown, silent ones are grey
 //   npm run e2e:scope    two live towns with opposite scope conventions (names; tags): the inspector says where each system lives, from a recorded inventory
 //   npm run e2e:functions two live towns with opposite conventions (names; tags) whose functions have an app state and scheduled jobs, and whose services run in two regions
@@ -34,6 +35,7 @@ const registries: Record<string, string> = {
   ui: 'shared-test-data/registries/mini-town',
   direct: 'shared-test-data/registries/direct-town',
   live: 'shared-test-data/registries/live-town',
+  history: 'shared-test-data/registries/live-town',
   sources: 'shared-test-data/registries/live-sources-town',
   tenants: 'shared-test-data/registries/tenants-town',
   dashboard: 'shared-test-data/registries/tenants-town',
@@ -60,7 +62,7 @@ const fixture = registries[suite] ? resolve(repo, registries[suite]) : ''
 
 // The scenario tests edit registry files to check reloading, so they run against a copy. The main process makes the copy and
 // passes its path down in the environment, which the workers inherit, so there is only ever one.
-if (['scenarios', 'links', 'tenants', 'dashboard', 'ui', 'direct', 'live', 'sources', 'discovery', 'scope', 'scopeb', 'health', 'healthb', 'functions', 'functionsb', 'messaging', 'messagingb', 'routes', 'freetopics', 'multihub'].includes(suite) && !process.env.E2E_REGISTRY_COPY) {
+if (['scenarios', 'links', 'tenants', 'dashboard', 'ui', 'direct', 'live', 'history', 'sources', 'discovery', 'scope', 'scopeb', 'health', 'healthb', 'functions', 'functionsb', 'messaging', 'messagingb', 'routes', 'freetopics', 'multihub'].includes(suite) && !process.env.E2E_REGISTRY_COPY) {
   const copy = mkdtempSync(join(tmpdir(), 'oc-e2e-registry-'))
   cpSync(fixture, copy, { recursive: true })
   process.env.E2E_REGISTRY_COPY = copy
@@ -79,7 +81,7 @@ export default defineConfig({
   workers: 1,
   fullyParallel: false,
   retries: process.env.CI ? 1 : 0,
-  timeout: ['scenarios', 'links', 'tenants', 'dashboard', 'ui', 'direct', 'live', 'sources', 'scope', 'scopeb', 'health', 'healthb', 'functions', 'functionsb', 'messaging', 'messagingb', 'routes', 'freetopics', 'multihub', 'towns', 'wide'].includes(suite) ? 60_000 : 240_000,
+  timeout: ['scenarios', 'links', 'tenants', 'dashboard', 'ui', 'direct', 'live', 'history', 'sources', 'scope', 'scopeb', 'health', 'healthb', 'functions', 'functionsb', 'messaging', 'messagingb', 'routes', 'freetopics', 'multihub', 'towns', 'wide'].includes(suite) ? 60_000 : 240_000,
   expect: { timeout: 10_000 },
   reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
   outputDir: 'test-results',
@@ -113,6 +115,8 @@ export default defineConfig({
         Registry__WatchSeconds: '1',
         // tests that ask the server's API directly have no browser looking: keep every environment reading
         Polling__AlwaysOn: 'true',
+        // the shortest gap history allows, so the history suite has frames to travel to within half a minute
+        History__IntervalSeconds: '10',
       },
     },
     {

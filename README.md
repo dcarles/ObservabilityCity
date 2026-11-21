@@ -354,6 +354,10 @@ The sample town has 17 islands, about 110 buildings and up to 420 cars. Roads, l
 | `Adapters:Path` | `adapters/` beside the program | The folder the adapter modules are loaded from |
 | `Fake:DayLengthSeconds` | `120` | Real seconds per simulated day |
 | `Polling:AlwaysOn` | `false` | A live environment reads its sources only while a browser looks at it (and 2 minutes after). `true` keeps every environment polling all the time |
+| `History:Enabled` | `true` | A live town saves its snapshots so the town can be taken back in time (the History button). A demo town never does. `false` turns it off |
+| `History:Days` | `7` | How many days back the town can go, and how long frames are kept (1 to 14) |
+| `History:IntervalSeconds` | `300` | The gap between two saved frames, on the clock (10:00, 10:05, ...). At least 10 |
+| `History:Path` | the town's own folder, in `_history/` | Where frames are kept: one folder for each town under this path. Never commit it (`_history/` is in `.gitignore`) |
 | `Snapshot:IntervalSeconds` | `2` | How often a snapshot is built (the newest is always at `/api/snapshot/latest`) |
 | `Snapshot:KeepAliveSeconds` | `15` | Viewers are sent a snapshot when something in it changed, and at least this often so the feed shows it is alive. `0` sends every build |
 | `Snapshot:StaleAfterSeconds` | `30` | Readings older than this are shown as stale |
