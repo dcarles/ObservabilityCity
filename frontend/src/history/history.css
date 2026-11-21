@@ -52,3 +52,9 @@ body.history::after { content: ''; position: fixed; inset: 0; pointer-events: no
 @keyframes history-spin { to { transform: rotate(-360deg); } }
 @keyframes history-bob { 50% { transform: translateY(-6px); } }
 @media (prefers-reduced-motion: reduce) { #history-travel .streaks i, #history-travel .capsule, #history-travel .hands { animation: none; } }
+
+/* the picture on screen was worked out afterwards from the cloud, not recorded */
+#history-rebuilt { position: fixed; z-index: 14; top: 58px; left: 50%; transform: translateX(-50%); padding: 3px 10px; border-radius: 999px; font-size: 12px; background: rgba(40, 60, 110, 0.85); color: #dbe8ff; border: 1px solid #8fb2ff; pointer-events: auto; }
+#history-nodata.filling { border-color: #8fb2ff; }
+#history-strip-svg .rebuilt { fill: rgba(143, 178, 255, 0.28); stroke: none; pointer-events: none; }
+#history-strip-svg .gap.fillable { opacity: 0.55; }

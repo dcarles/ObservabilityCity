@@ -607,13 +607,16 @@ public sealed record LogSection(string Id, IReadOnlyList<LogGroup> Groups, IRead
 public sealed record LogGroup(DateTimeOffset At, LogLevel? Level, string Text, int Count, double? DurationMs, string? Result);
 
 /// <summary>One recorded frame in the day index: when it was taken, how many systems were not healthy (degraded and down together, dead letters not counted) and how many of those were down.</summary>
-public sealed record HistoryPointSnapshot(DateTimeOffset At, int Unhealthy, int Down);
+public sealed record HistoryPointSnapshot(DateTimeOffset At, int Unhealthy, int Down, bool Rebuilt = false);
 
 /// <summary>
 /// What the history of one environment holds. Enabled is false for a demo town and when history is switched off; then nothing else is filled. Days is how far back the town can
 /// go, IntervalSeconds the gap between frames, Oldest and Newest the first and last frame, Frames how many there are and Bytes what they take on disk. Points lists every frame
 /// from the start of the limit, for the time bar's strip.
 /// </summary>
+/// <summary>Where the filling of the history's gaps from the cloud stands: whether the environment can fill at all, whether it is working now, how many hours are done of how many, and the hour in hand.</summary>
+public sealed record HistoryFill(bool Available, bool Running, int Done, int Total, DateTimeOffset? Hour, string? Problem);
+
 public sealed record HistoryRange(
     bool Enabled,
     int Days,

@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Time.Testing;
+using ObservabilityCity.AdapterKit;
 using ObservabilityCity.Adapters.Azure;
 using ObservabilityCity.Contracts;
 using ObservabilityCity.Core.Registry;
@@ -32,6 +33,30 @@ public class FunctionBuildingTests
         var state = new LatestState();
         foreach (var source in set.Sources) state.Update(source.Name, await source.PollAsync(registry, CancellationToken.None));
         return new SnapshotBuilder(change?.Invoke(registry) ?? registry, state, new FakeTimeProvider(T0)) { Environment = "prod" }.Build();
+    }
+
+    [Fact]
+    public async Task A_past_frame_asks_for_the_jobs_as_of_that_time()
+    {
+        var registry = Prod(TownA);
+        var env = registry.ActiveEnvironment!;
+        var set = new AdapterCatalog([new AzureAdapters()]).Build(env, TownA);
+        await set.Sources.Single(s => s.Name == "inventory").PollAsync(registry, CancellationToken.None);
+        var http = CannedHttp.Always(File.ReadAllText(Path.Combine(TownA, "jobs.json")));
+        var definition = env.Sources.Single(s => s.Name == "jobs") with { Connection = "00000000-0000-0000-0000-00000000c0de", Query = "FunctionAppLogs | where TimeGenerated > ago({window}) | summarize by x" };
+        var source = (FunctionJobsSource)new FunctionJobsSourceFactory(new HttpClient(http), new FakeTimeProvider(T0)).Create(new SourceContext("prod", definition, null, env.Scope, set.Scope, TownA));
+        var at = DateTimeOffset.Parse("2025-12-30T09:05:00Z");
+
+        var readings = await source.PollAtAsync(registry, at, CancellationToken.None);
+
+        var sent = Assert.Single(http.Sent);
+        var window = source.Window;
+        Assert.Equal($"{(at - window):yyyy-MM-dd'T'HH:mm:ss'Z'}/2025-12-30T09:05:00Z", sent.Json.GetProperty("timespan").GetString());
+        var query = sent.Json.GetProperty("query").GetString()!;
+        Assert.DoesNotContain("ago(", query);
+        Assert.Contains("datetime(2025-12-30T09:05:00Z)", query);
+        Assert.Equal(at, readings["aa.sched-fn"].At);
+        Assert.NotEmpty(readings["aa.sched-fn"].Jobs!);
     }
 
     // ---- the function building, whatever the conventions ----

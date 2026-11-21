@@ -42,6 +42,12 @@ public sealed class EnvironmentRuntime(string townId, string id, EnvironmentRegi
     public ObservabilityCity.Core.Sources.Demand? Gate => Fake is null ? Demand : null;
     /// <summary>The frames this environment has recorded; null in a demo town and when history is switched off.</summary>
     public FileHistoryStore? History { get; init; }
+    /// <summary>The frames rebuilt from the cloud for the times nothing was recorded; null where history is off. Read together with <see cref="History"/> through <see cref="HistoryView"/>.</summary>
+    public FileHistoryStore? RebuiltHistory { get; init; }
+    /// <summary>The recorded and rebuilt frames together; null where history is off.</summary>
+    /// <summary>Fills the gaps of the history from the cloud while somebody looks at this environment; null where history is off or nothing here can read the past.</summary>
+    public ObservabilityCity.Core.History.HistoryFiller? Filler { get; set; }
+    public ObservabilityCity.Core.History.HistoryReader? HistoryView => History is null ? null : new(History, RebuiltHistory);
 }
 
 /// <summary>

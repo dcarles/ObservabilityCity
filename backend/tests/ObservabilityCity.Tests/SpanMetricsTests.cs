@@ -248,6 +248,31 @@ public class SpanMetricsTests
     private static string Recorded(string folder) => File.ReadAllText(Path.Combine(folder, "telemetry.json"));
 
     [Fact]
+    public async Task A_past_frame_asks_the_same_query_moved_to_that_time_over_the_window_that_ended_then()
+    {
+        var (source, http) = Asking(TownA, Recorded(TownA));
+        var at = DateTimeOffset.Parse("2025-12-30T09:05:00Z");
+
+        var readings = await source.PollAtAsync(RegistryLoader.Load(TownA), at, CancellationToken.None);
+
+        var sent = Assert.Single(http.Sent);
+        Assert.Equal("2025-12-30T09:00:00Z/2025-12-30T09:05:00Z", sent.Json.GetProperty("timespan").GetString());
+        var query = sent.Json.GetProperty("query").GetString()!;
+        Assert.DoesNotContain("ago(", query);
+        Assert.Contains("(datetime(2025-12-30T09:05:00Z) - (5m))", query);
+        Assert.Equal(10, readings["aa.orders-api"].RequestsPerSecond);
+        Assert.Equal(at, readings["aa.orders-api"].At);
+    }
+
+    [Theory]
+    [InlineData("T | where TimeGenerated > ago(5m)", "T | where TimeGenerated > (datetime(2025-12-30T09:05:00Z) - (5m))")]
+    [InlineData("T | where TimeGenerated between (ago(1h) .. now())", "T | where TimeGenerated between ((datetime(2025-12-30T09:05:00Z) - (1h)) .. datetime(2025-12-30T09:05:00Z))")]
+    [InlineData("T | where Name == \"ago\" and TimeGenerated > ago( 300s )", "T | where Name == \"ago\" and TimeGenerated > (datetime(2025-12-30T09:05:00Z) - ( 300s ))")]
+    [InlineData("T | where TimeGenerated > datetime(2025-01-01)", "T | where TimeGenerated > datetime(2025-01-01)")]
+    public void A_query_is_moved_to_a_past_time_by_its_ago_and_now(string query, string expected) =>
+        Assert.Equal(expected, SourceQuery.AtPast(query, DateTimeOffset.Parse("2025-12-30T09:05:00Z")));
+
+    [Fact]
     public async Task Town_A_sends_its_own_query_with_the_window_and_every_telemetry_name_filled_in()
     {
         var (source, http) = Asking(TownA, Recorded(TownA));

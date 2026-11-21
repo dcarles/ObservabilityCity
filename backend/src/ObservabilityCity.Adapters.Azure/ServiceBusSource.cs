@@ -19,7 +19,7 @@ namespace ObservabilityCity.Adapters.Azure;
 /// <c>file:name.json</c> replays recorded series (<c>{ "&lt;namespace name&gt;": [ { "entity", "metric", "aggregation", "points": [...] } ] }</c>).
 /// </summary>
 public sealed class ServiceBusSource(
-    string name, string environmentId, RegistrySource definition, AzureMonitorReader reader, ScopeStore store, string? recording, TimeProvider time, LogAnalyticsReader? logs = null, ScopeRules? rules = null) : IMetricSource
+    string name, string environmentId, RegistrySource definition, AzureMonitorReader reader, ScopeStore store, string? recording, TimeProvider time, LogAnalyticsReader? logs = null, ScopeRules? rules = null) : IPastMetricSource, IMetricSource
 {
     public string Name => name;
     public TimeSpan PollInterval => definition.PollInterval;
@@ -33,7 +33,19 @@ public sealed class ServiceBusSource(
     /// <summary>How many entities the last poll found that no pattern claimed or no system consumes. They are left out; this is for the log and for tests.</summary>
     public int Unclaimed { get; private set; }
 
-    public async Task<IReadOnlyDictionary<string, NodeReading>> PollAsync(TownRegistry registry, CancellationToken ct)
+    public Task<IReadOnlyDictionary<string, NodeReading>> PollAsync(TownRegistry registry, CancellationToken ct) => PollCore(registry, time.GetUtcNow(), false, ct);
+
+    public bool CanReadPast => recording is null;
+
+    /// <summary>
+    /// The broker's numbers as they were at a past time. Each namespace's day is read in one call and kept, so every frame of that day costs nothing more. The
+    /// kinds of message of each queue are not rebuilt (the types query has no past form yet); a rebuilt queue lists none.
+    /// </summary>
+    public Task<IReadOnlyDictionary<string, NodeReading>> PollAtAsync(TownRegistry registry, DateTimeOffset at, CancellationToken ct) => PollCore(registry, at, true, ct);
+
+    private readonly Dictionary<(string Namespace, DateTimeOffset Day), Task<IReadOnlyList<EntitySeries>>> _days = [];
+
+    private async Task<IReadOnlyDictionary<string, NodeReading>> PollCore(TownRegistry registry, DateTimeOffset at, bool bulk, CancellationToken ct)
     {
         var config = _settings.Entities!;
         var view = registry.ForEnvironment(environmentId);
@@ -42,7 +54,6 @@ public sealed class ServiceBusSource(
         var namespaces = resolution.Systems.SelectMany(s => s.Resources).Where(r => r.Rule == config.Resources).DistinctBy(r => r.Id).ToList();
         if (namespaces.Count == 0) return new Dictionary<string, NodeReading>();
 
-        var at = time.GetUtcNow();
         var recorded = recording is null ? null : ReadRecording(await File.ReadAllTextAsync(recording, ct));
         var errors = new List<string>();
         var read = new List<EntitySeries>();
@@ -52,7 +63,7 @@ public sealed class ServiceBusSource(
             await gate.WaitAsync(ct);
             try
             {
-                var series = recorded is not null ? recorded.GetValueOrDefault(ns.Name) ?? [] : await ReadNamespace(config, ns, at, ct);
+                var series = recorded is not null ? recorded.GetValueOrDefault(ns.Name) ?? [] : bulk ? await ReadNamespaceDay(config, ns, at, ct) : await ReadNamespace(config, ns, at, ct, Window);
                 lock (read) read.AddRange(series.Select(s => s with { Region = ns.Region, NamespaceId = ns.Id }));
             }
             catch (Exception e) when (e is not OperationCanceledException || !ct.IsCancellationRequested) { lock (errors) errors.Add(e.Message); }
@@ -81,7 +92,7 @@ public sealed class ServiceBusSource(
             if (claim is null) { unclaimed++; continue; }
             _seen[entity] = claim;
         }
-        var types = _settings.TypesQuery is { } typesQuery ? TypesByQueue(await ReadTypes(typesQuery, resolution, ct), Window) : null;
+        var types = !bulk && _settings.TypesQuery is { } typesQuery ? TypesByQueue(await ReadTypes(typesQuery, resolution, ct), Window) : null;
         foreach (var (entity, claim) in _seen.OrderBy(kv => kv.Key, StringComparer.Ordinal))
         {
             var node = claim.Node;
@@ -217,7 +228,25 @@ public sealed class ServiceBusSource(
 
     private static bool Is(RegistryGroup g, string pillar) => pillar.Equals(g.Code ?? g.Id, StringComparison.OrdinalIgnoreCase) || pillar.Equals(g.Id, StringComparison.OrdinalIgnoreCase);
 
-    private async Task<IReadOnlyList<EntitySeries>> ReadNamespace(EntitiesConfig config, ResolvedResource ns, DateTimeOffset at, CancellationToken ct)
+    /// <summary>The entities' series for the window ending at <paramref name="at"/>, cut out of the namespace's one read of that UTC day (from the window before its first frame to its end).</summary>
+    private async Task<IReadOnlyList<EntitySeries>> ReadNamespaceDay(EntitiesConfig config, ResolvedResource ns, DateTimeOffset at, CancellationToken ct)
+    {
+        var day = AzureMonitorSource.MetricDay(at.AddTicks(-1));
+        Task<IReadOnlyList<EntitySeries>> read;
+        lock (_days)
+        {
+            if (!_days.TryGetValue((ns.Id, day), out read!)) _days[(ns.Id, day)] = read = ReadNamespace(config, ns, day.AddDays(1), ct, TimeSpan.FromDays(1) + Window);
+        }
+        var from = at - Window;
+        return (await read).Select(s =>
+        {
+            if (s.Times is null || s.Times.Count != s.Points.Count || s.Times.Any(t => t == DateTimeOffset.MinValue)) return s;
+            var keep = Enumerable.Range(0, s.Points.Count).Where(i => s.Times[i] >= from && s.Times[i] < at).ToList();
+            return s with { Points = keep.Select(i => s.Points[i]).ToList(), Times = keep.Select(i => s.Times[i]).ToList() };
+        }).ToList();
+    }
+
+    private async Task<IReadOnlyList<EntitySeries>> ReadNamespace(EntitiesConfig config, ResolvedResource ns, DateTimeOffset at, CancellationToken ct, TimeSpan window)
     {
         var all = new List<EntitySeries>();
         foreach (var group in new[] { config.Backlog, config.DeadLetter, config.Throughput }.Where(m => m is not null).GroupBy(m => m!.Aggregation))
@@ -225,7 +254,7 @@ public sealed class ServiceBusSource(
             // Azure Monitor has no "last": it is asked for the maximum of each grain, and the newest grain's point is the one the entity reads
             var asked = group.Key.Equals("last", StringComparison.OrdinalIgnoreCase) ? "maximum" : group.Key;
             var call = new MetricCall(null, asked, null, config.Interval is { } i ? AzureMonitorReader.Iso(i) : AzureMonitorReader.Interval);
-            var read = await reader.ReadByDimensionAsync(ns.Id, call, group.Select(m => m!.Metric).Distinct(StringComparer.OrdinalIgnoreCase).ToList(), config.Dimension, at, Window, ct);
+            var read = await reader.ReadByDimensionAsync(ns.Id, call, group.Select(m => m!.Metric).Distinct(StringComparer.OrdinalIgnoreCase).ToList(), config.Dimension, at, window, ct);
             all.AddRange(asked == group.Key ? read : read.Select(r => r with { Aggregation = group.Key }));
         }
         return all;

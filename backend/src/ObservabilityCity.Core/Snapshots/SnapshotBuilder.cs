@@ -71,6 +71,17 @@ public sealed partial class SnapshotBuilder(IRegistryProvider registries, Latest
     public IReadOnlyList<IHealthEventSource> HealthSources { get; init; } = [];
 
     /// <summary>
+    /// The same builder, with the same settings, for another set of readings, another clock and (when given) other health reports. It is how a past time is built: readings from that time, a clock
+    /// standing still at it so they are fresh, and the reports open then.
+    /// </summary>
+    public SnapshotBuilder For(LatestState otherState, TimeProvider otherClock, IReadOnlyList<IHealthEventSource>? health = null, Func<double>? dayFraction = null) =>
+        new(registries, otherState, otherClock)
+        {
+            StaleAfter = StaleAfter, SourceIntervals = SourceIntervals, SourceLateAfter = SourceLateAfter, Environment = Environment, ScopeSource = ScopeSource, FixedAssets = FixedAssets,
+            Traffic = Traffic, Mode = Mode, DayFraction = dayFraction ?? DayFraction, IncidentSources = [], HealthSources = health ?? HealthSources,
+        };
+
+    /// <summary>
     /// The whole town, or with <paramref name="islands"/> only those islands (and always the hub). What is left out is left out of everything: the
     /// totals count only what is on screen, and a third party shows only while one of the islands that call it does. The traffic that crosses the edge
     /// is listed in <see cref="Snapshot.View"/>, so the renderer can show where it goes. Ids the town does not have are ignored and reported.

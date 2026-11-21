@@ -163,4 +163,48 @@ test.describe('time travel on a live town', () => {
     await page.waitForFunction(() => (window as unknown as Win).dash?.seen.snapshots > 0)
     await expect(page.locator('#history-button')).toBeVisible()
   })
+
+  // ---- frames rebuilt from the cloud. This town's sources replay recordings and cannot rebuild, so the server's answers are changed on the way to the page.
+
+  async function realFrame(request: import('@playwright/test').APIRequestContext): Promise<{ at: string; snapshot: unknown }> {
+    const range = await (await request.get(`${API}/api/history/range`)).json() as { newest: string }
+    return (await (await request.get(`${API}/api/history/frame?at=${encodeURIComponent(range.newest)}`)).json()) as { at: string; snapshot: unknown }
+  }
+
+  test('a rebuilt frame says so: the badge, the word on the button and a mark on the strip', async ({ page, request }) => {
+    await waitForFrames(request, 3)
+    const frame = { ...(await realFrame(request)), at: new Date(Date.now() - 16_000).toISOString() }
+    await page.route('**/api/history/range*', async (route) => {
+      const body = await (await route.fetch()).json()
+      body.points = body.points.map((p: { at: string }) => ({ ...p, rebuilt: true }))
+      await route.fulfill({ json: body })
+    })
+    await page.route('**/api/history/frame?*', (route) => route.fulfill({ json: { ...frame, rebuilt: true } }))
+    await openTown(page)
+
+    await page.evaluate((at) => (window as unknown as Win).city.history.goTo(Date.parse(at) + 1_000, { paused: true }), frame.at)
+    await expect(page.locator('#history-travel')).toBeHidden({ timeout: 15_000 })
+
+    await expect(page.locator('#history-rebuilt')).toBeVisible()
+    await expect(page.locator('#history-rebuilt')).toContainText('Rebuilt from the cloud')
+    await expect(page.locator('#history-button')).toContainText('rebuilt')
+    await page.locator('#history-button').click()
+    expect(await page.locator('#history-strip-svg .rebuilt').count()).toBeGreaterThan(0)
+  })
+
+  test('a time with no frame that the server can rebuild shows a loading card, then the rebuilt town', async ({ page, request }) => {
+    await waitForFrames(request, 3)
+    const frame = { ...(await realFrame(request)), at: new Date(Date.now() - 16_000).toISOString() }
+    let asked = false
+    await page.route('**/api/history/fill', (route) => route.fulfill({ json: { available: true, running: !asked, done: 0, total: 2, hour: null, problem: null } }))
+    await page.route('**/api/history/fill/priority*', (route) => { asked = true; return route.fulfill({ status: 202, body: '' }) })
+    await page.route('**/api/history/frame?*', (route) => asked ? route.fulfill({ json: { ...frame, rebuilt: true } }) : route.fulfill({ status: 404, json: { error: 'no' } }))
+    await openTown(page)
+
+    // not awaited: the jump itself waits for the rebuild, and the loading card is what is looked at meanwhile
+    await page.evaluate((at) => { void (window as unknown as Win).city.history.goTo(Date.parse(at) + 1_000, { paused: true }) }, frame.at)
+    await expect(page.locator('#history-nodata')).toContainText('Rebuilding', { timeout: 15_000 })
+    await expect(page.locator('#history-rebuilt')).toBeVisible({ timeout: 20_000 })
+    await expect(page.locator('#history-nodata')).toBeHidden()
+  })
 })

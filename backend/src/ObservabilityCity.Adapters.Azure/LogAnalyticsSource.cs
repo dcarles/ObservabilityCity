@@ -34,6 +34,14 @@ public sealed class LogAnalyticsReader(HttpClient http, ICredentialSource? crede
     public async Task<IReadOnlyList<SpanRow>> QueryAsync(string workspace, string query, TimeSpan window, CancellationToken ct) =>
         Parse(await SendAsync(workspace, query, System.Xml.XmlConvert.ToString(window), ct));
 
+    /// <summary>The same rows as <see cref="QueryAsync(string, string, TimeSpan, CancellationToken)"/>, over the past span [from, to).</summary>
+    public async Task<IReadOnlyList<SpanRow>> QueryAsync(string workspace, string query, DateTimeOffset from, DateTimeOffset to, CancellationToken ct) =>
+        Parse(await SendAsync(workspace, query, $"{LinkQuery.Iso(from)}/{LinkQuery.Iso(to)}", ct));
+
+    /// <summary>The region rows over the past span [from, to).</summary>
+    public async Task<IReadOnlyList<RegionRow>> QueryRegionsAsync(string workspace, string query, DateTimeOffset from, DateTimeOffset to, CancellationToken ct) =>
+        ParseRegions(await SendAsync(workspace, query, $"{LinkQuery.Iso(from)}/{LinkQuery.Iso(to)}", ct));
+
     /// <summary>The dependency rows of the link discovery query over [from, to).</summary>
     public async Task<IReadOnlyList<DependencyRow>> QueryDependenciesAsync(string workspace, string query, DateTimeOffset from, DateTimeOffset to, CancellationToken ct) =>
         ParseDependencies(await SendAsync(workspace, query, $"{LinkQuery.Iso(from)}/{LinkQuery.Iso(to)}", ct));
@@ -139,6 +147,10 @@ public sealed class LogAnalyticsReader(HttpClient http, ICredentialSource? crede
             if (Text(row[role]) is { Length: > 0 } who && Text(row[region]) is { Length: > 0 } where) rows.Add(new RegionRow(who, where, Number(row, calls) ?? 0));
         return rows;
     }
+
+    /// <summary>The job rows over the past span [from, to).</summary>
+    public async Task<IReadOnlyList<JobRow>> QueryJobsAsync(string workspace, string query, DateTimeOffset from, DateTimeOffset to, CancellationToken ct) =>
+        ParseJobs(await SendAsync(workspace, query, $"{LinkQuery.Iso(from)}/{LinkQuery.Iso(to)}", ct));
 
     public async Task<IReadOnlyList<JobRow>> QueryJobsAsync(string workspace, string query, TimeSpan window, CancellationToken ct) =>
         ParseJobs(await SendAsync(workspace, query, System.Xml.XmlConvert.ToString(window), ct));
@@ -292,7 +304,7 @@ public sealed record SpanRow(string Role, double Calls, double Errors, double? L
 /// <c>file:name.json</c> replays a recorded answer kept beside the town's files, for trying a query's shape offline and for tests.
 /// </summary>
 public sealed class LogAnalyticsSource(
-    string name, string environmentId, RegistrySource definition, LogAnalyticsReader reader, ScopeStore store, ScopeRules rules, string? recording, TimeProvider time) : IMetricSource, IDependencySource, IRateHistory, ILogRowSource
+    string name, string environmentId, RegistrySource definition, LogAnalyticsReader reader, ScopeStore store, ScopeRules rules, string? recording, TimeProvider time) : IPastMetricSource, IMetricSource, IDependencySource, IRateHistory, ILogRowSource
 {
     public bool CanReadDependencies => recording is null;
 
@@ -341,7 +353,19 @@ public sealed class LogAnalyticsSource(
     public TimeSpan Window { get; } = SourceQuery.WindowOf(definition);
     private readonly AzureSettings _settings = AzureSettings.Of(definition);
 
-    public async Task<IReadOnlyDictionary<string, NodeReading>> PollAsync(TownRegistry registry, CancellationToken ct)
+    public Task<IReadOnlyDictionary<string, NodeReading>> PollAsync(TownRegistry registry, CancellationToken ct) => PollCore(registry, time.GetUtcNow(), false, ct);
+
+    public bool CanReadPast => recording is null;
+
+    /// <summary>
+    /// What the source's queries said for the window that ended at a past time: the same query and the same rules as a live poll, with the time span of the question
+    /// given to Log Analytics instead of "the last window". Nothing is kept between frames, so each frame is its own question (Azure's own limits pace the rebuild).
+    /// A recording has no past to ask.
+    /// </summary>
+    public Task<IReadOnlyDictionary<string, NodeReading>> PollAtAsync(TownRegistry registry, DateTimeOffset at, CancellationToken ct) =>
+        recording is null ? PollCore(registry, at, true, ct) : throw new InvalidOperationException($"source '{name}' replays a recording, which has no past to read");
+
+    private async Task<IReadOnlyDictionary<string, NodeReading>> PollCore(TownRegistry registry, DateTimeOffset at, bool past, CancellationToken ct)
     {
         var view = registry.ForEnvironment(environmentId);
         // a workspace given by name is looked up in the inventory, which is read at the same moment the first poll starts
@@ -357,7 +381,8 @@ public sealed class LogAnalyticsSource(
         {
             var query = definition.Query ?? throw new InvalidOperationException($"source '{name}' has no query. Write the query that returns one row per telemetry name with the columns {string.Join(", ", LogAnalyticsReader.Columns)} (see docs/connect-your-company.md)");
             var workspace = Workspace(resolution);
-            rows = await reader.QueryAsync(workspace, SourceQuery.Render(query, definition, environmentId, rules, asked.Select(s => s.TelemetryRole!).Distinct(StringComparer.OrdinalIgnoreCase)), Window, ct);
+            var rendered = SourceQuery.Render(query, definition, environmentId, rules, asked.Select(s => s.TelemetryRole!).Distinct(StringComparer.OrdinalIgnoreCase));
+            rows = past ? await reader.QueryAsync(workspace, SourceQuery.AtPast(rendered, at), at - Window, at, ct) : await reader.QueryAsync(workspace, rendered, Window, ct);
         }
         IReadOnlyList<RegionRow> regionRows = [];
         if (recording is not null)
@@ -366,8 +391,11 @@ public sealed class LogAnalyticsSource(
             if (_settings.RegionQuery is not null && File.Exists(sibling)) regionRows = LogAnalyticsReader.ParseRegions(await File.ReadAllTextAsync(sibling, ct));
         }
         else if (_settings.RegionQuery is { } regionQuery)
-            regionRows = await reader.QueryRegionsAsync(Workspace(resolution), SourceQuery.Render(regionQuery, definition, environmentId, rules, asked.Select(s => s.TelemetryRole!).Distinct(StringComparer.OrdinalIgnoreCase)), Window, ct);
-        return Readings(asked, rows, Window, time.GetUtcNow(), regionRows);
+        {
+            var rendered = SourceQuery.Render(regionQuery, definition, environmentId, rules, asked.Select(s => s.TelemetryRole!).Distinct(StringComparer.OrdinalIgnoreCase));
+            regionRows = past ? await reader.QueryRegionsAsync(Workspace(resolution), SourceQuery.AtPast(rendered, at), at - Window, at, ct) : await reader.QueryRegionsAsync(Workspace(resolution), rendered, Window, ct);
+        }
+        return Readings(asked, rows, Window, at, regionRows);
     }
 
     /// <summary>

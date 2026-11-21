@@ -330,6 +330,33 @@ public sealed class HistoryTests : IDisposable
         Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/api/history/range?env=nope", ct)).StatusCode);
     }
 
+    [Fact]
+    public async Task Rebuilt_frames_are_served_with_the_recorded_ones_and_say_so()
+    {
+        using var factory = Host(TestPaths.LiveTown);
+        var runtime = factory.Services.GetRequiredService<TownSet>().Default.Environments.Default;
+        var now = DateTimeOffset.UtcNow;
+        var slot = new DateTimeOffset((now.UtcTicks / Gap.Ticks - 1) * Gap.Ticks, TimeSpan.Zero);
+        runtime.History!.Append(slot, Frame(1, 0, 10), 1, 0);
+        runtime.RebuiltHistory!.Append(slot - Gap, Frame(2, 0, 20), 2, 0);
+        var client = factory.CreateClient();
+        var ct = TestContext.Current.CancellationToken;
+
+        var range = (await client.GetFromJsonAsync<HistoryRange>("/api/history/range", Json, ct))!;
+        Assert.Equal([true, false], range.Points.Select(p => p.Rebuilt));
+        Assert.Equal(2, range.Frames);
+
+        var rebuilt = JsonNode.Parse(await client.GetStringAsync($"/api/history/frame?at={Uri.EscapeDataString((slot - Gap).ToString("O"))}", ct))!;
+        Assert.True((bool)rebuilt["rebuilt"]!);
+        var recorded = JsonNode.Parse(await client.GetStringAsync($"/api/history/frame?at={Uri.EscapeDataString(slot.ToString("O"))}", ct))!;
+        Assert.False((bool)recorded["rebuilt"]!);
+
+        var fill = (await client.GetFromJsonAsync<HistoryFill>("/api/history/fill", Json, ct))!;
+        Assert.False(fill.Available); // this town's sources replay recordings: nothing can read its past
+        Assert.False(fill.Running);
+        Assert.Equal(HttpStatusCode.Accepted, (await client.PostAsync($"/api/history/fill/priority?at={Uri.EscapeDataString(slot.ToString("O"))}", null, ct)).StatusCode);
+    }
+
     // ---- helpers
 
     private static async Task WaitFor(Func<bool> condition)

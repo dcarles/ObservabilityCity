@@ -164,6 +164,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/history/fill": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetHistoryFill"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -277,6 +293,17 @@ export interface components {
             displayName: string;
             vendor: boolean;
         };
+        HistoryFill: {
+            available: boolean;
+            running: boolean;
+            /** Format: int32 */
+            done: number;
+            /** Format: int32 */
+            total: number;
+            /** Format: date-time */
+            hour?: string | null;
+            problem?: string | null;
+        };
         HistoryPointSnapshot: {
             /** Format: date-time */
             at: string;
@@ -284,6 +311,7 @@ export interface components {
             unhealthy: number;
             /** Format: int32 */
             down: number;
+            rebuilt: boolean;
         };
         HistoryRange: {
             enabled: boolean;
@@ -999,6 +1027,28 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HistoryRange"];
+                };
+            };
+        };
+    };
+    GetHistoryFill: {
+        parameters: {
+            query?: {
+                env?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HistoryFill"];
                 };
             };
         };

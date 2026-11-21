@@ -17,10 +17,10 @@ public sealed record MetricCall(string? Namespace, string Aggregation, string? F
 }
 
 /// <summary>The points one metric gave for one entity (the value of the dimension the answer was split by) over the window.</summary>
-public sealed record EntitySeries(string Entity, string Metric, string Aggregation, IReadOnlyList<double> Points, string? Region = null, string? NamespaceId = null);
+public sealed record EntitySeries(string Entity, string Metric, string Aggregation, IReadOnlyList<double> Points, string? Region = null, string? NamespaceId = null, IReadOnlyList<DateTimeOffset>? Times = null);
 
 /// <summary>The points one metric gave over the window, as asked: this metric, added up this way, with this filter. No point is a gap the cloud left, not a zero. Part is the value of the dimension a split read was split by (see <c>parts</c>): the piece of the resource the points are for.</summary>
-public sealed record MetricSeries(string Metric, string Aggregation, string? Filter, IReadOnlyList<double> Points, string? Part = null);
+public sealed record MetricSeries(string Metric, string Aggregation, string? Filter, IReadOnlyList<double> Points, string? Part = null, IReadOnlyList<DateTimeOffset>? Times = null);
 
 /// <summary>
 /// Reads platform metrics of single resources from the Azure Monitor metrics API. The adapter knows no metric: which ones to ask for, for which
@@ -135,11 +135,15 @@ public sealed class AzureMonitorReader(HttpClient http, ICredentialSource? crede
                             entity = ev.GetString();
                 if (entity is null) continue;
                 var points = new List<double>();
+                var times = new List<DateTimeOffset>();
                 if (one.TryGetProperty("data", out var data) && data.ValueKind == JsonValueKind.Array)
                     foreach (var point in data.EnumerateArray())
                         if (point.TryGetProperty(field, out var number) && number.ValueKind == JsonValueKind.Number && number.TryGetDouble(out var d) && double.IsFinite(d))
+                        {
                             points.Add(d);
-                all.Add(new EntitySeries(entity, name, call.Aggregation, points));
+                            times.Add(PointTime(point));
+                        }
+                all.Add(new EntitySeries(entity, name, call.Aggregation, points, Times: times));
             }
         }
         return all;
@@ -165,15 +169,23 @@ public sealed class AzureMonitorReader(HttpClient http, ICredentialSource? crede
                         if (m.TryGetProperty("name", out var mn) && mn.TryGetProperty("value", out var mv) && string.Equals(mv.GetString(), dimension, StringComparison.OrdinalIgnoreCase) && m.TryGetProperty("value", out var ev))
                             part = ev.GetString() ?? "";
                 var points = new List<double>();
+                var times = new List<DateTimeOffset>();
                 if (one.TryGetProperty("data", out var data) && data.ValueKind == JsonValueKind.Array)
                     foreach (var point in data.EnumerateArray())
                         if (point.TryGetProperty(field, out var number) && number.ValueKind == JsonValueKind.Number && number.TryGetDouble(out var d) && double.IsFinite(d))
+                        {
                             points.Add(d);
-                all.Add(new MetricSeries(name, call.Aggregation, call.Filter, points, part));
+                            times.Add(PointTime(point));
+                        }
+                all.Add(new MetricSeries(name, call.Aggregation, call.Filter, points, part, times));
             }
         }
         return all;
     }
+
+    /// <summary>When a point starts, from its <c>timeStamp</c>; the start of time when the answer has none (a recording), so a series without times is never mistaken for a dated one.</summary>
+    private static DateTimeOffset PointTime(JsonElement point) =>
+        point.TryGetProperty("timeStamp", out var t) && t.ValueKind == JsonValueKind.String && DateTimeOffset.TryParse(t.GetString(), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var at) ? at : DateTimeOffset.MinValue;
 
     private static string Capitalised(string text) => text.Length == 0 ? text : char.ToUpperInvariant(text[0]) + text[1..].ToLowerInvariant();
 
@@ -193,13 +205,17 @@ public sealed class AzureMonitorReader(HttpClient http, ICredentialSource? crede
             var name = metric.TryGetProperty("name", out var n) && n.TryGetProperty("value", out var v) ? v.GetString() : null;
             if (name is null) continue;
             var points = new List<double>();
+            var times = new List<DateTimeOffset>();
             if (metric.TryGetProperty("timeseries", out var all) && all.ValueKind == JsonValueKind.Array)
                 foreach (var one in all.EnumerateArray())
                     if (one.TryGetProperty("data", out var data) && data.ValueKind == JsonValueKind.Array)
                         foreach (var point in data.EnumerateArray())
                             if (point.TryGetProperty(field, out var number) && number.ValueKind == JsonValueKind.Number && number.TryGetDouble(out var d) && double.IsFinite(d))
+                            {
                                 points.Add(d);
-            series.Add(new MetricSeries(name, call.Aggregation, call.Filter, points));
+                                times.Add(PointTime(point));
+                            }
+            series.Add(new MetricSeries(name, call.Aggregation, call.Filter, points, Times: times));
         }
         return series;
     }
@@ -228,7 +244,7 @@ public sealed class AzureMonitorReader(HttpClient http, ICredentialSource? crede
 /// <c>file:name.json</c> replays recorded series (<c>{ "&lt;resource name&gt;": [ { "metric", "aggregation", "filter", "points": [...] } ] }</c>) kept beside the town's files.
 /// </summary>
 public sealed class AzureMonitorSource(
-    string name, string environmentId, RegistrySource definition, AzureMonitorReader reader, ScopeStore store, string? recording, TimeProvider time) : IProgressiveMetricSource
+    string name, string environmentId, RegistrySource definition, AzureMonitorReader reader, ScopeStore store, string? recording, TimeProvider time) : IPastMetricSource, IProgressiveMetricSource
 {
     public const int MaxParallel = 8;
 
@@ -253,7 +269,25 @@ public sealed class AzureMonitorSource(
     /// up as the reads finish and one slow or failing read holds back only the systems that use it. A system is never reported from only some of its
     /// resources. When any read fails the poll still ends in an error saying how many, after everything that could be reported has been.
     /// </summary>
-    public async Task PollAsync(TownRegistry registry, Action<IReadOnlyDictionary<string, NodeReading>> publish, CancellationToken ct)
+    public Task PollAsync(TownRegistry registry, Action<IReadOnlyDictionary<string, NodeReading>> publish, CancellationToken ct) =>
+        PollCore(registry, publish, time.GetUtcNow(), false, ct);
+
+    public bool CanReadPast => recording is null;
+
+    /// <summary>
+    /// The town's readings as they were at a past time, with the same rules as a live poll. A day of each resource's series is read in one call and kept, so the frames
+    /// of that day cost no more calls (<see cref="MetricDay"/>); a resource that cannot be read fails the whole answer, as in a live poll.
+    /// </summary>
+    public async Task<IReadOnlyDictionary<string, NodeReading>> PollAtAsync(TownRegistry registry, DateTimeOffset at, CancellationToken ct)
+    {
+        var all = new Dictionary<string, NodeReading>();
+        await PollCore(registry, found => { lock (all) foreach (var (id, reading) in found) all[id] = reading; }, at, true, ct);
+        return all;
+    }
+
+    private readonly Dictionary<(string Resource, MetricGroup Group, DateTimeOffset Day), Task<IReadOnlyList<MetricSeries>>> _days = [];
+
+    private async Task PollCore(TownRegistry registry, Action<IReadOnlyDictionary<string, NodeReading>> publish, DateTimeOffset at, bool bulk, CancellationToken ct)
     {
         var view = registry.ForEnvironment(environmentId);
         if (store.Inventory is null) await store.WaitForReadAsync(Timeout / 2, ct); // the resources to read are in the inventory
@@ -261,7 +295,6 @@ public sealed class AzureMonitorSource(
         var targets = resolution.Systems.SelectMany(s => s.Resources.SelectMany(r => _settings.Metrics.Where(g => g.Resources == r.Rule).Select(g => new Target(s.SystemId, r, g)))).ToList();
         if (targets.Count == 0) return;
 
-        var at = time.GetUtcNow();
         var recorded = recording is null ? null : ReadRecording(await File.ReadAllTextAsync(recording, ct));
         var gate = new SemaphoreSlim(MaxParallel);
         var errors = new List<string>();
@@ -279,7 +312,7 @@ public sealed class AzureMonitorSource(
             else
             {
                 await gate.WaitAsync(ct);
-                try { series = await ReadResource(target, at, ct); }
+                try { series = bulk ? await ReadResourceDay(target, at, ct) : await ReadResource(target, at, ct); }
                 catch (Exception e) when (e is not OperationCanceledException || !ct.IsCancellationRequested)
                 {
                     lock (errors) errors.Add(e.Message);
@@ -368,10 +401,40 @@ public sealed class AzureMonitorSource(
     private static IEnumerable<MetricSignal> Flatten(MetricSignal s) =>
         new[] { s }.Concat(s.Over is null ? [] : Flatten(s.Over)).Concat(s.OrElse is null ? [] : Flatten(s.OrElse));
 
-    private async Task<IReadOnlyList<MetricSeries>> ReadResource(Target target, DateTimeOffset at, CancellationToken ct)
+    /// <summary>The UTC day a time falls in, which is the span one read covers when the past is rebuilt.</summary>
+    public static DateTimeOffset MetricDay(DateTimeOffset at) => new(at.UtcDateTime.Date, TimeSpan.Zero);
+
+    /// <summary>The series that were read for the window ending at <paramref name="at"/>, cut out of the day's one read (the day is read once, from the window before its first frame to its end).</summary>
+    private async Task<IReadOnlyList<MetricSeries>> ReadResourceDay(Target target, DateTimeOffset at, CancellationToken ct)
+    {
+        var window = target.Group.Window ?? Window;
+        var day = MetricDay(at.AddTicks(-1)); // a frame at midnight sharp belongs to the day that ended
+        Task<IReadOnlyList<MetricSeries>> read;
+        lock (_days)
+        {
+            if (!_days.TryGetValue((target.Resource.Id, target.Group, day), out read!))
+                _days[(target.Resource.Id, target.Group, day)] = read = ReadResourceWindow(target, day.AddDays(1), TimeSpan.FromDays(1) + window, ct);
+        }
+        var whole = await read;
+        return AtWindow(whole, at - window, at);
+    }
+
+    /// <summary>The points of each series that start inside [from, to); a series without times (a recording) is kept whole.</summary>
+    public static IReadOnlyList<MetricSeries> AtWindow(IReadOnlyList<MetricSeries> series, DateTimeOffset from, DateTimeOffset to) =>
+        series.Select(s =>
+        {
+            if (s.Times is null || s.Times.Count != s.Points.Count || s.Times.Any(t => t == DateTimeOffset.MinValue)) return s;
+            var keep = Enumerable.Range(0, s.Points.Count).Where(i => s.Times[i] >= from && s.Times[i] < to).ToList();
+            return s with { Points = keep.Select(i => s.Points[i]).ToList(), Times = keep.Select(i => s.Times[i]).ToList() };
+        }).ToList();
+
+    private Task<IReadOnlyList<MetricSeries>> ReadResourceWindow(Target target, DateTimeOffset end, TimeSpan span, CancellationToken ct) =>
+        ReadResource(target, end, ct, span);
+
+    private async Task<IReadOnlyList<MetricSeries>> ReadResource(Target target, DateTimeOffset at, CancellationToken ct, TimeSpan? over = null)
     {
         var all = new List<MetricSeries>();
-        var window = target.Group.Window ?? Window;
+        var window = over ?? target.Group.Window ?? Window;
         foreach (var (call, metrics) in Calls(target.Group))
         {
             if (target.Group.Parts is not { } parts) { all.AddRange(await reader.ReadAsync(target.Resource.Id, call, metrics, at, window, ct)); continue; }

@@ -389,6 +389,35 @@
           }
         }
       }
+    },
+    "/api/history/fill": {
+      "get": {
+        "tags": [
+          "ObservabilityCity.Host"
+        ],
+        "operationId": "GetHistoryFill",
+        "parameters": [
+          {
+            "name": "env",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HistoryFill"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -814,11 +843,46 @@
           }
         }
       },
+      "HistoryFill": {
+        "required": [
+          "available",
+          "running",
+          "done",
+          "total"
+        ],
+        "type": "object",
+        "properties": {
+          "available": {
+            "type": "boolean"
+          },
+          "running": {
+            "type": "boolean"
+          },
+          "done": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "hour": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "problem": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
       "HistoryPointSnapshot": {
         "required": [
           "at",
           "unhealthy",
-          "down"
+          "down",
+          "rebuilt"
         ],
         "type": "object",
         "properties": {
@@ -833,6 +897,9 @@
           "down": {
             "type": "integer",
             "format": "int32"
+          },
+          "rebuilt": {
+            "type": "boolean"
           }
         }
       },

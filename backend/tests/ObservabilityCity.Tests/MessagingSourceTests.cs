@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text.Json;
 using Microsoft.Extensions.Time.Testing;
 using ObservabilityCity.AdapterKit;
 using ObservabilityCity.Adapters.Azure;
@@ -108,6 +109,43 @@ public class MessagingSourceTests
 
         Assert.Contains("'brokr' is not a rule of scope.resources", ex.Message);
         Assert.Contains("broker", ex.Message); // and says what it meant
+    }
+
+    /// <summary>Answers a metrics request split by entity with one point a minute over the timespan asked, for the inbox of the orders worker, valued at the hour it starts in.</summary>
+    private static HttpResponseMessage QueueByHour(SentRequest request)
+    {
+        var query = System.Web.HttpUtility.ParseQueryString(request.Uri!.Query);
+        var aggregation = query["aggregation"]!.ToLowerInvariant();
+        var dimension = query["$filter"]!.Split(' ')[0];
+        var span = query["timespan"]!.Split('/');
+        var (from, to) = (DateTimeOffset.Parse(span[0]), DateTimeOffset.Parse(span[1]));
+        var points = new List<Dictionary<string, object>>();
+        for (var t = from; t < to; t = t.AddMinutes(1))
+            points.Add(new Dictionary<string, object> { ["timeStamp"] = t.UtcDateTime.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'"), [aggregation] = t.Hour });
+        var value = query["metricnames"]!.Split(',').Select(n => new
+        {
+            name = new { value = n },
+            timeseries = new[] { new { metadatavalues = new[] { new { name = new { value = dimension }, value = "q-al-ord-in" } }, data = points } },
+        });
+        return CannedHttp.Reply(JsonSerializer.Serialize(new { value }));
+    }
+
+    [Fact]
+    public async Task The_past_is_read_a_day_at_a_time_and_each_frame_gets_the_numbers_of_its_own_window()
+    {
+        var http = new CannedHttp().Respond(QueueByHour);
+        var (source, registry) = await Messaging(TownA, http);
+        var past = (ServiceBusSource)source;
+
+        var nine = await past.PollAtAsync(registry, DateTimeOffset.Parse("2025-12-30T09:05:00Z"), CancellationToken.None);
+        var calls = http.Sent.Count;
+        var ten = await past.PollAtAsync(registry, DateTimeOffset.Parse("2025-12-30T10:05:00Z"), CancellationToken.None);
+
+        await AdapterContract.AssertPastAsync(past, registry, DateTimeOffset.Parse("2025-12-30T10:05:00Z")); // what every adapter that reads the past owes
+        Assert.Equal(calls, http.Sent.Count); // the second frame of the day asks Azure nothing
+        Assert.True(nine["aa.orders-worker"].QueueDepth > 0);
+        Assert.True(ten["aa.orders-worker"].QueueDepth > nine["aa.orders-worker"].QueueDepth);
+        Assert.Equal(DateTimeOffset.Parse("2025-12-30T09:05:00Z"), nine["aa.orders-worker"].At);
     }
 
     [Fact]

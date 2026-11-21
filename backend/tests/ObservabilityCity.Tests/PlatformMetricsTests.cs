@@ -521,6 +521,42 @@ public class PlatformMetricsTests
         Assert.Contains("1m, 5m, 15m, 30m, 1h, 6h, 12h, 1d", message);
     }
 
+    /// <summary>Answers any metrics request with one point a minute over the timespan asked, whose value is the hour it starts in times ten.</summary>
+    private static HttpResponseMessage HourlyAnswer(SentRequest request)
+    {
+        var query = System.Web.HttpUtility.ParseQueryString(request.Uri!.Query);
+        var aggregation = query["aggregation"]!.ToLowerInvariant();
+        var span = query["timespan"]!.Split('/');
+        var (from, to) = (DateTimeOffset.Parse(span[0]), DateTimeOffset.Parse(span[1]));
+        var points = new List<Dictionary<string, object>>();
+        for (var t = from; t < to; t = t.AddMinutes(1))
+            points.Add(new Dictionary<string, object> { ["timeStamp"] = t.UtcDateTime.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'"), [aggregation] = t.Hour * 10 });
+        var value = query["metricnames"]!.Split(',').Select(n => new { name = new { value = n }, timeseries = new[] { new { data = points } } });
+        return CannedHttp.Reply(JsonSerializer.Serialize(new { value }));
+    }
+
+    [Fact]
+    public async Task The_past_is_read_a_day_at_a_time_and_each_frame_gets_the_points_of_its_own_window()
+    {
+        var http = new CannedHttp().Respond(HourlyAnswer);
+        var (source, registry) = await Platform(TownA, http);
+        var past = (AzureMonitorSource)source;
+
+        var nine = await past.PollAtAsync(registry, DateTimeOffset.Parse("2025-12-30T09:05:00Z"), CancellationToken.None);
+        var calls = http.Sent.Count;
+        var ten = await past.PollAtAsync(registry, DateTimeOffset.Parse("2025-12-30T10:05:00Z"), CancellationToken.None);
+
+        await AdapterContract.AssertPastAsync(past, registry, DateTimeOffset.Parse("2025-12-30T10:05:00Z")); // what every adapter that reads the past owes
+        Assert.Equal(calls, http.Sent.Count); // the second frame of the day asks Azure nothing
+        var system = nine.First(kv => kv.Value.Cpu is not null).Key;
+        Assert.Equal(0.9, nine[system].Cpu!.Value, 6); // the five minutes before 09:05 start in hour 9 (a share, not a percentage)
+        Assert.Equal(1.0, ten[system].Cpu!.Value, 6);
+        Assert.Equal(DateTimeOffset.Parse("2025-12-30T09:05:00Z"), nine[system].At);
+        var span = System.Web.HttpUtility.ParseQueryString(http.Sent[0].Uri!.Query)["timespan"]!.Split('/');
+        Assert.Equal("2025-12-30T23:55:00Z".Length, span[0].Length);
+        Assert.Equal("2025-12-31T00:00:00Z", span[1]); // the day's end, and the window before its first frame is included
+    }
+
     [Fact]
     public async Task Each_system_is_reported_as_soon_as_its_own_resources_are_read_not_when_every_read_is_done()
     {

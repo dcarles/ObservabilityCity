@@ -3,7 +3,7 @@
 // reads the newest snapshot once and lets the feed carry on. Starting is always live: nothing here is remembered between visits.
 
 import { scopeParams, type Scope } from '../scope'
-import { advance, frameFor, isSpeed, SPEEDS, type Frame, type HistoryPoint, type HistoryRange, type Speed } from './model'
+import { advance, frameFor, isSpeed, SPEEDS, type Frame, type HistoryFill, type HistoryPoint, type HistoryRange, type Speed } from './model'
 
 export interface HistoryHost {
   scope: Scope
@@ -23,7 +23,13 @@ export interface HistoryState {
   newest: number | null
   frames: number
   bytes: number
-  points: { at: number; unhealthy: number; down: number }[]
+  points: { at: number; unhealthy: number; down: number; rebuilt: boolean }[]
+  /** How the filling of the gaps from the cloud stands; null until read, or where the server cannot fill. */
+  fill: HistoryFill | null
+  /** True while the viewed moment is a gap the server is rebuilding: the loading card shows. */
+  filling: boolean
+  /** True while the frame on screen was rebuilt from the cloud: an approximation. */
+  rebuilt: boolean
   /** True while the page looks at the past. */
   active: boolean
   /** The moment being looked at (ms since 1970); meaningful while active. */
@@ -42,10 +48,12 @@ const TICK_MS = 250
 const AHEAD_FRAMES = 12
 const MIN_AHEAD = 4
 const RETRY_MS = 5000
+const FILL_POLL_MS = 3000
+const FILL_WAIT_TRIES = 100
 
 export class HistoryController {
   private s: HistoryState = {
-    enabled: false, days: 7, intervalMs: 300_000, oldest: null, newest: null, frames: 0, bytes: 0, points: [],
+    enabled: false, days: 7, intervalMs: 300_000, oldest: null, newest: null, frames: 0, bytes: 0, points: [], fill: null, filling: false, rebuilt: false,
     active: false, viewed: 0, speed: 1, paused: false, loading: false, noData: false, travel: null,
   }
   private readonly listeners = new Set<() => void>()
@@ -100,12 +108,49 @@ export class HistoryController {
         newest: range.newest ? Date.parse(range.newest) : null,
         frames: range.frames,
         bytes: range.bytes,
-        points: range.points.map((p: HistoryPoint) => ({ at: Date.parse(p.at), unhealthy: p.unhealthy, down: p.down })),
+        points: range.points.map((p: HistoryPoint) => ({ at: Date.parse(p.at), unhealthy: p.unhealthy, down: p.down, rebuilt: p.rebuilt === true })),
       })
+      if (range.enabled) void this.loadFill()
       return range.enabled
     } catch {
       this.set({ enabled: false })
       return false
+    }
+  }
+
+  /** Reads how the filling of the gaps stands. A server that cannot say leaves it unknown. */
+  async loadFill(): Promise<HistoryFill | null> {
+    try {
+      const r = await fetch(`/api/history/fill${this.query()}`)
+      if (!r.ok) return null
+      const fill = (await r.json()) as HistoryFill
+      this.set({ fill })
+      return fill
+    } catch { return null }
+  }
+
+  /**
+   * A moment with no frame, on a server that can rebuild it: asks for that hour to be done next and waits for it, asking again every few seconds, until the frame is there or the filling
+   * has stopped with nothing for it. The page shows the loading card meanwhile; leaving the moment (another jump, going live) ends the wait.
+   */
+  private async waitForRebuild(at: number, mine: number): Promise<Frame | null> {
+    const fill = await this.loadFill()
+    if (!fill?.available || mine !== this.seq) return null
+    this.set({ filling: true })
+    try {
+      await fetch(`/api/history/fill/priority${this.query({ at: new Date(at).toISOString() })}`, { method: 'POST' })
+      for (let i = 0; i < FILL_WAIT_TRIES; i++) {
+        await new Promise((resolve) => setTimeout(resolve, FILL_POLL_MS))
+        if (mine !== this.seq) return null
+        const frame = await this.fetchFrame(at)
+        if (frame) return frame
+        const now = await this.loadFill()
+        if (mine !== this.seq) return null
+        if (now && !now.running && i > 0) return null // the filling has stopped and this moment is not in it: nothing could be rebuilt
+      }
+      return null
+    } catch { return null } finally {
+      if (mine === this.seq) this.set({ filling: false })
     }
   }
 
@@ -124,11 +169,18 @@ export class HistoryController {
     this.travelId++
     this.set({ active: true, viewed: at, paused: options.paused ?? false, loading: true, noData: false, travel: { from, to: at, id: this.travelId } })
     this.start()
-    const frame = await this.fetchFrame(at)
+    let frame = await this.fetchFrame(at)
     if (mine !== this.seq) return
     if (frame) this.frames = [frame]
     this.set({ loading: false })
     this.show()
+    if (!frame) {
+      // a gap the server can fill: ask for it and show the loading card until it is there
+      frame = await this.waitForRebuild(at, mine)
+      if (mine !== this.seq) return
+      if (frame) { this.frames = [frame]; this.show() }
+      void this.loadRange()
+    }
     void this.ensureAhead()
   }
 
@@ -140,7 +192,7 @@ export class HistoryController {
     this.stop()
     this.frames = []
     this.shown = null
-    this.set({ active: false, loading: false, noData: false, paused: false, travel: wasActive ? { from, to: this.now(), id: ++this.travelId } : this.s.travel })
+    this.set({ active: false, loading: false, noData: false, filling: false, rebuilt: false, paused: false, travel: wasActive ? { from, to: this.now(), id: ++this.travelId } : this.s.travel })
     if (!wasActive) return
     try {
       const islands = this.host.islands()
@@ -215,6 +267,7 @@ export class HistoryController {
       return
     }
     if (this.s.noData) this.set({ noData: false })
+    if (this.s.rebuilt !== (f.rebuilt === true)) this.set({ rebuilt: f.rebuilt === true })
     if (this.shown === f.at) return
     this.shown = f.at
     this.host.feed(f.snapshot)
@@ -226,8 +279,8 @@ export class HistoryController {
     try {
       const r = await fetch(`/api/history/frame${this.query({ at: new Date(at).toISOString() })}`)
       if (!r.ok) return null
-      const body = (await r.json()) as { at: string; snapshot: unknown }
-      return { at: Date.parse(body.at), snapshot: body.snapshot }
+      const body = (await r.json()) as { at: string; snapshot: unknown; rebuilt?: boolean }
+      return { at: Date.parse(body.at), snapshot: body.snapshot, rebuilt: body.rebuilt === true }
     } catch { return null }
   }
 
@@ -244,8 +297,8 @@ export class HistoryController {
       const r = await fetch(`/api/history/frames${this.query({ from: new Date(from).toISOString(), count: String(AHEAD_FRAMES) })}`)
       if (mine !== this.seq) return
       if (!r.ok) { this.retryAfter = this.now() + RETRY_MS; return }
-      const body = (await r.json()) as { frames: { at: string; snapshot: unknown }[] }
-      const more = body.frames.map((f) => ({ at: Date.parse(f.at), snapshot: f.snapshot }))
+      const body = (await r.json()) as { frames: { at: string; snapshot: unknown; rebuilt?: boolean }[] }
+      const more = body.frames.map((f) => ({ at: Date.parse(f.at), snapshot: f.snapshot, rebuilt: f.rebuilt === true }))
       if (more.length === 0) this.retryAfter = this.now() + RETRY_MS // nothing newer is recorded yet
       this.frames = [...this.frames, ...more.filter((f) => !this.frames.some((x) => x.at === f.at))]
       this.show()
