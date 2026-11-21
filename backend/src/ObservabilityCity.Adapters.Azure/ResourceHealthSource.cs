@@ -298,7 +298,7 @@ public sealed class ResourceHealthSource(
 
     public async Task<Func<DateTimeOffset, IReadOnlyList<ResourceHealthEvent>>> ReadSinceAsync(TownRegistry registry, DateTimeOffset from, CancellationToken ct)
     {
-        var entries = await ReadLogSinceAsync(registry, from, ct);
+        var entries = await ReadLogSinceAsync(registry, from - Window, ct); // a report open at "from" started up to a window before it
         return at => EventsAt(entries, at);
     }
 
