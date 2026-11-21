@@ -39,6 +39,11 @@ export function mountHistory(controller: HistoryController, mount: HistoryMount)
   const noData = document.createElement('div')
   noData.id = 'history-nodata'
   noData.hidden = true
+  const badge = document.createElement('div')
+  badge.id = 'history-rebuilt'
+  badge.hidden = true
+  badge.textContent = 'Rebuilt from the cloud · approximate'
+  badge.title = 'The app was not recording at this time, so this picture was worked out afterwards from what the cloud keeps: numbers are right to the nearest five minutes, instance counts are today\'s.'
   const travel = document.createElement('div')
   travel.id = 'history-travel'
   travel.hidden = true
@@ -46,7 +51,7 @@ export function mountHistory(controller: HistoryController, mount: HistoryMount)
     <svg class="capsule" viewBox="0 0 100 100" aria-hidden="true"><path d="M14 56a36 34 0 0 1 72 0z" fill="rgba(120,170,255,0.35)" stroke="#bcd6ff" stroke-width="3"/><circle cx="50" cy="56" r="26" fill="#10224a" stroke="#bcd6ff" stroke-width="3"/><g class="hands"><line x1="50" y1="56" x2="50" y2="38" stroke="#fff" stroke-width="3" stroke-linecap="round"/><line x1="50" y1="56" x2="63" y2="56" stroke="#fff" stroke-width="3" stroke-linecap="round"/></g><rect x="22" y="84" width="56" height="6" rx="3" fill="#bcd6ff"/></svg>
     <div class="when" id="history-when"></div><div class="words" id="history-words"></div>
     <button class="skip" id="history-skip" type="button">Skip</button>`
-  document.body.append(pop, noData, travel)
+  document.body.append(pop, noData, badge, travel)
   const when = travel.querySelector<HTMLElement>('#history-when')!
   const words = travel.querySelector<HTMLElement>('#history-words')!
 
@@ -79,9 +84,10 @@ export function mountHistory(controller: HistoryController, mount: HistoryMount)
     const handle = s.active ? stripX(g, Math.min(Math.max(s.viewed, g.from), g.to)) : null
     return `<svg viewBox="0 0 ${STRIP_W} ${STRIP_H}" preserveAspectRatio="none" id="history-strip-svg" role="img" aria-label="Degraded systems over the last ${s.days} days">
       <rect x="0" y="0" width="${STRIP_W}" height="${g.height}" fill="transparent"/>
-      ${strip.gaps.map(([x, w]) => `<rect class="gap" x="${x.toFixed(1)}" y="0" width="${w.toFixed(1)}" height="${g.height}"/>`).join('')}
+      ${strip.gaps.map(([x, w]) => `<rect class="gap${s.fill?.available ? ' fillable' : ''}" x="${x.toFixed(1)}" y="0" width="${w.toFixed(1)}" height="${g.height}"/>`).join('')}
       ${strip.areas.map((a) => `<path class="area" d="${a}"/>`).join('')}
       ${strip.lines.map((l) => `<path class="line" d="${l}"/>`).join('')}
+      ${strip.rebuilt.map(([x, w]) => `<rect class="rebuilt" x="${x.toFixed(1)}" y="0" width="${w.toFixed(1)}" height="${g.height}"/>`).join('')}
       ${strip.days.map((d) => `<line class="tick" x1="${d.x.toFixed(1)}" x2="${d.x.toFixed(1)}" y1="0" y2="${g.height + 4}"/><text class="daylabel" x="${(d.x + 3).toFixed(1)}" y="${STRIP_H - 3}">${escapeHtml(d.label)}</text>`).join('')}
       <line class="nowline" x1="${STRIP_W - 1}" x2="${STRIP_W - 1}" y1="0" y2="${g.height}"/>
       ${handle === null ? '' : `<line class="handle" x1="${handle.toFixed(1)}" x2="${handle.toFixed(1)}" y1="0" y2="${g.height + 4}"/>`}
@@ -95,17 +101,20 @@ export function mountHistory(controller: HistoryController, mount: HistoryMount)
     const field = s.active ? s.viewed : now - 3_600_000
     const range = s.frames === 0
       ? 'Nothing recorded yet. The app records while it runs and someone has the town open.'
-      : `Recorded: ${s.frames} frames from ${viewedText(s.oldest!)} to ${viewedText(s.newest!)} (${(s.bytes / 1024).toFixed(0)} KB on disk).`
-    popKey = [s.active, s.paused, s.speed, s.loading, s.enabled, s.frames, s.points.length, s.oldest, s.newest, s.days].join('|')
+      : `${s.points.filter((p) => !p.rebuilt).length} recorded and ${s.points.filter((p) => p.rebuilt).length} rebuilt frames from ${viewedText(s.oldest!)} to ${viewedText(s.newest!)} (${(s.bytes / 1024).toFixed(0)} KB on disk).`
+    const fill = s.fill?.available
+      ? (s.fill.running ? `Rebuilding the gaps from the cloud: ${s.fill.done} of ${s.fill.total} hours done.` : 'Gaps are rebuilt from the cloud in the background while you look at an environment.')
+      : ''
+    popKey = [s.active, s.paused, s.speed, s.loading, s.enabled, s.frames, s.points.length, s.oldest, s.newest, s.days, s.fill?.available, s.fill?.running, s.fill?.done, s.fill?.total].join('|')
     pop.innerHTML = `
-      <h3>Go to a time <span class="note">· back up to ${s.days} days, only what was recorded</span></h3>
+      <h3>Go to a time <span class="note">· back up to ${s.days} days${s.fill?.available ? ', recorded or rebuilt from the cloud' : ', only what was recorded'}</span></h3>
       <div class="row"><span class="label">Quick</span>${picks.map((p) => `<button type="button" class="hb" data-pick="${p.at}">${escapeHtml(p.label)}</button>`).join('')}</div>
       <div class="row"><span class="label">Date</span><input type="datetime-local" id="history-date" value="${fieldValue(field)}" min="${fieldValue(now - s.days * 86_400_000)}" max="${fieldValue(now)}"><button type="button" class="hb" id="history-go">Go</button></div>
       <div id="history-strip">${stripSvg(s)}<div id="history-tip" ${tipAt ? '' : 'hidden'} style="left:${tipAt?.x ?? 0}px">${escapeHtml(tipAt?.text ?? '')}</div></div>
       <div class="row"><span class="label">Speed</span>${SPEEDS.map((v) => `<button type="button" class="hb" data-speed="${v}" aria-pressed="${s.speed === v}">${speedText(v)}</button>`).join('')}
         ${s.active ? `<button type="button" class="hb" id="history-pause">${s.paused ? 'Play' : 'Pause'}</button>` : ''}</div>
       <div class="row">${s.active ? '<button type="button" class="hb live" id="history-live">Go back to live</button><button type="button" class="hb" id="history-copy">Copy link</button>' : ''}${copied ? '<span class="copied">Link copied</span>' : ''}</div>
-      <div class="note">${escapeHtml(range)}</div>`
+      <div class="note">${escapeHtml(range)}</div>${fill ? `<div class="note" id="history-fill">${escapeHtml(fill)}</div>` : ''}`
     position()
   }
 
@@ -113,17 +122,21 @@ export function mountHistory(controller: HistoryController, mount: HistoryMount)
     const s = controller.state
     button.hidden = !s.enabled
     // live: only a small clock (the bar has little room, and "Live" is already said by the status); in the past: the moment and the speed, in words
-    if (s.active) button.textContent = text(s)
+    if (s.active) button.textContent = text(s) + (s.rebuilt ? ' · rebuilt' : '')
     else if (!button.querySelector('svg')) button.innerHTML = CLOCK
     button.setAttribute('aria-label', s.active ? `Looking at ${text(s)}. Open to jump, change the speed or go back to live.` : 'History')
     button.classList.toggle('travelling', s.active)
     button.title = s.active ? 'Looking at the past. Open to jump, change the speed or go back to live.' : 'Go back in time and see how the town looked'
     document.body.classList.toggle('history', s.active)
     noData.hidden = !(s.active && s.noData && !s.loading)
-    if (!noData.hidden) noData.textContent = `Nothing was recorded at ${viewedText(s.viewed)}. History only holds what the app recorded while it was running; later frames play as soon as they come.`
+    noData.classList.toggle('filling', s.filling)
+    if (!noData.hidden) noData.textContent = s.filling
+      ? `Rebuilding ${viewedText(s.viewed)} from the cloud. This can take a minute; the town shows as soon as it is ready.`
+      : `Nothing was recorded at ${viewedText(s.viewed)}${s.fill?.available ? ' and it could not be rebuilt from the cloud' : '. History only holds what the app recorded while it was running'}; later frames play as soon as they come.`
+    badge.hidden = !(s.active && s.rebuilt && !s.noData)
     if (open && !dragging) {
       // the popup is drawn again only when something other than the moving clock changed: a click lands only on a button that was not replaced between pressing and letting go
-      const key = [s.active, s.paused, s.speed, s.loading, s.enabled, s.frames, s.points.length, s.oldest, s.newest, s.days].join('|')
+      const key = [s.active, s.paused, s.speed, s.loading, s.enabled, s.frames, s.points.length, s.oldest, s.newest, s.days, s.fill?.available, s.fill?.running, s.fill?.done, s.fill?.total].join('|')
       if (key !== popKey) drawPop()
       else moveHandle()
     }

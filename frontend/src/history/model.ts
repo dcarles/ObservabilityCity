@@ -5,6 +5,7 @@ import type { components } from '../contracts'
 
 export type HistoryRange = components['schemas']['HistoryRange']
 export type HistoryPoint = components['schemas']['HistoryPointSnapshot']
+export type HistoryFill = components['schemas']['HistoryFill']
 
 /** The speeds of time: how many seconds of the town's past go by in one real second. */
 export const SPEEDS = [1, 2, 4, 15, 30, 60] as const
@@ -16,6 +17,8 @@ export const isSpeed = (n: number): n is Speed => (SPEEDS as readonly number[]).
 export interface Frame {
   at: number
   snapshot: unknown
+  /** True when the frame was rebuilt from the cloud for a time the app was not recording: an approximation. */
+  rebuilt?: boolean
 }
 
 /** A frame older than two gaps than the viewed time is not what the town looked like then: the app was not recording. */
@@ -138,6 +141,8 @@ export interface Strip {
   lines: string[]
   /** The stretches with no recording: [x, width]. */
   gaps: [number, number][]
+  /** The stretches made of rebuilt frames rather than recorded ones: [x, width]. */
+  rebuilt: [number, number][]
   /** The midnights inside the range: x and the day's label. */
   days: { x: number; label: string }[]
   /** The largest count drawn (never below 1, so a quiet town is a flat line and not a scaled-up one). */
@@ -157,12 +162,12 @@ export function stripTime(g: StripGeometry, x: number): number {
  * The strip: how many systems were not healthy (degraded or down, dead letters not counted) at each recorded moment, as a line chart over the whole range.
  * A stretch where two recorded moments are more than two gaps apart is broken: nothing is drawn across it, and it shows as a gap, never as a flat line that looks fine.
  */
-export function buildStrip(points: readonly { at: number; unhealthy: number }[], g: StripGeometry, intervalMs: number): Strip {
+export function buildStrip(points: readonly { at: number; unhealthy: number; rebuilt?: boolean }[], g: StripGeometry, intervalMs: number): Strip {
   const max = Math.max(1, ...points.map((p) => p.unhealthy))
   const top = 4
   const base = g.height - 2
   const y = (n: number): number => base - (n / max) * (base - top)
-  const stretches: { at: number; unhealthy: number }[][] = []
+  const stretches: { at: number; unhealthy: number; rebuilt?: boolean }[][] = []
   for (const p of points) {
     if (p.at < g.from || p.at > g.to) continue
     const current = stretches[stretches.length - 1]
@@ -172,6 +177,7 @@ export function buildStrip(points: readonly { at: number; unhealthy: number }[],
   const areas: string[] = []
   const lines: string[] = []
   const gaps: [number, number][] = []
+  const rebuilt: [number, number][] = []
   let cursor = 0
   for (const s of stretches) {
     // a lone frame is drawn as a short bar one gap wide, so it can be seen and clicked
@@ -182,6 +188,14 @@ export function buildStrip(points: readonly { at: number; unhealthy: number }[],
     const xy = s.length === 1 ? [[first, y(s[0].unhealthy)], [last, y(s[0].unhealthy)]] : s.map((p) => [stripX(g, p.at), y(p.unhealthy)])
     const line = xy.map(([x, yy], i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(1)} ${yy.toFixed(1)}`).join(' ')
     lines.push(line)
+    // each run of rebuilt frames inside the stretch gets its own mark, up to the next frame after it
+    for (let i = 0; i < s.length; i++) {
+      if (!s[i].rebuilt) continue
+      const from = stripX(g, s[i].at)
+      while (i + 1 < s.length && s[i + 1].rebuilt) i++
+      const to = i + 1 < s.length ? stripX(g, s[i + 1].at) : Math.max(last, from + 2)
+      rebuilt.push([from, Math.max(2, to - from)])
+    }
     areas.push(`${line} L${last.toFixed(1)} ${base} L${first.toFixed(1)} ${base} Z`)
   }
   if (cursor < g.width) gaps.push([cursor, g.width - cursor])
@@ -189,17 +203,17 @@ export function buildStrip(points: readonly { at: number; unhealthy: number }[],
   const d = new Date(g.from)
   d.setHours(24, 0, 0, 0)
   for (; d.getTime() < g.to; d.setDate(d.getDate() + 1)) days.push({ x: stripX(g, d.getTime()), label: `${WEEKDAYS[d.getDay()]} ${d.getDate()}` })
-  return { areas, lines, gaps, days, max }
+  return { areas, lines, gaps, rebuilt, days, max }
 }
 
 /** The words for a point on the strip: the time, and how many were unhealthy then, or that nothing was recorded. */
-export function stripTip(points: readonly HistoryPoint[] | readonly { at: number; unhealthy: number; down: number }[], at: number, intervalMs: number): string {
-  let best: { at: number; unhealthy: number; down: number } | null = null
+export function stripTip(points: readonly HistoryPoint[] | readonly { at: number; unhealthy: number; down: number; rebuilt?: boolean }[], at: number, intervalMs: number): string {
+  let best: { at: number; unhealthy: number; down: number; rebuilt: boolean } | null = null
   for (const p of points) {
     const t = typeof p.at === 'number' ? p.at : Date.parse(p.at)
-    if (t <= at && (best === null || t > best.at)) best = { at: t, unhealthy: p.unhealthy, down: p.down }
+    if (t <= at && (best === null || t > best.at)) best = { at: t, unhealthy: p.unhealthy, down: p.down, rebuilt: p.rebuilt === true }
   }
   if (best === null || at - best.at > intervalMs * 2) return `${viewedText(at)} · no data recorded`
   const worse = best.unhealthy === 0 ? 'none degraded' : `${best.unhealthy} degraded${best.down > 0 ? `, ${best.down} down` : ''}`
-  return `${viewedText(at)} · ${worse}`
+  return `${viewedText(at)} · ${worse}${best.rebuilt ? ' · rebuilt from the cloud' : ''}`
 }

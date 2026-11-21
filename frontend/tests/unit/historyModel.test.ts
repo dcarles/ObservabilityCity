@@ -113,3 +113,27 @@ describe('the strip', () => {
     expect(stripTip(points, NOW - 3 * 24 * 3_600_000, GAP)).toContain('no data recorded')
   })
 })
+
+describe('rebuilt frames on the strip', () => {
+  const g = { width: 1000, height: 40, from: NOW - 100 * MIN, to: NOW }
+  const points = [
+    { at: NOW - 50 * MIN, unhealthy: 1, rebuilt: true },
+    { at: NOW - 45 * MIN, unhealthy: 2, rebuilt: true },
+    { at: NOW - 40 * MIN, unhealthy: 0, rebuilt: false },
+    { at: NOW - 35 * MIN, unhealthy: 0, rebuilt: false },
+  ]
+  it('marks each run of rebuilt frames, up to the first recorded one after it', () => {
+    const s = buildStrip(points, g, GAP)
+    expect(s.rebuilt).toHaveLength(1)
+    const [x, w] = s.rebuilt[0]
+    expect(x).toBeCloseTo(stripX(g, NOW - 50 * MIN), 1)
+    expect(x + w).toBeCloseTo(stripX(g, NOW - 40 * MIN), 1)
+  })
+  it('marks nothing when every frame was recorded', () => {
+    expect(buildStrip(points.map((p) => ({ ...p, rebuilt: false })), g, GAP).rebuilt).toEqual([])
+  })
+  it('says in the tip that a rebuilt frame was rebuilt', () => {
+    expect(stripTip(points.map((p) => ({ ...p, down: 0 })), NOW - 46 * MIN, GAP)).toContain('rebuilt from the cloud')
+    expect(stripTip(points.map((p) => ({ ...p, down: 0 })), NOW - 36 * MIN, GAP)).not.toContain('rebuilt')
+  })
+})
