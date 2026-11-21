@@ -119,6 +119,15 @@ describe('what a pier reports', () => {
     expect(m.perSecond).toBe(10 + 2000)
   })
 
+  it('also adds the waiting messages, oldest message and dead letters of a worker with queues and no route, once', () => {
+    const q = { name: 'q', perSecond: 5 } as unknown as NonNullable<NodeSnapshot['queues']>[number]
+    const m = messagingOf([worker('a.one', {}), worker('a.two', { queueDepth: 5000, oldestMessageSeconds: 900, deadLetters: 40, queues: [q] })], messaging)
+
+    expect(m.waiting).toBe(5100)
+    expect(m.oldestSeconds).toBe(900)
+    expect(m.deadLetters).toBe(43)
+  })
+
   it('does not count the queues of a worker that is down or stale', () => {
     const q = { name: 'q', perSecond: 900 } as unknown as NonNullable<NodeSnapshot['queues']>[number]
     const m = messagingOf([worker('a.one', {}), worker('a.two', { state: 'Down', queues: [q] }), worker('a.three', { state: 'Stale', queues: [q] })], messaging)

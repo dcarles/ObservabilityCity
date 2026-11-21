@@ -49,19 +49,22 @@ function unrouted(nodes: NodeSnapshot[], consumers: Set<string>): number {
 /** Adds up the island's consumers: the rate, the queue behind them, the oldest message and the dead-letter queue. */
 export function messagingOf(nodes: NodeSnapshot[], messaging?: MessagingSnapshot): Messaging {
   const consumers = consumersOf(messaging)
-  const workers = nodes.filter((n) => n.kind === 'Worker' && n.state !== 'Stale' && consumers.has(n.id))
+  const live = nodes.filter((n) => n.kind === 'Worker' && n.state !== 'Stale')
+  const workers = live.filter((n) => consumers.has(n.id))
+  // what waits and what is dead-lettered counts every worker that reads queues, whether or not a route names the sender of those queues
+  const readers = live.filter((n) => consumers.has(n.id) || (n.queues?.length ?? 0) > 0)
   const sum = (pick: (n: NodeSnapshot) => number | null | undefined) => {
-    const v = workers.map(pick).filter((x): x is number => x != null)
+    const v = readers.map(pick).filter((x): x is number => x != null)
     return v.length ? v.reduce((a, b) => a + b, 0) : null
   }
-  const oldest = workers.map((n) => n.oldestMessageSeconds).filter((x): x is number => x != null)
+  const oldest = readers.map((n) => n.oldestMessageSeconds).filter((x): x is number => x != null)
   return {
     perSecond: workers.filter((n) => n.state !== 'Down').reduce((a, n) => a + n.requestsPerSecond, 0) + unrouted(nodes, consumers),
     waiting: sum((n) => n.queueDepth),
     oldestSeconds: oldest.length ? Math.max(...oldest) : null,
     deadLetters: sum((n) => n.deadLetters),
-    amber: workers[0]?.backlogAmber ?? 60,
-    red: workers[0]?.backlogRed ?? 300,
+    amber: readers[0]?.backlogAmber ?? 60,
+    red: readers[0]?.backlogRed ?? 300,
     topics: messaging?.topics.length ?? 0,
     subscriptions: messaging?.subscriptions.length ?? 0,
   }

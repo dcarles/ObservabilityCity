@@ -119,7 +119,7 @@ public sealed partial class SnapshotBuilder(IRegistryProvider registries, Latest
             live.Concat(liveVendors).Count(n => n.State == HealthState.Degraded),
             live.Concat(liveVendors).Count(n => n.State == HealthState.Down),
             groups.Sum(g => g.Incidents.Count) + (events?.Count(e => e.State != "Resolved") ?? 0), // a resolved report is listed, not counted
-            live.Where(n => registry.ConsumerIds.Contains(n.Id)).Sum(n => n.DeadLetters ?? 0));
+            live.Sum(n => n.DeadLetters ?? 0)); // every worker that reads queues, whether or not a route names its sender
 
         var env = registry.ActiveEnvironment;
         var environments = registry.Environments.Count > 0
