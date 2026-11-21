@@ -2,6 +2,7 @@ import { groupWords } from '../groupLabel'
 import { fitHeads } from './sticky'
 import '../style.css'
 import '../dashboard.css'
+import { startHistory } from '../history/start'
 import { Connection, markFeed, SILENT_WORDS, type ConnectionState } from '../connection'
 import { checkSnapshot } from '../snapshotGuard'
 import { Inspector } from '../inspector'
@@ -313,7 +314,9 @@ export function startDashboard(plug?: PagePlug): void {
   $('wall-button-dash').addEventListener('click', () => enterWall(store))
 
   let held = false // for tests: while true, the snapshots from the server are ignored, so one fed by hand stays on screen
-  const connection = new Connection((raw) => { if (!held) onSnapshot(raw) }, setStatus, scope, (e) => {
+  // time travel: while it looks at the past, the live feed is ignored and recorded frames come through the same door
+  const history = startHistory({ scope, islands: () => islands, feed: (raw) => onSnapshot(raw) }, { beforeId: 'wall-button-dash' })
+  const connection = new Connection((raw) => { if (!held && !history.active) onSnapshot(raw) }, setStatus, scope, (e) => {
     const b = $('banner')
     b.textContent = `There is no environment "${e.requested ?? ''}". Available: ${e.environments.join(', ') || 'none'}.`
     b.hidden = false
@@ -377,6 +380,8 @@ export function startDashboard(plug?: PagePlug): void {
     seen,
     muteFeed: (muted: boolean, silentAfterMs?: number) => connection.mute(muted, silentAfterMs),
     feed: (raw: unknown) => onSnapshot(raw),
+    /** The time travel controller, for tests. */
+    history,
     /** For tests: let the page wait for its sources again, as it does when it has just opened. */
     resetLoading: () => loadingGate.reset(),
     /** For tests: stop (or resume) showing the server's snapshots; `feed` still works. */

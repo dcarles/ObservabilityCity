@@ -564,6 +564,7 @@ Hosting with sign-in is a later phase (see the [plan](observability-city-plan.md
 - **A writable `_discovered/`.** The process must be able to write `<town>/_discovered/` (saved readings, found links, `third-parties.yaml`).
 - **The login.** With the Azure adapter, define a `default` credential of kind `managed-identity` in each environment file, or the server tries the Azure CLI login (see [step 2](#azure-adapter)).
 - **Polling.** Set `Polling:AlwaysOn=true` if the town should be warm when someone opens it.
+- **History.** A live town records its snapshots (`History:*` settings, see the README) so the History button can take the town back up to `History:Days` days. Frames are saved only while the environment is being read, so a time nobody was looking at shows "nothing was recorded"; `Polling:AlwaysOn=true` records around the clock (and reads every environment around the clock). Keep `_history/` out of git; a hosted server needs one process writing it and storage that survives a restart.
 
 ## 7. Then the next environment, the next signal
 
