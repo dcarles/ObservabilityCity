@@ -16,7 +16,7 @@ namespace ObservabilityCity.Adapters.Azure;
 /// <c>file:name.json</c> replays a recorded answer kept beside the town's files.
 /// </summary>
 public sealed class FunctionJobsSource(
-    string name, string environmentId, RegistrySource definition, LogAnalyticsReader reader, ScopeStore store, ScopeRules rules, string? recording, TimeProvider time) : IMetricSource
+    string name, string environmentId, RegistrySource definition, LogAnalyticsReader reader, ScopeStore store, ScopeRules rules, string? recording, TimeProvider time) : IPastMetricSource, IMetricSource
 {
     public string Name => name;
     public TimeSpan PollInterval => definition.PollInterval;
@@ -24,6 +24,8 @@ public sealed class FunctionJobsSource(
     public TimeSpan Window { get; } = SourceQuery.WindowOf(definition);
 
     public Task<IReadOnlyDictionary<string, NodeReading>> PollAsync(TownRegistry registry, CancellationToken ct) => PollCore(registry, time.GetUtcNow(), false, ct);
+
+    public bool CanReadPast => recording is null;
 
     /// <summary>The jobs as they stood at a past time: the same query moved to that time (<see cref="SourceQuery.AtPast"/>), over the window that ended then, so last run, result and next run are as of then.</summary>
     public Task<IReadOnlyDictionary<string, NodeReading>> PollAtAsync(TownRegistry registry, DateTimeOffset at, CancellationToken ct) =>

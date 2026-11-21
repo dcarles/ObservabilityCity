@@ -154,6 +154,25 @@ public static partial class AdapterContract
 
     public static async Task AssertPollAsync(IMetricSource source, Registry registry) => Raise(await CheckPollAsync(source, registry));
 
+    /// <summary>
+    /// What a source that can read the past (<see cref="IPastMetricSource"/>) owes: readings as sensible as a live poll's, stamped with the time asked about, since the frame
+    /// built from them is dated by it. A source that says it cannot read the past (<c>CanReadPast</c> false) is not asked.
+    /// </summary>
+    public static async Task<IReadOnlyList<string>> CheckPastAsync(IPastMetricSource source, Registry registry, DateTimeOffset at)
+    {
+        if (!source.CanReadPast) return [];
+        try
+        {
+            var readings = await source.PollAtAsync(registry, at, CancellationToken.None);
+            var problems = CheckReadings(readings, registry).ToList();
+            foreach (var (id, r) in readings.Where(kv => kv.Value.At != at)) problems.Add($"{id}: the reading is stamped {r.At:O}, not the time asked about ({at:O}); a rebuilt frame is dated by it");
+            return problems;
+        }
+        catch (Exception e) { return [$"reading the past threw {e.GetType().Name}: {e.Message}"]; }
+    }
+
+    public static async Task AssertPastAsync(IPastMetricSource source, Registry registry, DateTimeOffset at) => Raise(await CheckPastAsync(source, registry, at));
+
     /// <summary>What a source may report: a number for a system the registry has, with rates at or above zero and shares between 0 and 1.</summary>
     public static IReadOnlyList<string> CheckReadings(IReadOnlyDictionary<string, NodeReading> readings, Registry registry)
     {

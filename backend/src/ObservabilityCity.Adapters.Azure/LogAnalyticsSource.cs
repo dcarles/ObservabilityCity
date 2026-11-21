@@ -304,7 +304,7 @@ public sealed record SpanRow(string Role, double Calls, double Errors, double? L
 /// <c>file:name.json</c> replays a recorded answer kept beside the town's files, for trying a query's shape offline and for tests.
 /// </summary>
 public sealed class LogAnalyticsSource(
-    string name, string environmentId, RegistrySource definition, LogAnalyticsReader reader, ScopeStore store, ScopeRules rules, string? recording, TimeProvider time) : IMetricSource, IDependencySource, IRateHistory, ILogRowSource
+    string name, string environmentId, RegistrySource definition, LogAnalyticsReader reader, ScopeStore store, ScopeRules rules, string? recording, TimeProvider time) : IPastMetricSource, IMetricSource, IDependencySource, IRateHistory, ILogRowSource
 {
     public bool CanReadDependencies => recording is null;
 
@@ -354,6 +354,8 @@ public sealed class LogAnalyticsSource(
     private readonly AzureSettings _settings = AzureSettings.Of(definition);
 
     public Task<IReadOnlyDictionary<string, NodeReading>> PollAsync(TownRegistry registry, CancellationToken ct) => PollCore(registry, time.GetUtcNow(), false, ct);
+
+    public bool CanReadPast => recording is null;
 
     /// <summary>
     /// What the source's queries said for the window that ended at a past time: the same query and the same rules as a live poll, with the time span of the question

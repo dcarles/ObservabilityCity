@@ -244,7 +244,7 @@ public sealed class AzureMonitorReader(HttpClient http, ICredentialSource? crede
 /// <c>file:name.json</c> replays recorded series (<c>{ "&lt;resource name&gt;": [ { "metric", "aggregation", "filter", "points": [...] } ] }</c>) kept beside the town's files.
 /// </summary>
 public sealed class AzureMonitorSource(
-    string name, string environmentId, RegistrySource definition, AzureMonitorReader reader, ScopeStore store, string? recording, TimeProvider time) : IProgressiveMetricSource
+    string name, string environmentId, RegistrySource definition, AzureMonitorReader reader, ScopeStore store, string? recording, TimeProvider time) : IPastMetricSource, IProgressiveMetricSource
 {
     public const int MaxParallel = 8;
 
@@ -271,6 +271,8 @@ public sealed class AzureMonitorSource(
     /// </summary>
     public Task PollAsync(TownRegistry registry, Action<IReadOnlyDictionary<string, NodeReading>> publish, CancellationToken ct) =>
         PollCore(registry, publish, time.GetUtcNow(), false, ct);
+
+    public bool CanReadPast => recording is null;
 
     /// <summary>
     /// The town's readings as they were at a past time, with the same rules as a live poll. A day of each resource's series is read in one call and kept, so the frames

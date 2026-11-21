@@ -145,7 +145,7 @@ public static class ResourceHealthLog
 /// <c>file:name.json</c> replays a recording: <c>{ "events": { "value": [ ...an activity log answer... ] }, "status": { "&lt;resource name&gt;": "Available" } }</c>.
 /// </summary>
 public sealed class ResourceHealthSource(
-    string name, string environmentId, RegistrySource definition, AzureMonitorReader reader, ScopeStore store, string? recording, TimeProvider time) : IMetricSource, IHealthEventSource, IRoundNote, IRetrySoon
+    string name, string environmentId, RegistrySource definition, AzureMonitorReader reader, ScopeStore store, string? recording, TimeProvider time) : IMetricSource, IPastHealthSource, IRoundNote, IRetrySoon
 {
     /// <summary>How far back the log is read when the source gives no window: a problem that lasts days must still be listed.</summary>
     public const string DefaultWindow = "3d";
@@ -294,6 +294,12 @@ public sealed class ResourceHealthSource(
         var (entries, failed, firstError) = await ReadLogAsync(asks, from, ct);
         if (failed.Count > 0) throw new HttpRequestException($"{failed.Count} of {asks.Count} activity log reads failed, so the past reports are not complete; the first: {firstError}");
         return entries;
+    }
+
+    public async Task<Func<DateTimeOffset, IReadOnlyList<ResourceHealthEvent>>> ReadSinceAsync(TownRegistry registry, DateTimeOffset from, CancellationToken ct)
+    {
+        var entries = await ReadLogSinceAsync(registry, from, ct);
+        return at => EventsAt(entries, at);
     }
 
     /// <summary>The reports as they stood at a past time, from entries read with <see cref="ReadLogSinceAsync"/>.</summary>

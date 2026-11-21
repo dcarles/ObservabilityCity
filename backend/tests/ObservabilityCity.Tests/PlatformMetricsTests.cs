@@ -546,6 +546,7 @@ public class PlatformMetricsTests
         var calls = http.Sent.Count;
         var ten = await past.PollAtAsync(registry, DateTimeOffset.Parse("2025-12-30T10:05:00Z"), CancellationToken.None);
 
+        await AdapterContract.AssertPastAsync(past, registry, DateTimeOffset.Parse("2025-12-30T10:05:00Z")); // what every adapter that reads the past owes
         Assert.Equal(calls, http.Sent.Count); // the second frame of the day asks Azure nothing
         var system = nine.First(kv => kv.Value.Cpu is not null).Key;
         Assert.Equal(0.9, nine[system].Cpu!.Value, 6); // the five minutes before 09:05 start in hour 9 (a share, not a percentage)

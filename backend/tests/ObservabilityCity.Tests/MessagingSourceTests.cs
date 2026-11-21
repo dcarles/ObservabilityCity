@@ -141,6 +141,7 @@ public class MessagingSourceTests
         var calls = http.Sent.Count;
         var ten = await past.PollAtAsync(registry, DateTimeOffset.Parse("2025-12-30T10:05:00Z"), CancellationToken.None);
 
+        await AdapterContract.AssertPastAsync(past, registry, DateTimeOffset.Parse("2025-12-30T10:05:00Z")); // what every adapter that reads the past owes
         Assert.Equal(calls, http.Sent.Count); // the second frame of the day asks Azure nothing
         Assert.True(nine["aa.orders-worker"].QueueDepth > 0);
         Assert.True(ten["aa.orders-worker"].QueueDepth > nine["aa.orders-worker"].QueueDepth);

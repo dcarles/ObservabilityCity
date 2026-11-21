@@ -19,7 +19,7 @@ namespace ObservabilityCity.Adapters.Azure;
 /// <c>file:name.json</c> replays recorded series (<c>{ "&lt;namespace name&gt;": [ { "entity", "metric", "aggregation", "points": [...] } ] }</c>).
 /// </summary>
 public sealed class ServiceBusSource(
-    string name, string environmentId, RegistrySource definition, AzureMonitorReader reader, ScopeStore store, string? recording, TimeProvider time, LogAnalyticsReader? logs = null, ScopeRules? rules = null) : IMetricSource
+    string name, string environmentId, RegistrySource definition, AzureMonitorReader reader, ScopeStore store, string? recording, TimeProvider time, LogAnalyticsReader? logs = null, ScopeRules? rules = null) : IPastMetricSource, IMetricSource
 {
     public string Name => name;
     public TimeSpan PollInterval => definition.PollInterval;
@@ -34,6 +34,8 @@ public sealed class ServiceBusSource(
     public int Unclaimed { get; private set; }
 
     public Task<IReadOnlyDictionary<string, NodeReading>> PollAsync(TownRegistry registry, CancellationToken ct) => PollCore(registry, time.GetUtcNow(), false, ct);
+
+    public bool CanReadPast => recording is null;
 
     /// <summary>
     /// The broker's numbers as they were at a past time. Each namespace's day is read in one call and kept, so every frame of that day costs nothing more. The
