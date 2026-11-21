@@ -39,6 +39,13 @@ export function hasMessaging(messaging: MessagingSnapshot | undefined): boolean 
   return !!messaging && (messaging.topics.length > 0 || messaging.subscriptions.length > 0)
 }
 
+/** The messages a second that arrive in the queues of workers no route points at (their queues have no named sender, so they are not consumers), counted once for each worker. */
+function unrouted(nodes: NodeSnapshot[], consumers: Set<string>): number {
+  return nodes
+    .filter((n) => n.kind === 'Worker' && n.state !== 'Stale' && n.state !== 'Down' && !consumers.has(n.id))
+    .reduce((a, n) => a + (n.queues ?? []).reduce((b, q) => b + (q.perSecond ?? 0), 0), 0)
+}
+
 /** Adds up the island's consumers: the rate, the queue behind them, the oldest message and the dead-letter queue. */
 export function messagingOf(nodes: NodeSnapshot[], messaging?: MessagingSnapshot): Messaging {
   const consumers = consumersOf(messaging)
@@ -49,7 +56,7 @@ export function messagingOf(nodes: NodeSnapshot[], messaging?: MessagingSnapshot
   }
   const oldest = workers.map((n) => n.oldestMessageSeconds).filter((x): x is number => x != null)
   return {
-    perSecond: workers.filter((n) => n.state !== 'Down').reduce((a, n) => a + n.requestsPerSecond, 0),
+    perSecond: workers.filter((n) => n.state !== 'Down').reduce((a, n) => a + n.requestsPerSecond, 0) + unrouted(nodes, consumers),
     waiting: sum((n) => n.queueDepth),
     oldestSeconds: oldest.length ? Math.max(...oldest) : null,
     deadLetters: sum((n) => n.deadLetters),

@@ -48,6 +48,21 @@ public class PillarFlowTests
     }
 
     [Fact]
+    public void A_pillar_with_no_topics_gets_its_flows_from_the_queues_a_service_reads_and_writes()
+    {
+        // one entry queue is "received", every queue named like an outbound queue (with or without a prefix word and suffix) is "sent"; no other name is picked up
+        IReadOnlyList<EntityFlow> shape = [new(@"^(?<pillar>[a-z]+)-gate-in-queue$", "received"), new(@"^(?<pillar>[a-z]+)-gate-(?:[a-z]+-)?out-queue.*$", "sent")];
+        var arrived = new Dictionary<string, double>
+        {
+            ["al-gate-in-queue"] = 6000, ["al-gate-out-queue"] = 600, ["al-gate-fast-out-queue"] = 1200, ["al-gate-out-queue-02-fast"] = 600, ["al-gate-misc-queue"] = 9999,
+        };
+
+        var flows = ServiceBusSource.PillarFlows(Prod(TownA), shape, arrived, Window);
+
+        Assert.Equal(new PillarFlowReading(4, 10, 600), flows["aa"]);
+    }
+
+    [Fact]
     public void Without_flows_in_the_config_nothing_is_reported()
     {
         Assert.Empty(ServiceBusSource.PillarFlows(Prod(TownA), null, new Dictionary<string, double> { ["al-out"] = 600 }, Window));
