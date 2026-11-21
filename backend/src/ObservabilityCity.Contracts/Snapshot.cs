@@ -607,7 +607,7 @@ public sealed record LogSection(string Id, IReadOnlyList<LogGroup> Groups, IRead
 public sealed record LogGroup(DateTimeOffset At, LogLevel? Level, string Text, int Count, double? DurationMs, string? Result);
 
 /// <summary>One recorded frame in the day index: when it was taken, how many systems were not healthy (degraded and down together, dead letters not counted) and how many of those were down.</summary>
-public sealed record HistoryPointSnapshot(DateTimeOffset At, int Unhealthy, int Down);
+public sealed record HistoryPointSnapshot(DateTimeOffset At, int Unhealthy, int Down, bool Rebuilt = false);
 
 /// <summary>
 /// What the history of one environment holds. Enabled is false for a demo town and when history is switched off; then nothing else is filled. Days is how far back the town can

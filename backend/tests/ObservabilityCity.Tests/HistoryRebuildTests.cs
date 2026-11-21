@@ -105,4 +105,26 @@ public class HistoryRebuildTests : IDisposable
         Assert.Empty(rebuilt.Points(ten));
         Assert.Contains(ten, rebuilder.MissingHours(ten));
     }
+
+    [Fact]
+    public async Task Recorded_and_rebuilt_frames_read_as_one_history_with_the_recorded_one_winning_and_each_saying_where_it_came_from()
+    {
+        var (rebuilder, recorded, rebuilt, _, frames) = Setup();
+        var nine = DateTimeOffset.Parse("2025-12-30T09:00:00Z");
+        foreach (var slot in rebuilder.Slots(nine, nine.AddMinutes(30))) await Record(frames, recorded, slot);
+        await rebuilder.RebuildHourAsync(nine, NoHealth, CancellationToken.None); // 09:30 to 09:55 only
+        var reader = new HistoryReader(recorded, rebuilt);
+
+        var points = reader.Points(nine);
+        var play = reader.FramesFrom(DateTimeOffset.Parse("2025-12-30T09:20:00Z"), 4);
+
+        Assert.Equal(12, points.Count);
+        Assert.All(points.Where(p => p.At < nine.AddMinutes(30)), p => Assert.False(p.Rebuilt));
+        Assert.All(points.Where(p => p.At >= nine.AddMinutes(30)), p => Assert.True(p.Rebuilt));
+        Assert.Equal([false, false, true, true], play.Select(f => f.Rebuilt)); // 09:20, 09:25, 09:30, 09:35
+        Assert.False(reader.FrameAtOrBefore(DateTimeOffset.Parse("2025-12-30T09:27:00Z"))!.Value.Rebuilt);
+        Assert.True(reader.FrameAtOrBefore(DateTimeOffset.Parse("2025-12-30T09:42:00Z"))!.Value.Rebuilt);
+        Assert.Equal(12, reader.Summary(nine).Frames);
+        Assert.Null(new HistoryReader(recorded, null).FrameAtOrBefore(DateTimeOffset.Parse("2025-12-30T09:50:00Z"))); // without the rebuilt store the gap is a gap
+    }
 }

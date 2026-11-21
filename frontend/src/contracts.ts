@@ -284,6 +284,7 @@ export interface components {
             unhealthy: number;
             /** Format: int32 */
             down: number;
+            rebuilt: boolean;
         };
         HistoryRange: {
             enabled: boolean;

@@ -19,7 +19,8 @@ public sealed class HistoryRecorder(
     HistoryOptions options,
     Demand? gate = null,
     TimeProvider? time = null,
-    ILogger<HistoryRecorder>? log = null) : BackgroundService
+    ILogger<HistoryRecorder>? log = null,
+    FileHistoryStore? rebuilt = null) : BackgroundService
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     private readonly TimeProvider _time = time ?? TimeProvider.System;
@@ -34,6 +35,14 @@ public sealed class HistoryRecorder(
         return new DateTimeOffset((now.UtcTicks / ticks + 1) * ticks, TimeSpan.Zero);
     }
 
+    /// <summary>Deletes what is older than the days kept, in the recorded store and in the rebuilt one.</summary>
+    private void Prune()
+    {
+        var oldest = _time.GetUtcNow() - options.Keep;
+        store.Prune(oldest);
+        rebuilt?.Prune(oldest);
+    }
+
     /// <summary>Saves a frame now if there is a fresh snapshot to save. Returns whether one was saved.</summary>
     public bool RecordOnce(DateTimeOffset slot)
     {
@@ -41,7 +50,7 @@ public sealed class HistoryRecorder(
         var json = ToJson(snapshot);
         var (unhealthy, down) = (snapshot.Totals.Degraded + snapshot.Totals.Down, snapshot.Totals.Down);
         var newHour = store.Append(slot, json, unhealthy, down);
-        if (newHour) store.Prune(_time.GetUtcNow() - options.Keep);
+        if (newHour) Prune();
         return true;
     }
 
@@ -50,7 +59,8 @@ public sealed class HistoryRecorder(
         try
         {
             store.EnsureIndex();
-            store.Prune(_time.GetUtcNow() - options.Keep);
+            rebuilt?.EnsureIndex();
+            Prune();
         }
         catch (Exception e) when (e is not OperationCanceledException)
         {

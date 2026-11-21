@@ -17,10 +17,10 @@ public static class HistoryEndpoints
         app.MapGet("/api/history/range", (EnvironmentSet envs, string? env, TimeProvider time) =>
             {
                 if (envs.Find(env) is not { } rt) return NotFound(envs, env);
-                if (rt.History is not { } store) return Results.Ok(new HistoryRange(false, options.EffectiveDays, (int)options.Interval.TotalSeconds, null, null, 0, 0, []));
+                if (rt.HistoryView is not { } store) return Results.Ok(new HistoryRange(false, options.EffectiveDays, (int)options.Interval.TotalSeconds, null, null, 0, 0, []));
                 var since = time.GetUtcNow() - options.Keep;
                 var summary = store.Summary(since);
-                var points = store.Points(since).Select(p => new HistoryPointSnapshot(p.At, p.Unhealthy, p.Down)).ToList();
+                var points = store.Points(since).Select(p => new HistoryPointSnapshot(p.At, p.Unhealthy, p.Down, p.Rebuilt)).ToList();
                 return Results.Ok(new HistoryRange(true, options.EffectiveDays, (int)options.Interval.TotalSeconds, summary.Oldest, summary.Newest, summary.Frames, summary.Bytes, points));
             })
            .Produces<HistoryRange>()
@@ -30,11 +30,11 @@ public static class HistoryEndpoints
         app.MapGet("/api/history/frame", (EnvironmentSet envs, string? env, string? at, TimeProvider time) =>
             {
                 if (envs.Find(env) is not { } rt) return NotFound(envs, env);
-                if (rt.History is not { } store) return Results.NotFound(new { error = "History is not kept for this environment." });
+                if (rt.HistoryView is not { } store) return Results.NotFound(new { error = "History is not kept for this environment." });
                 if (!TryTime(at, out var when)) return Results.BadRequest(new { error = "at must be a time such as 2026-11-21T09:00:00Z." });
                 if (when < time.GetUtcNow() - options.Keep) return Results.NotFound(new { error = $"History goes back {options.EffectiveDays} days." });
                 return store.FrameAtOrBefore(when) is { } frame
-                    ? Results.Content(Frame(frame.At, frame.Json), "application/json")
+                    ? Results.Content(Frame(frame.At, frame.Json, frame.Rebuilt), "application/json")
                     : Results.NotFound(new { error = "Nothing was recorded at that time." });
             })
            .ExcludeFromDescription();
@@ -43,22 +43,22 @@ public static class HistoryEndpoints
         app.MapGet("/api/history/frames", (EnvironmentSet envs, string? env, string? from, int? count) =>
             {
                 if (envs.Find(env) is not { } rt) return NotFound(envs, env);
-                if (rt.History is not { } store) return Results.NotFound(new { error = "History is not kept for this environment." });
+                if (rt.HistoryView is not { } store) return Results.NotFound(new { error = "History is not kept for this environment." });
                 if (!TryTime(from, out var start)) return Results.BadRequest(new { error = "from must be a time such as 2026-11-21T09:00:00Z." });
                 var frames = store.FramesFrom(start, Math.Clamp(count ?? MaxFrames, 1, MaxFrames));
                 var text = new StringBuilder("{\"frames\":[");
                 for (var i = 0; i < frames.Count; i++)
                 {
                     if (i > 0) text.Append(',');
-                    text.Append(Frame(frames[i].At, frames[i].Json));
+                    text.Append(Frame(frames[i].At, frames[i].Json, frames[i].Rebuilt));
                 }
                 return Results.Content(text.Append("]}").ToString(), "application/json");
             })
            .ExcludeFromDescription();
     }
 
-    private static string Frame(DateTimeOffset at, string snapshot) =>
-        $"{{\"at\":\"{at.ToString("O", CultureInfo.InvariantCulture)}\",\"snapshot\":{snapshot}}}";
+    private static string Frame(DateTimeOffset at, string snapshot, bool rebuilt) =>
+        $"{{\"at\":\"{at.ToString("O", CultureInfo.InvariantCulture)}\",\"rebuilt\":{(rebuilt ? "true" : "false")},\"snapshot\":{snapshot}}}";
 
     private static bool TryTime(string? text, out DateTimeOffset at) =>
         DateTimeOffset.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out at);
