@@ -102,7 +102,8 @@ body.wall #more-menu, body.dash #more-menu { display: none !important; }
 #topbar.fit-4 { gap: 6px 4px; }
 #topbar.fit-4 #view-bar { gap: 4px; }
 #topbar.fit-4 #view-bar .vb-btn { padding: 6px 7px; }
-#topbar.fit-4 #tools { gap: 3px; }
+#topbar.fit-4 #tools { gap: 2px; }
+#topbar.fit-4 #history-button { padding: 4px 3px; }
 #topbar.fit-4 button { padding: 4px 5px; }
 #topbar.fit-4 .chip { padding: 2px 3px; }
 #topbar.fit-4 #search { min-width: 80px; }

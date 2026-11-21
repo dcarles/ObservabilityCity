@@ -18,6 +18,8 @@ const STRIP_H = 76
 const TRAVEL_MS = 1500
 const MIDNIGHT_BAR = 16
 
+const CLOCK = '<svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true" style="vertical-align:-3px"><circle cx="10" cy="10" r="7.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M10 5.5V10l3 2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+
 const reduced = (): boolean => typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
 export function mountHistory(controller: HistoryController, mount: HistoryMount): void {
@@ -110,7 +112,10 @@ export function mountHistory(controller: HistoryController, mount: HistoryMount)
   function render(): void {
     const s = controller.state
     button.hidden = !s.enabled
-    button.textContent = text(s)
+    // live: only a small clock (the bar has little room, and "Live" is already said by the status); in the past: the moment and the speed, in words
+    if (s.active) button.textContent = text(s)
+    else if (!button.querySelector('svg')) button.innerHTML = CLOCK
+    button.setAttribute('aria-label', s.active ? `Looking at ${text(s)}. Open to jump, change the speed or go back to live.` : 'History')
     button.classList.toggle('travelling', s.active)
     button.title = s.active ? 'Looking at the past. Open to jump, change the speed or go back to live.' : 'Go back in time and see how the town looked'
     document.body.classList.toggle('history', s.active)
