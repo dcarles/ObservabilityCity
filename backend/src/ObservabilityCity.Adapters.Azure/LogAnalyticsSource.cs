@@ -148,6 +148,10 @@ public sealed class LogAnalyticsReader(HttpClient http, ICredentialSource? crede
         return rows;
     }
 
+    /// <summary>The job rows over the past span [from, to).</summary>
+    public async Task<IReadOnlyList<JobRow>> QueryJobsAsync(string workspace, string query, DateTimeOffset from, DateTimeOffset to, CancellationToken ct) =>
+        ParseJobs(await SendAsync(workspace, query, $"{LinkQuery.Iso(from)}/{LinkQuery.Iso(to)}", ct));
+
     public async Task<IReadOnlyList<JobRow>> QueryJobsAsync(string workspace, string query, TimeSpan window, CancellationToken ct) =>
         ParseJobs(await SendAsync(workspace, query, System.Xml.XmlConvert.ToString(window), ct));
 

@@ -23,7 +23,13 @@ public sealed class FunctionJobsSource(
     public TimeSpan Timeout => definition.Timeout;
     public TimeSpan Window { get; } = SourceQuery.WindowOf(definition);
 
-    public async Task<IReadOnlyDictionary<string, NodeReading>> PollAsync(TownRegistry registry, CancellationToken ct)
+    public Task<IReadOnlyDictionary<string, NodeReading>> PollAsync(TownRegistry registry, CancellationToken ct) => PollCore(registry, time.GetUtcNow(), false, ct);
+
+    /// <summary>The jobs as they stood at a past time: the same query moved to that time (<see cref="SourceQuery.AtPast"/>), over the window that ended then, so last run, result and next run are as of then.</summary>
+    public Task<IReadOnlyDictionary<string, NodeReading>> PollAtAsync(TownRegistry registry, DateTimeOffset at, CancellationToken ct) =>
+        recording is null ? PollCore(registry, at, true, ct) : throw new InvalidOperationException($"source '{name}' replays a recording, which has no past to read");
+
+    private async Task<IReadOnlyDictionary<string, NodeReading>> PollCore(TownRegistry registry, DateTimeOffset at, bool past, CancellationToken ct)
     {
         var view = registry.ForEnvironment(environmentId);
         if (recording is null && string.IsNullOrWhiteSpace(definition.Connection) && store.Inventory is null) await store.WaitForReadAsync(Timeout / 2, ct);
@@ -39,9 +45,10 @@ public sealed class FunctionJobsSource(
         {
             var query = definition.Query ?? throw new InvalidOperationException($"source '{name}' has no query. Write the query that returns one row per function app and job with the columns {string.Join(", ", LogAnalyticsReader.JobColumns)} (see docs/connect-your-company.md)");
             var workspace = LogAnalyticsSource.Workspace(name, definition, resolution);
-            rows = await reader.QueryJobsAsync(workspace, SourceQuery.Render(query, definition, environmentId, rules, []), Window, ct);
+            var rendered = SourceQuery.Render(query, definition, environmentId, rules, []);
+            rows = past ? await reader.QueryJobsAsync(workspace, SourceQuery.AtPast(rendered, at), at - Window, at, ct) : await reader.QueryJobsAsync(workspace, rendered, Window, ct);
         }
-        return Readings(asked, rows, time.GetUtcNow());
+        return Readings(asked, rows, at);
     }
 
     /// <summary>A reading for every asked function: the jobs of the rows whose app is one of its resources, each in the region of that resource (else the row's own).</summary>
