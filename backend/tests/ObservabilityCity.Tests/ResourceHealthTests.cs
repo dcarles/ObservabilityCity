@@ -44,6 +44,30 @@ public class ResourceHealthTests
         new(resource, DateTimeOffset.Parse(at), $"Microsoft.Resourcehealth/healthevent/{step}/action", current, previous, cause, title);
 
     [Fact]
+    public void The_reports_of_a_past_time_know_only_what_the_log_said_by_then()
+    {
+        var db = "/subscriptions/s/providers/p/accounts/db1";
+        var log = new[]
+        {
+            Entry(db, "2026-01-01T00:10:00Z", "Activated", "Degraded", "Available", "Unknown"),
+            Entry(db, "2026-01-01T00:20:00Z", "Resolved", "Available", "Degraded"),
+        };
+        var window = TimeSpan.FromDays(3);
+        var keep = TimeSpan.FromHours(4);
+
+        var before = ResourceHealthLog.At(log, DateTimeOffset.Parse("2026-01-01T00:05:00Z"), window, keep);
+        var during = ResourceHealthLog.At(log, DateTimeOffset.Parse("2026-01-01T00:15:00Z"), window, keep);
+        var after = ResourceHealthLog.At(log, DateTimeOffset.Parse("2026-01-01T00:30:00Z"), window, keep);
+        var muchLater = ResourceHealthLog.At(log, DateTimeOffset.Parse("2026-01-01T09:00:00Z"), window, keep);
+
+        Assert.Empty(before); // not written yet
+        Assert.Equal("Degraded", Assert.Single(during).State); // open: the recovery came later
+        Assert.Equal("Resolved", Assert.Single(after).State);
+        Assert.Empty(muchLater); // resolved long enough ago to be dropped, as a live round drops it
+        Assert.Empty(ResourceHealthLog.At(log, DateTimeOffset.Parse("2026-01-05T00:15:00Z"), window, keep)); // older than the window
+    }
+
+    [Fact]
     public void An_activation_opens_an_event_with_what_the_cloud_said()
     {
         var open = ResourceHealthLog.Open([Entry("/subscriptions/s/providers/p/accounts/db1", "2026-01-01T00:50:00Z", "Activated", "Degraded", "Available", "Unknown", "Account is degraded")]);
