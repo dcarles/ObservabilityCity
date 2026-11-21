@@ -148,6 +148,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/history/range": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetHistoryRange"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -260,6 +276,30 @@ export interface components {
             id: string;
             displayName: string;
             vendor: boolean;
+        };
+        HistoryPointSnapshot: {
+            /** Format: date-time */
+            at: string;
+            /** Format: int32 */
+            unhealthy: number;
+            /** Format: int32 */
+            down: number;
+        };
+        HistoryRange: {
+            enabled: boolean;
+            /** Format: int32 */
+            days: number;
+            /** Format: int32 */
+            intervalSeconds: number;
+            /** Format: date-time */
+            oldest?: string | null;
+            /** Format: date-time */
+            newest?: string | null;
+            /** Format: int32 */
+            frames: number;
+            /** Format: int64 */
+            bytes: number;
+            points: components["schemas"]["HistoryPointSnapshot"][];
         };
         InboundLinkSnapshot: {
             from: string;
@@ -937,6 +977,28 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SystemLogs"];
+                };
+            };
+        };
+    };
+    GetHistoryRange: {
+        parameters: {
+            query?: {
+                env?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HistoryRange"];
                 };
             };
         };

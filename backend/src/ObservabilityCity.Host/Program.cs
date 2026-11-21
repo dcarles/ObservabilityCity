@@ -1,5 +1,6 @@
 using ObservabilityCity.Adapters.Fake;
 using ObservabilityCity.Contracts;
+using ObservabilityCity.Core.History;
 using ObservabilityCity.Core.Links;
 using ObservabilityCity.Core.Logs;
 using ObservabilityCity.Core.Registry;
@@ -49,6 +50,8 @@ var snapshotInterval = TimeSpan.FromSeconds(builder.Configuration.GetValue("Snap
 // viewers are sent a snapshot when something changed, and at least this often so the feed shows it is alive (0 sends every tick)
 var keepAliveSeconds = builder.Configuration.GetValue("Snapshot:KeepAliveSeconds", 15.0);
 var staleAfter = TimeSpan.FromSeconds(builder.Configuration.GetValue("Snapshot:StaleAfterSeconds", 30.0));
+// The history section: how far back a live town can be taken and where the frames are kept (see HistoryOptions)
+var historyOptions = builder.Configuration.GetSection("History").Get<HistoryOptions>() ?? new HistoryOptions();
 
 Console.WriteLine($"Adapters: {string.Join(", ", sourceCatalog.Modules)}");
 foreach (var (_, registry) in loaded)
@@ -113,7 +116,9 @@ foreach (var (folder, registry) in loaded)
         };
         var scopeStore = set.Scope ?? new ScopeStore();
         ILogSource logs = fake is null ? new QueryLogSource(set.Sources, view, scopeStore, TimeProvider.System) : new FakeLogSource(state, TimeProvider.System, staleAfter);
-        runtimes.Add(new EnvironmentRuntime(registry.Town.Id, environmentId, view, fake, state, snapshots, store, logs, set.Sources, set.Problems, scopeStore, discovered, readings));
+        // only a live environment has a past worth keeping; a demo town's data is made up
+        var history = fake is null && historyOptions.Enabled ? new FileHistoryStore(Path.Combine(historyOptions.FolderFor(folder, registry.Town.Id), environmentId), historyOptions.Interval, startupLogs.CreateLogger<FileHistoryStore>()) : null;
+        runtimes.Add(new EnvironmentRuntime(registry.Town.Id, environmentId, view, fake, state, snapshots, store, logs, set.Sources, set.Problems, scopeStore, discovered, readings) { History = history });
     }
     var town = new TownRuntime(registry.Town.Id, registry.Town.Name, folder, registries, new EnvironmentSet(runtimes, registry.DefaultEnvironmentId, registry.Town.Id));
     townRuntimes.Add(town);
@@ -142,6 +147,8 @@ foreach (var (town, runtimes) in hostedByTown)
         if (rt.Discovered is not null && rt.Registry.Current.ActiveEnvironment?.Links?.Traffic is not null
             && rt.Sources.OfType<IDependencySource>().FirstOrDefault(s => s.CanReadDependencies && ((IMetricSource)s).Name == rt.Registry.Current.ActiveEnvironment.Links.Source) is { } trafficSource)
             builder.Services.AddSingleton<IHostedService>(sp => new LinkTrafficRunner(trafficSource, rt.Scope, rt.Registry, rt.Discovered.Traffic, TimeProvider.System, sp.GetRequiredService<ILogger<LinkTrafficRunner>>(), trafficSource as IRateHistory, rt.Gate));
+        if (rt.History is { } frames)
+            builder.Services.AddSingleton<IHostedService>(sp => new HistoryRecorder(frames, rt.Store, historyOptions, rt.Gate, TimeProvider.System, sp.GetRequiredService<ILogger<HistoryRecorder>>()));
         builder.Services.AddSingleton<IHostedService>(sp => new SnapshotPublisher(rt.Builder, rt.Store,
             new SignalRSnapshotNotifier(sp.GetRequiredService<IHubContext<TownHub>>(), town.Environments, sp.GetRequiredService<IslandViews>()),
             snapshotInterval, sp.GetRequiredService<ILogger<SnapshotPublisher>>(), keepAliveSeconds > 0 ? TimeSpan.FromSeconds(keepAliveSeconds) : null));
@@ -381,6 +388,9 @@ static IResult EnvironmentNotFound(EnvironmentSet envs, string? env) =>
     envs.Exists
         ? Results.NotFound(new { error = $"No environment '{env}'.", environments = envs.All.Select(e => e.Id) })
         : Results.NotFound(new { error = $"No town '{envs.TownId}'.", towns = Array.Empty<string>() });
+
+// The time bar's reads: what is recorded, one frame, and a few frames in a row for playback. Frames are served as the stored snapshot, not parsed again.
+HistoryEndpoints.Map(app, historyOptions);
 
 app.MapHub<TownHub>("/hubs/town");
 
