@@ -244,6 +244,19 @@ public class SourcePlumbingTests
     }
 
     [Fact]
+    public void A_system_no_route_names_still_counts_its_dead_letters_in_the_town_total()
+    {
+        // in the live town only the workers hold a subscription; the API's queues (an API-only service reads its own) are read all the same
+        using var withBus = LiveTownWith(ShapeB);
+        NodeReading Read(DateTimeOffset at) => new(at, true, 1, 1, 0, 1, 0, 10, QueueDepth: 40, OldestMessageSeconds: 5, DeadLetters: 7);
+
+        var snapshot = Build(Prod(withBus), Read, "aa.orders-api");
+
+        Assert.DoesNotContain("aa.orders-api", Prod(withBus).ConsumerIds);
+        Assert.Equal(7, snapshot.Totals.DeadLetters);
+    }
+
+    [Fact]
     public void A_queue_signal_is_present_only_when_a_messaging_source_is_configured()
     {
         using var withBus = LiveTownWith(ShapeB);
