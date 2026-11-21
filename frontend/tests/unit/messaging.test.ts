@@ -112,6 +112,20 @@ describe('what a pier reports', () => {
     expect([m.topics, m.subscriptions]).toEqual([1, 1])
   })
 
+  it('also counts the queue rates of a worker no route points at, once, and leaves routed workers as they are', () => {
+    const q = (perSecond: number | null) => ({ name: 'q', perSecond }) as unknown as NonNullable<NodeSnapshot['queues']>[number]
+    const m = messagingOf([worker('a.one', { queues: [q(500)] }), worker('a.two', { requestsPerSecond: 0, queues: [q(1500), q(500), q(null)] })], messaging)
+
+    expect(m.perSecond).toBe(10 + 2000)
+  })
+
+  it('does not count the queues of a worker that is down or stale', () => {
+    const q = { name: 'q', perSecond: 900 } as unknown as NonNullable<NodeSnapshot['queues']>[number]
+    const m = messagingOf([worker('a.one', {}), worker('a.two', { state: 'Down', queues: [q] }), worker('a.three', { state: 'Stale', queues: [q] })], messaging)
+
+    expect(m.perSecond).toBe(10)
+  })
+
   it('reports nothing for an island with no subscriptions, however busy its workers are', () => {
     const m = messagingOf([worker('a.one', {})], { topics: messaging.topics, subscriptions: [] })
 
