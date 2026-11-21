@@ -14,6 +14,9 @@ public sealed class HistoryRebuilder(FileHistoryStore recorded, FileHistoryStore
 {
     private static DateTimeOffset HourOf(DateTimeOffset at) => new(at.UtcDateTime.Year, at.UtcDateTime.Month, at.UtcDateTime.Day, at.UtcDateTime.Hour, 0, 0, TimeSpan.Zero);
 
+    /// <summary>Whether any of these sources can say what the past was (a metric source that is not a recording, or a health source).</summary>
+    public bool CanRebuildFrom(IReadOnlyList<IMetricSource> sources) => sources.Any(s => s is IPastMetricSource { CanReadPast: true } || s is IPastHealthSource);
+
     /// <summary>The slots of a stretch of time, oldest first: every multiple of the interval from the first one at or after <paramref name="from"/> up to (not including) <paramref name="to"/>.</summary>
     public IEnumerable<DateTimeOffset> Slots(DateTimeOffset from, DateTimeOffset to)
     {

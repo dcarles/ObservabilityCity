@@ -26,6 +26,25 @@ public static class HistoryEndpoints
            .Produces<HistoryRange>()
            .WithName("GetHistoryRange");
 
+        // How the filling of the gaps stands, for the loading card. Priority asks for the hour of a time to be filled next. A town that cannot rebuild says it is not running.
+        app.MapGet("/api/history/fill", (EnvironmentSet envs, string? env) =>
+            {
+                if (envs.Find(env) is not { } rt) return NotFound(envs, env);
+                var status = rt.Filler?.Status;
+                return Results.Ok(new HistoryFill(rt.Filler is not null, status?.Running ?? false, status?.Done ?? 0, status?.Total ?? 0, status?.Hour, status?.Problem));
+            })
+           .Produces<HistoryFill>()
+           .WithName("GetHistoryFill");
+
+        app.MapPost("/api/history/fill/priority", (EnvironmentSet envs, string? env, string? at) =>
+            {
+                if (envs.Find(env) is not { } rt) return NotFound(envs, env);
+                if (!TryTime(at, out var when)) return Results.BadRequest(new { error = "at must be a time such as 2026-11-21T09:00:00Z." });
+                rt.Filler?.Prioritise(when);
+                return Results.Accepted();
+            })
+           .ExcludeFromDescription();
+
         // The frame at (or just before) a time: the snapshot as it was. 404 when nothing was recorded then.
         app.MapGet("/api/history/frame", (EnvironmentSet envs, string? env, string? at, TimeProvider time) =>
             {

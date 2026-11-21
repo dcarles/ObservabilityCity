@@ -614,6 +614,9 @@ public sealed record HistoryPointSnapshot(DateTimeOffset At, int Unhealthy, int 
 /// go, IntervalSeconds the gap between frames, Oldest and Newest the first and last frame, Frames how many there are and Bytes what they take on disk. Points lists every frame
 /// from the start of the limit, for the time bar's strip.
 /// </summary>
+/// <summary>Where the filling of the history's gaps from the cloud stands: whether the environment can fill at all, whether it is working now, how many hours are done of how many, and the hour in hand.</summary>
+public sealed record HistoryFill(bool Available, bool Running, int Done, int Total, DateTimeOffset? Hour, string? Problem);
+
 public sealed record HistoryRange(
     bool Enabled,
     int Days,

@@ -127,4 +127,64 @@ public class HistoryRebuildTests : IDisposable
         Assert.Equal(12, reader.Summary(nine).Frames);
         Assert.Null(new HistoryReader(recorded, null).FrameAtOrBefore(DateTimeOffset.Parse("2025-12-30T09:50:00Z"))); // without the rebuilt store the gap is a gap
     }
+
+    private HistoryFiller Filler(HistoryRebuilder rebuilder, Stub source, Demand? gate) =>
+        new(rebuilder, [source], new RegistryHolder(RegistryLoader.Load(Town).ForEnvironment("prod")), new HistoryOptions { Days = 1 }, gate, _time);
+
+    [Fact]
+    public async Task A_pass_fills_every_gap_of_the_days_kept_newest_first_and_a_second_pass_finds_nothing_to_do()
+    {
+        var (rebuilder, _, rebuilt, source, _) = Setup();
+        var filler = Filler(rebuilder, source, gate: null);
+
+        await filler.PassAsync(CancellationToken.None);
+
+        Assert.False(filler.Status.Running);
+        Assert.Null(filler.Status.Problem);
+        Assert.True(filler.Status.Done >= 23);
+        Assert.Empty(rebuilder.MissingHours(DateTimeOffset.Parse("2025-12-29T12:30:00Z")));
+        var before = rebuilt.Points(DateTimeOffset.Parse("2025-12-29T00:00:00Z")).Count;
+        await filler.PassAsync(CancellationToken.None);
+        Assert.Equal(before, rebuilt.Points(DateTimeOffset.Parse("2025-12-29T00:00:00Z")).Count);
+    }
+
+    [Fact]
+    public async Task An_hour_a_person_asks_for_goes_first()
+    {
+        var order = new List<DateTimeOffset>();
+        var (rebuilder, _, _, source, _) = Setup(t => { order.Add(t); return new Dictionary<string, NodeReading> { ["aa.orders-api"] = Reading(t, 1) }; });
+        var filler = Filler(rebuilder, source, gate: null);
+
+        filler.Prioritise(DateTimeOffset.Parse("2025-12-29T15:20:00Z"));
+        await filler.PassAsync(CancellationToken.None);
+
+        Assert.Equal(DateTimeOffset.Parse("2025-12-29T15:00:00Z"), order[0]); // not the newest hour
+        Assert.Equal(DateTimeOffset.Parse("2025-12-30T11:00:00Z"), order[12]); // then the newest hour
+    }
+
+    [Fact]
+    public async Task Nothing_is_fetched_when_nobody_looks_and_a_failed_hour_is_tried_again_only_after_ten_minutes()
+    {
+        var failing = true;
+        var (rebuilder, _, rebuilt, source, _) = Setup(t => failing ? throw new HttpRequestException("login expired") : new Dictionary<string, NodeReading> { ["aa.orders-api"] = Reading(t, 1) });
+        var nobody = new Demand();
+        await Filler(rebuilder, source, nobody).PassAsync(CancellationToken.None);
+        Assert.Equal(0, source.Asked); // nobody is looking
+
+        var viewers = new Demand();
+        viewers.Join();
+        var filler = Filler(rebuilder, source, viewers);
+        await filler.PassAsync(CancellationToken.None);
+        Assert.Contains("login expired", filler.Status.Problem);
+        Assert.Empty(rebuilt.Points(DateTimeOffset.Parse("2025-12-29T00:00:00Z")));
+        var asked = source.Asked;
+
+        failing = false;
+        await filler.PassAsync(CancellationToken.None);
+        Assert.Equal(asked, source.Asked); // left alone for now
+
+        _time.Advance(TimeSpan.FromMinutes(11));
+        await filler.PassAsync(CancellationToken.None);
+        Assert.NotEmpty(rebuilt.Points(DateTimeOffset.Parse("2025-12-29T00:00:00Z")));
+    }
 }
