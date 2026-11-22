@@ -54,7 +54,9 @@ public sealed class HistoryRebuilder(FileHistoryStore recorded, FileHistoryStore
         {
             if (have.Contains(slot)) continue;
             ct.ThrowIfCancellationRequested();
+            var frameClock = System.Diagnostics.Stopwatch.StartNew();
             built.Add((slot, HistoryRecorder.ToJson(await frames.BuildAsync(slot, ct))));
+            log?.LogInformation("History: built the frame {At} ({Done} of {Total} of the hour) in {Seconds:0.0} s", slot.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture), built.Count, Slots(hour, hour.AddHours(1)).Count(s => !have.Contains(s)), frameClock.Elapsed.TotalSeconds);
         }
         foreach (var (at, json) in built)
         {
