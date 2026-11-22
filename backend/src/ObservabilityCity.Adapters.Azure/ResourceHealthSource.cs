@@ -87,18 +87,6 @@ public static class ResourceHealthLog
     }
 
     /// <summary>
-    /// The reports as the log stood at a past time: only what had been written by then and not older than the window decides, so a recovery that came later is not known yet. The cloud's
-    /// current word on a resource (Available now) is not asked for the past; the log alone says. Resolved reports stay listed for <paramref name="keepResolvedFor"/> as in a live round.
-    /// </summary>
-    public static IReadOnlyList<ResourceHealthEvent> At(IEnumerable<HealthLogEntry> entries, DateTimeOffset at, TimeSpan window, TimeSpan keepResolvedFor)
-    {
-        var seen = entries.Where(e => e.At <= at && e.At >= at - window).ToList();
-        var open = Open(seen);
-        var openIds = open.Select(e => e.Id).ToHashSet();
-        return [.. open, .. Resolved(seen, at - keepResolvedFor).Where(e => !openIds.Contains(e.Id))];
-    }
-
-    /// <summary>
     /// The events that ended: every run of entries that a resolution (or an Available state) closed, resolved no earlier than <paramref name="since"/>. A resource can have several: one that went
     /// wrong, recovered and went wrong again has the first listed as resolved and the second as open (see <see cref="Open"/>), each with its own id. State is "Resolved", Since when it went
     /// wrong, ResolvedAt when the log says it recovered, Previous what it was before.
@@ -145,7 +133,7 @@ public static class ResourceHealthLog
 /// <c>file:name.json</c> replays a recording: <c>{ "events": { "value": [ ...an activity log answer... ] }, "status": { "&lt;resource name&gt;": "Available" } }</c>.
 /// </summary>
 public sealed class ResourceHealthSource(
-    string name, string environmentId, RegistrySource definition, AzureMonitorReader reader, ScopeStore store, string? recording, TimeProvider time) : IMetricSource, IPastHealthSource, IRoundNote, IRetrySoon
+    string name, string environmentId, RegistrySource definition, AzureMonitorReader reader, ScopeStore store, string? recording, TimeProvider time) : IMetricSource, IHealthEventSource, IRoundNote, IRetrySoon
 {
     /// <summary>How far back the log is read when the source gives no window: a problem that lasts days must still be listed.</summary>
     public const string DefaultWindow = "3d";
@@ -278,33 +266,6 @@ public sealed class ResourceHealthSource(
         $"{events.Count} reports ({events.Count(e => e.State != "Resolved")} open)";
 
     /// <summary>The subscription and provider pairs to read: a pair is asked only when the inventory has a resource of that provider in that subscription, since an empty one cannot have a report that lands on a building.</summary>
-    /// <summary>
-    /// The log's entries from <paramref name="from"/> until now, for every subscription and provider the inventory has resources for, to work out the reports of past times with
-    /// <see cref="ResourceHealthLog.At"/>. One read serves every frame after <paramref name="from"/>. A read that fails fails the whole call: a rebuilt past with some reports missing would show a
-    /// resource as fine that was not. The activity log keeps about 90 days.
-    /// </summary>
-    public async Task<IReadOnlyList<HealthLogEntry>> ReadLogSinceAsync(TownRegistry registry, DateTimeOffset from, CancellationToken ct)
-    {
-        if (recording is not null) return ReadRecording(await File.ReadAllTextAsync(recording, ct)).Entries;
-        if (store.Inventory is null) await store.WaitForReadAsync(Timeout / 2, ct);
-        var resolution = store.Resolve(registry.ForEnvironment(environmentId));
-        var subscriptions = resolution.Systems.Select(s => s.AccountId).Concat(resolution.Pillars.Select(p => p.AccountId)).Concat(resolution.AssetList.Select(a => a.AccountId))
-            .Where(id => !string.IsNullOrEmpty(id)).Select(id => id!).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-        var asks = AsksOf(subscriptions, store.Inventory);
-        var (entries, failed, firstError) = await ReadLogAsync(asks, from, ct);
-        if (failed.Count > 0) throw new HttpRequestException($"{failed.Count} of {asks.Count} activity log reads failed, so the past reports are not complete; the first: {firstError}");
-        return entries;
-    }
-
-    public async Task<Func<DateTimeOffset, IReadOnlyList<ResourceHealthEvent>>> ReadSinceAsync(TownRegistry registry, DateTimeOffset from, CancellationToken ct)
-    {
-        var entries = await ReadLogSinceAsync(registry, from - Window, ct); // a report open at "from" started up to a window before it
-        return at => EventsAt(entries, at);
-    }
-
-    /// <summary>The reports as they stood at a past time, from entries read with <see cref="ReadLogSinceAsync"/>.</summary>
-    public IReadOnlyList<ResourceHealthEvent> EventsAt(IEnumerable<HealthLogEntry> entries, DateTimeOffset at) => ResourceHealthLog.At(entries, at, Window, KeepResolvedFor);
-
     public IReadOnlyList<(string Subscription, string Provider)> AsksOf(IReadOnlyList<string> subscriptions, Inventory? inventory)
     {
         var has = inventory is null ? null : inventory.Resources.Select(r => (r.AccountId.ToLowerInvariant(), ProviderOf(r.Type))).ToHashSet();

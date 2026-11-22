@@ -152,11 +152,11 @@ foreach (var (town, runtimes) in hostedByTown)
             builder.Services.AddSingleton<IHostedService>(sp => new HistoryRecorder(frames, rt.Store, historyOptions, rt.Gate, TimeProvider.System, sp.GetRequiredService<ILogger<HistoryRecorder>>(), rt.RebuiltHistory));
         if (rt.History is { } recordedFrames && rt.RebuiltHistory is { } rebuiltFrames && rt.Fake is null)
         {
-            var pastFrames = new PastFrameBuilder(rt.Builder, rt.State, rt.Registry, rt.Sources);
+            var pastFrames = new PastFrameBuilder(rt.Builder, rt.State, rt.Registry, rt.Sources, startupLogs.CreateLogger<PastFrameBuilder>());
             var rebuilder = new HistoryRebuilder(recordedFrames, rebuiltFrames, pastFrames, historyOptions.Interval, TimeProvider.System, startupLogs.CreateLogger<HistoryRebuilder>());
             if (rebuilder.CanRebuildFrom(rt.Sources))
             {
-                rt.Filler = new HistoryFiller(rebuilder, rt.Sources, rt.Registry, historyOptions, rt.Gate, TimeProvider.System, startupLogs.CreateLogger<HistoryFiller>());
+                rt.Filler = new HistoryFiller(rebuilder, rt.Sources, historyOptions, rt.Gate, TimeProvider.System, startupLogs.CreateLogger<HistoryFiller>());
                 builder.Services.AddSingleton<IHostedService>(rt.Filler);
             }
         }

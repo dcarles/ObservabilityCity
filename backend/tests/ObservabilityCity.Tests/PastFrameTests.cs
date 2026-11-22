@@ -36,13 +36,15 @@ public class PastFrameTests
 
     private static NodeReading Reading(DateTimeOffset at, double rps, int instances = 0) => new(at, true, instances, instances, 0, rps, 0.001, 50);
 
-    private static (PastFrameBuilder Frames, TownRegistry Registry) Frames(params IMetricSource[] sources)
+    private static (PastFrameBuilder Frames, TownRegistry Registry) Frames(params IMetricSource[] sources) => FramesLogged(null, sources);
+
+    private static (PastFrameBuilder Frames, TownRegistry Registry) FramesLogged(Microsoft.Extensions.Logging.ILogger? log, params IMetricSource[] sources)
     {
         var registry = RegistryLoader.Load(Town).ForEnvironment("prod");
         var liveState = new LatestState();
         liveState.Update("inventory", new Dictionary<string, NodeReading> { ["aa.orders-api"] = Reading(Now, 0, 3) });
         var live = new SnapshotBuilder(registry, liveState, new FixedClock(Now)) { Environment = "prod" };
-        return (new PastFrameBuilder(live, liveState, new RegistryHolder(registry), sources), registry);
+        return (new PastFrameBuilder(live, liveState, new RegistryHolder(registry), sources, log), registry);
     }
 
     private static NodeSnapshot Node(Snapshot s, string id) => s.Groups.SelectMany(g => g.Nodes).First(n => n.Id == id);
@@ -53,7 +55,7 @@ public class PastFrameTests
         var telemetry = new Past("telemetry", at => new Dictionary<string, NodeReading> { ["aa.orders-api"] = Reading(at, 7) });
         var (frames, _) = Frames(telemetry, new Inventory("inventory"));
 
-        var snapshot = await frames.BuildAsync(Then, new Dictionary<string, Func<DateTimeOffset, IReadOnlyList<ResourceHealthEvent>>>(), CancellationToken.None);
+        var snapshot = await frames.BuildAsync(Then, CancellationToken.None);
 
         var api = Node(snapshot, "aa.orders-api");
         Assert.Equal(7, api.RequestsPerSecond); // what the source said for then
@@ -69,7 +71,7 @@ public class PastFrameTests
         var recorded = new Past("telemetry", at => new Dictionary<string, NodeReading> { ["aa.orders-api"] = Reading(at, 7) }, can: false);
         var (frames, _) = Frames(recorded, new Inventory("inventory"));
 
-        var snapshot = await frames.BuildAsync(Then, new Dictionary<string, Func<DateTimeOffset, IReadOnlyList<ResourceHealthEvent>>>(), CancellationToken.None);
+        var snapshot = await frames.BuildAsync(Then, CancellationToken.None);
 
         Assert.Equal(0, recorded.Asked);
         Assert.NotEqual(7, Node(snapshot, "aa.orders-api").RequestsPerSecond);
@@ -81,20 +83,26 @@ public class PastFrameTests
         var failing = new Past("telemetry", _ => throw new HttpRequestException("Log Analytics answered 429"));
         var (frames, _) = Frames(failing, new Inventory("inventory"));
 
-        await Assert.ThrowsAsync<HttpRequestException>(() => frames.BuildAsync(Then, new Dictionary<string, Func<DateTimeOffset, IReadOnlyList<ResourceHealthEvent>>>(), CancellationToken.None));
+        await Assert.ThrowsAsync<HttpRequestException>(() => frames.BuildAsync(Then, CancellationToken.None));
     }
 
     [Fact]
-    public async Task The_health_reports_of_that_time_are_in_the_frame()
+    public async Task A_frame_has_no_health_reports_of_the_cloud_and_a_slow_or_failing_source_is_logged()
     {
-        var (frames, _) = Frames(new Past("telemetry", at => new Dictionary<string, NodeReading> { ["aa.orders-api"] = Reading(at, 7) }), new Inventory("inventory"));
-        var event1 = new ResourceHealthEvent("e1", "/subscriptions/s/providers/p/accounts/db1", "db1", "Degraded", "Available", "Unknown", Then.AddMinutes(-5), "Account is degraded");
-        var health = new Dictionary<string, Func<DateTimeOffset, IReadOnlyList<ResourceHealthEvent>>> { ["health"] = at => at >= event1.Since ? [event1] : [] };
+        var log = new Lines();
+        var (logged, _) = FramesLogged(log, new Past("telemetry", at => throw new HttpRequestException("Log Analytics answered 429")), new Inventory("inventory"));
+        await Assert.ThrowsAsync<HttpRequestException>(() => logged.BuildAsync(Then, CancellationToken.None));
+        Assert.Contains(log.Messages, m => m.Contains("telemetry") && m.Contains("429"));
 
-        var during = await frames.BuildAsync(Then, health, CancellationToken.None);
-        var before = await frames.BuildAsync(Then.AddHours(-1), health, CancellationToken.None);
+        var (ok, _) = Frames(new Past("telemetry", at => new Dictionary<string, NodeReading> { ["aa.orders-api"] = Reading(at, 7) }), new Inventory("inventory"));
+        Assert.Empty((await ok.BuildAsync(Then, CancellationToken.None)).HealthEvents ?? []);
+    }
 
-        Assert.Contains(during.HealthEvents ?? [], e => e.Id == "e1");
-        Assert.DoesNotContain(before.HealthEvents ?? [], e => e.Id == "e1");
+    private sealed class Lines : Microsoft.Extensions.Logging.ILogger
+    {
+        public List<string> Messages { get; } = [];
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(Microsoft.Extensions.Logging.LogLevel level) => true;
+        public void Log<TState>(Microsoft.Extensions.Logging.LogLevel level, Microsoft.Extensions.Logging.EventId id, TState state, Exception? exception, Func<TState, Exception?, string> formatter) => Messages.Add(formatter(state, exception));
     }
 }
