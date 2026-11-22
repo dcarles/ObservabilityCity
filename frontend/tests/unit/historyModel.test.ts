@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { addressAt, addressLive, advance, buildStrip, catchUpSeconds, fieldTime, fieldValue, frameFor, halfHourMark, quickPicks, requestedAt, SPEEDS, stepMoves, waitingText, stripTime, stripTip, stripX, viewedText } from '../../src/history/model'
+import { addressAt, addressLive, advance, buildStrip, catchUpSeconds, fieldTime, fieldValue, frameFor, halfHourMark, historyAgeText, quickPicks, requestedAt, sizeText, SPEEDS, stepMoves, waitingText, stripTime, stripTip, stripX, viewedText } from '../../src/history/model'
 
 const MIN = 60_000
 const GAP = 5 * MIN
@@ -182,5 +182,26 @@ describe('the words of the loading card', () => {
     expect(text).toContain('2 hours are built before it, so about 6 min')
     expect(text).toContain('Fri 20 Nov 05:03')
     expect(waitingText(at, { ahead: 1, building: false, secondsPerHour: null })).toBe('Rebuilding Fri 20 Nov 05:03 from the cloud. 1 hour is built before it. The clock waits for it.')
+  })
+})
+
+describe('the words about what is held', () => {
+  it('says the days of history, or hours when it is younger than a day', () => {
+    expect(historyAgeText(NOW - 12 * 86_400_000, NOW)).toBe('12 days of history')
+    expect(historyAgeText(NOW - 86_400_000, NOW)).toBe('1 day of history')
+    expect(historyAgeText(NOW - 5 * 3_600_000, NOW)).toBe('5 hours of history')
+    expect(historyAgeText(NOW - 20 * MIN, NOW)).toBe('Less than an hour of history')
+  })
+
+  it('says the size in MB from one MB up and in KB below', () => {
+    expect(sizeText(36_819 * 1024)).toBe('36.0 MB')
+    expect(sizeText(300 * 1024)).toBe('300 KB')
+    expect(sizeText(10)).toBe('1 KB')
+  })
+
+  it('leaves the y scale of the strip at the highest count, never below 1', () => {
+    const g = { width: 600, height: 60, from: NOW - 3_600_000, to: NOW }
+    expect(buildStrip([{ at: NOW - 10 * MIN, unhealthy: 0 }], g, GAP).max).toBe(1)
+    expect(buildStrip([{ at: NOW - 10 * MIN, unhealthy: 7 }, { at: NOW - 5 * MIN, unhealthy: 3 }], g, GAP).max).toBe(7)
   })
 })

@@ -273,3 +273,17 @@ export function stripTip(points: readonly HistoryPoint[] | readonly { at: number
   const worse = best.unhealthy === 0 ? 'none degraded' : `${best.unhealthy} degraded${best.down > 0 ? `, ${best.down} down` : ''}`
   return `${viewedText(at)} · ${worse}${best.rebuilt ? ' · rebuilt from the cloud' : ''}`
 }
+
+/** How much history is held, in words: whole days from the oldest frame to now, or hours (and "less than an hour") when it is younger than a day. */
+export function historyAgeText(oldest: number, now: number): string {
+  const hours = Math.max(0, now - oldest) / 3_600_000
+  if (hours < 1) return 'Less than an hour of history'
+  if (hours < 24) return `${Math.round(hours)} ${Math.round(hours) === 1 ? 'hour' : 'hours'} of history`
+  const days = Math.round(hours / 24)
+  return `${days} ${days === 1 ? 'day' : 'days'} of history`
+}
+
+/** A size on disk for people: MB with one decimal from 1 MB up, else whole KB. */
+export function sizeText(bytes: number): string {
+  return bytes >= 1_048_576 ? `${(bytes / 1_048_576).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`
+}
