@@ -275,8 +275,8 @@ public sealed class AzureMonitorSource(
     public bool CanReadPast => recording is null;
 
     /// <summary>
-    /// The town's readings as they were at a past time, with the same rules as a live poll. A day of each resource's series is read in one call and kept, so the frames
-    /// of that day cost no more calls (<see cref="MetricDay"/>); a resource that cannot be read fails the whole answer, as in a live poll.
+    /// The town's readings as they were at a past time, with the same rules as a live poll. An hour of each resource's series is read in one call and kept, so the frames
+    /// of that hour cost no more calls (<see cref="PastChunk"/>); a resource that cannot be read fails the whole answer, as in a live poll.
     /// </summary>
     public async Task<IReadOnlyDictionary<string, NodeReading>> PollAtAsync(TownRegistry registry, DateTimeOffset at, CancellationToken ct)
     {
@@ -286,6 +286,7 @@ public sealed class AzureMonitorSource(
     }
 
     private readonly Dictionary<(string Resource, MetricGroup Group, DateTimeOffset Day), Task<IReadOnlyList<MetricSeries>>> _days = [];
+    private readonly List<(string Resource, MetricGroup Group, DateTimeOffset Day)> _order = [];
 
     private async Task PollCore(TownRegistry registry, Action<IReadOnlyDictionary<string, NodeReading>> publish, DateTimeOffset at, bool bulk, CancellationToken ct)
     {
@@ -401,21 +402,48 @@ public sealed class AzureMonitorSource(
     private static IEnumerable<MetricSignal> Flatten(MetricSignal s) =>
         new[] { s }.Concat(s.Over is null ? [] : Flatten(s.Over)).Concat(s.OrElse is null ? [] : Flatten(s.OrElse));
 
-    /// <summary>The UTC day a time falls in, which is the span one read covers when the past is rebuilt.</summary>
-    public static DateTimeOffset MetricDay(DateTimeOffset at) => new(at.UtcDateTime.Date, TimeSpan.Zero);
+    /// <summary>
+    /// How much time one read covers when the past is rebuilt: an hour. A day of a busy namespace's queues is over the 8 MB Azure answers with (a 400 "response size exceeded maximum limit"),
+    /// an hour is a twenty-fourth of it.
+    /// </summary>
+    public static readonly TimeSpan PastChunk = TimeSpan.FromHours(1);
 
-    /// <summary>The series that were read for the window ending at <paramref name="at"/>, cut out of the day's one read (the day is read once, from the window before its first frame to its end).</summary>
+    /// <summary>The start of the hour a time falls in (the end of an hour belongs to the hour that ended).</summary>
+    public static DateTimeOffset MetricChunk(DateTimeOffset at) => new(at.UtcDateTime.Ticks / PastChunk.Ticks * PastChunk.Ticks, TimeSpan.Zero);
+
+    /// <summary>How many chunks a source keeps read: the frames of an hour are built one after the other, so the last few are all that is asked again.</summary>
+    public const int ChunksKept = 4;
+
+    /// <summary>Forgets what was read for all but the last <see cref="ChunksKept"/> hours from a cache whose keys are added in the order they were read (<paramref name="hourOf"/> says which hour a key is of).</summary>
+    public static void Trim<TKey, TValue>(Dictionary<TKey, TValue> cache, List<TKey> order, Func<TKey, DateTimeOffset> hourOf) where TKey : notnull
+    {
+        var keep = order.Select(hourOf).Distinct().OrderByDescending(h => h).Take(ChunksKept).ToHashSet();
+        foreach (var key in order.Where(k => !keep.Contains(hourOf(k))).ToList()) { cache.Remove(key); order.Remove(key); }
+    }
+
+    /// <summary>The series that were read for the window ending at <paramref name="at"/>, cut out of the hour's one read (the hour is read once, from the window before its first frame to its end).</summary>
     private async Task<IReadOnlyList<MetricSeries>> ReadResourceDay(Target target, DateTimeOffset at, CancellationToken ct)
     {
         var window = target.Group.Window ?? Window;
-        var day = MetricDay(at.AddTicks(-1)); // a frame at midnight sharp belongs to the day that ended
+        var day = MetricChunk(at.AddTicks(-1)); // a frame on the hour sharp belongs to the hour that ended
         Task<IReadOnlyList<MetricSeries>> read;
         lock (_days)
         {
             if (!_days.TryGetValue((target.Resource.Id, target.Group, day), out read!))
-                _days[(target.Resource.Id, target.Group, day)] = read = ReadResourceWindow(target, day.AddDays(1), TimeSpan.FromDays(1) + window, ct);
+            {
+                _days[(target.Resource.Id, target.Group, day)] = read = ReadResourceWindow(target, day + PastChunk, PastChunk + window, ct);
+                _order.Add((target.Resource.Id, target.Group, day));
+                Trim(_days, _order, k => k.Day);
+            }
         }
-        var whole = await read;
+        IReadOnlyList<MetricSeries> whole;
+        try { whole = await read; }
+        catch
+        {
+            lock (_days)
+                if (_days.TryGetValue((target.Resource.Id, target.Group, day), out var kept) && ReferenceEquals(kept, read)) { _days.Remove((target.Resource.Id, target.Group, day)); _order.Remove((target.Resource.Id, target.Group, day)); }
+            throw; // a read that failed is asked again next time, not remembered as failed
+        }
         return AtWindow(whole, at - window, at);
     }
 

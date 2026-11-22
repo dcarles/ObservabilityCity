@@ -131,7 +131,7 @@ public class MessagingSourceTests
     }
 
     [Fact]
-    public async Task The_past_is_read_a_day_at_a_time_and_each_frame_gets_the_numbers_of_its_own_window()
+    public async Task The_past_is_read_an_hour_at_a_time_and_each_frame_gets_the_numbers_of_its_own_window()
     {
         var http = new CannedHttp().Respond(QueueByHour);
         var (source, registry) = await Messaging(TownA, http);
@@ -139,13 +139,36 @@ public class MessagingSourceTests
 
         var nine = await past.PollAtAsync(registry, DateTimeOffset.Parse("2025-12-30T09:05:00Z"), CancellationToken.None);
         var calls = http.Sent.Count;
+        await past.PollAtAsync(registry, DateTimeOffset.Parse("2025-12-30T09:35:00Z"), CancellationToken.None);
+        Assert.Equal(calls, http.Sent.Count); // the second frame of the hour asks Azure nothing
         var ten = await past.PollAtAsync(registry, DateTimeOffset.Parse("2025-12-30T10:05:00Z"), CancellationToken.None);
 
         await AdapterContract.AssertPastAsync(past, registry, DateTimeOffset.Parse("2025-12-30T10:05:00Z")); // what every adapter that reads the past owes
-        Assert.Equal(calls, http.Sent.Count); // the second frame of the day asks Azure nothing
+        Assert.True(http.Sent.Count > calls); // the next hour is read on its own: a whole day is over the 8 MB Azure answers with
+        Assert.All(http.Sent, r =>
+        {
+            var span = System.Web.HttpUtility.ParseQueryString(r.Uri!.Query)["timespan"]!.Split('/');
+            Assert.True(DateTimeOffset.Parse(span[1]) - DateTimeOffset.Parse(span[0]) <= TimeSpan.FromHours(2));
+        });
         Assert.True(nine["aa.orders-worker"].QueueDepth > 0);
         Assert.True(ten["aa.orders-worker"].QueueDepth > nine["aa.orders-worker"].QueueDepth);
         Assert.Equal(DateTimeOffset.Parse("2025-12-30T09:05:00Z"), nine["aa.orders-worker"].At);
+    }
+
+    [Fact]
+    public async Task A_past_read_that_failed_is_asked_again_and_not_remembered_as_failed()
+    {
+        var failing = true;
+        var http = new CannedHttp().Respond(r => failing ? throw new HttpRequestException("Azure Monitor answered 400 Bad Request: response size exceeded maximum limit of 8MB") : QueueByHour(r));
+        var (source, registry) = await Messaging(TownA, http);
+        var past = (ServiceBusSource)source;
+        var at = DateTimeOffset.Parse("2025-12-30T09:05:00Z");
+
+        await Assert.ThrowsAnyAsync<Exception>(() => past.PollAtAsync(registry, at, CancellationToken.None));
+        failing = false;
+        var again = await past.PollAtAsync(registry, at, CancellationToken.None);
+
+        Assert.True(again["aa.orders-worker"].QueueDepth > 0);
     }
 
     [Fact]

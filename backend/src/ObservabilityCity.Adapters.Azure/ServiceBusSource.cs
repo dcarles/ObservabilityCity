@@ -38,12 +38,13 @@ public sealed class ServiceBusSource(
     public bool CanReadPast => recording is null;
 
     /// <summary>
-    /// The broker's numbers as they were at a past time. Each namespace's day is read in one call and kept, so every frame of that day costs nothing more. The
+    /// The broker's numbers as they were at a past time. Each namespace's hour is read in one call and kept, so every frame of that hour costs nothing more (a whole day is over the 8 MB Azure answers with). The
     /// kinds of message of each queue are not rebuilt (the types query has no past form yet); a rebuilt queue lists none.
     /// </summary>
     public Task<IReadOnlyDictionary<string, NodeReading>> PollAtAsync(TownRegistry registry, DateTimeOffset at, CancellationToken ct) => PollCore(registry, at, true, ct);
 
     private readonly Dictionary<(string Namespace, DateTimeOffset Day), Task<IReadOnlyList<EntitySeries>>> _days = [];
+    private readonly List<(string Namespace, DateTimeOffset Day)> _order = [];
 
     private async Task<IReadOnlyDictionary<string, NodeReading>> PollCore(TownRegistry registry, DateTimeOffset at, bool bulk, CancellationToken ct)
     {
@@ -228,22 +229,36 @@ public sealed class ServiceBusSource(
 
     private static bool Is(RegistryGroup g, string pillar) => pillar.Equals(g.Code ?? g.Id, StringComparison.OrdinalIgnoreCase) || pillar.Equals(g.Id, StringComparison.OrdinalIgnoreCase);
 
-    /// <summary>The entities' series for the window ending at <paramref name="at"/>, cut out of the namespace's one read of that UTC day (from the window before its first frame to its end).</summary>
+    /// <summary>The entities' series for the window ending at <paramref name="at"/>, cut out of the namespace's one read of that UTC hour (from the window before its first frame to its end).</summary>
     private async Task<IReadOnlyList<EntitySeries>> ReadNamespaceDay(EntitiesConfig config, ResolvedResource ns, DateTimeOffset at, CancellationToken ct)
     {
-        var day = AzureMonitorSource.MetricDay(at.AddTicks(-1));
+        var day = AzureMonitorSource.MetricChunk(at.AddTicks(-1));
         Task<IReadOnlyList<EntitySeries>> read;
         lock (_days)
         {
-            if (!_days.TryGetValue((ns.Id, day), out read!)) _days[(ns.Id, day)] = read = ReadNamespace(config, ns, day.AddDays(1), ct, TimeSpan.FromDays(1) + Window);
+            if (!_days.TryGetValue((ns.Id, day), out read!))
+            {
+                _days[(ns.Id, day)] = read = ReadNamespace(config, ns, day + AzureMonitorSource.PastChunk, ct, AzureMonitorSource.PastChunk + Window);
+                _order.Add((ns.Id, day));
+                AzureMonitorSource.Trim(_days, _order, k => k.Day);
+            }
         }
         var from = at - Window;
-        return (await read).Select(s =>
+        IReadOnlyList<EntitySeries> whole;
+        try { whole = await read; }
+        catch { Forget((ns.Id, day), read); throw; } // a read that failed is asked again next time, not remembered as failed
+        return whole.Select(s =>
         {
             if (s.Times is null || s.Times.Count != s.Points.Count || s.Times.Any(t => t == DateTimeOffset.MinValue)) return s;
             var keep = Enumerable.Range(0, s.Points.Count).Where(i => s.Times[i] >= from && s.Times[i] < at).ToList();
             return s with { Points = keep.Select(i => s.Points[i]).ToList(), Times = keep.Select(i => s.Times[i]).ToList() };
         }).ToList();
+    }
+
+    private void Forget((string Namespace, DateTimeOffset Day) key, Task<IReadOnlyList<EntitySeries>> read)
+    {
+        lock (_days)
+            if (_days.TryGetValue(key, out var kept) && ReferenceEquals(kept, read)) { _days.Remove(key); _order.Remove(key); }
     }
 
     private async Task<IReadOnlyList<EntitySeries>> ReadNamespace(EntitiesConfig config, ResolvedResource ns, DateTimeOffset at, CancellationToken ct, TimeSpan window)

@@ -536,7 +536,7 @@ public class PlatformMetricsTests
     }
 
     [Fact]
-    public async Task The_past_is_read_a_day_at_a_time_and_each_frame_gets_the_points_of_its_own_window()
+    public async Task The_past_is_read_an_hour_at_a_time_and_each_frame_gets_the_points_of_its_own_window()
     {
         var http = new CannedHttp().Respond(HourlyAnswer);
         var (source, registry) = await Platform(TownA, http);
@@ -544,17 +544,19 @@ public class PlatformMetricsTests
 
         var nine = await past.PollAtAsync(registry, DateTimeOffset.Parse("2025-12-30T09:05:00Z"), CancellationToken.None);
         var calls = http.Sent.Count;
+        await past.PollAtAsync(registry, DateTimeOffset.Parse("2025-12-30T09:35:00Z"), CancellationToken.None);
+        Assert.Equal(calls, http.Sent.Count); // the second frame of the hour asks Azure nothing
         var ten = await past.PollAtAsync(registry, DateTimeOffset.Parse("2025-12-30T10:05:00Z"), CancellationToken.None);
 
         await AdapterContract.AssertPastAsync(past, registry, DateTimeOffset.Parse("2025-12-30T10:05:00Z")); // what every adapter that reads the past owes
-        Assert.Equal(calls, http.Sent.Count); // the second frame of the day asks Azure nothing
+        Assert.True(http.Sent.Count > calls); // the next hour is read on its own
         var system = nine.First(kv => kv.Value.Cpu is not null).Key;
         Assert.Equal(0.9, nine[system].Cpu!.Value, 6); // the five minutes before 09:05 start in hour 9 (a share, not a percentage)
         Assert.Equal(1.0, ten[system].Cpu!.Value, 6);
         Assert.Equal(DateTimeOffset.Parse("2025-12-30T09:05:00Z"), nine[system].At);
         var span = System.Web.HttpUtility.ParseQueryString(http.Sent[0].Uri!.Query)["timespan"]!.Split('/');
         Assert.Equal("2025-12-30T23:55:00Z".Length, span[0].Length);
-        Assert.Equal("2025-12-31T00:00:00Z", span[1]); // the day's end, and the window before its first frame is included
+        Assert.Equal("2025-12-30T10:00:00Z", span[1]); // the hour's end, and the window before its first frame is included
     }
 
     [Fact]
