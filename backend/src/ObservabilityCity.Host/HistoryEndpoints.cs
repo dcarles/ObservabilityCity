@@ -18,10 +18,11 @@ public static class HistoryEndpoints
             {
                 if (envs.Find(env) is not { } rt) return NotFound(envs, env);
                 if (rt.HistoryView is not { } store) return Results.Ok(new HistoryRange(false, options.EffectiveDays, (int)options.Interval.TotalSeconds, null, null, 0, 0, []));
-                var since = time.GetUtcNow() - options.Keep;
+                var mine = rt.HistorySettings ?? options; // the days of this environment
+                var since = time.GetUtcNow() - mine.Keep;
                 var summary = store.Summary(since);
                 var points = store.Points(since).Select(p => new HistoryPointSnapshot(p.At, p.Unhealthy, p.Down, p.Rebuilt)).ToList();
-                return Results.Ok(new HistoryRange(true, options.EffectiveDays, (int)options.Interval.TotalSeconds, summary.Oldest, summary.Newest, summary.Frames, summary.Bytes, points));
+                return Results.Ok(new HistoryRange(true, mine.EffectiveDays, (int)mine.Interval.TotalSeconds, summary.Oldest, summary.Newest, summary.Frames, summary.Bytes, points));
             })
            .Produces<HistoryRange>()
            .WithName("GetHistoryRange");
@@ -63,7 +64,8 @@ public static class HistoryEndpoints
                 if (envs.Find(env) is not { } rt) return NotFound(envs, env);
                 if (rt.HistoryView is not { } store) return Results.NotFound(new { error = "History is not kept for this environment." });
                 if (!TryTime(at, out var when)) return Results.BadRequest(new { error = "at must be a time such as 2026-11-21T09:00:00Z." });
-                if (when < time.GetUtcNow() - options.Keep) return Results.NotFound(new { error = $"History goes back {options.EffectiveDays} days." });
+                var mine = rt.HistorySettings ?? options; // the days of this environment
+                if (when < time.GetUtcNow() - mine.Keep) return Results.NotFound(new { error = $"History goes back {mine.EffectiveDays} days." });
                 return store.FrameAtOrBefore(when) is { } frame
                     ? Results.Content(Frame(frame.At, frame.Json, frame.Rebuilt), "application/json")
                     : Results.NotFound(new { error = "Nothing was recorded at that time." });

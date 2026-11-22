@@ -127,6 +127,21 @@ public class BatchMetricsTests
     }
 
     [Fact]
+    public async Task The_stats_say_how_long_the_reads_of_each_group_of_metrics_took_longest_first_and_start_again_when_taken()
+    {
+        var http = new CannedHttp().Respond(r => IsBatch(r) ? Batch(r) : Single(r));
+        var (source, registry) = await Platform(http, batch: true);
+
+        await source.PollAtAsync(registry, Frame, CancellationToken.None);
+
+        var groups = ((IPastReadStats)source).TakeStats().Groups!;
+        Assert.NotEmpty(groups);
+        Assert.All(groups, g => { Assert.Contains(": ", g.Name); Assert.True(g.Reads > 0); Assert.True(g.Seconds >= 0); });
+        Assert.Equal(groups.OrderByDescending(g => g.Seconds).Select(g => g.Name), groups.Select(g => g.Name));
+        Assert.Empty(((IPastReadStats)source).TakeStats().Groups!);
+    }
+
+    [Fact]
     public async Task A_batch_the_login_may_not_make_is_asked_once_and_the_resources_are_read_one_by_one_with_the_same_numbers()
     {
         var one = new CannedHttp().Respond(Single);

@@ -394,4 +394,7 @@ public sealed record RegistryEnvironment(
 
     /// <summary>Where the Logs tab of a system reads from (<c>logs:</c>). Null: the environment has no logs to show, and the tab says so.</summary>
     public ObservabilityCity.Core.Logs.LogsConfig? Logs { get; init; }
+
+    /// <summary>How many days back this environment keeps its history (<c>history.days:</c>). Null: the app's own History:Days is used.</summary>
+    public int? HistoryDays { get; init; }
 }

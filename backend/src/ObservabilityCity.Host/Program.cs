@@ -119,7 +119,9 @@ foreach (var (folder, registry) in loaded)
         // only a live environment has a past worth keeping; a demo town's data is made up
         var history = fake is null && historyOptions.Enabled ? new FileHistoryStore(Path.Combine(historyOptions.FolderFor(folder, registry.Town.Id), environmentId), historyOptions.Interval, startupLogs.CreateLogger<FileHistoryStore>()) : null;
         var rebuiltHistory = history is null ? null : new FileHistoryStore(Path.Combine(history.Root, "rebuilt"), historyOptions.Interval, startupLogs.CreateLogger<FileHistoryStore>());
-        runtimes.Add(new EnvironmentRuntime(registry.Town.Id, environmentId, view, fake, state, snapshots, store, logs, set.Sources, set.Problems, scopeStore, discovered, readings) { History = history, RebuiltHistory = rebuiltHistory });
+        // each environment may keep its own number of days (history.days in its file); the rest of the History section is the app's
+        var envHistory = historyOptions.ForDays(registry.Environments.FirstOrDefault(e => e.Id == environmentId)?.HistoryDays);
+        runtimes.Add(new EnvironmentRuntime(registry.Town.Id, environmentId, view, fake, state, snapshots, store, logs, set.Sources, set.Problems, scopeStore, discovered, readings) { History = history, RebuiltHistory = rebuiltHistory, HistorySettings = history is null ? null : envHistory });
     }
     var town = new TownRuntime(registry.Town.Id, registry.Town.Name, folder, registries, new EnvironmentSet(runtimes, registry.DefaultEnvironmentId, registry.Town.Id));
     townRuntimes.Add(town);
@@ -149,14 +151,14 @@ foreach (var (town, runtimes) in hostedByTown)
             && rt.Sources.OfType<IDependencySource>().FirstOrDefault(s => s.CanReadDependencies && ((IMetricSource)s).Name == rt.Registry.Current.ActiveEnvironment.Links.Source) is { } trafficSource)
             builder.Services.AddSingleton<IHostedService>(sp => new LinkTrafficRunner(trafficSource, rt.Scope, rt.Registry, rt.Discovered.Traffic, TimeProvider.System, sp.GetRequiredService<ILogger<LinkTrafficRunner>>(), trafficSource as IRateHistory, rt.Gate));
         if (rt.History is { } frames)
-            builder.Services.AddSingleton<IHostedService>(sp => new HistoryRecorder(frames, rt.Store, historyOptions, rt.Gate, TimeProvider.System, sp.GetRequiredService<ILogger<HistoryRecorder>>(), rt.RebuiltHistory));
+            builder.Services.AddSingleton<IHostedService>(sp => new HistoryRecorder(frames, rt.Store, rt.HistorySettings ?? historyOptions, rt.Gate, TimeProvider.System, sp.GetRequiredService<ILogger<HistoryRecorder>>(), rt.RebuiltHistory));
         if (rt.History is { } recordedFrames && rt.RebuiltHistory is { } rebuiltFrames && rt.Fake is null)
         {
             var pastFrames = new PastFrameBuilder(rt.Builder, rt.State, rt.Registry, rt.Sources, startupLogs.CreateLogger<PastFrameBuilder>());
             var rebuilder = new HistoryRebuilder(recordedFrames, rebuiltFrames, pastFrames, historyOptions.Interval, TimeProvider.System, startupLogs.CreateLogger<HistoryRebuilder>());
             if (rebuilder.CanRebuildFrom(rt.Sources))
             {
-                rt.Filler = new HistoryFiller(rebuilder, rt.Sources, historyOptions, rt.Gate, TimeProvider.System, startupLogs.CreateLogger<HistoryFiller>());
+                rt.Filler = new HistoryFiller(rebuilder, rt.Sources, rt.HistorySettings ?? historyOptions, rt.Gate, TimeProvider.System, startupLogs.CreateLogger<HistoryFiller>());
                 builder.Services.AddSingleton<IHostedService>(rt.Filler);
             }
         }

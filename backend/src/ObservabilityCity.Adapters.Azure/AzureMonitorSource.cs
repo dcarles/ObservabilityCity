@@ -511,6 +511,23 @@ public sealed class AzureMonitorSource(
     private int _batched;
     private int _singly;
     private string? _batchNote;
+    private readonly Dictionary<string, (double Seconds, int Reads)> _groupSpent = [];
+
+    /// <summary>What a group of metrics is called in the log: the resources it is for, the signals it reads and the dimension it splits by.</summary>
+    public static string GroupName(MetricGroup group) =>
+        $"{group.Resources}: {string.Join('+', group.Signals.Keys)}{(group.Parts is null ? "" : $"{(group.Signals.Count > 0 ? " " : "")}by {group.Parts.By}")}";
+
+    /// <summary>Runs a read of the past and adds the time it took to its group, so the log can say where the time of an hour went.</summary>
+    private async Task<T> Timed<T>(MetricGroup group, Func<Task<T>> read)
+    {
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        try { return await read(); }
+        finally
+        {
+            var name = GroupName(group);
+            lock (_groupSpent) _groupSpent[name] = _groupSpent.TryGetValue(name, out var was) ? (was.Seconds + clock.Elapsed.TotalSeconds, was.Reads + 1) : (clock.Elapsed.TotalSeconds, 1);
+        }
+    }
 
     /// <summary>What was read for the past since the last call, for the log of a rebuilt hour.</summary>
     public PastReadStats TakeStats()
@@ -518,7 +535,9 @@ public sealed class AzureMonitorSource(
         var (calls, bytes) = reader.TakeCounts();
         string? note;
         lock (_days) { note = _batchNote; _batchNote = null; }
-        return new PastReadStats(calls, Interlocked.Exchange(ref _hits, 0), bytes / 1_048_576.0, Interlocked.Exchange(ref _splits, 0), Interlocked.Exchange(ref _batched, 0), Interlocked.Exchange(ref _singly, 0), note);
+        List<PastGroupSpent> groups;
+        lock (_groupSpent) { groups = _groupSpent.Select(g => new PastGroupSpent(g.Key, g.Value.Seconds, g.Value.Reads)).OrderByDescending(g => g.Seconds).ToList(); _groupSpent.Clear(); }
+        return new PastReadStats(calls, Interlocked.Exchange(ref _hits, 0), bytes / 1_048_576.0, Interlocked.Exchange(ref _splits, 0), Interlocked.Exchange(ref _batched, 0), Interlocked.Exchange(ref _singly, 0), note, groups);
     }
 
     /// <summary>The steps a batch is made smaller by when Azure refuses it: 50 resources, then 25, then 10. Below that the resources are read one by one.</summary>
@@ -576,7 +595,7 @@ public sealed class AzureMonitorSource(
             foreach (var part in bucket.Select(w => w.Target).Chunk(BatchSizes[0]))
             {
                 if (refused) return;
-                refused = !await ReadBatch(part, bucket.Key.Group, bucket.Key.Subscription, bucket.Key.Location, bucket.Key.Namespace, chunk, 0, ct);
+                refused = !await Timed(bucket.Key.Group, () => ReadBatch(part, bucket.Key.Group, bucket.Key.Subscription, bucket.Key.Location, bucket.Key.Namespace, chunk, 0, ct));
             }
     }
 
@@ -648,7 +667,7 @@ public sealed class AzureMonitorSource(
         {
             if (!_days.TryGetValue(key, out read!))
             {
-                _days[key] = read = ReadResourceWindow(target, chunk + length, length + window, ct);
+                _days[key] = read = Timed(target.Group, () => ReadResourceWindow(target, chunk + length, length + window, ct));
                 _order.Add(key);
                 Trim(_days, _order, k => k.Chunk);
             }

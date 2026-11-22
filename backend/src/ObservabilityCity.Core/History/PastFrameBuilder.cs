@@ -59,7 +59,8 @@ public sealed class PastFrameBuilder(SnapshotBuilder live, LatestState liveState
             var text = $"{source.Name} {seconds:0.0} s";
             if (source is IPastReadStats stats && stats.TakeStats() is { } r)
                 text += $" ({r.Calls} reads, {r.Megabytes:0.0} MB, {r.CacheHits} from what was already read{(r.Splits > 0 ? $", {r.Splits} too big and read in pieces" : "")}" +
-                        $"{(r.Batched > 0 ? $", {r.Batched} resources read in batches" : "")}{(r.Singly > 0 ? $", {r.Singly} read one by one" : "")}{(r.Note is not null ? $"; a batch failed: {r.Note}" : "")})";
+                        $"{(r.Batched > 0 ? $", {r.Batched} resources read in batches" : "")}{(r.Singly > 0 ? $", {r.Singly} read one by one" : "")}{(r.Note is not null ? $"; a batch failed: {r.Note}" : "")}" +
+                        $"{(r.Groups is { Count: > 0 } groups ? $"; by group, the time of its reads added up (they overlap, so these are shares and not a total): {string.Join(", ", groups.Select(g => $"{g.Name} {g.Seconds:0.0} s in {g.Reads} reads"))}" : "")})";
             parts.Add(text);
         }
         return string.Join("; ", parts);

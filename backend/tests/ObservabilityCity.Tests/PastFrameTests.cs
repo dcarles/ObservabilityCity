@@ -65,14 +65,27 @@ public class PastFrameTests
         Assert.Equal(1, telemetry.Asked);
     }
 
-    private sealed class Counting(string name) : IPastMetricSource, IPastReadStats
+    private sealed class Counting(string name, IReadOnlyList<PastGroupSpent>? groups = null) : IPastMetricSource, IPastReadStats
     {
         public string Name => name;
         public TimeSpan PollInterval => TimeSpan.FromSeconds(30);
         public bool CanReadPast => true;
         public Task<IReadOnlyDictionary<string, NodeReading>> PollAsync(TownRegistry registry, CancellationToken ct) => Task.FromResult<IReadOnlyDictionary<string, NodeReading>>(new Dictionary<string, NodeReading>());
         public Task<IReadOnlyDictionary<string, NodeReading>> PollAtAsync(TownRegistry registry, DateTimeOffset when, CancellationToken ct) => Task.FromResult<IReadOnlyDictionary<string, NodeReading>>(new Dictionary<string, NodeReading>());
-        public PastReadStats TakeStats() => new(2, 10, 3.25, 1);
+        public PastReadStats TakeStats() => new(2, 10, 3.25, 1, Groups: groups);
+    }
+
+    [Fact]
+    public async Task The_summary_says_how_long_the_reads_of_each_group_of_metrics_took_and_that_they_overlap()
+    {
+        var groups = new[] { new PastGroupSpent("cosmos: utilisation+throttled by CollectionName", 31.24, 6), new PastGroupSpent("plans: cpu+memory", 4.5, 190) };
+        var (frames, _) = Frames(new Counting("platform", groups), new Inventory("inventory"));
+        await frames.BuildAsync(Then, CancellationToken.None);
+
+        var summary = frames.TakeSummary();
+
+        Assert.Contains("they overlap, so these are shares and not a total", summary);
+        Assert.Contains("cosmos: utilisation+throttled by CollectionName 31.2 s in 6 reads, plans: cpu+memory 4.5 s in 190 reads)", summary);
     }
 
     [Fact]

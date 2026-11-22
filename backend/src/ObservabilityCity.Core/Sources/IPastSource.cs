@@ -28,7 +28,11 @@ public interface IPastMetricSource : IMetricSource
 /// <param name="Batched">Resources whose numbers came from a call that asked about many at once.</param>
 /// <param name="Singly">Resources that were tried in a batch, which failed, and were read one by one instead.</param>
 /// <param name="Note">Why the first batch of the hour failed, when one did.</param>
-public sealed record PastReadStats(int Calls, int CacheHits, double Megabytes, int Splits, int Batched = 0, int Singly = 0, string? Note = null);
+/// <param name="Groups">The time each group of metrics took to read, longest first; null when the source does not say.</param>
+public sealed record PastReadStats(int Calls, int CacheHits, double Megabytes, int Splits, int Batched = 0, int Singly = 0, string? Note = null, IReadOnlyList<PastGroupSpent>? Groups = null);
+
+/// <summary>The time the reads of one group of metrics took. Reads run several at a time, so the groups' seconds add up to more than the time the source spent: they show shares.</summary>
+public sealed record PastGroupSpent(string Name, double Seconds, int Reads);
 
 /// <summary>A past-reading source that can tell what it read. Reading the numbers resets them.</summary>
 public interface IPastReadStats

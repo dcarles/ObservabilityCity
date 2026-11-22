@@ -288,6 +288,14 @@ One file per environment. The pillar and system files are shared; this file says
 | `links` | no | none | How the calls the systems make are found in the telemetry (see `links` below). |
 | `logs` | no | none | Where a system's Logs tab reads from (see `logs` below). Without it the tab says logs are not set up. |
 | `scope` | no | none | How pillars and systems map onto the cloud provider. |
+| `history` | no | none | How far back this environment can be taken in time travel (see `history` below). Without it the app's own `History:Days` is used. |
+
+The `history` block of an environment file, to keep a different number of days in one environment than in another (a prod environment 14 days, a test one 2):
+
+<!-- file: HistoryFile -->
+| Key | Required | Default | Meaning |
+|---|---|---|---|
+| `days` | no | the app's `History:Days` (7) | How many days back this environment keeps its history and can be taken, 1 to 14. Read when the app starts, so a change needs a restart. Frames older than that are removed. |
 
 <!-- file: TenantFile -->
 | Key | Required | Default | Meaning |

@@ -349,6 +349,15 @@ internal sealed class EnvironmentFile
     public LinksFile? Links { get; set; }
     /// <summary>Where the Logs tab of a system reads from: a query run only when the tab is opened. Without it the tab says logs are not set up.</summary>
     public LogsFile? Logs { get; set; }
+    /// <summary>How far back this environment can be taken (time travel). Without it the app's own setting, History:Days, is used.</summary>
+    public HistoryFile? History { get; set; }
+}
+
+/// <summary>The <c>history:</c> block of an environment file.</summary>
+internal sealed class HistoryFile
+{
+    /// <summary>How many days back this environment keeps its history and can be taken, 1 to 14. Without it the app's History:Days (default 7) is used. Read when the app starts.</summary>
+    public int? Days { get; set; }
 }
 
 /// <summary>The <c>logs:</c> block of an environment file.</summary>

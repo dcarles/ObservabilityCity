@@ -51,6 +51,7 @@ public static partial class RegistryLoader
                 Scope = ToScope(f.Scope),
                 Links = ToLinks(f.Links),
                 Logs = ToLogs(f.Logs),
+                HistoryDays = f.History?.Days,
             }, f.Order ?? 100));
         }
         var ordered = parsed.OrderBy(p => p.Order).ThenBy(p => p.Env.Id, StringComparer.Ordinal).Select(p => p.Env).ToList();
@@ -208,6 +209,8 @@ public static partial class RegistryLoader
     private static void CheckEnvironment(EnvironmentFile f, string stem, string name, HashSet<string> ids, Dictionary<string, string> aliases, List<string> errors)
     {
         if (!KebabId.IsMatch(stem)) errors.Add($"{name}: the file name '{stem}' is the environment's id and must be lowercase kebab-case");
+        if (f.History?.Days is { } days && (days < 1 || days > ObservabilityCity.Core.History.HistoryOptions.MaxDays))
+            errors.Add($"{name}: history.days is {days}; it must be 1 to {ObservabilityCity.Core.History.HistoryOptions.MaxDays}");
         foreach (var (source, def) in f.Sources)
         {
             if (!KebabId.IsMatch(source))
