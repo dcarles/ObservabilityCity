@@ -238,9 +238,29 @@ export function logLinkLabel(name: string): { text: string; title: string } {
 }
 
 /** What an empty section says, so an empty list is never mistaken for a list that failed to load. */
-export function logSectionEmpty(section: LogSection, window: string): string {
+export function logSectionEmpty(section: LogSection, window: string, before?: string): string {
   const what = { failed: 'No 5xx requests', slow: 'No slow requests', logs: 'No warnings or errors', exceptions: 'No exceptions' }[section.id] ?? 'Nothing'
-  return `${what} in the last ${window}.`
+  return before ? `${what} in the ${window} before ${before}.` : `${what} in the last ${window}.`
+}
+
+/** While a page looks at the past, the Logs tab follows the viewed time: it is read again once the time has moved this far from the time it was read for... */
+export const LOGS_FOLLOW_MS = 5 * 60_000
+/** ...but a clock that runs at speed does not make a read each frame: reads are at least this far apart, unless the time jumped by more than an hour. */
+export const LOGS_FOLLOW_GAP_MS = 10_000
+const LOGS_JUMP_MS = 60 * 60_000
+
+/**
+ * Whether the Logs tab is read again. <paramref name="read"/> is the viewed time the logs on screen were read for (null: they were read for now), <paramref name="viewed"/> the viewed time now
+ * (null: live). Going into the past or back to live reads at once; moving through the past reads when the time has moved five minutes, at most once in ten seconds, and a jump of an hour
+ * or more at once. `due` says it is time to read, `wait` how many milliseconds to hold off first when reading now would be too soon.
+ */
+export function logsFollow(read: number | null, viewed: number | null, sinceReadMs: number): { due: boolean; wait: number } {
+  if (viewed === null && read === null) return { due: false, wait: 0 }
+  if ((viewed === null) !== (read === null)) return { due: true, wait: 0 }
+  const moved = Math.abs((viewed as number) - (read as number))
+  if (moved < LOGS_FOLLOW_MS) return { due: false, wait: 0 }
+  if (moved >= LOGS_JUMP_MS || sinceReadMs >= LOGS_FOLLOW_GAP_MS) return { due: true, wait: 0 }
+  return { due: true, wait: LOGS_FOLLOW_GAP_MS - sinceReadMs }
 }
 
 /** How many times an entry repeated, written as "×4"; nothing for one. */

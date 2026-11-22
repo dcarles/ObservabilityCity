@@ -65,6 +65,55 @@ test.describe('time travel on a live town', () => {
     await expect(page.locator('#wall-button')).toBeHidden()
   })
 
+  for (const machine of ['car', 'cabin'] as const) {
+    test(`the Town travels in a time machine (${machine}): the overlay draws a scene and says which machine it is`, async ({ page, request }) => {
+      await waitForFrames(request, 3)
+      await openTown(page, `&machine=${machine}`)
+      await page.evaluate(() => (window as unknown as Win).city.history.goTo(Date.now() - 15_000))
+      const overlay = page.locator('#history-travel')
+      await expect(overlay).toBeVisible()
+      await expect(overlay).toHaveClass(/machine/)
+      await expect(overlay).toHaveAttribute('data-machine', machine)
+      await expect(page.locator('#history-travel canvas.scene')).toBeVisible()
+      await page.waitForTimeout(700)
+      // something is drawn: the canvas is not one flat colour
+      const colours = await page.evaluate(() => {
+        const c = document.querySelector<HTMLCanvasElement>('#history-travel canvas.scene')!
+        const g = c.getContext('2d')!
+        const seen = new Set<string>()
+        for (let i = 1; i < 12; i++) for (let j = 1; j < 8; j++) seen.add(Array.from(g.getImageData(Math.floor((c.width * i) / 12), Math.floor((c.height * j) / 8), 1, 1).data).join(','))
+        return seen.size
+      })
+      expect(colours).toBeGreaterThan(5)
+      await expect(page.locator('#history-when')).not.toHaveText('')
+      await page.locator('#history-skip').click()
+      await expect(overlay).toBeHidden()
+    })
+  }
+
+  test('the Logs tab reads the logs around the viewed time while in the past, and for now again when live', async ({ page, request }) => {
+    await waitForFrames(request, 3)
+    await openTown(page)
+    const asked: string[] = []
+    page.on('request', (r) => { if (r.url().includes('/logs')) asked.push(r.url()) })
+    await page.evaluate(() => (window as unknown as Win).city.history.goTo(Date.now() - 15_000))
+    await page.locator('#history-skip').click()
+    const viewed = (await state(page)).viewed as number
+    await page.evaluate(() => {
+      const c = (window as any).city
+      c.openSystem(c.seen.last.groups[0].nodes[0].id, 'logs')
+    })
+    await expect.poll(() => asked.length).toBeGreaterThanOrEqual(1)
+    const at = new URL(asked[0]).searchParams.get('at')
+    expect(at).not.toBeNull()
+    expect(Math.abs(Date.parse(at!) - viewed)).toBeLessThan(2000)
+    // back to live: the tab reads for now, without a time
+    const before = asked.length
+    await page.evaluate(() => (window as unknown as Win).city.history.goLive())
+    await expect.poll(() => asked.length).toBeGreaterThan(before)
+    expect(new URL(asked[asked.length - 1]).searchParams.has('at')).toBe(false)
+  })
+
   test('going back to live shows the newest snapshot and the feed carries on', async ({ page, request }) => {
     await waitForFrames(request, 3)
     await openTown(page)
@@ -143,12 +192,27 @@ test.describe('time travel on a live town', () => {
     if (link) expect(link).toMatch(/env=demo.*&at=\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ/)
   })
 
+  test('the freshness popup has a History section with what is held', async ({ page, request }) => {
+    await waitForFrames(request, 2)
+    await page.goto('/?view=dashboard&test=1')
+    await page.waitForFunction(() => (window as unknown as Win).dash?.seen.snapshots > 0)
+    await page.locator('#fresh-button').click()
+    const pop = page.locator('#fresh-pop')
+    await expect(pop.locator('#fresh-history')).toHaveText('History')
+    await expect(pop).toContainText('up to 7 days')
+    await expect(pop).toContainText('recorded')
+  })
+
   test('the dashboard has the same button and travels the same way', async ({ page, request }) => {
     await waitForFrames(request, 3)
     await page.goto('/?view=dashboard&test=1')
     await page.waitForFunction(() => (window as unknown as Win).dash?.seen.snapshots > 0)
     await expect(page.locator('#history-button')).toBeVisible()
     await page.evaluate(() => (window as unknown as Win).dash.history.goTo(Date.now() - 15_000))
+    // only the Town has the time machine: the dashboard keeps the plain overlay
+    await expect(page.locator('#history-travel')).toBeVisible()
+    await expect(page.locator('#history-travel')).not.toHaveClass(/machine/)
+    await expect(page.locator('#history-travel canvas')).toHaveCount(0)
     await page.locator('#history-skip').click()
     await expect(page.locator('body')).toHaveClass(/history/)
     await expect(page.locator('#wall-button-dash')).toBeHidden()

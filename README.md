@@ -79,6 +79,15 @@ Hover a building for its numbers. Drag to orbit, scroll to zoom, right-drag to p
 
 `mode` in `town.yaml` is read once, when the server starts. A town with `mode: demo` gets the fake source, `/api/fake/*`, the Break things panel and the story bar, and the top bar says "Live (demo data)". A town with no `mode`, or `mode: live`, gets none of them: `/api/fake` answers 404, the panel and story bar are not drawn, and the top bar says "Live". Every town in `shared-test-data` that uses the fake source says `mode: demo`.
 
+### Go back in time
+
+A live town (not the demo town) saves its snapshots, and the clock button in the top bar takes the town back: pick a quick time, a date, or click the strip, then play it at 1x to 60x. Each jump plays a short time-machine animation (a time car or a police-box time cabin, picked at random; the Dashboard and Architecture views use a plain overlay). Gaps are rebuilt from the cloud while you look at an environment, and the Logs tab follows the time you are looking at. 
+
+| ![The time car going back in time](docs/screenshots/time-travel-car.png) | ![The time cabin in space](docs/screenshots/time-travel-cabin.png) |
+| --- | --- |
+
+The settings are `History:*` below; how it works is in [docs/how-it-fits-together.md](docs/how-it-fits-together.md).
+
 ### Break things
 
 The **Break things** panel on the left breaks the fake town on purpose. Pick a scenario (Traffic spike, Slow, Errors, Sick instances, High CPU, High memory, DB saturated, Tenant DB throttled, Queue backs up, Dead letters, Down, Go quiet, or an incident from Sev 1 storm to Sev 4 clouds), then click a building in the town, or search for a target (the whole town, an island, a building or a third party). The search works the other way round too: choose the target, then the scenario. Esc lets go of a scenario that is waiting.

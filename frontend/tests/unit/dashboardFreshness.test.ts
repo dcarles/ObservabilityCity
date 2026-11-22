@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { agoText, feedLateAfter, intervalText, marker, popupLeft, sourceLines } from '../../src/dashboard/freshness'
+import { agoText, feedLateAfter, historyLines, intervalText, marker, popupLeft, sourceLines } from '../../src/dashboard/freshness'
 import { buildDashboard, detailText, sectionSummary, type Row, type SideRow } from '../../src/dashboard/model'
 import { freshnessHtml, sectionHtml, sectionsHtml, type UiState } from '../../src/dashboard/render'
 import { checkSnapshot } from '../../src/snapshotGuard'
@@ -122,5 +122,24 @@ describe('the lists under the pillars', () => {
     expect(detailText(base)).toBe('12 rps · errors 0.4% · p99 90 ms · backlog 3 · DLQ 0')
     expect(detailText({ ...base, rps: null, errorPct: null, p99: null, backlog: null, dlq: null })).toBe('')
     expect(detailText({ ...base, type: 'DB', rps: null, ru: 72.4, backlog: null, dlq: null })).toBe('capacity 72%')
+  })
+})
+
+describe('the history lines of the freshness popup', () => {
+  const base = { enabled: true, days: 7, frames: 0, points: [], oldest: null, newest: null, fill: null }
+  it('says nothing where the environment keeps no history', () => {
+    expect(historyLines({ ...base, enabled: false })).toEqual([])
+    expect(freshnessHtml([], [])).not.toContain('History')
+  })
+  it('says how far back it goes and that nothing is held yet', () => {
+    expect(historyLines(base)).toEqual([{ label: 'Keeps', value: 'up to 7 days' }, { label: 'Held', value: 'nothing yet' }])
+  })
+  it('counts recorded and rebuilt frames and shows the fill progress', () => {
+    const t = Date.parse('2026-11-20T10:00:00Z')
+    const points = [{ at: t, unhealthy: 0, down: 0, rebuilt: false }, { at: t + 300_000, unhealthy: 0, down: 0, rebuilt: true }, { at: t + 600_000, unhealthy: 0, down: 0, rebuilt: true }]
+    const lines = historyLines({ ...base, frames: 3, points, oldest: t, newest: t + 600_000, fill: { available: true, running: true, done: 4, total: 167, hour: null } as never })
+    expect(lines[1].value).toContain('1 recorded, 2 rebuilt frames')
+    expect(lines[2]).toEqual({ label: 'Gaps', value: '4 of 167 hours rebuilt from the cloud' })
+    expect(freshnessHtml([], lines)).toContain('id="fresh-history"')
   })
 })

@@ -5,7 +5,8 @@ import { partLabel, partLines, tenantListOrder, tenantFigures, yardSummary, type
 import { regionFigures, regionOptions, validChoice, WORST, type RegionChoice } from './regions'
 import { cloudHealthRows, dismissEvent, eventOfNode } from './healthEvents'
 import { brokerNames } from './hubSystems'
-import { ago, clockTime, configOrder, messagesPerSecond, messageRate, queueRows, groupDetail, incidentSummary, jobRows, layerWord, linkSections, logLinkLabel, logSectionEmpty, logSectionTitle, logTabLabel, pickLogSection, originLabel, type LinkItem, type QueueTypes, overviewLinks, overviewRows, reasons, repeatLabel, resourceLinks, scopeView, SEVERITY_WORD, sectionLinks, stateTone, vendorWhere } from './inspectorModel'
+import { viewedText } from './history/model'
+import { ago, clockTime, configOrder, logsFollow, messagesPerSecond, messageRate, queueRows, groupDetail, incidentSummary, jobRows, layerWord, linkSections, logLinkLabel, logSectionEmpty, logSectionTitle, logTabLabel, pickLogSection, originLabel, type LinkItem, type QueueTypes, overviewLinks, overviewRows, reasons, repeatLabel, resourceLinks, scopeView, SEVERITY_WORD, sectionLinks, stateTone, vendorWhere } from './inspectorModel'
 
 export type InspectorTab = 'overview' | 'links' | 'logs' | 'config'
 const TABS: { id: InspectorTab; label: string }[] = [
@@ -29,6 +30,8 @@ export interface InspectorHost {
   setRegion(id: string, choice: RegionChoice): void
   /** The drawer was closed or its system left the town. */
   closed(): void
+  /** The time the page looks at while it shows the past (milliseconds), or null while it is live: the Logs tab reads the logs around it. */
+  viewedAt?(): number | null
 }
 
 /**
@@ -46,6 +49,10 @@ export class Inspector {
   private logs: SystemLogs | null = null
   private logsState: 'loading' | 'ready' | 'failed' = 'loading'
   private logsError = ''
+  /** The viewed time the logs on screen were read for (null: for now), and when the read started. */
+  private logsAt: number | null = null
+  private logsStarted = 0
+  private followTimer = 0
   private logSection = ''
   /** The queues whose full list of kinds of message is open, by name; kept while the drawer redraws with new numbers. */
   private readonly typesOpen = new Set<string>()
@@ -83,6 +90,8 @@ export class Inspector {
   close(): void {
     if (!this.id) return
     this.id = null
+    window.clearTimeout(this.followTimer)
+    this.followTimer = 0
     this.logSeq++
     this.seq++
     this.el.hidden = true
@@ -96,6 +105,19 @@ export class Inspector {
     if (!this.id) return
     if (!this.find(this.id)) { this.close(); return }
     this.render()
+    this.followLogs()
+  }
+
+  /** While the page looks at the past, the Logs tab shows the logs around the viewed time: it reads again when the time has moved (see logsFollow). */
+  private followLogs(): void {
+    if (this.tab !== 'logs' || !this.id) return
+    const d = logsFollow(this.logsAt, this.host.viewedAt?.() ?? null, performance.now() - this.logsStarted)
+    if (!d.due) return
+    if (d.wait > 0) {
+      if (this.followTimer === 0) this.followTimer = window.setTimeout(() => { this.followTimer = 0; this.followLogs() }, d.wait)
+      return
+    }
+    void this.loadLogs()
   }
 
   private setTab(tab: InspectorTab): void {
@@ -130,11 +152,15 @@ export class Inspector {
     const id = this.id
     if (!id) return
     const seq = ++this.logSeq
+    const at = this.host.viewedAt?.() ?? null
+    this.logsAt = at
+    this.logsStarted = performance.now()
     this.logsState = 'loading'
     this.logsError = ''
     this.render()
     try {
-      const r = await fetch(`/api/systems/${encodeURIComponent(id)}/logs${this.query ? `?${this.query}` : ''}`)
+      const params = [this.query, at === null ? '' : `at=${encodeURIComponent(new Date(at).toISOString())}`].filter(Boolean).join('&')
+      const r = await fetch(`/api/systems/${encodeURIComponent(id)}/logs${params ? `?${params}` : ''}`)
       if (seq !== this.logSeq || this.id !== id) return
       if (!r.ok) {
         this.logsError = ((await r.json().catch(() => null)) as { error?: string } | null)?.error ?? ''
@@ -344,10 +370,10 @@ export class Inspector {
     const links = shown ? sectionLinks(shown) : []
     const linkRow = links.length === 0 ? '' : `<div class="logbuttons">${links.map((l) => { const b = logLinkLabel(l.name); return this.anchor(b.text, l.url, b.title) }).join('')}</div>`
     const body = !shown ? '' : shown.groups.length === 0
-      ? `<p class="none">${escapeHtml(logSectionEmpty(shown, logs.window))}</p>`
+      ? `<p class="none">${escapeHtml(logSectionEmpty(shown, logs.window, this.logsAt === null ? undefined : viewedText(this.logsAt)))}</p>`
       : `<div class="logs">${shown.groups.map((g) => `<div class="log ${(g.level ?? 'Info').toLowerCase()}"><time>${escapeHtml(clockTime(g.at))}</time><span>${escapeHtml(g.text)}${groupDetail(g) ? ` <i class="detail">${escapeHtml(groupDetail(g))}</i>` : ''}${repeatLabel(g) ? ` <b class="count">${escapeHtml(repeatLabel(g))}</b>` : ''}</span></div>`).join('')}</div>`
     return `${refresh}${tabs}${linkRow}<div data-section="${escapeHtml(shown?.id ?? '')}">${body}${shown && (shown.more ?? 0) > 0 ? `<p class="note">and ${shown.more} more, older lines not shown</p>` : ''}</div>
-      <p class="note">Read ${ago(logs.at, Date.now())} over the last ${escapeHtml(logs.window)}, newest first. Logs are read on demand and do not decide the colours.</p>`
+      <p class="note">${this.logsAt === null ? `Read ${ago(logs.at, Date.now())} over the last ${escapeHtml(logs.window)}` : `As the page looks at ${escapeHtml(viewedText(this.logsAt))}: the ${escapeHtml(logs.window)} before it`}, newest first. Logs are read on demand and do not decide the colours.</p>`
   }
 
   private config(): string {

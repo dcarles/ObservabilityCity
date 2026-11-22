@@ -1,6 +1,8 @@
 // How fresh the data is, as plain functions: the marker in the menu, the popup's lines and where the popup goes.
 
 import type { SourceFreshness } from '../types'
+import type { HistoryState } from '../history/controller'
+import { viewedText } from '../history/model'
 
 export const agoText = (seconds: number): string => {
   const s = Math.max(0, Math.round(seconds))
@@ -41,4 +43,20 @@ export function sourceLines(sources: readonly SourceFreshness[] | null | undefin
 /** Where the popup's left edge goes: under the button, pulled back so the whole popup stays on the screen with a gutter either side. */
 export function popupLeft(anchorLeft: number, popupWidth: number, viewportWidth: number, gutter = 16): number {
   return Math.max(gutter, Math.min(anchorLeft, viewportWidth - popupWidth - gutter))
+}
+
+export interface HistoryLine { label: string; value: string }
+
+/** What the popup says about the history: how far back it goes, how much was recorded and how much rebuilt, and how the filling of the gaps stands. Empty where the environment keeps none. */
+export function historyLines(s: Pick<HistoryState, 'enabled' | 'days' | 'frames' | 'points' | 'oldest' | 'newest' | 'fill'>): HistoryLine[] {
+  if (!s.enabled) return []
+  const rebuilt = s.points.filter((p) => p.rebuilt).length
+  const lines: HistoryLine[] = [{ label: 'Keeps', value: `up to ${s.days} days` }]
+  lines.push(s.frames === 0 || s.oldest === null || s.newest === null
+    ? { label: 'Held', value: 'nothing yet' }
+    : { label: 'Held', value: `${s.points.length - rebuilt} recorded, ${rebuilt} rebuilt frames, from ${viewedText(s.oldest)} to ${viewedText(s.newest)}` })
+  if (s.fill?.available) {
+    lines.push({ label: 'Gaps', value: s.fill.running ? `${s.fill.done} of ${s.fill.total} hours rebuilt from the cloud` : s.fill.total > 0 && s.fill.done >= s.fill.total ? 'all rebuilt from the cloud' : 'rebuilt from the cloud while a browser looks' })
+  }
+  return lines
 }

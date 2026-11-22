@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { engineText, sourceRows, ago, clockTime, configOrder, groupDetail, incidentSummary, linkSections, logSectionEmpty, logSectionTitle, originLabel, isWebAddress, overviewLinks, overviewRows, reasons, repeatLabel, resourceLinks, scopeView, logLinkLabel, logTabLabel, pickLogSection, sectionLinks, stateTone } from '../../src/inspectorModel'
+import { engineText, sourceRows, ago, clockTime, configOrder, groupDetail, incidentSummary, linkSections, logSectionEmpty, logsFollow, LOGS_FOLLOW_GAP_MS, LOGS_FOLLOW_MS, logSectionTitle, originLabel, isWebAddress, overviewLinks, overviewRows, reasons, repeatLabel, resourceLinks, scopeView, logLinkLabel, logTabLabel, pickLogSection, sectionLinks, stateTone } from '../../src/inspectorModel'
 import type { ConfigValue, LogGroup, LogSection, ScopeInfo, ScopeResource, SystemDetail, NodeSnapshot, Snapshot } from '../../src/types'
 
 const bad = JSON.parse(readFileSync(resolve(__dirname, '../../../shared-test-data/snapshots/bad-day.json'), 'utf8')) as Snapshot
@@ -184,6 +184,7 @@ describe('the Logs tab', () => {
     expect(logSectionEmpty(section('slow'), '30m')).toBe('No slow requests in the last 30m.')
     expect(logSectionEmpty(section('logs'), '4h')).toBe('No warnings or errors in the last 4h.')
     expect(logSectionEmpty(section('exceptions'), '4h')).toBe('No exceptions in the last 4h.')
+    expect(logSectionEmpty(section('exceptions'), '4h', 'Sat 21 Nov 20:30')).toBe('No exceptions in the 4h before Sat 21 Nov 20:30.')
   })
 
   it('shows a repeat as a count and nothing for a single entry', () => {
@@ -447,5 +448,28 @@ describe('where the numbers come from when a source is late', () => {
     const rows = overviewRows(node({ state: 'Healthy', sources: [src('platform', 240, false, ['cpu']), src('telemetry', 8, true, ['requests'])] }))
 
     expect(rows.map((r) => r.label)).toContain('From platform')
+  })
+})
+
+describe('the Logs tab following the viewed time', () => {
+  const T = Date.parse('2026-11-21T12:00:00Z')
+  const MIN = 60_000
+  it('does nothing while live', () => expect(logsFollow(null, null, 99_999)).toEqual({ due: false, wait: 0 }))
+  it('reads at once when the page goes into the past, and when it comes back to live', () => {
+    expect(logsFollow(null, T, 0)).toEqual({ due: true, wait: 0 })
+    expect(logsFollow(T, null, 0)).toEqual({ due: true, wait: 0 })
+  })
+  it('keeps the logs it has until the time has moved five minutes', () => {
+    expect(logsFollow(T, T + LOGS_FOLLOW_MS - 1, 99_999).due).toBe(false)
+    expect(logsFollow(T, T - LOGS_FOLLOW_MS + 1, 99_999).due).toBe(false)
+    expect(logsFollow(T, T + LOGS_FOLLOW_MS, LOGS_FOLLOW_GAP_MS)).toEqual({ due: true, wait: 0 })
+    expect(logsFollow(T, T - LOGS_FOLLOW_MS, LOGS_FOLLOW_GAP_MS)).toEqual({ due: true, wait: 0 })
+  })
+  it('holds back a fast clock: a read too soon after the last waits for the rest of the ten seconds', () => {
+    expect(logsFollow(T, T + 10 * MIN, 3_000)).toEqual({ due: true, wait: LOGS_FOLLOW_GAP_MS - 3_000 })
+  })
+  it('does not hold back a jump of an hour or more', () => {
+    expect(logsFollow(T, T + 60 * MIN, 1)).toEqual({ due: true, wait: 0 })
+    expect(logsFollow(T, T - 6 * 60 * MIN, 1)).toEqual({ due: true, wait: 0 })
   })
 })

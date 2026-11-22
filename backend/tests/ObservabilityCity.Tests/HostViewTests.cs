@@ -109,6 +109,18 @@ public class HostViewTests : IDisposable
         Assert.All(logs.Sections, s => Assert.Equal(s.Groups.OrderByDescending(g => g.At).Select(g => g.At), s.Groups.Select(g => g.At)));
     }
 
+    [Fact]
+    public async Task A_systems_logs_can_be_asked_for_a_past_time_and_a_bad_time_is_refused()
+    {
+        await Get<Snapshot>("/api/snapshot/latest");
+        var at = Uri.EscapeDataString(DateTimeOffset.UtcNow.AddHours(-2).ToString("O"));
+
+        var logs = await Get<SystemLogs>($"/api/systems/aa.orders-api/logs?at={at}");
+
+        Assert.True(logs.Configured);
+        Assert.Equal(HttpStatusCode.BadRequest, (await Client.GetAsync("/api/systems/aa.orders-api/logs?at=yesterday-ish", TestContext.Current.CancellationToken)).StatusCode);
+    }
+
     // ── the live stream ───────────────────────────────────────────────────────
 
     private HubConnection Connect(string query = "") => new HubConnectionBuilder()
