@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using Microsoft.Extensions.Logging;
 using ObservabilityCity.Contracts;
 using ObservabilityCity.Core.Snapshots;
@@ -49,7 +50,9 @@ public sealed class PastFrameBuilder(SnapshotBuilder live, LatestState liveState
         {
             var readings = await source.PollAtAsync(registry, at, ct);
             if (clock.Elapsed > SlowRead)
-                log?.LogWarning("History: the source {Source} was slow reading {At}: {Seconds:0} s", source.Name, at.ToString("O"), clock.Elapsed.TotalSeconds);
+                log?.LogWarning("History: the source {Source} was slow reading {At}: {Seconds:0} s", source.Name, at.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture), clock.Elapsed.TotalSeconds);
+            else
+                log?.LogInformation("History: read {At} from the source {Source}: {Count} readings in {Seconds:0.0} s", at.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture), source.Name, readings.Count, clock.Elapsed.TotalSeconds);
             return readings;
         }
         catch (Exception e) when (e is not OperationCanceledException || !ct.IsCancellationRequested)
