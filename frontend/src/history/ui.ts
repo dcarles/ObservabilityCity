@@ -3,7 +3,7 @@
 
 import './history.css'
 import { escapeHtml } from '../picker'
-import { addressAt, buildStrip, clockText, fieldTime, fieldValue, quickPicks, SPEEDS, speedText, stepMoves, stripTime, stripTip, stripX, viewedText, waitingText } from './model'
+import { addressAt, buildStrip, clockText, fieldTime, fieldValue, historyAgeText, quickPicks, sizeText, SPEEDS, speedText, stepMoves, stripTime, stripTip, stripX, viewedText, waitingText } from './model'
 import type { HistoryController, HistoryState } from './controller'
 import { drawMachine, MACHINE_MS, pickMachine, requestedMachine, type Machine } from './travelMachine'
 
@@ -93,6 +93,7 @@ export function mountHistory(controller: HistoryController, mount: HistoryMount)
     return `<svg viewBox="0 0 ${STRIP_W} ${STRIP_H}" preserveAspectRatio="none" id="history-strip-svg" role="img" aria-label="Degraded systems over the last ${s.days} days">
       <rect x="0" y="0" width="${STRIP_W}" height="${g.height}" fill="transparent"/>
       ${strip.gaps.map(([x, w]) => `<rect class="gap${s.fill?.available ? ' fillable' : ''}" x="${x.toFixed(1)}" y="0" width="${w.toFixed(1)}" height="${g.height}"/>`).join('')}
+      <line class="grid" x1="0" x2="${STRIP_W}" y1="${((g.height + 2) / 2).toFixed(1)}" y2="${((g.height + 2) / 2).toFixed(1)}"/>
       ${strip.areas.map((a) => `<path class="area" d="${a}"/>`).join('')}
       ${strip.lines.map((l) => `<path class="line" d="${l}"/>`).join('')}
       ${strip.rebuilt.map(([x, w]) => `<rect class="rebuilt" x="${x.toFixed(1)}" y="0" width="${w.toFixed(1)}" height="${g.height}"/>`).join('')}
@@ -100,6 +101,13 @@ export function mountHistory(controller: HistoryController, mount: HistoryMount)
       <line class="nowline" x1="${STRIP_W - 1}" x2="${STRIP_W - 1}" y1="0" y2="${g.height}"/>
       ${handle === null ? '' : `<line class="handle" x1="${handle.toFixed(1)}" x2="${handle.toFixed(1)}" y1="0" y2="${g.height + 4}"/>`}
     </svg>`
+  }
+
+  /** The scale on the left of the graph: 0 at the bottom and the highest count of the range at the top (HTML on top of the strip, so the text is not stretched with the picture). */
+  function yScale(s: HistoryState): string {
+    if (s.frames === 0) return ''
+    const max = buildStrip(s.points, geometry(s), s.intervalMs).max
+    return `<span class="yscale top" aria-hidden="true">${max} not healthy</span><span class="yscale bottom" aria-hidden="true">0</span>`
   }
 
   const movesOf = (s: HistoryState) => stepMoves(s.active ? s.viewed : Date.now(), Date.now(), s.days)
@@ -114,10 +122,13 @@ export function mountHistory(controller: HistoryController, mount: HistoryMount)
     const field = s.active ? s.viewed : now - 3_600_000
     const range = s.frames === 0
       ? 'Nothing recorded yet. The app records while it runs and someone has the town open.'
-      : `${s.points.filter((p) => !p.rebuilt).length} recorded and ${s.points.filter((p) => p.rebuilt).length} rebuilt frames from ${viewedText(s.oldest!)} to ${viewedText(s.newest!)} (${(s.bytes / 1024).toFixed(0)} KB on disk).`
-    const fill = s.fill?.available
-      ? (s.fill.running ? `Rebuilding the gaps from the cloud: ${s.fill.done} of ${s.fill.total} hours done${s.fill.hour ? `, now the hour of ${viewedText(Date.parse(s.fill.hour))}` : ''}.` : 'Gaps are rebuilt from the cloud in the background while you look at an environment.')
+      : `${historyAgeText(s.oldest!, now)} (from ${viewedText(s.oldest!)}), ${sizeText(s.bytes)} on disk`
+    // the filling is only said while it runs, as a bar and the hours done
+    const fill = s.fill?.available && s.fill.running
+      ? `<div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="${s.fill.total}" aria-valuenow="${s.fill.done}"><i style="width:${s.fill.total > 0 ? Math.min(100, (s.fill.done / s.fill.total) * 100).toFixed(1) : 0}%"></i></div>`
+        + `<span>Filling gaps from the cloud: ${s.fill.done} of ${s.fill.total} hours${s.fill.hour ? `, now ${viewedText(Date.parse(s.fill.hour))}` : ''}</span>`
       : ''
+    const arrows = s.active && s.paused
     popKey = keyOf(s)
     pop.innerHTML = `
       <h3>Go to a time <span class="note">· back up to ${s.days} days${s.fill?.available ? ', recorded or rebuilt from the cloud' : ', only what was recorded'}</span></h3>
@@ -125,11 +136,13 @@ export function mountHistory(controller: HistoryController, mount: HistoryMount)
       <div class="row"><span class="label">Date</span><input type="datetime-local" id="history-date" value="${fieldValue(field)}" min="${fieldValue(now - s.days * 86_400_000)}" max="${fieldValue(now)}"><button type="button" class="hb" id="history-go">Go</button></div>
       <div class="row"><span class="label">Step</span>${moves.steps.map((m) => `<button type="button" class="hb" data-pick="${m.at}">${escapeHtml(m.label)}</button>`).join('')}</div>
       ${moves.snaps.length ? `<div class="row"><span class="label">Snap to</span>${moves.snaps.map((m) => `<button type="button" class="hb" data-pick="${m.at}">${escapeHtml(m.label)}</button>`).join('')}</div>` : ''}
-      <div id="history-strip">${stripSvg(s)}<div id="history-tip" ${tipAt ? '' : 'hidden'} style="left:${tipAt?.x ?? 0}px">${escapeHtml(tipAt?.text ?? '')}</div></div>
+      <div id="history-strip">${stripSvg(s)}${yScale(s)}<div id="history-tip" ${tipAt ? '' : 'hidden'} style="left:${tipAt?.x ?? 0}px">${escapeHtml(tipAt?.text ?? '')}</div></div>
       <div class="row"><span class="label">Speed</span>${SPEEDS.map((v) => `<button type="button" class="hb" data-speed="${v}" aria-pressed="${s.speed === v}">${speedText(v)}</button>`).join('')}
         ${s.active ? `<button type="button" class="hb" id="history-pause">${s.paused ? 'Play' : 'Pause'}</button>` : ''}</div>
       <div class="row">${s.active ? '<button type="button" class="hb live" id="history-live">Go back to live</button><button type="button" class="hb" id="history-copy">Copy link</button>' : ''}${copied ? '<span class="copied">Link copied</span>' : ''}</div>
-      <div class="note">${escapeHtml(range)}</div><div class="note">Keys: Space plays or pauses, L goes live, [ and ] go 30 min back or forward (Shift: 1 h), arrows step a frame while paused.</div>${fill ? `<div class="note" id="history-fill">${escapeHtml(fill)}</div>` : ''}`
+      <div class="note">${escapeHtml(range)}</div><div class="keys note">
+        <span><kbd>Space</kbd> play / pause</span><span><kbd>L</kbd> go live</span><span><kbd>[</kbd> <kbd>]</kbd> 30 min back / forward (<kbd>Shift</kbd> 1 h)</span>
+        <span class="arrows${arrows ? '' : ' off'}" title="The arrows step one frame, but only while paused"><kbd>←</kbd> <kbd>→</kbd> step a frame, only while paused</span></div>${fill ? `<div class="note" id="history-fill">${fill}</div>` : ''}`
     position()
   }
 
