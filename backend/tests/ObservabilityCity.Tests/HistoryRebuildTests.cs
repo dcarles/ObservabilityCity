@@ -48,6 +48,40 @@ public class HistoryRebuildTests : IDisposable
         store.Append(at, json, unhealthy, down);
     }
 
+    private sealed class Slow : IPastMetricSource
+    {
+        public int Now, Most;
+        public string Name => "telemetry";
+        public TimeSpan PollInterval => TimeSpan.FromSeconds(30);
+        public bool CanReadPast => true;
+        public Task<IReadOnlyDictionary<string, NodeReading>> PollAsync(TownRegistry registry, CancellationToken ct) => throw new NotSupportedException();
+        public async Task<IReadOnlyDictionary<string, NodeReading>> PollAtAsync(TownRegistry registry, DateTimeOffset when, CancellationToken ct)
+        {
+            var now = Interlocked.Increment(ref Now);
+            lock (this) Most = Math.Max(Most, now);
+            await Task.Delay(30, ct);
+            Interlocked.Decrement(ref Now);
+            return new Dictionary<string, NodeReading> { ["aa.orders-api"] = Reading(when, when.Minute) };
+        }
+    }
+
+    [Fact]
+    public async Task The_frames_of_an_hour_are_built_a_few_at_a_time_and_saved_in_order()
+    {
+        var registry = RegistryLoader.Load(Town).ForEnvironment("prod");
+        var slow = new Slow();
+        var frames = new PastFrameBuilder(new SnapshotBuilder(registry, new LatestState(), _time) { Environment = "prod" }, new LatestState(), new RegistryHolder(registry), [slow]);
+        var rebuilt = new FileHistoryStore(Path.Combine(_folder, "rebuilt-parallel"), Interval);
+        var rebuilder = new HistoryRebuilder(new FileHistoryStore(Path.Combine(_folder, "recorded-parallel"), Interval), rebuilt, frames, Interval, _time);
+
+        var saved = await rebuilder.RebuildHourAsync(DateTimeOffset.Parse("2025-12-30T09:00:00Z"), CancellationToken.None);
+
+        Assert.Equal(12, saved);
+        Assert.Equal(HistoryRebuilder.FramesAtOnce, slow.Most); // several at once, never more than the limit
+        var points = rebuilt.Points(DateTimeOffset.Parse("2025-12-30T09:00:00Z")).Select(p => p.At).Where(t => t.Hour == 9).ToList();
+        Assert.Equal(points.OrderBy(t => t).ToList(), points); // saved oldest first, however they finished
+    }
+
     [Fact]
     public async Task The_hours_with_a_gap_are_listed_newest_first_and_the_hour_being_lived_is_left_out()
     {
