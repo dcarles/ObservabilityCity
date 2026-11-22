@@ -117,7 +117,10 @@ export function mountHistory(controller: HistoryController, mount: HistoryMount)
     if (!e) return ''
     const systems = (n: number): string => `${n} ${n === 1 ? 'system' : 'systems'} degraded or down`
     if (e.worst.unhealthy === 0) return '<div class="extremes"><div class="best">Nothing was degraded or down in this range</div></div>'
-    return `<div class="extremes"><div class="worst">Worst: ${viewedText(e.worst.at)}, ${systems(e.worst.unhealthy)}</div><div class="best">Best: ${viewedText(e.best.at)}, ${systems(e.best.unhealthy)}</div></div>`
+    // each line is a button that goes to its moment, like the quick picks
+    const line = (cls: string, word: string, p: { at: number; unhealthy: number }): string =>
+      `<div><button type="button" class="${cls}" data-pick="${p.at}" title="Go to this time">${word}: ${viewedText(p.at)}, ${systems(p.unhealthy)}</button></div>`
+    return `<div class="extremes">${line('worst', 'Worst', e.worst)}${line('best', 'Best', e.best)}</div>`
   }
 
   const movesOf = (s: HistoryState) => stepMoves(s.active ? s.viewed : Date.now(), Date.now(), s.days)

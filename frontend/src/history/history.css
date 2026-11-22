@@ -34,6 +34,8 @@ body.history::after { content: ''; position: fixed; inset: 0; pointer-events: no
 #history-tip[hidden] { display: none; }
 #history-pop .note { color: var(--muted, #6c7480); font-size: 12px; }
 #history-pop .extremes { margin: 0 0 10px; font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
+#history-pop .extremes button { padding: 0; border: 0; background: none; font: inherit; text-align: left; cursor: pointer; }
+#history-pop .extremes button:hover, #history-pop .extremes button:focus-visible { text-decoration: underline; }
 #history-pop .extremes .worst { color: var(--bad, #c0392b); }
 #history-pop .extremes .best { color: var(--ok, #1a8a52); }
 #history-pop .keys { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: center; }
