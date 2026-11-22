@@ -73,6 +73,13 @@ public class HourlyQueryTests
             if (t.Minute == 0) events.Add(new JobEvent("/apps/one", "hourly", false, t, null, t + TimeSpan.FromHours(1)));
             if (t.Hour == 0 && t.Minute == 30) { events.Add(new JobEvent("/apps/two", "daily", true, t, true, null)); events.Add(new JobEvent("/apps/two", "daily", false, t, null, t + TimeSpan.FromDays(1))); }
         }
+        // a job of an app that runs in two regions and fails over: the north app ran it until three days ago, the west app since, each logging its own schedule lines
+        for (var t = until - TimeSpan.FromDays(7); t < until; t += TimeSpan.FromMinutes(5))
+        {
+            var resource = t < until - TimeSpan.FromDays(3) ? "/apps/north" : "/apps/west";
+            events.Add(new JobEvent(resource, "failover", true, t, true, null, "app-x-scheduler"));
+            events.Add(new JobEvent(resource, "failover", false, t, null, t + TimeSpan.FromMinutes(5), "app-x-scheduler"));
+        }
         events.Add(Run("rare", (until - TimeSpan.FromDays(6)).ToString("o"), false));
         events.Add(Schedule("rare", (until - TimeSpan.FromDays(6)).ToString("o"), (until - TimeSpan.FromDays(5)).ToString("o")));
         return events;
@@ -80,7 +87,7 @@ public class HourlyQueryTests
 
     /// <summary>What the logs say about each job just before the start of the hour, and everything in the hour: the answer the hourly query gives.</summary>
     private static List<JobEvent> HourlyAnswer(List<JobEvent> week, DateTimeOffset hour) =>
-        week.Where(e => e.At < hour).GroupBy(e => (e.ResourceId, e.Job, e.IsRun)).Select(g => g.OrderByDescending(e => e.At).First())
+        week.Where(e => e.At < hour).GroupBy(e => (Owner: e.App ?? e.ResourceId, e.Job, e.IsRun)).Select(g => g.OrderByDescending(e => e.At).First())
             .Concat(week.Where(e => e.At >= hour && e.At < hour + TimeSpan.FromHours(1))).ToList();
 
     [Fact]
@@ -119,6 +126,39 @@ public class HourlyQueryTests
         Assert.Equal(DateTimeOffset.Parse("2026-11-20T11:30:00Z"), a.LastRun);
         Assert.False(a.Succeeded);
         Assert.Null(a.Next);
+    }
+
+    [Fact]
+    public void A_job_that_runs_in_the_apps_of_two_regions_is_one_job_and_the_region_on_standby_is_not_late()
+    {
+        var at = DateTimeOffset.Parse("2026-11-16T19:29:00Z");
+        JobEvent Of(string resource, string kind, string time, string? next) =>
+            new(resource, "scale", kind == "run", DateTimeOffset.Parse(time), kind == "run" ? true : null, next is null ? null : DateTimeOffset.Parse(next), "app-x-scheduler");
+        var events = new List<JobEvent>
+        {
+            Of("/apps/west", "run", "2026-11-16T11:03:00Z", null), Of("/apps/west", "schedule", "2026-11-16T11:03:00Z", "2026-11-16T11:04:00Z"), // west ran it this morning
+            Of("/apps/north", "run", "2026-11-16T19:24:00Z", null), Of("/apps/north", "schedule", "2026-11-16T19:24:00Z", "2026-11-16T19:25:00Z"), // north has it now
+        };
+
+        var row = Assert.Single(FunctionJobsSource.RowsAt(events, at, Window));
+
+        Assert.Equal("/apps/north", row.ResourceId);
+        Assert.Equal(DateTimeOffset.Parse("2026-11-16T19:24:00Z"), row.LastRun);
+        Assert.Equal(DateTimeOffset.Parse("2026-11-16T19:25:00Z"), row.Next);
+        // a query that does not name the app keeps each function app on its own, as before
+        Assert.Equal(2, FunctionJobsSource.RowsAt(events.Select(e => e with { App = null }), at, Window).Count);
+    }
+
+    [Fact]
+    public void The_app_column_of_an_hourly_answer_is_read_and_is_optional()
+    {
+        var withApp = LogAnalyticsReader.ParseJobEvents(Table(["resourceId", "job", "kind", "at", "succeeded", "next", "app"],
+            [["/apps/one", "tick", "run", "2026-11-20T02:50:00Z", true, null, "app-x-scheduler"]]));
+        var without = LogAnalyticsReader.ParseJobEvents(Table(["resourceId", "job", "kind", "at", "succeeded", "next"],
+            [["/apps/one", "tick", "run", "2026-11-20T02:50:00Z", true, null]]));
+
+        Assert.Equal("app-x-scheduler", Assert.Single(withApp).App);
+        Assert.Null(Assert.Single(without).App);
     }
 
     [Fact]

@@ -47,7 +47,8 @@ public sealed class FunctionJobsSource(
     /// </summary>
     public static IReadOnlyList<JobRow> RowsAt(IEnumerable<JobEvent> events, DateTimeOffset at, TimeSpan window)
     {
-        var inWindow = events.Where(e => e.At > at - window && e.At < at).GroupBy(e => (Resource: e.ResourceId.ToLowerInvariant(), e.Job));
+        // a job that runs in the apps of several regions is one job (by its app, when the query names it): its newest run decides, whichever region ran it, so the region that is on standby is not late
+        var inWindow = events.Where(e => e.At > at - window && e.At < at).GroupBy(e => (Owner: e.App is { } app ? "app:" + app.ToLowerInvariant() : "resource:" + e.ResourceId.ToLowerInvariant(), e.Job));
         var rows = new List<JobRow>();
         foreach (var job in inWindow)
         {

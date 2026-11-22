@@ -267,6 +267,7 @@ public sealed class LogAnalyticsReader(HttpClient http, ICredentialSource? crede
     /// <summary>
     /// The rows of the hourly job query: one row for each thing the logs said about a job. <c>resourceId</c> (the function app), <c>job</c>, <c>kind</c> (<c>run</c> for a finished
     /// run, <c>schedule</c> for a line that says when it runs next), <c>at</c> (when the log said it), and <c>succeeded</c> (a run) or <c>next</c> (a schedule line), which may be left empty.
+    /// The optional column <c>app</c> names the app a job belongs to when one job runs in the function apps of several regions: it is then one job, as late as its newest run.
     /// </summary>
     public static IReadOnlyList<JobEvent> ParseJobEvents(string json)
     {
@@ -276,7 +277,7 @@ public sealed class LogAnalyticsReader(HttpClient http, ICredentialSource? crede
         var table = tables[0];
         var names = table.GetProperty("columns").EnumerateArray().Select(c => c.GetProperty("name").GetString() ?? "").ToList();
         int Index(string column) => names.FindIndex(n => n.Equals(column, StringComparison.OrdinalIgnoreCase));
-        var (resource, job, kind, at, succeeded, next) = (Index("resourceId"), Index("job"), Index("kind"), Index("at"), Index("succeeded"), Index("next"));
+        var (resource, job, kind, at, succeeded, next, app) = (Index("resourceId"), Index("job"), Index("kind"), Index("at"), Index("succeeded"), Index("next"), Index("app"));
         if (resource < 0 || job < 0 || kind < 0 || at < 0)
             throw new InvalidOperationException($"the hourly job query must return the columns {string.Join(", ", JobEventColumns)} (succeeded and next may be left empty); it returned {string.Join(", ", names)}");
         DateTimeOffset? Time(JsonElement row, int index) =>
@@ -295,7 +296,7 @@ public sealed class LogAnalyticsReader(HttpClient http, ICredentialSource? crede
             if (Time(row, at) is not { } time) continue;
             var word = what.Trim().ToLowerInvariant();
             if (word is not ("run" or "schedule")) continue;
-            events.Add(new JobEvent(id, name, word == "run", time, Flag(row, succeeded), Time(row, next)));
+            events.Add(new JobEvent(id, name, word == "run", time, Flag(row, succeeded), Time(row, next), app < 0 ? null : Text(row[app]) ?? ""));
         }
         return events;
     }
@@ -331,8 +332,12 @@ public sealed class LogAnalyticsReader(HttpClient http, ICredentialSource? crede
 }
 
 /// <summary>One scheduled job of one function app as the log query summarised it: when it last ran, whether that run succeeded and when it runs next.</summary>
-/// <summary>One thing the logs said about a job: a finished run (<paramref name="IsRun"/>, with <paramref name="Succeeded"/>) or a schedule line (with the time it says the job runs <paramref name="Next"/>).</summary>
-public sealed record JobEvent(string ResourceId, string Job, bool IsRun, DateTimeOffset At, bool? Succeeded, DateTimeOffset? Next);
+/// <summary>
+/// One thing the logs said about a job: a finished run (<paramref name="IsRun"/>, with <paramref name="Succeeded"/>) or a schedule line (with the time it says the job runs <paramref name="Next"/>).
+/// <paramref name="App"/> is the name of the app that owns the job when the query says it (the same job runs in the apps of several regions): the newest run and the newest schedule line are then
+/// taken across all of them, as the per-frame query does. Null: each function app is its own.
+/// </summary>
+public sealed record JobEvent(string ResourceId, string Job, bool IsRun, DateTimeOffset At, bool? Succeeded, DateTimeOffset? Next, string? App = null);
 
 public sealed record JobRow(string ResourceId, string Job, DateTimeOffset? LastRun, bool? Succeeded, DateTimeOffset? Next, string? Region);
 
