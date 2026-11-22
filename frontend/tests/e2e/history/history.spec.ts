@@ -66,6 +66,26 @@ test.describe('time travel on a live town', () => {
     await expect(page.locator('#history-pop .keys .arrows')).not.toHaveClass(/off/)
   })
 
+  test('the worst and the best moment under the graph are buttons that go to that time', async ({ page, request }) => {
+    await waitForFrames(request, 3)
+    // the test town is healthy all the time, so one recorded moment is made to look bad to have a worst one
+    await page.route('**/api/history/range*', async (route) => {
+      const response = await route.fetch()
+      const json = await response.json()
+      json.points = json.points.map((p: { unhealthy: number }, i: number) => ({ ...p, unhealthy: i === 1 ? 5 : 0 }))
+      await route.fulfill({ response, json })
+    })
+    await openTown(page)
+    await page.locator('#history-button').click()
+    const line = page.locator('#history-pop .extremes .worst')
+    await expect(line).toContainText('5 systems degraded or down')
+    await expect(line).toHaveAttribute('data-pick', /^\d+$/)
+    const at = Number(await line.getAttribute('data-pick'))
+    await line.click()
+    await expect(page.locator('#history-pop')).toBeHidden()
+    await expect.poll(async () => Math.abs((await state(page)).viewed - at)).toBeLessThan(15_000)
+  })
+
   test('travelling to a recorded moment shows the overlay, stops the live feed, and the button says when and how fast', async ({ page, request }) => {
     await waitForFrames(request, 3)
     await openTown(page)
