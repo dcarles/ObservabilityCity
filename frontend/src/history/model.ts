@@ -69,6 +69,41 @@ export function quickPicks(now: number, days: number): QuickPick[] {
   return picks.filter((p) => p.at >= now - days * DAY)
 }
 
+export interface Move { label: string; at: number }
+
+/** The half-hour mark (local time) nearest before `at` when `before`, else nearest after; never `at` itself. */
+export function halfHourMark(at: number, before: boolean): number {
+  const d = new Date(at)
+  d.setSeconds(0, 0)
+  const m = d.getMinutes()
+  const floor = m < 30 ? 0 : 30
+  d.setMinutes(floor)
+  let t = d.getTime()
+  if (before) { if (t >= at) t -= 30 * 60_000 } else t += 30 * 60_000
+  return t
+}
+
+const clock = (at: number): string => `${String(new Date(at).getHours()).padStart(2, '0')}:${String(new Date(at).getMinutes()).padStart(2, '0')}`
+
+/**
+ * The moves from the moment being looked at (`base`, which is now while live): steps of 30 minutes and an hour, and the two nearest half-hour marks on each side
+ * with their real clock on the button. Nothing earlier than the days kept, nothing later than now.
+ */
+export function stepMoves(base: number, now: number, days: number): { steps: Move[]; snaps: Move[] } {
+  const oldest = now - days * DAY
+  const ok = (at: number): boolean => at >= oldest && at <= now
+  const live = base >= now - 5_000
+  const steps: Move[] = [
+    { label: '−1 h', at: base - HOUR }, { label: '−30 m', at: base - HOUR / 2 },
+    // forward past now goes live, so forward steps are offered only while looking at the past
+    ...(live ? [] : [{ label: '+30 m', at: Math.min(base + HOUR / 2, now) }, { label: '+1 h', at: Math.min(base + HOUR, now) }]),
+  ].filter((m) => m.at >= oldest)
+  const b1 = halfHourMark(base, true)
+  const f1 = halfHourMark(base, false)
+  const snaps = [b1 - HOUR / 2, b1, f1, f1 + HOUR / 2].filter(ok).map((at) => ({ label: clock(at), at }))
+  return { steps, snaps }
+}
+
 const pad = (n: number): string => String(n).padStart(2, '0')
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']

@@ -271,4 +271,26 @@ test.describe('time travel on a live town', () => {
     await expect(page.locator('#history-rebuilt')).toBeVisible({ timeout: 20_000 })
     await expect(page.locator('#history-nodata')).toBeHidden()
   })
+
+  // last on purpose: stepping back asks the server to rebuild that hour, which changes what the tests after it see
+  test('the Step and Snap to rows move from the viewed time, and [ ] hop by half an hour', async ({ page, request }) => {
+    await waitForFrames(request, 2)
+    await openTown(page, '&machine=car')
+    await page.locator('#history-button').click()
+    await expect(page.locator('#history-pop')).toContainText('Step')
+    await expect(page.locator('#history-pop')).toContainText('Snap to')
+    // live: only backward steps
+    expect(await page.locator('#history-pop .row:has(.label:text("Step")) button').allInnerTexts()).toEqual(['−1 h', '−30 m'])
+    await page.locator('#history-pop .row:has(.label:text("Step")) button', { hasText: '−30 m' }).click()
+    await page.waitForFunction(() => (window as unknown as Win).city.history.state.active)
+    const first = (await state(page)).viewed
+    expect(Date.now() - first).toBeGreaterThan(29 * 60_000)
+    expect(Date.now() - first).toBeLessThan(31 * 60_000)
+    await page.locator('#history-skip').click()
+    // the key goes a further half hour back, then Shift+] an hour forward (held at now: live)
+    await page.keyboard.press('[')
+    await page.waitForFunction((was) => (window as unknown as Win).city.history.state.viewed < was - 25 * 60_000, first)
+    await page.keyboard.press('Shift+}')
+    await page.waitForFunction(() => !(window as unknown as Win).city.history.state.active)
+  })
 })

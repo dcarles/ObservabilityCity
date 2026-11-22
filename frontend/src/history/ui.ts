@@ -3,7 +3,7 @@
 
 import './history.css'
 import { escapeHtml } from '../picker'
-import { addressAt, buildStrip, clockText, fieldTime, fieldValue, quickPicks, SPEEDS, speedText, stripTime, stripTip, stripX, viewedText } from './model'
+import { addressAt, buildStrip, clockText, fieldTime, fieldValue, quickPicks, SPEEDS, speedText, stepMoves, stripTime, stripTip, stripX, viewedText } from './model'
 import type { HistoryController, HistoryState } from './controller'
 import { drawMachine, MACHINE_MS, pickMachine, requestedMachine, type Machine } from './travelMachine'
 
@@ -97,10 +97,15 @@ export function mountHistory(controller: HistoryController, mount: HistoryMount)
     </svg>`
   }
 
+  const movesOf = (s: HistoryState) => stepMoves(s.active ? s.viewed : Date.now(), Date.now(), s.days)
+  // the buttons name real clock times, so the popup is drawn again when they change as the time moves
+  const keyOf = (s: HistoryState): string => [s.active, s.paused, s.speed, s.loading, s.enabled, s.frames, s.points.length, s.oldest, s.newest, s.days, s.fill?.available, s.fill?.running, s.fill?.done, s.fill?.total, s.fill?.hour, movesOf(s).snaps.map((m) => m.label).join(','), movesOf(s).steps.length].join('|')
+
   function drawPop(): void {
     const s = controller.state
     const now = Date.now()
     const picks = quickPicks(now, s.days)
+    const moves = movesOf(s)
     const field = s.active ? s.viewed : now - 3_600_000
     const range = s.frames === 0
       ? 'Nothing recorded yet. The app records while it runs and someone has the town open.'
@@ -108,16 +113,18 @@ export function mountHistory(controller: HistoryController, mount: HistoryMount)
     const fill = s.fill?.available
       ? (s.fill.running ? `Rebuilding the gaps from the cloud: ${s.fill.done} of ${s.fill.total} hours done${s.fill.hour ? `, now the hour of ${viewedText(Date.parse(s.fill.hour))}` : ''}.` : 'Gaps are rebuilt from the cloud in the background while you look at an environment.')
       : ''
-    popKey = [s.active, s.paused, s.speed, s.loading, s.enabled, s.frames, s.points.length, s.oldest, s.newest, s.days, s.fill?.available, s.fill?.running, s.fill?.done, s.fill?.total, s.fill?.hour].join('|')
+    popKey = keyOf(s)
     pop.innerHTML = `
       <h3>Go to a time <span class="note">· back up to ${s.days} days${s.fill?.available ? ', recorded or rebuilt from the cloud' : ', only what was recorded'}</span></h3>
       <div class="row"><span class="label">Quick</span>${picks.map((p) => `<button type="button" class="hb" data-pick="${p.at}">${escapeHtml(p.label)}</button>`).join('')}</div>
       <div class="row"><span class="label">Date</span><input type="datetime-local" id="history-date" value="${fieldValue(field)}" min="${fieldValue(now - s.days * 86_400_000)}" max="${fieldValue(now)}"><button type="button" class="hb" id="history-go">Go</button></div>
+      <div class="row"><span class="label">Step</span>${moves.steps.map((m) => `<button type="button" class="hb" data-pick="${m.at}">${escapeHtml(m.label)}</button>`).join('')}</div>
+      ${moves.snaps.length ? `<div class="row"><span class="label">Snap to</span>${moves.snaps.map((m) => `<button type="button" class="hb" data-pick="${m.at}">${escapeHtml(m.label)}</button>`).join('')}</div>` : ''}
       <div id="history-strip">${stripSvg(s)}<div id="history-tip" ${tipAt ? '' : 'hidden'} style="left:${tipAt?.x ?? 0}px">${escapeHtml(tipAt?.text ?? '')}</div></div>
       <div class="row"><span class="label">Speed</span>${SPEEDS.map((v) => `<button type="button" class="hb" data-speed="${v}" aria-pressed="${s.speed === v}">${speedText(v)}</button>`).join('')}
         ${s.active ? `<button type="button" class="hb" id="history-pause">${s.paused ? 'Play' : 'Pause'}</button>` : ''}</div>
       <div class="row">${s.active ? '<button type="button" class="hb live" id="history-live">Go back to live</button><button type="button" class="hb" id="history-copy">Copy link</button>' : ''}${copied ? '<span class="copied">Link copied</span>' : ''}</div>
-      <div class="note">${escapeHtml(range)}</div>${fill ? `<div class="note" id="history-fill">${escapeHtml(fill)}</div>` : ''}`
+      <div class="note">${escapeHtml(range)}</div><div class="note">Keys: Space plays or pauses, L goes live, [ and ] go 30 min back or forward (Shift: 1 h), arrows step a frame while paused.</div>${fill ? `<div class="note" id="history-fill">${escapeHtml(fill)}</div>` : ''}`
     position()
   }
 
@@ -139,8 +146,7 @@ export function mountHistory(controller: HistoryController, mount: HistoryMount)
     badge.hidden = !(s.active && s.rebuilt && !s.noData)
     if (open && !dragging) {
       // the popup is drawn again only when something other than the moving clock changed: a click lands only on a button that was not replaced between pressing and letting go
-      const key = [s.active, s.paused, s.speed, s.loading, s.enabled, s.frames, s.points.length, s.oldest, s.newest, s.days, s.fill?.available, s.fill?.running, s.fill?.done, s.fill?.total, s.fill?.hour].join('|')
-      if (key !== popKey) drawPop()
+      if (keyOf(s) !== popKey) drawPop()
       else moveHandle()
     }
   }
@@ -259,8 +265,16 @@ export function mountHistory(controller: HistoryController, mount: HistoryMount)
   window.addEventListener('keydown', (e) => {
     const target = e.target as HTMLElement
     if (e.key === 'Escape' && open) { setOpen(false); return }
-    if (!controller.state.active || e.ctrlKey || e.metaKey || e.altKey) return
+    if (e.ctrlKey || e.metaKey || e.altKey) return
     if (target.closest('input, textarea, select, [contenteditable]')) return
+    // [ and ] go 30 minutes back and forward, with Shift an hour; from live only back
+    const hop = ({ '[': -0.5, ']': 0.5, '{': -1, '}': 1 } as Record<string, number>)[e.key]
+    if (hop !== undefined && controller.state.enabled) {
+      const base = controller.state.active ? controller.state.viewed : Date.now()
+      if (hop < 0 || controller.state.active) { e.preventDefault(); void controller.goTo(base + hop * 3_600_000) }
+      return
+    }
+    if (!controller.state.active) return
     if (e.key === ' ') { e.preventDefault(); controller.setPaused(!controller.state.paused) }
     else if (e.key === 'l' || e.key === 'L') void controller.goLive()
     else if (controller.state.paused && e.key === 'ArrowLeft') { e.preventDefault(); controller.step(-1) }

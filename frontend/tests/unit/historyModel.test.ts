@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { addressAt, addressLive, advance, buildStrip, catchUpSeconds, fieldTime, fieldValue, frameFor, quickPicks, requestedAt, SPEEDS, stripTime, stripTip, stripX, viewedText } from '../../src/history/model'
+import { addressAt, addressLive, advance, buildStrip, catchUpSeconds, fieldTime, fieldValue, frameFor, halfHourMark, quickPicks, requestedAt, SPEEDS, stepMoves, stripTime, stripTip, stripX, viewedText } from '../../src/history/model'
 
 const MIN = 60_000
 const GAP = 5 * MIN
@@ -135,5 +135,34 @@ describe('rebuilt frames on the strip', () => {
   it('says in the tip that a rebuilt frame was rebuilt', () => {
     expect(stripTip(points.map((p) => ({ ...p, down: 0 })), NOW - 46 * MIN, GAP)).toContain('rebuilt from the cloud')
     expect(stripTip(points.map((p) => ({ ...p, down: 0 })), NOW - 36 * MIN, GAP)).not.toContain('rebuilt')
+  })
+})
+
+describe('step and snap moves', () => {
+  const at = (h: number, m: number): number => new Date(2026, 10, 22, h, m, 0, 0).getTime()
+  const now = at(14, 5)
+  it('finds the half-hour marks on each side and never the moment itself', () => {
+    expect(halfHourMark(at(12, 40), true)).toBe(at(12, 30))
+    expect(halfHourMark(at(12, 40), false)).toBe(at(13, 0))
+    expect(halfHourMark(at(12, 30), true)).toBe(at(12, 0))
+    expect(halfHourMark(at(12, 30), false)).toBe(at(13, 0))
+    expect(halfHourMark(at(12, 5), true)).toBe(at(12, 0))
+  })
+  it('offers steps and the two nearest marks on each side, named by their clock', () => {
+    const m = stepMoves(at(12, 40), now, 7)
+    expect(m.steps.map((x) => x.label)).toEqual(['−1 h', '−30 m', '+30 m', '+1 h'])
+    expect(m.steps.map((x) => x.at)).toEqual([at(11, 40), at(12, 10), at(13, 10), at(13, 40)])
+    expect(m.snaps.map((x) => x.label)).toEqual(['12:00', '12:30', '13:00', '13:30'])
+  })
+  it('offers no forward step while live and no mark after now', () => {
+    const m = stepMoves(now, now, 7)
+    expect(m.steps.map((x) => x.label)).toEqual(['−1 h', '−30 m'])
+    expect(m.snaps.map((x) => x.label)).toEqual(['13:30', '14:00'])
+  })
+  it('holds a forward step at now and drops what is older than the days kept', () => {
+    const m = stepMoves(at(13, 50), now, 7)
+    expect(m.steps.find((x) => x.label === '+1 h')!.at).toBe(now)
+    const old = stepMoves(now - 7 * 86_400_000 + 20 * 60_000, now, 7)
+    expect(old.steps.map((x) => x.label)).toEqual(['+30 m', '+1 h'])
   })
 })
