@@ -12,4 +12,10 @@ public interface IPastMetricSource : IMetricSource
 
     /// <summary>The readings as of <paramref name="at"/>, from the window that ended then. Many frames of one day may be asked in a row: a source may keep what it read to answer the next one.</summary>
     Task<IReadOnlyDictionary<string, NodeReading>> PollAtAsync(Registry.Registry registry, DateTimeOffset at, CancellationToken ct);
+
+    /// <summary>
+    /// What the last <see cref="PollAtAsync"/> could not say, for the log (never for the town): a source that leaves some signal out of a past frame instead of failing it (the cloud has no history
+    /// of it) says why here. Null when it said everything it was asked.
+    /// </summary>
+    string? PastNote => null;
 }
