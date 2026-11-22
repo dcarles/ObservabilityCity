@@ -103,9 +103,9 @@ export function mountHistory(controller: HistoryController, mount: HistoryMount)
       ? 'Nothing recorded yet. The app records while it runs and someone has the town open.'
       : `${s.points.filter((p) => !p.rebuilt).length} recorded and ${s.points.filter((p) => p.rebuilt).length} rebuilt frames from ${viewedText(s.oldest!)} to ${viewedText(s.newest!)} (${(s.bytes / 1024).toFixed(0)} KB on disk).`
     const fill = s.fill?.available
-      ? (s.fill.running ? `Rebuilding the gaps from the cloud: ${s.fill.done} of ${s.fill.total} hours done.` : 'Gaps are rebuilt from the cloud in the background while you look at an environment.')
+      ? (s.fill.running ? `Rebuilding the gaps from the cloud: ${s.fill.done} of ${s.fill.total} hours done${s.fill.hour ? `, now the hour of ${viewedText(Date.parse(s.fill.hour))}` : ''}.` : 'Gaps are rebuilt from the cloud in the background while you look at an environment.')
       : ''
-    popKey = [s.active, s.paused, s.speed, s.loading, s.enabled, s.frames, s.points.length, s.oldest, s.newest, s.days, s.fill?.available, s.fill?.running, s.fill?.done, s.fill?.total].join('|')
+    popKey = [s.active, s.paused, s.speed, s.loading, s.enabled, s.frames, s.points.length, s.oldest, s.newest, s.days, s.fill?.available, s.fill?.running, s.fill?.done, s.fill?.total, s.fill?.hour].join('|')
     pop.innerHTML = `
       <h3>Go to a time <span class="note">· back up to ${s.days} days${s.fill?.available ? ', recorded or rebuilt from the cloud' : ', only what was recorded'}</span></h3>
       <div class="row"><span class="label">Quick</span>${picks.map((p) => `<button type="button" class="hb" data-pick="${p.at}">${escapeHtml(p.label)}</button>`).join('')}</div>
@@ -136,7 +136,7 @@ export function mountHistory(controller: HistoryController, mount: HistoryMount)
     badge.hidden = !(s.active && s.rebuilt && !s.noData)
     if (open && !dragging) {
       // the popup is drawn again only when something other than the moving clock changed: a click lands only on a button that was not replaced between pressing and letting go
-      const key = [s.active, s.paused, s.speed, s.loading, s.enabled, s.frames, s.points.length, s.oldest, s.newest, s.days, s.fill?.available, s.fill?.running, s.fill?.done, s.fill?.total].join('|')
+      const key = [s.active, s.paused, s.speed, s.loading, s.enabled, s.frames, s.points.length, s.oldest, s.newest, s.days, s.fill?.available, s.fill?.running, s.fill?.done, s.fill?.total, s.fill?.hour].join('|')
       if (key !== popKey) drawPop()
       else moveHandle()
     }

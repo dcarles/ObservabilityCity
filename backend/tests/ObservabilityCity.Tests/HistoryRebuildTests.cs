@@ -41,11 +41,9 @@ public class HistoryRebuildTests : IDisposable
         return (new HistoryRebuilder(recorded, rebuilt, frames, Interval, _time), recorded, rebuilt, source, frames);
     }
 
-    private static readonly Dictionary<string, Func<DateTimeOffset, IReadOnlyList<ResourceHealthEvent>>> NoHealth = new();
-
     private static async Task Record(PastFrameBuilder frames, FileHistoryStore store, DateTimeOffset at)
     {
-        var json = HistoryRecorder.ToJson(await frames.BuildAsync(at, NoHealth, CancellationToken.None));
+        var json = HistoryRecorder.ToJson(await frames.BuildAsync(at, CancellationToken.None));
         var (unhealthy, down) = FileHistoryStore.Counts(json);
         store.Append(at, json, unhealthy, down);
     }
@@ -67,7 +65,7 @@ public class HistoryRebuildTests : IDisposable
         var (rebuilder, recorded, rebuilt, source, _) = Setup();
         var ten = DateTimeOffset.Parse("2025-12-30T10:00:00Z");
 
-        var saved = await rebuilder.RebuildHourAsync(ten, NoHealth, CancellationToken.None);
+        var saved = await rebuilder.RebuildHourAsync(ten, CancellationToken.None);
 
         Assert.Equal(12, saved);
         Assert.Equal(12, source.Asked);
@@ -86,7 +84,7 @@ public class HistoryRebuildTests : IDisposable
         foreach (var slot in rebuilder.Slots(DateTimeOffset.Parse("2025-12-30T09:00:00Z"), DateTimeOffset.Parse("2025-12-30T09:30:00Z"))) await Record(frames, recorded, slot);
         var asked = source.Asked;
 
-        var saved = await rebuilder.RebuildHourAsync(DateTimeOffset.Parse("2025-12-30T09:00:00Z"), NoHealth, CancellationToken.None);
+        var saved = await rebuilder.RebuildHourAsync(DateTimeOffset.Parse("2025-12-30T09:00:00Z"), CancellationToken.None);
 
         Assert.Equal(6, saved); // 09:30 to 09:55
         Assert.Equal(6, source.Asked - asked);
@@ -100,7 +98,7 @@ public class HistoryRebuildTests : IDisposable
         var (rebuilder, _, rebuilt, _, _) = Setup(t => ++calls == 7 ? throw new HttpRequestException("429") : new Dictionary<string, NodeReading> { ["aa.orders-api"] = Reading(t, 1) });
         var ten = DateTimeOffset.Parse("2025-12-30T10:00:00Z");
 
-        await Assert.ThrowsAsync<HttpRequestException>(() => rebuilder.RebuildHourAsync(ten, NoHealth, CancellationToken.None));
+        await Assert.ThrowsAsync<HttpRequestException>(() => rebuilder.RebuildHourAsync(ten, CancellationToken.None));
 
         Assert.Empty(rebuilt.Points(ten));
         Assert.Contains(ten, rebuilder.MissingHours(ten));
@@ -112,7 +110,7 @@ public class HistoryRebuildTests : IDisposable
         var (rebuilder, recorded, rebuilt, _, frames) = Setup();
         var nine = DateTimeOffset.Parse("2025-12-30T09:00:00Z");
         foreach (var slot in rebuilder.Slots(nine, nine.AddMinutes(30))) await Record(frames, recorded, slot);
-        await rebuilder.RebuildHourAsync(nine, NoHealth, CancellationToken.None); // 09:30 to 09:55 only
+        await rebuilder.RebuildHourAsync(nine, CancellationToken.None); // 09:30 to 09:55 only
         var reader = new HistoryReader(recorded, rebuilt);
 
         var points = reader.Points(nine);
@@ -129,7 +127,7 @@ public class HistoryRebuildTests : IDisposable
     }
 
     private HistoryFiller Filler(HistoryRebuilder rebuilder, Stub source, Demand? gate) =>
-        new(rebuilder, [source], new RegistryHolder(RegistryLoader.Load(Town).ForEnvironment("prod")), new HistoryOptions { Days = 1 }, gate, _time);
+        new(rebuilder, [source], new HistoryOptions { Days = 1 }, gate, _time);
 
     [Fact]
     public async Task A_pass_fills_every_gap_of_the_days_kept_newest_first_and_a_second_pass_finds_nothing_to_do()

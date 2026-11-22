@@ -1,4 +1,6 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
+using System.Globalization;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using ObservabilityCity.Core.Sources;
@@ -17,7 +19,6 @@ public sealed record FillStatus(bool Running, int Done, int Total, DateTimeOffse
 public sealed class HistoryFiller(
     HistoryRebuilder rebuilder,
     IReadOnlyList<IMetricSource> sources,
-    Registry.IRegistryProvider registries,
     HistoryOptions options,
     Demand? gate = null,
     TimeProvider? time = null,
@@ -54,11 +55,11 @@ public sealed class HistoryFiller(
             while (!ct.IsCancellationRequested)
             {
                 if (!await Demand.WaitUntilWantedAsync(gate, ct)) return;
-                var due = wasIdle || !_priority.IsEmpty || _time.GetUtcNow() - lastPass >= PassEvery;
-                if (due)
+                var reason = wasIdle ? "somebody is looking again" : !_priority.IsEmpty ? "an hour was asked for" : _time.GetUtcNow() - lastPass >= PassEvery ? "the hourly check" : null;
+                if (reason is not null)
                 {
                     wasIdle = false;
-                    await PassAsync(ct);
+                    await PassAsync(ct, reason);
                     lastPass = _time.GetUtcNow();
                 }
                 await Task.Delay(CheckEvery, _time, ct);
@@ -69,38 +70,52 @@ public sealed class HistoryFiller(
     }
 
     /// <summary>One pass: every hour of the days kept that is still a gap, the asked-for ones first, then newest first. Public so a test can run one.</summary>
-    public async Task PassAsync(CancellationToken ct)
+    public async Task PassAsync(CancellationToken ct, string reason = "asked")
     {
         var from = _time.GetUtcNow() - options.Keep;
+        var clock = Stopwatch.StartNew();
         try
         {
             var missing = rebuilder.MissingHours(from).ToList();
-            if (missing.Count == 0) { _status = new FillStatus(false, 0, 0, null, null); return; }
+            if (missing.Count == 0)
+            {
+                _status = new FillStatus(false, 0, 0, null, null);
+                log?.LogInformation("History: nothing to fill ({Reason})", reason);
+                return;
+            }
             var done = 0;
+            var failed = 0;
             string? problem = null;
             _status = new FillStatus(true, 0, missing.Count, null, null);
-            var health = await rebuilder.ReadHealthAsync(sources, registries.Current, from, ct);
+            log?.LogInformation("History: filling started ({Reason}): {Hours} hours are missing, newest first", reason, missing.Count);
             while (missing.Count > 0)
             {
-                if (gate is { Wanted: false }) break; // nobody looks any more
+                if (gate is { Wanted: false })
+                {
+                    log?.LogInformation("History: filling paused, nobody is looking; {Left} hours left", missing.Count);
+                    break;
+                }
                 var hour = Next(missing);
                 missing.Remove(hour);
                 if (_failed.TryGetValue(hour, out var when) && _time.GetUtcNow() - when < RetryFailedAfter) continue;
                 _status = new FillStatus(true, done, done + missing.Count + 1, hour, problem);
+                log?.LogInformation("History: rebuilding the hour {Hour} ({Done} of {Total} done)", hour.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture), done, done + missing.Count + 1);
                 try
                 {
-                    await rebuilder.RebuildHourAsync(hour, health, ct);
+                    await rebuilder.RebuildHourAsync(hour, ct);
                     _failed.Remove(hour);
                     done++;
                 }
                 catch (Exception e) when (e is not OperationCanceledException || !ct.IsCancellationRequested)
                 {
                     _failed[hour] = _time.GetUtcNow();
+                    failed++;
                     problem = e.Message;
-                    log?.LogWarning("History: could not rebuild the hour {Hour}: {Reason}", hour.ToString("O"), e.Message);
+                    log?.LogWarning("History: could not rebuild the hour {Hour}, it is tried again in {Minutes:0} minutes: {Reason}", hour.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture), RetryFailedAfter.TotalMinutes, e.Message);
                 }
             }
             _status = new FillStatus(false, done, done, null, problem);
+            log?.LogInformation("History: filling pass ended: {Done} hours done, {Failed} failed, {Seconds:0} s", done, failed, clock.Elapsed.TotalSeconds);
         }
         catch (Exception e) when (e is not OperationCanceledException || !ct.IsCancellationRequested)
         {
