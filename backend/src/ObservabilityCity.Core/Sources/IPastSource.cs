@@ -1,5 +1,3 @@
-using ObservabilityCity.Contracts;
-
 namespace ObservabilityCity.Core.Sources;
 
 /// <summary>
@@ -14,14 +12,4 @@ public interface IPastMetricSource : IMetricSource
 
     /// <summary>The readings as of <paramref name="at"/>, from the window that ended then. Many frames of one day may be asked in a row: a source may keep what it read to answer the next one.</summary>
     Task<IReadOnlyDictionary<string, NodeReading>> PollAtAsync(Registry.Registry registry, DateTimeOffset at, CancellationToken ct);
-}
-
-/// <summary>
-/// A source of the cloud's own health reports that can say which were open at a past time. <see cref="ReadSinceAsync"/> reads what the cloud logged from a time until now once; the list for
-/// each frame is then worked out from it with no more reads.
-/// </summary>
-public interface IPastHealthSource : IHealthEventSource
-{
-    /// <summary>Reads the cloud's log from <paramref name="from"/> and returns a function that gives the reports open at any time from then on.</summary>
-    Task<Func<DateTimeOffset, IReadOnlyList<ResourceHealthEvent>>> ReadSinceAsync(Registry.Registry registry, DateTimeOffset from, CancellationToken ct);
 }
