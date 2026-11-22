@@ -3,7 +3,7 @@
 
 import './history.css'
 import { escapeHtml } from '../picker'
-import { addressAt, buildStrip, clockText, fieldTime, fieldValue, historyAgeText, quickPicks, sizeText, SPEEDS, speedText, stepMoves, stripTime, stripTip, stripX, viewedText, waitingText } from './model'
+import { addressAt, buildStrip, clockText, fieldTime, fieldValue, historyAgeText, quickPicks, sizeText, SPEEDS, speedText, stepMoves, stripExtremes, stripTime, stripTip, stripX, viewedText, waitingText } from './model'
 import type { HistoryController, HistoryState } from './controller'
 import { drawMachine, MACHINE_MS, pickMachine, requestedMachine, type Machine } from './travelMachine'
 
@@ -93,7 +93,7 @@ export function mountHistory(controller: HistoryController, mount: HistoryMount)
     return `<svg viewBox="0 0 ${STRIP_W} ${STRIP_H}" preserveAspectRatio="none" id="history-strip-svg" role="img" aria-label="Degraded systems over the last ${s.days} days">
       <rect x="0" y="0" width="${STRIP_W}" height="${g.height}" fill="transparent"/>
       ${strip.gaps.map(([x, w]) => `<rect class="gap${s.fill?.available ? ' fillable' : ''}" x="${x.toFixed(1)}" y="0" width="${w.toFixed(1)}" height="${g.height}"/>`).join('')}
-      <line class="grid" x1="0" x2="${STRIP_W}" y1="${((g.height + 2) / 2).toFixed(1)}" y2="${((g.height + 2) / 2).toFixed(1)}"/>
+      ${strip.ticks.filter((k) => k.value > 0).map((k) => `<line class="grid" x1="0" x2="${STRIP_W}" y1="${k.y.toFixed(1)}" y2="${k.y.toFixed(1)}"/>`).join('')}
       ${strip.areas.map((a) => `<path class="area" d="${a}"/>`).join('')}
       ${strip.lines.map((l) => `<path class="line" d="${l}"/>`).join('')}
       ${strip.rebuilt.map(([x, w]) => `<rect class="rebuilt" x="${x.toFixed(1)}" y="0" width="${w.toFixed(1)}" height="${g.height}"/>`).join('')}
@@ -103,11 +103,21 @@ export function mountHistory(controller: HistoryController, mount: HistoryMount)
     </svg>`
   }
 
-  /** The scale on the left of the graph: 0 at the bottom and the highest count of the range at the top (HTML on top of the strip, so the text is not stretched with the picture). */
+  /** The scale on the left of the graph, in its own strip: round numbers from 0 to the top, each at the height of its line (HTML beside the picture, so the text is not stretched with it). */
   function yScale(s: HistoryState): string {
     if (s.frames === 0) return ''
-    const max = buildStrip(s.points, geometry(s), s.intervalMs).max
-    return `<span class="yscale top" aria-hidden="true">${max} not healthy</span><span class="yscale bottom" aria-hidden="true">0</span>`
+    const strip = buildStrip(s.points, geometry(s), s.intervalMs)
+    return strip.ticks.map((k) => `<span class="yscale" aria-hidden="true" style="top:${(k.y - 6).toFixed(1)}px">${k.value}</span>`).join('')
+  }
+
+  /** The worst and the best moment under the graph, in red and green; the closest to now when several tie. */
+  function extremes(s: HistoryState): string {
+    const g = geometry(s)
+    const e = stripExtremes(s.points, g.from, g.to)
+    if (!e) return ''
+    const systems = (n: number): string => `${n} ${n === 1 ? 'system' : 'systems'} degraded or down`
+    if (e.worst.unhealthy === 0) return '<div class="extremes"><div class="best">Nothing was degraded or down in this range</div></div>'
+    return `<div class="extremes"><div class="worst">Worst: ${viewedText(e.worst.at)}, ${systems(e.worst.unhealthy)}</div><div class="best">Best: ${viewedText(e.best.at)}, ${systems(e.best.unhealthy)}</div></div>`
   }
 
   const movesOf = (s: HistoryState) => stepMoves(s.active ? s.viewed : Date.now(), Date.now(), s.days)
@@ -137,6 +147,7 @@ export function mountHistory(controller: HistoryController, mount: HistoryMount)
       <div class="row"><span class="label">Step</span>${moves.steps.map((m) => `<button type="button" class="hb" data-pick="${m.at}">${escapeHtml(m.label)}</button>`).join('')}</div>
       ${moves.snaps.length ? `<div class="row"><span class="label">Snap to</span>${moves.snaps.map((m) => `<button type="button" class="hb" data-pick="${m.at}">${escapeHtml(m.label)}</button>`).join('')}</div>` : ''}
       <div id="history-strip">${stripSvg(s)}${yScale(s)}<div id="history-tip" ${tipAt ? '' : 'hidden'} style="left:${tipAt?.x ?? 0}px">${escapeHtml(tipAt?.text ?? '')}</div></div>
+      ${extremes(s)}
       <div class="row"><span class="label">Speed</span>${SPEEDS.map((v) => `<button type="button" class="hb" data-speed="${v}" aria-pressed="${s.speed === v}">${speedText(v)}</button>`).join('')}
         ${s.active ? `<button type="button" class="hb" id="history-pause">${s.paused ? 'Play' : 'Pause'}</button>` : ''}</div>
       <div class="row">${s.active ? '<button type="button" class="hb live" id="history-live">Go back to live</button><button type="button" class="hb" id="history-copy">Copy link</button>' : ''}${copied ? '<span class="copied">Link copied</span>' : ''}</div>

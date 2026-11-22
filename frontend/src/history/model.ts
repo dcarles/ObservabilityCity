@@ -203,6 +203,21 @@ export interface Strip {
   days: { x: number; label: string }[]
   /** The largest count drawn (never below 1, so a quiet town is a flat line and not a scaled-up one). */
   max: number
+  /** The top of the scale: the largest count rounded up to a round number, so every point fits under it. */
+  top: number
+  /** The marks of the scale, 0 up to the top, with where each one is drawn (y). */
+  ticks: { value: number; y: number }[]
+}
+
+/** A scale for counts from 0 to max: a round step (1, 2, 5, 10, 20, 50 ...) with at most four steps, and the top the first multiple of it at or over max. */
+export function niceScale(max: number): { top: number; step: number } {
+  const wanted = Math.max(1, Math.ceil(max))
+  for (let magnitude = 1; ; magnitude *= 10) {
+    for (const m of [1, 2, 5]) {
+      const step = m * magnitude
+      if (Math.ceil(wanted / step) <= 4) return { top: Math.ceil(wanted / step) * step, step }
+    }
+  }
 }
 
 /** The x of a moment on the strip. */
@@ -220,9 +235,10 @@ export function stripTime(g: StripGeometry, x: number): number {
  */
 export function buildStrip(points: readonly { at: number; unhealthy: number; rebuilt?: boolean }[], g: StripGeometry, intervalMs: number): Strip {
   const max = Math.max(1, ...points.map((p) => p.unhealthy))
+  const scale = niceScale(max)
   const top = 4
   const base = g.height - 2
-  const y = (n: number): number => base - (n / max) * (base - top)
+  const y = (n: number): number => base - (n / scale.top) * (base - top)
   const stretches: { at: number; unhealthy: number; rebuilt?: boolean }[][] = []
   for (const p of points) {
     if (p.at < g.from || p.at > g.to) continue
@@ -259,7 +275,24 @@ export function buildStrip(points: readonly { at: number; unhealthy: number; reb
   const d = new Date(g.from)
   d.setHours(24, 0, 0, 0)
   for (; d.getTime() < g.to; d.setDate(d.getDate() + 1)) days.push({ x: stripX(g, d.getTime()), label: `${WEEKDAYS[d.getDay()]} ${d.getDate()}` })
-  return { areas, lines, gaps, rebuilt, days, max }
+  const ticks: { value: number; y: number }[] = []
+  for (let v = 0; v <= scale.top; v += scale.step) ticks.push({ value: v, y: y(v) })
+  return { areas, lines, gaps, rebuilt, days, max, top: scale.top, ticks }
+}
+
+/**
+ * The worst and the best moment of the range: the most and the fewest systems not healthy. When several moments tie, the one closest to now.
+ * Null when nothing was recorded inside the range.
+ */
+export function stripExtremes(points: readonly { at: number; unhealthy: number }[], from: number, to: number): { worst: { at: number; unhealthy: number }; best: { at: number; unhealthy: number } } | null {
+  let worst: { at: number; unhealthy: number } | null = null
+  let best: { at: number; unhealthy: number } | null = null
+  for (const p of points) {
+    if (p.at < from || p.at > to) continue
+    if (worst === null || p.unhealthy > worst.unhealthy || (p.unhealthy === worst.unhealthy && p.at > worst.at)) worst = { at: p.at, unhealthy: p.unhealthy }
+    if (best === null || p.unhealthy < best.unhealthy || (p.unhealthy === best.unhealthy && p.at > best.at)) best = { at: p.at, unhealthy: p.unhealthy }
+  }
+  return worst && best ? { worst, best } : null
 }
 
 /** The words for a point on the strip: the time, and how many were unhealthy then, or that nothing was recorded. */

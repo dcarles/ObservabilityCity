@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { addressAt, addressLive, advance, buildStrip, catchUpSeconds, fieldTime, fieldValue, frameFor, halfHourMark, historyAgeText, quickPicks, requestedAt, sizeText, SPEEDS, stepMoves, waitingText, stripTime, stripTip, stripX, viewedText } from '../../src/history/model'
+import { addressAt, addressLive, advance, buildStrip, catchUpSeconds, fieldTime, fieldValue, frameFor, halfHourMark, historyAgeText, niceScale, quickPicks, requestedAt, sizeText, SPEEDS, stepMoves, stripExtremes, waitingText, stripTime, stripTip, stripX, viewedText } from '../../src/history/model'
 
 const MIN = 60_000
 const GAP = 5 * MIN
@@ -203,5 +203,42 @@ describe('the words about what is held', () => {
     const g = { width: 600, height: 60, from: NOW - 3_600_000, to: NOW }
     expect(buildStrip([{ at: NOW - 10 * MIN, unhealthy: 0 }], g, GAP).max).toBe(1)
     expect(buildStrip([{ at: NOW - 10 * MIN, unhealthy: 7 }, { at: NOW - 5 * MIN, unhealthy: 3 }], g, GAP).max).toBe(7)
+  })
+})
+
+describe('the scale of the strip', () => {
+  const g = { width: 600, height: 60, from: NOW - 3_600_000, to: NOW }
+  it('rounds the top up to a round number with at most four steps', () => {
+    expect(niceScale(27)).toEqual({ top: 30, step: 10 })
+    expect(niceScale(1)).toEqual({ top: 1, step: 1 })
+    expect(niceScale(3)).toEqual({ top: 3, step: 1 })
+    expect(niceScale(5)).toEqual({ top: 6, step: 2 })
+    expect(niceScale(7)).toEqual({ top: 8, step: 2 })
+    expect(niceScale(40)).toEqual({ top: 40, step: 10 })
+    expect(niceScale(41)).toEqual({ top: 60, step: 20 })
+    expect(niceScale(120)).toEqual({ top: 150, step: 50 })
+  })
+  it('puts a mark at every step from 0 to the top, and the highest point under the top', () => {
+    const s = buildStrip([{ at: NOW - 10 * MIN, unhealthy: 27 }, { at: NOW - 5 * MIN, unhealthy: 2 }], g, GAP)
+    expect(s.top).toBe(30)
+    expect(s.ticks.map((k) => k.value)).toEqual([0, 10, 20, 30])
+    expect(s.ticks[0].y).toBeGreaterThan(s.ticks[3].y) // 0 is the lowest
+    expect(s.lines[0]).toMatch(/^M[\d.]+ [\d.]+ L/)
+    const y27 = Number(s.lines[0].split(' ')[1])
+    expect(y27).toBeGreaterThan(s.ticks[3].y) // 27 is under the 30
+    expect(y27).toBeLessThan(s.ticks[2].y) // and over the 20
+  })
+  it('names the worst and the best moment, the closest to now when several tie', () => {
+    const points = [
+      { at: NOW - 50 * MIN, unhealthy: 9 },
+      { at: NOW - 40 * MIN, unhealthy: 0 },
+      { at: NOW - 30 * MIN, unhealthy: 9 },
+      { at: NOW - 20 * MIN, unhealthy: 3 },
+      { at: NOW - 10 * MIN, unhealthy: 0 },
+      { at: NOW - 5 * MIN, unhealthy: 2 },
+    ]
+    expect(stripExtremes(points, g.from, g.to)).toEqual({ worst: { at: NOW - 30 * MIN, unhealthy: 9 }, best: { at: NOW - 10 * MIN, unhealthy: 0 } })
+    expect(stripExtremes(points, NOW - 25 * MIN, NOW)?.worst).toEqual({ at: NOW - 20 * MIN, unhealthy: 3 }) // only what is inside the range
+    expect(stripExtremes([], g.from, g.to)).toBeNull()
   })
 })
