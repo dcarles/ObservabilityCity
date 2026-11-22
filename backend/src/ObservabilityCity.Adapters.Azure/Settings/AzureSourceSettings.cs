@@ -26,6 +26,7 @@ public sealed partial class AzureSourceSettings : SourceSettingsReader<AzureSour
     {
         RegionQuery = f.RegionQuery,
         RangeQuery = f.RangeQuery,
+        RegionRangeQuery = f.RegionRangeQuery,
         TypesQuery = f.TypesQuery,
         Metrics = ToMetrics(f.Metrics),
         Entities = ToEntities(f.Entities),
@@ -45,7 +46,13 @@ public sealed partial class AzureSourceSettings : SourceSettingsReader<AzureSour
         if (def.RangeQuery is { } rangeQuery)
         {
             if (rangeQuery.Trim().Length == 0) report.Add($"source '{source}' has an empty rangeQuery; give the query that returns role, calls and at (the start of each time bin), or leave it out", "rangeQuery");
-            foreach (var problem in ScopeTemplate.Check(rangeQuery, known)) report.Add($"source '{source}' rangeQuery: {problem}", "rangeQuery");
+            foreach (var problem in ScopeTemplate.Check(rangeQuery, known.Append(SourceQuery.RangeStart).ToList())) report.Add($"source '{source}' rangeQuery: {problem}", "rangeQuery");
+        }
+        if (def.RegionRangeQuery is { } regionRangeQuery)
+        {
+            if (regionRangeQuery.Trim().Length == 0) report.Add($"source '{source}' has an empty regionRangeQuery; give the query that returns role, region, calls and at (the start of each time bin), or leave it out", "regionRangeQuery");
+            foreach (var problem in ScopeTemplate.Check(regionRangeQuery, known)) report.Add($"source '{source}' regionRangeQuery: {problem}", "regionRangeQuery");
+            if (def.RegionQuery is null) report.Add($"source '{source}' has a regionRangeQuery but no regionQuery; the region split is only measured when there is a regionQuery", "regionRangeQuery");
         }
         if (def.TypesQuery is { } typesQuery)
         {
@@ -270,6 +277,8 @@ public sealed class AzureSourceFile
     public string? RegionQuery { get; set; }
     /// <summary>Request sources only (loganalytics): the query of the source asked once for a whole hour of the past, with one more column, at (the start of each time bin as wide as the window). Without it each past frame is asked on its own.</summary>
     public string? RangeQuery { get; set; }
+    /// <summary>Request sources only (loganalytics): the regionQuery asked once for a whole hour of the past, with one more column, at (the start of each time bin as wide as the window). Without it each past frame is asked on its own.</summary>
+    public string? RegionRangeQuery { get; set; }
     /// <summary>Broker sources only (servicebus): the query that says which kinds of message each queue handled, a template like query. Returns one row per queue and message type with the columns queue, type and calls (counts over the window). Without it the types are not shown.</summary>
     public string? TypesQuery { get; set; }
     /// <summary>Platform-metric sources only (azuremonitor): which metric of which resources fills which signal. Everything about the metrics is written here; the program knows none.</summary>
