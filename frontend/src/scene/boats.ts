@@ -17,6 +17,8 @@ export interface BoatRoute {
   oneWay?: boolean
   /** Boats leaving per second. Zero while the broker is down or has no data. */
   rate: () => number
+  /** How busy the lane is, 0 to 1 (see boatLoad): a busier lane's boats are bigger and unload faster. Missing: quiet. */
+  load?: () => number
   /** Sailing speed multiplier from the broker's latency against its SLA. */
   speed: () => number
 }
@@ -39,6 +41,9 @@ interface Boat {
   hz: number
   /** Seconds spent unloading at the quay at the end of a circuit. */
   hold: number
+  /** How much bigger than the usual boat this one is, and the seconds it takes to unload one crate: both set when it leaves, from how busy its lane is. */
+  size: number
+  step: number
 }
 
 const BASE_SPEED = 4.4
@@ -55,6 +60,25 @@ const AVOID_EASE = 3
 export const LANE_SIDE = 1.3
 /** A boat at the end of its circuit lies at the quay and unloads one crate every UNLOAD_STEP seconds, then leaves. */
 export const UNLOAD_STEP = 0.15
+/** On a fully busy lane a crate is unloaded in this many seconds, and the boat is this much bigger; in between both follow the lane's load smoothly. */
+export const UNLOAD_STEP_FAST = 0.03
+export const BUSY_BOAT_SIZE = 1.6
+/** The length of the usual boat, bow to stern, and the clear water kept between two boats leaving the same lane. */
+const BOAT_LENGTH = 6.7
+export const LEAVE_GAP = 1.4
+
+/** How much bigger than the usual boat one of a lane with this load is: 1 when quiet. */
+export function boatSizeFor(load: number): number {
+  return 1 + (BUSY_BOAT_SIZE - 1) * clamp(load, 0, 1)
+}
+/** Seconds to unload one crate for a lane with this load: slow when quiet, fast when busy (smooth, on a log scale). */
+export function unloadStepFor(load: number): number {
+  return UNLOAD_STEP * Math.pow(UNLOAD_STEP_FAST / UNLOAD_STEP, clamp(load, 0, 1))
+}
+/** How far a boat that has just left must have sailed before the next one of its lane may leave. */
+export function leaveSpacing(load: number): number {
+  return BOAT_LENGTH * boatSizeFor(load) * BOAT_SCALE + LEAVE_GAP
+}
 const UNLOAD_LEAVE = 0.7
 
 /** The same path moved sideways by `side` (positive: to the right of the way it runs), corners included. */
@@ -136,8 +160,16 @@ export class BoatSystem {
       if (rate <= 0) continue
       const a = (this.acc.get(r) ?? Math.random()) + rate * this.density * dt
       let whole = Math.floor(a)
-      this.acc.set(r, a - whole)
-      while (whole-- > 0 && (BoatSystem.isInternal(r) ? this.freeInternal : this.free).length > 0) this.spawn(r)
+      let left = a - whole
+      // a boat leaves only when the last one of its lane has sailed clear of the start; the wait is kept (never more than one boat), so the lane never bunches up
+      const gap = leaveSpacing(r.load?.() ?? 0)
+      while (whole > 0 && (BoatSystem.isInternal(r) ? this.freeInternal : this.free).length > 0) {
+        if (this.boats.some((b) => b.route === r && b.dist < gap)) break
+        this.spawn(r)
+        whole--
+      }
+      left += Math.min(whole, 1)
+      this.acc.set(r, left)
     }
     for (let i = this.boats.length - 1; i >= 0; i--) {
       const b = this.boats[i]
@@ -148,9 +180,9 @@ export class BoatSystem {
           b.dist = b.total
           b.hold += dt
           const crates = b.cargo.children
-          const gone = Math.min(crates.length, Math.floor(b.hold / UNLOAD_STEP))
+          const gone = Math.min(crates.length, Math.floor(b.hold / b.step))
           crates.forEach((c, k) => { c.visible = k >= gone })
-          if (b.hold < crates.length * UNLOAD_STEP + UNLOAD_LEAVE) { this.place(b); continue }
+          if (b.hold < crates.length * b.step + UNLOAD_LEAVE) { this.place(b); continue }
         }
         this.release(b)
         this.boats.splice(i, 1)
@@ -172,10 +204,11 @@ export class BoatSystem {
     const lengths: number[] = []
     let total = 0
     for (let i = 1; i < points.length; i++) { const l = points[i].distanceTo(points[i - 1]); lengths.push(l); total += l }
+    const load = r.load?.() ?? 0
     const slot = (BoatSystem.isInternal(r) ? this.freeInternal : this.free).pop()!
     slot.object.visible = true
     slot.cargo.children.forEach((c) => { c.visible = true }) // always the full load of crates
-    const boat: Boat = { object: slot.object, cargo: slot.cargo, points, lengths, total, dist: 0, route: r, phase: Math.random() * 6, lateral: 0, want: 0, slow: 1, hx: 0, hz: 1, hold: 0 }
+    const boat: Boat = { object: slot.object, cargo: slot.cargo, points, lengths, total, dist: 0, route: r, phase: Math.random() * 6, lateral: 0, want: 0, slow: 1, hx: 0, hz: 1, hold: 0, size: boatSizeFor(load), step: unloadStepFor(load) }
     this.boats.push(boat)
     this.place(boat) // on the water from the start, so the checks between boats see it where it is
   }
@@ -245,8 +278,8 @@ export class BoatSystem {
     b.cargo.visible = BoatSystem.unloads(b.route) || b.dist < b.total / 2
     // ease in and out at the quays
     const fade = BoatSystem.unloads(b.route)
-      ? Math.min(clamp(b.dist / 4, 0, 1), clamp(1 - (b.hold - (b.cargo.children.length * UNLOAD_STEP)) / UNLOAD_LEAVE, 0, 1)) // a circuit boat stays full size at the quay until its crates are off
+      ? Math.min(clamp(b.dist / 4, 0, 1), clamp(1 - (b.hold - (b.cargo.children.length * b.step)) / UNLOAD_LEAVE, 0, 1)) // a circuit boat stays full size at the quay until its crates are off
       : clamp(Math.min(b.dist, b.total - b.dist) / 4, 0, 1)
-    o.scale.setScalar(BOAT_SCALE * (0.4 + 0.6 * fade))
+    o.scale.setScalar(BOAT_SCALE * b.size * (0.4 + 0.6 * fade))
   }
 }
