@@ -169,7 +169,7 @@ public sealed class AzureMonitorReader(HttpClient http, ICredentialSource? crede
                         Interlocked.Add(ref _bytes, text.Length);
                         return text;
                     }
-                    if (attempt >= Attempts || !IsHiccup(response.StatusCode))
+                    if (attempt >= Attempts || !(IsHiccup(response.StatusCode) || IsConfigurationGlitch(response.StatusCode, text)))
                         throw new HttpRequestException($"{service} answered {(int)response.StatusCode} {response.ReasonPhrase} for {Last(resourceId)}: {Trim(text)}", null, response.StatusCode);
                     told = RetryWait.For(response.Headers, attempt, retryDelay, DateTimeOffset.UtcNow, Random.Shared.NextDouble());
                 }
@@ -179,6 +179,13 @@ public sealed class AzureMonitorReader(HttpClient http, ICredentialSource? crede
     }
 
     private static bool IsHiccup(System.Net.HttpStatusCode code) => RetryWait.IsHiccup(code);
+
+    /// <summary>
+    /// A 400 in which Azure says it cannot find the metric configuration of a resource that has the metric (an empty list of valid metrics). It comes and goes for the same resource,
+    /// so it is tried again like a hiccup instead of failing the read (and, in the past, the whole hour).
+    /// </summary>
+    public static bool IsConfigurationGlitch(System.Net.HttpStatusCode code, string text) =>
+        code == System.Net.HttpStatusCode.BadRequest && text.Contains("Failed to find metric configuration", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>The series of an answer split by a dimension, each with the value of the dimension it is for. A series without that value is left out.</summary>
     public static IReadOnlyList<EntitySeries> ParseByDimension(string json, MetricCall call, string dimension)
@@ -580,22 +587,26 @@ public sealed class AzureMonitorSource(
         try
         {
             var per = part.ToDictionary(t => t.Resource.Id, _ => new List<MetricSeries>(), StringComparer.OrdinalIgnoreCase);
+            var alone = new HashSet<string>(StringComparer.OrdinalIgnoreCase); // resources the batch has no usable answer for: each is read on its own, the rest keep their answer
             foreach (var (call, metrics) in Calls(group))
             {
                 var answer = await reader.ReadBatchAsync(part.Select(t => t.Resource.Id).ToList(), location, subscription, metricNamespace, call, metrics, group.Parts?.By, chunk + PastChunk, PastChunk + window, ct);
                 foreach (var t in part)
                 {
-                    if (!answer.TryGetValue(t.Resource.Id.TrimEnd('/'), out var one)) throw new InvalidOperationException($"the answer has nothing for {t.Resource.Name}");
-                    if (one.Cut) throw new InvalidOperationException($"the answer for {t.Resource.Name} was cut at {AzureMonitorReader.MaxSeries} series");
-                    // a resource the batch could not read (an entry with no metrics) would look like a resource with no data: it is read on its own instead
-                    if (metrics.FirstOrDefault(m => !one.Series.Any(s => s.Metric.Equals(m, StringComparison.OrdinalIgnoreCase))) is { } missing)
-                        throw new InvalidOperationException($"the answer for {t.Resource.Name} has no {missing}");
+                    if (alone.Contains(t.Resource.Id)) continue;
+                    // a resource the answer says nothing about, or cut at the most series, is not taken from the batch
+                    if (!answer.TryGetValue(t.Resource.Id.TrimEnd('/'), out var one) || one.Cut) { alone.Add(t.Resource.Id); continue; }
                     per[t.Resource.Id].AddRange(one.Series);
+                    // a metric Azure leaves out has no data (a quiet account), which is no failure: it reads as the same empty series that a read of the resource alone gives
+                    if (group.Parts is null)
+                        foreach (var m in metrics.Where(m => !one.Series.Any(s => s.Metric.Equals(m, StringComparison.OrdinalIgnoreCase))))
+                            per[t.Resource.Id].Add(new MetricSeries(m, call.Aggregation, call.Filter, new List<double>(), null, new List<DateTimeOffset>()));
                 }
             }
             lock (_days)
                 foreach (var t in part)
                 {
+                    if (alone.Contains(t.Resource.Id)) continue;
                     var key = (t.Resource.Id, t.Group, chunk, PastChunk);
                     if (_days.ContainsKey(key)) continue;
                     _days[key] = Task.FromResult<IReadOnlyList<MetricSeries>>(per[t.Resource.Id]);
@@ -603,7 +614,8 @@ public sealed class AzureMonitorSource(
                     _fresh.Add(key);
                 }
             lock (_days) Trim(_days, _order, k => k.Chunk);
-            Interlocked.Add(ref _batched, part.Count);
+            Interlocked.Add(ref _batched, part.Count - alone.Count);
+            Interlocked.Add(ref _singly, alone.Count);
             return true;
         }
         catch (Exception e) when (e is not OperationCanceledException || !ct.IsCancellationRequested)
