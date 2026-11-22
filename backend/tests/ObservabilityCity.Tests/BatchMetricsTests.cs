@@ -179,21 +179,88 @@ public class BatchMetricsTests
         Assert.Equal(0, ((IPastReadStats)source).TakeStats().Batched);
     }
 
-    [Fact]
-    public async Task A_resource_the_batch_gave_no_metrics_for_is_read_on_its_own_not_taken_for_a_resource_with_no_data()
+    /// <summary>The answer of the batch with the entry of <paramref name="quiet"/> left empty: Azure sends no metric for an account that had nothing to report.</summary>
+    private static HttpResponseMessage BatchWithQuiet(SentRequest request, string? quiet)
     {
-        var one = new CannedHttp().Respond(Single);
-        var (alone, registry) = await Platform(one, batch: false);
-        // every entry of the answer is empty: no metric at all (what an entry with an error inside it looks like)
-        var empty = new CannedHttp().Respond(r => IsBatch(r)
-            ? CannedHttp.Reply(JsonSerializer.Serialize(new { values = JsonDocument.Parse(r.Body).RootElement.GetProperty("resourceids").EnumerateArray().Select(e => new { resourceid = e.GetString(), value = Array.Empty<object>() }) }))
-            : Single(r));
-        var (source, _) = await Platform(empty, batch: true);
+        var query = System.Web.HttpUtility.ParseQueryString(request.Uri!.Query);
+        var points = Points(DateTimeOffset.Parse(query["starttime"]!), DateTimeOffset.Parse(query["endtime"]!), query["aggregation"]!.ToLowerInvariant());
+        var ids = JsonDocument.Parse(request.Body).RootElement.GetProperty("resourceids").EnumerateArray().Select(e => e.GetString()!).ToList();
+        var values = ids.Select(id => new
+        {
+            resourceid = id,
+            value = id.Equals(quiet, StringComparison.OrdinalIgnoreCase)
+                ? Array.Empty<object>()
+                : query["metricnames"]!.Split(',').Select(n => new { name = new { value = n }, timeseries = new[] { new { data = points } } }).ToArray<object>(),
+        });
+        return CannedHttp.Reply(JsonSerializer.Serialize(new { values }));
+    }
+
+    /// <summary>What a read of one resource gives for an account with nothing to report: its metrics, with no points.</summary>
+    private static HttpResponseMessage SingleWithQuiet(SentRequest request, string? quiet)
+    {
+        if (quiet is null || !request.Uri!.AbsolutePath.Contains(quiet, StringComparison.OrdinalIgnoreCase)) return Single(request);
+        var query = System.Web.HttpUtility.ParseQueryString(request.Uri.Query);
+        var value = query["metricnames"]!.Split(',').Select(n => new { name = new { value = n }, timeseries = Array.Empty<object>() });
+        return CannedHttp.Reply(JsonSerializer.Serialize(new { value }));
+    }
+
+    [Fact]
+    public async Task A_metric_Azure_has_no_data_for_is_no_failure_the_batch_is_kept_and_nothing_is_logged()
+    {
+        // the first resource of the first batch is a quiet account
+        string? quiet = null;
+        var batched = new CannedHttp().Respond(r =>
+        {
+            if (!IsBatch(r)) return SingleWithQuiet(r, quiet);
+            quiet ??= JsonDocument.Parse(r.Body).RootElement.GetProperty("resourceids")[0].GetString();
+            return BatchWithQuiet(r, quiet);
+        });
+        var (source, registry) = await Platform(batched, batch: true);
+
+        var actual = await source.PollAtAsync(registry, Frame, CancellationToken.None);
+
+        var one = new CannedHttp().Respond(r => SingleWithQuiet(r, quiet));
+        var (alone, _) = await Platform(one, batch: false);
+        AssertSameReadings(await alone.PollAtAsync(registry, Frame, CancellationToken.None), actual); // the same numbers as when each is read alone, the quiet account has none
+        var stats = ((IPastReadStats)source).TakeStats();
+        Assert.True(stats.Batched > 0);
+        Assert.Equal(0, stats.Singly); // nothing was read again, and the quiet account is not one of the resources read alone
+        Assert.Null(stats.Note);
+        Assert.Equal(await BatchCallsOfAnAnswerWithNothingWrong(registry), batched.Sent.Count(IsBatch)); // no batch was asked again in smaller pieces
+    }
+
+    private static async Task<int> BatchCallsOfAnAnswerWithNothingWrong(TownRegistry registry)
+    {
+        var http = new CannedHttp().Respond(r => IsBatch(r) ? Batch(r) : Single(r));
+        var (source, _) = await Platform(http, batch: true);
+        await source.PollAtAsync(registry, Frame, CancellationToken.None);
+        return http.Sent.Count(IsBatch);
+    }
+
+    [Fact]
+    public async Task A_resource_the_answer_says_nothing_about_is_read_on_its_own_and_the_others_keep_their_batch_answer()
+    {
+        string? missing = null;
+        var http = new CannedHttp().Respond(r =>
+        {
+            if (!IsBatch(r)) return Single(r);
+            var ids = JsonDocument.Parse(r.Body).RootElement.GetProperty("resourceids").EnumerateArray().Select(e => e.GetString()!).ToList();
+            missing ??= ids[0];
+            var full = JsonDocument.Parse(Batch(r).Content.ReadAsStringAsync().Result).RootElement.GetProperty("values").EnumerateArray().Where(e => !e.GetProperty("resourceid").GetString()!.Equals(missing, StringComparison.OrdinalIgnoreCase));
+            return CannedHttp.Reply(JsonSerializer.Serialize(new { values = full }));
+        });
+        var (source, registry) = await Platform(http, batch: true);
+        var (alone, _) = await Platform(new CannedHttp().Respond(Single), batch: false);
 
         var actual = await source.PollAtAsync(registry, Frame, CancellationToken.None);
 
         AssertSameReadings(await alone.PollAtAsync(registry, Frame, CancellationToken.None), actual);
-        Assert.Equal(0, ((IPastReadStats)source).TakeStats().Batched);
+        var stats = ((IPastReadStats)source).TakeStats();
+        Assert.True(stats.Batched > 0); // the others of the batch were not thrown away
+        Assert.True(stats.Singly > 0);
+        Assert.Null(stats.Note); // nothing failed, so nothing is logged as a failure
+        Assert.Contains(http.Sent, r => !IsBatch(r) && r.Uri!.AbsolutePath.Contains(missing!, StringComparison.OrdinalIgnoreCase));
+        Assert.Equal(await BatchCallsOfAnAnswerWithNothingWrong(registry), http.Sent.Count(IsBatch)); // and no batch was asked again in smaller pieces
     }
 
     [Fact]

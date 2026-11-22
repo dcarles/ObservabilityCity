@@ -52,6 +52,38 @@ public class AzureMonitorRetryTests
         Assert.Equal(AzureMonitorReader.Attempts, http.Sent.Count);
     }
 
+    private const string NoConfiguration = """{"error":{"code":"BadRequest","message":"Failed to find metric configuration for provider: Microsoft.Web, resource Type: serverFarms, metric: CpuPercentage, Valid metrics: "}}""";
+
+    [Fact]
+    public async Task A_400_that_says_the_metric_configuration_was_not_found_is_tried_again_because_it_comes_and_goes()
+    {
+        var http = new CannedHttp().Answer(NoConfiguration, HttpStatusCode.BadRequest).Answer(NoConfiguration, HttpStatusCode.BadRequest).Answer(Answer);
+
+        Assert.Single(await Read(http));
+        Assert.Equal(3, http.Sent.Count);
+    }
+
+    [Fact]
+    public async Task A_400_about_the_metric_configuration_that_never_goes_gives_up_after_three_tries()
+    {
+        var http = CannedHttp.Always(NoConfiguration, HttpStatusCode.BadRequest);
+
+        var ex = await Assert.ThrowsAsync<HttpRequestException>(() => Read(http));
+
+        Assert.Contains("400", ex.Message);
+        Assert.Equal(AzureMonitorReader.Attempts, http.Sent.Count);
+    }
+
+    [Fact]
+    public async Task Another_400_is_not_tried_again()
+    {
+        var http = CannedHttp.Always("""{"error":{"code":"BadRequest","message":"Dimension not found"}}""", HttpStatusCode.BadRequest);
+
+        await Assert.ThrowsAsync<HttpRequestException>(() => Read(http));
+
+        Assert.Single(http.Sent);
+    }
+
     [Fact]
     public async Task A_refusal_is_not_tried_again()
     {
