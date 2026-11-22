@@ -243,7 +243,11 @@
                 },
                 "rangeQuery": {
                   "type": "string",
-                  "description": "Request sources (loganalytics): the query of the source asked once for a whole hour of the past instead of once for each frame (twelve for a window of 5m), a template like query. It returns one row per telemetry name and time bin with the columns of the query plus at, the start of the bin: summarize ... by role, at = bin(TimeGenerated, {window}). Do not filter on time: the program gives the span. Without it each frame is asked on its own. The live poll never uses it."
+                  "description": "Request sources (loganalytics) and job sources (functionjobs; there it returns the log events of the jobs, see the docs and may use {rangeStart}): the query of the source asked once for a whole hour of the past instead of once for each frame (twelve for a window of 5m), a template like query. It returns one row per telemetry name and time bin with the columns of the query plus at, the start of the bin: summarize ... by role, at = bin(TimeGenerated, {window}). Do not filter on time: the program gives the span. Without it each frame is asked on its own. The live poll never uses it."
+                },
+                "regionRangeQuery": {
+                  "type": "string",
+                  "description": "Request sources (loganalytics): the regionQuery asked once for a whole hour of the past instead of once for each frame, a template like query. It returns the columns of the regionQuery plus at, the start of the time bin: summarize ... by role, region, at = bin(TimeGenerated, {window}). Do not filter on time: the program gives the span. Needs the regionQuery. Without it each frame is asked on its own. The live poll never uses it."
                 },
                 "typesQuery": {
                   "type": "string",

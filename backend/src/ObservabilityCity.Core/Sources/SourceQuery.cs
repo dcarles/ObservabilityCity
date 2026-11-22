@@ -13,6 +13,8 @@ public static class SourceQuery
     public const string Window = "window";
     public const string WindowSeconds = "windowSeconds";
     public const string Roles = "roles";
+    /// <summary>For the hourly query of a job source only: the start of the hour being read, written as a KQL datetime (<c>datetime(2026-11-20T03:00:00Z)</c>).</summary>
+    public const string RangeStart = "rangeStart";
 
     /// <summary>The variables a query template may use besides the scope variables and {environment}.</summary>
     public static readonly string[] Variables = [Window, WindowSeconds, Roles];
@@ -58,7 +60,7 @@ public static class SourceQuery
         TryParseWindow(source.Window ?? DefaultWindow, out var window) ? window : throw new InvalidOperationException($"the window '{source.Window}' is not a number and a unit like 5m");
 
     /// <summary>The query with every hole filled. <paramref name="roles"/> are written as double-quoted strings separated by commas.</summary>
-    public static string Render(string template, RegistrySource source, string environmentId, ScopeRules rules, IEnumerable<string> roles, TimeSpan? over = null)
+    public static string Render(string template, RegistrySource source, string environmentId, ScopeRules rules, IEnumerable<string> roles, TimeSpan? over = null, DateTimeOffset? rangeStart = null)
     {
         var window = over ?? WindowOf(source);
         var quoted = string.Join(", ", roles.Select(r => "\"" + r.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\""));
@@ -67,6 +69,7 @@ public static class SourceQuery
             Window => over is { } o ? Text(o) : (source.Window ?? DefaultWindow).Trim(),
             WindowSeconds => ((long)Math.Round(window.TotalSeconds)).ToString(CultureInfo.InvariantCulture),
             Roles => quoted,
+            RangeStart when rangeStart is { } start => $"datetime({start.UtcDateTime:yyyy-MM-dd'T'HH:mm:ss'Z'})",
             ScopeRules.EnvironmentVariable => environmentId,
             _ => rules.Variables.GetValueOrDefault(name),
         });

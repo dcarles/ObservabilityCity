@@ -23,6 +23,42 @@ public sealed class FunctionJobsSource(
     public TimeSpan Timeout => definition.Timeout;
     public TimeSpan Window { get; } = SourceQuery.WindowOf(definition);
 
+    private readonly AzureSettings _settings = AzureSettings.Of(definition);
+    private readonly HourCache<IReadOnlyList<JobEvent>> _hours = new();
+
+    /// <summary>
+    /// The rows the per-frame query would give for the window that ended at <paramref name="at"/>, cut out of the events of the hour that holds the frame: the hour is asked once.
+    /// The query is given the start of the hour (<c>{rangeStart}</c>) and returns what each job last did before it, and everything that happened in the hour.
+    /// </summary>
+    private async Task<IReadOnlyList<JobRow>> RowsOfFrameAsync(string workspace, string rangeQuery, DateTimeOffset at, CancellationToken ct)
+    {
+        var hour = HourCache<IReadOnlyList<JobEvent>>.HourOf(at - TimeSpan.FromTicks(1)); // a frame at 12:00 is the last of the hour that started at 11:00
+        var events = await _hours.GetAsync(hour, () =>
+        {
+            var rendered = SourceQuery.Render(rangeQuery, definition, environmentId, rules, [], rangeStart: hour);
+            return reader.QueryJobEventsAsync(workspace, rendered, hour - Window, hour + TimeSpan.FromHours(1), ct);
+        });
+        return RowsAt(events, at, Window);
+    }
+
+    /// <summary>
+    /// What the job query says for the window that ended at <paramref name="at"/>, from the events: a job has a row when it finished a run in the window; its last run and whether it
+    /// succeeded are those of its newest run, and its next run is the one the newest schedule line in the window gives (empty if that line gave none).
+    /// </summary>
+    public static IReadOnlyList<JobRow> RowsAt(IEnumerable<JobEvent> events, DateTimeOffset at, TimeSpan window)
+    {
+        var inWindow = events.Where(e => e.At > at - window && e.At < at).GroupBy(e => (Resource: e.ResourceId.ToLowerInvariant(), e.Job));
+        var rows = new List<JobRow>();
+        foreach (var job in inWindow)
+        {
+            var run = job.Where(e => e.IsRun).OrderByDescending(e => e.At).FirstOrDefault();
+            if (run is null) continue;
+            var schedule = job.Where(e => !e.IsRun).OrderByDescending(e => e.At).FirstOrDefault();
+            rows.Add(new JobRow(run.ResourceId, run.Job, run.At, run.Succeeded, schedule?.Next, null));
+        }
+        return rows;
+    }
+
     public Task<IReadOnlyDictionary<string, NodeReading>> PollAsync(TownRegistry registry, CancellationToken ct) => PollCore(registry, time.GetUtcNow(), false, ct);
 
     public bool CanReadPast => recording is null;
@@ -48,7 +84,10 @@ public sealed class FunctionJobsSource(
             var query = definition.Query ?? throw new InvalidOperationException($"source '{name}' has no query. Write the query that returns one row per function app and job with the columns {string.Join(", ", LogAnalyticsReader.JobColumns)} (see docs/connect-your-company.md)");
             var workspace = LogAnalyticsSource.Workspace(name, definition, resolution);
             var rendered = SourceQuery.Render(query, definition, environmentId, rules, []);
-            rows = past ? await reader.QueryJobsAsync(workspace, SourceQuery.AtPast(rendered, at), at - Window, at, ct) : await reader.QueryJobsAsync(workspace, rendered, Window, ct);
+            if (past && _settings.RangeQuery is { } rangeQuery)
+                rows = await RowsOfFrameAsync(workspace, rangeQuery, at, ct);
+            else
+                rows = past ? await reader.QueryJobsAsync(workspace, SourceQuery.AtPast(rendered, at), at - Window, at, ct) : await reader.QueryJobsAsync(workspace, rendered, Window, ct);
         }
         return Readings(asked, rows, at);
     }
