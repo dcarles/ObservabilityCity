@@ -19,6 +19,7 @@ body.dash #dash-root[hidden] { display: none; }
 #dash-menu #dash-filters { display: flex; flex-wrap: nowrap; align-items: center; gap: 8px; }
 #dash-menu #view-bar { display: contents; }
 #dash-menu .vb-btn, #dash-menu .vb-list { color: var(--fg); }
+#dash-menu .view-select { padding: 6px 12px; border-radius: 10px; font-size: 13px; font-weight: 600; box-sizing: border-box; }
 .vb { position: relative; }
 #pillar-menu { position: absolute; z-index: 20; background: var(--surface); border: 1px solid var(--dline); border-radius: 8px; padding: 6px; min-width: 220px; box-shadow: 0 8px 24px rgba(0,0,0,.18); max-height: 60vh; overflow: auto; }
 #pillar-menu .vb-row { display: flex; gap: 8px; align-items: center; padding: 4px 8px; cursor: pointer; }
