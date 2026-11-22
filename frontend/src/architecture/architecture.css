@@ -76,6 +76,7 @@ body.arch #dash-menu { position: static; flex: none; }
   body.arch #dash-menu .brand { display: none; }
   body.arch #dash-menu .wrap { gap: 6px; padding-block: 6px; }
   body.arch #dash-menu .vb-btn, body.arch #dash-menu .btn, body.arch #dash-menu .view-select { padding: 4px 8px; font-size: 12px; }
+  body.arch #dash-menu .view-select { padding-right: 24px; background-position: right 8px center; }
   #arch-root .sum { gap: 6px; padding-block: 6px; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); }
   #arch-root .kpi { min-height: 0; padding: 6px 9px; } #arch-root .kpi b { font-size: 20px; } #arch-root .kpi small { display: none; }
   .arch-look { left: 8px; transform: none; bottom: 8px; min-width: 0; max-width: calc(100% - 70px); width: auto; }
