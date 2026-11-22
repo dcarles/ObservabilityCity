@@ -23,6 +23,9 @@ public sealed record AzureSettings : IDeadLetterLinkSettings, IQueueLinkSettings
     /// <summary>For a request source: the region query asked once for a whole hour of the past (columns of the region query plus <c>at</c>, the start of each time bin as wide as the window). Null: each frame is asked on its own. Used only together with <see cref="RegionQuery"/>.</summary>
     public string? RegionRangeQuery { get; init; }
 
+    /// <summary>For a platform-metric source: whether the past is read with the batch endpoint (many resources in one call), which is faster. The live poll never uses it. False reads each resource on its own.</summary>
+    public bool BatchMetrics { get; init; } = true;
+
     /// <summary>For a broker source (servicebus): the query that gives how many messages each queue handled by message type (columns queue, type, calls). Null: the types are not measured.</summary>
     public string? TypesQuery { get; init; }
 

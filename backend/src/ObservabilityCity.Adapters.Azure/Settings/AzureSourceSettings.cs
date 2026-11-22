@@ -27,6 +27,7 @@ public sealed partial class AzureSourceSettings : SourceSettingsReader<AzureSour
         RegionQuery = f.RegionQuery,
         RangeQuery = f.RangeQuery,
         RegionRangeQuery = f.RegionRangeQuery,
+        BatchMetrics = f.BatchMetrics ?? true,
         TypesQuery = f.TypesQuery,
         Metrics = ToMetrics(f.Metrics),
         Entities = ToEntities(f.Entities),
@@ -279,6 +280,8 @@ public sealed class AzureSourceFile
     public string? RangeQuery { get; set; }
     /// <summary>Request sources only (loganalytics): the regionQuery asked once for a whole hour of the past, with one more column, at (the start of each time bin as wide as the window). Without it each past frame is asked on its own.</summary>
     public string? RegionRangeQuery { get; set; }
+    /// <summary>Platform-metric sources only (azuremonitor): false reads the past of each resource on its own instead of many resources in one batch call. Default true. The live poll never uses batches.</summary>
+    public bool? BatchMetrics { get; set; }
     /// <summary>Broker sources only (servicebus): the query that says which kinds of message each queue handled, a template like query. Returns one row per queue and message type with the columns queue, type and calls (counts over the window). Without it the types are not shown.</summary>
     public string? TypesQuery { get; set; }
     /// <summary>Platform-metric sources only (azuremonitor): which metric of which resources fills which signal. Everything about the metrics is written here; the program knows none.</summary>

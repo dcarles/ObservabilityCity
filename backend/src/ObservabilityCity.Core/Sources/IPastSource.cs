@@ -25,7 +25,10 @@ public interface IPastMetricSource : IMetricSource
 /// <param name="CacheHits">Frames that were answered from what was already read.</param>
 /// <param name="Megabytes">The size of the answers read.</param>
 /// <param name="Splits">Reads that were too big for the cloud and were made again in smaller pieces.</param>
-public sealed record PastReadStats(int Calls, int CacheHits, double Megabytes, int Splits);
+/// <param name="Batched">Resources whose numbers came from a call that asked about many at once.</param>
+/// <param name="Singly">Resources that were tried in a batch, which failed, and were read one by one instead.</param>
+/// <param name="Note">Why the first batch of the hour failed, when one did.</param>
+public sealed record PastReadStats(int Calls, int CacheHits, double Megabytes, int Splits, int Batched = 0, int Singly = 0, string? Note = null);
 
 /// <summary>A past-reading source that can tell what it read. Reading the numbers resets them.</summary>
 public interface IPastReadStats

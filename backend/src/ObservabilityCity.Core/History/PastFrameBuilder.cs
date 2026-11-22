@@ -58,7 +58,8 @@ public sealed class PastFrameBuilder(SnapshotBuilder live, LatestState liveState
             var seconds = _spent.TryRemove(source.Name, out var s) ? s : 0;
             var text = $"{source.Name} {seconds:0.0} s";
             if (source is IPastReadStats stats && stats.TakeStats() is { } r)
-                text += $" ({r.Calls} reads, {r.Megabytes:0.0} MB, {r.CacheHits} from what was already read{(r.Splits > 0 ? $", {r.Splits} too big and read in pieces" : "")})";
+                text += $" ({r.Calls} reads, {r.Megabytes:0.0} MB, {r.CacheHits} from what was already read{(r.Splits > 0 ? $", {r.Splits} too big and read in pieces" : "")}" +
+                        $"{(r.Batched > 0 ? $", {r.Batched} resources read in batches" : "")}{(r.Singly > 0 ? $", {r.Singly} read one by one after a batch failed" : "")}{(r.Note is not null ? $"; batch said: {r.Note}" : "")})";
             parts.Add(text);
         }
         return string.Join("; ", parts);

@@ -84,16 +84,71 @@ public sealed class AzureMonitorReader(HttpClient http, ICredentialSource? crede
         return ParseByPart(await GetAsync(resourceId, Url(resourceId, split, metrics, end, window) + $"&top={MaxSeries}", ct), call, dimension);
     }
 
+    /// <summary>The login scope of the batch endpoint, which is not the one of the management endpoint.</summary>
+    public const string BatchTokenScope = "https://metrics.monitor.azure.com/.default";
+    public const string BatchApiVersion = "2023-10-01";
+
+    /// <summary>How many resources one batch call may ask about: the most Azure takes.</summary>
+    public const int BatchLimit = 50;
+
+    /// <summary>The batch call for resources of one subscription, one region and one metric namespace: the same question as <see cref="Url"/>, asked about many resources at once. The region is the cloud's own name of it (northeurope).</summary>
+    public static string BatchUrl(string location, string subscription, string metricNamespace, MetricCall call, IEnumerable<string> metrics, DateTimeOffset end, TimeSpan window, string? dimension)
+    {
+        const string format = "yyyy-MM-dd'T'HH:mm:ss'Z'";
+        var filter = dimension is null ? call.Filter : call.Filter is null ? $"{dimension} eq '*'" : $"{call.Filter} and {dimension} eq '*'";
+        var url = $"https://{location}.metrics.monitor.azure.com/subscriptions/{subscription}/metrics:getBatch?api-version={BatchApiVersion}" +
+                  $"&metricnamespace={Uri.EscapeDataString(metricNamespace)}&metricnames={string.Join(',', metrics.Select(Uri.EscapeDataString))}" +
+                  $"&aggregation={Uri.EscapeDataString(call.Aggregation.ToLowerInvariant())}&interval={call.Interval}" +
+                  $"&starttime={(end.UtcDateTime - window).ToString(format, CultureInfo.InvariantCulture)}&endtime={end.UtcDateTime.ToString(format, CultureInfo.InvariantCulture)}";
+        if (filter is not null) url += $"&filter={Uri.EscapeDataString(filter)}";
+        if (dimension is not null) url += $"&top={MaxSeries}";
+        return url;
+    }
+
+    /// <summary>What a batch call gave for one resource: its series, and whether the answer was cut at <see cref="MaxSeries"/> (so some series may be missing).</summary>
+    public sealed record BatchAnswer(IReadOnlyList<MetricSeries> Series, bool Cut);
+
+    /// <summary>Reads the same metrics of up to <see cref="BatchLimit"/> resources in one call. The answer has an entry for each resource, keyed by its id (not case sensitive).</summary>
+    public async Task<IReadOnlyDictionary<string, BatchAnswer>> ReadBatchAsync(IReadOnlyList<string> resourceIds, string location, string subscription, string metricNamespace, MetricCall call, IReadOnlyList<string> metrics, string? dimension, DateTimeOffset end, TimeSpan window, CancellationToken ct)
+    {
+        var url = BatchUrl(location, subscription, metricNamespace, call, metrics, end, window, dimension);
+        var body = JsonSerializer.Serialize(new { resourceids = resourceIds });
+        var text = await SendAsync(HttpMethod.Post, $"{resourceIds.Count}-resources-in-{location}", url, body, BatchTokenScope, ct, "Azure Monitor batch");
+        return ParseBatch(text, call, dimension);
+    }
+
+    /// <summary>The entries of a batch answer, each read like the answer of a single resource. An answer that is not a batch answer fails, so it is never taken for one with no data.</summary>
+    public static IReadOnlyDictionary<string, BatchAnswer> ParseBatch(string json, MetricCall call, string? dimension)
+    {
+        using var doc = JsonDocument.Parse(json);
+        if (!doc.RootElement.TryGetProperty("values", out var values) || values.ValueKind != JsonValueKind.Array)
+            throw new InvalidOperationException("the answer has no list of resources; was it an Azure Monitor batch answer?");
+        var all = new Dictionary<string, BatchAnswer>(StringComparer.OrdinalIgnoreCase);
+        foreach (var entry in values.EnumerateArray())
+        {
+            if (!entry.TryGetProperty("resourceid", out var id) || id.GetString() is not { Length: > 0 } resource) continue;
+            var raw = entry.GetRawText();
+            var cut = entry.TryGetProperty("value", out var metrics) && metrics.ValueKind == JsonValueKind.Array
+                && metrics.EnumerateArray().Any(m => m.TryGetProperty("timeseries", out var s) && s.ValueKind == JsonValueKind.Array && s.GetArrayLength() >= MaxSeries);
+            all[resource.TrimEnd('/')] = new BatchAnswer(dimension is null ? Parse(raw, call) : ParseByPart(raw, call, dimension), cut);
+        }
+        return all;
+    }
+
     /// <summary>
     /// The answer's text. A hiccup of Azure's (too many requests, busy, unavailable, a connection that drops) is tried again a couple of times a moment later, since it
     /// nearly always passes; any other answer, such as a refusal, fails at once.
     /// </summary>
-    public async Task<string> GetAsync(string resourceId, string url, CancellationToken ct, string service = "Azure Monitor")
+    public Task<string> GetAsync(string resourceId, string url, CancellationToken ct, string service = "Azure Monitor") =>
+        SendAsync(HttpMethod.Get, resourceId, url, null, TokenScope, ct, service);
+
+    private async Task<string> SendAsync(HttpMethod method, string resourceId, string url, string? body, string scope, CancellationToken ct, string service)
     {
-        var token = credential is null ? null : await credential.GetTokenAsync(TokenScope, ct);
+        var token = credential is null ? null : await credential.GetTokenAsync(scope, ct);
         for (var attempt = 1; ; attempt++)
         {
-            using var request = new HttpRequestMessage(HttpMethod.Get, url);
+            using var request = new HttpRequestMessage(method, url);
+            if (body is not null) request.Content = new StringContent(body, System.Text.Encoding.UTF8, "application/json");
             if (token is not null) request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
             HttpResponseMessage? response = null;
             string? text = null;
@@ -349,6 +404,7 @@ public sealed class AzureMonitorSource(
         }
         // a plan that several systems share is read once
         var unique = targets.DistinctBy(t => (t.Resource.Id, t.Group)).ToList();
+        if (bulk && recorded is null && _settings.BatchMetrics) await PrefetchBatches(unique, at, ct); // only the past: a live poll reads each resource as it always did
         await Task.WhenAll(unique.Select(Read));
         if (errors.Count > 0)
             throw new HttpRequestException($"{errors.Count} of {unique.Count} resource reads failed, so the systems that use them were not reported this time; the first: {errors[0]}");
@@ -445,12 +501,125 @@ public sealed class AzureMonitorSource(
     private readonly HashSet<string> _small = [];
     private int _hits;
     private int _splits;
+    private int _batched;
+    private int _singly;
+    private string? _batchNote;
 
     /// <summary>What was read for the past since the last call, for the log of a rebuilt hour.</summary>
     public PastReadStats TakeStats()
     {
         var (calls, bytes) = reader.TakeCounts();
-        return new PastReadStats(calls, Interlocked.Exchange(ref _hits, 0), bytes / 1_048_576.0, Interlocked.Exchange(ref _splits, 0));
+        string? note;
+        lock (_days) { note = _batchNote; _batchNote = null; }
+        return new PastReadStats(calls, Interlocked.Exchange(ref _hits, 0), bytes / 1_048_576.0, Interlocked.Exchange(ref _splits, 0), Interlocked.Exchange(ref _batched, 0), Interlocked.Exchange(ref _singly, 0), note);
+    }
+
+    /// <summary>The steps a batch is made smaller by when Azure refuses it: 50 resources, then 25, then 10. Below that the resources are read one by one.</summary>
+    public static readonly int[] BatchSizes = [AzureMonitorReader.BatchLimit, 25, 10];
+
+    private readonly Dictionary<DateTimeOffset, Task> _prefetched = [];
+    private readonly List<DateTimeOffset> _prefetchOrder = [];
+    private readonly HashSet<(string Resource, MetricGroup Group, DateTimeOffset Chunk, TimeSpan Length)> _fresh = [];
+
+    private static readonly System.Text.RegularExpressions.Regex SubscriptionOf = new(@"^/subscriptions/(?<id>[0-9A-Za-z-]+)/", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Compiled);
+    private static readonly System.Text.RegularExpressions.Regex LocationName = new("^[a-z0-9]+$", System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    /// <summary>
+    /// Reads the three hours of many resources in a few calls instead of one call for each: resources of one subscription, region and metric namespace go 50 at a time to the batch endpoint,
+    /// and what comes back is kept as if each had been read alone. A batch Azure refuses or answers badly is made smaller (25, then 10); what still cannot be read that way is simply left
+    /// for the read of one resource, which is how it was always read, so a failure here only makes the hour slower. Frames of an hour that are built together share one prefetch.
+    /// </summary>
+    private async Task PrefetchBatches(List<Target> targets, DateTimeOffset at, CancellationToken ct)
+    {
+        var chunk = MetricChunk(at.AddTicks(-1), PastChunk);
+        Task work;
+        lock (_days)
+        {
+            if (!_prefetched.TryGetValue(chunk, out work!))
+            {
+                _prefetched[chunk] = work = PrefetchChunk(targets, chunk, ct);
+                _prefetchOrder.Add(chunk);
+                while (_prefetchOrder.Count > ChunksKept + 1) { _prefetched.Remove(_prefetchOrder[0]); _prefetchOrder.RemoveAt(0); }
+            }
+        }
+        try { await work; }
+        catch (OperationCanceledException)
+        {
+            lock (_days) { _prefetched.Remove(chunk); _prefetchOrder.Remove(chunk); } // a read that was cancelled is asked again next time
+            throw;
+        }
+    }
+
+    private async Task PrefetchChunk(List<Target> targets, DateTimeOffset chunk, CancellationToken ct)
+    {
+        var locations = (store.Inventory?.Resources ?? []).Where(r => r.Region is { Length: > 0 }).GroupBy(r => r.Id, StringComparer.OrdinalIgnoreCase).ToDictionary(g => g.Key, g => g.First().Region!.ToLowerInvariant(), StringComparer.OrdinalIgnoreCase);
+        var wanted = new List<(Target Target, string Subscription, string Location, string Namespace)>();
+        foreach (var t in targets)
+        {
+            bool known;
+            lock (_days) known = _small.Contains(t.Resource.Id) || _days.ContainsKey((t.Resource.Id, t.Group, chunk, PastChunk));
+            if (known || t.Group.Signals.Count == 0 && t.Group.Parts is null) continue;
+            var ns = t.Group.Namespace ?? t.Resource.Type;
+            if (string.IsNullOrWhiteSpace(ns) || !locations.TryGetValue(t.Resource.Id, out var location) || !LocationName.IsMatch(location)) continue;
+            if (SubscriptionOf.Match(t.Resource.Id) is not { Success: true } sub) continue;
+            wanted.Add((t, sub.Groups["id"].Value, location, ns));
+        }
+        var refused = false; // the batch endpoint is not open to this login: the rest are read one by one without asking again
+        foreach (var bucket in wanted.GroupBy(w => (w.Target.Group, w.Subscription, w.Location, Namespace: w.Namespace.ToLowerInvariant())))
+            foreach (var part in bucket.Select(w => w.Target).Chunk(BatchSizes[0]))
+            {
+                if (refused) return;
+                refused = !await ReadBatch(part, bucket.Key.Group, bucket.Key.Subscription, bucket.Key.Location, bucket.Key.Namespace, chunk, 0, ct);
+            }
+    }
+
+    /// <summary>Reads one batch and keeps what it read; false when the batch cannot be read at all (the login or the endpoint is refused), so the caller stops asking.</summary>
+    private async Task<bool> ReadBatch(IReadOnlyList<Target> part, MetricGroup group, string subscription, string location, string metricNamespace, DateTimeOffset chunk, int size, CancellationToken ct)
+    {
+        var window = group.Window ?? Window;
+        try
+        {
+            var per = part.ToDictionary(t => t.Resource.Id, _ => new List<MetricSeries>(), StringComparer.OrdinalIgnoreCase);
+            foreach (var (call, metrics) in Calls(group))
+            {
+                var answer = await reader.ReadBatchAsync(part.Select(t => t.Resource.Id).ToList(), location, subscription, metricNamespace, call, metrics, group.Parts?.By, chunk + PastChunk, PastChunk + window, ct);
+                foreach (var t in part)
+                {
+                    if (!answer.TryGetValue(t.Resource.Id.TrimEnd('/'), out var one)) throw new InvalidOperationException($"the answer has nothing for {t.Resource.Name}");
+                    if (one.Cut) throw new InvalidOperationException($"the answer for {t.Resource.Name} was cut at {AzureMonitorReader.MaxSeries} series");
+                    // a resource the batch could not read (an entry with no metrics) would look like a resource with no data: it is read on its own instead
+                    if (metrics.FirstOrDefault(m => !one.Series.Any(s => s.Metric.Equals(m, StringComparison.OrdinalIgnoreCase))) is { } missing)
+                        throw new InvalidOperationException($"the answer for {t.Resource.Name} has no {missing}");
+                    per[t.Resource.Id].AddRange(one.Series);
+                }
+            }
+            lock (_days)
+                foreach (var t in part)
+                {
+                    var key = (t.Resource.Id, t.Group, chunk, PastChunk);
+                    if (_days.ContainsKey(key)) continue;
+                    _days[key] = Task.FromResult<IReadOnlyList<MetricSeries>>(per[t.Resource.Id]);
+                    _order.Add(key);
+                    _fresh.Add(key);
+                }
+            lock (_days) Trim(_days, _order, k => k.Chunk);
+            Interlocked.Add(ref _batched, part.Count);
+            return true;
+        }
+        catch (Exception e) when (e is not OperationCanceledException || !ct.IsCancellationRequested)
+        {
+            lock (_days) _batchNote ??= e.Message.Length <= 200 ? e.Message : e.Message[..200] + "...";
+            var refused = e is HttpRequestException { StatusCode: System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.NotFound };
+            if (!refused && size + 1 < BatchSizes.Length)
+            {
+                var ok = true;
+                foreach (var smaller in part.Chunk(BatchSizes[size + 1]))
+                    ok &= await ReadBatch(smaller, group, subscription, location, metricNamespace, chunk, size + 1, ct);
+                return ok;
+            }
+            Interlocked.Add(ref _singly, part.Count);
+            return !refused; // refused: the batch endpoint is not open to this login, so do not ask again for the rest; the resources are read one by one
+        }
     }
 
     /// <summary>The series that were read for the window ending at <paramref name="at"/>, cut out of the hour's one read (the hour is read once, from the window before its first frame to its end).</summary>
@@ -471,7 +640,7 @@ public sealed class AzureMonitorSource(
                 _order.Add(key);
                 Trim(_days, _order, k => k.Chunk);
             }
-            else Interlocked.Increment(ref _hits);
+            else if (!_fresh.Remove(key)) Interlocked.Increment(ref _hits); // the first use of what a batch read is not a frame answered from before
         }
         IReadOnlyList<MetricSeries> whole;
         try { whole = await read; }
