@@ -238,7 +238,8 @@ export class CarSystem {
     }
   }
 
-  private clear(): void {
+  /** Takes every car away at once; the traffic builds up again from the rates of the next snapshot (a jump in time starts from an empty road). */
+  clear(): void {
     this.cars.length = 0
     this.acc.clear()
     this.shown = 0

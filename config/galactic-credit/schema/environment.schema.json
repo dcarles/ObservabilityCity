@@ -498,6 +498,14 @@
         }
       }
     },
+    "history": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "How far back this environment can be taken in time travel. Without it the app's own History:Days setting is used.",
+      "properties": {
+        "days": { "type": "integer", "minimum": 1, "maximum": 14, "description": "How many days back this environment keeps its history and can be taken, 1 to 14. Without it the app's History:Days (default 7) is used. Read when the app starts, so a change needs a restart." }
+      }
+    },
     "logs": {
       "type": "object",
       "additionalProperties": false,

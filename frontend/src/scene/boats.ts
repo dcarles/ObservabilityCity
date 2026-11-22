@@ -144,6 +144,12 @@ export class BoatSystem {
   /** The share of the usual number of boats that are sent out: 1 for all of them, less on a weak PC (see the quality presets). */
   density = 1
 
+  /** Takes every boat away at once; the traffic builds up again from the lanes' rates (a jump in time starts from empty water). */
+  clear(): void {
+    this.acc.clear()
+    for (const b of this.boats.splice(0)) this.release(b)
+  }
+
   setRoutes(routes: BoatRoute[]): void {
     this.routes.length = 0
     this.routes.push(...routes)

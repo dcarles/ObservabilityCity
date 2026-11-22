@@ -378,7 +378,22 @@ export async function startTown(): Promise<void> {
 
   let held = false // for tests: while true, the snapshots from the server are ignored, so one fed by hand stays on screen
   // time travel: while it looks at the past, the live feed is ignored and recorded frames come through the same door
-  const history = startHistory({ scope, islands: () => islands, feed: (raw) => onSnapshot(raw) }, { beforeId: 'wall-button', machine: true })
+  // a jump in time starts from an empty road and empty water: the cars and boats of the moment left would keep driving into the new one. They are taken away when the jump
+  // starts and once more when its frame arrives (the old rates may have sent a few meanwhile); a replay that just plays on is not a jump and keeps its traffic.
+  let clearTrafficAtNextFrame = false
+  const history = startHistory({ scope, islands: () => islands, feed: (raw) => {
+    if (clearTrafficAtNextFrame) { clearTrafficAtNextFrame = false; town.cars.clear(); town.boats.clear() }
+    onSnapshot(raw)
+  } }, { beforeId: 'wall-button', machine: true })
+  let travelSeen = history.state.travel?.id ?? 0
+  history.subscribe(() => {
+    const id = history.state.travel?.id ?? 0
+    if (id === travelSeen) return
+    travelSeen = id
+    town.cars.clear()
+    town.boats.clear()
+    clearTrafficAtNextFrame = true
+  })
   const connection = new Connection((raw) => { if (!held && !history.active) onSnapshot(raw) }, (st) => { topbar.setStatus(st); wall?.setConnection(st); markFeed(st) }, scope, (e) => {
     banner.textContent = e.environments.length === 0 && e.towns
       ? `There is no town "${e.requestedTown ?? ''}". Available: ${e.towns.join(', ') || 'none'}.`

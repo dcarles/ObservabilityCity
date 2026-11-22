@@ -23,6 +23,9 @@ public sealed class HistoryOptions
     /// <summary>Where history is kept. Empty means the town's own folder, in <c>_history/</c>; a path here holds one folder for each town.</summary>
     public string? Path { get; set; }
 
+    /// <summary>The same settings for one environment, which may keep fewer or more days than the app's setting says (<c>history.days</c> in its file).</summary>
+    public HistoryOptions ForDays(int? days) => new() { Enabled = Enabled, Days = days ?? Days, IntervalSeconds = IntervalSeconds, Path = Path };
+
     public int EffectiveDays => Math.Clamp(Days, 1, MaxDays);
     public TimeSpan Interval => TimeSpan.FromSeconds(Math.Max(IntervalSeconds, MinIntervalSeconds));
     public TimeSpan Keep => TimeSpan.FromDays(EffectiveDays);

@@ -65,6 +65,40 @@ test.describe('time travel on a live town', () => {
     await expect(page.locator('#wall-button')).toBeHidden()
   })
 
+  test('a jump in time takes every car and boat away at once, and so does going back to live', async ({ page, request }) => {
+    await waitForFrames(request, 3)
+    await openTown(page)
+    // this town has hardly any traffic to count, so the test counts how often the cars and the boats are told to clear
+    await page.evaluate(() => {
+      const w = window as unknown as { city: any; cleared: { cars: number; boats: number } }
+      w.cleared = { cars: 0, boats: 0 }
+      for (const kind of ['cars', 'boats'] as const) {
+        const system = w.city.town[kind]
+        const clear = system.clear.bind(system)
+        system.clear = () => { w.cleared[kind]++; clear() }
+      }
+    })
+    const cleared = () => page.evaluate(() => (window as unknown as { cleared: { cars: number; boats: number } }).cleared)
+    expect(await cleared()).toEqual({ cars: 0, boats: 0 })
+
+    // the jump clears the road and the water in the very moment it starts, before the frame it goes to has even been asked for
+    await page.evaluate(() => { void (window as unknown as Win).city.history.goTo(Date.now() - 15_000) })
+    expect(await cleared()).toEqual({ cars: 1, boats: 1 })
+    await page.locator('#history-skip').click()
+    await expect(page.locator('body')).toHaveClass(/history/)
+    // and once more when the frame of that moment arrives, for the cars the old rates sent meanwhile
+    await expect.poll(cleared).toEqual({ cars: 2, boats: 2 })
+
+    // a replay that plays on is not a jump: its frames clear nothing
+    await page.evaluate(() => (window as unknown as Win).city.history.setSpeed(1))
+    await page.waitForTimeout(2_500)
+    expect(await cleared()).toEqual({ cars: 2, boats: 2 })
+
+    // going back to live is one
+    await page.evaluate(() => { void (window as unknown as Win).city.history.goLive() })
+    expect(await cleared()).toEqual({ cars: 3, boats: 3 })
+  })
+
   for (const machine of ['car', 'cabin'] as const) {
     test(`the Town travels in a time machine (${machine}): the overlay draws a scene and says which machine it is`, async ({ page, request }) => {
       await waitForFrames(request, 3)

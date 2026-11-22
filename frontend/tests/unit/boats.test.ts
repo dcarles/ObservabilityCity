@@ -39,6 +39,17 @@ describe.each(Object.keys(KITS))('boats in the %s theme', (id) => {
     }
   })
 
+  it('are all taken away by clear (a jump in time) and come back from the rates of their lanes', () => {
+    const boats = new BoatSystem(4)
+    boats.setRoutes([route('aa', 'bb')])
+    boats.update(1)
+    expect(visible(boats).length).toBeGreaterThan(0)
+    boats.clear()
+    expect(visible(boats)).toHaveLength(0)
+    boats.update(1)
+    expect(visible(boats).length).toBeGreaterThan(0)
+  })
+
   it('are painted differently when they loop out of their own island and when they sail to another', () => {
     const between = new BoatSystem(4)
     between.setRoutes([route('aa', 'bb')])
