@@ -81,7 +81,7 @@ public sealed class HistoryRebuilder(FileHistoryStore recorded, FileHistoryStore
             var (unhealthy, down) = FileHistoryStore.Counts(json);
             rebuilt.Append(at, json, unhealthy, down);
         }
-        log?.LogInformation("History: rebuilt {Frames} frames of the hour {Hour} in {Seconds:0.0} s", built.Count, hour.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture), clock.Elapsed.TotalSeconds);
+        log?.LogInformation("History: rebuilt {Frames} frames of the hour {Hour} in {Seconds:0.0} s. Spent on: {Summary}", built.Count, hour.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture), clock.Elapsed.TotalSeconds, frames.TakeSummary());
         return built.Count;
     }
 }

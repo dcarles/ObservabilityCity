@@ -244,6 +244,8 @@ test.describe('time travel on a live town', () => {
       await route.fulfill({ json: body })
     })
     await page.route('**/api/history/frame?*', (route) => route.fulfill({ json: { ...frame, rebuilt: true } }))
+    // no real frames read ahead: a recorded frame that falls between the made-up one and the viewed second would be shown instead (a one in ten chance, which made this test flaky)
+    await page.route('**/api/history/frames*', (route) => route.fulfill({ json: { frames: [] } }))
     await openTown(page)
 
     await page.evaluate((at) => (window as unknown as Win).city.history.goTo(Date.parse(at) + 1_000, { paused: true }), frame.at)
@@ -260,7 +262,7 @@ test.describe('time travel on a live town', () => {
     await waitForFrames(request, 3)
     const frame = { ...(await realFrame(request)), at: new Date(Date.now() - 16_000).toISOString() }
     let asked = false
-    await page.route('**/api/history/fill', (route) => route.fulfill({ json: { available: true, running: !asked, done: 0, total: 2, hour: null, problem: null } }))
+    await page.route(/\/api\/history\/fill(\?.*)?$/, (route) => route.fulfill({ json: { available: true, running: !asked, done: 0, total: 2, hour: null, problem: null, ahead: 2, building: false, secondsPerHour: 110 } }))
     await page.route('**/api/history/fill/priority*', (route) => { asked = true; return route.fulfill({ status: 202, body: '' }) })
     await page.route('**/api/history/frame?*', (route) => asked ? route.fulfill({ json: { ...frame, rebuilt: true } }) : route.fulfill({ status: 404, json: { error: 'no' } }))
     await openTown(page)
@@ -268,8 +270,16 @@ test.describe('time travel on a live town', () => {
     // not awaited: the jump itself waits for the rebuild, and the loading card is what is looked at meanwhile
     await page.evaluate((at) => { void (window as unknown as Win).city.history.goTo(Date.parse(at) + 1_000, { paused: true }) }, frame.at)
     await expect(page.locator('#history-nodata')).toContainText('Rebuilding', { timeout: 15_000 })
+    // while it waits: the town is covered, the card says what is ahead, the button says it waits and the clock stands still
+    await expect(page.locator('#history-veil')).toBeVisible()
+    await expect(page.locator('#history-nodata')).toContainText('2 hours are built before it, so about 6 min')
+    await expect(page.locator('#history-button')).toContainText('Waiting')
+    const waitingAt = (await state(page)).viewed
+    await page.waitForTimeout(1_200)
+    expect((await state(page)).viewed).toBe(waitingAt)
     await expect(page.locator('#history-rebuilt')).toBeVisible({ timeout: 20_000 })
     await expect(page.locator('#history-nodata')).toBeHidden()
+    await expect(page.locator('#history-veil')).toBeHidden()
   })
 
   // last on purpose: stepping back asks the server to rebuild that hour, which changes what the tests after it see

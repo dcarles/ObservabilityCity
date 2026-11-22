@@ -208,6 +208,59 @@ public class HistoryRebuildTests : IDisposable
     }
 
     [Fact]
+    public async Task Hours_asked_for_are_done_in_the_order_asked_and_an_ask_that_was_taken_back_goes_back_to_the_normal_order()
+    {
+        var order = new List<DateTimeOffset>();
+        var (rebuilder, _, _, source, _) = Setup(t => { order.Add(t); return new Dictionary<string, NodeReading> { ["aa.orders-api"] = Reading(t, 1) }; });
+        var filler = Filler(rebuilder, source, gate: null);
+
+        filler.Prioritise(DateTimeOffset.Parse("2025-12-29T15:20:00Z"));
+        filler.Prioritise(DateTimeOffset.Parse("2025-12-29T13:05:00Z"));
+        filler.Prioritise(DateTimeOffset.Parse("2025-12-29T13:30:00Z")); // the same hour asked twice is one ask
+        filler.Prioritise(DateTimeOffset.Parse("2025-12-29T18:00:00Z"));
+        filler.Withdraw(DateTimeOffset.Parse("2025-12-29T15:59:00Z")); // the person left the first one
+        await filler.PassAsync(CancellationToken.None);
+
+        var hours = order.Select(t => new DateTimeOffset(t.UtcDateTime.Date.AddHours(t.UtcDateTime.Hour), TimeSpan.Zero)).Distinct().ToList();
+        Assert.Equal(DateTimeOffset.Parse("2025-12-29T13:00:00Z"), hours[0]);
+        Assert.Equal(DateTimeOffset.Parse("2025-12-29T18:00:00Z"), hours[1]);
+        Assert.Equal(DateTimeOffset.Parse("2025-12-30T11:00:00Z"), hours[2]); // then the newest
+        Assert.Contains(DateTimeOffset.Parse("2025-12-29T15:00:00Z"), hours); // and the one taken back is still filled, in its turn
+        Assert.True(filler.SecondsPerHour is >= 0);
+    }
+
+    [Fact]
+    public async Task The_loading_card_can_ask_how_many_hours_come_before_an_hour_and_whether_it_is_being_built()
+    {
+        var first = DateTimeOffset.Parse("2025-12-29T13:00:00Z");
+        var second = DateTimeOffset.Parse("2025-12-29T15:00:00Z");
+        var third = DateTimeOffset.Parse("2025-12-29T18:00:00Z");
+        HistoryFiller? filler = null;
+        var seen = new List<(bool Building, int? AheadOfSecond, int? AheadOfThird)>();
+        var (rebuilder, _, _, source, _) = Setup(t =>
+        {
+            if (t == first.AddMinutes(5)) seen.Add((filler!.IsBuilding(first), filler.Ahead(second), filler.Ahead(third)));
+            return new Dictionary<string, NodeReading> { ["aa.orders-api"] = Reading(t, 1) };
+        });
+        filler = Filler(rebuilder, source, gate: null);
+
+        Assert.Null(filler.Ahead(first)); // not asked yet
+        filler.Prioritise(first);
+        filler.Prioritise(second);
+        filler.Prioritise(third);
+        Assert.Equal(0, filler.Ahead(first));
+        Assert.Equal(1, filler.Ahead(second));
+        Assert.Equal(2, filler.Ahead(third));
+        await filler.PassAsync(CancellationToken.None);
+
+        var one = Assert.Single(seen);
+        Assert.True(one.Building); // the hour in hand is 0 ahead and building
+        Assert.Equal(1, one.AheadOfSecond); // the hour in hand is ahead of it
+        Assert.Equal(2, one.AheadOfThird); // and the hour asked before it
+        Assert.Null(filler.Ahead(first)); // done: not waiting any more
+    }
+
+    [Fact]
     public async Task Nothing_is_fetched_when_nobody_looks_and_a_failed_hour_is_tried_again_only_after_ten_minutes()
     {
         var failing = true;

@@ -29,7 +29,8 @@ public sealed class HistoryFiller(
     public static readonly TimeSpan PassEvery = TimeSpan.FromHours(1);
 
     private readonly TimeProvider _time = time ?? TimeProvider.System;
-    private readonly ConcurrentQueue<DateTimeOffset> _priority = new();
+    private readonly List<DateTimeOffset> _asked = [];
+    private readonly Queue<double> _hourSeconds = new();
     private readonly Dictionary<DateTimeOffset, DateTimeOffset> _failed = [];
     private volatile FillStatus _status = new(false, 0, 0, null, null);
 
@@ -38,11 +39,48 @@ public sealed class HistoryFiller(
     /// <summary>Whether this environment has a past to rebuild from at all.</summary>
     public bool CanFill => rebuilder.CanRebuildFrom(sources);
 
-    /// <summary>Asks for the hour of a time to be filled next, when it is a gap.</summary>
+    /// <summary>Asks for the hour of a time to be filled next, when it is a gap. Hours asked for are done in the order they were asked, before the newest-first order of the rest.</summary>
     public void Prioritise(DateTimeOffset at)
     {
         if (at < _time.GetUtcNow() - options.Keep) return;
-        _priority.Enqueue(new DateTimeOffset(at.UtcDateTime.Date.AddHours(at.UtcDateTime.Hour), TimeSpan.Zero));
+        var hour = HourOf(at);
+        lock (_asked) if (!_asked.Contains(hour)) _asked.Add(hour);
+    }
+
+    /// <summary>
+    /// Takes back an ask: the person left that moment. The hour stays a gap and is filled in the normal order. An hour that has already started is not touched: it runs to its end and is saved.
+    /// </summary>
+    public void Withdraw(DateTimeOffset at)
+    {
+        var hour = HourOf(at);
+        lock (_asked) _asked.Remove(hour);
+    }
+
+    private static DateTimeOffset HourOf(DateTimeOffset at) => new(at.UtcDateTime.Date.AddHours(at.UtcDateTime.Hour), TimeSpan.Zero);
+
+    /// <summary>
+    /// How many hours will be built before the hour of <paramref name="at"/> starts: the hour in progress (it always finishes) and the hours asked for before it. Null when the hour is not waiting
+    /// for a turn (it was never asked for, or it is the one being built: then it is 0 and <see cref="IsBuilding"/> says so).
+    /// </summary>
+    public int? Ahead(DateTimeOffset at)
+    {
+        var hour = HourOf(at);
+        if (IsBuilding(at)) return 0;
+        lock (_asked)
+        {
+            var index = _asked.IndexOf(hour);
+            if (index < 0) return null;
+            return index + (_status is { Running: true, Hour: not null } ? 1 : 0);
+        }
+    }
+
+    /// <summary>Whether the hour of <paramref name="at"/> is the one being built right now.</summary>
+    public bool IsBuilding(DateTimeOffset at) => _status is { Running: true, Hour: { } h } && h == HourOf(at);
+
+    /// <summary>How long an hour has taken lately (the last ten, in seconds), for an estimate on the loading card. Null until one hour was built.</summary>
+    public double? SecondsPerHour
+    {
+        get { lock (_hourSeconds) return _hourSeconds.Count == 0 ? null : _hourSeconds.Average(); }
     }
 
     protected override async Task ExecuteAsync(CancellationToken ct)
@@ -55,7 +93,7 @@ public sealed class HistoryFiller(
             while (!ct.IsCancellationRequested)
             {
                 if (!await Demand.WaitUntilWantedAsync(gate, ct)) return;
-                var reason = wasIdle ? "somebody is looking again" : !_priority.IsEmpty ? "an hour was asked for" : _time.GetUtcNow() - lastPass >= PassEvery ? "the hourly check" : null;
+                var reason = wasIdle ? "somebody is looking again" : AnyAsked() ? "an hour was asked for" : _time.GetUtcNow() - lastPass >= PassEvery ? "the hourly check" : null;
                 if (reason is not null)
                 {
                     wasIdle = false;
@@ -102,7 +140,9 @@ public sealed class HistoryFiller(
                 log?.LogInformation("History: rebuilding the hour {Hour} ({Done} of {Total} done)", hour.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture), done, done + missing.Count + 1);
                 try
                 {
+                    var hourClock = Stopwatch.StartNew();
                     await rebuilder.RebuildHourAsync(hour, ct);
+                    lock (_hourSeconds) { _hourSeconds.Enqueue(hourClock.Elapsed.TotalSeconds); while (_hourSeconds.Count > 10) _hourSeconds.Dequeue(); }
                     _failed.Remove(hour);
                     done++;
                 }
@@ -124,11 +164,18 @@ public sealed class HistoryFiller(
         }
     }
 
-    /// <summary>The hour to do next: one a person asked for if it is still a gap, else the newest.</summary>
+    private bool AnyAsked() { lock (_asked) return _asked.Count > 0; }
+
+    /// <summary>The hour to do next: the one asked for first that is still a gap, else the newest. An hour taken here is no longer waiting: it is the one in progress.</summary>
     private DateTimeOffset Next(List<DateTimeOffset> missing)
     {
-        while (_priority.TryDequeue(out var asked))
-            if (missing.Contains(asked)) return asked;
+        lock (_asked)
+            while (_asked.Count > 0)
+            {
+                var asked = _asked[0];
+                _asked.RemoveAt(0);
+                if (missing.Contains(asked)) return asked;
+            }
         return missing[0]; // MissingHours lists the newest first
     }
 }

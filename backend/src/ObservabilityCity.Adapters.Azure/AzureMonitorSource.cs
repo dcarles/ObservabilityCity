@@ -34,6 +34,12 @@ public sealed class AzureMonitorReader(HttpClient http, ICredentialSource? crede
     /// <summary>How many series a read split by a dimension asks for: Azure answers with only 10 unless asked for more, and a broker holds hundreds of queues.</summary>
     public const int MaxSeries = 1000;
 
+    private long _calls;
+    private long _bytes;
+
+    /// <summary>How many answers were read and how many characters they held since the last call; reading them resets them (for the log of a rebuilt hour).</summary>
+    public (int Calls, long Bytes) TakeCounts() => ((int)Interlocked.Exchange(ref _calls, 0), Interlocked.Exchange(ref _bytes, 0));
+
     public const string TokenScope = "https://management.azure.com/.default";
     public const string Endpoint = "https://management.azure.com";
     public const string ApiVersion = "2018-01-01";
@@ -102,7 +108,12 @@ public sealed class AzureMonitorReader(HttpClient http, ICredentialSource? crede
             {
                 using (response)
                 {
-                    if (response.IsSuccessStatusCode) return text;
+                    if (response.IsSuccessStatusCode)
+                    {
+                        Interlocked.Increment(ref _calls);
+                        Interlocked.Add(ref _bytes, text.Length);
+                        return text;
+                    }
                     if (attempt >= Attempts || !IsHiccup(response.StatusCode))
                         throw new HttpRequestException($"{service} answered {(int)response.StatusCode} {response.ReasonPhrase} for {Last(resourceId)}: {Trim(text)}", null, response.StatusCode);
                     told = RetryWait.For(response.Headers, attempt, retryDelay, DateTimeOffset.UtcNow, Random.Shared.NextDouble());
@@ -244,7 +255,7 @@ public sealed class AzureMonitorReader(HttpClient http, ICredentialSource? crede
 /// <c>file:name.json</c> replays recorded series (<c>{ "&lt;resource name&gt;": [ { "metric", "aggregation", "filter", "points": [...] } ] }</c>) kept beside the town's files.
 /// </summary>
 public sealed class AzureMonitorSource(
-    string name, string environmentId, RegistrySource definition, AzureMonitorReader reader, ScopeStore store, string? recording, TimeProvider time) : IPastMetricSource, IProgressiveMetricSource
+    string name, string environmentId, RegistrySource definition, AzureMonitorReader reader, ScopeStore store, string? recording, TimeProvider time) : IPastMetricSource, IPastReadStats, IProgressiveMetricSource
 {
     public const int MaxParallel = 8;
 
@@ -285,8 +296,8 @@ public sealed class AzureMonitorSource(
         return all;
     }
 
-    private readonly Dictionary<(string Resource, MetricGroup Group, DateTimeOffset Day), Task<IReadOnlyList<MetricSeries>>> _days = [];
-    private readonly List<(string Resource, MetricGroup Group, DateTimeOffset Day)> _order = [];
+    private readonly Dictionary<(string Resource, MetricGroup Group, DateTimeOffset Chunk, TimeSpan Length), Task<IReadOnlyList<MetricSeries>>> _days = [];
+    private readonly List<(string Resource, MetricGroup Group, DateTimeOffset Chunk, TimeSpan Length)> _order = [];
 
     private async Task PollCore(TownRegistry registry, Action<IReadOnlyDictionary<string, NodeReading>> publish, DateTimeOffset at, bool bulk, CancellationToken ct)
     {
@@ -403,45 +414,77 @@ public sealed class AzureMonitorSource(
         new[] { s }.Concat(s.Over is null ? [] : Flatten(s.Over)).Concat(s.OrElse is null ? [] : Flatten(s.OrElse));
 
     /// <summary>
-    /// How much time one read covers when the past is rebuilt: an hour. A day of a busy namespace's queues is over the 8 MB Azure answers with (a 400 "response size exceeded maximum limit"),
-    /// an hour is a twenty-fourth of it.
+    /// How much time one read of a resource's platform metrics covers when the past is rebuilt: three hours, so the 36 frames of them cost one read. Chunks sit on the clock (00 to 03, 03 to 06, ...).
+    /// A read that Azure answers with "response size exceeded maximum limit" (8 MB) is read again in <see cref="SmallChunk"/> pieces, and that resource stays on them.
     /// </summary>
-    public static readonly TimeSpan PastChunk = TimeSpan.FromHours(1);
+    public static readonly TimeSpan PastChunk = TimeSpan.FromHours(3);
 
-    /// <summary>The start of the hour a time falls in (the end of an hour belongs to the hour that ended).</summary>
-    public static DateTimeOffset MetricChunk(DateTimeOffset at) => new(at.UtcDateTime.Ticks / PastChunk.Ticks * PastChunk.Ticks, TimeSpan.Zero);
+    /// <summary>The piece a read falls back to when the answer for <see cref="PastChunk"/> was too big.</summary>
+    public static readonly TimeSpan SmallChunk = TimeSpan.FromHours(1);
 
-    /// <summary>How many chunks a source keeps read: the frames of an hour are built one after the other, so the last few are all that is asked again.</summary>
-    public const int ChunksKept = 4;
+    /// <summary>The start of the chunk a time falls in (the end of a chunk belongs to the chunk that ended).</summary>
+    public static DateTimeOffset MetricChunk(DateTimeOffset at, TimeSpan chunk) => new(at.UtcDateTime.Ticks / chunk.Ticks * chunk.Ticks, TimeSpan.Zero);
 
-    /// <summary>Forgets what was read for all but the last <see cref="ChunksKept"/> hours from a cache whose keys are added in the order they were read (<paramref name="hourOf"/> says which hour a key is of).</summary>
-    public static void Trim<TKey, TValue>(Dictionary<TKey, TValue> cache, List<TKey> order, Func<TKey, DateTimeOffset> hourOf) where TKey : notnull
+    /// <summary>How many chunks a source keeps read: the frames of an hour are built one after the other, and a fill moves from one chunk to the one before it, so the one being used and the last one are enough.</summary>
+    public const int ChunksKept = 2;
+
+    /// <summary>
+    /// Forgets what was read, keeping the <see cref="ChunksKept"/> chunks that were read last. <paramref name="order"/> lists the keys in the order they were read, and <paramref name="chunkOf"/> says which chunk a key is of.
+    /// The newest chunks by the clock are not the ones to keep: a fill goes back in time, so the chunk it is reading is the oldest one it has.
+    /// </summary>
+    public static void Trim<TKey, TValue>(Dictionary<TKey, TValue> cache, List<TKey> order, Func<TKey, DateTimeOffset> chunkOf) where TKey : notnull
     {
-        var keep = order.Select(hourOf).Distinct().OrderByDescending(h => h).Take(ChunksKept).ToHashSet();
-        foreach (var key in order.Where(k => !keep.Contains(hourOf(k))).ToList()) { cache.Remove(key); order.Remove(key); }
+        var keep = new HashSet<DateTimeOffset>();
+        for (var i = order.Count - 1; i >= 0 && keep.Count < ChunksKept; i--) keep.Add(chunkOf(order[i]));
+        foreach (var key in order.Where(k => !keep.Contains(chunkOf(k))).ToList()) { cache.Remove(key); order.Remove(key); }
+    }
+
+    /// <summary>Whether Azure refused a read because the answer would be over its 8 MB.</summary>
+    public static bool IsTooLarge(Exception e) => e is HttpRequestException { StatusCode: System.Net.HttpStatusCode.BadRequest } h && h.Message.Contains("response size", StringComparison.OrdinalIgnoreCase);
+
+    private readonly HashSet<string> _small = [];
+    private int _hits;
+    private int _splits;
+
+    /// <summary>What was read for the past since the last call, for the log of a rebuilt hour.</summary>
+    public PastReadStats TakeStats()
+    {
+        var (calls, bytes) = reader.TakeCounts();
+        return new PastReadStats(calls, Interlocked.Exchange(ref _hits, 0), bytes / 1_048_576.0, Interlocked.Exchange(ref _splits, 0));
     }
 
     /// <summary>The series that were read for the window ending at <paramref name="at"/>, cut out of the hour's one read (the hour is read once, from the window before its first frame to its end).</summary>
     private async Task<IReadOnlyList<MetricSeries>> ReadResourceDay(Target target, DateTimeOffset at, CancellationToken ct)
     {
         var window = target.Group.Window ?? Window;
-        var day = MetricChunk(at.AddTicks(-1)); // a frame on the hour sharp belongs to the hour that ended
+        bool small;
+        lock (_days) small = _small.Contains(target.Resource.Id);
+        var length = small ? SmallChunk : PastChunk;
+        var chunk = MetricChunk(at.AddTicks(-1), length); // a frame on the hour sharp belongs to the chunk that ended
+        var key = (target.Resource.Id, target.Group, chunk, length);
         Task<IReadOnlyList<MetricSeries>> read;
         lock (_days)
         {
-            if (!_days.TryGetValue((target.Resource.Id, target.Group, day), out read!))
+            if (!_days.TryGetValue(key, out read!))
             {
-                _days[(target.Resource.Id, target.Group, day)] = read = ReadResourceWindow(target, day + PastChunk, PastChunk + window, ct);
-                _order.Add((target.Resource.Id, target.Group, day));
-                Trim(_days, _order, k => k.Day);
+                _days[key] = read = ReadResourceWindow(target, chunk + length, length + window, ct);
+                _order.Add(key);
+                Trim(_days, _order, k => k.Chunk);
             }
+            else Interlocked.Increment(ref _hits);
         }
         IReadOnlyList<MetricSeries> whole;
         try { whole = await read; }
-        catch
+        catch (Exception e)
         {
             lock (_days)
-                if (_days.TryGetValue((target.Resource.Id, target.Group, day), out var kept) && ReferenceEquals(kept, read)) { _days.Remove((target.Resource.Id, target.Group, day)); _order.Remove((target.Resource.Id, target.Group, day)); }
+                if (_days.TryGetValue(key, out var kept) && ReferenceEquals(kept, read)) { _days.Remove(key); _order.Remove(key); }
+            if (!small && IsTooLarge(e) && !ct.IsCancellationRequested)
+            {
+                lock (_days) _small.Add(target.Resource.Id);
+                Interlocked.Increment(ref _splits);
+                return await ReadResourceDay(target, at, ct); // the same read in pieces of an hour
+            }
             throw; // a read that failed is asked again next time, not remembered as failed
         }
         return AtWindow(whole, at - window, at);
@@ -468,7 +511,8 @@ public sealed class AzureMonitorSource(
             if (target.Group.Parts is not { } parts) { all.AddRange(await reader.ReadAsync(target.Resource.Id, call, metrics, at, window, ct)); continue; }
             try { all.AddRange(await reader.ReadByPartAsync(target.Resource.Id, call, metrics, parts.By, at, window, ct)); }
             // a metric that has no such dimension is refused: read it as a whole, so the resource is shown without parts rather than not at all
-            catch (HttpRequestException e) when (e.StatusCode == System.Net.HttpStatusCode.BadRequest)
+            // (an answer that was only too big is not that: it fails, and the past is read in smaller pieces)
+            catch (HttpRequestException e) when (e.StatusCode == System.Net.HttpStatusCode.BadRequest && !IsTooLarge(e))
             {
                 all.AddRange(await reader.ReadAsync(target.Resource.Id, call, metrics, at, window, ct));
             }

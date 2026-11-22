@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Globalization;
 using Microsoft.Extensions.Logging;
@@ -42,12 +43,34 @@ public sealed class PastFrameBuilder(SnapshotBuilder live, LatestState liveState
         return builder.Build();
     }
 
+    private readonly ConcurrentDictionary<string, double> _spent = new();
+
+    /// <summary>
+    /// What the frames built since the last call cost, for the log of a rebuilt hour: for each source the seconds spent reading it and, when it can say, how much it asked the cloud
+    /// (answers read, their size, frames answered from what was already read, reads that were too big and were made again in smaller pieces). Reading it resets it.
+    /// </summary>
+    public string TakeSummary()
+    {
+        var parts = new List<string>();
+        foreach (var source in sources)
+        {
+            if (source is not IPastMetricSource) continue;
+            var seconds = _spent.TryRemove(source.Name, out var s) ? s : 0;
+            var text = $"{source.Name} {seconds:0.0} s";
+            if (source is IPastReadStats stats && stats.TakeStats() is { } r)
+                text += $" ({r.Calls} reads, {r.Megabytes:0.0} MB, {r.CacheHits} from what was already read{(r.Splits > 0 ? $", {r.Splits} too big and read in pieces" : "")})";
+            parts.Add(text);
+        }
+        return string.Join("; ", parts);
+    }
+
     private async Task<IReadOnlyDictionary<string, NodeReading>> ReadAsync(IPastMetricSource source, Registry.Registry registry, DateTimeOffset at, CancellationToken ct)
     {
         var clock = Stopwatch.StartNew();
         try
         {
             var readings = await source.PollAtAsync(registry, at, ct);
+            _spent.AddOrUpdate(source.Name, clock.Elapsed.TotalSeconds, (_, was) => was + clock.Elapsed.TotalSeconds);
             if (clock.Elapsed > SlowRead)
                 log?.LogWarning("History: the source {Source} was slow reading {At}: {Seconds:0} s", source.Name, at.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture), clock.Elapsed.TotalSeconds);
             else

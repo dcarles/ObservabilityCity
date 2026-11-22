@@ -17,6 +17,9 @@ public sealed record AzureSettings : IDeadLetterLinkSettings, IQueueLinkSettings
     /// <summary>For a request source: the query that gives how the requests divide between regions (columns role, region, calls). Null: the split is not measured.</summary>
     public string? RegionQuery { get; init; }
 
+    /// <summary>For a request source: the same question as the query, asked once for a whole hour of the past instead of once per frame (columns of the query plus <c>at</c>, the start of each time bin as wide as the window). Null: each frame is asked on its own.</summary>
+    public string? RangeQuery { get; init; }
+
     /// <summary>For a broker source (servicebus): the query that gives how many messages each queue handled by message type (columns queue, type, calls). Null: the types are not measured.</summary>
     public string? TypesQuery { get; init; }
 

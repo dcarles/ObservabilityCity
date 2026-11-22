@@ -109,6 +109,27 @@ const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
 /** "Sat 21 Nov 09:12", in the browser's time. */
+/** What the loading card knows about the hour being waited for: how many hours are built before it, whether it is the one being built, and how long an hour has taken lately. */
+export interface Waiting { ahead: number | null; building: boolean; secondsPerHour: number | null }
+
+const about = (seconds: number): string => {
+  const minutes = Math.max(1, Math.ceil(seconds / 60))
+  return minutes >= 120 ? `${Math.round(minutes / 60)} h` : `${minutes} min`
+}
+
+/** The words of the loading card: which time is being built, what comes before it, and a rough wait (hours ahead plus its own, at the pace of the last hours). */
+export function waitingText(viewed: number, waiting: Waiting | null): string {
+  const time = viewedText(viewed)
+  const head = `Rebuilding ${time} from the cloud.`
+  if (!waiting || (waiting.ahead === null && !waiting.building)) return `${head} This can take a minute; the town shows as soon as it is ready.`
+  const pace = waiting.secondsPerHour
+  if (waiting.building) return `${head} It is being built now${pace === null ? '' : ` (an hour takes about ${about(pace)})`}. The clock waits for it.`
+  const ahead = waiting.ahead ?? 0
+  if (ahead === 0) return `${head} It is next${pace === null ? '' : `, about ${about(pace)}`}. The clock waits for it.`
+  const before = `${ahead} ${ahead === 1 ? 'hour is' : 'hours are'} built before it`
+  return `${head} ${before}${pace === null ? '' : `, so about ${about(pace * (ahead + 1))}`}. The clock waits for it.`
+}
+
 export function viewedText(at: number): string {
   const d = new Date(at)
   return `${WEEKDAYS[d.getDay()]} ${d.getDate()} ${MONTHS[d.getMonth()]} ${pad(d.getHours())}:${pad(d.getMinutes())}`

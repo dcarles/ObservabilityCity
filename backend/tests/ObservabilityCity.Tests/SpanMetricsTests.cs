@@ -264,6 +264,41 @@ public class SpanMetricsTests
         Assert.Equal(at, readings["aa.orders-api"].At);
     }
 
+    private static string Bins(params (string Role, string At, double Calls)[] rows) =>
+        JsonSerializer.Serialize(new { tables = new[] { new { name = "PrimaryResult", columns = new[] { "role", "at", "calls", "errors", "latencyMs" }.Select(n => new { name = n, type = "string" }), rows = rows.Select(r => new object[] { r.Role, r.At, r.Calls, 0, 100 }) } } });
+
+    [Fact]
+    public async Task An_hour_of_the_past_is_asked_once_by_the_range_query_and_each_frame_is_cut_out_of_the_answer()
+    {
+        var answer = Bins(("OrdersApi", "2025-12-30T09:00:00Z", 300), ("OrdersApi", "2025-12-30T09:05:00Z", 600), ("OrdersApi", "2025-12-30T09:55:00Z", 900), ("OrdersApi", "2025-12-30T10:00:00Z", 1500));
+        var (source, http) = Asking(TownA, answer, d => d with { Typed = AzureSettings.None with { RangeQuery = "AppMetrics | summarize calls = sum(Val) by role = AppRoleName, at = bin(TimeGenerated, {window})" } });
+        var registry = RegistryLoader.Load(TownA);
+
+        var first = await source.PollAtAsync(registry, DateTimeOffset.Parse("2025-12-30T09:05:00Z"), CancellationToken.None);
+        var second = await source.PollAtAsync(registry, DateTimeOffset.Parse("2025-12-30T09:10:00Z"), CancellationToken.None);
+        var last = await source.PollAtAsync(registry, DateTimeOffset.Parse("2025-12-30T10:00:00Z"), CancellationToken.None);
+
+        var sent = Assert.Single(http.Sent); // one question for the three frames of the hour
+        Assert.Equal("2025-12-30T09:00:00Z/2025-12-30T10:05:00Z", sent.Json.GetProperty("timespan").GetString());
+        Assert.Contains("bin(TimeGenerated, 5m)", sent.Json.GetProperty("query").GetString());
+        Assert.Equal(1, first["aa.orders-api"].RequestsPerSecond); // 300 calls in the bin that starts at 09:00
+        Assert.Equal(2, second["aa.orders-api"].RequestsPerSecond);
+        Assert.Equal(3, last["aa.orders-api"].RequestsPerSecond);
+    }
+
+    [Fact]
+    public async Task A_frame_off_the_bin_grid_is_asked_on_its_own_and_an_answer_without_the_time_column_says_what_is_missing()
+    {
+        var (source, http) = Asking(TownA, Recorded(TownA), d => d with { Typed = AzureSettings.None with { RangeQuery = "T | summarize calls = sum(Val) by role = AppRoleName" } });
+        var registry = RegistryLoader.Load(TownA);
+
+        await source.PollAtAsync(registry, DateTimeOffset.Parse("2025-12-30T09:07:00Z"), CancellationToken.None);
+        Assert.Equal("2025-12-30T09:02:00Z/2025-12-30T09:07:00Z", Assert.Single(http.Sent).Json.GetProperty("timespan").GetString());
+
+        var e = await Assert.ThrowsAsync<InvalidOperationException>(() => source.PollAtAsync(registry, DateTimeOffset.Parse("2025-12-30T09:05:00Z"), CancellationToken.None));
+        Assert.Contains("must return the column at", e.Message);
+    }
+
     [Theory]
     [InlineData("T | where TimeGenerated > ago(5m)", "T | where TimeGenerated > (datetime(2025-12-30T09:05:00Z) - (5m))")]
     [InlineData("T | where TimeGenerated between (ago(1h) .. now())", "T | where TimeGenerated between ((datetime(2025-12-30T09:05:00Z) - (1h)) .. datetime(2025-12-30T09:05:00Z))")]

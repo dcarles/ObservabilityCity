@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { addressAt, addressLive, advance, buildStrip, catchUpSeconds, fieldTime, fieldValue, frameFor, halfHourMark, quickPicks, requestedAt, SPEEDS, stepMoves, stripTime, stripTip, stripX, viewedText } from '../../src/history/model'
+import { addressAt, addressLive, advance, buildStrip, catchUpSeconds, fieldTime, fieldValue, frameFor, halfHourMark, quickPicks, requestedAt, SPEEDS, stepMoves, waitingText, stripTime, stripTip, stripX, viewedText } from '../../src/history/model'
 
 const MIN = 60_000
 const GAP = 5 * MIN
@@ -164,5 +164,23 @@ describe('step and snap moves', () => {
     expect(m.steps.find((x) => x.label === '+1 h')!.at).toBe(now)
     const old = stepMoves(now - 7 * 86_400_000 + 20 * 60_000, now, 7)
     expect(old.steps.map((x) => x.label)).toEqual(['+30 m', '+1 h'])
+  })
+})
+
+describe('the words of the loading card', () => {
+  const at = new Date(2026, 10, 20, 5, 3).getTime()
+  it('keeps the plain words until the server says where the hour stands', () => {
+    expect(waitingText(at, null)).toContain('This can take a minute')
+    expect(waitingText(at, { ahead: null, building: false, secondsPerHour: null })).toContain('This can take a minute')
+  })
+  it('says the hour is being built now, and that it is next', () => {
+    expect(waitingText(at, { ahead: 0, building: true, secondsPerHour: 100 })).toContain('It is being built now (an hour takes about 2 min)')
+    expect(waitingText(at, { ahead: 0, building: false, secondsPerHour: 100 })).toContain('It is next, about 2 min')
+  })
+  it('counts the hours ahead and gives a rough wait of them and its own', () => {
+    const text = waitingText(at, { ahead: 2, building: false, secondsPerHour: 110 })
+    expect(text).toContain('2 hours are built before it, so about 6 min')
+    expect(text).toContain('Fri 20 Nov 05:03')
+    expect(waitingText(at, { ahead: 1, building: false, secondsPerHour: null })).toBe('Rebuilding Fri 20 Nov 05:03 from the cloud. 1 hour is built before it. The clock waits for it.')
   })
 })

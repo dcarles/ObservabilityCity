@@ -19,3 +19,16 @@ public interface IPastMetricSource : IMetricSource
     /// </summary>
     string? PastNote => null;
 }
+
+/// <summary>What a source asked the cloud for while it rebuilt the past: for the log of a rebuilt hour, never for the town.</summary>
+/// <param name="Calls">Answers read from the cloud.</param>
+/// <param name="CacheHits">Frames that were answered from what was already read.</param>
+/// <param name="Megabytes">The size of the answers read.</param>
+/// <param name="Splits">Reads that were too big for the cloud and were made again in smaller pieces.</param>
+public sealed record PastReadStats(int Calls, int CacheHits, double Megabytes, int Splits);
+
+/// <summary>A past-reading source that can tell what it read. Reading the numbers resets them.</summary>
+public interface IPastReadStats
+{
+    PastReadStats TakeStats();
+}

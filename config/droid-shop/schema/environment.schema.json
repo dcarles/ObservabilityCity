@@ -241,6 +241,10 @@
                   "type": "string",
                   "description": "Request sources (loganalytics): the query that says how each service's requests divide between regions, a template like query. It returns one row per telemetry name and region with the columns role, region and calls. Sampled counts are fine: only the proportions are used. Without it the split is not measured."
                 },
+                "rangeQuery": {
+                  "type": "string",
+                  "description": "Request sources (loganalytics): the query of the source asked once for a whole hour of the past instead of once for each frame (twelve for a window of 5m), a template like query. It returns one row per telemetry name and time bin with the columns of the query plus at, the start of the bin: summarize ... by role, at = bin(TimeGenerated, {window}). Do not filter on time: the program gives the span. Without it each frame is asked on its own. The live poll never uses it."
+                },
                 "typesQuery": {
                   "type": "string",
                   "description": "Message-broker sources (servicebus): a query to the telemetry store that says which kinds of message each queue handled, a template like query. It returns one row per queue and message type with the columns queue, type and calls. Without it the kinds are not shown."

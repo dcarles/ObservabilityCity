@@ -131,28 +131,80 @@ public class MessagingSourceTests
     }
 
     [Fact]
-    public async Task The_past_is_read_an_hour_at_a_time_and_each_frame_gets_the_numbers_of_its_own_window()
+    public async Task The_past_is_read_two_hours_at_a_time_and_each_frame_gets_the_numbers_of_its_own_window()
     {
         var http = new CannedHttp().Respond(QueueByHour);
         var (source, registry) = await Messaging(TownA, http);
         var past = (ServiceBusSource)source;
 
-        var nine = await past.PollAtAsync(registry, DateTimeOffset.Parse("2025-12-30T09:05:00Z"), CancellationToken.None);
+        var nine = await past.PollAtAsync(registry, DateTimeOffset.Parse("2025-12-30T08:05:00Z"), CancellationToken.None);
         var calls = http.Sent.Count;
-        await past.PollAtAsync(registry, DateTimeOffset.Parse("2025-12-30T09:35:00Z"), CancellationToken.None);
+        await past.PollAtAsync(registry, DateTimeOffset.Parse("2025-12-30T08:35:00Z"), CancellationToken.None);
         Assert.Equal(calls, http.Sent.Count); // the second frame of the hour asks Azure nothing
-        var ten = await past.PollAtAsync(registry, DateTimeOffset.Parse("2025-12-30T10:05:00Z"), CancellationToken.None);
+        var ten = await past.PollAtAsync(registry, DateTimeOffset.Parse("2025-12-30T09:55:00Z"), CancellationToken.None);
+        Assert.Equal(calls, http.Sent.Count); // 09:55 is in the same two hours (08:00 to 10:00)
 
-        await AdapterContract.AssertPastAsync(past, registry, DateTimeOffset.Parse("2025-12-30T10:05:00Z")); // what every adapter that reads the past owes
-        Assert.True(http.Sent.Count > calls); // the next hour is read on its own: a whole day is over the 8 MB Azure answers with
+        await AdapterContract.AssertPastAsync(past, registry, DateTimeOffset.Parse("2025-12-30T09:55:00Z")); // what every adapter that reads the past owes
+        Assert.Equal(calls, http.Sent.Count);
+        await past.PollAtAsync(registry, DateTimeOffset.Parse("2025-12-30T10:05:00Z"), CancellationToken.None);
+        Assert.True(http.Sent.Count > calls); // the next two hours are read on their own: 538 queues are 1.6 MB an hour and Azure answers no more than 8 MB
         Assert.All(http.Sent, r =>
         {
             var span = System.Web.HttpUtility.ParseQueryString(r.Uri!.Query)["timespan"]!.Split('/');
-            Assert.True(DateTimeOffset.Parse(span[1]) - DateTimeOffset.Parse(span[0]) <= TimeSpan.FromHours(2));
+            Assert.True(DateTimeOffset.Parse(span[1]) - DateTimeOffset.Parse(span[0]) <= TimeSpan.FromHours(3));
         });
         Assert.True(nine["aa.orders-worker"].QueueDepth > 0);
         Assert.True(ten["aa.orders-worker"].QueueDepth > nine["aa.orders-worker"].QueueDepth);
-        Assert.Equal(DateTimeOffset.Parse("2025-12-30T09:05:00Z"), nine["aa.orders-worker"].At);
+        Assert.Equal(DateTimeOffset.Parse("2025-12-30T08:05:00Z"), nine["aa.orders-worker"].At);
+    }
+
+    [Fact]
+    public async Task A_fill_that_goes_back_in_time_reads_each_chunk_once_however_many_chunks_it_has_done()
+    {
+        var http = new CannedHttp().Respond(QueueByHour);
+        var (source, registry) = await Messaging(TownA, http);
+        var past = (ServiceBusSource)source;
+        var firstCosts = new List<int>();
+        foreach (var start in new[] { 22, 20, 18, 16, 14, 12 })
+        {
+            var day = DateTimeOffset.Parse("2025-12-30T00:00:00Z").AddHours(start);
+            var before = http.Sent.Count;
+            await past.PollAtAsync(registry, day.AddMinutes(5), CancellationToken.None);
+            firstCosts.Add(http.Sent.Count - before);
+            var after = http.Sent.Count;
+            foreach (var minutes in new[] { 35, 65, 95, 115 })
+                await past.PollAtAsync(registry, day.AddMinutes(minutes), CancellationToken.None);
+            Assert.Equal(after, http.Sent.Count);
+        }
+        Assert.All(firstCosts, c => Assert.Equal(firstCosts[0], c));
+        Assert.True(firstCosts[0] > 0);
+    }
+
+    [Fact]
+    public async Task A_read_that_is_over_the_size_limit_is_made_again_in_hours_and_that_namespace_stays_on_them()
+    {
+        static TimeSpan SpanOf(SentRequest r)
+        {
+            var span = System.Web.HttpUtility.ParseQueryString(r.Uri!.Query)["timespan"]!.Split('/');
+            return DateTimeOffset.Parse(span[1]) - DateTimeOffset.Parse(span[0]);
+        }
+        var http = new CannedHttp().Respond(r => SpanOf(r) > TimeSpan.FromHours(1.5)
+            ? CannedHttp.Reply("""{"error":{"code":"BadRequest","message":"The response size of 9950585 exceeded maximum limit of 8MB."}}""", System.Net.HttpStatusCode.BadRequest)
+            : QueueByHour(r));
+        var (source, registry) = await Messaging(TownA, http);
+        var past = (ServiceBusSource)source;
+
+        var nine = await past.PollAtAsync(registry, DateTimeOffset.Parse("2025-12-30T09:05:00Z"), CancellationToken.None);
+        Assert.True(nine["aa.orders-worker"].QueueDepth > 0);
+        var calls = http.Sent.Count;
+        await past.PollAtAsync(registry, DateTimeOffset.Parse("2025-12-30T09:35:00Z"), CancellationToken.None);
+        Assert.Equal(calls, http.Sent.Count);
+        await past.PollAtAsync(registry, DateTimeOffset.Parse("2025-12-30T10:05:00Z"), CancellationToken.None);
+        Assert.True(http.Sent.Count > calls);
+        var tooBig = http.Sent.Count(r => SpanOf(r) > TimeSpan.FromHours(1.5));
+        await past.PollAtAsync(registry, DateTimeOffset.Parse("2025-12-30T11:05:00Z"), CancellationToken.None);
+        Assert.Equal(tooBig, http.Sent.Count(r => SpanOf(r) > TimeSpan.FromHours(1.5)));
+        Assert.True(((IPastReadStats)past).TakeStats().Splits > 0);
     }
 
     [Fact]

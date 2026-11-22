@@ -184,14 +184,15 @@ public sealed class LogAnalyticsReader(HttpClient http, ICredentialSource? crede
         var table = tables[0];
         var names = table.GetProperty("columns").EnumerateArray().Select(c => c.GetProperty("name").GetString() ?? "").ToList();
         int Index(string column) => names.FindIndex(n => n.Equals(column, StringComparison.OrdinalIgnoreCase));
-        var (role, calls, errors, latency) = (Index("role"), Index("calls"), Index("errors"), Index("latencyMs"));
+        var (role, calls, errors, latency, binAt) = (Index("role"), Index("calls"), Index("errors"), Index("latencyMs"), Index("at"));
         if (role < 0 || calls < 0)
             throw new InvalidOperationException($"the query must return the columns {string.Join(", ", Columns)} (errors and latencyMs may be left out); it returned {string.Join(", ", names)}");
         var rows = new List<SpanRow>();
         foreach (var row in table.GetProperty("rows").EnumerateArray())
         {
             if (row[role].ValueKind != JsonValueKind.String || row[role].GetString() is not { Length: > 0 } name) continue;
-            rows.Add(new SpanRow(name, Number(row, calls) ?? 0, errors < 0 ? 0 : Number(row, errors) ?? 0, latency < 0 ? null : Number(row, latency)));
+            DateTimeOffset? binStart = binAt >= 0 && Text(row[binAt]) is { Length: > 0 } when && DateTimeOffset.TryParse(when, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var parsed) ? parsed : null;
+            rows.Add(new SpanRow(name, Number(row, calls) ?? 0, errors < 0 ? 0 : Number(row, errors) ?? 0, latency < 0 ? null : Number(row, latency), binStart));
         }
         return rows;
     }
@@ -297,7 +298,8 @@ public sealed record TypeRow(string Queue, string Type, double Calls);
 /// <summary>How many requests a service (by telemetry name) answered in one region, by the region query.</summary>
 public sealed record RegionRow(string Role, string Region, double Calls);
 
-public sealed record SpanRow(string Role, double Calls, double Errors, double? LatencyMs);
+/// <summary>One telemetry name's calls in one answer. <paramref name="At"/> is the start of the time bin the row is for; only the hourly (range) query gives it.</summary>
+public sealed record SpanRow(string Role, double Calls, double Errors, double? LatencyMs, DateTimeOffset? At = null);
 
 /// <summary>
 /// The Log Analytics source. Its connection is the workspace (an id or resource id); without one, the environment's <c>scope.workspace</c> is used.
@@ -365,6 +367,38 @@ public sealed class LogAnalyticsSource(
     public Task<IReadOnlyDictionary<string, NodeReading>> PollAtAsync(TownRegistry registry, DateTimeOffset at, CancellationToken ct) =>
         recording is null ? PollCore(registry, at, true, ct) : throw new InvalidOperationException($"source '{name}' replays a recording, which has no past to read");
 
+
+    // the hourly (range) query: one answer per hour, in time bins as wide as the window, kept for the frames of that hour (the last few hours are kept, a fill goes back in time one hour after another)
+    private readonly object _hoursLock = new();
+    private readonly Dictionary<DateTimeOffset, Task<IReadOnlyList<SpanRow>>> _hours = [];
+    private readonly List<DateTimeOffset> _hourOrder = [];
+
+    /// <summary>A frame whose window starts on a bin edge (bins are as wide as the window, counted from midnight) can be cut out of an hourly answer; any other frame is asked on its own.</summary>
+    private bool IsOnTheGrid(DateTimeOffset at) => Window > TimeSpan.Zero && TimeSpan.FromHours(1).Ticks % Window.Ticks == 0 && (at.UtcTicks % Window.Ticks) == 0;
+
+    private async Task<IReadOnlyList<SpanRow>> RowsOfFrameAsync(string workspace, string rangeQuery, IReadOnlyList<SystemScope> asked, DateTimeOffset at, CancellationToken ct)
+    {
+        var from = at - Window;
+        var hour = new DateTimeOffset(from.UtcTicks - from.UtcTicks % TimeSpan.FromHours(1).Ticks, TimeSpan.Zero);
+        Task<IReadOnlyList<SpanRow>> task;
+        lock (_hoursLock)
+        {
+            if (!_hours.TryGetValue(hour, out task!))
+            {
+                var rendered = SourceQuery.Render(rangeQuery, definition, environmentId, rules, asked.Select(s => s.TelemetryRole!).Distinct(StringComparer.OrdinalIgnoreCase));
+                task = reader.QueryAsync(workspace, rendered, hour, hour + TimeSpan.FromHours(1) + Window, ct);
+                _hours[hour] = task;
+                _hourOrder.Add(hour);
+                while (_hourOrder.Count > 3) { _hours.Remove(_hourOrder[0]); _hourOrder.RemoveAt(0); }
+            }
+        }
+        IReadOnlyList<SpanRow> all;
+        try { all = await task; }
+        catch { lock (_hoursLock) { if (_hours.TryGetValue(hour, out var t) && t == task) { _hours.Remove(hour); _hourOrder.Remove(hour); } } throw; }
+        if (all.Any(r => r.At is null)) throw new InvalidOperationException($"source '{name}': the rangeQuery must return the column at, the start of the time bin of each row (bin(TimeGenerated, {SourceQuery.Text(Window)}))");
+        return all.Where(r => r.At >= from && r.At < at).ToList();
+    }
+
     private async Task<IReadOnlyDictionary<string, NodeReading>> PollCore(TownRegistry registry, DateTimeOffset at, bool past, CancellationToken ct)
     {
         var view = registry.ForEnvironment(environmentId);
@@ -382,7 +416,10 @@ public sealed class LogAnalyticsSource(
             var query = definition.Query ?? throw new InvalidOperationException($"source '{name}' has no query. Write the query that returns one row per telemetry name with the columns {string.Join(", ", LogAnalyticsReader.Columns)} (see docs/connect-your-company.md)");
             var workspace = Workspace(resolution);
             var rendered = SourceQuery.Render(query, definition, environmentId, rules, asked.Select(s => s.TelemetryRole!).Distinct(StringComparer.OrdinalIgnoreCase));
-            rows = past ? await reader.QueryAsync(workspace, SourceQuery.AtPast(rendered, at), at - Window, at, ct) : await reader.QueryAsync(workspace, rendered, Window, ct);
+            if (past && _settings.RangeQuery is { } rangeQuery && IsOnTheGrid(at))
+                rows = await RowsOfFrameAsync(workspace, rangeQuery, asked, at, ct);
+            else
+                rows = past ? await reader.QueryAsync(workspace, SourceQuery.AtPast(rendered, at), at - Window, at, ct) : await reader.QueryAsync(workspace, rendered, Window, ct);
         }
         IReadOnlyList<RegionRow> regionRows = [];
         if (recording is not null)
