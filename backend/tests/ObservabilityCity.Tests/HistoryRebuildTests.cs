@@ -66,18 +66,31 @@ public class HistoryRebuildTests : IDisposable
     }
 
     [Fact]
-    public async Task The_frames_of_an_hour_are_built_a_few_at_a_time_and_saved_in_order()
+    public async Task By_default_the_frames_of_an_hour_are_built_one_after_the_other()
+    {
+        var registry = RegistryLoader.Load(Town).ForEnvironment("prod");
+        var slow = new Slow();
+        var frames = new PastFrameBuilder(new SnapshotBuilder(registry, new LatestState(), _time) { Environment = "prod" }, new LatestState(), new RegistryHolder(registry), [slow]);
+        var rebuilder = new HistoryRebuilder(new FileHistoryStore(Path.Combine(_folder, "recorded-serial"), Interval), new FileHistoryStore(Path.Combine(_folder, "rebuilt-serial"), Interval), frames, Interval, _time);
+
+        await rebuilder.RebuildHourAsync(DateTimeOffset.Parse("2025-12-30T09:00:00Z"), CancellationToken.None);
+
+        Assert.Equal(1, slow.Most); // three at once made Azure Monitor slow down on a real environment
+    }
+
+    [Fact]
+    public async Task The_frames_of_an_hour_can_be_built_a_few_at_a_time_and_are_saved_in_order()
     {
         var registry = RegistryLoader.Load(Town).ForEnvironment("prod");
         var slow = new Slow();
         var frames = new PastFrameBuilder(new SnapshotBuilder(registry, new LatestState(), _time) { Environment = "prod" }, new LatestState(), new RegistryHolder(registry), [slow]);
         var rebuilt = new FileHistoryStore(Path.Combine(_folder, "rebuilt-parallel"), Interval);
-        var rebuilder = new HistoryRebuilder(new FileHistoryStore(Path.Combine(_folder, "recorded-parallel"), Interval), rebuilt, frames, Interval, _time);
+        var rebuilder = new HistoryRebuilder(new FileHistoryStore(Path.Combine(_folder, "recorded-parallel"), Interval), rebuilt, frames, Interval, _time, framesAtOnce: 3);
 
         var saved = await rebuilder.RebuildHourAsync(DateTimeOffset.Parse("2025-12-30T09:00:00Z"), CancellationToken.None);
 
         Assert.Equal(12, saved);
-        Assert.Equal(HistoryRebuilder.FramesAtOnce, slow.Most); // several at once, never more than the limit
+        Assert.Equal(3, slow.Most); // several at once, never more than the limit
         var points = rebuilt.Points(DateTimeOffset.Parse("2025-12-30T09:00:00Z")).Select(p => p.At).Where(t => t.Hour == 9).ToList();
         Assert.Equal(points.OrderBy(t => t).ToList(), points); // saved oldest first, however they finished
     }

@@ -11,8 +11,11 @@ namespace ObservabilityCity.Core.History;
 /// </summary>
 public sealed class HistoryRebuilder(FileHistoryStore recorded, FileHistoryStore rebuilt, PastFrameBuilder frames, TimeSpan interval, TimeProvider time, ILogger? log = null, int framesAtOnce = HistoryRebuilder.FramesAtOnce)
 {
-    /// <summary>How many frames of an hour are built at the same time.</summary>
-    public const int FramesAtOnce = 3;
+    /// <summary>
+    /// How many frames of an hour are built at the same time: one. Three at once was tried on a real environment and was slower: Azure Monitor slowed down or refused the calls (reads of 18 s to 65 s
+    /// against 1 s to 4 s one at a time), so a frame took 24 s to 72 s instead of 3 s to 5 s.
+    /// </summary>
+    public const int FramesAtOnce = 1;
 
     private static DateTimeOffset HourOf(DateTimeOffset at) => new(at.UtcDateTime.Year, at.UtcDateTime.Month, at.UtcDateTime.Day, at.UtcDateTime.Hour, 0, 0, TimeSpan.Zero);
 
