@@ -11,7 +11,7 @@ import { buildIslandBody, GROUND, makeOutline, scatterNature, type Outline, type
 import { layoutWithHubRoom } from './hubRoom'
 import { CURB, DOCK_X, HUB_PLOT, LANE_Z, PAD_D, PAD_W, coastScan, coastScanZ, hubBenches, hubFree, laneStart, padX, placeHubBuildings, placeHubClusters, planIsland, rectsTouch, rowEdge, type HubCluster, type Placed, type Plan } from './plan'
 import { hashString } from './random'
-import { boatRate, clamp, formatRate } from '../visuals'
+import { boatLoad, boatRate, clamp, formatRate } from '../visuals'
 import { CarSystem, type Route } from './cars'
 import { BoatSystem, type BoatRoute } from './boats'
 import { archCount, clearArches, deckAt } from './arches'
@@ -491,9 +491,10 @@ export class Town {
         const hubTip = this.hubDock(gates[index].coast.clone().setY(0).add(beside), toIsland)
         const pathOut = [harbours[index]!.clone(), hubTip]
         const rate = (pick: (f: PillarFlowSnapshot) => number | null | undefined) => () => (sea().running && island.flow ? boatRate(pick(island.flow) ?? 0, 1) : 0)
+        const load = (pick: (f: PillarFlowSnapshot) => number | null | undefined) => () => (island.flow ? boatLoad(pick(island.flow) ?? 0) : 0)
         const speed = () => sea().speed
-        boatRoutes.push({ path: pathOut, from: g.id, to: 'hub', oneWay: true, rate: rate((f) => f.sentPerSecond), speed })
-        boatRoutes.push({ path: [...pathOut].reverse(), from: null, to: g.id, oneWay: true, rate: rate((f) => f.receivedPerSecond), speed })
+        boatRoutes.push({ path: pathOut, from: g.id, to: 'hub', oneWay: true, rate: rate((f) => f.sentPerSecond), load: load((f) => f.sentPerSecond), speed })
+        boatRoutes.push({ path: [...pathOut].reverse(), from: null, to: g.id, oneWay: true, rate: rate((f) => f.receivedPerSecond), load: load((f) => f.receivedPerSecond), speed })
         this.boatLanes.add(g.id)
         this.hubLanePaths.push({ id: g.id, path: pathOut })
       })
@@ -1315,19 +1316,19 @@ export class Town {
     // the boats carry what this island's own consumers take in, from every broker; whether they sail and how fast follows all the brokers (brokerSea)
     const sea = () => brokerSea(hubBuildings.filter((b) => b.kind === 'Broker').map((b) => b.node))
     const workers = [...island.buildings.values()].filter((b) => b.kind === 'Worker' && island.consumers.has(b.id))
+    const arriving = () => {
+      // what really arrives in the queues its workers read; without that number, the workers' own request rate
+      const live = workers.filter((w) => w.node && w.node.state !== 'Down')
+      const queued = live.flatMap((w) => w.node?.queues ?? []).filter((q) => q.perSecond != null)
+      return queued.length > 0 ? queued.reduce((a, q) => a + (q.perSecond ?? 0), 0) : live.reduce((a, w) => a + (w.node && w.node.state !== 'Stale' ? w.node.requestsPerSecond : 0), 0)
+    }
     return {
       path,
       from,
       to: island.group.id,
       circuit: from === island.group.id && path.length > 2,
-      rate: () => {
-        if (!sea().running) return 0
-        // what really arrives in the queues its workers read; without that number, the workers' own request rate
-        const live = workers.filter((w) => w.node && w.node.state !== 'Down')
-        const queued = live.flatMap((w) => w.node?.queues ?? []).filter((q) => q.perSecond != null)
-        const rps = queued.length > 0 ? queued.reduce((a, q) => a + (q.perSecond ?? 0), 0) : live.reduce((a, w) => a + (w.node && w.node.state !== 'Stale' ? w.node.requestsPerSecond : 0), 0)
-        return boatRate(rps, weight)
-      },
+      rate: () => (sea().running ? boatRate(arriving(), weight) : 0),
+      load: () => boatLoad(arriving() * weight),
       speed: () => sea().speed,
     }
   }

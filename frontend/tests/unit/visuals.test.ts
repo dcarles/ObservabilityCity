@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { boatRate, MAX_FLOORS, MIN_BOAT_RATE, MAX_BOAT_RATE, carRate, MIN_CAR_RATE, beaconLevel, darkFloorsFor, floorsFor, formatAge, formatCount, formatRate, litFraction, speedFactor, spawnRate } from '../../src/visuals'
+import { BUSY_MESSAGES, boatLoad, boatRate, MAX_FLOORS, MIN_BOAT_RATE, MAX_BOAT_RATE, carRate, MIN_CAR_RATE, beaconLevel, darkFloorsFor, floorsFor, formatAge, formatCount, formatRate, litFraction, speedFactor, spawnRate } from '../../src/visuals'
 import type { Snapshot } from '../../src/types'
 
 describe('floors', () => {
@@ -132,6 +132,25 @@ describe('boat rate', () => {
     expect(boatRate(100, 1)).toBeGreaterThan(boatRate(10, 1))
     expect(boatRate(7, 1)).toBeGreaterThan(0.016 * Math.sqrt(7))
     expect(boatRate(100000, 1)).toBe(MAX_BOAT_RATE)
+  })
+  it('is never more than a quay can unload (a boat every few seconds), however busy', () => {
+    expect(MAX_BOAT_RATE).toBeLessThanOrEqual(0.3)
+    expect(boatRate(1800, 1)).toBe(MAX_BOAT_RATE)
+  })
+})
+
+describe('boat load', () => {
+  it('is 0 with no messages and 1 from the busy mark up', () => {
+    expect(boatLoad(0)).toBe(0)
+    expect(boatLoad(-3)).toBe(0)
+    expect(boatLoad(BUSY_MESSAGES)).toBe(1)
+    expect(boatLoad(BUSY_MESSAGES * 10)).toBe(1)
+  })
+  it('grows with the messages in between, so a busier lane always shows busier', () => {
+    expect(boatLoad(10)).toBeGreaterThan(boatLoad(1))
+    expect(boatLoad(100)).toBeGreaterThan(boatLoad(10))
+    expect(boatLoad(1800)).toBeGreaterThan(boatLoad(100))
+    expect(boatLoad(1800)).toBeLessThan(1)
   })
 })
 

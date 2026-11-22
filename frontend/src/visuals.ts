@@ -85,8 +85,16 @@ export function carRate(rps: number, share: number, scale: number, traffic: numb
 /** The fewest boats a real route sends: one every 30 seconds, so a quiet route still shows a boat now and then. */
 export const MIN_BOAT_RATE = 1 / 30
 
-/** The most boats one route sends a second, however busy: more would only crowd the boat pool. */
-export const MAX_BOAT_RATE = 1.5
+/** The most boats one route sends a second, however busy: more boats than a quay can unload would only queue up and overlap. A busier lane gets bigger boats that unload faster instead (see boatLoad). */
+export const MAX_BOAT_RATE = 0.3
+
+/** The messages a second at which a lane counts as fully busy: its boats are as big as they get and unload as fast as they can. */
+export const BUSY_MESSAGES = 3000
+/** How busy a lane is, 0 (quiet) to 1 (fully busy), on a log scale so each tenfold step in messages shows. */
+export function boatLoad(messagesPerSecond: number): number {
+  if (!(messagesPerSecond > 0)) return 0
+  return clamp(Math.log10(1 + messagesPerSecond) / Math.log10(1 + BUSY_MESSAGES), 0, 1)
+}
 
 /**
  * Boats leaving per second on one sea lane: the messages a second that reach the island, scaled like the cars (gently, so a very busy broker stays readable),

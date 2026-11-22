@@ -1,9 +1,10 @@
 import { beforeAll, describe, expect, it } from 'vitest'
 import * as THREE from 'three'
-import { AVOID_GAP, AVOID_STEP, BoatSystem, LANE_SIDE, UNLOAD_STEP, sidestep, type BoatRoute } from '../../src/scene/boats'
+import { AVOID_GAP, AVOID_STEP, BUSY_BOAT_SIZE, BoatSystem, LANE_SIDE, UNLOAD_STEP, UNLOAD_STEP_FAST, boatSizeFor, leaveSpacing, sidestep, unloadStepFor, type BoatRoute } from '../../src/scene/boats'
 import { BOAT_PAINT } from '../../src/themes/boatColours'
 import { activateTheme } from '../../src/themes/active'
 import { KITS } from '../../src/themes/kits'
+import { MAX_BOAT_RATE, boatLoad, boatRate } from '../../src/visuals'
 
 const lane = [new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, 30)]
 const route = (from: string | null, to: string): BoatRoute => ({ path: lane, from, to, rate: () => 5, speed: () => 1 })
@@ -251,5 +252,52 @@ describe('a boat at the end of its circuit', () => {
     }
 
     expect(closest).toBeGreaterThan(AVOID_GAP - 0.3)
+  })
+})
+
+describe('boats on a busy lane', () => {
+  it('get bigger and unload faster as the lane gets busier, and stay as they were when it is quiet', () => {
+    expect(boatSizeFor(0)).toBe(1)
+    expect(boatSizeFor(1)).toBe(BUSY_BOAT_SIZE)
+    expect(boatSizeFor(0.5)).toBeGreaterThan(boatSizeFor(0.2))
+    expect(unloadStepFor(0)).toBeCloseTo(UNLOAD_STEP, 6)
+    expect(unloadStepFor(1)).toBeCloseTo(UNLOAD_STEP_FAST, 6)
+    expect(unloadStepFor(0.6)).toBeLessThan(unloadStepFor(0.3))
+    expect(leaveSpacing(1)).toBeGreaterThan(leaveSpacing(0))
+  })
+
+  describe.each(Object.keys(KITS))('in the %s theme', (id) => {
+    beforeAll(() => activateTheme(KITS[id]))
+    it.each([100, 1800, 8000])('never overlap on a one-way lane at %i messages a second', (perSecond) => {
+      const ring = [new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, 70)]
+      const boats = new BoatSystem(48)
+      boats.setRoutes([{ path: ring, from: 'aa', to: 'hub', oneWay: true, rate: () => boatRate(perSecond, 1), load: () => boatLoad(perSecond), speed: () => 1 }])
+      let closest = Infinity
+      let most = 0
+      for (let t = 0; t < 180; t += 0.05) {
+        boats.update(0.05)
+        const v = visible(boats)
+        most = Math.max(most, v.length)
+        for (let i = 0; i < v.length; i++) for (let j = i + 1; j < v.length; j++) closest = Math.min(closest, v[i].position.distanceTo(v[j].position))
+      }
+      expect(most).toBeGreaterThan(1) // there is a line of them, not just one
+      expect(closest).toBeGreaterThan(5.5) // and a boat's length of water (about 6.4) stays between any two of them
+      expect(most).toBeLessThan(48) // the boat pool never runs dry
+    })
+
+    it('send no more than the cap a second, and every one that leaves is at the same lane start', () => {
+      const lane1 = [new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, 200)]
+      const boats = new BoatSystem(48)
+      boats.setRoutes([{ path: lane1, from: 'aa', to: 'bb', oneWay: true, rate: () => boatRate(8000, 1), load: () => 1, speed: () => 1 }])
+      let left = 0
+      let seen = 0
+      for (let t = 0; t < 60; t += 0.05) {
+        boats.update(0.05)
+        const n = boats.count
+        if (n > seen) left += n - seen
+        seen = n
+      }
+      expect(left).toBeLessThanOrEqual(Math.ceil(MAX_BOAT_RATE * 60) + 1)
+    })
   })
 })
