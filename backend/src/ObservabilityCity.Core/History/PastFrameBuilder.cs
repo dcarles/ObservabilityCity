@@ -15,8 +15,7 @@ public sealed class FixedClock(DateTimeOffset at) : TimeProvider
 
 /// <summary>
 /// Builds the town as it was at a past time, with the same rules as the live town: the readings of every source that can read the past (<see cref="IPastMetricSource"/>) asked for that time
-/// and, for the rest, what the live town last read. The rest is the inventory in practice: the instance counts of a rebuilt frame are today's (the cloud's change history of the instance
-/// count is not read), which the frame says by being marked rebuilt. The cloud's own health reports (the red "!" on a building) are not rebuilt: a rebuilt frame has none. A source that cannot
+/// and, for the rest, what the live town last read. The rest is the inventory in practice: the instance counts of a rebuilt frame are worked out from the cloud's change history (see the resource graph source); where the history has nothing they are left out. The cloud's own health reports (the red "!" on a building) are not rebuilt: a rebuilt frame has none. A source that cannot
 /// read the past and is not the inventory leaves its signals absent. A source that fails fails the frame: nothing is invented and nothing partial is saved.
 /// </summary>
 public sealed class PastFrameBuilder(SnapshotBuilder live, LatestState liveState, Registry.IRegistryProvider registries, IReadOnlyList<IMetricSource> sources, ILogger? log = null)
@@ -53,6 +52,8 @@ public sealed class PastFrameBuilder(SnapshotBuilder live, LatestState liveState
                 log?.LogWarning("History: the source {Source} was slow reading {At}: {Seconds:0} s", source.Name, at.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture), clock.Elapsed.TotalSeconds);
             else
                 log?.LogInformation("History: read {At} from the source {Source}: {Count} readings in {Seconds:0.0} s", at.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture), source.Name, readings.Count, clock.Elapsed.TotalSeconds);
+            if (source.PastNote is { } note)
+                log?.LogWarning("History: the source {Source} left something out of {At}: {Note}", source.Name, at.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture), note);
             return readings;
         }
         catch (Exception e) when (e is not OperationCanceledException || !ct.IsCancellationRequested)

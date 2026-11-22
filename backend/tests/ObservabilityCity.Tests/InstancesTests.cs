@@ -191,6 +191,98 @@ public class InstancesTests
         Assert.Equal([4, null, null, 0, null, 2], inventory.Resources.OrderBy(x => x.Name).Select(x => x.Instances));
     }
 
+    // ---- the past: the cloud's change history of resources ----
+
+    private const string Plan = "/subscriptions/00000000-0000-0000-0000-0000000000a1/resourceGroups/rg/providers/microsoft.web/serverfarms/plan-acme-al-ord-northeurope1x";
+
+    private static (ResourceGraphSource Source, Graph Graph) PastSource(string folder, Func<JsonDocument, HttpResponseMessage> answer)
+    {
+        var graph = new Graph(answer);
+        var scope = Prod(folder).ActiveEnvironment!.Scope;
+        var store = new ScopeStore();
+        store.Update(ResourceGraphInventory.FromRecording(File.ReadAllText(Path.Combine(folder, "inventory.json"))), T0);
+        var source = new ResourceGraphSource("inventory", "prod", new RegistrySource("inventory", "resourcegraph", null),
+            new ResourceGraphInventory(new HttpClient(graph), null, new RegistrySource("inventory", "resourcegraph", null), scope), store, null, new FakeTimeProvider(T0));
+        return (source, graph);
+    }
+
+    private static HttpResponseMessage Changes(params object[] rows) => new(HttpStatusCode.OK) { Content = JsonContent.Create(new { data = rows }) };
+
+    private static object Change(string target, string at, string path, object? previous) => new Dictionary<string, object?>
+    {
+        ["target"] = target, ["changedAt"] = at, ["changes"] = new Dictionary<string, object?> { [path] = new { previousValue = previous, newValue = 2 } },
+    };
+
+    [Fact]
+    public async Task A_past_frame_rolls_the_count_back_to_what_the_first_change_after_that_time_says_it_was()
+    {
+        var (source, graph) = PastSource(TownA, _ => Changes(
+            Change(Plan, "2025-12-31T21:00:00Z", "properties.numberOfWorkers", "9"), // before the time asked: it does not matter
+            Change(Plan, "2025-12-31T23:00:00Z", "properties.numberOfWorkers", "5"),
+            Change(Plan, "2025-12-31T23:30:00Z", "properties.numberOfWorkers", "2")));
+        var registry = RegistryLoader.Load(TownA);
+        var now = ResourceGraphSource.InstanceReadings(ScopeResolver.Resolve(registry.ForEnvironment("prod"), ResourceGraphInventory.FromRecording(File.ReadAllText(Path.Combine(TownA, "inventory.json")))), T0);
+
+        var past = await source.PollAtAsync(registry, DateTimeOffset.Parse("2025-12-31T22:00:00Z"), CancellationToken.None);
+        var after = await source.PollAtAsync(registry, DateTimeOffset.Parse("2025-12-31T23:45:00Z"), CancellationToken.None);
+
+        Assert.Null(source.PastNote);
+        Assert.Equal(1, graph.Bodies.Count(b => b.RootElement.GetProperty("query").GetString()!.StartsWith("resourcechanges"))); // the history is read once for both frames
+        Assert.Equal(5 + (now["aa.orders-api"].InstancesTotal - 2), past["aa.orders-api"].InstancesTotal); // this plan had 5 then; the other plans of the system are as they are
+        Assert.Equal(now["aa.orders-api"].InstancesTotal, after["aa.orders-api"].InstancesTotal); // no change after that time: the count it has now
+        Assert.Null(past["aa.orders-api"].App); // whether an app was running is not known of the past
+    }
+
+    [Fact]
+    public async Task When_the_history_cannot_be_read_the_frame_has_no_instance_counts_and_the_log_says_why()
+    {
+        var (source, _) = PastSource(TownA, _ => new HttpResponseMessage(HttpStatusCode.Forbidden) { Content = new StringContent("no access to resourcechanges") });
+
+        var past = await source.PollAtAsync(RegistryLoader.Load(TownA), DateTimeOffset.Parse("2025-12-31T22:00:00Z"), CancellationToken.None);
+
+        Assert.DoesNotContain("aa.orders-api", past.Keys); // grey, never today's number
+        Assert.Contains("change history of resources could not be read", source.PastNote);
+        Assert.Contains("403", source.PastNote);
+    }
+
+    [Fact]
+    public async Task A_time_older_than_the_change_history_has_no_instance_counts_and_asks_nothing()
+    {
+        var (source, graph) = PastSource(TownA, _ => Changes());
+
+        var past = await source.PollAtAsync(RegistryLoader.Load(TownA), T0 - TimeSpan.FromDays(15), CancellationToken.None);
+
+        Assert.Empty(past);
+        Assert.Contains("older than the change history", source.PastNote);
+        Assert.Empty(graph.Bodies);
+    }
+
+    [Fact]
+    public void The_properties_a_count_reads_are_found_in_the_expression_and_a_value_that_is_not_a_number_is_unknown()
+    {
+        var paths = ResourceGraphInventory.PathsOf("coalesce(toint(properties.numberOfWorkers), toint(sku.capacity)) + 1.5");
+        Assert.Equal(["properties.numberOfWorkers", "sku.capacity"], paths);
+
+        ResourceChange At(string when, string path, string? previous) => new("p", DateTimeOffset.Parse(when), new Dictionary<string, string?> { [path] = previous });
+        var at = DateTimeOffset.Parse("2026-01-01T00:00:00Z");
+        Assert.Equal(7, ResourceGraphInventory.InstancesAt(3, paths, [At("2026-01-01T01:00:00Z", "sku.capacity", "7")], at));
+        Assert.Equal(7, ResourceGraphInventory.InstancesAt(3, paths, [At("2026-01-01T01:00:00Z", "properties.sku.capacity", "7")], at)); // the history can name a property with or without the leading properties.
+        Assert.Null(ResourceGraphInventory.InstancesAt(3, paths, [At("2026-01-01T01:00:00Z", "sku.capacity", "many")], at));
+        Assert.Null(ResourceGraphInventory.InstancesAt(3, paths, [At("2026-01-01T01:00:00Z", "sku.capacity", null)], at));
+        Assert.Equal(3, ResourceGraphInventory.InstancesAt(3, paths, [At("2026-01-01T01:00:00Z", "sku.name", "S1")], at)); // a property the count does not read
+        Assert.Equal(3, ResourceGraphInventory.InstancesAt(3, paths, [At("2025-12-31T23:00:00Z", "sku.capacity", "7")], at)); // before the time asked
+    }
+
+    [Fact]
+    public void The_history_is_asked_for_the_counted_types_since_a_time()
+    {
+        var query = ResourceGraphInventory.ChangesQuery(["Microsoft.Web/serverfarms"], DateTimeOffset.Parse("2025-12-20T10:00:00Z"));
+
+        Assert.StartsWith("resourcechanges", query);
+        Assert.Contains("datetime(2025-12-20T10:00:00Z)", query);
+        Assert.Contains("'microsoft.web/serverfarms'", query);
+    }
+
     // ---- the source ----
 
     private static ResourceGraphSource Source(string folder, FakeTimeProvider time) =>
