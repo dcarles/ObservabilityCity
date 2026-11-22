@@ -539,6 +539,29 @@ export class Town {
       this.boatLanes.add(g.id)
     })
 
+    // a town with hub lanes: what the pillar's own services send each other ("Sends inside" on the pier) sails as boats in a loop out of the island's own harbour and back,
+    // beside the scheduled jobs' boats. Without this the hub lanes leave the inside traffic with no boats at all.
+    if (hubLanes) {
+      pillars.forEach((g, index) => {
+        if (!harbours[index] || !this.hubLanePaths.some((x) => x.id === g.id)) return // an island without a hub lane keeps the loop below, driven by the queues its workers read
+        const loop = laneBetween(index, index)
+        if (!loop) return
+        const island = this.islands[index]
+        const sea = () => brokerSea(hubBuildings.filter((b) => b.kind === 'Broker').map((b) => b.node))
+        const inside = () => island.messaging.pillar?.internal ?? 0
+        boatRoutes.push({
+          path: loop,
+          from: g.id,
+          to: g.id,
+          circuit: loop.length > 2,
+          rate: () => (sea().running ? boatRate(inside(), 1) : 0),
+          load: () => boatLoad(inside()),
+          speed: () => sea().speed,
+        })
+        this.boatLanes.add(g.id)
+      })
+    }
+
     // an island with a pier always has a lane, so the water by its harbour is proven open even while nothing sails (a loop out and back)
     pillars.forEach((g, index) => {
       if (!harbours[index] || this.boatLanes.has(g.id)) return
