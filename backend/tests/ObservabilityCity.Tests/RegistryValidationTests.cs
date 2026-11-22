@@ -201,7 +201,7 @@ public class RegistryValidationTests
         var branches = source["allOf"]!.AsArray().ToDictionary(b => string.Join(",", b!["if"]!["properties"]!["kind"]!["enum"]!.AsArray().Select(k => (string)k!)), b => b!["then"]!);
         var azure = branches["resourcegraph,loganalytics,azuremonitor,servicebus,functionjobs,resourcehealth"];
         Assert.False((bool)azure["additionalProperties"]!);
-        foreach (var key in new[] { "regionQuery", "rangeQuery", "regionRangeQuery", "typesQuery", "metrics", "entities", "providers", "keepResolvedFor", "kind", "pollSeconds" })
+        foreach (var key in new[] { "regionQuery", "rangeQuery", "regionRangeQuery", "batchMetrics", "typesQuery", "metrics", "entities", "providers", "keepResolvedFor", "kind", "pollSeconds" })
             Assert.NotNull(azure["properties"]![key]);
         Assert.NotNull(schema["$defs"]!["metricSignal"]);
         var core = branches["fake,prometheus,grafana-irm"]; // the kinds that take no settings: only the core's keys

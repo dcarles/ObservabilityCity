@@ -249,6 +249,10 @@
                   "type": "string",
                   "description": "Request sources (loganalytics): the regionQuery asked once for a whole hour of the past instead of once for each frame, a template like query. It returns the columns of the regionQuery plus at, the start of the time bin: summarize ... by role, region, at = bin(TimeGenerated, {window}). Do not filter on time: the program gives the span. Needs the regionQuery. Without it each frame is asked on its own. The live poll never uses it."
                 },
+                "batchMetrics": {
+                  "type": "boolean",
+                  "description": "Platform-metric sources (azuremonitor): false reads the past of each resource on its own instead of up to 50 resources of one subscription and region in one batch call. Default true. A batch the cloud refuses is made smaller and then read one by one, so the default needs no setting. The live poll never uses batches."
+                },
                 "typesQuery": {
                   "type": "string",
                   "description": "Message-broker sources (servicebus): a query to the telemetry store that says which kinds of message each queue handled, a template like query. It returns one row per queue and message type with the columns queue, type and calls. Without it the kinds are not shown."

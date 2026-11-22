@@ -39,7 +39,7 @@ public class PlatformMetricsTests
     }
 
     /// <summary>The platform source of a town, started over the inventory its recording gives, with the HTTP it is handed (none: it replays its recording).</summary>
-    private static async Task<(IMetricSource Source, TownRegistry Registry)> Platform(string folder, CannedHttp? http = null, ICredentialSource? login = null)
+    private static async Task<(IMetricSource Source, TownRegistry Registry)> Platform(string folder, CannedHttp? http = null, ICredentialSource? login = null, bool batch = false)
     {
         var registry = Prod(folder);
         var env = registry.ActiveEnvironment!;
@@ -47,6 +47,7 @@ public class PlatformMetricsTests
         await set.Sources.Single(s => s.Name == "inventory").PollAsync(registry, CancellationToken.None);
         if (http is null) return (set.Sources.Single(s => s.Name == "platform"), registry);
         var definition = env.Sources.Single(s => s.Name == "platform") with { Connection = null };
+        definition = definition with { Typed = AzureSettings.Of(definition) with { BatchMetrics = batch } }; // the tests of the one-by-one reads answer one resource at a time; the batch tests ask for it
         var source = new AzureMonitorSourceFactory(new HttpClient(http), new FakeTimeProvider(T0)).Create(new SourceContext("prod", definition, login, env.Scope, set.Scope, folder));
         return (source, registry);
     }
