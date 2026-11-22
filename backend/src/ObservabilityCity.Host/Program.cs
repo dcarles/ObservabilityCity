@@ -291,8 +291,8 @@ app.MapDelete("/api/added-hosts", (string id, EnvironmentSet envs, TownSet towns
    .WithName("RemoveAddedHost");
 
 // What the Logs tab of one system shows: 5xx requests, slow requests, warnings and errors, exceptions. Read on demand when the tab opens, never polled,
-// never part of health. A source that cannot be reached is a 502 with the reason.
-app.MapGet("/api/systems/{id}/logs", async (string id, EnvironmentSet envs, string? env, CancellationToken ct) =>
+// never part of health. With `at` (a past time) it shows the window that ended then, for a page that looks at the past. A source that cannot be reached is a 502 with the reason.
+app.MapGet("/api/systems/{id}/logs", async (string id, EnvironmentSet envs, string? env, DateTimeOffset? at, CancellationToken ct) =>
     {
         if (envs.Find(env) is not { } rt) return EnvironmentNotFound(envs, env);
         var registry = rt.Registry.Current;
@@ -301,7 +301,7 @@ app.MapGet("/api/systems/{id}/logs", async (string id, EnvironmentSet envs, stri
         // a slow workspace must not hold the request and its connection for the HTTP client's 100 seconds
         using var limit = CancellationTokenSource.CreateLinkedTokenSource(ct);
         limit.CancelAfter(LogsTimeout);
-        try { return Results.Ok(await rt.Logs.RecentAsync(node, limit.Token)); }
+        try { return Results.Ok(at is { } past && past < DateTimeOffset.UtcNow ? await rt.Logs.AtAsync(node, past, limit.Token) : await rt.Logs.RecentAsync(node, limit.Token)); }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
             return Results.Json(new { error = $"The logs query took longer than {LogsTimeout.TotalSeconds:0} seconds and was stopped." }, statusCode: StatusCodes.Status502BadGateway);

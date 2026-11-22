@@ -235,6 +235,7 @@ export async function startTown(): Promise<void> {
     regionChoice: (id) => town.regionChoice(id),
     setRegion: (id, choice) => town.setRegion(id, choice),
     closed: () => town.select(null),
+    viewedAt: () => (history.active ? history.state.viewed : null),
   })
   const legend = new LegendCard((open) => {
     document.getElementById('legend-button')?.classList.toggle('on', open)
@@ -377,7 +378,7 @@ export async function startTown(): Promise<void> {
 
   let held = false // for tests: while true, the snapshots from the server are ignored, so one fed by hand stays on screen
   // time travel: while it looks at the past, the live feed is ignored and recorded frames come through the same door
-  const history = startHistory({ scope, islands: () => islands, feed: (raw) => onSnapshot(raw) }, { beforeId: 'wall-button' })
+  const history = startHistory({ scope, islands: () => islands, feed: (raw) => onSnapshot(raw) }, { beforeId: 'wall-button', machine: true })
   const connection = new Connection((raw) => { if (!held && !history.active) onSnapshot(raw) }, (st) => { topbar.setStatus(st); wall?.setConnection(st); markFeed(st) }, scope, (e) => {
     banner.textContent = e.environments.length === 0 && e.towns
       ? `There is no town "${e.requestedTown ?? ''}". Available: ${e.towns.join(', ') || 'none'}.`

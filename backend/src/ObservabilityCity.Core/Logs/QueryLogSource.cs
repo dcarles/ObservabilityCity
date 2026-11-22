@@ -9,16 +9,20 @@ namespace ObservabilityCity.Core.Logs;
 /// The Logs tab of a live town: when a system's inspector opens its Logs tab, one query for that system's telemetry name over the environment's window
 /// (<c>logs:</c> in the environment file) goes to the source the file names. Nothing runs otherwise and nothing is kept. The rows come back grouped by
 /// the query; repeats of the same text are added up here too, so the tab shows one line with a count. A worker keeps only the logs and exceptions
-/// sections. An environment with no <c>logs:</c> block, or a source that cannot be asked, answers "not configured" (absent, not an empty tab).
+/// sections. While a page looks at the past, the same question is asked about the window that ended at that time. An environment with no <c>logs:</c> block, or a source that cannot be asked, answers "not configured" (absent, not an empty tab).
 /// </summary>
 public sealed class QueryLogSource(IReadOnlyList<IMetricSource> sources, IRegistryProvider registries, ScopeStore scope, TimeProvider time) : ILogSource
 {
     public string Name => "query";
 
-    public async Task<SystemLogs> RecentAsync(RegistryNode node, CancellationToken ct)
+    public Task<SystemLogs> RecentAsync(RegistryNode node, CancellationToken ct) => ReadAsync(node, time.GetUtcNow(), false, ct);
+
+    /// <summary>The same question moved to a past time: the window that ended at <paramref name="at"/>, with <c>ago()</c> and <c>now()</c> of the query moved to it (<see cref="SourceQuery.AtPast"/>).</summary>
+    public Task<SystemLogs> AtAsync(RegistryNode node, DateTimeOffset at, CancellationToken ct) => ReadAsync(node, at, true, ct);
+
+    private async Task<SystemLogs> ReadAsync(RegistryNode node, DateTimeOffset now, bool past, CancellationToken ct)
     {
         var view = registries.Current;
-        var now = time.GetUtcNow();
         var environment = view.ActiveEnvironment;
         if (environment?.Logs is not { } config)
             return new SystemLogs(now, false, "", node.SlaP99Ms, []);
@@ -31,6 +35,7 @@ public sealed class QueryLogSource(IReadOnlyList<IMetricSource> sources, IRegist
 
         var from = now - config.Window;
         var query = LogQuery.Render(config.Query, environment.Id, environment.Scope, role, node.Kind, node.SlaP99Ms, config.Window, from, now);
+        if (past) query = SourceQuery.AtPast(query, now);
         var rows = await source.ReadLogsAsync(view, query, from, now, ct);
         return new SystemLogs(now, true, window, node.SlaP99Ms, Sections(rows, LogSections.For(node.Kind), config, environment, role, scope.Resolve(view).AssetList, config.Window, from, now));
     }

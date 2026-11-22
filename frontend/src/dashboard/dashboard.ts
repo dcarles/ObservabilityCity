@@ -25,7 +25,7 @@ import { parseWall, wallTimings } from '../wall/params'
 import { enterWall, startWallControls } from '../wall/controls'
 import { WallMode } from '../wall/wall'
 import { dashPlaceOf, type DashPlace } from './wallPlace'
-import { feedLateAfter, marker, popupLeft, sourceLines } from './freshness'
+import { feedLateAfter, historyLines, marker, popupLeft, sourceLines } from './freshness'
 import type { PagePlug } from '../architecture/page'
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T
@@ -107,6 +107,7 @@ export function startDashboard(plug?: PagePlug): void {
     regionChoice: (id) => (regionChoices.get(id) ?? 'worst') as ReturnType<ConstructorParameters<typeof Inspector>[0]['regionChoice']>,
     setRegion: (id, choice) => { regionChoices.set(id, choice as string); if (last) inspector.update(last) },
     closed: () => {},
+    viewedAt: () => (history.active ? history.state.viewed : null),
   })
   const notices = new NoticesPanel()
   plug?.start(inspector, store)
@@ -224,7 +225,7 @@ export function startDashboard(plug?: PagePlug): void {
     freshButton.classList.toggle('late', m.late)
   }
   function drawFreshness(): void {
-    freshPop.innerHTML = freshnessHtml(sourceLines(last?.sources, Date.now()))
+    freshPop.innerHTML = freshnessHtml(sourceLines(last?.sources, Date.now()), historyLines(history.state))
     const r = freshButton.getBoundingClientRect()
     freshPop.style.top = `${r.bottom + 6}px`
     freshPop.style.left = `${popupLeft(r.left, freshPop.offsetWidth, window.innerWidth)}px`

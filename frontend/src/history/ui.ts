@@ -5,12 +5,15 @@ import './history.css'
 import { escapeHtml } from '../picker'
 import { addressAt, buildStrip, clockText, fieldTime, fieldValue, quickPicks, SPEEDS, speedText, stripTime, stripTip, stripX, viewedText } from './model'
 import type { HistoryController, HistoryState } from './controller'
+import { drawMachine, MACHINE_MS, pickMachine, requestedMachine, type Machine } from './travelMachine'
 
 export interface HistoryMount {
   /** The id of the button the clock button goes before (the Wall button of the page). */
   beforeId: string
   /** Called with true while the popup is open, so a page can close its own popups. */
   onOpen?: () => void
+  /** The Town plays a time machine (a car or a cabin, at random) on the travel overlay; the other pages keep the plain animation. */
+  machine?: boolean
 }
 
 const STRIP_W = 640
@@ -47,7 +50,7 @@ export function mountHistory(controller: HistoryController, mount: HistoryMount)
   const travel = document.createElement('div')
   travel.id = 'history-travel'
   travel.hidden = true
-  travel.innerHTML = `<div class="streaks">${Array.from({ length: 14 }, (_, i) => `<i style="top:${6 + i * 6.7}%;animation-delay:${((i * 37) % 90) / 100}s;animation-duration:${0.7 + ((i * 13) % 6) / 10}s"></i>`).join('')}</div>
+  travel.innerHTML = `${mount.machine ? '<canvas class="scene" aria-hidden="true"></canvas>' : ''}<div class="streaks">${Array.from({ length: 14 }, (_, i) => `<i style="top:${6 + i * 6.7}%;animation-delay:${((i * 37) % 90) / 100}s;animation-duration:${0.7 + ((i * 13) % 6) / 10}s"></i>`).join('')}</div>
     <svg class="capsule" viewBox="0 0 100 100" aria-hidden="true"><path d="M14 56a36 34 0 0 1 72 0z" fill="rgba(120,170,255,0.35)" stroke="#bcd6ff" stroke-width="3"/><circle cx="50" cy="56" r="26" fill="#10224a" stroke="#bcd6ff" stroke-width="3"/><g class="hands"><line x1="50" y1="56" x2="50" y2="38" stroke="#fff" stroke-width="3" stroke-linecap="round"/><line x1="50" y1="56" x2="63" y2="56" stroke="#fff" stroke-width="3" stroke-linecap="round"/></g><rect x="22" y="84" width="56" height="6" rx="3" fill="#bcd6ff"/></svg>
     <div class="when" id="history-when"></div><div class="words" id="history-words"></div>
     <button class="skip" id="history-skip" type="button">Skip</button>`
@@ -264,24 +267,37 @@ export function mountHistory(controller: HistoryController, mount: HistoryMount)
     else if (controller.state.paused && e.key === 'ArrowRight') { e.preventDefault(); controller.step(1) }
   })
 
-  // ---- the travel animation: a tint, streaks, the clock capsule and the date counting from where the page was to where it goes
+  // ---- the travel animation: a tint, streaks, the clock capsule and the date counting from where the page was to where it goes; in the Town a time machine (a car or a cabin) travels instead of the capsule
   let travelId = 0
   let frame = 0
   let skip: (() => void) | null = null
+  const canvas = travel.querySelector<HTMLCanvasElement>('canvas.scene')
+  function paint(machine: Machine | null, started: number, back: boolean): void {
+    if (!canvas || !machine) return
+    const w = window.innerWidth
+    const h = window.innerHeight
+    const dpr = Math.min(window.devicePixelRatio || 1, 1.5)
+    if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) { canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr) }
+    const g = canvas.getContext('2d')
+    if (g) drawMachine(g, machine, { w, h, dpr }, (performance.now() - started) / 1000, back)
+  }
   function playTravel(from: number, to: number): void {
     travel.hidden = false
     const forward = to > from
     travel.classList.toggle('forward', forward)
     const back = !controller.state.active
     words.textContent = back ? 'Back to now…' : forward ? 'Travelling forward in time…' : 'Travelling back in time…'
-    const duration = reduced() ? 300 : TRAVEL_MS
+    const machine: Machine | null = canvas && !reduced() ? (requestedMachine(window.location.search) ?? pickMachine()) : null
+    travel.classList.toggle('machine', machine !== null)
+    travel.dataset.machine = machine ?? ''
+    const duration = reduced() ? 300 : machine ? MACHINE_MS : TRAVEL_MS
     const started = performance.now()
     cancelAnimationFrame(frame)
     const end = (): void => {
       cancelAnimationFrame(frame)
       skip = null
       const wait = (): void => {
-        if (controller.state.loading) { words.textContent = 'Fetching what was recorded…'; frame = requestAnimationFrame(wait); return }
+        if (controller.state.loading) { words.textContent = 'Fetching what was recorded…'; paint(machine, started, !forward); frame = requestAnimationFrame(wait); return }
         travel.hidden = true
       }
       wait()
@@ -289,8 +305,9 @@ export function mountHistory(controller: HistoryController, mount: HistoryMount)
     skip = end
     const step = (now: number): void => {
       const p = Math.min(1, (now - started) / duration)
-      const eased = 1 - Math.pow(1 - p, 3)
+      const eased = machine ? (p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2) : 1 - Math.pow(1 - p, 3)
       when.textContent = viewedText(from + (to - from) * eased)
+      paint(machine, started, !forward)
       if (p < 1) frame = requestAnimationFrame(step)
       else end()
     }

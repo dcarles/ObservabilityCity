@@ -47,6 +47,12 @@ body.history::after { content: ''; position: fixed; inset: 0; pointer-events: no
 #history-travel .when { font: 600 42px/1.1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: 0.02em; text-shadow: 0 0 18px rgba(120, 180, 255, 0.6); font-variant-numeric: tabular-nums; }
 #history-travel .words { font-size: 14px; opacity: 0.85; }
 #history-travel .skip { position: absolute; top: 16px; right: 16px; padding: 6px 14px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.55); background: rgba(255, 255, 255, 0.08); color: inherit; font: inherit; cursor: pointer; }
+#history-travel canvas.scene { display: none; }
+#history-travel.machine { background: #050c26; justify-content: flex-end; padding-bottom: 8vh; box-sizing: border-box; }
+#history-travel.machine canvas.scene { display: block; position: absolute; inset: 0; width: 100%; height: 100%; }
+#history-travel.machine .streaks, #history-travel.machine .capsule { display: none; }
+#history-travel.machine .when, #history-travel.machine .words { position: relative; z-index: 1; }
+#history-travel .skip { z-index: 2; }
 @keyframes history-streak { from { transform: translateX(0); } to { transform: translateX(380%); } }
 @keyframes history-streak-back { from { transform: translateX(0); } to { transform: translateX(-380%); } }
 @keyframes history-spin { to { transform: rotate(-360deg); } }

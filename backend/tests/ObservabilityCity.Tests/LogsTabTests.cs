@@ -119,6 +119,50 @@ public class LogsTabTests
     }
 
     [Fact]
+    public async Task A_past_time_asks_for_the_window_that_ended_then_and_says_so()
+    {
+        using var rig = new Rig(TownA, LogsA);
+        var api = rig.Node(NodeKind.Api);
+        var at = Now.AddDays(-2);
+
+        var logs = await rig.Logs.AtAsync(api, at, TestContext.Current.CancellationToken);
+
+        var asked = Assert.Single(rig.Source.Asked);
+        Assert.Contains("datetime(2026-10-30T08:00:00Z) .. datetime(2026-10-30T12:00:00Z)", asked.Query);
+        Assert.Equal(at, asked.To);
+        Assert.Equal(TimeSpan.FromHours(4), asked.To - asked.From);
+        Assert.Equal(at, logs.At);
+        Assert.Equal("4h", logs.Window);
+    }
+
+    [Fact]
+    public async Task A_query_written_with_ago_is_moved_to_the_past_time()
+    {
+        using var rig = new Rig(TownB, LogsB, _ => [Row("logs", 5, "Disk was nearly full", level: LogLevel.Warn)]);
+        var api = rig.Node(NodeKind.Api);
+        var at = Now.AddDays(-2);
+
+        var logs = await rig.Logs.AtAsync(api, at, TestContext.Current.CancellationToken);
+
+        var asked = Assert.Single(rig.Source.Asked);
+        Assert.Contains("datetime(2026-10-30T12:00:00Z) - (1800s)", asked.Query);
+        Assert.DoesNotContain("ago(", asked.Query);
+        Assert.Equal(TimeSpan.FromMinutes(30), asked.To - asked.From);
+        Assert.Equal("Disk was nearly full", logs.Sections.Single(s => s.Id == "logs").Groups.Single().Text);
+    }
+
+    [Fact]
+    public async Task Asking_for_now_still_uses_the_clock_and_leaves_ago_as_it_is()
+    {
+        using var rig = new Rig(TownB, LogsB);
+        var api = rig.Node(NodeKind.Api);
+
+        await rig.Logs.RecentAsync(api, TestContext.Current.CancellationToken);
+
+        Assert.Contains("ago(1800s)", Assert.Single(rig.Source.Asked).Query);
+    }
+
+    [Fact]
     public async Task A_second_town_with_opposite_conventions_runs_through_the_same_code()
     {
         using var rig = new Rig(TownB, LogsB, _ => [Row("logs", 5, "Disk is nearly full", level: LogLevel.Warn)]);

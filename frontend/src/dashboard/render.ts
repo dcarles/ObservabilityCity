@@ -3,7 +3,7 @@
 
 import { escapeHtml as esc } from '../picker'
 import type { Chip, Dashboard, Group, Issue, JobRow, Level, Pillar, PartRow, Row, Section, SideRow, TenantRow } from './model'
-import type { SourceLine } from './freshness'
+import type { HistoryLine, SourceLine } from './freshness'
 import { busiest, windowText, type Flow } from './flows'
 import { formatRate } from '../visuals'
 import { groupWords } from '../groupLabel'
@@ -270,7 +270,8 @@ export function sectionsHtml(d: Dashboard, ui: UiState): string {
   return d.sections.map((x) => sectionHtml(x, ui.sections.has(x.id))).join('')
 }
 
-export function freshnessHtml(lines: readonly SourceLine[]): string {
-  if (lines.length === 0) return '<div class="sub-title" style="margin-top:0">Data freshness</div><div class="dim">No source reports its read time.</div>'
-  return `<div class="sub-title" style="margin-top:0">Data freshness</div><table><thead><tr><th>Source</th><th>Last read</th><th>Interval</th></tr></thead><tbody>${lines.map((l) => `<tr class="${l.overdue ? 'warn' : ''}"><td>${esc(l.name)}</td><td>${esc(l.lastRead)}</td><td>${esc(l.interval)}${l.overdue ? ' (overdue)' : ''}</td></tr>`).join('')}</tbody></table>`
+export function freshnessHtml(lines: readonly SourceLine[], history: readonly HistoryLine[] = []): string {
+  const hist = history.length === 0 ? '' : `<div class="sub-title" id="fresh-history">History</div><table><tbody>${history.map((h) => `<tr><td>${esc(h.label)}</td><td>${esc(h.value)}</td></tr>`).join('')}</tbody></table>`
+  if (lines.length === 0) return `<div class="sub-title" style="margin-top:0">Data freshness</div><div class="dim">No source reports its read time.</div>${hist}`
+  return `<div class="sub-title" style="margin-top:0">Data freshness</div><table><thead><tr><th>Source</th><th>Last read</th><th>Interval</th></tr></thead><tbody>${lines.map((l) => `<tr class="${l.overdue ? 'warn' : ''}"><td>${esc(l.name)}</td><td>${esc(l.lastRead)}</td><td>${esc(l.interval)}${l.overdue ? ' (overdue)' : ''}</td></tr>`).join('')}</tbody></table>${hist}`
 }

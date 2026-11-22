@@ -345,6 +345,14 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "at",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
           }
         ],
         "responses": {
