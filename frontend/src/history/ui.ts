@@ -3,7 +3,7 @@
 
 import './history.css'
 import { escapeHtml } from '../picker'
-import { addressAt, buildStrip, clockText, fieldTime, fieldValue, quickPicks, SPEEDS, speedText, stepMoves, stripTime, stripTip, stripX, viewedText } from './model'
+import { addressAt, buildStrip, clockText, fieldTime, fieldValue, quickPicks, SPEEDS, speedText, stepMoves, stripTime, stripTip, stripX, viewedText, waitingText } from './model'
 import type { HistoryController, HistoryState } from './controller'
 import { drawMachine, MACHINE_MS, pickMachine, requestedMachine, type Machine } from './travelMachine'
 
@@ -39,6 +39,10 @@ export function mountHistory(controller: HistoryController, mount: HistoryMount)
   const pop = document.createElement('div')
   pop.id = 'history-pop'
   pop.hidden = true
+  // a dark layer over the page while its picture is not the viewed time (an hour being rebuilt, or nothing recorded), so the town that is still there cannot be read as that time
+  const veil = document.createElement('div')
+  veil.id = 'history-veil'
+  veil.hidden = true
   const noData = document.createElement('div')
   noData.id = 'history-nodata'
   noData.hidden = true
@@ -54,7 +58,7 @@ export function mountHistory(controller: HistoryController, mount: HistoryMount)
     <svg class="capsule" viewBox="0 0 100 100" aria-hidden="true"><path d="M14 56a36 34 0 0 1 72 0z" fill="rgba(120,170,255,0.35)" stroke="#bcd6ff" stroke-width="3"/><circle cx="50" cy="56" r="26" fill="#10224a" stroke="#bcd6ff" stroke-width="3"/><g class="hands"><line x1="50" y1="56" x2="50" y2="38" stroke="#fff" stroke-width="3" stroke-linecap="round"/><line x1="50" y1="56" x2="63" y2="56" stroke="#fff" stroke-width="3" stroke-linecap="round"/></g><rect x="22" y="84" width="56" height="6" rx="3" fill="#bcd6ff"/></svg>
     <div class="when" id="history-when"></div><div class="words" id="history-words"></div>
     <button class="skip" id="history-skip" type="button">Skip</button>`
-  document.body.append(pop, noData, badge, travel)
+  document.body.append(pop, veil, noData, badge, travel)
   const when = travel.querySelector<HTMLElement>('#history-when')!
   const words = travel.querySelector<HTMLElement>('#history-words')!
 
@@ -66,6 +70,7 @@ export function mountHistory(controller: HistoryController, mount: HistoryMount)
   const text = (s: HistoryState): string => {
     if (!s.active) return 'History'
     const date = viewedText(s.viewed).slice(0, -5)
+    if (s.filling) return `Waiting · ${date}${clockText(s.viewed)}` // the clock stands still until the hour is rebuilt
     return `${s.paused ? 'Paused · ' : ''}${date}${clockText(s.viewed)} · ${speedText(s.speed)}`
   }
 
@@ -140,8 +145,9 @@ export function mountHistory(controller: HistoryController, mount: HistoryMount)
     document.body.classList.toggle('history', s.active)
     noData.hidden = !(s.active && s.noData && !s.loading)
     noData.classList.toggle('filling', s.filling)
+    veil.hidden = noData.hidden
     if (!noData.hidden) noData.textContent = s.filling
-      ? `Rebuilding ${viewedText(s.viewed)} from the cloud. This can take a minute; the town shows as soon as it is ready.`
+      ? waitingText(s.viewed, s.waiting)
       : `Nothing was recorded at ${viewedText(s.viewed)}${s.fill?.available ? ' and it could not be rebuilt from the cloud' : '. History only holds what the app recorded while it was running'}; later frames play as soon as they come.`
     badge.hidden = !(s.active && s.rebuilt && !s.noData)
     if (open && !dragging) {

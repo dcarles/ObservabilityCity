@@ -60,6 +60,74 @@ describe('going to a time nothing was recorded at', () => {
     c.dispose()
   })
 
+  it('does not run the clock while the hour is being rebuilt, and runs it again when the town is there', async () => {
+    const s = server()
+    vi.stubGlobal('fetch', s.fetch)
+    const c = new HistoryController({ scope: { town: null, env: null } as never, islands: () => [], feed: () => undefined }, () => NOW)
+    await c.loadRange()
+
+    const going = c.goTo(NOW - 3 * 3_600_000 - MIN)
+    await vi.advanceTimersByTimeAsync(10)
+    const waitingAt = c.state.viewed
+    expect(c.state.filling).toBe(true)
+    c.tick(60_000)
+    c.tick(60_000)
+    expect(c.state.viewed).toBe(waitingAt) // the clock waits; showing the past at a moving time while the picture is not that time would be a lie
+
+    await vi.advanceTimersByTimeAsync(3_100)
+    await going
+    c.tick(60_000)
+    expect(c.state.viewed).toBeGreaterThan(waitingAt)
+    c.dispose()
+  })
+
+  it('keeps what the server says about the hours ahead for the loading card', async () => {
+    const s = server()
+    const ahead: typeof fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input)
+      if (url.startsWith('/api/history/fill?') && url.includes('at=')) return new Response(JSON.stringify({ available: true, running: true, done: 1, total: 9, hour: null, problem: null, ahead: 2, building: false, secondsPerHour: 110 }), { status: 200 })
+      if (url.startsWith('/api/history/fill/priority')) return new Response(null, { status: 202 })
+      if (url.startsWith('/api/history/frame')) return new Response('{}', { status: 404 })
+      return s.fetch(input, init)
+    }) as typeof fetch
+    vi.stubGlobal('fetch', ahead)
+    const c = new HistoryController({ scope: { town: null, env: null } as never, islands: () => [], feed: () => undefined }, () => NOW)
+    await c.loadRange()
+
+    void c.goTo(NOW - 3 * 3_600_000 - MIN)
+    await vi.advanceTimersByTimeAsync(10)
+
+    expect(c.state.filling).toBe(true)
+    expect(c.state.waiting).toEqual({ ahead: 2, building: false, secondsPerHour: 110 })
+    c.dispose()
+  })
+
+  it('takes the ask back when the person goes live, and before asking for another hour', async () => {
+    const s = server()
+    const calls = s.calls
+    const stuck: typeof fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input)
+      if (url.startsWith('/api/history/fill/priority')) return new Response(null, { status: init?.method === 'DELETE' ? 204 : 202 })
+      if (url.startsWith('/api/history/frame')) return new Response('{}', { status: 404 }) // never ready
+      return s.fetch(input, init)
+    }) as typeof fetch
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => { if (String(input).startsWith('/api/history/fill/priority')) calls.push(`${init?.method ?? 'GET'} ${String(input)}`); return stuck(input, init) })
+    const c = new HistoryController({ scope: { town: null, env: null } as never, islands: () => [], feed: () => undefined }, () => NOW)
+    await c.loadRange()
+
+    void c.goTo(NOW - 3 * 3_600_000 - MIN)
+    await vi.advanceTimersByTimeAsync(10)
+    void c.goTo(NOW - 5 * 3_600_000 - MIN)
+    await vi.advanceTimersByTimeAsync(10)
+    const priority = calls.filter((x) => x.includes('/api/history/fill/priority')).map((x) => x.split(' ')[0])
+    expect(priority.slice(0, 3)).toEqual(['POST', 'DELETE', 'POST']) // the first ask is taken back before the second is made
+
+    await c.goLive()
+    await vi.advanceTimersByTimeAsync(10)
+    expect(calls.filter((x) => x.startsWith('DELETE')).length).toBe(2) // and going live takes the second back
+    c.dispose()
+  })
+
   it('gives up with the plain note when the filling has stopped and the time is not in it', async () => {
     const s = server()
     const fetchOnly: typeof fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {

@@ -65,6 +65,32 @@ public class PastFrameTests
         Assert.Equal(1, telemetry.Asked);
     }
 
+    private sealed class Counting(string name) : IPastMetricSource, IPastReadStats
+    {
+        public string Name => name;
+        public TimeSpan PollInterval => TimeSpan.FromSeconds(30);
+        public bool CanReadPast => true;
+        public Task<IReadOnlyDictionary<string, NodeReading>> PollAsync(TownRegistry registry, CancellationToken ct) => Task.FromResult<IReadOnlyDictionary<string, NodeReading>>(new Dictionary<string, NodeReading>());
+        public Task<IReadOnlyDictionary<string, NodeReading>> PollAtAsync(TownRegistry registry, DateTimeOffset when, CancellationToken ct) => Task.FromResult<IReadOnlyDictionary<string, NodeReading>>(new Dictionary<string, NodeReading>());
+        public PastReadStats TakeStats() => new(2, 10, 3.25, 1);
+    }
+
+    [Fact]
+    public async Task The_summary_of_the_frames_says_where_the_time_went_and_what_was_asked_of_the_cloud_and_starts_again_after_it_is_read()
+    {
+        var (frames, _) = Frames(new Counting("platform"), new Past("telemetry", at => new Dictionary<string, NodeReading>()), new Inventory("inventory"));
+        await frames.BuildAsync(Then, CancellationToken.None);
+        await frames.BuildAsync(Then.AddMinutes(5), CancellationToken.None);
+
+        var summary = frames.TakeSummary();
+
+        Assert.Contains("platform ", summary);
+        Assert.Contains("(2 reads, 3.3 MB, 10 from what was already read, 1 too big and read in pieces)", summary);
+        Assert.Contains("telemetry ", summary);
+        Assert.DoesNotContain("inventory", summary); // it is not read for the past
+        Assert.Contains("telemetry 0.0 s", frames.TakeSummary()); // nothing was built since: it starts again
+    }
+
     [Fact]
     public async Task A_source_that_cannot_read_the_past_leaves_its_signals_out()
     {

@@ -411,6 +411,13 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "at",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -856,7 +863,8 @@
           "available",
           "running",
           "done",
-          "total"
+          "total",
+          "building"
         ],
         "type": "object",
         "properties": {
@@ -881,6 +889,19 @@
           },
           "problem": {
             "type": "string",
+            "nullable": true
+          },
+          "ahead": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "building": {
+            "type": "boolean"
+          },
+          "secondsPerHour": {
+            "type": "number",
+            "format": "double",
             "nullable": true
           }
         }

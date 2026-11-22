@@ -355,6 +355,13 @@ public sealed class HistoryTests : IDisposable
         Assert.False(fill.Available); // this town's sources replay recordings: nothing can read its past
         Assert.False(fill.Running);
         Assert.Equal(HttpStatusCode.Accepted, (await client.PostAsync($"/api/history/fill/priority?at={Uri.EscapeDataString(slot.ToString("O"))}", null, ct)).StatusCode);
+        // taking an ask back, and asking where an hour stands (nothing here fills, so nothing is ahead)
+        Assert.Equal(HttpStatusCode.NoContent, (await client.DeleteAsync($"/api/history/fill/priority?at={Uri.EscapeDataString(slot.ToString("O"))}", ct)).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.DeleteAsync("/api/history/fill/priority?at=never", ct)).StatusCode);
+        var asked = (await client.GetFromJsonAsync<HistoryFill>($"/api/history/fill?at={Uri.EscapeDataString(slot.ToString("O"))}", Json, ct))!;
+        Assert.Null(asked.Ahead);
+        Assert.False(asked.Building);
+        Assert.Null(asked.SecondsPerHour);
     }
 
     // ---- helpers

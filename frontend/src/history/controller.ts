@@ -3,7 +3,7 @@
 // reads the newest snapshot once and lets the feed carry on. Starting is always live: nothing here is remembered between visits.
 
 import { scopeParams, type Scope } from '../scope'
-import { advance, frameFor, isSpeed, SPEEDS, type Frame, type HistoryFill, type HistoryPoint, type HistoryRange, type Speed } from './model'
+import { advance, frameFor, isSpeed, SPEEDS, type Frame, type HistoryFill, type HistoryPoint, type HistoryRange, type Speed, type Waiting } from './model'
 
 export interface HistoryHost {
   scope: Scope
@@ -26,8 +26,10 @@ export interface HistoryState {
   points: { at: number; unhealthy: number; down: number; rebuilt: boolean }[]
   /** How the filling of the gaps from the cloud stands; null until read, or where the server cannot fill. */
   fill: HistoryFill | null
-  /** True while the viewed moment is a gap the server is rebuilding: the loading card shows. */
+  /** True while the viewed moment is a gap the server is rebuilding: the loading card shows and the clock waits. */
   filling: boolean
+  /** While filling: how many hours come before this one and how long an hour takes; null otherwise. */
+  waiting: Waiting | null
   /** True while the frame on screen was rebuilt from the cloud: an approximation. */
   rebuilt: boolean
   /** True while the page looks at the past. */
@@ -53,7 +55,7 @@ const FILL_WAIT_TRIES = 100
 
 export class HistoryController {
   private s: HistoryState = {
-    enabled: false, days: 7, intervalMs: 300_000, oldest: null, newest: null, frames: 0, bytes: 0, points: [], fill: null, filling: false, rebuilt: false,
+    enabled: false, days: 7, intervalMs: 300_000, oldest: null, newest: null, frames: 0, bytes: 0, points: [], fill: null, filling: false, waiting: null, rebuilt: false,
     active: false, viewed: 0, speed: 1, paused: false, loading: false, noData: false, travel: null,
   }
   private readonly listeners = new Set<() => void>()
@@ -62,6 +64,8 @@ export class HistoryController {
   private seq = 0
   private travelId = 0
   private fetching = false
+  /** The hour (as asked of the server) this page is waiting for and has not been given, so leaving takes the ask back. */
+  private pendingAsk: string | null = null
   private retryAfter = 0
   private timer: number | undefined
   private lastTick = 0
@@ -118,45 +122,63 @@ export class HistoryController {
     }
   }
 
-  /** Reads how the filling of the gaps stands. A server that cannot say leaves it unknown. */
-  async loadFill(): Promise<HistoryFill | null> {
+  /** Reads how the filling of the gaps stands. A server that cannot say leaves it unknown. With a moment, also how many hours come before its hour. */
+  async loadFill(at?: number): Promise<HistoryFill | null> {
     try {
-      const r = await fetch(`/api/history/fill${this.query()}`)
+      const r = await fetch(`/api/history/fill${this.query(at === undefined ? {} : { at: new Date(at).toISOString() })}`)
       if (!r.ok) return null
       const fill = (await r.json()) as HistoryFill
-      this.set({ fill })
+      this.set(at === undefined ? { fill } : { fill, waiting: { ahead: fill.ahead ?? null, building: fill.building === true, secondsPerHour: fill.secondsPerHour ?? null } })
       return fill
     } catch { return null }
   }
 
+  /** Takes back the ask for an hour that was not given: the person left it, so it is filled in the normal order instead of ahead of the recent hours. */
+  private async withdraw(): Promise<void> {
+    const asked = this.pendingAsk
+    this.pendingAsk = null
+    if (asked === null) return
+    try { await fetch(`/api/history/fill/priority${this.query({ at: asked })}`, { method: 'DELETE' }) } catch { /* the hour is only filled a little earlier than needed */ }
+  }
+
   /**
    * A moment with no frame, on a server that can rebuild it: asks for that hour to be done next and waits for it, asking again every few seconds, until the frame is there or the filling
-   * has stopped with nothing for it. The page shows the loading card meanwhile; leaving the moment (another jump, going live) ends the wait.
+   * has stopped with nothing for it. The page shows the loading card meanwhile and the clock does not run; leaving the moment (another jump, going live) ends the wait and takes the ask back.
    */
   private async waitForRebuild(at: number, mine: number): Promise<Frame | null> {
     const fill = await this.loadFill()
     if (!fill?.available || mine !== this.seq) return null
-    this.set({ filling: true })
+    this.set({ filling: true, waiting: null })
+    let got = false
     try {
-      await fetch(`/api/history/fill/priority${this.query({ at: new Date(at).toISOString() })}`, { method: 'POST' })
+      const asked = new Date(at).toISOString()
+      await fetch(`/api/history/fill/priority${this.query({ at: asked })}`, { method: 'POST' })
+      this.pendingAsk = asked
+      if (mine !== this.seq) { await this.withdraw(); return null } // the person left while the ask was on its way
+      await this.loadFill(at)
       for (let i = 0; i < FILL_WAIT_TRIES; i++) {
         await new Promise((resolve) => setTimeout(resolve, FILL_POLL_MS))
         if (mine !== this.seq) return null
         const frame = await this.fetchFrame(at)
-        if (frame) return frame
-        const now = await this.loadFill()
+        if (frame) { got = true; return frame }
+        const now = await this.loadFill(at)
         if (mine !== this.seq) return null
         if (now && !now.running && i > 0) return null // the filling has stopped and this moment is not in it: nothing could be rebuilt
       }
       return null
     } catch { return null } finally {
-      if (mine === this.seq) this.set({ filling: false })
+      if (got) this.pendingAsk = null // the hour was built: nothing is waiting any more
+      if (mine === this.seq) {
+        this.set({ filling: false, waiting: null })
+        if (!got) await this.withdraw()
+      }
     }
   }
 
   /** Goes to a moment in the past. Beyond the limit it is held at the limit; at (or within seconds of) now it is just going live. */
   async goTo(at: number, options: { paused?: boolean } = {}): Promise<void> {
     if (!this.s.enabled) return
+    if (this.pendingAsk !== null) await this.withdraw() // the hour that was waited for is no longer wanted first
     const now = this.now()
     const oldestAllowed = now - this.s.days * 86_400_000
     if (at >= now - 5_000) return this.goLive()
@@ -189,10 +211,11 @@ export class HistoryController {
     const wasActive = this.s.active
     const from = this.s.viewed
     ++this.seq
+    void this.withdraw()
     this.stop()
     this.frames = []
     this.shown = null
-    this.set({ active: false, loading: false, noData: false, filling: false, rebuilt: false, paused: false, travel: wasActive ? { from, to: this.now(), id: ++this.travelId } : this.s.travel })
+    this.set({ active: false, loading: false, noData: false, filling: false, waiting: null, rebuilt: false, paused: false, travel: wasActive ? { from, to: this.now(), id: ++this.travelId } : this.s.travel })
     if (!wasActive) return
     try {
       const islands = this.host.islands()
@@ -251,7 +274,7 @@ export class HistoryController {
     const t = performance.now()
     const dt = realMs ?? t - this.lastTick
     this.lastTick = t
-    if (!this.s.active || this.s.loading) return
+    if (!this.s.active || this.s.loading || this.s.filling) return // the clock waits for an hour that is being rebuilt
     const next = advance(this.s.viewed, dt, this.s.speed, this.s.paused, this.now())
     if (next.caughtUp) { void this.goLive(); return }
     if (next.viewed !== this.s.viewed) this.set({ viewed: next.viewed })

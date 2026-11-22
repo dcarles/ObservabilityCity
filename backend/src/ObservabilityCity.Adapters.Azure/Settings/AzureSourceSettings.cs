@@ -25,6 +25,7 @@ public sealed partial class AzureSourceSettings : SourceSettingsReader<AzureSour
     protected override AzureSettings Convert(AzureSourceFile f) => new()
     {
         RegionQuery = f.RegionQuery,
+        RangeQuery = f.RangeQuery,
         TypesQuery = f.TypesQuery,
         Metrics = ToMetrics(f.Metrics),
         Entities = ToEntities(f.Entities),
@@ -40,6 +41,11 @@ public sealed partial class AzureSourceSettings : SourceSettingsReader<AzureSour
         {
             if (regionQuery.Trim().Length == 0) report.Add($"source '{source}' has an empty regionQuery; give the query that returns role, region and calls, or leave it out", "regionQuery");
             foreach (var problem in ScopeTemplate.Check(regionQuery, known)) report.Add($"source '{source}' regionQuery: {problem}", "regionQuery");
+        }
+        if (def.RangeQuery is { } rangeQuery)
+        {
+            if (rangeQuery.Trim().Length == 0) report.Add($"source '{source}' has an empty rangeQuery; give the query that returns role, calls and at (the start of each time bin), or leave it out", "rangeQuery");
+            foreach (var problem in ScopeTemplate.Check(rangeQuery, known)) report.Add($"source '{source}' rangeQuery: {problem}", "rangeQuery");
         }
         if (def.TypesQuery is { } typesQuery)
         {
@@ -262,6 +268,8 @@ public sealed class AzureSourceFile
 {
     /// <summary>Request sources only (loganalytics): the query that says how a service's requests divide between regions, a template like query. Returns one row per telemetry name and region with the columns role, region and calls (sampling-corrected counts do: only the proportions are used).</summary>
     public string? RegionQuery { get; set; }
+    /// <summary>Request sources only (loganalytics): the query of the source asked once for a whole hour of the past, with one more column, at (the start of each time bin as wide as the window). Without it each past frame is asked on its own.</summary>
+    public string? RangeQuery { get; set; }
     /// <summary>Broker sources only (servicebus): the query that says which kinds of message each queue handled, a template like query. Returns one row per queue and message type with the columns queue, type and calls (counts over the window). Without it the types are not shown.</summary>
     public string? TypesQuery { get; set; }
     /// <summary>Platform-metric sources only (azuremonitor): which metric of which resources fills which signal. Everything about the metrics is written here; the program knows none.</summary>

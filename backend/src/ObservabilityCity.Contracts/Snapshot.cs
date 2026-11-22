@@ -614,8 +614,12 @@ public sealed record HistoryPointSnapshot(DateTimeOffset At, int Unhealthy, int 
 /// go, IntervalSeconds the gap between frames, Oldest and Newest the first and last frame, Frames how many there are and Bytes what they take on disk. Points lists every frame
 /// from the start of the limit, for the time bar's strip.
 /// </summary>
-/// <summary>Where the filling of the history's gaps from the cloud stands: whether the environment can fill at all, whether it is working now, how many hours are done of how many, and the hour in hand.</summary>
-public sealed record HistoryFill(bool Available, bool Running, int Done, int Total, DateTimeOffset? Hour, string? Problem);
+/// <summary>
+/// Where the filling of the history's gaps from the cloud stands: whether the environment can fill at all, whether it is working now, how many hours are done of how many, and the hour in hand.
+/// For a time that was asked about (<c>at</c>): Ahead is how many hours are built before its hour starts (0 when it is next or being built, null when it is not waiting), Building says it is the hour in hand,
+/// and SecondsPerHour is how long an hour has taken lately (null until one was built), for an estimate.
+/// </summary>
+public sealed record HistoryFill(bool Available, bool Running, int Done, int Total, DateTimeOffset? Hour, string? Problem, int? Ahead = null, bool Building = false, double? SecondsPerHour = null);
 
 public sealed record HistoryRange(
     bool Enabled,

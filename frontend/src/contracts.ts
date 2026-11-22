@@ -303,6 +303,11 @@ export interface components {
             /** Format: date-time */
             hour?: string | null;
             problem?: string | null;
+            /** Format: int32 */
+            ahead?: number | null;
+            building: boolean;
+            /** Format: double */
+            secondsPerHour?: number | null;
         };
         HistoryPointSnapshot: {
             /** Format: date-time */
@@ -1036,6 +1041,7 @@ export interface operations {
         parameters: {
             query?: {
                 env?: string;
+                at?: string;
             };
             header?: never;
             path?: never;
