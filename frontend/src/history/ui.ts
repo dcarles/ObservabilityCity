@@ -96,7 +96,6 @@ export function mountHistory(controller: HistoryController, mount: HistoryMount)
       ${strip.ticks.filter((k) => k.value > 0).map((k) => `<line class="grid" x1="0" x2="${STRIP_W}" y1="${k.y.toFixed(1)}" y2="${k.y.toFixed(1)}"/>`).join('')}
       ${strip.areas.map((a) => `<path class="area" d="${a}"/>`).join('')}
       ${strip.lines.map((l) => `<path class="line" d="${l}"/>`).join('')}
-      ${strip.rebuilt.map(([x, w]) => `<rect class="rebuilt" x="${x.toFixed(1)}" y="0" width="${w.toFixed(1)}" height="${g.height}"/>`).join('')}
       ${strip.days.map((d) => `<line class="tick" x1="${d.x.toFixed(1)}" x2="${d.x.toFixed(1)}" y1="0" y2="${g.height + 4}"/><text class="daylabel" x="${(d.x + 3).toFixed(1)}" y="${STRIP_H - 3}">${escapeHtml(d.label)}</text>`).join('')}
       <line class="nowline" x1="${STRIP_W - 1}" x2="${STRIP_W - 1}" y1="0" y2="${g.height}"/>
       ${handle === null ? '' : `<line class="handle" x1="${handle.toFixed(1)}" x2="${handle.toFixed(1)}" y1="0" y2="${g.height + 4}"/>`}
