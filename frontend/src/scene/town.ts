@@ -19,7 +19,7 @@ import { consumersOf, HarbourStatus, messagingOf, pierLines, type Messaging } fr
 import { connectorsOf, portSummary, type Connectors, type PortSummary } from './links'
 import { findLane, harbourCircuit, harbourLoop, OUTER_PAD, padLand, type SeaMap } from './sea'
 import { schedulerRate } from './scheduler'
-import { coastPoint, laneLength, layoutKey, parkProps, wrapText } from './townHelpers'
+import { coastPoint, laneLength, layoutDifferences, layoutKey, layoutParts, parkProps, wrapText } from './townHelpers'
 import { vendorCallersOf, vendorShare } from './vendorRing'
 
 // kept importable from here, where they used to be
@@ -150,6 +150,8 @@ export class Town {
   /** Points along every coast, for working out how far back the camera must stand to show the whole town. */
   readonly extent: THREE.Vector3[] = []
   private snapshotId = ''
+  /** The parts of the layout this town was built from, to say what differs when it has to be built again. */
+  private layout: Map<string, string> = new Map()
   /** The hub's message broker by name (Service Bus, Kafka, ...), for the port's board. */
   private brokerName: string | null = null
   private brokerCount = 0
@@ -206,9 +208,15 @@ export class Town {
     return this.snapshotId === layoutKey(s)
   }
 
+  /** Why this snapshot does not match the town: the parts of the layout that differ, for the console. */
+  differences(s: Snapshot): string[] {
+    return this.layout.size === 0 ? ['no town built yet'] : layoutDifferences(this.layout, layoutParts(s))
+  }
+
   /** Forget the layout, so the next snapshot builds the town again. Used after a build that failed half way. */
   invalidate(): void {
     this.snapshotId = ''
+    this.layout = new Map()
   }
 
   build(s: Snapshot): void {
@@ -594,6 +602,7 @@ export class Town {
     for (const [id, vi] of this.vendors) anchors.set(id, { at: vi.root.position.clone(), color: VENDOR_COLOR })
     this.overlay.setAnchors(anchors)
     this.snapshotId = layoutKey(s)
+    this.layout = layoutParts(s)
     if (this.tenantView) this.setTenantView(this.tenantView)
     this.setLayers(this.layers)
   }
