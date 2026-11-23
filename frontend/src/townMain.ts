@@ -9,6 +9,7 @@ import { rng } from './scene/random'
 import { loadKit } from './assets/kit'
 import { Connection, markFeed } from './connection'
 import { startHistory } from './history/start'
+import { liveShapeOf, withLiveShape, type LiveShape } from './history/liveShape'
 import { addressForTown, fetchTowns, requestedScope, type TownChoice } from './scope'
 import { saveQuality, startQuality, type Quality } from './quality'
 import { parseWall, wallTimings } from './wall/params'
@@ -305,6 +306,7 @@ export async function startTown(): Promise<void> {
       if (!town.matches(s)) {
         const started = performance.now()
         const why = town.differences(s)
+        const firstBuild = town.islands.length === 0
         const before = town.islands.map((i) => i.group.id).join('|')
         const gone = town.root.children.filter((c) => c !== town.cars.object && c !== town.boats.object && c !== town.overlay.object)
         town.root.remove(...gone)
@@ -318,7 +320,7 @@ export async function startTown(): Promise<void> {
         town.build(s)
         seen.buildMs = performance.now() - started
         // a rebuild freezes the page for a moment, so the console says how long and why
-        console.info(`Town rebuilt in ${Math.round(seen.buildMs)} ms because ${why.slice(0, 6).join('; ')}${why.length > 6 ? `; and ${why.length - 6} more` : ''}.`)
+        if (seen.buildMs > 300 && !firstBuild) console.warn(`Town rebuilt in ${Math.round(seen.buildMs)} ms because ${why.slice(0, 6).join('; ')}${why.length > 6 ? `; and ${why.length - 6} more` : ''}.`)
         stage.frame(town.extent)
         // the same islands as before (only a service came or went): the camera stays where the viewer put it
         if (town.islands.map((i) => i.group.id).join('|') !== before) stage.home(true)
@@ -384,10 +386,16 @@ export async function startTown(): Promise<void> {
   // a jump in time starts from an empty road and empty water: the cars and boats of the moment left would keep driving into the new one. They are taken away when the jump
   // starts and once more when its frame arrives (the old rates may have sent a few meanwhile); a replay that just plays on is not a jump and keeps its traffic.
   let clearTrafficAtNextFrame = false
+  // the links of the live town, kept while the page looks at the past: a frame of the past is drawn with them, so a jump never changes the layout and never builds the town again
+  let liveShape: LiveShape | null = null
+  const shapeWaiters: (() => void)[] = []
   const history = startHistory({ scope, islands: () => islands, feed: (raw) => {
     if (clearTrafficAtNextFrame) { clearTrafficAtNextFrame = false; town.cars.clear(); town.boats.clear() }
-    onSnapshot(raw)
-  } }, { beforeId: 'wall-button', machine: true })
+    onSnapshot(withLiveShape(raw, liveShape))
+  },
+  // a page opened straight into the past has no live snapshot yet: the jump waits a moment (at most 1.5 s) for the first
+  prepare: () => (liveShape ? Promise.resolve() : new Promise<void>((resolve) => { shapeWaiters.push(resolve); window.setTimeout(resolve, 1500) })) },
+  { beforeId: 'wall-button', machine: true })
   let travelSeen = history.state.travel?.id ?? 0
   history.subscribe(() => {
     const id = history.state.travel?.id ?? 0
@@ -397,7 +405,13 @@ export async function startTown(): Promise<void> {
     town.boats.clear()
     clearTrafficAtNextFrame = true
   })
-  const connection = new Connection((raw) => { if (!held && !history.active) onSnapshot(raw) }, (st) => { topbar.setStatus(st); wall?.setConnection(st); markFeed(st) }, scope, (e) => {
+  const connection = new Connection((raw) => {
+    if (held) return
+    // live snapshots keep coming while the page looks at the past: their links are what its frames are drawn with
+    const shape = liveShapeOf(raw)
+    if (shape) { liveShape = shape; for (const w of shapeWaiters.splice(0)) w() }
+    if (!history.active) onSnapshot(raw)
+  }, (st) => { topbar.setStatus(st); wall?.setConnection(st); markFeed(st) }, scope, (e) => {
     banner.textContent = e.environments.length === 0 && e.towns
       ? `There is no town "${e.requestedTown ?? ''}". Available: ${e.towns.join(', ') || 'none'}.`
       : `There is no environment "${e.requested ?? ''}". Available: ${e.environments.join(', ') || 'none'}.`

@@ -11,6 +11,8 @@ export interface HistoryHost {
   islands: () => readonly string[]
   /** Hands a snapshot to the page as if the server had sent it. */
   feed: (raw: unknown) => void
+  /** Called before the frame of a jump is asked for, so the page can get ready for it (see liveShape.ts). */
+  prepare?: () => Promise<void>
 }
 
 export interface HistoryState {
@@ -191,15 +193,13 @@ export class HistoryController {
     this.travelId++
     this.set({ active: true, viewed: at, paused: options.paused ?? false, loading: true, noData: false, travel: { from, to: at, id: this.travelId } })
     this.start()
-    const asked = performance.now()
+    await this.host.prepare?.()
+    if (mine !== this.seq) return
     let frame = await this.fetchFrame(at)
     if (mine !== this.seq) return
-    const came = performance.now()
     if (frame) this.frames = [frame]
     this.set({ loading: false })
     this.show()
-    // how long a jump took, to show where a stutter comes from
-    if (frame) console.info(`History jump: the frame came in ${Math.round(came - asked)} ms and was put on the town in ${Math.round(performance.now() - came)} ms.`)
     if (!frame) {
       // a gap the server can fill: ask for it and show the loading card until it is there
       frame = await this.waitForRebuild(at, mine)
