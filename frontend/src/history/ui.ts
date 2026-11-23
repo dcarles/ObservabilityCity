@@ -336,8 +336,14 @@ export function mountHistory(controller: HistoryController, mount: HistoryMount)
     const machine: Machine | null = canvas && !reduced() ? (requestedMachine(window.location.search) ?? pickMachine()) : null
     travel.classList.toggle('machine', machine !== null)
     travel.dataset.machine = machine ?? ''
+    // the time machine screen covers the town completely, so the town stops drawing behind it (see the frame loop in townMain.ts)
+    document.body.classList.toggle('history-machine', machine !== null)
     const duration = reduced() ? 300 : machine ? MACHINE_MS : TRAVEL_MS
     const started = performance.now()
+    let frames = 0
+    let slow = 0
+    let slowest = 0
+    let last = started
     cancelAnimationFrame(frame)
     const end = (): void => {
       cancelAnimationFrame(frame)
@@ -345,11 +351,19 @@ export function mountHistory(controller: HistoryController, mount: HistoryMount)
       const wait = (): void => {
         if (controller.state.loading) { words.textContent = 'Fetching what was recorded…'; paint(machine, started, !forward); frame = requestAnimationFrame(wait); return }
         travel.hidden = true
+        document.body.classList.remove('history-machine')
+        // what the animation cost, to show where a stutter comes from
+        if (frames > 0) console.info(`History animation: ${frames} frames in ${Math.round(performance.now() - started)} ms, the slowest ${Math.round(slowest)} ms, ${slow} over 50 ms.`)
       }
       wait()
     }
     skip = end
     const step = (now: number): void => {
+      frames++
+      const gap = now - last
+      last = now
+      if (gap > slowest) slowest = gap
+      if (gap > 50) slow++
       const p = Math.min(1, (now - started) / duration)
       const eased = machine ? (p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2) : 1 - Math.pow(1 - p, 3)
       when.textContent = viewedText(from + (to - from) * eased)
