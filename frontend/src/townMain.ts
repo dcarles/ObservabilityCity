@@ -85,6 +85,8 @@ export async function startTown(): Promise<void> {
   window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') events.stop()
     if (e.ctrlKey || e.metaKey || e.altKey || isTyping(e.target)) return
+    // H frames the whole town again, like the Home button
+    if (e.key === 'h' || e.key === 'H') { stage.home(); return }
     if (konami.push(e.key)) void events.play()
   })
   if (params.has('event')) void events.play()
