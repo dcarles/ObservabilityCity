@@ -319,3 +319,91 @@ test.describe('the Unknown hosts button', () => {
     await expect(page.locator('#unknown-hosts li[data-host="theirs.example.test"]')).toBeVisible()
   })
 })
+
+test.describe('the airport and the islands on the pointer', () => {
+  /** A screen point over bare ground of an island (nothing to click or hover there), found by trying points of its ground from the camera. */
+  const bareGround = (page: import('@playwright/test').Page, kind: 'airport' | 'island', id: string) => page.evaluate(([k, wanted]) => {
+    const c = (window as any).city
+    const T = c.THREE
+    const root = k === 'airport' ? c.town.airport.root : (c.town.islands.find((i: any) => i.group.id === wanted) ?? c.town.vendors.get(wanted)).root
+    const outline = k === 'airport' ? c.town.airport.outline : (c.town.islands.find((i: any) => i.group.id === wanted) ?? c.town.vendors.get(wanted)).outline
+    root.updateWorldMatrix(true, false)
+    const ray = new T.Raycaster()
+    const lists = () => [c.town.hitMeshes(), c.town.serviceHits(), c.town.assetHits(), c.town.harbourHits()]
+    for (let x = -40; x <= 40; x += 2) for (let z = -28; z <= 28; z += 2) {
+      if (!outline.contains(x, z, 3)) continue
+      const p = root.localToWorld(new T.Vector3(x, -0.55, z)).project(c.stage.camera)
+      if (Math.abs(p.x) > 0.9 || Math.abs(p.y) > 0.9) continue
+      ray.setFromCamera(new T.Vector2(p.x, p.y), c.stage.camera)
+      if (lists().some((l: any) => ray.intersectObjects(l, false).length > 0)) continue
+      return { x: (p.x + 1) / 2 * window.innerWidth, y: (1 - p.y) / 2 * window.innerHeight }
+    }
+    return null
+  }, [kind, id] as const)
+
+  test('hovering the airport gives its arrivals and the traffic inside the town, the numbers on its board', async ({ town, page }) => {
+    await town.open()
+    const got = await page.evaluate(() => {
+      const c = (window as any).city
+      const at = c.town.airport.root.getWorldPosition(new c.THREE.Vector3())
+      return { hover: c.town.airportAt(at.x, at.z), sea: c.town.airportAt(at.x + 400, at.z + 400), board: c.town.inspectAirport().board }
+    })
+    expect(got.sea).toBeNull()
+    expect(got.hover.name).toBe('Airport')
+    expect(got.hover.lines[0]).toMatch(/^Arrivals .+ req\/s$/)
+    expect(got.board[0]).toMatch(/^ARRIVALS {2}.+ req\/s$/)
+  })
+
+  test('clicking the airport glides the camera to the whole airport', async ({ town, page }) => {
+    await town.open()
+    const at = await bareGround(page, 'airport', 'airport')
+    expect(at).not.toBeNull()
+    await page.mouse.click(at!.x, at!.y)
+    await town.step(3)
+    const d = await page.evaluate(() => {
+      const c = (window as any).city
+      const want = c.town.islandFocusOf('airport')
+      return { off: c.stage.controls.target.distanceTo(want.target), dist: c.stage.camera.position.distanceTo(c.stage.controls.target), want: want.distance }
+    })
+    expect(d.off).toBeLessThan(1)
+    expect(d.dist).toBeLessThan(d.want * 1.15)
+  })
+
+  test('clicking a pillar\'s island glides to the whole island, but the hub island stays where it is', async ({ town, page }) => {
+    await town.open()
+    const at = await bareGround(page, 'island', 'cc')
+    expect(at).not.toBeNull()
+    await page.mouse.click(at!.x, at!.y)
+    await town.step(3)
+    const off = await page.evaluate(() => { const c = (window as any).city; return c.stage.controls.target.distanceTo(c.town.islandFocusOf('cc').target) })
+    expect(off).toBeLessThan(1)
+    // nothing happens over the hub's ground
+    const before = await page.evaluate(() => (window as any).city.stage.controls.target.toArray())
+    expect(await page.evaluate(() => { const c = (window as any).city; return c.town.islandAt(0, 0) })).toBeNull()
+    expect(before).toHaveLength(3)
+  })
+
+  test('says what the town sends a third party under its name and on its hover, summed over its services', async ({ town, page }) => {
+    await town.open()
+    const got = await page.evaluate(() => {
+      const c = (window as any).city
+      const s = structuredClone(c.seen.last)
+      // a third party has no source of its own, so its requests are absent; the rate is what the town is seen sending it
+      for (const v of s.vendors) { v.node.requestsPerSecond = 0; v.node.inbound = null; v.node.absent = [...new Set([...(v.node.absent ?? []), 'requests'])] }
+      const v = s.vendors.find((x: any) => x.node.id === 'ext.mailer')
+      v.node.requestsPerSecond = 8
+      v.node.inbound = [{ from: 'cc.notify-worker', requestsPerSecond: 8 }]
+      c.feed(s)
+      const island = c.town.vendors.get('ext.mailer')
+      const same = s.vendors.filter((x: any) => (x.islandId ?? x.node.id) === island.id).reduce((a: number, x: any) => a + x.node.requestsPerSecond, 0)
+      return { line: island.nameSign.userData.line(), summary: c.town.signSummary(island.id), picked: island.nameSign.children.every((p: any) => p.userData.signIsland === island.id), same, others: c.town.inspectVendorSigns().filter((x: any) => x.id !== island.id).map((x: any) => x.line) }
+    })
+    expect(got.picked).toBe(true)
+    expect(got.line).toBe(`in ${got.summary.lines[0].split(' ')[2]} rps`)
+    expect(got.summary.lines).toHaveLength(1)
+    expect(got.summary.lines[0]).toMatch(/^Requests in .+ rps$/)
+    expect(got.same).toBeGreaterThanOrEqual(8)
+    // a third party nothing is sent to says nothing
+    for (const l of got.others) expect(l).toBe('')
+  })
+})

@@ -286,6 +286,21 @@ export class Airport {
     return rows
   }
 
+  /** What hovering the airport says: the arrivals, the callers' names when the outside traffic is not measured, and the traffic inside the town. */
+  tooltipLines(): string[] {
+    const lines = [`Arrivals ${formatRate(this.rps)} req/s`]
+    if (!this.measured) for (const c of this.callers.slice(0, 4)) lines.push(`${c.name} ${formatRate(c.requestsPerSecond)}/s`)
+    if (this.internal !== null) lines.push(`Internal traffic ${formatRate(this.internal)} req/s`)
+    return lines
+  }
+
+  /** Whether the point (x, z) of the world is on the airport's ground. */
+  contains(x: number, z: number): boolean {
+    this.root.updateWorldMatrix(true, false)
+    const p = this.root.worldToLocal(new THREE.Vector3(x, 0, z))
+    return this.outline.contains(p.x, p.z)
+  }
+
   private boardLines(): string[] {
     return this.boardRows().filter((r) => !r.divider).map((r) => (r.right ? `${r.left}  ${r.right}` : r.left ?? ''))
   }
