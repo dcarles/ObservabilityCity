@@ -493,7 +493,14 @@ export async function startTown(): Promise<void> {
     else if (pier) { servicePanel.close(); inspector.close(); stateList.toggle('DeadLetters', new DOMRect(e.clientX, e.clientY, 0, 0), pier) }
     else { servicePanel.close(); inspector.close() }
     town.select(b?.id ?? null)
-    const focus = b ? town.focusOf(b.id) : null
+    // a click on the ground of the airport or of a pillar's or third party's island (not the hub's) glides to that whole island
+    let focus = b ? town.focusOf(b.id) : null
+    if (!b && !sv && !av && !pier) {
+      const ground = ray.ray.intersectPlane(groundPlane, groundHit)
+      const isl = ground ? town.islandAt(ground.x, ground.z) : null
+      const id = isl ? isl.id : ground && town.airportAt(ground.x, ground.z) ? 'airport' : null
+      if (id) focus = town.islandFocusOf(id)
+    }
     if (focus) stage.focus(focus.target, focus.distance, false, focus.azimuth)
   })
 
@@ -520,7 +527,9 @@ export async function startTown(): Promise<void> {
     else if (!b) {
       const ground = ray.ray.intersectPlane(groundPlane, groundHit)
       const isl = ground ? town.islandAt(ground.x, ground.z) : null
+      const airport = ground && !isl ? town.airportAt(ground.x, ground.z) : null
       if (isl) showIslandTooltip(isl.name, isl.vendor, pointerPx.x, pointerPx.y)
+      else if (airport) showIslandTooltip(airport.name, false, pointerPx.x, pointerPx.y, airport.lines, 'outside callers')
     }
     const overService = !b && (pier != null || ray.intersectObjects(town.serviceHits(), false).length > 0 || ray.intersectObjects(town.assetHits(), false).length > 0)
     canvas.style.cursor = breakPanel?.armed ? 'crosshair' : b || overService ? 'pointer' : 'grab'

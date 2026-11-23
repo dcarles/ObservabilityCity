@@ -82,6 +82,8 @@ export class VendorIsland {
   readonly gateZ: number
   /** Where each building stands for the service lane: its x, the road in front, and the side of the spine. */
   readonly targets = new Map<string, BayTarget>()
+  /** The island's sign by the gate: its name and, under it, the requests the town sends it. */
+  readonly nameSign: THREE.Group
 
   constructor(readonly id: string, readonly name: string, nodes: NodeSnapshot[]) {
     const { slots, rows, outline, rx, rz, gateZ, edge, perRow } = planVendorIsland(id, nodes.length)
@@ -120,7 +122,9 @@ export class VendorIsland {
     })
 
     const signZ = this.gateZ - 2.4
-    decor.add(islandSign(name, VENDOR_COLOR, 7.5, signZ))
+    this.nameSign = islandSign(name, VENDOR_COLOR, 7.5, signZ)
+    for (const part of this.nameSign.children) part.userData.signIsland = id
+    decor.add(this.nameSign)
     avoid.push({ x: 7.5, z: signZ, w: 12, d: 5 })
     const trees = Math.round(26 * (rx * rz) / (17 * 15))
     this.root.add(scatterNature(outline, avoid, hashString(id + '-nature'), { trees, rocks: Math.round(trees / 3) }))
