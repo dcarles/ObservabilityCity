@@ -647,8 +647,11 @@ export async function startTown(): Promise<void> {
       events.update(dt)
       wall?.tick(time)
       updateIslandLabels()
-      hover()
-      stage.render()
+      // the time machine screen of a jump covers the town, so drawing it behind would only take the graphics chip from the animation
+      if (!document.body.classList.contains('history-machine')) {
+        hover()
+        stage.render()
+      }
     } catch (e) {
       const key = String(e)
       if (!failed.has(key)) {

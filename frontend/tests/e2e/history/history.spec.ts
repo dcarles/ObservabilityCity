@@ -45,6 +45,18 @@ test.describe('time travel on a live town', () => {
     await expect(page.locator('#history-pop')).toBeHidden()
   })
 
+  test('a jump says in the console how long its frame took and how the animation ran', async ({ page, request }) => {
+    await waitForFrames(request, 3)
+    const lines: string[] = []
+    page.on('console', (m) => { if (m.text().startsWith('History ')) lines.push(m.text()) })
+    await openTown(page, '&machine=car')
+    await page.evaluate(() => (window as unknown as Win).city.history.goTo(Date.now() - 15_000))
+    await page.locator('#history-skip').click()
+    await expect(page.locator('#history-travel')).toBeHidden()
+    await expect.poll(() => lines.some((l) => /^History jump: the frame came in \d+ ms and was put on the town in \d+ ms\.$/.test(l))).toBe(true)
+    await expect.poll(() => lines.some((l) => /^History animation: \d+ frames in \d+ ms, the slowest \d+ ms, \d+ over 50 ms\.$/.test(l))).toBe(true)
+  })
+
   test('the popup says the days and size held, scales the graph, shows the keys and greys out the arrows unless paused', async ({ page, request }) => {
     await waitForFrames(request, 3)
     await openTown(page)
@@ -164,8 +176,11 @@ test.describe('time travel on a live town', () => {
       })
       expect(colours).toBeGreaterThan(5)
       await expect(page.locator('#history-when')).not.toHaveText('')
+      // the town stops drawing behind the machine screen, and draws again when it is gone
+      await expect(page.locator('body')).toHaveClass(/history-machine/)
       await page.locator('#history-skip').click()
       await expect(overlay).toBeHidden()
+      await expect(page.locator('body')).not.toHaveClass(/history-machine/)
     })
   }
 
