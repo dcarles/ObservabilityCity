@@ -46,6 +46,7 @@ import { Signpost } from './signpost'
 import { eventsByNode } from '../healthEvents'
 import { portCountsLine, portSignText } from '../portSign'
 import { brokerSea, combinedGateways, type GatewayTotal } from '../hubSystems'
+import { isAbsent } from '../signals'
 import { regionLine, splitLine, validChoice, withRegion, WORST, type RegionChoice } from '../regions'
 
 const QUAY = 9
@@ -674,6 +675,13 @@ export class Town {
       for (const isl of this.islands) if (isl.signpost) this.guard(`signpost ${isl.group.id}`, () => isl.signpost!.set(signLines(links, isl.nodeIds)))
     }
     for (const v of s.vendors) this.guard(`apply ${v.node.id}`, () => this.buildings.get(v.node.id)?.setNode(v.node))
+    // a third party's sign: what the town sends it, summed over the services on its island; nothing where no source measures it
+    for (const vi of new Set(this.vendors.values())) this.guard(`vendor sign ${vi.id}`, () => {
+      const nodes = s.vendors.filter((v) => (v.islandId ?? v.node.id) === vi.id).map((v) => v.node).filter((n) => !isAbsent(n, 'requests'))
+      const rps = nodes.reduce((a, n) => a + n.requestsPerSecond, 0)
+      this.vendorTraffic.set(vi.id, nodes.length > 0 && rps > 0 ? [`Requests in ${formatRate(rps)} rps`] : [])
+      vi.nameSign.userData.setLine(nodes.length > 0 && rps > 0 ? `in ${formatRate(rps)} rps` : '')
+    })
     this.gateways = combinedGateways(s.groups.find((g) => g.isHub)?.nodes ?? [])
     this.guard('airport', () => this.airport?.setCallers(s.externalCallers, s.outsideRequestsPerSecond ?? null, trafficSplit(s, s.totals.requestsPerSecond)?.internal ?? null))
     this.guard('overlay', () => this.overlay.set(s.dependencies))
@@ -845,21 +853,36 @@ export class Town {
     return this.hubLanePaths.map((l) => ({ id: l.id, path: l.path.map((p) => ({ x: p.x, z: p.z })) }))
   }
 
+  /** What each third party's sign says when hovered, by island id. */
+  private readonly vendorTraffic = new Map<string, string[]>()
+
   /** The parts of every island's sign, for picking with the pointer. Each carries `userData.signIsland`. */
   signHits(): THREE.Object3D[] {
-    return this.islands.flatMap((i) => i.nameSign.children)
+    return [...this.islands.flatMap((i) => i.nameSign.children), ...[...new Set(this.vendors.values())].flatMap((v) => v.nameSign.children)]
   }
 
   /** What hovering an island's sign says: the pillar's name and its traffic; null when the island is unknown. */
   signSummary(islandId: string): { name: string; lines: string[] } | null {
     const isl = this.islands.find((i) => i.group.id === islandId)
-    return isl ? { name: isl.group.displayName, lines: isl.trafficWords } : null
+    if (isl) return { name: isl.group.displayName, lines: isl.trafficWords }
+    const vi = [...new Set(this.vendors.values())].find((v) => v.id === islandId)
+    return vi ? { name: vi.name, lines: this.vendorTraffic.get(vi.id) ?? [] } : null
+  }
+
+  /** What hovering the airport says, when the point (x, z) of the world is on its ground; null anywhere else. */
+  airportAt(x: number, z: number): { name: string; lines: string[] } | null {
+    return this.airport?.contains(x, z) ? { name: 'Airport', lines: this.airport.tooltipLines() } : null
   }
 
   /** The pier's words for an island (see `pierLines`), or null when it has no pier. */
   pierSummary(islandId: string): { name: string; lines: string[] } | null {
     const isl = this.islands.find((i) => i.group.id === islandId)
     return isl && isl.harbour ? { name: isl.group.displayName, lines: pierLines(isl.messaging) } : null
+  }
+
+  /** The line under each third party's name on its sign. For tests. */
+  inspectVendorSigns(): { id: string; line: string }[] {
+    return [...new Set(this.vendors.values())].map((v) => ({ id: v.id, line: v.nameSign.userData.line() as string }))
   }
 
   /** What the signs say, for tests: each island's line under its name, and what the pier board gets for the pillar's messages. */
