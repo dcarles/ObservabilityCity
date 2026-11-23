@@ -675,9 +675,9 @@ export class Town {
       for (const isl of this.islands) if (isl.signpost) this.guard(`signpost ${isl.group.id}`, () => isl.signpost!.set(signLines(links, isl.nodeIds)))
     }
     for (const v of s.vendors) this.guard(`apply ${v.node.id}`, () => this.buildings.get(v.node.id)?.setNode(v.node))
-    // a third party's sign: what the town sends it, summed over the services on its island; nothing where no source measures it
+    // a third party's sign: what the town sends it, summed over the services on its island. A third party has no source of its own (its requests are listed as absent), so its rate is the calls the town is seen making to it, which come with `inbound`; nothing where neither measures it
     for (const vi of new Set(this.vendors.values())) this.guard(`vendor sign ${vi.id}`, () => {
-      const nodes = s.vendors.filter((v) => (v.islandId ?? v.node.id) === vi.id).map((v) => v.node).filter((n) => !isAbsent(n, 'requests'))
+      const nodes = s.vendors.filter((v) => (v.islandId ?? v.node.id) === vi.id).map((v) => v.node).filter((n) => n.inbound != null || !isAbsent(n, 'requests'))
       const rps = nodes.reduce((a, n) => a + n.requestsPerSecond, 0)
       this.vendorTraffic.set(vi.id, nodes.length > 0 && rps > 0 ? [`Requests in ${formatRate(rps)} rps`] : [])
       vi.nameSign.userData.setLine(nodes.length > 0 && rps > 0 ? `in ${formatRate(rps)} rps` : '')

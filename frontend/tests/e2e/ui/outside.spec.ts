@@ -388,9 +388,11 @@ test.describe('the airport and the islands on the pointer', () => {
     const got = await page.evaluate(() => {
       const c = (window as any).city
       const s = structuredClone(c.seen.last)
-      for (const v of s.vendors) { v.node.requestsPerSecond = 0; v.node.absent = (v.node.absent ?? []).filter((a: string) => a !== 'requests') }
+      // a third party has no source of its own, so its requests are absent; the rate is what the town is seen sending it
+      for (const v of s.vendors) { v.node.requestsPerSecond = 0; v.node.inbound = null; v.node.absent = [...new Set([...(v.node.absent ?? []), 'requests'])] }
       const v = s.vendors.find((x: any) => x.node.id === 'ext.mailer')
       v.node.requestsPerSecond = 8
+      v.node.inbound = [{ from: 'cc.notify-worker', requestsPerSecond: 8 }]
       c.feed(s)
       const island = c.town.vendors.get('ext.mailer')
       const same = s.vendors.filter((x: any) => (x.islandId ?? x.node.id) === island.id).reduce((a: number, x: any) => a + x.node.requestsPerSecond, 0)
