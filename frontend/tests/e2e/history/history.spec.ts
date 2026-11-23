@@ -45,14 +45,15 @@ test.describe('time travel on a live town', () => {
     await expect(page.locator('#history-pop')).toBeHidden()
   })
 
-  test('a jump says in the console how long its frame took and how the animation ran', async ({ page, request }) => {
+  test('a jump says in the console how long its frame took and how the animation ran, and a rebuild of the town says why', async ({ page, request }) => {
     await waitForFrames(request, 3)
     const lines: string[] = []
-    page.on('console', (m) => { if (m.text().startsWith('History ')) lines.push(m.text()) })
+    page.on('console', (m) => { if (/^(History|Town rebuilt) /.test(m.text())) lines.push(m.text()) })
     await openTown(page, '&machine=car')
     await page.evaluate(() => (window as unknown as Win).city.history.goTo(Date.now() - 15_000))
     await page.locator('#history-skip').click()
     await expect(page.locator('#history-travel')).toBeHidden()
+    expect(lines.some((l) => /^Town rebuilt in \d+ ms because no town built yet\.$/.test(l))).toBe(true)
     await expect.poll(() => lines.some((l) => /^History jump: the frame came in \d+ ms and was put on the town in \d+ ms\.$/.test(l))).toBe(true)
     await expect.poll(() => lines.some((l) => /^History animation: \d+ frames in \d+ ms, the slowest \d+ ms, \d+ over 50 ms\.$/.test(l))).toBe(true)
   })

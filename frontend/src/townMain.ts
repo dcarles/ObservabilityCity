@@ -304,6 +304,7 @@ export async function startTown(): Promise<void> {
     try {
       if (!town.matches(s)) {
         const started = performance.now()
+        const why = town.differences(s)
         const before = town.islands.map((i) => i.group.id).join('|')
         const gone = town.root.children.filter((c) => c !== town.cars.object && c !== town.boats.object && c !== town.overlay.object)
         town.root.remove(...gone)
@@ -316,6 +317,8 @@ export async function startTown(): Promise<void> {
         town.bounds.makeEmpty()
         town.build(s)
         seen.buildMs = performance.now() - started
+        // a rebuild freezes the page for a moment, so the console says how long and why
+        console.info(`Town rebuilt in ${Math.round(seen.buildMs)} ms because ${why.slice(0, 6).join('; ')}${why.length > 6 ? `; and ${why.length - 6} more` : ''}.`)
         stage.frame(town.extent)
         // the same islands as before (only a service came or went): the camera stays where the viewer put it
         if (town.islands.map((i) => i.group.id).join('|') !== before) stage.home(true)

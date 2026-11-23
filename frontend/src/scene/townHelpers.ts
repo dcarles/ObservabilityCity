@@ -49,10 +49,49 @@ export function parkProps(x: number, z: number): THREE.Object3D[] {
   return out
 }
 
+/**
+ * What the town's layout depends on, in named parts: the town, each group's bridges, assets and messaging, each system with its kind, tenants and calls, each vendor and the links.
+ * The town is built again when any part differs, and the names say which one.
+ */
+export function layoutParts(s: Snapshot): Map<string, string> {
+  const parts = new Map<string, string>()
+  parts.set('town', `${s.townId}|${s.environment ?? ''}`)
+  for (const g of s.groups) {
+    parts.set(`group ${g.id}`, `${g.configError ? '!' : ''}${g.hasBridge === false ? 'nb' : 'b'}${g.hasRingBridge ? 'r' : ''}${g.flow ? 'f' : ''}`)
+    for (const n of g.nodes) parts.set(`system ${n.id}`, `${n.kind}/${n.tenants != null ? 'T' : ''}/${n.service ?? ''}/${n.calls.join('+')}/${(n.gatewayCalls ?? []).join('+')}`)
+    parts.set(`assets of ${g.id}`, (g.assets ?? []).map((a) => `${a.id}/${a.shape}/${a.service ?? ''}/${a.group ?? ''}`).join('+'))
+    parts.set(`topics of ${g.id}`, (g.messaging?.topics ?? []).map((t) => t.name).join('+'))
+    parts.set(`subscriptions of ${g.id}`, (g.messaging?.subscriptions ?? []).map((x) => `${x.topic}>${x.consumer}`).join('+'))
+  }
+  for (const v of s.vendors ?? []) parts.set(`vendor ${v.node.id}`, `${v.islandId ?? ''}<${v.calledBy.join('+')}>${(v.calls ?? []).join('+')}`)
+  parts.set('links', edgeKey(s))
+  return parts
+}
+
+/** The order of the groups matters to the layout too, so it is part of the key. */
 export function layoutKey(s: Snapshot): string {
-  const groups = s.groups.map((g) => `${g.id}${g.configError ? '!' : ''}:${g.nodes.map((n) => `${n.id}/${n.kind}/${n.tenants != null ? 'T' : ''}/${n.service ?? ''}/${n.calls.join('+')}/${(n.gatewayCalls ?? []).join('+')}`).join(',')}|${g.hasBridge === false ? 'nb' : 'b'}${g.hasRingBridge ? 'r' : ''}${g.flow ? 'f' : ''}|${(g.assets ?? []).map((a) => `${a.id}/${a.shape}/${a.service ?? ''}/${a.group ?? ''}`).join('+')}|${(g.messaging?.topics ?? []).map((t) => t.name).join('+')}|${(g.messaging?.subscriptions ?? []).map((x) => `${x.topic}>${x.consumer}`).join('+')}`).join(';')
-  const vendors = (s.vendors ?? []).map((v) => `${v.node.id}@${v.islandId ?? ''}<${v.calledBy.join('+')}>${(v.calls ?? []).join("+")}`).join(';')
-  return `${s.townId}|${s.environment ?? ''}|${groups}|${vendors}|${edgeKey(s)}`
+  return `${[...layoutParts(s)].map(([k, v]) => `${k}=${v}`).join(';')}`
+}
+
+/** What differs between two layouts, by part name: a part that came, one that went, and one that changed (with the old and the new text, cut short). */
+export function layoutDifferences(before: ReadonlyMap<string, string>, after: ReadonlyMap<string, string>): string[] {
+  const cut = (x: string): string => (x.length > 60 ? `${x.slice(0, 57)}...` : x)
+  // only the stretch that differs is shown: what is the same at the start and at the end of the two texts is left out
+  const stretch = (a: string, b: string): [string, string] => {
+    let head = 0
+    while (head < a.length && head < b.length && a[head] === b[head]) head++
+    let tail = 0
+    while (tail < a.length - head && tail < b.length - head && a[a.length - 1 - tail] === b[b.length - 1 - tail]) tail++
+    return [cut(a.slice(head, a.length - tail)), cut(b.slice(head, b.length - tail))]
+  }
+  const out: string[] = []
+  for (const [k, v] of after) {
+    if (!before.has(k)) out.push(`${k} came`)
+    else if (before.get(k) !== v) { const [x, y] = stretch(before.get(k)!, v); out.push(`${k} changed: "${x}" to "${y}"`) }
+  }
+  for (const k of before.keys()) if (!after.has(k)) out.push(`${k} went`)
+  if (out.length === 0) out.push('the order of the groups or systems') // the same parts in another order
+  return out
 }
 
 /** Where a straight line from the hub's centre leaves the hub's coast (inset a little). */
