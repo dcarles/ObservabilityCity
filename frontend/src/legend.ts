@@ -219,7 +219,7 @@ export const LEGEND: readonly LegendSection[] = [
       { id: 'btn-search', sees: 'Search ( / )', means: 'Find a system or island', tone: 'neutral', icon: '🔎' },
       { id: 'btn-lighting', sees: 'Day / Dusk', means: 'Switch the light (remembered)', tone: 'neutral', icon: '🌗' },
       { id: 'btn-dashboard', sees: 'Dashboard', means: 'The same data as a plain table', tone: 'neutral', icon: '📋' },
-      { id: 'btn-home', sees: 'Home', means: 'Frame the whole town again', tone: 'neutral', icon: '🏠' },
+      { id: 'btn-home', sees: 'Home', means: 'Frame the whole town again (or press H)', tone: 'neutral', icon: '🏠' },
     ],
   },
   {

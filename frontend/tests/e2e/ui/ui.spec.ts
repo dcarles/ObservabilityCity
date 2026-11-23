@@ -666,3 +666,34 @@ test.describe('the bar and the panels at Dusk', () => {
     })
   }
 })
+
+test.describe('the H key', () => {
+  const pose = (page: import('@playwright/test').Page) => page.evaluate(() => { const c = (window as any).city; return [...c.stage.camera.position.toArray(), ...c.stage.controls.target.toArray()] })
+  const away = (page: import('@playwright/test').Page) => page.evaluate(() => { const c = (window as any).city; c.stage.focus(c.town.islandFocusOf('cc').target, 40, true, 1) })
+
+  test('frames the whole town again, the same view as the Home button', async ({ town, page }) => {
+    await town.open()
+    await away(page)
+    await page.locator('#home').click()
+    await town.step(4)
+    const home = await pose(page)
+    await away(page)
+    await town.step(1)
+    expect(await pose(page)).not.toEqual(home)
+    await page.keyboard.press('h')
+    await town.step(4)
+    const after = await pose(page)
+    for (let i = 0; i < 6; i++) expect(after[i]).toBeCloseTo(home[i], 1)
+  })
+
+  test('does nothing while typing in the search box', async ({ town, page }) => {
+    await town.open()
+    await away(page)
+    await town.step(1)
+    const before = await pose(page)
+    await page.locator('#search-input').fill('h')
+    await town.step(4)
+    expect(await page.locator('#search-input').inputValue()).toBe('h')
+    expect(await pose(page)).toEqual(before)
+  })
+})
