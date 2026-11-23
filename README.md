@@ -33,7 +33,7 @@ And as an architecture diagram (`?view=architecture`): a box for each pillar, th
 | A browser with WebGL | Any current Chrome, Edge, Firefox or Safari | The 3D town |
 | Git | Any | To clone |
 
-**You do not need Docker, Docker Desktop, Rancher or any container tool.** The app keeps no history store, so nothing runs in a container. The .NET Aspire dashboard that opens with the app runs as a normal process.
+**You do not need Docker, Docker Desktop, Rancher or any container tool.** The app keeps its history as plain files in the town folder, so nothing runs in a container. The .NET Aspire dashboard that opens with the app runs as a normal process.
 
 On Windows: `winget install Microsoft.DotNet.SDK.10` and `winget install OpenJS.NodeJS.LTS`, then open a new terminal.
 
@@ -73,7 +73,7 @@ The browser app proxies `/api` and `/hubs` to the backend, so there is nothing t
 
 ## Try it
 
-Hover a building for its numbers. Drag to orbit, scroll to zoom, right-drag to pan, **Home** frames the whole town. Click a building, or pick one in the search box (press `/` to focus it), and the camera glides to it and keeps its name board readable. Search also finds islands. Any drag cancels a glide.
+Hover a building for its numbers. Drag to orbit, scroll to zoom, right-drag to pan, **Home** (or the `H` key) frames the whole town. Click a building, or pick one in the search box (press `/` to focus it), and the camera glides to it and keeps its name board readable. Search also finds islands, and a click on an island's ground (or the airport's) glides to the whole island. Any drag cancels a glide.
 
 ### Demo and live towns
 
@@ -238,6 +238,8 @@ On a pull request the check writes annotations on the files and posts one commen
 
 **A broken pillar file does not stop the town.** The running app skips a pillar file with problems and draws its island as a *config error* island (a board saying what is wrong), drops call links that point nowhere, and lists everything it worked around in a small panel under the top bar. The registry folder is watched: a reload that fails keeps the last good registry and says so in the panel. If `town.yaml`, `defaults.yaml`, `hub.yaml` or `third-parties.yaml` is unreadable at start-up the app does not start, since there is nothing to show. The page also refuses a snapshot it cannot draw and keeps the last good town.
 
+**Dependencies.** Dependabot opens one pull request a week (Mondays) for each of npm, NuGet and GitHub Actions that holds all the minor and patch updates, and one pull request for each major update (`.github/dependabot.yml`).
+
 **Pull request checks.** `.github/workflows/ci.yml` runs side by side the backend tests, the frontend tests and build, the registry checks and the UI scenarios (spread over five jobs, one per group of browser suites) and a final job called `PR checks` that passes when none of them failed. A first job, `What changed` (`.github/scripts/changed-areas.mjs`), skips the jobs a pull request does not need: documents run no tests (the few the backend tests read run the backend tests only), and a change inside `frontend/` skips the backend tests. Anything it does not recognise, and every push to `main`, runs everything. `.github/workflows/slow.yml` runs the stress towns, the full sample town and all three themes (a pull request runs only the harbour theme) on merge to main and every night.
 
 To make it required on `main`: GitHub, Settings, Branches, Add branch protection rule (or Rulesets, New branch ruleset), branch name pattern `main`, tick *Require a pull request before merging* and *Require status checks to pass before merging*, search for and add **PR checks**, save. Run CI once first, or the check name will not be offered in the search.
@@ -331,6 +333,7 @@ fake: { undeclaredTenants: [zeta-trading] }   # fake source only: a tenant that 
 
 - **Top bar:** the town name; dropdowns for the environment, tenants, islands, layers and theme; a search box (`/`); the totals (requests per second, errors, p99, dead letters, degraded, down, no data, incidents); the connection state; Day/Dusk, the legend (`?`) and Home. On a narrow window the bar wraps to more rows and the panels start below it.
 - **Totals follow what you look at.** With the island filter on they count only the islands on screen (and the third parties a visible island calls). With tenants followed, requests per second are those tenants' share and degraded/down follow their own databases; errors, p99, dead letters and incidents are not split by tenant, and the tooltips say so.
+- **The airport:** hovering it shows the arrivals in req/s, the callers' names when the outside traffic is not measured, and the traffic inside the town. A vendor's sign shows its req/s from our calls to it, even when the vendor has no source of its own.
 - **Island names:** hovering an island's ground (not a building) shows its name in the tooltip; zoomed out, a name sign floats over every island and third-party island and fades away as the camera comes close (`islandLabels.ts`).
 - **Island filter** (`?islands=ldg,pay`, or the Islands dropdown): the backend sends a town with only those islands and the hub, so it also counts only what is on screen. In a hub-and-spoke town a call to a hidden island ends at the hub plaza, and a call from one starts there. In a town whose islands call each other directly, an island with traffic to or from a hidden island gets a signpost naming it. A third party's island can be chosen in the same dropdown (under "Third parties"): it then shows even when no chosen island calls it, and one that is left out is listed as hidden (`view.hidden[].vendor`). An id the town does not have is ignored and the page says so. Over SignalR the choice is `?islands=` on connect and the `SetIslands` hub method after; `GET /api/snapshot/latest?env=&islands=` does the same over HTTP.
 - **Layers** (`?hide=traffic,workers`, `?show=dependencies`): Traffic (cars), Messaging (boats, crates, the dead-letter pen, the broker's counts line), Databases, Workers, and Dependencies (off until shown). A hidden family cannot be hovered or clicked.
@@ -364,7 +367,7 @@ The sample town has 17 islands, about 110 buildings and up to 420 cars. Roads, l
 | `Fake:DayLengthSeconds` | `120` | Real seconds per simulated day |
 | `Polling:AlwaysOn` | `false` | A live environment reads its sources only while a browser looks at it (and 2 minutes after). `true` keeps every environment polling all the time |
 | `History:Enabled` | `true` | A live town saves its snapshots so the town can be taken back in time (the History button). A demo town never does. `false` turns it off |
-| `History:Days` | `7` | How many days back the town can go, and how long frames are kept (1 to 14). Gaps inside these days are rebuilt from the cloud while you look at an environment (see docs/connect-your-company.md) |
+| `History:Days` | `7` | How many days back the town can go, and how long frames are kept (1 to 14; an environment file can keep its own number with `history: { days: N }`, see docs/config-reference.md). Gaps inside these days are rebuilt from the cloud while you look at an environment (see docs/connect-your-company.md) |
 | `History:IntervalSeconds` | `300` | The gap between two saved frames, on the clock (10:00, 10:05, ...). At least 10 |
 | `History:Path` | the town's own folder, in `_history/` | Where frames are kept: one folder for each town under this path. Never commit it (`_history/` is in `.gitignore`) |
 | `Snapshot:IntervalSeconds` | `2` | How often a snapshot is built (the newest is always at `/api/snapshot/latest`) |

@@ -50,7 +50,7 @@ Each signal has exactly one visual meaning, and it reads the same in every theme
 | Tenants | A store with one database per tenant is a yard with a unit for each tenant. Test tenants are paler and striped and never go past amber; an undeclared tenant is a purple unit marked "?" |
 | Incident | Weather over the island it belongs to: light cloud for sev 4, overcast for sev 3, rain for sev 2, a storm with lightning for sev 1. The rest of the town stays sunny |
 | Cloud health report | A red "!" above a building whose resource the cloud provider reports as degraded or unavailable |
-| Outside callers | An airport whose planes land at the rate of outside traffic, with an arrivals board. Taxis carry the requests from the terminal into the town |
+| Outside callers | An airport whose planes land at the rate of outside traffic, with an arrivals board. Taxis carry the requests from the terminal into the town. Hovering it shows the arrivals and the traffic inside the town; a click zooms to it |
 | Third parties | Vendor islands outside the ring road. A call leaves the island's back gate, goes round the ring road and down the vendor's own road |
 | Who calls whom | The dependency overlay: dashed arcs between islands, as thick as the traffic between them (a layer, off until shown) |
 | Lost & found | An optional island, id `lost-found`, with boxes and bins by its gate, for systems you declare that no team owns. It always stands last |
@@ -60,6 +60,8 @@ Each signal has exactly one visual meaning, and it reads the same in every theme
 ## Views
 
 **The town.** The 3D view: orbit, zoom, pan, Home (also the H key), and search (`/`) for a system or island. Clicking a building opens the inspector drawer with Overview, Links, Logs and Config tabs. The top bar has the town, environment, tenant, island, layer, theme and quality choices, the totals, the connection state, Day/Dusk, the legend, Home, the Wall button and a View list (Town, Dashboard, Architecture; in a "⋯" menu when the bar is full). Notices (config problems, failed reloads, unmapped jobs) and the Unknown hosts panel sit under it. The island filter (`?islands=`) is applied by the backend, so totals count only what is on screen; layers (`?hide=`, `?show=dependencies`) only hide things in the page.
+
+**Time travel.** The History button in the top bar (Town, Dashboard and Architecture) takes the page back up to `History:Days` days (7 by default, at most 14, or an environment's own `history.days`). A live town saves a frame every five minutes as plain gzip files in its folder, and the gaps are rebuilt from the cloud while someone looks at an environment, so a past moment is either recorded or marked "Rebuilt from the cloud · approximate". A page always opens live; replay runs at 1x to 60x and ends by switching to live. The how-it-fits-together page has the details. A demo town has no history, and wall mode is live only.
 
 **The dashboard.** `?view=dashboard`, remembered per browser. It reads the same snapshot and never loads Three.js. It has a service table (traffic with the share per region, errors, p99 against the SLA, CPU and memory per region, and the reason a service is amber or red), six boxes at the top (Down, Degraded, Dead letters, Total traffic, Message flow, Incidents) and a freshness marker for each source.
 
@@ -206,12 +208,11 @@ Real sources are added one adapter at a time behind the same town, so the town i
 **Next**
 
 5. **Incidents and third parties.** An incidents adapter so real incidents drive the weather over the right island (today only the fake source makes weather, and provider health reports go to the Incidents list), and third-party health from our own outbound calls in live towns.
-6. **Hosting.** Sign-in, a hosted deployment, and what that needs from polling and security (`Polling:AlwaysOn`, `Security:AllowedOrigins` are already there).
+6. **Hosting.** Sign-in, a hosted deployment, and what that needs from polling and security (`Polling:AlwaysOn`, `Security:AllowedOrigins` are already there). History needs one process writing it and storage that survives a restart (a persistent volume or blob storage behind the store interface), because a container's disk is wiped on restart.
 
 **Later, or ideas**
 
 - Adapters for other metric stores, message brokers and platforms.
-- History and replay of the town.
 - Hysteresis, so a state that hovers at a threshold does not flicker.
 - Deployment crews from CI/CD events.
 
@@ -228,4 +229,3 @@ Open questions:
 - [ ] Incidents: how do open incidents map to islands and systems (labels, service tags)?
 - [ ] Third parties: which vendors matter most, and are their status pages worth a second signal?
 - [ ] Hosting: where it should live, how people sign in, and whether it then needs per-team views beyond the island filter.
-- [ ] History and replay: how often to keep a snapshot, where to store it and for how long.
