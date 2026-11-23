@@ -197,8 +197,6 @@ export interface Strip {
   lines: string[]
   /** The stretches with no recording: [x, width]. */
   gaps: [number, number][]
-  /** The stretches made of rebuilt frames rather than recorded ones: [x, width]. */
-  rebuilt: [number, number][]
   /** The midnights inside the range: x and the day's label. */
   days: { x: number; label: string }[]
   /** The largest count drawn (never below 1, so a quiet town is a flat line and not a scaled-up one). */
@@ -249,7 +247,6 @@ export function buildStrip(points: readonly { at: number; unhealthy: number; reb
   const areas: string[] = []
   const lines: string[] = []
   const gaps: [number, number][] = []
-  const rebuilt: [number, number][] = []
   let cursor = 0
   for (const s of stretches) {
     // a lone frame is drawn as a short bar one gap wide, so it can be seen and clicked
@@ -260,14 +257,6 @@ export function buildStrip(points: readonly { at: number; unhealthy: number; reb
     const xy = s.length === 1 ? [[first, y(s[0].unhealthy)], [last, y(s[0].unhealthy)]] : s.map((p) => [stripX(g, p.at), y(p.unhealthy)])
     const line = xy.map(([x, yy], i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(1)} ${yy.toFixed(1)}`).join(' ')
     lines.push(line)
-    // each run of rebuilt frames inside the stretch gets its own mark, up to the next frame after it
-    for (let i = 0; i < s.length; i++) {
-      if (!s[i].rebuilt) continue
-      const from = stripX(g, s[i].at)
-      while (i + 1 < s.length && s[i + 1].rebuilt) i++
-      const to = i + 1 < s.length ? stripX(g, s[i + 1].at) : Math.max(last, from + 2)
-      rebuilt.push([from, Math.max(2, to - from)])
-    }
     areas.push(`${line} L${last.toFixed(1)} ${base} L${first.toFixed(1)} ${base} Z`)
   }
   if (cursor < g.width) gaps.push([cursor, g.width - cursor])
@@ -277,7 +266,7 @@ export function buildStrip(points: readonly { at: number; unhealthy: number; reb
   for (; d.getTime() < g.to; d.setDate(d.getDate() + 1)) days.push({ x: stripX(g, d.getTime()), label: `${WEEKDAYS[d.getDay()]} ${d.getDate()}` })
   const ticks: { value: number; y: number }[] = []
   for (let v = 0; v <= scale.top; v += scale.step) ticks.push({ value: v, y: y(v) })
-  return { areas, lines, gaps, rebuilt, days, max, top: scale.top, ticks }
+  return { areas, lines, gaps, days, max, top: scale.top, ticks }
 }
 
 /**

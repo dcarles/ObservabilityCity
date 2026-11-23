@@ -313,7 +313,7 @@ test.describe('time travel on a live town', () => {
     return (await (await request.get(`${API}/api/history/frame?at=${encodeURIComponent(range.newest)}`)).json()) as { at: string; snapshot: unknown }
   }
 
-  test('a rebuilt frame says so: the badge, the word on the button and a mark on the strip', async ({ page, request }) => {
+  test('a rebuilt frame says so: the badge and the word on the button', async ({ page, request }) => {
     await waitForFrames(request, 3)
     const frame = { ...(await realFrame(request)), at: new Date(Date.now() - 16_000).toISOString() }
     await page.route('**/api/history/range*', async (route) => {
@@ -332,8 +332,9 @@ test.describe('time travel on a live town', () => {
     await expect(page.locator('#history-rebuilt')).toBeVisible()
     await expect(page.locator('#history-rebuilt')).toContainText('Rebuilt from the cloud')
     await expect(page.locator('#history-button')).toContainText('rebuilt')
+    // the strip does not tell recorded from rebuilt frames: only gaps are marked
     await page.locator('#history-button').click()
-    expect(await page.locator('#history-strip-svg .rebuilt').count()).toBeGreaterThan(0)
+    await expect(page.locator('#history-strip-svg .rebuilt')).toHaveCount(0)
   })
 
   test('a time with no frame that the server can rebuild shows a loading card, then the rebuilt town', async ({ page, request }) => {

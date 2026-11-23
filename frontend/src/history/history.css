@@ -21,7 +21,8 @@ body.history::after { content: ''; position: fixed; inset: 0; pointer-events: no
 #history-pop input[type='datetime-local'] { padding: 3px 6px; border-radius: 6px; border: 1px solid var(--line, #d9dfe5); background: transparent; color: inherit; }
 #history-strip { position: relative; margin: 2px 0 6px 26px; user-select: none; touch-action: none; }
 #history-strip svg { display: block; width: 100%; height: 76px; cursor: pointer; }
-#history-strip .gap { fill: color-mix(in srgb, var(--muted, #6c7480) 18%, transparent); }
+/* a stretch with no data is the only thing tinted: recorded and rebuilt frames look the same */
+#history-strip .gap { fill: rgba(143, 178, 255, 0.28); }
 #history-strip .area { fill: color-mix(in srgb, var(--warn, #b7791f) 30%, transparent); }
 #history-strip .line { fill: none; stroke: var(--warn, #b7791f); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
 #history-strip .tick { stroke: var(--muted, #6c7480); stroke-width: 1; opacity: 0.45; vector-effect: non-scaling-stroke; }
@@ -77,5 +78,4 @@ body.history::after { content: ''; position: fixed; inset: 0; pointer-events: no
 /* the picture on screen was worked out afterwards from the cloud, not recorded */
 #history-rebuilt { position: fixed; z-index: 14; top: 58px; left: 50%; transform: translateX(-50%); padding: 3px 10px; border-radius: 999px; font-size: 12px; background: rgba(40, 60, 110, 0.85); color: #dbe8ff; border: 1px solid #8fb2ff; pointer-events: auto; }
 #history-nodata.filling { border-color: #8fb2ff; }
-#history-strip-svg .rebuilt { fill: rgba(143, 178, 255, 0.28); stroke: none; pointer-events: none; }
 #history-strip-svg .gap.fillable { opacity: 0.55; }
