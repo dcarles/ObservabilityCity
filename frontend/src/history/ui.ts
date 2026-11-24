@@ -367,7 +367,7 @@ export function mountHistory(controller: HistoryController, mount: HistoryMount)
 
   controller.subscribe(() => {
     const t = controller.state.travel
-    if (t && t.id !== travelId) { travelId = t.id; playTravel(t.from, t.to) }
+    if (t && t.id !== travelId) { travelId = t.id; if (!t.quiet) playTravel(t.from, t.to) }
     render()
   })
   render()
