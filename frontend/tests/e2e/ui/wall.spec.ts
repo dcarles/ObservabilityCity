@@ -443,7 +443,9 @@ test.describe('the Wall button and the ways out', () => {
     await page.locator('#wall-fullscreen').click()
     await page.waitForFunction(() => !!document.fullscreenElement)
     // headless Chromium leaves full screen without telling the page, so the event a real browser sends is sent by hand
+    // (leaving the wall navigates the page, which can end this call before it answers: that is the leaving, not a failure)
     await page.evaluate(async () => { await document.exitFullscreen(); document.dispatchEvent(new Event('fullscreenchange')) })
+      .catch((e: Error) => { if (!/context was destroyed|navigation/i.test(e.message)) throw e })
     await page.waitForFunction(() => !document.body.classList.contains('wall') && (window as any).city?.seen.snapshots > 0)
   })
 })
