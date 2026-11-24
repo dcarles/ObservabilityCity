@@ -251,6 +251,10 @@ export interface components {
             kind: string;
             calledBy: string[];
         };
+        ApiBodyInfo: {
+            description?: string | null;
+            representations: components["schemas"]["ApiRepresentation"][];
+        };
         ApiCatalogueList: {
             /** Format: date-time */
             at: string;
@@ -264,6 +268,13 @@ export interface components {
             policy: components["schemas"]["ApiPolicyInfo"];
             differences: string[];
         };
+        ApiField: {
+            name: string;
+            type: string;
+            required: boolean;
+            description?: string | null;
+            children: components["schemas"]["ApiField"][];
+        };
         ApiFragmentInfo: {
             id: string;
             xml?: string | null;
@@ -275,7 +286,8 @@ export interface components {
             urlTemplate: string;
             description?: string | null;
             parameters: components["schemas"]["ApiParameterInfo"][];
-            responses: number[];
+            request: components["schemas"]["ApiBodyInfo"];
+            responses: components["schemas"]["ApiResponseInfo"][];
         };
         ApiParameterInfo: {
             name: string;
@@ -286,6 +298,18 @@ export interface components {
         ApiPolicyInfo: {
             xml?: string | null;
             fragments: components["schemas"]["ApiFragmentInfo"][];
+        };
+        ApiRepresentation: {
+            contentType: string;
+            typeName?: string | null;
+            example?: string | null;
+            fields: components["schemas"]["ApiField"][];
+        };
+        ApiResponseInfo: {
+            /** Format: int32 */
+            statusCode: number;
+            description?: string | null;
+            representations: components["schemas"]["ApiRepresentation"][];
         };
         ApiSummary: {
             id: string;

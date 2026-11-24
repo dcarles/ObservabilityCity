@@ -647,8 +647,20 @@ public sealed record ApiSummary(string Id, string Name, string DisplayName, stri
 /// <summary>One API with its operations and the policy set on it. Differences say what is not the same on the gateways that serve it (empty when all agree or only one does).</summary>
 public sealed record ApiDetail(ApiSummary Summary, IReadOnlyList<ApiOperationInfo> Operations, ApiPolicyInfo Policy, IReadOnlyList<string> Differences);
 
-/// <summary>One operation of an API as the gateway describes it: the call (method, URL template, parameters) and the response codes it can answer.</summary>
-public sealed record ApiOperationInfo(string Id, string Name, string Method, string UrlTemplate, string? Description, IReadOnlyList<ApiParameterInfo> Parameters, IReadOnlyList<int> Responses);
+/// <summary>One operation of an API as the gateway describes it: the call (method, URL template, parameters, request body) and the responses it can answer. Request has no representations when no body is described.</summary>
+public sealed record ApiOperationInfo(string Id, string Name, string Method, string UrlTemplate, string? Description, IReadOnlyList<ApiParameterInfo> Parameters, ApiBodyInfo Request, IReadOnlyList<ApiResponseInfo> Responses);
+
+/// <summary>The body of a request: its description and one representation for each content type.</summary>
+public sealed record ApiBodyInfo(string? Description, IReadOnlyList<ApiRepresentation> Representations);
+
+/// <summary>One response an operation can answer: the status code, what it means and the bodies it can carry.</summary>
+public sealed record ApiResponseInfo(int StatusCode, string? Description, IReadOnlyList<ApiRepresentation> Representations);
+
+/// <summary>A body in one content type: the type's name, an example when the gateway holds one, and the fields of the type a few levels deep (empty when its definition is not known).</summary>
+public sealed record ApiRepresentation(string ContentType, string? TypeName, string? Example, IReadOnlyList<ApiField> Fields);
+
+/// <summary>One field of a body type. Type is in words ("string (uuid)", "array of Contact"); Children are the fields of an object or of the items of an array.</summary>
+public sealed record ApiField(string Name, string Type, bool Required, string? Description, IReadOnlyList<ApiField> Children);
 
 /// <summary>One parameter of an operation. In is path, query or header.</summary>
 public sealed record ApiParameterInfo(string Name, string In, string? Type, bool Required);

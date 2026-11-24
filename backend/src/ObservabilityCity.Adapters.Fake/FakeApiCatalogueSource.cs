@@ -48,11 +48,21 @@ public sealed class FakeApiCatalogueSource(IRegistryProvider registries) : IApiC
     {
         var path = apiId.Replace('-', '/');
         var gateways = Gateways(registries.Current).Select(g => g.Id).ToList();
+        ApiRepresentation Json(string type, string? example, params ApiField[] fields) => new("application/json", type, example, fields);
+        ApiResponseInfo Reply(int code, string text, params ApiRepresentation[] bodies) => new(code, text, bodies);
+        var item = Json("Item", "{\n  \"id\": \"3f2b8c1e\",\n  \"name\": \"Example\"\n}", new ApiField("id", "string (uuid)", true, null, []), new ApiField("name", "string", true, null, []),
+            new ApiField("address", "object", false, null, [new ApiField("line1", "string", true, null, []), new ApiField("postcode", "string", false, null, [])]));
+        var problem = Json("Problem", null, new ApiField("title", "string", true, null, []), new ApiField("status", "integer", false, null, []));
+        var created = new ApiBodyInfo("What to create", [Json("CreateItem", "{\n  \"name\": \"Example\"\n}", new ApiField("name", "string", true, "The display name", []), new ApiField("status", "string · enum Active, Suspended", false, null, []),
+            new ApiField("address", "object", true, null, [new ApiField("line1", "string", true, null, []), new ApiField("postcode", "string", false, null, [])]))]);
         var operations = new List<ApiOperationInfo>
         {
-            new("list", "List", "GET", $"/{path}", "Lists what the service holds.", [new("page", "query", "integer", false), new("context-tenantid", "header", "string", true)], [200, 401, 429, 500]),
-            new("get", "Get", "GET", $"/{path}/{{id}}", "Reads one.", [new("id", "path", "string", true), new("context-tenantid", "header", "string", true)], [200, 404, 500]),
-            new("create", "Create", "POST", $"/{path}", "Adds one.", [new("context-tenantid", "header", "string", true)], [201, 400, 409, 500]),
+            new("list", "List", "GET", $"/{path}", "Lists what the service holds.", [new("page", "query", "integer", false), new("context-tenantid", "header", "string", true)], new ApiBodyInfo(null, []),
+                [Reply(200, "A page of items", item), Reply(401, "Not signed in"), Reply(429, "Too many calls", problem), Reply(500, "Unexpected error", problem)]),
+            new("get", "Get", "GET", $"/{path}/{{id}}", "Reads one.", [new("id", "path", "string", true), new("context-tenantid", "header", "string", true)], new ApiBodyInfo(null, []),
+                [Reply(200, "The item", item), Reply(404, "No such item"), Reply(500, "Unexpected error", problem)]),
+            new("create", "Create", "POST", $"/{path}", "Adds one.", [new("context-tenantid", "header", "string", true)], created,
+                [Reply(201, "The item that was created", item), Reply(400, "The request is not valid", problem), Reply(409, "It exists already", problem), Reply(500, "Unexpected error", problem)]),
         };
         // the second gateway has one operation fewer and a different rate limit, so the demo shows what a difference looks like
         if (gateways.IndexOf(gateway.Id) > 0) operations.RemoveAt(2);

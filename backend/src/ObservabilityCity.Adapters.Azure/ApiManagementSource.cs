@@ -40,8 +40,9 @@ public static partial class ApiManagementReading
     }
 
     /// <summary>The operations of one answer page and the next page's address.</summary>
-    public static (IReadOnlyList<ApiOperationInfo> Operations, string? Next) ParseOperations(string json)
+    public static (IReadOnlyList<ApiOperationInfo> Operations, string? Next) ParseOperations(string json, IReadOnlyDictionary<string, JsonDocument>? schemas = null)
     {
+        schemas ??= new Dictionary<string, JsonDocument>();
         using var doc = JsonDocument.Parse(json);
         var operations = new List<ApiOperationInfo>();
         if (doc.RootElement.TryGetProperty("value", out var value) && value.ValueKind == JsonValueKind.Array)
@@ -56,12 +57,16 @@ public static partial class ApiManagementReading
                     Parameters(request, "queryParameters", "query", parameters);
                     Parameters(request, "headers", "header", parameters);
                 }
-                var responses = new List<int>();
+                var body = new ApiBodyInfo(null, []);
+                var responses = new List<ApiResponseInfo>();
+                if (p.TryGetProperty("request", out var rq) && rq.ValueKind == JsonValueKind.Object)
+                    body = new ApiBodyInfo(Text(rq, "description"), ApiManagementSchemas.Representations(rq, schemas));
                 if (p.TryGetProperty("responses", out var rs) && rs.ValueKind == JsonValueKind.Array)
                     foreach (var r in rs.EnumerateArray())
-                        if (r.TryGetProperty("statusCode", out var code) && code.TryGetInt32(out var c)) responses.Add(c);
+                        if (r.TryGetProperty("statusCode", out var code) && code.TryGetInt32(out var c) && responses.All(x => x.StatusCode != c))
+                            responses.Add(new ApiResponseInfo(c, Text(r, "description"), ApiManagementSchemas.Representations(r, schemas)));
                 operations.Add(new ApiOperationInfo(id, Text(p, "displayName") ?? id, (Text(p, "method") ?? "").ToUpperInvariant(), Text(p, "urlTemplate") ?? "", Text(p, "description"),
-                    parameters, responses.Distinct().Order().ToList()));
+                    parameters, body, responses.OrderBy(x => x.StatusCode).ToList()));
             }
         return (operations, Text(doc.RootElement, "nextLink"));
     }
@@ -134,9 +139,13 @@ public sealed class ApiManagementSource(string name, AzureMonitorReader reader) 
     public async Task<SourceApiDetail> DetailAsync(GatewayRef gateway, string apiId, CancellationToken ct)
     {
         var operations = new List<ApiOperationInfo>();
+        IReadOnlyDictionary<string, JsonDocument> schemas = new Dictionary<string, JsonDocument>();
+        // the shared type definitions fill in the bodies; an API without them, or a gateway that will not say, still shows its operations
+        try { schemas = ApiManagementSchemas.ParseSchemas(await reader.GetAsync(gateway.Id, ApiManagementSchemas.SchemasUrl(gateway.Id, apiId), ct, Service)); }
+        catch (HttpRequestException) { }
         for (var url = ApiManagementReading.OperationsUrl(gateway.Id, apiId); url is not null;)
         {
-            var (page, next) = ApiManagementReading.ParseOperations(await reader.GetAsync(gateway.Id, url, ct, Service));
+            var (page, next) = ApiManagementReading.ParseOperations(await reader.GetAsync(gateway.Id, url, ct, Service), schemas);
             operations.AddRange(page);
             url = next;
         }

@@ -621,6 +621,24 @@
           }
         }
       },
+      "ApiBodyInfo": {
+        "required": [
+          "representations"
+        ],
+        "type": "object",
+        "properties": {
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "representations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ApiRepresentation"
+            }
+          }
+        }
+      },
       "ApiCatalogueList": {
         "required": [
           "at",
@@ -680,6 +698,36 @@
           }
         }
       },
+      "ApiField": {
+        "required": [
+          "name",
+          "type",
+          "required",
+          "children"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "children": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ApiField"
+            }
+          }
+        }
+      },
       "ApiFragmentInfo": {
         "required": [
           "id"
@@ -702,6 +750,7 @@
           "method",
           "urlTemplate",
           "parameters",
+          "request",
           "responses"
         ],
         "type": "object",
@@ -728,11 +777,13 @@
               "$ref": "#/components/schemas/ApiParameterInfo"
             }
           },
+          "request": {
+            "$ref": "#/components/schemas/ApiBodyInfo"
+          },
           "responses": {
             "type": "array",
             "items": {
-              "type": "integer",
-              "format": "int32"
+              "$ref": "#/components/schemas/ApiResponseInfo"
             }
           }
         }
@@ -774,6 +825,55 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/ApiFragmentInfo"
+            }
+          }
+        }
+      },
+      "ApiRepresentation": {
+        "required": [
+          "contentType",
+          "fields"
+        ],
+        "type": "object",
+        "properties": {
+          "contentType": {
+            "type": "string"
+          },
+          "typeName": {
+            "type": "string",
+            "nullable": true
+          },
+          "example": {
+            "type": "string",
+            "nullable": true
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ApiField"
+            }
+          }
+        }
+      },
+      "ApiResponseInfo": {
+        "required": [
+          "statusCode",
+          "representations"
+        ],
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "representations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ApiRepresentation"
             }
           }
         }

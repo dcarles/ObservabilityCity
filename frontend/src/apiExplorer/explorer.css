@@ -47,3 +47,15 @@
 .ae-open { padding: 3px 10px; border: 1px solid var(--accent); border-radius: 8px; background: none; color: var(--accent); font: inherit; font-weight: 600; cursor: pointer; }
 .ae-open:hover { background: var(--accent); color: #fff; }
 @media (max-width: 900px) { .ae-body { grid-template-columns: 1fr; overflow-y: auto; } .ae-tree, .ae-ops, .ae-detail { overflow: visible; border-right: 0; } }
+
+.ae-codes { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+button.ae-status { border: 0; color: inherit; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; opacity: 0.75; }
+button.ae-status.sel { opacity: 1; outline: 2px solid currentColor; }
+.ae-resp { padding: 8px 10px; background: var(--pill); border-radius: 6px; }
+.ae-tabs { display: flex; gap: 4px; margin-bottom: 6px; }
+.ae-tabs button { border: 1px solid var(--soft-line); background: none; color: inherit; font: inherit; font-size: 12px; padding: 2px 10px; border-radius: 6px; cursor: pointer; opacity: 0.8; }
+.ae-tabs button.on { background: var(--pill); font-weight: 700; opacity: 1; }
+.ae-fields { font: 12px/1.6 ui-monospace, Menlo, monospace; margin-top: 6px; overflow-x: auto; }
+.ae-ind { margin-left: 18px; }
+.ae-fold { display: inline-block; width: 16px; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; padding: 0; }
+.ae-ftype { opacity: 0.7; } .ae-req { color: var(--warn-ink); font-size: 11px; } .ae-fdesc { margin-left: 16px; opacity: 0.65; font-family: system-ui, sans-serif; }
