@@ -398,14 +398,17 @@ test.describe('time travel on a live town', () => {
   })
 
   // after the one above on purpose too: a step back asks the server to rebuild that hour
-  test('while paused the cars and the boats stand still, and a step to the next frame plays no animation and clears nothing', async ({ page, request }) => {
+  test('while paused the cars, the boats and the planes stand still, and a step to the next frame plays no animation and clears nothing', async ({ page, request }) => {
     await waitForFrames(request, 3)
     await openTown(page, '&machine=car')
     // the time the cars and the boats are told to move by, and how often they are told to clear
     await page.evaluate(() => {
-      const w = window as unknown as { city: any; moved: { cars: number; boats: number }; cleared: number }
-      w.moved = { cars: 0, boats: 0 }
+      const w = window as unknown as { city: any; moved: { cars: number; boats: number; planes: number }; cleared: number }
+      w.moved = { cars: 0, boats: 0, planes: 0 }
       w.cleared = 0
+      const airport = w.city.town.airport
+      const flown = airport.update.bind(airport)
+      airport.update = (dt: number, time: number, camera: unknown) => { w.moved.planes += dt; flown(dt, time, camera) }
       for (const kind of ['cars', 'boats'] as const) {
         const system = w.city.town[kind]
         const update = system.update.bind(system)
@@ -414,7 +417,7 @@ test.describe('time travel on a live town', () => {
         system.clear = () => { w.cleared++; clear() }
       }
     })
-    const moved = () => page.evaluate(() => (window as unknown as { moved: { cars: number; boats: number } }).moved)
+    const moved = () => page.evaluate(() => (window as unknown as { moved: { cars: number; boats: number; planes: number } }).moved)
     await page.evaluate(() => (window as unknown as Win).city.history.goTo(Date.now() - 25_000))
     await page.locator('#history-skip').click()
     await expect(page.locator('#history-travel')).toBeHidden()
@@ -438,5 +441,6 @@ test.describe('time travel on a live town', () => {
     await page.evaluate(() => (window as unknown as Win).city.step(1))
     expect((await moved()).cars).toBeGreaterThan(paused.cars)
     expect((await moved()).boats).toBeGreaterThan(paused.boats)
+    expect((await moved()).planes).toBeGreaterThan(paused.planes)
   })
 })

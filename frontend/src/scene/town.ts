@@ -705,7 +705,7 @@ export class Town {
       try { isl.weather.update(dt, time, camera) } catch (e) { this.report(`weather ${isl.group.id}`, e) }
     }
     try { this.hubWeather?.update(dt, time, camera) } catch (e) { this.report('weather hub', e) }
-    try { this.airport?.update(dt, time, camera) } catch (e) { this.report('airport', e) }
+    try { this.airport?.update(trafficDt, time, camera) } catch (e) { this.report('airport', e) }
     try { this.overlay.update(dt) } catch (e) { this.report('overlay', e) }
     try { this.cars.update(trafficDt) } catch (e) { this.report('cars', e) }
     try { this.boats.update(trafficDt) } catch (e) { this.report('boats', e) }
