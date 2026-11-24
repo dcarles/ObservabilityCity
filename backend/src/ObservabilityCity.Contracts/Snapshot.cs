@@ -574,9 +574,9 @@ public sealed record ScopeInfo(
 
 /// <summary>
 /// A resource that belongs to a system. Tenant is the tenant's friendly name when the rules found one, else its id. Links are the addresses the
-/// environment's <c>scope.links</c> make for it (a portal page, a runbook); null when the environment has none for this resource.
+/// environment's <c>scope.links</c> make for it (a portal page, a runbook); null when the environment has none for this resource. Tags are the tags or labels the cloud provider keeps on the resource, as read (null when it has none); the Tags tab shows them.
 /// </summary>
-public sealed record ScopeResource(string Name, string Type, string? Region, string? Tenant, int? Instances, IReadOnlyList<ResourceLink>? Links = null);
+public sealed record ScopeResource(string Name, string Type, string? Region, string? Tenant, int? Instances, IReadOnlyList<ResourceLink>? Links = null, IReadOnlyDictionary<string, string>? Tags = null);
 
 /// <summary>An address that opens a resource somewhere else (a cloud portal, a console), already filled in. The browser only shows it as a link.</summary>
 public sealed record ResourceLink(string Name, string Url);

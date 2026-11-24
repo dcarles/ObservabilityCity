@@ -669,6 +669,7 @@ export interface components {
             /** Format: int32 */
             instances?: number | null;
             links?: components["schemas"]["ResourceLink"][] | null;
+            tags?: { [key: string]: string } | null;
         };
         /** @enum {string} */
         SettingLayer: "System" | "Pillar" | "App" | "BuiltIn";

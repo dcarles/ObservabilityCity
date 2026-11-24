@@ -9,14 +9,15 @@ import { regionFigures, regionOptions, validChoice, WORST, type RegionChoice } f
 import { cloudHealthRows, dismissEvent, eventOfNode } from './healthEvents'
 import { brokerNames } from './hubSystems'
 import { viewedText } from './history/model'
-import { ago, clockTime, configOrder, logsFollow, messagesPerSecond, messageRate, queueRows, groupDetail, incidentSummary, jobRows, layerWord, linkSections, logLinkLabel, logSectionEmpty, logSectionTitle, logTabLabel, pickLogSection, originLabel, type LinkItem, type QueueTypes, overviewLinks, overviewRows, reasons, repeatLabel, resourceLinks, scopeView, SEVERITY_WORD, sectionLinks, stateTone, vendorWhere } from './inspectorModel'
+import { ago, clockTime, configOrder, logsFollow, messagesPerSecond, messageRate, queueRows, groupDetail, incidentSummary, jobRows, layerWord, linkSections, logLinkLabel, logSectionEmpty, logSectionTitle, logTabLabel, pickLogSection, originLabel, type LinkItem, type QueueTypes, overviewLinks, overviewRows, reasons, repeatLabel, resourceLinks, scopeView, tagsView, type TagRow, SEVERITY_WORD, sectionLinks, stateTone, vendorWhere } from './inspectorModel'
 
-export type InspectorTab = 'overview' | 'links' | 'logs' | 'config'
+export type InspectorTab = 'overview' | 'links' | 'logs' | 'config' | 'tags'
 const TABS: { id: InspectorTab; label: string }[] = [
   { id: 'overview', label: 'Overview' },
   { id: 'links', label: 'Links' },
   { id: 'logs', label: 'Logs' },
   { id: 'config', label: 'Config' },
+  { id: 'tags', label: 'Tags' },
 ]
 
 /** What the drawer needs from the page. */
@@ -215,7 +216,7 @@ export class Inspector {
     const found = id ? this.find(id) : null
     if (!id || !found) return
     const { node: n, group, vendor } = found
-    const body = { overview: () => this.overview(n, group), links: () => this.links(), logs: () => this.logLines(), config: () => this.config() }[this.tab]()
+    const body = { overview: () => this.overview(n, group), links: () => this.links(), logs: () => this.logLines(), config: () => this.config(), tags: () => this.tagsTab() }[this.tab]()
     const html = `
       <div class="head">
         <div><b>${escapeHtml(n.name)}</b> <span class="${stateTone(n.state)}">· ${n.state}</span>
@@ -223,7 +224,7 @@ export class Inspector {
           ${n.engine ? `<div class="engine" title="Database engine and type, from the town's databaseEngines"><b>${escapeHtml(n.engine.name)}</b><span>${escapeHtml(n.engine.typeName)}</span></div>` : ''}</div>
         <button id="inspector-close" title="Close (Esc)">✕</button>
       </div>
-      <div class="tabs" role="tablist">${TABS.map((t) => `<button role="tab" data-tab="${t.id}" class="${t.id === this.tab ? 'on' : ''}">${t.label}</button>`).join('')}</div>
+      <div class="tabs" role="tablist">${this.tabs().map((t) => `<button role="tab" data-tab="${t.id}" class="${t.id === this.tab ? 'on' : ''}">${t.label}</button>`).join('')}</div>
       <div class="body">${body}</div>`
     // the same words are not drawn again: a redraw would throw away the scroll position every half second
     const key = `${id}|${this.tab}|${html}`
@@ -422,6 +423,25 @@ export class Inspector {
     return `
       <p class="note">Defined in <code>${escapeHtml(d.file)}</code>. Each value says which file layer it comes from.</p>
       <div class="cfg">${configOrder(d.config).map((c) => `<div class="cfg-row" data-key="${escapeHtml(c.key)}"><span class="k">${escapeHtml(c.key)}</span><span class="v">${escapeHtml(c.value)}</span><span class="o ${c.layer.toLowerCase()}" title="${escapeHtml(c.source)}">${escapeHtml(layerWord(c.layer, this.snap?.groupLabel))}</span></div>`).join('')}</div>${this.scope(d)}`
+  }
+
+  /** The Tags tab is offered once the system's resources are known to carry tags (or while it is the open tab). */
+  private tabs(): { id: InspectorTab; label: string }[] {
+    const hasTags = tagsView(this.detail?.scope) !== null
+    return TABS.filter((t) => t.id !== 'tags' || hasTags || this.tab === 'tags')
+  }
+
+  private tagTable(rows: TagRow[]): string {
+    return `<div class="cfg">${rows.map((t) => `<div class="cfg-row" data-tag="${escapeHtml(t.key)}"><span class="k">${escapeHtml(t.key)}</span><span class="v">${escapeHtml(t.value)}</span></div>`).join('')}</div>`
+  }
+
+  private tagsTab(): string {
+    if (this.detailState === 'loading') return '<p class="none">Loading…</p>'
+    const v = tagsView(this.detail?.scope)
+    if (!v) return '<p class="none">No tags: none of this one\'s resources has any, or the cloud provider has not been read yet.</p>'
+    const shared = v.shared.length === 0 ? '' : `<h4 class="scope-title">On all ${v.total} resources</h4>${this.tagTable(v.shared)}`
+    const resources = v.resources.map((r) => `<div class="tag-res" data-resource="${escapeHtml(r.name)}"><h4 class="scope-title">${escapeHtml(r.name)}</h4><p class="note">${escapeHtml([r.type, r.place].filter(Boolean).join(' · '))}</p>${r.tags.length === 0 ? '<p class="none">Nothing more than the tags above.</p>' : this.tagTable(r.tags)}</div>`).join('')
+    return `<p class="note">Tags the cloud provider keeps on this one's resources.</p>${shared}${resources}`
   }
 
   private resourceLinkRow(r: ScopeResource): string {

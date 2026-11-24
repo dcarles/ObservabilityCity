@@ -2139,6 +2139,13 @@
               "$ref": "#/components/schemas/ResourceLink"
             },
             "nullable": true
+          },
+          "tags": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "nullable": true
           }
         }
       },

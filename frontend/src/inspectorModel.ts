@@ -518,3 +518,36 @@ export function queueRows(n: Pick<NodeSnapshot, 'queues'>): QueueRow[] {
 export function vendorWhere(v?: { internal: boolean; islandName?: string | null }): string {
   return (v?.internal ? 'Internal service' : 'Third party') + (v?.islandName ? `, ${v.islandName}` : '')
 }
+
+export interface TagRow { key: string; value: string }
+export interface TagsResource { name: string; type: string; place: string; tags: TagRow[] }
+export interface TagsView {
+  /** How many resources the system has. */
+  total: number
+  /** Tags with the same value on every resource, shown once. Empty when there is a single resource. */
+  shared: TagRow[]
+  /** Each resource with the tags that are not shared. */
+  resources: TagsResource[]
+}
+
+const byKey = (a: TagRow, b: TagRow) => a.key.localeCompare(b.key, undefined, { sensitivity: 'base' })
+
+/**
+ * What the Tags tab shows: the tags of the system's resources, as the cloud provider keeps them. A tag with the same value on every resource is
+ * listed once; each resource then lists only what differs. Null when no resource has a tag, so the tab is not offered.
+ */
+export function tagsView(s: ScopeInfo | null | undefined): TagsView | null {
+  if (!s || !s.resources.some((r) => r.tags && Object.keys(r.tags).length > 0)) return null
+  const all = [...s.resources].sort((a, b) => a.name.localeCompare(b.name))
+  const tagsOf = (r: ScopeResource): Record<string, string> => r.tags ?? {}
+  const first = all.length > 1 ? Object.entries(tagsOf(all[0])) : []
+  const sharedKeys = new Set(first.filter(([k, v]) => all.every((r) => tagsOf(r)[k] === v)).map(([k]) => k))
+  const shared = first.filter(([k]) => sharedKeys.has(k)).map(([key, value]) => ({ key, value })).sort(byKey)
+  const resources = all.map((r) => ({
+    name: r.name,
+    type: r.type,
+    place: [r.tenant, r.region].filter(Boolean).join(' · '),
+    tags: Object.entries(tagsOf(r)).filter(([k]) => !sharedKeys.has(k)).map(([key, value]) => ({ key, value })).sort(byKey),
+  }))
+  return { total: all.length, shared, resources }
+}
