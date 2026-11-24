@@ -33,7 +33,8 @@ public sealed partial record Registry
     /// health reports fills no signal by design, which only the adapters know (<paramref name="kinds"/>).
     /// </summary>
     internal IEnumerable<string> UnusedSourceWarnings(RegistryEnvironment env, ISourceKindCatalog? kinds = null) =>
-        env.Sources.Where(s => s.Name is not ("metrics" or "incidents" or "messaging" or "jobs") && kinds?.CapabilitiesOf(s.Kind).HasFlag(SourceCapabilities.HealthEvents) != true
+        env.Sources.Where(s => s.Name is not ("metrics" or "incidents" or "messaging" or "jobs") && (kinds?.CapabilitiesOf(s.Kind) ?? SourceCapabilities.None).HasFlag(SourceCapabilities.HealthEvents) == false
+                               && (kinds?.CapabilitiesOf(s.Kind) ?? SourceCapabilities.None).HasFlag(SourceCapabilities.ApiCatalogue) == false
                                && !env.Signals.Values.Contains(s.Name) && !AllNodes.Any(n => n.Signals.Values.Contains(s.Name)))
             .Select(s => $"Environment '{env.Id}' defines source '{s.Name}', but no signal uses it. Point a signal at it in environments/{env.Id}.yaml, a pillar or a system, or remove it.");
 

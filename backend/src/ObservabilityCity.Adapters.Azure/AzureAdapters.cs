@@ -23,6 +23,7 @@ public sealed class AzureAdapters : IAdapterModule
                      (ServiceBusSourceFactory.SourceKind, SourceCapabilities.None),
                      (FunctionJobsSourceFactory.SourceKind, SourceCapabilities.None),
                      (ResourceHealthSourceFactory.SourceKind, SourceCapabilities.HealthEvents),
+                     (ApiManagementSourceFactory.SourceKind, SourceCapabilities.ApiCatalogue),
                  })
             registry.AddSourceKind(new SourceKindInfo(kind, LoginKind) { Capabilities = can, Settings = AzureSourceSettings.Reader }); // every Azure kind takes the same settings keys
         registry.AddSource(new ResourceGraphSourceFactory());
@@ -31,6 +32,7 @@ public sealed class AzureAdapters : IAdapterModule
         registry.AddSource(new ServiceBusSourceFactory());
         registry.AddSource(new FunctionJobsSourceFactory());
         registry.AddSource(new ResourceHealthSourceFactory());
+        registry.AddSource(new ApiManagementSourceFactory());
         foreach (var login in new AzureLogin[] { new AzureCliLogin(), new AzureDefaultLogin(), new AzureManagedIdentityLogin(), new AzureServicePrincipalLogin() })
             registry.AddCredentialKind(login);
     }

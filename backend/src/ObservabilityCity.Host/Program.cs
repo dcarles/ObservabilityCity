@@ -116,12 +116,15 @@ foreach (var (folder, registry) in loaded)
         };
         var scopeStore = set.Scope ?? new ScopeStore();
         ILogSource logs = fake is null ? new QueryLogSource(set.Sources, view, scopeStore, TimeProvider.System) : new FakeLogSource(state, TimeProvider.System, staleAfter);
+        ObservabilityCity.Core.Apis.ApiCatalogue apis = fake is null
+            ? new ObservabilityCity.Core.Apis.ApiCatalogue(view, scopeStore, name => set.Sources.OfType<ObservabilityCity.Core.Apis.IApiCatalogueSource>().FirstOrDefault(s => s.Name == name), TimeProvider.System)
+            : DemoApis(view);
         // only a live environment has a past worth keeping; a demo town's data is made up
         var history = fake is null && historyOptions.Enabled ? new FileHistoryStore(Path.Combine(historyOptions.FolderFor(folder, registry.Town.Id), environmentId), historyOptions.Interval, startupLogs.CreateLogger<FileHistoryStore>()) : null;
         var rebuiltHistory = history is null ? null : new FileHistoryStore(Path.Combine(history.Root, "rebuilt"), historyOptions.Interval, startupLogs.CreateLogger<FileHistoryStore>());
         // each environment may keep its own number of days (history.days in its file); the rest of the History section is the app's
         var envHistory = historyOptions.ForDays(registry.Environments.FirstOrDefault(e => e.Id == environmentId)?.HistoryDays);
-        runtimes.Add(new EnvironmentRuntime(registry.Town.Id, environmentId, view, fake, state, snapshots, store, logs, set.Sources, set.Problems, scopeStore, discovered, readings) { History = history, RebuiltHistory = rebuiltHistory, HistorySettings = history is null ? null : envHistory });
+        runtimes.Add(new EnvironmentRuntime(registry.Town.Id, environmentId, view, fake, state, snapshots, store, logs, set.Sources, set.Problems, scopeStore, discovered, readings) { Apis = apis, History = history, RebuiltHistory = rebuiltHistory, HistorySettings = history is null ? null : envHistory });
     }
     var town = new TownRuntime(registry.Town.Id, registry.Town.Name, folder, registries, new EnvironmentSet(runtimes, registry.DefaultEnvironmentId, registry.Town.Id));
     townRuntimes.Add(town);
@@ -220,6 +223,30 @@ app.MapGet("/api/unknown-hosts", (EnvironmentSet envs, string? env) =>
 
 // The hosts added from the Unknown hosts panel (kept in _discovered/third-parties.yaml of the town), and adding and removing them. A change saves the file and
 // loads the town again at once, so the building (or the missing host) shows without a restart.
+static ObservabilityCity.Core.Apis.ApiCatalogue DemoApis(IRegistryProvider view)
+{
+    var source = new FakeApiCatalogueSource(view);
+    return new ObservabilityCity.Core.Apis.ApiCatalogue(view, new ScopeStore(), _ => source, TimeProvider.System,
+        new ObservabilityCity.Core.Apis.ApiCatalogueOverrides(FakeApiCatalogueSource.Config, FakeApiCatalogueSource.Gateways, FakeApiCatalogueSource.HostSystem(view)));
+}
+
+static async Task<IResult> ReadApis<T>(EnvironmentSet envs, string? env, CancellationToken ct, Func<EnvironmentRuntime, CancellationToken, Task<T?>> read) where T : class
+{
+    if (envs.Find(env) is not { } rt) return EnvironmentNotFound(envs, env);
+    // a slow gateway must not hold the request and its connection for the HTTP client's 100 seconds
+    using var limit = CancellationTokenSource.CreateLinkedTokenSource(ct);
+    limit.CancelAfter(Program.LogsTimeout);
+    try { return await read(rt, limit.Token) is { } found ? Results.Ok(found) : Results.NotFound(new { error = "No such API." }); }
+    catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+    {
+        return Results.Json(new { error = $"Reading the APIs took longer than {Program.LogsTimeout.TotalSeconds:0} seconds and was stopped." }, statusCode: StatusCodes.Status502BadGateway);
+    }
+    catch (Exception e) when (e is not OperationCanceledException)
+    {
+        return Results.Json(new { error = e.Message.ReplaceLineEndings(" ") }, statusCode: StatusCodes.Status502BadGateway);
+    }
+}
+
 static IReadOnlyList<AddedHostSnapshot> AddedList(string folder) => AddedHosts.Read(folder).Select(a => new AddedHostSnapshot(a.Id, a.Name, a.Host, a.Kind, a.CalledBy)).ToList();
 
 app.MapGet("/api/added-hosts", (EnvironmentSet envs, TownSet towns) =>
@@ -315,6 +342,20 @@ app.MapGet("/api/systems/{id}/logs", async (string id, EnvironmentSet envs, stri
     })
    .Produces<SystemLogs>()
    .WithName("GetSystemLogs");
+
+// The API explorer: the APIs of the town's gateways (read on demand from the environment's `apis` source and kept for a while), each matched to the system its backend address belongs to.
+// A source that cannot be reached is a 502 with the reason; an environment with no `apis` block answers "not configured" (Configured false).
+app.MapGet("/api/apis", (EnvironmentSet envs, string? env, CancellationToken ct) => ReadApis(envs, env, ct, async (rt, token) => await rt.Apis.ListAsync(token)))
+   .Produces<ApiCatalogueList>()
+   .WithName("GetApis");
+
+app.MapGet("/api/api-detail", (EnvironmentSet envs, string id, string? env, CancellationToken ct) => ReadApis(envs, env, ct, (rt, token) => rt.Apis.DetailAsync(id, token)))
+   .Produces<ApiDetail>()
+   .WithName("GetApiDetail");
+
+app.MapGet("/api/api-operation-policy", (EnvironmentSet envs, string id, string operation, string? env, CancellationToken ct) => ReadApis(envs, env, ct, (rt, token) => rt.Apis.OperationPolicyAsync(id, operation, token)))
+   .Produces<ApiPolicyInfo>()
+   .WithName("GetApiOperationPolicy");
 
 // Demo steering for the fake generator: the Break things panel and the story bar are built on this.
 // With several towns, only a demo town answers: asking a live town for a fake call is a plain 404.

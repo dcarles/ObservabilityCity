@@ -51,6 +51,7 @@ public static partial class RegistryLoader
                 Scope = ToScope(f.Scope),
                 Links = ToLinks(f.Links),
                 Logs = ToLogs(f.Logs),
+                Apis = ToApis(f.Apis),
                 HistoryDays = f.History?.Days,
             }, f.Order ?? 100));
         }
@@ -80,6 +81,22 @@ public static partial class RegistryLoader
     private static ObservabilityCity.Core.Logs.LogsConfig? ToLogs(LogsFile? f) => f is null ? null : new ObservabilityCity.Core.Logs.LogsConfig(
         f.Source, f.Query, Duration(f.Window, ObservabilityCity.Core.Logs.LogsConfig.DefaultWindow),
         f.Links.Select(l => new ObservabilityCity.Core.Logs.LogLinkRule(l.Name, l.Section.Trim().ToLowerInvariant(), l.Resources, l.Url.Trim())).ToList());
+
+    private static ObservabilityCity.Core.Apis.ApiCatalogueConfig? ToApis(ApisFile? f) => f is null ? null : new ObservabilityCity.Core.Apis.ApiCatalogueConfig(
+        f.Source, f.Gateway.Trim(), f.Merge, f.ResourceHosts.Select(h => h.Trim()).ToList(), Duration(f.CacheFor, ObservabilityCity.Core.Apis.ApiCatalogueConfig.DefaultCacheFor));
+
+    private static void CheckApis(EnvironmentFile f, string name, List<string> errors)
+    {
+        if (f.Apis is not { } apis) return;
+        var owner = $"{name}: apis";
+        // whether the source's kind can read APIs is the adapters' word: the AdapterCatalog checks it, since the files alone cannot say
+        if (!f.Sources.ContainsKey(apis.Source))
+            errors.Add($"{owner}.source '{apis.Source}' is not a source of this file.{DidYouMean.Hint(apis.Source, f.Sources.Keys)}");
+        if (string.IsNullOrWhiteSpace(apis.Gateway)) errors.Add($"{owner}.gateway is empty. Name the system whose resources are the gateways, for example the hub's gateway (hub.<id>)");
+        if (apis.CacheFor is { } cache && !SourceQuery.TryParseWindow(cache, out _)) errors.Add($"{owner}.cacheFor '{cache}' is not a number and a unit like 1h or 30m");
+        foreach (var host in apis.ResourceHosts)
+            if (!host.Contains("{name}", StringComparison.Ordinal)) errors.Add($"{owner}.resourceHosts '{host}' has no {{name}}: write the address of a resource with {{name}} where its name goes, for example {{name}}.example.test");
+    }
 
     private static void CheckLogs(EnvironmentFile f, string name, List<string> errors)
     {
@@ -239,6 +256,7 @@ public static partial class RegistryLoader
         CheckScope(f, name, errors);
         CheckLinks(f, name, errors);
         CheckLogs(f, name, errors);
+        CheckApis(f, name, errors);
         var seen = new HashSet<string>();
         foreach (var t in f.Tenants)
         {

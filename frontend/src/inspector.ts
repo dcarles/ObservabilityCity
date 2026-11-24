@@ -1,3 +1,6 @@
+import { ApiExplorer, knownApiList, warmApiList } from './apiExplorer/explorer'
+import { apisOfSystem } from './apiExplorer/model'
+import { groupWords } from './groupLabel'
 import type { GroupSnapshot, NodeSnapshot, ScopeResource, Snapshot, SystemDetail, SystemLogs, VendorSnapshot } from './types'
 import { escapeHtml } from './picker'
 import { scopeParams, type Scope } from './scope'
@@ -83,6 +86,7 @@ export class Inspector {
       this.logsState = 'loading'
       this.logSection = ''
       void this.loadDetail(id)
+      this.warmApis(id)
     }
     this.setTab(tab)
   }
@@ -192,6 +196,7 @@ export class Inspector {
     if (t.closest('#inspector-close')) { this.close(); return }
     const tab = t.closest<HTMLElement>('[data-tab]')
     if (tab) { this.setTab(tab.dataset.tab as InspectorTab); return }
+    if (t.closest('[data-api-explorer]')) { this.openExplorer(); return }
     if (t.closest('[data-refresh-logs]')) { void this.loadLogs(); return }
     const logTab = t.closest<HTMLElement>('[data-log-tab]')
     if (logTab) { this.logSection = logTab.dataset.logTab!; this.render(); return }
@@ -246,6 +251,7 @@ export class Inspector {
       ${this.regions(n)}
       ${tenants}
       ${this.openIn(n)}
+      ${this.apiButton(n)}
       ${incidents.length === 0 ? '' : `<h4>Incidents on this island <small>${escapeHtml(incidentSummary(incidents))}</small></h4>
         ${incidents.map((i) => `<div class="row"><span>${escapeHtml(i.title)}</span><span class="warn">sev ${i.severity}${SEVERITY_WORD[i.severity] ? ` · ${SEVERITY_WORD[i.severity]}` : ''} · since ${escapeHtml(clockTime(i.startedAt))}</span></div>`).join('')}`}`
   }
@@ -310,6 +316,39 @@ export class Inspector {
     const rows = v.items.map((i) => `<div class="row open-in" data-resource="${escapeHtml(i.resource)}"><span>${escapeHtml(i.resource)}${i.tenant ? ` <small>${escapeHtml(i.tenant)}</small>` : ''}</span><span>${this.anchor(i.link.name, i.link.url)}</span></div>`).join('')
     const more = v.more === 0 ? '' : `<p class="note">${v.more} more on the Config tab.</p>`
     return `<h4>Open in</h4>${rows}${more}`
+  }
+
+  /** The list of APIs is read (once for a while) only for a system that can have one: an API or a gateway. The button appears when the read has finished. */
+  private warmApis(id: string): void {
+    const kind = this.find(id)?.node.kind
+    if (kind !== 'Api' && kind !== 'Gateway') return
+    void warmApiList(this.query).then(() => { if (this.id === id) this.render() })
+  }
+
+  /** "API explorer", for a gateway (when the environment has one set up) and for a service with an API the gateways serve. */
+  private apiButton(n: NodeSnapshot): string {
+    const list = knownApiList()
+    if (!list?.configured) return ''
+    const own = apisOfSystem(list.apis, n.id).length
+    if (n.kind !== 'Gateway' && own === 0) return ''
+    const label = n.kind === 'Gateway' ? `${list.apis.length} API${list.apis.length === 1 ? '' : 's'}` : `${own} API${own === 1 ? '' : 's'}`
+    return `<h4>APIs</h4><div class="row"><span>${label}</span><button class="ae-open" data-api-explorer title="Browse the operations and policies of the gateways' APIs">API explorer</button></div>`
+  }
+
+  private openExplorer(): void {
+    const id = this.id
+    const snap = this.snap
+    if (!id || !snap) return
+    const words = groupWords(snap.groupLabel)
+    void new ApiExplorer({
+      query: this.query,
+      system: this.find(id)?.node.kind === 'Gateway' ? null : id,
+      groupName: (g) => snap.groups.find((x) => x.id === g)?.displayName ?? g,
+      systemName: (s) => this.find(s)?.node.name ?? s,
+      groupWord: words.lower,
+      vendorsLabel: 'Third parties',
+      go: (s) => this.host.go(s),
+    }).open()
   }
 
   private anchor(name: string, url: string, title?: string): string {

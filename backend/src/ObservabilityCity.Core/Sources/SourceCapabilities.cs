@@ -21,6 +21,9 @@ public enum SourceCapabilities
 
     /// <summary>Reads the cloud's own health reports. Its source implements <see cref="IHealthEventSource"/> and fills no signal, so no signal has to name it.</summary>
     HealthEvents = 8,
+
+    /// <summary>Reads the APIs a gateway serves for the API explorer (<c>apis.source</c>). Its source implements <see cref="Apis.IApiCatalogueSource"/> and fills no signal, so no signal has to name it.</summary>
+    ApiCatalogue = 16,
 }
 
 /// <summary>What the core asks about a source kind. The <see cref="AdapterCatalog"/> answers from what the loaded modules declared.</summary>

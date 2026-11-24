@@ -1,0 +1,49 @@
+/* The API explorer window (see explorer.ts). It uses the page's own colours, so every theme and both lightings read right. */
+.ae-backdrop { position: fixed; inset: 0; z-index: 30; background: rgba(10, 20, 35, 0.45); display: flex; align-items: center; justify-content: center; padding: 3vh 3vw; }
+.ae-window { width: min(1500px, 100%); height: 100%; display: flex; flex-direction: column; background: var(--field); color: var(--ink); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 12px 40px rgba(10, 20, 35, 0.4); overflow: hidden; font-size: 13px; }
+.ae-head { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+.ae-head b { font-size: 15px; }
+.ae-note { opacity: 0.65; font-size: 12px; }
+.ae-close { margin-left: auto; border: 0; background: none; padding: 2px 8px; font-size: 15px; color: inherit; cursor: pointer; }
+.ae-body { flex: 1; min-height: 0; display: grid; grid-template-columns: 290px 340px 1fr; }
+.ae-tree, .ae-ops, .ae-detail { min-height: 0; overflow-y: auto; }
+.ae-tree, .ae-ops { border-right: 1px solid var(--line); }
+.ae-search { padding: 10px 12px 4px; }
+.ae-search input, .ae-ops-head input { width: 100%; padding: 6px 9px; border: 1px solid var(--line); border-radius: 8px; background: var(--field); color: var(--ink); font: inherit; }
+.ae-chips { display: flex; gap: 6px; padding: 4px 12px 8px; }
+.ae-chips button { border: 1px solid var(--line); border-radius: 99px; background: none; color: inherit; padding: 1px 10px; font-size: 12px; cursor: pointer; }
+.ae-chips button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.ae-none { opacity: 0.65; margin: 10px 14px; }
+.ae-warn { margin: 6px 12px; font-size: 12px; color: var(--warn-ink); }
+.ae-group-head { width: 100%; display: flex; align-items: center; gap: 6px; padding: 6px 12px; border: 0; border-top: 1px solid var(--soft-line); background: var(--pill); color: inherit; font: inherit; font-weight: 600; text-align: left; cursor: pointer; }
+.ae-group-head small { margin-left: auto; font-weight: 400; opacity: 0.65; }
+.ae-api { width: 100%; display: grid; grid-template-columns: 1fr auto; gap: 0 8px; padding: 6px 12px 6px 28px; border: 0; border-top: 1px solid var(--soft-line); background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.ae-api:hover, .ae-op:hover { background: var(--row-hover); }
+.ae-api.sel, .ae-op.sel { background: var(--row-hover); box-shadow: inset 3px 0 0 var(--accent); }
+.ae-api-name { font-family: ui-monospace, Menlo, monospace; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ae-api-sub { grid-column: 1; font-size: 11px; opacity: 0.6; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ae-flag { grid-column: 2; grid-row: 1 / 3; align-self: center; font-size: 10px; padding: 1px 7px; border-radius: 99px; background: var(--warn-ink); color: #fff; white-space: nowrap; }
+.ae-ops-head { padding: 10px 12px; border-bottom: 1px solid var(--line); display: grid; gap: 4px; }
+.ae-backend { font-family: ui-monospace, Menlo, monospace; font-size: 11px; opacity: 0.75; overflow-wrap: anywhere; }
+.ae-where { font-size: 12px; }
+.ae-link { color: var(--link-ink); cursor: pointer; }
+.ae-op { width: 100%; display: grid; grid-template-columns: auto 1fr; gap: 0 8px; align-items: center; padding: 6px 12px; border: 0; border-top: 1px solid var(--soft-line); background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.ae-op-path { font-family: ui-monospace, Menlo, monospace; font-size: 12px; overflow-wrap: anywhere; }
+.ae-op small { grid-column: 2; opacity: 0.6; }
+.ae-m { display: inline-block; min-width: 52px; text-align: center; padding: 2px 6px; border-radius: 4px; font: 700 10.5px ui-monospace, Menlo, monospace; color: #fff; background: var(--stale-ink); }
+.ae-m.get { background: #1f8a52; } .ae-m.post { background: #1f6fb2; } .ae-m.put { background: #b3741e; } .ae-m.delete { background: #c0392b; } .ae-m.patch { background: #7a4fb3; }
+.ae-sec { padding: 10px 16px; border-bottom: 1px solid var(--soft-line); }
+.ae-sec h4 { margin: 0 0 6px; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.7; }
+.ae-call { font-size: 14px; } .ae-sub { opacity: 0.7; margin-top: 2px; }
+.ae-sec table { border-collapse: collapse; width: 100%; } .ae-sec td, .ae-sec th { text-align: left; padding: 3px 10px 3px 0; font-size: 12px; } .ae-sec th { opacity: 0.6; font-weight: 500; }
+.ae-sec .mono, .ae-sec pre, .ae-sec code { font-family: ui-monospace, Menlo, monospace; }
+.ae-status { display: inline-block; padding: 1px 9px; border-radius: 99px; font-size: 12px; font-weight: 600; background: var(--pill); }
+.ae-status.ok { color: var(--ok-ink); } .ae-status.client { color: var(--warn-ink); } .ae-status.server { color: var(--bad-ink); }
+.ae-sec pre { margin: 0 0 6px; padding: 8px 10px; background: var(--pill); border-radius: 6px; font-size: 11.5px; line-height: 1.5; overflow-x: auto; }
+.ae-fragment { margin: 4px 0; } .ae-fragment summary { cursor: pointer; font-size: 12px; }
+.x-tag { color: var(--link-ink); } .x-attr { color: var(--warn-ink); } .x-val { color: var(--ok-ink); }
+.ae-diff { margin: 10px 16px 0; padding: 8px 12px; border-radius: 8px; background: var(--pill); border-left: 3px solid var(--warn-ink); font-size: 12px; }
+.ae-diff b { display: block; margin-bottom: 2px; }
+.ae-open { padding: 3px 10px; border: 1px solid var(--accent); border-radius: 8px; background: none; color: var(--accent); font: inherit; font-weight: 600; cursor: pointer; }
+.ae-open:hover { background: var(--accent); color: #fff; }
+@media (max-width: 900px) { .ae-body { grid-template-columns: 1fr; overflow-y: auto; } .ae-tree, .ae-ops, .ae-detail { overflow: visible; border-right: 0; } }
