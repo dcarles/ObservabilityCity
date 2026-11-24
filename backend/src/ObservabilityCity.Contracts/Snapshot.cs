@@ -630,3 +630,34 @@ public sealed record HistoryRange(
     int Frames,
     long Bytes,
     IReadOnlyList<HistoryPointSnapshot> Points);
+
+/// <summary>
+/// The API catalogue of one environment, read on demand when the API explorer opens (never part of health): every API the town's gateways serve, each matched to
+/// the system or third party its backend address belongs to. Configured is false when the environment has no <c>apis</c> block. Problems say why a gateway could not be read.
+/// </summary>
+public sealed record ApiCatalogueList(DateTimeOffset At, bool Configured, IReadOnlyList<ApiSummary> Apis, IReadOnlyList<string> Problems);
+
+/// <summary>
+/// One API. Id is what the other calls ask for. Gateways lists the gateways that serve it (by label); MissingFrom the gateways of the same group that do not, so a copy that is gone from
+/// one region shows. SystemId is the town system its backend host belongs to (GroupId its group), ThirdPartyId a third party's id when the host is a vendor's; both null when nothing matches.
+/// </summary>
+public sealed record ApiSummary(string Id, string Name, string DisplayName, string? Path, string? BackendUrl, string? BackendHost, IReadOnlyList<string> Gateways,
+    IReadOnlyList<string> MissingFrom, string? SystemId, string? GroupId, string? ThirdPartyId);
+
+/// <summary>One API with its operations and the policy set on it. Differences say what is not the same on the gateways that serve it (empty when all agree or only one does).</summary>
+public sealed record ApiDetail(ApiSummary Summary, IReadOnlyList<ApiOperationInfo> Operations, ApiPolicyInfo Policy, IReadOnlyList<string> Differences);
+
+/// <summary>One operation of an API as the gateway describes it: the call (method, URL template, parameters) and the response codes it can answer.</summary>
+public sealed record ApiOperationInfo(string Id, string Name, string Method, string UrlTemplate, string? Description, IReadOnlyList<ApiParameterInfo> Parameters, IReadOnlyList<int> Responses);
+
+/// <summary>One parameter of an operation. In is path, query or header.</summary>
+public sealed record ApiParameterInfo(string Name, string In, string? Type, bool Required);
+
+/// <summary>
+/// The policy set directly on an API or operation, as XML with anything that looks like a secret masked; Xml is null when none is set (the gateway's own policy applies). Fragments are the
+/// reusable pieces the policy includes, with their own XML (null when it could not be read).
+/// </summary>
+public sealed record ApiPolicyInfo(string? Xml, IReadOnlyList<ApiFragmentInfo> Fragments);
+
+/// <summary>A reusable policy piece an API's policy includes by id.</summary>
+public sealed record ApiFragmentInfo(string Id, string? Xml);

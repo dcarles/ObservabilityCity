@@ -287,6 +287,7 @@ One file per environment. The pillar and system files are shared; this file says
 | `fake` | no | none | Settings for the fake source only. |
 | `links` | no | none | How the calls the systems make are found in the telemetry (see `links` below). |
 | `logs` | no | none | Where a system's Logs tab reads from (see `logs` below). Without it the tab says logs are not set up. |
+| `apis` | no | none | Where the API explorer reads the APIs of a gateway from (see `apis` below). Without it the explorer is not offered in a live town. |
 | `scope` | no | none | How pillars and systems map onto the cloud provider. |
 | `history` | no | none | How far back this environment can be taken in time travel (see `history` below). Without it the app's own `History:Days` is used. |
 
@@ -539,6 +540,18 @@ links:
       | summarize calls = sum(ItemCount)
           by caller = AppRoleName, host = tostring(u.Host), path = tostring(u.Path)
 ```
+
+### apis
+What the API explorer shows in a live town: the APIs a gateway publishes, their operations and their policies. Nothing is polled: the lists are read when someone opens the explorer, kept for `cacheFor`, and values that look like secrets in a policy are masked before they leave the server. An API belongs to a system by the host of its backend address (the `links` rules, vendor domains and `resourceHosts` decide), never by its name. A demo town makes its own APIs and needs none of this.
+
+<!-- file: ApisFile -->
+| Key | Required | Default | Meaning |
+|---|---|---|---|
+| `source` | yes | | Name of a source of this file whose kind can read APIs (with the Azure adapter, an `apimanagement` source). Its connection and login are used. |
+| `gateway` | yes | | The system (a gateway) whose resources are read. Every resource of that system in every region is read. |
+| `merge` | no | `false` | When the gateway exists once in each region and holds copies of the same APIs, show each API once (matched by name) and flag what differs between regions. |
+| `resourceHosts` | no | none | Backend host templates that belong to a system by its resource name, for example `{name}.example.net`; `{name}` is the name of a discovered resource. A name that two systems share is ignored. |
+| `cacheFor` | no | `1h` | How long a read is kept before it is read again. |
 
 ### logs
 What a system's Logs tab shows in a live town. Nothing is polled: when someone opens the tab, one query for that system's telemetry name goes to the named source, over the last `window`, and the answer is not kept. It never affects health. The tab has four separate sections so a flood in one never hides another: 5xx requests, slow requests (over the system's own `slaP99Ms`), warnings and errors, and exceptions. Repeats are one line with a count, newest first. A worker, a function or anything else that does not answer requests gets only the logs and exceptions sections. A demo town makes its own entries and needs none of this.

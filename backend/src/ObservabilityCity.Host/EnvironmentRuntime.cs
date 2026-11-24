@@ -28,6 +28,8 @@ public sealed class EnvironmentRuntime(string townId, string id, EnvironmentRegi
     public SnapshotBuilder Builder { get; } = builder;
     public SnapshotStore Store { get; } = store;
     public ILogSource Logs { get; } = logs;
+    /// <summary>The API explorer's data: the APIs of the gateways, matched to the systems. Not configured (and saying so) when the environment has no <c>apis</c> block.</summary>
+    public ObservabilityCity.Core.Apis.ApiCatalogue Apis { get; init; } = null!;
     /// <summary>The sources polled for this environment: the fake one in a demo town, the ones its environment file defines (that have an adapter) in a live one.</summary>
     public IReadOnlyList<IMetricSource> Sources { get; } = sources;
     /// <summary>Sources the environment defines that could not be started (no adapter for the kind yet, a login that could not be made).</summary>

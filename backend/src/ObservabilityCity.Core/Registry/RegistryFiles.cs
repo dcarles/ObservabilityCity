@@ -349,6 +349,8 @@ internal sealed class EnvironmentFile
     public LinksFile? Links { get; set; }
     /// <summary>Where the Logs tab of a system reads from: a query run only when the tab is opened. Without it the tab says logs are not set up.</summary>
     public LogsFile? Logs { get; set; }
+    /// <summary>Where the API explorer reads the APIs of the gateways from. Without it the explorer says nothing is set up.</summary>
+    public ApisFile? Apis { get; set; }
     /// <summary>How far back this environment can be taken (time travel). Without it the app's own setting, History:Days, is used.</summary>
     public HistoryFile? History { get; set; }
 }
@@ -358,6 +360,21 @@ internal sealed class HistoryFile
 {
     /// <summary>How many days back this environment keeps its history and can be taken, 1 to 14. Without it the app's History:Days (default 7) is used. Read when the app starts.</summary>
     public int? Days { get; set; }
+}
+
+/// <summary>The <c>apis:</c> block of an environment file.</summary>
+internal sealed class ApisFile
+{
+    /// <summary>The name of a source of this file whose kind can read the APIs of a gateway (on Azure, apimanagement). Its connection and login are used.</summary>
+    public string Source { get; set; } = "";
+    /// <summary>The id of the system whose resources are the gateways (one for each region), for example the hub's gateway.</summary>
+    public string Gateway { get; set; } = "";
+    /// <summary>True when the gateways are copies of one another (for resilience): an API they share is listed once and a difference between them is marked. Default false.</summary>
+    public bool Merge { get; set; }
+    /// <summary>Address templates with {name} that say how one of the town's own resources is addressed (a web app's default address), so a backend on one is matched to the system that owns the resource.</summary>
+    public List<string> ResourceHosts { get; set; } = [];
+    /// <summary>How long a read is kept before the cloud is asked again. Default 1h.</summary>
+    public string? CacheFor { get; set; }
 }
 
 /// <summary>The <c>logs:</c> block of an environment file.</summary>

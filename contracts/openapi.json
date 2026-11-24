@@ -369,6 +369,117 @@
         }
       }
     },
+    "/api/apis": {
+      "get": {
+        "tags": [
+          "ObservabilityCity.Host"
+        ],
+        "operationId": "GetApis",
+        "parameters": [
+          {
+            "name": "env",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiCatalogueList"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/api-detail": {
+      "get": {
+        "tags": [
+          "ObservabilityCity.Host"
+        ],
+        "operationId": "GetApiDetail",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "env",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/api-operation-policy": {
+      "get": {
+        "tags": [
+          "ObservabilityCity.Host"
+        ],
+        "operationId": "GetApiOperationPolicy",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "operation",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "env",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiPolicyInfo"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/history/range": {
       "get": {
         "tags": [
@@ -507,6 +618,220 @@
             "items": {
               "type": "string"
             }
+          }
+        }
+      },
+      "ApiCatalogueList": {
+        "required": [
+          "at",
+          "configured",
+          "apis",
+          "problems"
+        ],
+        "type": "object",
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "configured": {
+            "type": "boolean"
+          },
+          "apis": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ApiSummary"
+            }
+          },
+          "problems": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "ApiDetail": {
+        "required": [
+          "summary",
+          "operations",
+          "policy",
+          "differences"
+        ],
+        "type": "object",
+        "properties": {
+          "summary": {
+            "$ref": "#/components/schemas/ApiSummary"
+          },
+          "operations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ApiOperationInfo"
+            }
+          },
+          "policy": {
+            "$ref": "#/components/schemas/ApiPolicyInfo"
+          },
+          "differences": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "ApiFragmentInfo": {
+        "required": [
+          "id"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "xml": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "ApiOperationInfo": {
+        "required": [
+          "id",
+          "name",
+          "method",
+          "urlTemplate",
+          "parameters",
+          "responses"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "method": {
+            "type": "string"
+          },
+          "urlTemplate": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "parameters": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ApiParameterInfo"
+            }
+          },
+          "responses": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        }
+      },
+      "ApiParameterInfo": {
+        "required": [
+          "name",
+          "in",
+          "required"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "in": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "nullable": true
+          },
+          "required": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ApiPolicyInfo": {
+        "required": [
+          "fragments"
+        ],
+        "type": "object",
+        "properties": {
+          "xml": {
+            "type": "string",
+            "nullable": true
+          },
+          "fragments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ApiFragmentInfo"
+            }
+          }
+        }
+      },
+      "ApiSummary": {
+        "required": [
+          "id",
+          "name",
+          "displayName",
+          "gateways",
+          "missingFrom"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string",
+            "nullable": true
+          },
+          "backendUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "backendHost": {
+            "type": "string",
+            "nullable": true
+          },
+          "gateways": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "missingFrom": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "systemId": {
+            "type": "string",
+            "nullable": true
+          },
+          "groupId": {
+            "type": "string",
+            "nullable": true
+          },
+          "thirdPartyId": {
+            "type": "string",
+            "nullable": true
           }
         }
       },

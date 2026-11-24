@@ -176,6 +176,7 @@ public sealed class AdapterCatalog : IAdapterRegistry, ISourceKindCatalog
     {
         if (environment.Logs is { } logs) yield return ("logs.source", logs.Source, SourceCapabilities.Logs, "read the logs");
         if (environment.Links is { } links) yield return ("links.source", links.Source, SourceCapabilities.Links, "read the dependencies link discovery needs");
+        if (environment.Apis is { } apis) yield return ("apis.source", apis.Source, SourceCapabilities.ApiCatalogue, "read the APIs of a gateway");
         if (environment.Scope.Inventory is { } inventory) yield return ("scope.inventory", inventory, SourceCapabilities.Inventory, "read the inventory");
     }
 

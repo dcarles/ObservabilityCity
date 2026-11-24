@@ -148,6 +148,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/apis": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetApis"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/api-detail": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetApiDetail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/api-operation-policy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetApiOperationPolicy"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/history/range": {
         parameters: {
             query?: never;
@@ -202,6 +250,55 @@ export interface components {
             host: string;
             kind: string;
             calledBy: string[];
+        };
+        ApiCatalogueList: {
+            /** Format: date-time */
+            at: string;
+            configured: boolean;
+            apis: components["schemas"]["ApiSummary"][];
+            problems: string[];
+        };
+        ApiDetail: {
+            summary: components["schemas"]["ApiSummary"];
+            operations: components["schemas"]["ApiOperationInfo"][];
+            policy: components["schemas"]["ApiPolicyInfo"];
+            differences: string[];
+        };
+        ApiFragmentInfo: {
+            id: string;
+            xml?: string | null;
+        };
+        ApiOperationInfo: {
+            id: string;
+            name: string;
+            method: string;
+            urlTemplate: string;
+            description?: string | null;
+            parameters: components["schemas"]["ApiParameterInfo"][];
+            responses: number[];
+        };
+        ApiParameterInfo: {
+            name: string;
+            in: string;
+            type?: string | null;
+            required: boolean;
+        };
+        ApiPolicyInfo: {
+            xml?: string | null;
+            fragments: components["schemas"]["ApiFragmentInfo"][];
+        };
+        ApiSummary: {
+            id: string;
+            name: string;
+            displayName: string;
+            path?: string | null;
+            backendUrl?: string | null;
+            backendHost?: string | null;
+            gateways: string[];
+            missingFrom: string[];
+            systemId?: string | null;
+            groupId?: string | null;
+            thirdPartyId?: string | null;
         };
         /** @enum {string} */
         AppState: "Running" | "Stopped" | "Missing";
@@ -1012,6 +1109,75 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SystemLogs"];
+                };
+            };
+        };
+    };
+    GetApis: {
+        parameters: {
+            query?: {
+                env?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiCatalogueList"];
+                };
+            };
+        };
+    };
+    GetApiDetail: {
+        parameters: {
+            query: {
+                id: string;
+                env?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiDetail"];
+                };
+            };
+        };
+    };
+    GetApiOperationPolicy: {
+        parameters: {
+            query: {
+                id: string;
+                operation: string;
+                env?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiPolicyInfo"];
                 };
             };
         };

@@ -199,7 +199,7 @@ public class RegistryValidationTests
         Assert.Null(source["additionalProperties"]); // any other key is the kind's: the branches below say which
 
         var branches = source["allOf"]!.AsArray().ToDictionary(b => string.Join(",", b!["if"]!["properties"]!["kind"]!["enum"]!.AsArray().Select(k => (string)k!)), b => b!["then"]!);
-        var azure = branches["resourcegraph,loganalytics,azuremonitor,servicebus,functionjobs,resourcehealth"];
+        var azure = branches["resourcegraph,loganalytics,azuremonitor,servicebus,functionjobs,resourcehealth,apimanagement"];
         Assert.False((bool)azure["additionalProperties"]!);
         foreach (var key in new[] { "regionQuery", "rangeQuery", "regionRangeQuery", "batchMetrics", "typesQuery", "metrics", "entities", "providers", "keepResolvedFor", "kind", "pollSeconds" })
             Assert.NotNull(azure["properties"]![key]);

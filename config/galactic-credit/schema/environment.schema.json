@@ -215,7 +215,8 @@
                     "azuremonitor",
                     "servicebus",
                     "functionjobs",
-                    "resourcehealth"
+                    "resourcehealth",
+                    "apimanagement"
                   ]
                 }
               },
@@ -530,6 +531,19 @@
             }
           }
         }
+      }
+    },
+    "apis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "gateway"],
+      "description": "Where the API explorer reads the APIs of the town's gateways from: each API with its operations and the policies set on it, matched to the system its backend address belongs to. Nothing is polled; it is read when the explorer opens and kept for cacheFor. The backend address is first matched with the links rules and the third parties' domains, then with resourceHosts. Without this block the explorer says nothing is set up.",
+      "properties": {
+        "source": { "type": "string", "description": "The source (from sources) the APIs are read from: one whose kind can read the APIs of a gateway (on Azure, apimanagement). Its connection and login are used." },
+        "gateway": { "type": "string", "description": "The id of the system whose resources are the gateways, one for each region (for example the hub's gateway). The resources its scope rule finds are read." },
+        "merge": { "type": "boolean", "default": false, "description": "The gateways are copies of one another (for resilience): an API they share is listed once, and what differs between them (an API or operation one lacks, a different policy) is marked. Without it each gateway's APIs are listed separately." },
+        "resourceHosts": { "type": "array", "description": "How one of the town's own resources is addressed, with {name} where the resource's name goes (for example {name}.example.test), so a backend on one is matched to the system that owns the resource.", "items": { "type": "string", "pattern": "\\{name\\}" } },
+        "cacheFor": { "type": "string", "pattern": "^[0-9]+(\\.[0-9]+)?[smhd]$", "description": "How long a read is kept before the cloud is asked again. Default 1h." }
       }
     },
     "links": {
