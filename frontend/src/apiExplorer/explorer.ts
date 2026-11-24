@@ -95,8 +95,10 @@ export class ApiExplorer {
     catch (e) { this.error = (e as Error).message }
     if (!this.el) return
     this.drawAll()
-    const first = this.list && this.opt.system ? apisOfSystem(this.list.apis, this.opt.system)[0] : null
-    if (first) await this.select(first)
+    const own = this.list && this.opt.system ? apisOfSystem(this.list.apis, this.opt.system) : []
+    // opened from a service: only its APIs in the tree, so the one chosen is never lost in a long list
+    if (own.length > 0) { this.filter = { ...this.filter, system: this.opt.system! }; this.drawTree() }
+    if (own[0]) await this.select(own[0])
   }
 
   close(): void {
@@ -109,6 +111,7 @@ export class ApiExplorer {
   private click(t: HTMLElement): void {
     if (t === this.el || t.closest('[data-ae-close]')) { this.close(); return }
     const chip = t.closest<HTMLElement>('[data-ae-chip]')
+    if (chip?.dataset.aeChip === 'system') { this.filter = { ...this.filter, system: undefined }; this.drawTree(); return }
     if (chip) { const k = chip.dataset.aeChip as 'differing' | 'unlinked'; this.filter = { ...this.filter, [k]: !this.filter[k] }; this.drawTree(); return }
     const group = t.closest<HTMLElement>('[data-ae-group]')
     if (group) { const id = group.dataset.aeGroup!; if (!this.closed.delete(id)) this.closed.add(id); this.drawTree(); return }
@@ -179,8 +182,9 @@ export class ApiExplorer {
     const chips = this.q('ae-chips')
     const tree = this.q('ae-tree')
     if (!chips || !tree) return
+    const only = this.filter.system ? `<button data-ae-chip="system" class="on" title="Show the APIs of every system again">Only ${escapeHtml(this.opt.systemName(this.filter.system))} ✕</button>` : ''
     chips.innerHTML = this.list?.configured
-      ? `<button data-ae-chip="differing" class="${this.filter.differing ? 'on' : ''}" title="Only APIs the gateways do not agree on">Differs</button><button data-ae-chip="unlinked" class="${this.filter.unlinked ? 'on' : ''}" title="Only APIs whose backend matched no service">Not linked</button>`
+      ? `${only}<button data-ae-chip="differing" class="${this.filter.differing ? 'on' : ''}" title="Only APIs the gateways do not agree on">Differs</button><button data-ae-chip="unlinked" class="${this.filter.unlinked ? 'on' : ''}" title="Only APIs whose backend matched no service">Not linked</button>`
       : ''
     if (this.error) { tree.innerHTML = `<p class="ae-none">${escapeHtml(this.error)}</p>`; return }
     if (!this.list) { tree.innerHTML = '<p class="ae-none">Loading…</p>'; return }
