@@ -27,7 +27,7 @@ public static class ScopeInfos
             scope.Resources.Select(r =>
             {
                 var tenant = r.Tenant is null ? null : names.GetValueOrDefault(r.Tenant, r.Tenant);
-                return new ScopeResource(r.Name, r.Type, r.Region, tenant, r.Instances, ScopeLinks.For(env.Scope, env.Id, r, r.AccountId ?? scope.AccountId, tenant));
+                return new ScopeResource(r.Name, r.Type, r.Region, tenant, r.Instances, ScopeLinks.For(env.Scope, env.Id, r, r.AccountId ?? scope.AccountId, tenant), r.Tags);
             }).ToList(),
             scope.Instances, problems, state);
     }

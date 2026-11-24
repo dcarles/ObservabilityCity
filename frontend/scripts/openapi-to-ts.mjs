@@ -32,6 +32,7 @@ function typeOf(schema, indent, where) {
     const item = typeOf(schema.items, indent, `${where}[]`).type
     type = `${/[|&]/.test(item) ? `(${item})` : item}[]`
   } else if (schema.type === 'object' && schema.properties) type = objectOf(schema, indent, where)
+  else if (schema.type === 'object' && schema.additionalProperties && typeof schema.additionalProperties === 'object') type = `{ [key: string]: ${typeOf(schema.additionalProperties, indent, `${where}[key]`).type} }`
   else unsupported(`the schema type ${JSON.stringify(schema.type)}`, where)
   if (schema.format && !schema.enum && !schema.$ref) comment = `Format: ${schema.format}`
   if (schema.nullable) type = `${type} | null`

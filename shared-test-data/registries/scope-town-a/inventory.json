@@ -56,7 +56,9 @@
       "subscriptionId": "00000000-0000-0000-0000-0000000000a1",
       "location": "northeurope",
       "tags": {
-        "tenant": "Acme Bank"
+        "tenant": "Acme Bank",
+        "environment": "Production",
+        "team": "Payments"
       }
     },
     {
@@ -66,7 +68,9 @@
       "subscriptionId": "00000000-0000-0000-0000-0000000000a1",
       "location": "northeurope",
       "tags": {
-        "tenant": "Borealis Credit Union"
+        "tenant": "Borealis Credit Union",
+        "environment": "Production",
+        "team": "Payments"
       }
     },
     {
@@ -76,7 +80,9 @@
       "subscriptionId": "00000000-0000-0000-0000-0000000000a1",
       "location": "northeurope",
       "tags": {
-        "tenant": "Cygnus Finance"
+        "tenant": "Cygnus Finance",
+        "environment": "Production",
+        "team": "Payments"
       }
     },
     {

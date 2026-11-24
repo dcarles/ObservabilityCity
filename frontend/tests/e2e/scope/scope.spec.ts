@@ -55,6 +55,26 @@ test.describe(`a live town with scope rules (${B ? 'tags and derived names' : 'n
     for (const customer of ['Acme Bank', 'Borealis Credit Union', 'Cygnus Finance']) expect(text).toContain(customer)
   })
 
+  test('the Tags tab shows the tags the provider keeps: shared ones once, then each resource', async ({ page, request }) => {
+    test.skip(B, 'only the recorded inventory of town A carries tags on the databases')
+    await expect.poll(async () => (await (await request.get(`${API}/api/systems/aa.orders-db`)).json()).scope?.inventoryState, { timeout: 15_000 }).toBe('read')
+    const scope = (await (await request.get(`${API}/api/systems/aa.orders-db`)).json()).scope
+    expect(scope.resources.map((r: any) => r.tags?.team)).toEqual(['Payments', 'Payments', 'Payments'])
+    await openConfig(page, 'Orders DB')
+    await page.locator('#inspector [data-tab="tags"]').click()
+    await expect(page.locator('#inspector .scope-title').first()).toHaveText('On all 3 resources')
+    await expect(page.locator('#inspector .cfg-row[data-tag="team"]')).toHaveCount(1)
+    await expect(page.locator('#inspector .tag-res')).toHaveCount(3)
+    await expect(page.locator('#inspector .tag-res[data-resource$="-al-ord"] .cfg-row[data-tag="tenant"]')).toHaveCount(3)
+    await expect(page.locator('#inspector .tag-res').first()).toContainText('Acme Bank')
+  })
+
+  test('a system whose resources carry no tags has no Tags tab', async ({ page }) => {
+    test.skip(B, 'town B has its own tags')
+    await openConfig(page, 'Orders API')
+    await expect(page.locator('#inspector [data-tab="tags"]')).toHaveCount(0)
+  })
+
   // The environment's link rules turn each resource into addresses; the program only shows them (it never opens or fetches one).
   test('the server sends the links the rules make for each resource', async ({ request }) => {
     await expect.poll(async () => (await (await request.get(`${API}/api/systems/aa.orders-api`)).json()).scope?.inventoryState, { timeout: 15_000 }).toBe('read')

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { engineText, sourceRows, ago, clockTime, configOrder, groupDetail, incidentSummary, linkSections, logSectionEmpty, logsFollow, LOGS_FOLLOW_GAP_MS, LOGS_FOLLOW_MS, logSectionTitle, originLabel, isWebAddress, overviewLinks, overviewRows, reasons, repeatLabel, resourceLinks, scopeView, logLinkLabel, logTabLabel, pickLogSection, sectionLinks, stateTone } from '../../src/inspectorModel'
+import { engineText, sourceRows, ago, clockTime, configOrder, groupDetail, incidentSummary, linkSections, logSectionEmpty, logsFollow, LOGS_FOLLOW_GAP_MS, LOGS_FOLLOW_MS, logSectionTitle, originLabel, isWebAddress, overviewLinks, overviewRows, reasons, repeatLabel, resourceLinks, scopeView, tagsView, logLinkLabel, logTabLabel, pickLogSection, sectionLinks, stateTone } from '../../src/inspectorModel'
 import type { ConfigValue, LogGroup, LogSection, ScopeInfo, ScopeResource, SystemDetail, NodeSnapshot, Snapshot } from '../../src/types'
 
 const bad = JSON.parse(readFileSync(resolve(__dirname, '../../../shared-test-data/snapshots/bad-day.json'), 'utf8')) as Snapshot
@@ -471,5 +471,35 @@ describe('the Logs tab following the viewed time', () => {
   it('does not hold back a jump of an hour or more', () => {
     expect(logsFollow(T, T + 60 * MIN, 1)).toEqual({ due: true, wait: 0 })
     expect(logsFollow(T, T - 6 * 60 * MIN, 1)).toEqual({ due: true, wait: 0 })
+  })
+})
+
+describe('the tags tab', () => {
+  const res = (name: string, tags?: Record<string, string>, extra: Record<string, unknown> = {}) => ({ name, type: 't', tags, ...extra })
+  const scope = (resources: any[]): ScopeInfo => ({ subscription: null, resources, instances: null, problems: [], inventoryState: 'read' } as unknown as ScopeInfo)
+
+  it('is not offered when no resource has a tag', () => {
+    expect(tagsView(null)).toBeNull()
+    expect(tagsView(scope([res('a'), res('b', {})]))).toBeNull()
+  })
+
+  it('lists one resource with all its tags, sorted by key', () => {
+    const v = tagsView(scope([res('a', { team: 'x', Env: 'prod' })]))!
+    expect(v.shared).toEqual([])
+    expect(v.resources[0].tags).toEqual([{ key: 'Env', value: 'prod' }, { key: 'team', value: 'x' }])
+  })
+
+  it('shows a tag with the same value on every resource once, and the rest per resource', () => {
+    const v = tagsView(scope([res('b', { env: 'prod', tenant: 'B' }, { region: 'north' }), res('a', { env: 'prod', tenant: 'A' }, { tenant: 'Acme' })]))!
+    expect(v.total).toBe(2)
+    expect(v.shared).toEqual([{ key: 'env', value: 'prod' }])
+    expect(v.resources.map((r) => r.name)).toEqual(['a', 'b'])
+    expect(v.resources[0].tags).toEqual([{ key: 'tenant', value: 'A' }])
+  })
+
+  it('shares nothing when one resource lacks the tag or has another value, and keeps tag-less resources listed', () => {
+    const v = tagsView(scope([res('a', { env: 'prod' }), res('b', { env: 'stg' }), res('c')]))!
+    expect(v.shared).toEqual([])
+    expect(v.resources.find((r) => r.name === 'c')!.tags).toEqual([])
   })
 })

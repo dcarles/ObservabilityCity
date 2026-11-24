@@ -5,8 +5,8 @@ namespace ObservabilityCity.Core.Scope;
 /// <summary>Where a pillar lives: its account (an Azure subscription, an AWS account, a GCP project). <see cref="Via"/> says how it was found: explicit, name or tag; empty when it is not (yet) known.</summary>
 public sealed record PillarScope(string PillarId, string Code, string? AccountId, string? AccountName, string Via);
 
-/// <summary>A resource that belongs to a system, and the rule that said so. Tenant is the tenant id without dashes, lowercase; null when the rule has none. AccountId is set only when the rule looks in accounts of its own, not the pillar's.</summary>
-public sealed record ResolvedResource(string Id, string Name, string Type, string? Region, string? Tenant, string Rule, int? Instances = null, bool? Running = null, string? AccountId = null);
+/// <summary>A resource that belongs to a system, and the rule that said so. Tenant is the tenant id without dashes, lowercase; null when the rule has none. Tags are the tags or labels the cloud provider keeps on it (null when it has none). AccountId is set only when the rule looks in accounts of its own, not the pillar's.</summary>
+public sealed record ResolvedResource(string Id, string Name, string Type, string? Region, string? Tenant, string Rule, int? Instances = null, bool? Running = null, string? AccountId = null, IReadOnlyDictionary<string, string>? Tags = null);
 
 /// <summary>A resource that stands in the town as a basic building (see <see cref="AssetRule"/>). Id is the pillar and the resource's name in lowercase. Service is the registry's service name it belongs to, null for the pillar as a whole.</summary>
 public sealed record ResolvedAsset(string Id, string PillarId, string Name, string Label, string Shape, string Type, string? Service, string? Region, string ResourceId, string Rule, string? AccountId, string? Group = null);
