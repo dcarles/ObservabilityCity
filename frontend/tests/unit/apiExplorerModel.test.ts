@@ -47,6 +47,7 @@ describe('the search', () => {
   })
   it('narrows to the APIs the gateways differ on, or to those nothing matched', () => {
     expect(filterTree(tree, { ...NO_FILTER, differing: true }, system).flatMap((g) => g.apis.map((a) => a.id))).toEqual(['basket-api'])
+    expect(filterTree(tree, { ...NO_FILTER, system: 'sales.orders' }, system).flatMap((g) => g.apis.map((a) => a.id))).toEqual(['orders-api'])
     expect(filterTree(tree, { ...NO_FILTER, unlinked: true }, system).flatMap((g) => g.apis.map((a) => a.id))).toEqual(['legacy-bridge'])
   })
 })

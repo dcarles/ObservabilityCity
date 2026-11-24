@@ -43,6 +43,8 @@ export interface ApiFilter {
   differing: boolean
   /** Only APIs that matched no system. */
   unlinked: boolean
+  /** Only the APIs of this system (what a service's drawer opens the explorer on); empty for all. */
+  system?: string
 }
 
 export const NO_FILTER: ApiFilter = { text: '', differing: false, unlinked: false }
@@ -58,6 +60,7 @@ export function filterTree(tree: readonly ApiGroup[], filter: ApiFilter, systemN
     const apis = g.apis.filter((a) => {
       if (filter.differing && !differs(a)) return false
       if (filter.unlinked && (a.systemId || a.thirdPartyId)) return false
+      if (filter.system && a.systemId !== filter.system) return false
       if (words.length === 0) return true
       const hay = [a.displayName, a.name, a.path ?? '', a.backendHost ?? '', a.systemId ? systemName(a.systemId) : '', g.name].join(' ').toLowerCase()
       return words.every((w) => hay.includes(w))

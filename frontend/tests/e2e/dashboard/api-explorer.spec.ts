@@ -24,6 +24,11 @@ test.describe('the API explorer', () => {
     const win = page.locator('#api-explorer')
     await expect(win).toBeVisible()
     await expect(win.locator('.ae-api.sel')).toHaveCount(1)
+    // opened from a service: only its own APIs are listed, and the chip brings the rest back
+    const own = await win.locator('.ae-api').count()
+    await expect(win.locator('[data-ae-chip="system"]')).toBeVisible()
+    await win.locator('[data-ae-chip="system"]').click()
+    expect(await win.locator('.ae-api').count()).toBeGreaterThan(own)
     await expect(win.locator('.ae-op').first()).toBeVisible()
     await win.locator('.ae-op').first().click()
     await expect(win.locator('#ae-detail')).toContainText('Responses')
