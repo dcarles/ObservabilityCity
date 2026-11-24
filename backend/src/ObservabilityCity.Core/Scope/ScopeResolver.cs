@@ -270,7 +270,7 @@ public static class ScopeResolver
 
                     if (rules.Regions.Tag is { } regionTag && TagValue(resource, regionTag) is { Length: > 0 } tagged) region = tagged;
                     bool? running = rule.State is null || string.IsNullOrWhiteSpace(resource.State) ? null : rule.Running!.Contains(resource.State, StringComparer.OrdinalIgnoreCase);
-                    resources.Add(new ResolvedResource(resource.Id, resource.Name, resource.Type, region, tenant, rule.Name, rule.Instances is null ? null : resource.Instances, running, rule.Account is null ? null : resource.AccountId));
+                    resources.Add(new ResolvedResource(resource.Id, resource.Name, resource.Type, region, tenant, rule.Name, rule.Instances is null ? null : resource.Instances, running, rule.Account is null ? null : resource.AccountId, resource.Tags.Count == 0 ? null : resource.Tags));
                     if (tenant is not null && rule.TenantNameTag is { } nameTag && TagValue(resource, nameTag) is { Length: > 0 } friendly)
                         tenantNames.TryAdd(tenant, friendly);
                 }

@@ -280,4 +280,17 @@ public class WorkspaceLookupTests
         Assert.Contains("scope.telemetryStoreId: {nope} is not a variable here", unknown);
         Assert.Contains("scope.telemetryStoreId is empty", empty);
     }
+
+    [Fact]
+    public async Task The_inspector_is_given_the_tags_the_provider_keeps_on_each_resource()
+    {
+        var (_, store, registry) = await Resolved(TownA);
+
+        var databases = ScopeInfos.Of(registry, store, "aa.orders-db")!.Resources;
+
+        Assert.Equal(3, databases.Count);
+        var acme = databases.Single(r => r.Tenant == "Acme Bank");
+        Assert.Equal(new Dictionary<string, string> { ["tenant"] = "Acme Bank", ["environment"] = "Production", ["team"] = "Payments" }, acme.Tags!);
+        Assert.Null(ScopeInfos.Of(registry, store, "aa.orders-api")!.Resources.First().Tags); // a resource with no tags carries none, not an empty list
+    }
 }
