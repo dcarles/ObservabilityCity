@@ -10,7 +10,7 @@
 .ae-tree, .ae-ops { border-right: 1px solid var(--line); }
 .ae-search { padding: 10px 12px 4px; }
 .ae-search input, .ae-ops-head input { width: 100%; padding: 6px 9px; border: 1px solid var(--line); border-radius: 8px; background: var(--field); color: var(--ink); font: inherit; }
-.ae-chips { display: flex; gap: 6px; padding: 4px 12px 8px; }
+.ae-chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 12px 8px; }
 .ae-chips button { border: 1px solid var(--line); border-radius: 99px; background: none; color: inherit; padding: 1px 10px; font-size: 12px; cursor: pointer; }
 .ae-chips button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
 .ae-none { opacity: 0.65; margin: 10px 14px; }
@@ -59,3 +59,5 @@ button.ae-status.sel { opacity: 1; outline: 2px solid currentColor; }
 .ae-ind { margin-left: 18px; }
 .ae-fold { display: inline-block; width: 16px; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; padding: 0; }
 .ae-ftype { opacity: 0.7; } .ae-req { color: var(--warn-ink); font-size: 11px; } .ae-fdesc { margin-left: 16px; opacity: 0.65; font-family: system-ui, sans-serif; }
+.ae-foldall { margin-left: auto; display: inline-flex; gap: 4px; }
+.ae-foldall button { border: 0; background: none; color: inherit; font: inherit; font-size: 12px; text-decoration: underline; cursor: pointer; opacity: 0.8; padding: 2px 4px; }
