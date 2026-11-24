@@ -47,7 +47,7 @@ public sealed class ApiCatalogue(IRegistryProvider registries, ScopeStore scope,
     private Task<T> Cached<T>(string key, TimeSpan keep, Func<Task<T>> read) where T : class?
     {
         var now = time.GetUtcNow();
-        if (_cache.TryGetValue(key, out var hit) && now - hit.At < keep) return Unbox<T>(hit.Result);
+        if (_cache.TryGetValue(key, out var hit) && now - hit.At < keep && !hit.Result.IsFaulted && !hit.Result.IsCanceled) return Unbox<T>(hit.Result);
         var task = Task.Run(async () => (object?)await read());
         _cache[key] = (now, task);
         task.ContinueWith(t => { if (t.IsFaulted || t.IsCanceled) _cache.TryRemove(new KeyValuePair<string, (DateTimeOffset, Task<object?>)>(key, (now, task))); }, TaskScheduler.Default);
