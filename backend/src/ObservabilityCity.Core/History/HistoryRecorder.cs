@@ -10,7 +10,7 @@ namespace ObservabilityCity.Core.History;
 
 /// <summary>
 /// Saves the environment's newest snapshot every <see cref="HistoryOptions.Interval"/>, on the clock (10:00, 10:05, ...), while the environment is being read. When nobody
-/// is looking the sources are not polled (the snapshot is still built, from old readings), so no frame is saved: a gap shows as a gap, never as the same picture repeated. The cleaner runs
+/// is looking the sources are not polled (the snapshot is still built, from old readings), so no frame is saved: a gap shows as a gap, never as the same picture repeated. Nor is a frame saved while every source is late, which would be a grey town. The cleaner runs
 /// when the recorder starts and then each time a new hour file is begun.
 /// </summary>
 public sealed class HistoryRecorder(
@@ -43,10 +43,13 @@ public sealed class HistoryRecorder(
         rebuilt?.Prune(oldest);
     }
 
-    /// <summary>Saves a frame now if there is a fresh snapshot to save. Returns whether one was saved.</summary>
+    /// <summary>Saves a frame now if there is a snapshot with fresh data to save. Returns whether one was saved.</summary>
     public bool RecordOnce(DateTimeOffset slot)
     {
         if (latest.Latest is not { } snapshot) return false;
+        // Every source is late (the connection or the login is gone): the town would be grey, and a grey frame saved now could never be replaced by the rebuild. The slot stays
+        // a gap, which the filler makes up from the sources once they answer again.
+        if (snapshot.Sources is { Count: > 0 } sources && sources.All(s => s.Overdue)) return false;
         var json = ToJson(snapshot);
         var (unhealthy, down) = (snapshot.Totals.Degraded + snapshot.Totals.Down, snapshot.Totals.Down);
         var newHour = store.Append(slot, json, unhealthy, down);

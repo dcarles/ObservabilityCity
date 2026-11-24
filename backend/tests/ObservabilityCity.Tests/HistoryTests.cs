@@ -240,6 +240,26 @@ public sealed class HistoryTests : IDisposable
     }
 
     [Fact]
+    public async Task The_recorder_saves_no_frame_while_every_source_is_late_and_saves_again_when_one_answers()
+    {
+        var clock = new FakeTimeProvider(T0 + TimeSpan.FromMinutes(1));
+        var latest = new SnapshotStore();
+        var snapshot = await RealSnapshot();
+        SourceFreshnessSnapshot Source(string name, bool overdue) => new(name, T0, 30, overdue);
+        var recorder = new HistoryRecorder(Store(), latest, new HistoryOptions { IntervalSeconds = 300 }, null, clock);
+
+        latest.Set(snapshot with { Sources = [Source("metrics", true), Source("messaging", true)] });
+        Assert.False(recorder.RecordOnce(T0 + Gap));
+        Assert.Empty(Store().Points(T0 - TimeSpan.FromHours(1)));
+
+        latest.Set(snapshot with { Sources = [Source("metrics", true), Source("messaging", false)] });
+        Assert.True(recorder.RecordOnce(T0 + Gap * 2));
+        latest.Set(snapshot with { Sources = null });
+        Assert.True(recorder.RecordOnce(T0 + Gap * 3));
+        Assert.Equal([T0 + Gap * 2, T0 + Gap * 3], Store().Points(T0 - TimeSpan.FromHours(1)).Select(p => p.At));
+    }
+
+    [Fact]
     public async Task A_recorded_snapshot_is_the_snapshot_the_browser_gets_and_later_frames_are_far_smaller_than_the_first()
     {
         var snapshot = await RealSnapshot();
