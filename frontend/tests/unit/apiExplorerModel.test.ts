@@ -72,8 +72,8 @@ describe('what the explorer says about an API', () => {
   })
   it('filters operations by method, name or address', () => {
     const ops = [
-      { id: 'a', name: 'GetOrder', method: 'GET', urlTemplate: '/orders/{id}', parameters: [], responses: [] },
-      { id: 'b', name: 'AddOrder', method: 'POST', urlTemplate: '/orders', parameters: [], responses: [] },
+      { id: 'a', name: 'GetOrder', method: 'GET', urlTemplate: '/orders/{id}', parameters: [], request: { representations: [] }, responses: [] },
+      { id: 'b', name: 'AddOrder', method: 'POST', urlTemplate: '/orders', parameters: [], request: { representations: [] }, responses: [] },
     ]
     expect(filterOperations(ops, 'post').map((o) => o.id)).toEqual(['b'])
     expect(filterOperations(ops, 'orders {id}').map((o) => o.id)).toEqual(['a'])

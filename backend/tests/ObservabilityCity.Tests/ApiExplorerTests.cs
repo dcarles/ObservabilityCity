@@ -93,7 +93,64 @@ public class ApiExplorerTests
         Assert.Null(next);
         Assert.Equal(("PUT", "/account/{accountId}/flag/{key}"), (op.Method, op.UrlTemplate));
         Assert.Equal([("accountId", "path", true), ("key", "path", true), ("dryRun", "query", false), ("context-tenantid", "header", true)], op.Parameters.Select(p => (p.Name, p.In, p.Required)));
-        Assert.Equal([204, 400, 404], op.Responses);
+        Assert.Equal([204, 400, 404], op.Responses.Select(r => r.StatusCode));
+    }
+
+    private const string BodyOperations = """
+        { "value": [ { "name": "create", "properties": { "displayName": "Create", "method": "POST", "urlTemplate": "/merchants",
+              "request": { "description": "What to create", "representations": [ { "contentType": "application/json", "schemaId": "s1", "typeName": "CreateMerchant",
+                  "examples": { "default": { "value": { "name": "Acme" } } } } ] },
+              "responses": [ { "statusCode": 201, "description": "Created", "representations": [ { "contentType": "application/json", "schemaId": "s2", "typeName": "Merchant" } ] },
+                             { "statusCode": 404, "description": "No such merchant" } ] } } ] }
+        """;
+
+    private const string Schemas = """
+        { "value": [
+          { "name": "s1", "properties": { "contentType": "application/vnd.oai.openapi.components+json", "document": { "components": { "schemas": {
+              "CreateMerchant": { "type": "object", "required": ["name", "address"], "properties": {
+                  "name": { "type": "string", "description": "The display name" },
+                  "status": { "type": "string", "enum": ["Active", "Suspended"] },
+                  "address": { "$ref": "#/components/schemas/Address" },
+                  "contacts": { "type": "array", "items": { "$ref": "#/components/schemas/Address" } } } },
+              "Address": { "type": "object", "required": ["line1"], "properties": { "line1": { "type": "string" }, "postcode": { "type": "string" } } } } } } } },
+          { "name": "s2", "properties": { "contentType": "application/vnd.ms-azure-apim.swagger.definitions+json", "document": { "definitions": {
+              "Merchant": { "type": "object", "properties": { "id": { "type": "string", "format": "uuid" }, "parent": { "$ref": "#/definitions/Merchant" } } } } } } },
+          { "name": "x1", "properties": { "contentType": "application/vnd.ms-azure-apim.xsd+xml", "document": "<xs:schema/>" } } ] }
+        """;
+
+    [Fact]
+    public void An_operation_shows_its_request_body_and_each_response_with_the_fields_of_the_types_it_names()
+    {
+        var schemas = ApiManagementSchemas.ParseSchemas(Schemas);
+        Assert.Equal(["s1", "s2"], schemas.Keys.Order()); // the XSD is left out
+        var op = Assert.Single(ApiManagementReading.ParseOperations(BodyOperations, schemas).Operations);
+
+        var body = Assert.Single(op.Request.Representations);
+        Assert.Equal("What to create", op.Request.Description);
+        Assert.Equal("application/json", body.ContentType);
+        Assert.Contains("\"name\": \"Acme\"", body.Example);
+        Assert.Equal([("name", "string", true), ("status", "string · enum Active, Suspended", false), ("address", "Address", true), ("contacts", "array of Address", false)], body.Fields.Select(f => (f.Name, f.Type, f.Required)));
+        Assert.Equal("The display name", body.Fields[0].Description);
+        Assert.Equal([("line1", true), ("postcode", false)], body.Fields[2].Children.Select(f => (f.Name, f.Required)));
+        Assert.Equal(["line1", "postcode"], body.Fields[3].Children.Select(f => f.Name));
+
+        Assert.Equal([201, 404], op.Responses.Select(r => r.StatusCode));
+        var created = op.Responses[0];
+        Assert.Equal("Created", created.Description);
+        // a type that holds itself stops after one round instead of going on for ever
+        var merchant = Assert.Single(created.Representations).Fields;
+        Assert.Equal(["id", "parent"], merchant.Select(f => f.Name));
+        Assert.Equal("string (uuid)", merchant[0].Type);
+        Assert.Empty(merchant[1].Children.SelectMany(c => c.Children));
+        Assert.Empty(op.Responses[1].Representations);
+    }
+
+    [Fact]
+    public void An_operation_whose_schemas_are_unknown_still_lists_its_bodies_without_fields()
+    {
+        var op = Assert.Single(ApiManagementReading.ParseOperations(BodyOperations).Operations);
+        Assert.Empty(op.Request.Representations[0].Fields);
+        Assert.NotNull(op.Request.Representations[0].Example);
     }
 
     [Fact]
@@ -133,6 +190,7 @@ public class ApiExplorerTests
     public async Task A_missing_policy_is_no_policy_and_a_fragment_that_cannot_be_read_is_listed_without_text()
     {
         var http = new CannedHttp()
+            .Answer("""{ "value": [] }""") // the schemas
             .Answer(Operations)
             .Answer("""<policies><inbound><base /><include-fragment fragment-id="good" /><include-fragment fragment-id="gone" /></inbound></policies>""")
             .Answer("""<fragment><set-header name="x" /></fragment>""")
@@ -143,7 +201,7 @@ public class ApiExplorerTests
         Assert.Contains("set-header", detail.Policy.Fragments[0].Xml);
         Assert.Null(detail.Policy.Fragments[1].Xml);
 
-        var none = new CannedHttp().Answer(Operations).Answer("""{ "error": { "code": "ResourceNotFound", "message": "PoliciesConfiguration not found." } }""", HttpStatusCode.NotFound);
+        var none = new CannedHttp().Answer("""{ "value": [] }""").Answer(Operations).Answer("""{ "error": { "code": "ResourceNotFound", "message": "PoliciesConfiguration not found." } }""", HttpStatusCode.NotFound);
         Assert.Null((await Source(none).DetailAsync(Gateway, "ams-as", CancellationToken.None)).Policy);
     }
 
@@ -177,7 +235,7 @@ public class ApiExplorerTests
             Task.FromResult<SourcePolicy?>(operationId == "get" ? new SourcePolicy("<policies><inbound><set-header name=\"x-api-key\"><value>abcDEF0123456789abcDEF0123456789</value></set-header></inbound></policies>", []) : null);
     }
 
-    private static ApiOperationInfo Op(string id, string method, string url) => new(id, id, method, url, null, [], [200]);
+    private static ApiOperationInfo Op(string id, string method, string url) => new(id, id, method, url, null, [], new ApiBodyInfo(null, []), [new ApiResponseInfo(200, null, [])]);
 
     private static (ApiCatalogue Catalogue, Stub Stub, FakeTimeProvider Time) Catalogue(bool merge, Func<string, string?>? hostSystem = null)
     {

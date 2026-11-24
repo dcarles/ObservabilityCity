@@ -4,7 +4,7 @@
 
 import './explorer.css'
 import { escapeHtml } from '../picker'
-import type { ApiCatalogueList, ApiDetail, ApiOperationInfo, ApiPolicyInfo, ApiSummary } from '../types'
+import type { ApiCatalogueList, ApiDetail, ApiField, ApiOperationInfo, ApiPolicyInfo, ApiRepresentation, ApiSummary } from '../types'
 import { apisOfSystem, buildTree, filterOperations, filterTree, highlightXml, marker, methodClass, NO_FILTER, servedBy, statusClass, type ApiFilter } from './model'
 
 export interface ExplorerOptions {
@@ -60,6 +60,11 @@ export class ApiExplorer {
   private detail: ApiDetail | null = null
   private detailError = ''
   private opId: string | null = null
+  /** The response chosen, the content type chosen for the request body and each response, whether an example shows instead of the fields, and the folds opened. */
+  private respCode: number | null = null
+  private contentType = ''
+  private asExample = false
+  private readonly folds = new Set<string>()
   private readonly opPolicies = new Map<string, ApiPolicyInfo | 'loading' | 'failed'>()
   private readonly closed = new Set<string>()
   private seq = 0
@@ -119,6 +124,14 @@ export class ApiExplorer {
     if (api) { const found = this.list?.apis.find((a) => a.id === api.dataset.aeApi); if (found) void this.select(found); return }
     const op = t.closest<HTMLElement>('[data-ae-op]')
     if (op) { void this.pick(op.dataset.aeOp!); return }
+    const code = t.closest<HTMLElement>('[data-ae-code]')
+    if (code) { this.respCode = Number(code.dataset.aeCode); this.drawDetail(); return }
+    const ct = t.closest<HTMLElement>('[data-ae-ct]')
+    if (ct) { this.contentType = ct.dataset.aeCt!; this.drawDetail(); return }
+    const view = t.closest<HTMLElement>('[data-ae-view]')
+    if (view) { this.asExample = view.dataset.aeView === 'example'; this.drawDetail(); return }
+    const fold = t.closest<HTMLElement>('[data-ae-fold]')
+    if (fold) { const f = fold.dataset.aeFold!; if (!this.folds.delete(f)) this.folds.add(f); this.drawDetail(); return }
     const go = t.closest<HTMLElement>('[data-ae-go]')
     if (go) { this.close(); this.opt.go(go.dataset.aeGo!) }
   }
@@ -147,6 +160,9 @@ export class ApiExplorer {
 
   private async pick(id: string): Promise<void> {
     this.opId = id
+    this.respCode = null
+    this.contentType = ''
+    this.folds.clear()
     this.drawOps()
     this.drawDetail()
     const api = this.api
@@ -246,7 +262,44 @@ export class ApiExplorer {
     return `<div class="ae-sec"><div class="ae-call"><span class="ae-m ${methodClass(o.method)}">${escapeHtml(o.method || '?')}</span> <b class="mono">${escapeHtml(o.urlTemplate)}</b></div>` +
       `<div class="ae-sub">${escapeHtml(o.name)}${o.description ? ` · ${escapeHtml(o.description)}` : ''}</div></div>` +
       `<div class="ae-sec"><h4>Parameters</h4>${rows ? `<table><thead><tr><th>Name</th><th>In</th><th>Type</th><th></th></tr></thead><tbody>${rows}</tbody></table>` : '<p class="ae-none">None.</p>'}</div>` +
-      `<div class="ae-sec"><h4>Responses</h4>${o.responses.length ? o.responses.map((c) => `<span class="ae-status ${statusClass(c)}">${c}</span>`).join(' ') : '<p class="ae-none">The gateway lists none.</p>'}</div>`
+      this.requestBody(o) + this.responses(o)
+  }
+
+  /** The request body: its content types, the fields of the type (or an example), and a note when the gateway describes none. */
+  private requestBody(o: ApiOperationInfo): string {
+    const reps = o.request.representations
+    const body = reps.length === 0 ? '<p class="ae-none">No request body is described.</p>' : this.bodyBox(reps, 'req', o.request.description)
+    return `<div class="ae-sec"><h4>Request body</h4>${body}</div>`
+  }
+
+  /** The response codes as chips; the chosen one (the first success when none is) shows its description and body. */
+  private responses(o: ApiOperationInfo): string {
+    if (o.responses.length === 0) return '<div class="ae-sec"><h4>Responses</h4><p class="ae-none">The gateway lists none.</p></div>'
+    const chosen = o.responses.find((r) => r.statusCode === this.respCode) ?? o.responses.find((r) => r.statusCode < 300) ?? o.responses[0]
+    const chips = o.responses.map((r) => `<button class="ae-status ${statusClass(r.statusCode)}${r.statusCode === chosen.statusCode ? ' sel' : ''}" data-ae-code="${r.statusCode}">${r.statusCode}</button>`).join(' ')
+    const body = chosen.representations.length === 0 ? '<p class="ae-none">No body.</p>' : this.bodyBox(chosen.representations, `res${chosen.statusCode}`, null)
+    return `<div class="ae-sec"><h4>Responses</h4><div class="ae-codes">${chips}</div><div class="ae-resp"><b>${chosen.statusCode}</b>${chosen.description ? ` <span class="ae-sub">${escapeHtml(chosen.description)}</span>` : ''}${body}</div></div>`
+  }
+
+  private bodyBox(reps: readonly ApiRepresentation[], scope: string, description: string | null | undefined): string {
+    const rep = reps.find((r) => r.contentType === this.contentType) ?? reps[0]
+    const tabs = reps.length > 1 ? `<div class="ae-tabs">${reps.map((r) => `<button data-ae-ct="${escapeHtml(r.contentType)}" class="${r === rep ? 'on' : ''}">${escapeHtml(r.contentType)}</button>`).join('')}</div>` : ''
+    const both = rep.fields.length > 0 && !!rep.example
+    const view = both ? `<div class="ae-tabs"><button data-ae-view="fields" class="${!this.asExample ? 'on' : ''}">Fields</button><button data-ae-view="example" class="${this.asExample ? 'on' : ''}">Example</button></div>` : ''
+    const showExample = rep.example && (this.asExample || rep.fields.length === 0)
+    const content = showExample ? `<pre>${escapeHtml(rep.example!)}</pre>` : rep.fields.length > 0 ? `<div class="ae-fields">${this.fields(rep.fields, scope)}</div>` : '<p class="ae-none">The gateway names this body but does not describe its fields.</p>'
+    const head = `<div class="ae-sub">${escapeHtml(rep.contentType)}${rep.typeName ? ` · ${escapeHtml(rep.typeName)}` : ''}${description ? ` · ${escapeHtml(description)}` : ''}</div>`
+    return `${tabs}${view}${head}${content}`
+  }
+
+  private fields(list: readonly ApiField[], path: string): string {
+    return list.map((f) => {
+      const id = `${path}.${f.name}`
+      const open = this.folds.has(id)
+      const fold = f.children.length > 0 ? `<button class="ae-fold" data-ae-fold="${escapeHtml(id)}" aria-expanded="${open}" aria-label="${open ? 'Close' : 'Open'} ${escapeHtml(f.name)}">${open ? '▾' : '▸'}</button>` : '<span class="ae-fold"></span>'
+      const row = `<div class="ae-field">${fold}<span class="ae-fname">${escapeHtml(f.name)}</span> <span class="ae-ftype">${escapeHtml(f.type)}</span>${f.required ? ' <span class="ae-req">required</span>' : ''}${f.description ? `<div class="ae-fdesc">${escapeHtml(f.description)}</div>` : ''}</div>`
+      return row + (open && f.children.length > 0 ? `<div class="ae-ind">${this.fields(f.children, id)}</div>` : '')
+    }).join('')
   }
 
   /** The policies in force on the selected operation: the API's own, then the operation's, each as the gateway holds it. */
