@@ -396,4 +396,47 @@ test.describe('time travel on a live town', () => {
     await page.keyboard.press('Shift+}')
     await page.waitForFunction(() => !(window as unknown as Win).city.history.state.active)
   })
+
+  // after the one above on purpose too: a step back asks the server to rebuild that hour
+  test('while paused the cars and the boats stand still, and a step to the next frame plays no animation and clears nothing', async ({ page, request }) => {
+    await waitForFrames(request, 3)
+    await openTown(page, '&machine=car')
+    // the time the cars and the boats are told to move by, and how often they are told to clear
+    await page.evaluate(() => {
+      const w = window as unknown as { city: any; moved: { cars: number; boats: number }; cleared: number }
+      w.moved = { cars: 0, boats: 0 }
+      w.cleared = 0
+      for (const kind of ['cars', 'boats'] as const) {
+        const system = w.city.town[kind]
+        const update = system.update.bind(system)
+        system.update = (dt: number) => { w.moved[kind] += dt; update(dt) }
+        const clear = system.clear.bind(system)
+        system.clear = () => { w.cleared++; clear() }
+      }
+    })
+    const moved = () => page.evaluate(() => (window as unknown as { moved: { cars: number; boats: number } }).moved)
+    await page.evaluate(() => (window as unknown as Win).city.history.goTo(Date.now() - 25_000))
+    await page.locator('#history-skip').click()
+    await expect(page.locator('#history-travel')).toBeHidden()
+    await page.locator('body').click({ position: { x: 5, y: 300 } })
+    await page.keyboard.press('Space') // pause
+    // (a test town draws no frames of its own: time moves when the test says so)
+    await page.evaluate(() => (window as unknown as Win).city.step(1))
+    const paused = await moved()
+    await page.evaluate(() => (window as unknown as Win).city.step(1))
+    expect(await moved()).toEqual(paused)
+
+    // a step to the next frame: no time machine, nothing cleared
+    const clearedBefore = await page.evaluate(() => (window as unknown as { cleared: number }).cleared)
+    await page.keyboard.press('ArrowLeft')
+    await page.waitForTimeout(400)
+    await expect(page.locator('#history-travel')).toBeHidden()
+    expect(await page.evaluate(() => (window as unknown as { cleared: number }).cleared)).toBe(clearedBefore)
+
+    // playing moves them again
+    await page.keyboard.press('Space')
+    await page.evaluate(() => (window as unknown as Win).city.step(1))
+    expect((await moved()).cars).toBeGreaterThan(paused.cars)
+    expect((await moved()).boats).toBeGreaterThan(paused.boats)
+  })
 })

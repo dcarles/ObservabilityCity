@@ -692,7 +692,8 @@ export class Town {
     }
   }
 
-  update(dt: number, time: number, camera: THREE.Camera): void {
+  /** <paramref name="trafficDt"/> is the time the cars and boats move by: 0 while the history is paused, so they stand still where they are. */
+  update(dt: number, time: number, camera: THREE.Camera, trafficDt = dt): void {
     // Run every frame: plain try/catch per item, so that no closure or label string is made for each one (a guard() call per building would make hundreds of short-lived objects a frame).
     for (const [id, b] of this.buildings) {
       try { b.update(dt, time, camera) } catch (e) { this.report(`update ${id}`, e) }
@@ -706,8 +707,8 @@ export class Town {
     try { this.hubWeather?.update(dt, time, camera) } catch (e) { this.report('weather hub', e) }
     try { this.airport?.update(dt, time, camera) } catch (e) { this.report('airport', e) }
     try { this.overlay.update(dt) } catch (e) { this.report('overlay', e) }
-    try { this.cars.update(dt) } catch (e) { this.report('cars', e) }
-    try { this.boats.update(dt) } catch (e) { this.report('boats', e) }
+    try { this.cars.update(trafficDt) } catch (e) { this.report('cars', e) }
+    try { this.boats.update(trafficDt) } catch (e) { this.report('boats', e) }
   }
 
   private readonly reported = new Set<string>()

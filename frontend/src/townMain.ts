@@ -403,6 +403,7 @@ export async function startTown(): Promise<void> {
     const id = history.state.travel?.id ?? 0
     if (id === travelSeen) return
     travelSeen = id
+    if (history.state.travel?.quiet) return // a step to the next frame: things do not change that much
     town.cars.clear()
     town.boats.clear()
     clearTrafficAtNextFrame = true
@@ -540,11 +541,13 @@ export async function startTown(): Promise<void> {
   // ?test=1 is for automated tests: nothing is drawn on its own, and time moves only when the test calls city.step(seconds).
   // Software rendering draws a frame in seconds, so tests read the scene's state instead of waiting for frames.
   let simTime = 0
+  // paused in the past: cars and boats stand still where they are
+  const trafficDt = (dt: number): number => (history.state.active && history.state.paused ? 0 : dt)
   function step(seconds: number, dt = 0.1): void {
     for (let t = 0; t < seconds - 1e-9; t += dt) {
       simTime += dt
       stage.tick(dt, simTime)
-      town.update(dt, simTime, stage.camera)
+      town.update(dt, simTime, stage.camera, trafficDt(dt))
       events.update(dt)
       wall?.tick(simTime)
     }
@@ -671,7 +674,7 @@ export async function startTown(): Promise<void> {
     const time = clock.getElapsed()
     try {
       stage.tick(dt, time)
-      town.update(dt, time, stage.camera)
+      town.update(dt, time, stage.camera, trafficDt(dt))
       events.update(dt)
       wall?.tick(time)
       updateIslandLabels()

@@ -44,8 +44,8 @@ export interface HistoryState {
   loading: boolean
   /** True while the viewed moment has no recorded frame. */
   noData: boolean
-  /** Set by a jump: where the travel came from and went to, for the animation. Changes with every jump. */
-  travel: { from: number; to: number; id: number } | null
+  /** Set by a jump: where the travel came from and went to, for the animation. Changes with every jump. Quiet: a step to the next or previous frame, which plays no animation and takes no car or boat away. */
+  travel: { from: number; to: number; id: number; quiet?: boolean } | null
 }
 
 const TICK_MS = 250
@@ -178,7 +178,7 @@ export class HistoryController {
   }
 
   /** Goes to a moment in the past. Beyond the limit it is held at the limit; at (or within seconds of) now it is just going live. */
-  async goTo(at: number, options: { paused?: boolean } = {}): Promise<void> {
+  async goTo(at: number, options: { paused?: boolean; quiet?: boolean } = {}): Promise<void> {
     if (!this.s.enabled) return
     if (this.pendingAsk !== null) await this.withdraw() // the hour that was waited for is no longer wanted first
     const now = this.now()
@@ -191,7 +191,7 @@ export class HistoryController {
     this.shown = null
     this.retryAfter = 0
     this.travelId++
-    this.set({ active: true, viewed: at, paused: options.paused ?? false, loading: true, noData: false, travel: { from, to: at, id: this.travelId } })
+    this.set({ active: true, viewed: at, paused: options.paused ?? false, loading: true, noData: false, travel: { from, to: at, id: this.travelId, quiet: options.quiet } })
     this.start()
     await this.host.prepare?.()
     if (mine !== this.seq) return
@@ -246,7 +246,7 @@ export class HistoryController {
     const slot = Math.floor(this.s.viewed / gap) * gap
     const target = direction === 1 ? slot + gap : (this.s.viewed === slot ? slot - gap : slot)
     if (target >= this.now()) { void this.goLive(); return }
-    void this.goTo(target, { paused: true })
+    void this.goTo(target, { paused: true, quiet: true })
   }
 
   /** Reads the range again (the popup does this when it opens, so the strip is as new as the recorder). */
