@@ -121,8 +121,10 @@ public class ApiExplorerTests
     [Fact]
     public void An_operation_shows_its_request_body_and_each_response_with_the_fields_of_the_types_it_names()
     {
-        var schemas = ApiManagementSchemas.ParseSchemas(Schemas);
-        Assert.Equal(["s1", "s2"], schemas.Keys.Order()); // the XSD is left out
+        var list = ApiManagementSchemas.ParseSchemaList(Schemas);
+        var schemas = list.Where(x => x.Definitions is not null).ToDictionary(x => x.Id, x => x.Definitions!, StringComparer.OrdinalIgnoreCase);
+        Assert.Equal(["s1", "s2", "x1"], list.Select(x => x.Id));
+        Assert.Equal(["s1", "s2"], schemas.Keys.Order()); // the XSD has no JSON definitions
         var op = Assert.Single(ApiManagementReading.ParseOperations(BodyOperations, schemas).Operations);
 
         var body = Assert.Single(op.Request.Representations);
@@ -151,6 +153,48 @@ public class ApiExplorerTests
         var op = Assert.Single(ApiManagementReading.ParseOperations(BodyOperations).Operations);
         Assert.Empty(op.Request.Representations[0].Fields);
         Assert.NotNull(op.Request.Representations[0].Example);
+    }
+
+    // what the service really answers: the list holds only each schema's id and content type, and the definitions come from reading the schema by its id
+    private const string SchemaListWithoutDefinitions = """
+        { "count": 1, "value": [ { "id": "/subscriptions/x/schemas/s1", "name": "s1", "properties": { "contentType": "application/vnd.oai.openapi.components+json" }, "type": "Microsoft.ApiManagement/service/apis/schemas" } ] }
+        """;
+
+    private const string OneSchema = """
+        { "name": "s1", "properties": { "contentType": "application/vnd.oai.openapi.components+json", "document": { "components": { "schemas": {
+            "CreateMerchant": { "type": "object", "required": ["name"], "properties": { "name": { "type": "string" }, "amount": { "$ref": "#/components/schemas/Amount" } } },
+            "Amount": { "type": "object", "required": ["value"], "properties": { "value": { "type": "number" }, "currency": { "type": "string" } } },
+            "Merchant": { "type": "object", "properties": { "id": { "type": "string" } } } } } } } }
+        """;
+
+    [Fact]
+    public async Task Each_schema_is_read_by_its_id_because_the_list_does_not_carry_the_definitions()
+    {
+        var http = new CannedHttp()
+            .Answer(SchemaListWithoutDefinitions)
+            .Answer(OneSchema)
+            .Answer(BodyOperations)
+            .Answer("""{ "error": { "code": "ResourceNotFound" } }""", HttpStatusCode.NotFound);
+        var detail = await Source(http).DetailAsync(Gateway, "ams-as", CancellationToken.None);
+        Assert.Empty(detail.Notes ?? []);
+        var fields = Assert.Single(Assert.Single(detail.Operations).Request.Representations).Fields;
+        Assert.Equal(["name", "amount"], fields.Select(f => f.Name));
+        Assert.Equal(["value", "currency"], fields[1].Children.Select(f => f.Name)); // the Amount type behind the $ref
+    }
+
+    [Fact]
+    public async Task A_schema_that_cannot_be_read_is_said_so_in_a_note_instead_of_silently_showing_no_fields()
+    {
+        var http = new CannedHttp()
+            .Answer(SchemaListWithoutDefinitions)
+            .Answer("""{ "error": { "code": "Forbidden" } }""", HttpStatusCode.Forbidden)
+            .Answer(BodyOperations)
+            .Answer("""{ "error": { "code": "ResourceNotFound" } }""", HttpStatusCode.NotFound);
+        var detail = await Source(http).DetailAsync(Gateway, "ams-as", CancellationToken.None);
+        Assert.Empty(Assert.Single(Assert.Single(detail.Operations).Request.Representations).Fields);
+        var note = Assert.Single(detail.Notes!);
+        Assert.Contains("s1", note);
+        Assert.Contains("403", note);
     }
 
     [Fact]

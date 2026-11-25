@@ -267,6 +267,7 @@ export interface components {
             operations: components["schemas"]["ApiOperationInfo"][];
             policy: components["schemas"]["ApiPolicyInfo"];
             differences: string[];
+            notes: string[];
         };
         ApiField: {
             name: string;

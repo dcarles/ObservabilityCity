@@ -266,7 +266,8 @@ export class ApiExplorer {
     if (!this.api || !d) { el.innerHTML = this.api && !this.detailError ? '<p class="ae-none">Loading…</p>' : ''; return }
     const notes = d.differences.length ? `<div class="ae-diff"><b>Differs between gateways</b>${d.differences.map((x) => `<div>${escapeHtml(x)}</div>`).join('')}</div>` : ''
     const op = this.opId ? d.operations.find((o) => o.id === this.opId) ?? null : null
-    el.innerHTML = notes + (op ? this.operation(op) : '<p class="ae-none">Pick an operation to see its call and responses.</p>') + this.policies(op)
+    const unread = d.notes.length ? `<p class="ae-warn">${d.notes.map(escapeHtml).join('<br>')}</p>` : ''
+    el.innerHTML = notes + unread + (op ? this.operation(op) : '<p class="ae-none">Pick an operation to see its call and responses.</p>') + this.policies(op)
   }
 
   private operation(o: ApiOperationInfo): string {

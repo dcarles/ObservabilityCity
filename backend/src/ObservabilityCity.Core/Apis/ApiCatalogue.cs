@@ -108,11 +108,11 @@ public sealed class ApiCatalogue(IRegistryProvider registries, ScopeStore scope,
         var details = new List<(GatewayRef Gateway, SourceApiDetail Detail)>();
         foreach (var (gateway, apiId) in served)
             details.Add((gateway, await Cached($"detail|{s.Source.Name}|{gateway.Id}|{apiId}", s.Config.CacheFor, () => s.Source.DetailAsync(gateway, apiId, CancellationToken.None))));
-        if (details.Count == 0) return new ApiDetail(summary, [], new ApiPolicyInfo(null, []), []);
+        if (details.Count == 0) return new ApiDetail(summary, [], new ApiPolicyInfo(null, []), [], []);
         var primary = details.OrderByDescending(d => d.Detail.Operations.Count).First();
         var policy = primary.Detail.Policy is { } p ? Mask(p) : null;
         return new ApiDetail(summary, primary.Detail.Operations.OrderBy(o => o.UrlTemplate, StringComparer.OrdinalIgnoreCase).ThenBy(o => o.Method, StringComparer.Ordinal).ToList(),
-            policy ?? new ApiPolicyInfo(null, []), Differences(summary, details));
+            policy ?? new ApiPolicyInfo(null, []), Differences(summary, details), primary.Detail.Notes ?? []);
     }
 
     /// <summary>The policy on one operation of an API (null Xml when none is set on it), taken from the first gateway that serves the API.</summary>

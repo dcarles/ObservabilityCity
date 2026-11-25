@@ -14,23 +14,38 @@ public static class ApiManagementSchemas
 
     public static string SchemasUrl(string gatewayId, string api) => $"{Azure.AzureMonitorReader.Endpoint}{gatewayId.TrimEnd('/')}/apis/{Uri.EscapeDataString(api)}/schemas?api-version={ApiManagementReading.ApiVersion}&$top=100";
 
-    /// <summary>The definitions of each schema of one API by schema id, as the JSON object that holds its types. A schema in another format (XSD, say) is left out.</summary>
-    public static IReadOnlyDictionary<string, JsonDocument> ParseSchemas(string json)
+    public static string SchemaUrl(string gatewayId, string api, string schema) =>
+        $"{Azure.AzureMonitorReader.Endpoint}{gatewayId.TrimEnd('/')}/apis/{Uri.EscapeDataString(api)}/schemas/{Uri.EscapeDataString(schema)}?api-version={ApiManagementReading.ApiVersion}";
+
+    /// <summary>
+    /// The schemas of one API as the list names them: each with its id and, when the answer carries it, its definitions. The service's list holds only the id and the content type, so
+    /// the definitions are then read one schema at a time (<see cref="ParseSchema"/>).
+    /// </summary>
+    public static IReadOnlyList<(string Id, JsonDocument? Definitions)> ParseSchemaList(string json)
     {
-        var found = new Dictionary<string, JsonDocument>(StringComparer.OrdinalIgnoreCase);
+        var found = new List<(string, JsonDocument?)>();
         using var doc = JsonDocument.Parse(json);
         if (!doc.RootElement.TryGetProperty("value", out var value) || value.ValueKind != JsonValueKind.Array) return found;
         foreach (var item in value.EnumerateArray())
         {
             if (!item.TryGetProperty("name", out var n) || n.GetString() is not { } id) continue;
-            if (!item.TryGetProperty("properties", out var p) || !p.TryGetProperty("document", out var document)) continue;
-            try
-            {
-                found[id] = document.ValueKind == JsonValueKind.String ? JsonDocument.Parse(document.GetString()!) : JsonDocument.Parse(document.GetRawText());
-            }
-            catch (JsonException) { } // not JSON (an XSD, for example)
+            found.Add((id, item.TryGetProperty("properties", out var p) ? Definitions(p) : null));
         }
         return found;
+    }
+
+    /// <summary>The definitions of one schema, as the JSON object that holds its types, or null when it has none or is in another format (an XSD, say).</summary>
+    public static JsonDocument? ParseSchema(string json)
+    {
+        using var doc = JsonDocument.Parse(json);
+        return doc.RootElement.TryGetProperty("properties", out var p) ? Definitions(p) : null;
+    }
+
+    private static JsonDocument? Definitions(JsonElement properties)
+    {
+        if (!properties.TryGetProperty("document", out var document)) return null;
+        try { return document.ValueKind == JsonValueKind.String ? JsonDocument.Parse(document.GetString()!) : JsonDocument.Parse(document.GetRawText()); }
+        catch (JsonException) { return null; }
     }
 
     /// <summary>The bodies of one <c>representations</c> array.</summary>
