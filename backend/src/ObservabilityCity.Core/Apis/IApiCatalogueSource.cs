@@ -9,7 +9,7 @@ public sealed record GatewayRef(string Id, string Name, string Label);
 public sealed record SourceApi(string Id, string Name, string DisplayName, string? Path, string? BackendUrl);
 
 /// <summary>What one API holds: its operations, and the policy set directly on it (null: none set).</summary>
-public sealed record SourceApiDetail(IReadOnlyList<ApiOperationInfo> Operations, SourcePolicy? Policy);
+public sealed record SourceApiDetail(IReadOnlyList<ApiOperationInfo> Operations, SourcePolicy? Policy, IReadOnlyList<string>? Notes = null);
 
 /// <summary>A policy as the gateway holds it: its XML and the fragments it includes. The source has already cleaned the text up (no byte-order mark); masking is the catalogue's job.</summary>
 public sealed record SourcePolicy(string Xml, IReadOnlyList<ApiFragmentInfo> Fragments);
