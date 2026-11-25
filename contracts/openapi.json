@@ -674,7 +674,8 @@
           "summary",
           "operations",
           "policy",
-          "differences"
+          "differences",
+          "notes"
         ],
         "type": "object",
         "properties": {
@@ -691,6 +692,12 @@
             "$ref": "#/components/schemas/ApiPolicyInfo"
           },
           "differences": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "notes": {
             "type": "array",
             "items": {
               "type": "string"

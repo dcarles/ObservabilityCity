@@ -136,20 +136,35 @@ public sealed class ApiManagementSource(string name, AzureMonitorReader reader) 
         return all;
     }
 
+    private const int MaxSchemas = 12;
+
+    private static string Why(HttpRequestException e) => e.StatusCode is { } code ? $"HTTP {(int)code}" : e.Message;
+
     public async Task<SourceApiDetail> DetailAsync(GatewayRef gateway, string apiId, CancellationToken ct)
     {
         var operations = new List<ApiOperationInfo>();
-        IReadOnlyDictionary<string, JsonDocument> schemas = new Dictionary<string, JsonDocument>();
-        // the shared type definitions fill in the bodies; an API without them, or a gateway that will not say, still shows its operations
-        try { schemas = ApiManagementSchemas.ParseSchemas(await reader.GetAsync(gateway.Id, ApiManagementSchemas.SchemasUrl(gateway.Id, apiId), ct, Service)); }
-        catch (HttpRequestException) { }
+        var schemas = new Dictionary<string, JsonDocument>(StringComparer.OrdinalIgnoreCase);
+        var notes = new List<string>();
+        // the shared type definitions fill in the bodies; an API without them, or a gateway that will not say, still shows its operations (with a note saying what could not be read)
+        try
+        {
+            var list = ApiManagementSchemas.ParseSchemaList(await reader.GetAsync(gateway.Id, ApiManagementSchemas.SchemasUrl(gateway.Id, apiId), ct, Service));
+            foreach (var (id, inline) in list.Take(MaxSchemas))
+            {
+                if (inline is not null) { schemas[id] = inline; continue; }
+                try { if (ApiManagementSchemas.ParseSchema(await reader.GetAsync(gateway.Id, ApiManagementSchemas.SchemaUrl(gateway.Id, apiId, id), ct, Service)) is { } one) schemas[id] = one; }
+                catch (HttpRequestException e) { notes.Add($"The definitions of schema {id} could not be read ({Why(e)}), so bodies that use it show no fields."); }
+            }
+            if (list.Count > MaxSchemas) notes.Add($"Only the first {MaxSchemas} of the API's {list.Count} schemas were read.");
+        }
+        catch (HttpRequestException e) { notes.Add($"The schemas of this API could not be read ({Why(e)}), so bodies show no fields."); }
         for (var url = ApiManagementReading.OperationsUrl(gateway.Id, apiId); url is not null;)
         {
             var (page, next) = ApiManagementReading.ParseOperations(await reader.GetAsync(gateway.Id, url, ct, Service), schemas);
             operations.AddRange(page);
             url = next;
         }
-        return new SourceApiDetail(operations, await PolicyAsync(gateway, ApiManagementReading.ApiPolicyUrl(gateway.Id, apiId), ct));
+        return new SourceApiDetail(operations, await PolicyAsync(gateway, ApiManagementReading.ApiPolicyUrl(gateway.Id, apiId), ct), notes);
     }
 
     public Task<SourcePolicy?> OperationPolicyAsync(GatewayRef gateway, string apiId, string operationId, CancellationToken ct) =>

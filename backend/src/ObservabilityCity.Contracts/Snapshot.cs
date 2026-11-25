@@ -644,8 +644,8 @@ public sealed record ApiCatalogueList(DateTimeOffset At, bool Configured, IReadO
 public sealed record ApiSummary(string Id, string Name, string DisplayName, string? Path, string? BackendUrl, string? BackendHost, IReadOnlyList<string> Gateways,
     IReadOnlyList<string> MissingFrom, string? SystemId, string? GroupId, string? ThirdPartyId);
 
-/// <summary>One API with its operations and the policy set on it. Differences say what is not the same on the gateways that serve it (empty when all agree or only one does).</summary>
-public sealed record ApiDetail(ApiSummary Summary, IReadOnlyList<ApiOperationInfo> Operations, ApiPolicyInfo Policy, IReadOnlyList<string> Differences);
+/// <summary>One API with its operations and the policy set on it. Differences say what is not the same on the gateways that serve it (empty when all agree or only one does). Notes say what could not be read, such as a schema, so a missing detail is explained.</summary>
+public sealed record ApiDetail(ApiSummary Summary, IReadOnlyList<ApiOperationInfo> Operations, ApiPolicyInfo Policy, IReadOnlyList<string> Differences, IReadOnlyList<string> Notes);
 
 /// <summary>One operation of an API as the gateway describes it: the call (method, URL template, parameters, request body) and the responses it can answer. Request has no representations when no body is described.</summary>
 public sealed record ApiOperationInfo(string Id, string Name, string Method, string UrlTemplate, string? Description, IReadOnlyList<ApiParameterInfo> Parameters, ApiBodyInfo Request, IReadOnlyList<ApiResponseInfo> Responses);
