@@ -61,3 +61,7 @@ button.ae-status.sel { opacity: 1; outline: 2px solid currentColor; }
 .ae-ftype { opacity: 0.7; } .ae-req { color: var(--warn-ink); font-size: 11px; } .ae-fdesc { margin-left: 16px; opacity: 0.65; font-family: system-ui, sans-serif; }
 .ae-foldall { margin-left: auto; display: inline-flex; gap: 4px; }
 .ae-foldall button { border: 0; background: none; color: inherit; font: inherit; font-size: 12px; text-decoration: underline; cursor: pointer; opacity: 0.8; padding: 2px 4px; }
+
+/* In the dashboard and architecture views the page has its own palette (and its own dark mode), not the town's: the window takes its surfaces, lines and signal colours from it. */
+body.dash .ae-window { --field: var(--surface); --pill: var(--surface2); --soft-line: var(--dline); --row-hover: var(--surface2); --accent: var(--daccent); --ok-ink: var(--ok); --warn-ink: var(--warn); --bad-ink: var(--bad); --stale-ink: var(--muted); --link-ink: var(--daccent); }
+body.dash .ae-chips button.on, body.dash .ae-flag { color: var(--bg); }
