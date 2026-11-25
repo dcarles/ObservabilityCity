@@ -24,6 +24,12 @@ test.describe('the API explorer', () => {
     const win = page.locator('#api-explorer')
     await expect(win).toBeVisible()
     await expect(win.locator('.ae-api.sel')).toHaveCount(1)
+    // the dashboard's own palette, not the town's: in its dark mode the window is dark with light text, never white
+    await page.evaluate(() => document.body.setAttribute('data-mode', 'dark'))
+    const dark = await win.locator('.ae-window').evaluate((e) => { const c = getComputedStyle(e); return [c.backgroundColor, c.color] })
+    expect(dark[0]).not.toBe('rgb(255, 255, 255)')
+    expect(dark[1]).toBe('rgb(230, 236, 242)')
+    await page.evaluate(() => document.body.removeAttribute('data-mode'))
     // opened from a service: only its own APIs are listed, and the chip brings the rest back
     const own = await win.locator('.ae-api').count()
     await expect(win.locator('[data-ae-chip="system"]')).toBeVisible()
