@@ -3,7 +3,7 @@ import { box, flat, group } from '../buildings/mk'
 import { kit } from '../assets/kit'
 import { activeKit, bridgeStyle, palette } from '../themes/active'
 import type { BridgeEnds } from '../themes/types'
-import { archHeight, registerArch } from './arches'
+import { archHeight, registerArch, ringRamps, STEEP_RAMPS } from './arches'
 import { GROUND } from './island'
 
 export const ROAD_W = 4.2
@@ -148,6 +148,8 @@ export interface BridgeOpts {
   ends?: boolean
   /** A causeway over land or along the ring: the deck stays level and is no arch, so no boat is meant to pass under it. */
   flat?: boolean
+  /** Which end of the bridge lands on the ring road, if one does: that end climbs gently, so the deck meets the road at road level and never rises over it. */
+  ringEnd?: 'from' | 'to'
 }
 
 /** The longest piece of an arched deck: short enough that the curve looks smooth, and the lamps and braces of a piece keep their spacing. */
@@ -167,13 +169,14 @@ export function bridge(opts: BridgeOpts): THREE.Group {
   const dir = to.clone().sub(from)
   const len = dir.length()
   const width = ROAD_W + 2.0
-  if (!opts.flat) registerArch(from, to, width)
+  const ramps = opts.ringEnd ? ringRamps(opts.ringEnd) : STEEP_RAMPS
+  if (!opts.flat) registerArch(from, to, width, ramps)
   const yaw = Math.atan2(dir.x, dir.z)
   const pieces = Math.max(1, Math.ceil(len / PIECE))
   const run = len / pieces
   for (let i = 0; i < pieces; i++) {
     const t0 = i / pieces, t1 = (i + 1) / pieces
-    const h0 = opts.flat ? 0 : archHeight(t0, len), h1 = opts.flat ? 0 : archHeight(t1, len)
+    const h0 = opts.flat ? 0 : archHeight(t0, len, ramps), h1 = opts.flat ? 0 : archHeight(t1, len, ramps)
     const along = (t0 + t1) / 2
     const deck = new THREE.Group()
     deck.position.copy(from).addScaledVector(dir, along)

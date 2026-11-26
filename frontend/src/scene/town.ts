@@ -361,14 +361,14 @@ export class Town {
         this.buildings.set(id, building)
       }
       const gate = vi.gate()
-      bridgeDecor.add(bridge({ from: new THREE.Vector3(spot.loopX, 0, spot.loopZ), to: gate.clone().setY(0) }))
+      bridgeDecor.add(bridge({ from: new THREE.Vector3(spot.loopX, 0, spot.loopZ), to: gate.clone().setY(0), ringEnd: 'from' }))
       const landIsland = (id: string) => {
         const index = order.indexOf(id)
         if (landed.has(id)) return
         landed.add(id)
         const back = backGate(id)
         const land = loopPoint(angles[index])
-        bridgeDecor.add(bridge({ from: back.clone().setY(0), to: land.clone().setY(0) }))
+        bridgeDecor.add(bridge({ from: back.clone().setY(0), to: land.clone().setY(0), ringEnd: 'to' }))
       }
       for (const vendor of group.members) {
         const links = callerIslands(vendor.calledBy).filter((g) => bridgedIslands.has(g))
@@ -387,7 +387,7 @@ export class Town {
         landed.add(g.island.group.id)
         const back = backGate(g.island.group.id)
         const land = loopPoint(g.ringAngle)
-        bridgeDecor.add(bridge({ from: back.clone().setY(0), to: land.clone().setY(0) }))
+        bridgeDecor.add(bridge({ from: back.clone().setY(0), to: land.clone().setY(0), ringEnd: 'to' }))
       })
     }
     if (loopR > 0) {
@@ -418,14 +418,14 @@ export class Town {
       const gate = airport.gate()
       // a hub-and-spoke town's airport has a spoke to the hub; a direct town's, like a third party, a bridge to the ring road
       const coast = (direct ? loopPoint(angles[pillars.length]) : hubCoasts[pillars.length]).clone().setY(0)
-      bridgeDecor.add(bridge({ from: coast, to: gate.clone().setY(0) }))
+      bridgeDecor.add(bridge({ from: coast, to: gate.clone().setY(0), ringEnd: direct ? 'from' : undefined }))
       this.airportPath = [airport.doorWorld(), gate.setY(GROUND), coast.clone().setY(GROUND)]
       this.airportJoin = ports[pillars.length]
       this.airportAngle = angles[pillars.length]
       const back = airport.backGate()
       if (back && loopR > 0) {
         const land = loopPoint(angles[pillars.length])
-        bridgeDecor.add(bridge({ from: back.clone().setY(0), to: land.clone().setY(0) }))
+        bridgeDecor.add(bridge({ from: back.clone().setY(0), to: land.clone().setY(0), ringEnd: 'to' }))
         this.airportBack = { landing: land.clone().setY(GROUND), angle: angles[pillars.length], path: [back.clone().setY(GROUND), ...airport.backPath().slice(1)] }
       }
     }
