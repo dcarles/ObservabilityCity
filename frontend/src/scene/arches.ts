@@ -1,30 +1,45 @@
 import * as THREE from 'three'
 
-// Every bridge is an arch, so a boat can sail under any of them and no island is ever walled off from the sea by a road. The deck rises from the
-// shore at both ends to a crown over the water. The bridge builder draws it; the cars read the same curve here so they climb and descend with it.
+// Every bridge is an arch, so a boat can sail under any of them and no island is ever walled off from the sea by a road. The deck climbs from the
+// shore over a short ramp, then runs level at the crown over the water, and comes down the same way at the far end. The bridge builder draws it; the
+// cars read the same curve here so they climb and descend with it.
+//
+// The boats that sail the circuit round an island pass under the bridge a few units off the coast, where a plain parabola is still low: a boat's
+// crates would poke through the road. The ramp is short so the deck is already above the boats by the time it reaches that lane.
 
-/** Lowest crown, in world units above the shore: enough for the tallest boat to pass under with room to spare. */
+/** Lowest crown, in world units above the shore: only for a span too short to climb any higher. */
 export const ARCH_MIN = 2.0
-/** Highest crown, so the longest causeway does not tower over the town. */
-export const ARCH_MAX = 3.0
-/** How much of the span's length the crown rises, between the two limits. */
-export const ARCH_RATIO = 0.1
+/** The crown of every span long enough to reach it: every boat's crates, and the cabin of a normal-size boat, pass under it on the circuit lane. Only the cabin of the very biggest boat can still touch the girder. */
+export const ARCH_MAX = 3.2
+/** How much of the span's length the crown rises, between the two limits (so a short span gets a lower crown). */
+export const ARCH_RATIO = 0.2
+/** How far from the shore the deck climbs before it levels off at the crown, in world units (less on a span too short for two ramps). */
+export const ARCH_RAMP = 7
 
 /** The crown height of an arch that spans `len`. */
 export function archPeak(len: number): number {
   return Math.min(ARCH_MAX, Math.max(ARCH_MIN, len * ARCH_RATIO))
 }
 
-/** The height of the deck above the shore at `t` (0 to 1) along a span of length `len`: a parabola, zero at both ends. */
+const smooth = (x: number): number => {
+  const c = Math.min(1, Math.max(0, x))
+  return c * c * (3 - 2 * c)
+}
+
+/** The height of the deck above the shore at `t` (0 to 1) along a span of length `len`: a smooth climb over the ramp, level at the crown, the same way down. */
 export function archHeight(t: number, len: number): number {
-  const u = 2 * Math.min(1, Math.max(0, t)) - 1
-  return archPeak(len) * (1 - u * u)
+  const d = Math.min(1, Math.max(0, t)) * len
+  const ramp = Math.min(ARCH_RAMP, len / 2)
+  return archPeak(len) * smooth(Math.min(d, len - d) / ramp)
 }
 
 /** The slope of the deck (rise over run) at `t` along a span of length `len`. */
 export function archSlope(t: number, len: number): number {
-  const u = 2 * Math.min(1, Math.max(0, t)) - 1
-  return (archPeak(len) * -4 * u) / len
+  const d = Math.min(1, Math.max(0, t)) * len
+  const ramp = Math.min(ARCH_RAMP, len / 2)
+  const x = Math.min(d, len - d) / ramp
+  if (x >= 1) return 0
+  return (archPeak(len) * 6 * x * (1 - x) / ramp) * (d < len / 2 ? 1 : -1)
 }
 
 interface Span {

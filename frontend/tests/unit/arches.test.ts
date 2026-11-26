@@ -21,6 +21,17 @@ describe('the arch of a bridge', () => {
     }
   })
 
+  it('is already high over the circuit lane off the coast, so the crates of the biggest boat pass under it', () => {
+    // the girder hangs about 0.58 below the deck; the biggest boat's crates reach 0.12 + 1.14 * 0.7 * 0.95 * 1.6 above the sea; a boat is about 2.1 wide
+    const girder = 0.58, crates = 0.12 + 1.14 * 0.7 * 0.95 * 1.6, halfBeam = 1.1, overrun = 1.4
+    for (const len of [20, 40, 80]) {
+      for (const lane of CIRCUIT_OFFSETS) {
+        const x = (lane + overrun - halfBeam) / len // the edge of the boat nearest the shore
+        expect(archHeight(x, len) - girder, `span ${len}, lane ${lane}`).toBeGreaterThan(crates)
+      }
+    }
+  })
+
   it('climbs on the way up, is level at the crown and falls on the way down', () => {
     expect(archSlope(0.1, 24)).toBeGreaterThan(0)
     expect(archSlope(0.5, 24)).toBeCloseTo(0, 6)
