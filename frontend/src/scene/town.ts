@@ -131,6 +131,9 @@ export interface EventSite {
 
 export interface IslandLabel { id: string; name: string; color: string; vendor: boolean; x: number; z: number }
 
+/** Half the length of the piece of ring road in front of a bridge that joins it, in world units: a little more than the bridge's own road is wide. */
+const JUNCTION_HALF = 3.6
+
 export class Town {
   readonly root = new THREE.Group()
   readonly cars = new CarSystem()
@@ -347,6 +350,7 @@ export class Town {
     }
     const loopPoint = (a: number) => dirOf(a).multiplyScalar(loopR)
     const landed = new Set<string>() // islands whose bridge to the ring road is already built
+    const junctions: { angle: number; far: THREE.Vector3 }[] = [] // where a bridge joins the ring road: its angle, and the bridge's far end
     spots.forEach((spot, i) => {
       const vi = vendorIslands[i]
       const group = vendorGroups[i]
@@ -361,7 +365,8 @@ export class Town {
         this.buildings.set(id, building)
       }
       const gate = vi.gate()
-      bridgeDecor.add(bridge({ from: new THREE.Vector3(spot.loopX, 0, spot.loopZ), to: gate.clone().setY(0), ringEnd: 'from' }))
+      bridgeDecor.add(bridge({ from: new THREE.Vector3(spot.loopX, 0, spot.loopZ), to: gate.clone().setY(0), ringEnd: 'from', flat: true }))
+      junctions.push({ angle: spot.angle, far: gate.clone().setY(0) })
       const landIsland = (id: string) => {
         const index = order.indexOf(id)
         if (landed.has(id)) return
@@ -369,6 +374,7 @@ export class Town {
         const back = backGate(id)
         const land = loopPoint(angles[index])
         bridgeDecor.add(bridge({ from: back.clone().setY(0), to: land.clone().setY(0), ringEnd: 'to' }))
+        junctions.push({ angle: angles[index], far: back.clone().setY(0) })
       }
       for (const vendor of group.members) {
         const links = callerIslands(vendor.calledBy).filter((g) => bridgedIslands.has(g))
@@ -388,23 +394,9 @@ export class Town {
         const back = backGate(g.island.group.id)
         const land = loopPoint(g.ringAngle)
         bridgeDecor.add(bridge({ from: back.clone().setY(0), to: land.clone().setY(0), ringEnd: 'to' }))
+        junctions.push({ angle: g.ringAngle, far: back.clone().setY(0) })
       })
     }
-    if (loopR > 0) {
-      // the ring road is one causeway all the way round, built in short pieces, level: it is a road, not a bridge over a sea lane
-      const pieces = Math.max(24, Math.ceil((2 * Math.PI * loopR) / 36))
-      for (let k = 0; k < pieces; k++) {
-        const a0 = (k / pieces) * Math.PI * 2, a1 = ((k + 1) / pieces) * Math.PI * 2
-        bridgeDecor.add(bridge({ from: loopPoint(a0).setY(0), to: loopPoint(a1).setY(0), ends: false, flat: true }))
-        this.ringMiddles.push(loopPoint((a0 + a1) / 2).setY(0))
-      }
-      for (let k = 0; k < 72; k++) {
-        const p = dirOf((k / 72) * Math.PI * 2).multiplyScalar(loopR + 14)
-        this.bounds.expandByPoint(p)
-        this.extent.push(p)
-      }
-    }
-
     // ── The airport: an island in the second ring, due north, with a spoke to the hub like any other ──
     this.airport = airport
     const airportCentre = centres[pillars.length]
@@ -419,6 +411,7 @@ export class Town {
       // a hub-and-spoke town's airport has a spoke to the hub; a direct town's, like a third party, a bridge to the ring road
       const coast = (direct ? loopPoint(angles[pillars.length]) : hubCoasts[pillars.length]).clone().setY(0)
       bridgeDecor.add(bridge({ from: coast, to: gate.clone().setY(0), ringEnd: direct ? 'from' : undefined }))
+      if (direct) junctions.push({ angle: angles[pillars.length], far: gate.clone().setY(0) })
       this.airportPath = [airport.doorWorld(), gate.setY(GROUND), coast.clone().setY(GROUND)]
       this.airportJoin = ports[pillars.length]
       this.airportAngle = angles[pillars.length]
@@ -426,9 +419,44 @@ export class Town {
       if (back && loopR > 0) {
         const land = loopPoint(angles[pillars.length])
         bridgeDecor.add(bridge({ from: back.clone().setY(0), to: land.clone().setY(0), ringEnd: 'to' }))
+        junctions.push({ angle: angles[pillars.length], far: back.clone().setY(0) })
         this.airportBack = { landing: land.clone().setY(GROUND), angle: angles[pillars.length], path: [back.clone().setY(GROUND), ...airport.backPath().slice(1)] }
       }
     }
+
+    if (loopR > 0) {
+      // the ring road is one causeway all the way round, built in short pieces, level: it is a road, not a bridge over a sea lane. Where a bridge joins it a short piece of
+      // its own has no fence on the side the bridge comes from, so the bridge's road runs straight into this one.
+      const TAU = Math.PI * 2
+      const turn = (a: number) => ((a % TAU) + TAU) % TAU
+      const half = JUNCTION_HALF / loopR
+      const windows = new Map<number, { start: number; far: THREE.Vector3[] }>()
+      for (const j of junctions) {
+        const key = Math.round(turn(j.angle) * 1e4)
+        const w = windows.get(key) ?? { start: turn(j.angle - half), far: [] }
+        w.far.push(j.far)
+        windows.set(key, w)
+      }
+      const uniform = Math.max(24, Math.ceil((TAU * loopR) / 36))
+      const apart = (x: number, y: number) => Math.min(turn(x - y), turn(y - x))
+      const inside = (a: number) => [...windows.values()].some((w) => apart(a, w.start + half) < half + 3 / loopR) // a break close to a junction piece would leave a sliver
+      const breaks: number[] = []
+      for (let k = 0; k < uniform; k++) if (!inside((k / uniform) * TAU)) breaks.push((k / uniform) * TAU)
+      for (const w of windows.values()) breaks.push(w.start, turn(w.start + 2 * half))
+      breaks.sort((x, y) => x - y)
+      for (let k = 0; k < breaks.length; k++) {
+        const a0 = breaks[k], a1 = k + 1 < breaks.length ? breaks[k + 1] : breaks[0] + TAU
+        const open = [...windows.values()].find((w) => Math.abs(turn(a0 - w.start)) < 1e-6)
+        bridgeDecor.add(bridge({ from: loopPoint(a0).setY(0), to: loopPoint(a1).setY(0), ends: false, flat: true, openToward: open?.far }))
+        this.ringMiddles.push(loopPoint((a0 + a1) / 2).setY(0))
+      }
+      for (let k = 0; k < 72; k++) {
+        const p = dirOf((k / 72) * Math.PI * 2).multiplyScalar(loopR + 14)
+        this.bounds.expandByPoint(p)
+        this.extent.push(p)
+      }
+    }
+
 
     // ── Sea lanes: every bridge is an arch, so boats sail island to island by the shortest open water and pass under the bridges ──
     this.root.updateMatrixWorld(true)
