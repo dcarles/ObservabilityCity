@@ -150,6 +150,8 @@ export interface BridgeOpts {
   flat?: boolean
   /** Which end of the bridge lands on the ring road, if one does: that end climbs gently, so the deck meets the road at road level and never rises over it. */
   ringEnd?: 'from' | 'to'
+  /** For a piece of the ring road where a bridge joins: the far end of each bridge, so the piece has no fence, wall or railing on the side that bridge comes from. */
+  openToward?: THREE.Vector3[]
 }
 
 /** How far from the middle line of the ring road its edge is: where a bridge that lands on the ring road begins (the ring's deck is as wide as a bridge's). */
@@ -193,6 +195,11 @@ export function bridge(opts: BridgeOpts): THREE.Group {
     const gateTo = opts.ends !== false && opts.ringEnd !== 'to' && i === pieces - 1
     const ends: BridgeEnds = gateFrom && gateTo ? true : gateFrom ? -1 : gateTo ? 1 : false
     bridgeStyle().dress(deck, pieceLen, width, ends)
+    for (const far of opts.openToward ?? []) {
+      // the side of the deck the bridge comes from: no fence there, so the bridge's road runs straight into this one
+      const side = Math.sign((far.x - deck.position.x) * Math.cos(yaw) - (far.z - deck.position.z) * Math.sin(yaw))
+      for (const child of [...deck.children]) if (child.position.x * side > ROAD_W / 2 - 0.1) deck.remove(child)
+    }
     const tiles = Math.max(1, Math.round(pieceLen / ROAD_W))
     for (let k = 0; k < tiles; k++) {
       const t = kit('road_straight')
