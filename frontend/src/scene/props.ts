@@ -152,6 +152,9 @@ export interface BridgeOpts {
   ringEnd?: 'from' | 'to'
 }
 
+/** How far from the middle line of the ring road its edge is: where a bridge that lands on the ring road begins (the ring's deck is as wide as a bridge's). */
+const RING_EDGE = (ROAD_W + 2.0) / 2 - 0.3
+
 /** The longest piece of an arched deck: short enough that the curve looks smooth, and the lamps and braces of a piece keep their spacing. */
 const PIECE = 7
 
@@ -164,8 +167,9 @@ export function bridge(opts: BridgeOpts): THREE.Group {
   // run the deck a little onto both shores so it meets the roads without a seam
   const unit = opts.to.clone().sub(opts.from).normalize()
   const overrun = opts.ends === false ? 0.15 : 1.4
-  const from = opts.from.clone().addScaledVector(unit, -overrun)
-  const to = opts.to.clone().addScaledVector(unit, overrun)
+  // the end that lands on the ring road starts at the road's edge, not inside it: it has no overrun, no gate, and is pulled back from the road's middle line
+  const from = opts.from.clone().addScaledVector(unit, opts.ringEnd === 'from' ? RING_EDGE : -overrun)
+  const to = opts.to.clone().addScaledVector(unit, opts.ringEnd === 'to' ? -RING_EDGE : overrun)
   const dir = to.clone().sub(from)
   const len = dir.length()
   const width = ROAD_W + 2.0
@@ -185,7 +189,9 @@ export function bridge(opts: BridgeOpts): THREE.Group {
     deck.rotation.y = yaw
     deck.rotation.x = -Math.atan2(h1 - h0, run)
     const pieceLen = Math.hypot(run, h1 - h0) + 0.06
-    const ends: BridgeEnds = opts.ends === false ? false : pieces === 1 ? true : i === 0 ? -1 : i === pieces - 1 ? 1 : false
+    const gateFrom = opts.ends !== false && opts.ringEnd !== 'from' && i === 0
+    const gateTo = opts.ends !== false && opts.ringEnd !== 'to' && i === pieces - 1
+    const ends: BridgeEnds = gateFrom && gateTo ? true : gateFrom ? -1 : gateTo ? 1 : false
     bridgeStyle().dress(deck, pieceLen, width, ends)
     const tiles = Math.max(1, Math.round(pieceLen / ROAD_W))
     for (let k = 0; k < tiles; k++) {

@@ -361,7 +361,7 @@ export class Town {
         this.buildings.set(id, building)
       }
       const gate = vi.gate()
-      bridgeDecor.add(bridge({ from: new THREE.Vector3(spot.loopX, 0, spot.loopZ), to: gate.clone().setY(0), ringEnd: 'from' }))
+      bridgeDecor.add(bridge({ from: new THREE.Vector3(spot.loopX, 0, spot.loopZ), to: gate.clone().setY(0), ringEnd: 'from', flat: true }))
       const landIsland = (id: string) => {
         const index = order.indexOf(id)
         if (landed.has(id)) return
