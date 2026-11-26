@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { afterEach, describe, expect, it } from 'vitest'
-import { ARCH_MAX, ARCH_MIN, archCount, archHeight, archPeak, archSlope, clearArches, deckAt, registerArch } from '../../src/scene/arches'
+import { ARCH_MAX, ARCH_MIN, ringRamps, archCount, archHeight, archPeak, archSlope, clearArches, deckAt, registerArch } from '../../src/scene/arches'
 import { findLane, CIRCUIT_OFFSETS, harbourCircuit, harbourLoop, LOOP_LENGTHS, LOOP_OFFSET, OUTER_PAD, padLand, PIER_GAP, type SeaMap } from '../../src/scene/sea'
 
 afterEach(() => clearArches())
@@ -30,6 +30,23 @@ describe('the arch of a bridge', () => {
         expect(archHeight(x, len) - girder, `span ${len}, lane ${lane}`).toBeGreaterThan(crates)
       }
     }
+  })
+
+  it('meets the ring road at road level: the end that lands on it climbs gently, the island end stays steep', () => {
+    const len = 90, overrun = 1.4, roadHalf = 2.1 // the deck runs 1.4 past the middle of the ring road, which is 4.2 wide
+    const ramps = ringRamps('to')
+    const roadEdge = (len - overrun - roadHalf) / len
+    expect(archHeight(roadEdge, len, ramps)).toBeLessThan(0.5) // before the fix the deck was about 1.5 up at the near edge of the road
+    expect(archHeight(roadEdge, len)).toBeGreaterThan(1)
+    const girder = 0.58, crates = 0.12 + 1.14 * 0.7 * 0.95 * 1.6
+    expect(archHeight((5 + overrun - 1.1) / len, len, ramps) - girder).toBeGreaterThan(crates) // boats on the island circuit still pass under
+    expect(archSlope(0.5, len, ramps)).toBeCloseTo(0, 6)
+    expect(archSlope(0.98, len, ramps)).toBeLessThan(0) // and it comes down toward the road
+  })
+
+  it('carries the cars over a bridge to the ring road by the same gentle end', () => {
+    registerArch(new THREE.Vector3(0, 0, 0), new THREE.Vector3(91.4, 0, 0), 6.2, ringRamps('to'))
+    expect(deckAt(91.4 - 1.4 - 2.1, 0, 1, 0).lift).toBeLessThan(0.5)
   })
 
   it('climbs on the way up, is level at the crown and falls on the way down', () => {

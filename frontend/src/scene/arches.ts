@@ -26,20 +26,44 @@ const smooth = (x: number): number => {
   return c * c * (3 - 2 * c)
 }
 
-/** The height of the deck above the shore at `t` (0 to 1) along a span of length `len`: a smooth climb over the ramp, level at the crown, the same way down. */
-export function archHeight(t: number, len: number): number {
+/** How far the deck climbs at each end of a span, in world units: at the `from` end and at the `to` end. */
+export interface Ramps {
+  from: number
+  to: number
+}
+
+/** The climb at both ends of an island-to-island bridge: steep, so a boat that passes under it a few units off the coast clears the deck. */
+export const STEEP_RAMPS: Ramps = { from: ARCH_RAMP, to: ARCH_RAMP }
+
+/** The climb of the end of a bridge that lands on the ring road: long and gentle, so the deck meets the road at road level instead of rising over it. */
+export const ARCH_RING_RAMP = 16
+
+/** The ramps of a bridge with the ring road at one end: the steep climb at the island end, the gentle one at the road. */
+export function ringRamps(ringEnd: 'from' | 'to'): Ramps {
+  return ringEnd === 'from' ? { from: ARCH_RING_RAMP, to: ARCH_RAMP } : { from: ARCH_RAMP, to: ARCH_RING_RAMP }
+}
+
+/** The two ramps scaled down together when a short span has no room for both, so the crown is still reached where they meet. */
+function fitRamps(len: number, ramps: Ramps): Ramps {
+  const sum = ramps.from + ramps.to
+  return sum > len ? { from: (ramps.from * len) / sum, to: (ramps.to * len) / sum } : ramps
+}
+
+/** The height of the deck above the shore at `t` (0 to 1) along a span of length `len`: a smooth climb over each end's ramp, level at the crown between. */
+export function archHeight(t: number, len: number, ramps: Ramps = STEEP_RAMPS): number {
   const d = Math.min(1, Math.max(0, t)) * len
-  const ramp = Math.min(ARCH_RAMP, len / 2)
-  return archPeak(len) * smooth(Math.min(d, len - d) / ramp)
+  const r = fitRamps(len, ramps)
+  return archPeak(len) * Math.min(smooth(d / r.from), smooth((len - d) / r.to))
 }
 
 /** The slope of the deck (rise over run) at `t` along a span of length `len`. */
-export function archSlope(t: number, len: number): number {
+export function archSlope(t: number, len: number, ramps: Ramps = STEEP_RAMPS): number {
   const d = Math.min(1, Math.max(0, t)) * len
-  const ramp = Math.min(ARCH_RAMP, len / 2)
-  const x = Math.min(d, len - d) / ramp
-  if (x >= 1) return 0
-  return (archPeak(len) * 6 * x * (1 - x) / ramp) * (d < len / 2 ? 1 : -1)
+  const r = fitRamps(len, ramps)
+  const x0 = d / r.from, x1 = (len - d) / r.to
+  const peak = archPeak(len)
+  if (x0 <= x1) return x0 >= 1 ? 0 : (peak * 6 * x0 * (1 - x0)) / r.from
+  return x1 >= 1 ? 0 : -(peak * 6 * x1 * (1 - x1)) / r.to
 }
 
 interface Span {
@@ -49,6 +73,7 @@ interface Span {
   ux: number
   uz: number
   len: number
+  ramps: Ramps
   /** Half the deck width, plus a margin, for the sideways test. */
   half: number
   minX: number
@@ -65,13 +90,13 @@ export function clearArches(): void {
 }
 
 /** Records a bridge's deck (the ground line it spans, ends included) so cars can ride its arch. */
-export function registerArch(from: THREE.Vector3, to: THREE.Vector3, width: number): void {
+export function registerArch(from: THREE.Vector3, to: THREE.Vector3, width: number, ramps: Ramps = STEEP_RAMPS): void {
   const dx = to.x - from.x, dz = to.z - from.z
   const len = Math.hypot(dx, dz)
   if (len < 1e-6) return
   const half = width / 2 + 0.3
   spans.push({
-    ax: from.x, az: from.z, ux: dx / len, uz: dz / len, len, half,
+    ax: from.x, az: from.z, ux: dx / len, uz: dz / len, len, ramps, half,
     minX: Math.min(from.x, to.x) - half, maxX: Math.max(from.x, to.x) + half,
     minZ: Math.min(from.z, to.z) - half, maxZ: Math.max(from.z, to.z) + half,
   })
@@ -92,10 +117,10 @@ export function deckAt(x: number, z: number, dx = 0, dz = 0): { lift: number; sl
     const side = Math.abs(-(x - s.ax) * s.uz + (z - s.az) * s.ux)
     if (along < 0 || along > s.len || side > s.half) continue
     const t = along / s.len
-    const h = archHeight(t, s.len)
+    const h = archHeight(t, s.len, s.ramps)
     if (h >= lift) {
       lift = h
-      slope = archSlope(t, s.len) * (dx * s.ux + dz * s.uz)
+      slope = archSlope(t, s.len, s.ramps) * (dx * s.ux + dz * s.uz)
     }
   }
   return { lift, slope }
