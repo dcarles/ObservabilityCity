@@ -198,7 +198,10 @@ test.describe('Galactic Credit keeps its hub and spokes', () => {
     expect(got.length).toBeGreaterThanOrEqual(3)
     for (const r of got) {
       expect(r.picked, r.id).toBe(r.id)
-      expect(r.lines.map((l) => l.split(' ')[1]), r.id).toEqual(['in', 'out', 'inside'])
+      // the traffic lines come first; when the town measures its calls they are followed by the island's busiest calls and method split (see ui/routes.spec.ts)
+      const traffic = r.lines.filter((l) => l.startsWith('Requests '))
+      expect(traffic.map((l) => l.split(' ')[1]), r.id).toEqual(['in', 'out', 'inside'])
+      expect(r.lines.slice(0, 3), r.id).toEqual(traffic)
       // the sign's line has the same in and out
       const rate = (label: string) => r.lines.find((l) => l.startsWith(`Requests ${label} `))!.split(' ')[2]
       expect(r.line, r.id).toBe(`in ${rate('in')} · out ${rate('out')} rps`)
