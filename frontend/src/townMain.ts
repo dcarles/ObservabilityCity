@@ -464,23 +464,13 @@ export async function startTown(): Promise<void> {
   let dirty = false
   // Cars: a card with both ends for the car under the pointer, and signs on the nearest ones when the camera is close.
   const carSigns = new CarSigns(town.cars)
-  let pointerOn = false
   const cameraDistance = (): number => stage.camera.position.distanceTo(stage.controls.target)
-  /** Cars move under a still pointer, so which one is under it is asked every frame, not only when the pointer moves. */
-  function pointAtCar(): void {
-    if (!pointerOn) { carSigns.point(null); return }
-    ray.setFromCamera(pointer, stage.camera)
-    const was = carSigns.hovered
-    carSigns.point(carSigns.pick(ray.ray, cameraDistance()))
-    if (carSigns.hovered !== was) dirty = true // from a car to the ground or back: the tooltip has to be asked again even if the pointer has not moved
-  }
   canvas.addEventListener('pointermove', (e) => {
-    pointerOn = true
     pointerPx = { x: e.clientX, y: e.clientY }
     pointer.set((e.clientX / window.innerWidth) * 2 - 1, -(e.clientY / window.innerHeight) * 2 + 1)
     dirty = true
   })
-  canvas.addEventListener('pointerleave', () => { pointerOn = false; showTooltip(null, 0, 0) })
+  canvas.addEventListener('pointerleave', () => showTooltip(null, 0, 0))
   // A click (not a drag) on a building glides the camera to it and keeps its name board visible; a click on the sea lets go.
   let down: { x: number; y: number } | null = null
   canvas.addEventListener('pointerdown', (e) => { stage.cancelGlide(); down = { x: e.clientX, y: e.clientY } })
@@ -533,8 +523,6 @@ export async function startTown(): Promise<void> {
     if (!dirty) return
     dirty = false
     ray.setFromCamera(pointer, stage.camera)
-    // over a car, the car's own card shows (drawn by the car signs) and nothing else
-    if (carSigns.hovered >= 0) { showTooltip(null, 0, 0); showIslandTooltip(null, false, 0, 0); canvas.style.cursor = 'pointer'; return }
     const hits = ray.intersectObjects(town.hitMeshes(), false)
     const b = hits[0]?.object.userData.building as Building | undefined
     showTooltip(b?.node ?? null, pointerPx.x, pointerPx.y, tenantView)
@@ -572,7 +560,6 @@ export async function startTown(): Promise<void> {
       wall?.tick(simTime)
     }
     updateIslandLabels()
-    pointAtCar()
     carSigns.update(stage.camera, cameraDistance(), stage.controls.target, window.innerWidth, window.innerHeight)
   }
 
@@ -702,7 +689,6 @@ export async function startTown(): Promise<void> {
       updateIslandLabels()
       // the time machine screen of a jump covers the town, so drawing it behind would only take the graphics chip from the animation
       if (!document.body.classList.contains('history-machine')) {
-        pointAtCar()
         carSigns.update(stage.camera, cameraDistance(), stage.controls.target, window.innerWidth, window.innerHeight)
         hover()
         stage.render()

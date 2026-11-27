@@ -1,16 +1,19 @@
-// Where a car came from and where it is going. Cars are small and there are many, so a sign over every car would only be a wall of text:
-// from the air nothing shows; point at a car for a card with both ends (and its route drawn); click it to keep the card on it; and when the
-// camera is close, the few cars nearest the middle of the view carry a small "from → to" sign. Plain DOM over the canvas, so the text stays sharp.
+// Where a car came from and where it is going. Cars are small and there are many, so a sign over every car would only be a wall of text, and a
+// card that follows the pointer over them is noise too: from the air nothing shows; click a car for a card with both ends and its route drawn, click it
+// again (or anywhere else) to let go; and when the camera is close, the few cars nearest the middle of the view carry a small "from → to" sign. Plain DOM over the canvas, so the text stays sharp.
 
 import * as THREE from 'three'
 import type { CarSystem, CarView } from './scene/cars'
 import { buildingName, carEnds, carSignText, OUTSIDE } from './scene/carLabel'
 
 /** The camera's distance from what it looks at, below which cars near the middle of the view get a sign. */
-export const SIGNS_BELOW = 70
+export const SIGNS_BELOW = 130
 /** How many signs at most, and how far from the middle of the view (metres on the ground) a car may be to get one. */
 export const SIGNS_MAX = 8
-export const SIGNS_RADIUS = 45
+export const SIGNS_RADIUS = 60
+/** The room one sign takes on screen (pixels): another sign closer than this in both directions is not drawn. */
+const SIGN_W = 130
+const SIGN_H = 22
 /** How close a pointer must be to a car to pick it: the metres grow with the camera's distance, so a small car is as easy to hit from far as from close. */
 export function pickReach(distance: number): number {
   return Math.max(1.1, distance * 0.022)
@@ -23,10 +26,8 @@ export class CarSigns {
   private readonly card: HTMLElement
   private readonly tags: HTMLElement[] = []
   private readonly v = new THREE.Vector3()
-  /** The car whose card is kept (clicked), -1 for none. */
+  /** The car whose card is shown (clicked), -1 for none. */
   pinned = -1
-  /** The car under the pointer, -1 for none. */
-  hovered = -1
 
   constructor(private readonly cars: CarSystem, host: HTMLElement = document.body) {
     this.layer = document.createElement('div')
@@ -44,39 +45,38 @@ export class CarSigns {
     return this.cars.pick(ray, pickReach(distance))
   }
 
-  /** Points at a car (or at none); a click on a car keeps its card until the next click. */
-  point(car: CarView | null): void {
-    this.hovered = car ? car.id : -1
-  }
-
-  /** A click: on a car keeps its card (a second click on the same car lets go), anywhere else lets go. */
+  /** A click: on a car shows its card and route (a second click on the same car lets go), anywhere else lets go. */
   click(car: CarView | null): void {
     this.pinned = car && car.id !== this.pinned ? car.id : -1
   }
 
   /** Draws the signs and the card for this frame. `target` is the point on the ground the camera looks at. */
   update(camera: THREE.Camera, distance: number, target: THREE.Vector3, width: number, height: number, hidden = false): void {
-    const keep = hidden ? null : this.cars.find(this.pinned)
-    if (this.pinned >= 0 && !keep) this.pinned = -1
-    const hover = hidden || keep ? null : this.cars.find(this.hovered)
-    const shown = keep ?? hover
+    const shown = hidden ? null : this.cars.find(this.pinned)
+    if (this.pinned >= 0 && !shown) this.pinned = -1
     this.cars.highlight(shown, distance)
-    this.drawCard(shown, camera, width, height, !!keep)
-    const near = !hidden && distance < SIGNS_BELOW ? this.cars.nearest(target.x, target.z, SIGNS_RADIUS, SIGNS_MAX) : []
-    const signs = near.filter((c) => c.id !== shown?.id)
-    for (let i = 0; i < signs.length; i++) {
-      const tag = this.tags[i] ?? this.makeTag()
-      const c = signs[i]
+    this.drawCard(shown, camera, width, height)
+    // The nearest cars first; one whose sign would sit on top of a sign already placed is skipped, so the text stays readable in a busy spot.
+    const near = !hidden && distance < SIGNS_BELOW ? this.cars.nearest(target.x, target.z, SIGNS_RADIUS, SIGNS_MAX * 4) : []
+    const placed: { x: number; y: number }[] = []
+    let used = 0
+    for (const c of near) {
+      if (used >= SIGNS_MAX) break
+      if (c.id === shown?.id) continue
       this.v.set(c.x, c.y + 1.6, c.z).project(camera)
-      const on = this.v.z < 1 && Math.abs(this.v.x) < 1.05 && Math.abs(this.v.y) < 1.05
-      tag.style.display = on ? '' : 'none'
-      if (!on) continue
+      if (!(this.v.z < 1 && Math.abs(this.v.x) < 1.05 && Math.abs(this.v.y) < 1.05)) continue
+      const x = ((this.v.x + 1) / 2) * width
+      const y = ((1 - this.v.y) / 2) * height
+      if (placed.some((p) => Math.abs(p.x - x) < SIGN_W && Math.abs(p.y - y) < SIGN_H)) continue
+      placed.push({ x, y })
+      const tag = this.tags[used++] ?? this.makeTag()
+      tag.style.display = ''
       const text = carSignText(c)
       if (tag.textContent !== text) tag.textContent = text
       tag.classList.toggle('bad', c.failed)
-      tag.style.transform = `translate(-50%, -100%) translate(${((this.v.x + 1) / 2) * width}px, ${((1 - this.v.y) / 2) * height}px)`
+      tag.style.transform = `translate(-50%, -100%) translate(${x}px, ${y}px)`
     }
-    for (let i = signs.length; i < this.tags.length; i++) this.tags[i].style.display = 'none'
+    for (let i = used; i < this.tags.length; i++) this.tags[i].style.display = 'none'
   }
 
   private makeTag(): HTMLElement {
@@ -87,7 +87,7 @@ export class CarSigns {
     return tag
   }
 
-  private drawCard(car: CarView | null, camera: THREE.Camera, width: number, height: number, pinned: boolean): void {
+  private drawCard(car: CarView | null, camera: THREE.Camera, width: number, height: number): void {
     if (!car) { this.card.hidden = true; return }
     const e = carEnds(car)
     const fromName = car.from ? buildingName(car.from) : 'Outside the town'
@@ -98,7 +98,7 @@ export class CarSigns {
       `<div class="row"><span>From</span><span>${esc(fromName)}${e.from === OUTSIDE ? '' : ` · ${esc(e.from)}`}</span></div>` +
       `<div class="row"><span>To</span><span>${esc(toName)} · ${esc(e.to)}</span></div>` +
       `<div class="row"><span>Request</span><span>${kind} · <b class="${car.failed ? 'bad' : 'ok'}">${car.failed ? 'failing' : 'ok'}</b></span></div>` +
-      (pinned ? '<div class="hint">click again to let go</div>' : '')
+      '<div class="hint">click the car again to let go</div>'
     this.card.hidden = false
     this.v.set(car.x, car.y + 2.4, car.z).project(camera)
     const x = ((this.v.x + 1) / 2) * width, y = ((1 - this.v.y) / 2) * height
