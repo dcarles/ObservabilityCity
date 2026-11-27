@@ -46,7 +46,7 @@ test.describe('car signs', () => {
     expect(shown.card).toMatch(/^\S+ → \S+$/)
     expect(shown.card).not.toContain('?')
     expect(shown.route).toBe(shown.pinnedId)
-    expect(shown.far).toBeGreaterThan(130) // from the air: a card, but no signs over the other cars
+    expect(shown.far).toBeGreaterThan(200) // from the air: a card, but no signs over the other cars
     expect(shown.signs).toEqual([])
     expect(shown.ids).toContain(`${shown.from ?? 'outside'} → ${shown.to}`) // the real ends of a real route
   })
@@ -82,11 +82,11 @@ test.describe('car signs', () => {
     const near = await page.evaluate(() => {
       const c = (window as any).city
       const car = c.town.cars.nearest(0, 0, 1e6, 1)[0]
-      c.stage.focus(new c.THREE.Vector3(car.x, 0, car.z), 110, true)
+      c.stage.focus(new c.THREE.Vector3(car.x, 0, car.z), 150, true)
       for (let i = 0; i < 10; i++) c.step(0.1)
       return { ...c.carSigns.shown(), distance: c.stage.camera.position.distanceTo(c.stage.controls.target) }
     })
-    expect(near.distance).toBeLessThan(130)
+    expect(near.distance).toBeLessThan(200)
     expect(near.signs.length).toBeGreaterThan(0)
     expect(near.signs.length).toBeLessThanOrEqual(8)
     for (const s of near.signs) expect(s).toMatch(/^\S+ → \S+$/)

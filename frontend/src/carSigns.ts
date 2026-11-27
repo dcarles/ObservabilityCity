@@ -7,10 +7,10 @@ import type { CarSystem, CarView } from './scene/cars'
 import { buildingName, carEnds, carSignText, OUTSIDE } from './scene/carLabel'
 
 /** The camera's distance from what it looks at, below which cars near the middle of the view get a sign. */
-export const SIGNS_BELOW = 130
+export const SIGNS_BELOW = 200
 /** How many signs at most, and how far from the middle of the view (metres on the ground) a car may be to get one. */
 export const SIGNS_MAX = 8
-export const SIGNS_RADIUS = 60
+export const SIGNS_RADIUS = 100
 /** The room one sign takes on screen (pixels): another sign closer than this in both directions is not drawn. */
 const SIGN_W = 130
 const SIGN_H = 22
