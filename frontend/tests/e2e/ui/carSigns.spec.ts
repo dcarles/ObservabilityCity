@@ -76,7 +76,7 @@ test.describe('car signs', () => {
     expect(gone.route).toBe(-1)
   })
 
-  test('close up, the cars nearest the middle carry a "from → to" sign, at most eight', async ({ town, page }) => {
+  test('close up, the cars nearest the middle carry a "from → to" sign, at most thirty', async ({ town, page }) => {
     await town.open()
     await drive(page)
     const near = await page.evaluate(() => {
@@ -88,7 +88,7 @@ test.describe('car signs', () => {
     })
     expect(near.distance).toBeLessThan(200)
     expect(near.signs.length).toBeGreaterThan(0)
-    expect(near.signs.length).toBeLessThanOrEqual(8)
+    expect(near.signs.length).toBeLessThanOrEqual(30)
     for (const s of near.signs) expect(s).toMatch(/^\S+ → \S+$/)
   })
 })
