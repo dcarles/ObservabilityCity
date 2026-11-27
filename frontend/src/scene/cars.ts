@@ -38,6 +38,34 @@ export interface Route {
   edge?: boolean
 }
 
+/** A flat ribbon of this width along a road, lying just above the ground. */
+function ribbon(road: readonly THREE.Vector3[], width: number): THREE.BufferGeometry {
+  const pos: number[] = []
+  const idx: number[] = []
+  const half = width / 2
+  for (let i = 0; i < road.length; i++) {
+    const a = road[Math.max(0, i - 1)], b = road[Math.min(road.length - 1, i + 1)]
+    let dx = b.x - a.x, dz = b.z - a.z
+    const len = Math.hypot(dx, dz) || 1
+    dx /= len; dz /= len
+    pos.push(road[i].x - dz * half, 0.9, road[i].z + dx * half, road[i].x + dz * half, 0.9, road[i].z - dx * half)
+    if (i > 0) { const k = (i - 1) * 2; idx.push(k, k + 1, k + 2, k + 1, k + 3, k + 2) }
+  }
+  const g = new THREE.BufferGeometry()
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3))
+  g.setIndex(idx)
+  return g
+}
+
+/** A flat ring of radius 1 (scaled to a building's footprint) lying on the ground. */
+function makeRing(color: string): THREE.Mesh {
+  const m = new THREE.Mesh(new THREE.RingGeometry(1, 1.12, 40), new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide, transparent: true, opacity: 0.9, depthTest: false, toneMapped: false }))
+  m.rotation.x = -Math.PI / 2
+  m.renderOrder = 10
+  m.visible = false
+  return m
+}
+
 function shareOf(route: Route): number {
   return typeof route.share === 'function' ? route.share() : route.share
 }
@@ -89,6 +117,27 @@ interface Car {
   age: number
   /** The tenant the request is for, or null in an environment without tenants. */
   tenant: string | null
+  /** Where it was drawn last frame (the car's roof), and whether it was drawn at all: what a pointer or a sign can pick. */
+  px: number
+  py: number
+  pz: number
+  drawn: boolean
+}
+
+/** One car as a sign or a card tells it: where it came from, where it is going, and whether the request fails. */
+export interface CarView {
+  id: number
+  /** The building the request came from: null for a car from outside the town (the airport side). */
+  from: Building | null
+  to: Building
+  origin: Origin
+  failed: boolean
+  /** The car's roof, in world metres. */
+  x: number
+  y: number
+  z: number
+  /** The road it follows, for drawing the route. */
+  road: readonly THREE.Vector3[]
 }
 
 interface Marker {
@@ -141,12 +190,19 @@ export class CarSystem {
   private readonly q = new THREE.Quaternion()
   private readonly up = new THREE.Vector3(0, 1, 0)
   private readonly pos = new THREE.Vector3()
+  private readonly probe = new THREE.Vector3()
   private readonly scaleV = new THREE.Vector3()
   private readonly tilt = new THREE.Quaternion()
   private readonly across = new THREE.Vector3(1, 0, 0)
   private readonly one = new THREE.Vector3(1, 1, 1)
   private readonly unit: number[] = []
   private nextId = 1
+  /** The route of the car under the pointer: its road as a dashed line, a blue ring round the building it came from and a green one round the one it goes to. */
+  private readonly routeLine = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshBasicMaterial({ color: '#2f7de1', transparent: true, opacity: 0.85, side: THREE.DoubleSide, depthTest: false, toneMapped: false }))
+  private routeKey = ''
+  private readonly rings: [THREE.Mesh, THREE.Mesh] = [makeRing('#2f7de1'), makeRing('#2fbf71')]
+  /** Which car the route is drawn for; -1 for none. */
+  highlighted = -1
   private tenants: readonly TenantInfo[] = []
   private readonly tenantKinds = new Map<string, TenantInfo['kind']>()
   private view: TenantView = { hideTest: false, tenants: [] }
@@ -198,6 +254,10 @@ export class CarSystem {
     this.lights.count = 0
     this.lights.frustumCulled = false
     this.object.add(this.flags, this.lights)
+    this.routeLine.visible = false
+    this.routeLine.renderOrder = 10
+    this.routeLine.frustumCulled = false
+    this.object.add(this.routeLine, ...this.rings)
   }
 
   setRoutes(routes: Route[]): void {
@@ -375,7 +435,9 @@ export class CarSystem {
       d = Math.atan2(Math.sin(d), Math.cos(d))
       c.yaw += d * Math.min(1, dt * 9)
       c.age += dt
-      if (!carShown(c.tenant, this.tenantKinds, this.view)) continue
+      c.drawn = carShown(c.tenant, this.tenantKinds, this.view)
+      if (!c.drawn) continue
+      c.px = this.pos.x; c.py = this.pos.y + 0.9; c.pz = this.pos.z
       const s = this.unit[c.model] * (c.fade >= 0 ? Math.max(0.01, c.fade / 0.5) : Math.min(1, 0.05 + c.age / GROW))
       this.q.setFromAxisAngle(this.up, c.yaw)
       if (deck.slope !== 0) this.q.multiply(this.tilt.setFromAxisAngle(this.across, -Math.atan(deck.slope)))
@@ -402,6 +464,72 @@ export class CarSystem {
     this.lights.count = lightN
     this.lights.instanceMatrix.needsUpdate = true
     this.updateMarkers()
+  }
+
+  private viewOf(c: Car): CarView {
+    const r = c.plan.route
+    return {
+      id: c.id, from: r.origin === 'external' ? null : ((r.source as Building).node ? (r.source as Building) : null), to: r.dest, origin: r.origin, failed: c.failed,
+      x: c.px, y: c.py, z: c.pz, road: c.plan.there,
+    }
+  }
+
+  /** The car drawn nearest to a ray (a pointer), if one is within `reach` metres of it: cars are small, so the reach grows with how far the camera is. */
+  pick(ray: THREE.Ray, reach: number): CarView | null {
+    let best: Car | null = null
+    let bestD = reach * reach
+    const p = this.probe
+    for (const c of this.cars) {
+      if (!c.drawn || c.fade >= 0) continue
+      const d = ray.distanceSqToPoint(p.set(c.px, c.py, c.pz))
+      if (d < bestD) { bestD = d; best = c }
+    }
+    return best ? this.viewOf(best) : null
+  }
+
+  /** The car with this id as it is now, or null once it has left. */
+  find(id: number): CarView | null {
+    const c = this.cars.find((o) => o.id === id)
+    return c && c.drawn && c.fade < 0 ? this.viewOf(c) : null
+  }
+
+  /** The `n` drawn cars nearest to a point on the ground, within `radius` metres: the ones that get a sign. */
+  nearest(x: number, z: number, radius: number, n: number): CarView[] {
+    const found: { c: Car; d: number }[] = []
+    for (const c of this.cars) {
+      if (!c.drawn || c.fade >= 0) continue
+      const d = Math.hypot(c.px - x, c.pz - z)
+      if (d <= radius) found.push({ c, d })
+    }
+    return found.sort((a, b) => a.d - b.d).slice(0, n).map((o) => this.viewOf(o.c))
+  }
+
+  /**
+   * Draws the route of this car (or nothing, for null): its road as a ribbon and a ring round each end. Called every frame while a car is under the pointer or
+   * pinned, so the ends follow the town when it rebuilds. `distance` is the camera's distance from what it looks at: the ribbon and rings grow with it, so they stay
+   * easy to see from the air.
+   */
+  highlight(car: CarView | null, distance = 40): void {
+    this.highlighted = car ? car.id : -1
+    this.routeLine.visible = !!car
+    for (const r of this.rings) r.visible = !!car
+    if (!car) { this.routeKey = ''; return }
+    const width = Math.max(0.55, distance * 0.007)
+    const key = `${car.id}:${Math.round(width * 10)}`
+    if (key !== this.routeKey) {
+      this.routeKey = key
+      this.routeLine.geometry.dispose()
+      this.routeLine.geometry = ribbon(car.road, width)
+    }
+    const put = (ring: THREE.Mesh, b: Building | null): void => {
+      ring.visible = !!b
+      if (!b) return
+      const at = b.root.getWorldPosition(new THREE.Vector3())
+      ring.position.set(at.x, 0.7, at.z)
+      ring.scale.setScalar(Math.max(b.model.radius + 0.8, distance * 0.045))
+    }
+    put(this.rings[0], car.from)
+    put(this.rings[1], car.to)
   }
 
   /** Every road cars can take, for tests. */
@@ -467,6 +595,7 @@ export class CarSystem {
       yaw: Math.atan2(first.x, first.z), x: start.x, z: start.z, dx: first.x, dz: first.z,
       speed: 0, stuck: 0, standoff: 0, fade: -1, lookX: new Array(LOOK).fill(start.x), lookZ: new Array(LOOK).fill(start.z), pace: 0.95 + this.random() * 0.1, wait: 0, age: 0,
       tenant: pickTenant(this.tenants, this.random()),
+      px: start.x, py: 0, pz: start.z, drawn: false,
     }
     const len = Math.hypot(car.dx, car.dz) || 1
     car.dx /= len; car.dz /= len

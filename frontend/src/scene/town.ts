@@ -13,6 +13,7 @@ import { CURB, DOCK_X, HUB_PLOT, LANE_Z, PAD_D, PAD_W, coastScan, coastScanZ, hu
 import { hashString } from './random'
 import { boatLoad, boatRate, clamp, formatRate } from '../visuals'
 import { CarSystem, type Route } from './cars'
+import { groupCallWords } from '../routesModel'
 import { BoatSystem, type BoatRoute } from './boats'
 import { archCount, clearArches, deckAt } from './arches'
 import { consumersOf, HarbourStatus, messagingOf, pierLines, type Messaging } from './harbour'
@@ -683,7 +684,7 @@ export class Town {
         isl.messaging = { ...messagingOf([...g.nodes], g.messaging), pillar: f ? { sent: f.sent, internal: f.internal, received: f.received, windowSeconds: f.windowSeconds } : null }
         isl.flow = g.flow ?? null
         const tr = traffic.get(g.id)
-        isl.trafficWords = tr && tr.in + tr.out + tr.internal > 0 ? [`Requests in ${formatRate(tr.in)} rps`, `Requests out ${formatRate(tr.out)} rps`, `Requests inside ${formatRate(tr.internal)} rps`] : []
+        isl.trafficWords = [...(tr && tr.in + tr.out + tr.internal > 0 ? [`Requests in ${formatRate(tr.in)} rps`, `Requests out ${formatRate(tr.out)} rps`, `Requests inside ${formatRate(tr.internal)} rps`] : []), ...groupCallWords(g.nodes)]
         isl.nameSign.userData.setLine(tr && tr.in + tr.out + tr.internal > 0 ? `in ${formatRate(tr.in)} · out ${formatRate(tr.out)} rps` : '')
       })
     }

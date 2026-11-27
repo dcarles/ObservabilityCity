@@ -79,7 +79,9 @@
           "engine": null,
           "backlogCountAmber": null,
           "backlogCountRed": null,
-          "serviceCode": null
+          "serviceCode": null,
+          "routes": null,
+          "methods": null
         },
         {
           "id": "hub.service-bus",
@@ -128,7 +130,9 @@
           "engine": null,
           "backlogCountAmber": null,
           "backlogCountRed": null,
-          "serviceCode": null
+          "serviceCode": null,
+          "routes": null,
+          "methods": null
         },
         {
           "id": "hub.egress",
@@ -177,7 +181,9 @@
           "engine": null,
           "backlogCountAmber": null,
           "backlogCountRed": null,
-          "serviceCode": null
+          "serviceCode": null,
+          "routes": null,
+          "methods": null
         },
         {
           "id": "hub.customer-db",
@@ -226,7 +232,9 @@
           "engine": null,
           "backlogCountAmber": null,
           "backlogCountRed": null,
-          "serviceCode": null
+          "serviceCode": null,
+          "routes": null,
+          "methods": null
         }
       ],
       "assets": [],
@@ -308,7 +316,66 @@
           "engine": null,
           "backlogCountAmber": null,
           "backlogCountRed": null,
-          "serviceCode": null
+          "serviceCode": null,
+          "routes": [
+            {
+              "method": "GET",
+              "route": "orders/{id}",
+              "perSecond": 13.237947122861586,
+              "errorRate": 0.1456
+            },
+            {
+              "method": "GET",
+              "route": "orders",
+              "perSecond": 6.0217729393468105,
+              "errorRate": 0.1456
+            },
+            {
+              "method": "POST",
+              "route": "orders",
+              "perSecond": 4.877138413685848,
+              "errorRate": 0.2912
+            },
+            {
+              "method": "GET",
+              "route": "orders/{id}/status",
+              "perSecond": 3.8818040435458787,
+              "errorRate": 0.1456
+            },
+            {
+              "method": "PUT",
+              "route": "orders/{id}",
+              "perSecond": 2.1897356143079314,
+              "errorRate": 0.2912
+            }
+          ],
+          "methods": [
+            {
+              "method": "GET",
+              "perSecond": 23.14152410575427,
+              "share": 0.7231726283048211
+            },
+            {
+              "method": "POST",
+              "perSecond": 4.877138413685848,
+              "share": 0.15241057542768277
+            },
+            {
+              "method": "PUT",
+              "perSecond": 2.1897356143079314,
+              "share": 0.06842923794712287
+            },
+            {
+              "method": "PATCH",
+              "perSecond": 1.2939346811819594,
+              "share": 0.04043545878693624
+            },
+            {
+              "method": "DELETE",
+              "perSecond": 0.4976671850699845,
+              "share": 0.015552099533437017
+            }
+          ]
         },
         {
           "id": "aa.orders-worker",
@@ -359,7 +426,9 @@
           "engine": null,
           "backlogCountAmber": null,
           "backlogCountRed": null,
-          "serviceCode": null
+          "serviceCode": null,
+          "routes": null,
+          "methods": null
         },
         {
           "id": "aa.orders-db",
@@ -408,7 +477,9 @@
           "engine": null,
           "backlogCountAmber": null,
           "backlogCountRed": null,
-          "serviceCode": null
+          "serviceCode": null,
+          "routes": null,
+          "methods": null
         }
       ],
       "assets": [],
@@ -502,7 +573,66 @@
           "engine": null,
           "backlogCountAmber": null,
           "backlogCountRed": null,
-          "serviceCode": null
+          "serviceCode": null,
+          "routes": [
+            {
+              "method": "GET",
+              "route": "notify/{id}",
+              "perSecond": 11.35632183908046,
+              "errorRate": 0.0016
+            },
+            {
+              "method": "GET",
+              "route": "notify",
+              "perSecond": 7.080459770114943,
+              "errorRate": 0.0016
+            },
+            {
+              "method": "POST",
+              "route": "notify",
+              "perSecond": 4.827586206896552,
+              "errorRate": 0.0032
+            },
+            {
+              "method": "GET",
+              "route": "notify/{id}/status",
+              "perSecond": 4.137931034482759,
+              "errorRate": 0.0016
+            },
+            {
+              "method": "PUT",
+              "route": "notify/{id}",
+              "perSecond": 2.7586206896551726,
+              "errorRate": 0.0031999999999999997
+            }
+          ],
+          "methods": [
+            {
+              "method": "GET",
+              "perSecond": 22.57471264367816,
+              "share": 0.7054597701149425
+            },
+            {
+              "method": "POST",
+              "perSecond": 4.827586206896552,
+              "share": 0.15086206896551724
+            },
+            {
+              "method": "PUT",
+              "perSecond": 2.7586206896551726,
+              "share": 0.08620689655172414
+            },
+            {
+              "method": "PATCH",
+              "perSecond": 1.2873563218390804,
+              "share": 0.040229885057471264
+            },
+            {
+              "method": "DELETE",
+              "perSecond": 0.5517241379310345,
+              "share": 0.017241379310344827
+            }
+          ]
         },
         {
           "id": "cc.notify-worker",
@@ -553,7 +683,9 @@
           "engine": null,
           "backlogCountAmber": null,
           "backlogCountRed": null,
-          "serviceCode": null
+          "serviceCode": null,
+          "routes": null,
+          "methods": null
         },
         {
           "id": "cc.notify-db",
@@ -602,7 +734,9 @@
           "engine": null,
           "backlogCountAmber": null,
           "backlogCountRed": null,
-          "serviceCode": null
+          "serviceCode": null,
+          "routes": null,
+          "methods": null
         }
       ],
       "assets": [],
@@ -662,7 +796,66 @@
         "engine": null,
         "backlogCountAmber": null,
         "backlogCountRed": null,
-        "serviceCode": null
+        "serviceCode": null,
+        "routes": [
+          {
+            "method": "GET",
+            "route": "bureau/{id}",
+            "perSecond": 5.661080074487896,
+            "errorRate": 0.0016
+          },
+          {
+            "method": "GET",
+            "route": "bureau",
+            "perSecond": 4.260707635009311,
+            "errorRate": 0.0016
+          },
+          {
+            "method": "POST",
+            "route": "bureau",
+            "perSecond": 2.085661080074488,
+            "errorRate": 0.0032
+          },
+          {
+            "method": "GET",
+            "route": "bureau/{id}/status",
+            "perSecond": 1.9664804469273742,
+            "errorRate": 0.0016
+          },
+          {
+            "method": "PUT",
+            "route": "bureau/{id}",
+            "perSecond": 1.0726256983240223,
+            "errorRate": 0.0032
+          }
+        ],
+        "methods": [
+          {
+            "method": "GET",
+            "perSecond": 11.88826815642458,
+            "share": 0.7430167597765364
+          },
+          {
+            "method": "POST",
+            "perSecond": 2.085661080074488,
+            "share": 0.13035381750465552
+          },
+          {
+            "method": "PUT",
+            "perSecond": 1.0726256983240223,
+            "share": 0.06703910614525141
+          },
+          {
+            "method": "PATCH",
+            "perSecond": 0.595903165735568,
+            "share": 0.03724394785847301
+          },
+          {
+            "method": "DELETE",
+            "perSecond": 0.3575418994413408,
+            "share": 0.022346368715083803
+          }
+        ]
       },
       "calledBy": [
         "aa.orders-api"
@@ -720,7 +913,66 @@
         "engine": null,
         "backlogCountAmber": null,
         "backlogCountRed": null,
-        "serviceCode": null
+        "serviceCode": null,
+        "routes": [
+          {
+            "method": "GET",
+            "route": "mailer/{id}",
+            "perSecond": 3.0099009900990104,
+            "errorRate": 0.0016
+          },
+          {
+            "method": "GET",
+            "route": "mailer",
+            "perSecond": 2.2653465346534656,
+            "errorRate": 0.0016
+          },
+          {
+            "method": "POST",
+            "route": "mailer",
+            "perSecond": 1.6633663366336637,
+            "errorRate": 0.0032
+          },
+          {
+            "method": "GET",
+            "route": "mailer/{id}/status",
+            "perSecond": 1.330693069306931,
+            "errorRate": 0.0016
+          },
+          {
+            "method": "PUT",
+            "route": "mailer/{id}",
+            "perSecond": 0.7603960396039605,
+            "errorRate": 0.0032
+          }
+        ],
+        "methods": [
+          {
+            "method": "GET",
+            "perSecond": 6.605940594059407,
+            "share": 0.6881188118811881
+          },
+          {
+            "method": "POST",
+            "perSecond": 1.6633663366336637,
+            "share": 0.17326732673267325
+          },
+          {
+            "method": "PUT",
+            "perSecond": 0.7603960396039605,
+            "share": 0.0792079207920792
+          },
+          {
+            "method": "PATCH",
+            "perSecond": 0.34851485148514855,
+            "share": 0.03630363036303629
+          },
+          {
+            "method": "DELETE",
+            "perSecond": 0.22178217821782184,
+            "share": 0.0231023102310231
+          }
+        ]
       },
       "calledBy": [
         "cc.notify-worker"

@@ -23,6 +23,12 @@ public sealed record AzureSettings : IDeadLetterLinkSettings, IQueueLinkSettings
     /// <summary>For a request source: the region query asked once for a whole hour of the past (columns of the region query plus <c>at</c>, the start of each time bin as wide as the window). Null: each frame is asked on its own. Used only together with <see cref="RegionQuery"/>.</summary>
     public string? RegionRangeQuery { get; init; }
 
+    /// <summary>For a request source: the query that gives the calls each service serves (columns role, method, route, calls, errors). Null: the routes are not measured.</summary>
+    public string? RoutesQuery { get; init; }
+
+    /// <summary>For a request source: the routes query asked once for a whole hour of the past (columns of the routes query plus <c>at</c>). Null: each frame is asked on its own. Used only together with <see cref="RoutesQuery"/>.</summary>
+    public string? RoutesRangeQuery { get; init; }
+
     /// <summary>For a platform-metric source: whether the past is read with the batch endpoint (many resources in one call), which is faster. The live poll never uses it. False reads each resource on its own.</summary>
     public bool BatchMetrics { get; init; } = true;
 

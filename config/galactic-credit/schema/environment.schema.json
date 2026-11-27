@@ -250,6 +250,14 @@
                   "type": "string",
                   "description": "Request sources (loganalytics): the regionQuery asked once for a whole hour of the past instead of once for each frame, a template like query. It returns the columns of the regionQuery plus at, the start of the time bin: summarize ... by role, region, at = bin(TimeGenerated, {window}). Do not filter on time: the program gives the span. Needs the regionQuery. Without it each frame is asked on its own. The live poll never uses it."
                 },
+                "routesQuery": {
+                  "type": "string",
+                  "description": "Request sources (loganalytics): the query that says which calls each service serves, a template like query. It returns one row per telemetry name, HTTP method and route with the columns role, method, route, calls and errors (counts over the window; unsampled span metrics, and the route as a template such as customers/{customerId}, not the address). Keep the busiest routes of each role in the query, for example the top 30. The town shows each API's busiest calls and the split by method. Without it they are not shown."
+                },
+                "routesRangeQuery": {
+                  "type": "string",
+                  "description": "Request sources (loganalytics): the routesQuery asked once for a whole hour of the past instead of once for each frame, a template like query. It returns the columns of the routesQuery plus at, the start of the time bin: summarize ... by role, method, route, at = bin(TimeGenerated, {window}). Do not filter on time: the program gives the span. Needs the routesQuery. Without it each frame is asked on its own. The live poll never uses it."
+                },
                 "batchMetrics": {
                   "type": "boolean",
                   "description": "Platform-metric sources (azuremonitor): false reads the past of each resource on its own instead of up to 50 resources of one subscription and region in one batch call. Default true. A batch the cloud refuses is made smaller and then read one by one, so the default needs no setting. The live poll never uses batches."

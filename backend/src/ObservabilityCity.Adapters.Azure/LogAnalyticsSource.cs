@@ -128,6 +128,36 @@ public sealed class LogAnalyticsReader(HttpClient http, ICredentialSource? crede
         return rows;
     }
 
+    public static readonly string[] RouteColumns = ["role", "method", "route", "calls", "errors"];
+
+    /// <summary>The routes rows over the last <paramref name="window"/>.</summary>
+    public async Task<IReadOnlyList<RouteRow>> QueryRoutesAsync(string workspace, string query, TimeSpan window, CancellationToken ct) =>
+        ParseRoutes(await SendAsync(workspace, query, System.Xml.XmlConvert.ToString(window), ct));
+
+    /// <summary>The routes rows over the past span [from, to).</summary>
+    public async Task<IReadOnlyList<RouteRow>> QueryRoutesAsync(string workspace, string query, DateTimeOffset from, DateTimeOffset to, CancellationToken ct) =>
+        ParseRoutes(await SendAsync(workspace, query, $"{LinkQuery.Iso(from)}/{LinkQuery.Iso(to)}", ct));
+
+    /// <summary>The rows of the routes query: <c>role</c> (the telemetry name), <c>method</c>, <c>route</c> and <c>calls</c> (counts over the window), with <c>errors</c> (failed calls) and <c>at</c> (the time bin, for the hourly form) optional. A row without a role, a method or a route is skipped.</summary>
+    public static IReadOnlyList<RouteRow> ParseRoutes(string json)
+    {
+        using var doc = JsonDocument.Parse(json);
+        if (!doc.RootElement.TryGetProperty("tables", out var tables) || tables.ValueKind != JsonValueKind.Array || tables.GetArrayLength() == 0)
+            throw new InvalidOperationException("the answer has no table; was the query a query that returns rows?");
+        var table = tables[0];
+        var names = table.GetProperty("columns").EnumerateArray().Select(c => c.GetProperty("name").GetString() ?? "").ToList();
+        int Index(string column) => names.FindIndex(n => n.Equals(column, StringComparison.OrdinalIgnoreCase));
+        var (role, method, route, calls, errors, binAt) = (Index("role"), Index("method"), Index("route"), Index("calls"), Index("errors"), Index("at"));
+        if (role < 0 || method < 0 || route < 0 || calls < 0)
+            throw new InvalidOperationException($"the routes query must return the columns role, method, route and calls (errors is optional); it returned {string.Join(", ", names)}");
+        var rows = new List<RouteRow>();
+        foreach (var row in table.GetProperty("rows").EnumerateArray())
+            if (Text(row[role]) is { Length: > 0 } who && Text(row[method]) is { Length: > 0 } how && Text(row[route]) is { Length: > 0 } what)
+                rows.Add(new RouteRow(who, how, what, Number(row, calls) ?? 0, errors < 0 ? 0 : Number(row, errors) ?? 0,
+                    binAt >= 0 && Text(row[binAt]) is { Length: > 0 } when && DateTimeOffset.TryParse(when, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var parsed) ? parsed : null));
+        return rows;
+    }
+
     public static readonly string[] RegionColumns = ["role", "region", "calls"];
 
     /// <summary>The rows of the region query: <c>role</c> (the telemetry name), <c>region</c> and <c>calls</c> (counts; only their proportions are used). A row without a role or a region is skipped.</summary>
@@ -346,6 +376,9 @@ public sealed record JobRow(string ResourceId, string Job, DateTimeOffset? LastR
 public sealed record TypeRow(string Queue, string Type, double Calls);
 
 /// <summary>How many requests a service (by telemetry name) answered in one region, by the region query.</summary>
+/// <summary>One row of the routes query: a service's calls of one HTTP method to one route over the window, and how many of them failed.</summary>
+public sealed record RouteRow(string Role, string Method, string Route, double Calls, double Errors, DateTimeOffset? At = null);
+
 public sealed record RegionRow(string Role, string Region, double Calls, DateTimeOffset? At = null);
 
 /// <summary>One telemetry name's calls in one answer. <paramref name="At"/> is the start of the time bin the row is for; only the hourly (range) query gives it.</summary>
@@ -421,6 +454,7 @@ public sealed class LogAnalyticsSource(
     // the hourly (range) queries: one answer per hour for the telemetry rows and one for the region rows, each cut into the frames of the hour
     private readonly HourCache<IReadOnlyList<SpanRow>> _spanHours = new();
     private readonly HourCache<IReadOnlyList<RegionRow>> _regionHours = new();
+    private readonly HourCache<IReadOnlyList<RouteRow>> _routeHours = new();
 
     /// <summary>A frame whose window starts on a bin edge (bins are as wide as the window, counted from midnight) can be cut out of an hourly answer; any other frame is asked on its own.</summary>
     private bool IsOnTheGrid(DateTimeOffset at) => Window > TimeSpan.Zero && TimeSpan.FromHours(1).Ticks % Window.Ticks == 0 && (at.UtcTicks % Window.Ticks) == 0;
@@ -448,6 +482,19 @@ public sealed class LogAnalyticsSource(
             return reader.QueryRegionsAsync(workspace, rendered, hour, hour + TimeSpan.FromHours(1) + Window, ct);
         });
         if (all.Any(r => r.At is null)) throw new InvalidOperationException($"source '{name}': the regionRangeQuery must return the column at, the start of the time bin of each row (bin(TimeGenerated, {SourceQuery.Text(Window)}))");
+        return all.Where(r => r.At >= from && r.At < at).ToList();
+    }
+
+    private async Task<IReadOnlyList<RouteRow>> RouteRowsOfFrameAsync(string workspace, string routesRangeQuery, IReadOnlyList<SystemScope> asked, DateTimeOffset at, CancellationToken ct)
+    {
+        var from = at - Window;
+        var hour = HourCache<IReadOnlyList<RouteRow>>.HourOf(from);
+        var all = await _routeHours.GetAsync(hour, () =>
+        {
+            var rendered = SourceQuery.Render(routesRangeQuery, definition, environmentId, rules, asked.Select(s => s.TelemetryRole!).Distinct(StringComparer.OrdinalIgnoreCase));
+            return reader.QueryRoutesAsync(workspace, rendered, hour, hour + TimeSpan.FromHours(1) + Window, ct);
+        });
+        if (all.Any(r => r.At is null)) throw new InvalidOperationException($"source '{name}': the routesRangeQuery must return the column at, the start of the time bin of each row (bin(TimeGenerated, {SourceQuery.Text(Window)}))");
         return all.Where(r => r.At >= from && r.At < at).ToList();
     }
 
@@ -487,8 +534,23 @@ public sealed class LogAnalyticsSource(
             else
                 regionRows = past ? await reader.QueryRegionsAsync(Workspace(resolution), SourceQuery.AtPast(rendered, at), at - Window, at, ct) : await reader.QueryRegionsAsync(Workspace(resolution), rendered, Window, ct);
         }
-        return Readings(asked, rows, Window, at, regionRows);
+        IReadOnlyList<RouteRow> routeRows = [];
+        if (recording is not null)
+        {
+            var sibling = Path.ChangeExtension(recording, ".routes.json");
+            if (_settings.RoutesQuery is not null && File.Exists(sibling)) routeRows = LogAnalyticsReader.ParseRoutes(await File.ReadAllTextAsync(sibling, ct));
+        }
+        else if (_settings.RoutesQuery is { } routesQuery)
+        {
+            var rendered = SourceQuery.Render(routesQuery, definition, environmentId, rules, asked.Select(s => s.TelemetryRole!).Distinct(StringComparer.OrdinalIgnoreCase));
+            if (past && _settings.RoutesRangeQuery is { } routesRange && IsOnTheGrid(at))
+                routeRows = await RouteRowsOfFrameAsync(Workspace(resolution), routesRange, asked, at, ct);
+            else
+                routeRows = past ? await reader.QueryRoutesAsync(Workspace(resolution), SourceQuery.AtPast(rendered, at), at - Window, at, ct) : await reader.QueryRoutesAsync(Workspace(resolution), rendered, Window, ct);
+        }
+        return Readings(asked, rows, Window, at, regionRows, routeRows);
     }
+
 
     /// <summary>
     /// The workspace to query: the source's own connection, else the id the environment's scope settles for its telemetry store (an explicit
@@ -514,6 +576,14 @@ public sealed class LogAnalyticsSource(
         return workspace;
     }
 
+    /// <summary>The calls of a service as the routes query reported them, added up per method and route (a telemetry name can come back in several rows): each one's rate over the window and failed share. Null when there are none.</summary>
+    private static IReadOnlyList<RouteReading>? Routes(IReadOnlyList<RouteRow>? rows, string role, TimeSpan window)
+    {
+        var mine = (rows ?? []).Where(r => r.Role.Equals(role, StringComparison.OrdinalIgnoreCase)).GroupBy(r => (Method: r.Method.Trim().ToUpperInvariant(), Route: r.Route.Trim()))
+            .Select(g => (g.Key.Method, g.Key.Route, Calls: g.Sum(r => r.Calls), Errors: Math.Min(g.Sum(r => r.Errors), g.Sum(r => r.Calls)))).Where(r => r.Calls > 0).ToList();
+        return mine.Count == 0 ? null : mine.Select(r => new RouteReading(r.Method, r.Route, r.Calls / window.TotalSeconds, r.Errors / r.Calls)).ToList();
+    }
+
     /// <summary>Each region's part of a service's requests, from the region query's rows (counts added up per region). Null when there are none or they add up to nothing.</summary>
     private static IReadOnlyList<RegionReading>? Shares(IReadOnlyList<RegionRow>? rows, string role)
     {
@@ -526,7 +596,7 @@ public sealed class LogAnalyticsSource(
     /// A reading for every asked system: its rows added up (two systems can share a telemetry name, and a name can come back in several rows), the rate over
     /// the window, the share of calls that were errors and the latency of the rows weighted by their calls. No row means no calls in the window.
     /// </summary>
-    public static IReadOnlyDictionary<string, NodeReading> Readings(IEnumerable<SystemScope> asked, IReadOnlyList<SpanRow> rows, TimeSpan window, DateTimeOffset at, IReadOnlyList<RegionRow>? regionRows = null)
+    public static IReadOnlyDictionary<string, NodeReading> Readings(IEnumerable<SystemScope> asked, IReadOnlyList<SpanRow> rows, TimeSpan window, DateTimeOffset at, IReadOnlyList<RegionRow>? regionRows = null, IReadOnlyList<RouteRow>? routeRows = null)
     {
         var byRole = rows.GroupBy(r => r.Role, StringComparer.OrdinalIgnoreCase).ToDictionary(g => g.Key, g => g.ToList(), StringComparer.OrdinalIgnoreCase);
         var readings = new Dictionary<string, NodeReading>();
@@ -536,7 +606,7 @@ public sealed class LogAnalyticsSource(
             var calls = mine.Sum(r => r.Calls);
             var errors = Math.Min(mine.Sum(r => r.Errors), calls);
             var latency = calls > 0 ? mine.Where(r => r.LatencyMs is not null).Sum(r => r.LatencyMs!.Value * r.Calls) / calls : 0;
-            readings[system.SystemId] = new NodeReading(at, true, 0, 0, 0, calls / window.TotalSeconds, calls > 0 ? errors / calls : 0, latency, Calls: calls, Regions: Shares(regionRows, system.TelemetryRole!));
+            readings[system.SystemId] = new NodeReading(at, true, 0, 0, 0, calls / window.TotalSeconds, calls > 0 ? errors / calls : 0, latency, Calls: calls, Regions: Shares(regionRows, system.TelemetryRole!), Routes: Routes(routeRows, system.TelemetryRole!, window));
         }
         return readings;
     }

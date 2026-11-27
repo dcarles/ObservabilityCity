@@ -27,6 +27,8 @@ public sealed partial class AzureSourceSettings : SourceSettingsReader<AzureSour
         RegionQuery = f.RegionQuery,
         RangeQuery = f.RangeQuery,
         RegionRangeQuery = f.RegionRangeQuery,
+        RoutesQuery = f.RoutesQuery,
+        RoutesRangeQuery = f.RoutesRangeQuery,
         BatchMetrics = f.BatchMetrics ?? true,
         TypesQuery = f.TypesQuery,
         Metrics = ToMetrics(f.Metrics),
@@ -54,6 +56,17 @@ public sealed partial class AzureSourceSettings : SourceSettingsReader<AzureSour
             if (regionRangeQuery.Trim().Length == 0) report.Add($"source '{source}' has an empty regionRangeQuery; give the query that returns role, region, calls and at (the start of each time bin), or leave it out", "regionRangeQuery");
             foreach (var problem in ScopeTemplate.Check(regionRangeQuery, known)) report.Add($"source '{source}' regionRangeQuery: {problem}", "regionRangeQuery");
             if (def.RegionQuery is null) report.Add($"source '{source}' has a regionRangeQuery but no regionQuery; the region split is only measured when there is a regionQuery", "regionRangeQuery");
+        }
+        if (def.RoutesQuery is { } routesQuery)
+        {
+            if (routesQuery.Trim().Length == 0) report.Add($"source '{source}' has an empty routesQuery; give the query that returns role, method, route, calls and errors, or leave it out", "routesQuery");
+            foreach (var problem in ScopeTemplate.Check(routesQuery, known)) report.Add($"source '{source}' routesQuery: {problem}", "routesQuery");
+        }
+        if (def.RoutesRangeQuery is { } routesRangeQuery)
+        {
+            if (routesRangeQuery.Trim().Length == 0) report.Add($"source '{source}' has an empty routesRangeQuery; give the query that returns role, method, route, calls, errors and at (the start of each time bin), or leave it out", "routesRangeQuery");
+            foreach (var problem in ScopeTemplate.Check(routesRangeQuery, known)) report.Add($"source '{source}' routesRangeQuery: {problem}", "routesRangeQuery");
+            if (def.RoutesQuery is null) report.Add($"source '{source}' has a routesRangeQuery but no routesQuery; the routes are only measured when there is a routesQuery", "routesRangeQuery");
         }
         if (def.TypesQuery is { } typesQuery)
         {
@@ -280,6 +293,10 @@ public sealed class AzureSourceFile
     public string? RangeQuery { get; set; }
     /// <summary>Request sources only (loganalytics): the regionQuery asked once for a whole hour of the past, with one more column, at (the start of each time bin as wide as the window). Without it each past frame is asked on its own.</summary>
     public string? RegionRangeQuery { get; set; }
+    /// <summary>Request sources only (loganalytics): the query that says which calls each service serves, a template like query. Returns one row per telemetry name, HTTP method and route with the columns role, method, route, calls and errors (counts over the window, from unsampled span metrics).</summary>
+    public string? RoutesQuery { get; set; }
+    /// <summary>Request sources only (loganalytics): the routesQuery asked once for a whole hour of the past, with one more column, at (the start of each time bin as wide as the window). Without it each past frame is asked on its own.</summary>
+    public string? RoutesRangeQuery { get; set; }
     /// <summary>Platform-metric sources only (azuremonitor): false reads the past of each resource on its own instead of many resources in one batch call. Default true. The live poll never uses batches.</summary>
     public bool? BatchMetrics { get; set; }
     /// <summary>Broker sources only (servicebus): the query that says which kinds of message each queue handled, a template like query. Returns one row per queue and message type with the columns queue, type and calls (counts over the window). Without it the types are not shown.</summary>

@@ -30,11 +30,15 @@ public sealed record NodeReading(
     IReadOnlyList<JobReading>? Jobs = null,
     IReadOnlyList<RegionReading>? Regions = null,
     IReadOnlyList<QueueReading>? Queues = null,
-    PillarFlowReading? Flow = null)
+    PillarFlowReading? Flow = null,
+    IReadOnlyList<RouteReading>? Routes = null)
 {
     /// <summary>The key a pillar's flow is reported under: a reading with only <see cref="Flow"/> set, for a pillar and not for a node.</summary>
     public static string FlowKey(string groupId) => "flow:" + groupId;
 }
+
+/// <summary>One call a system serves: the HTTP method, the route as the telemetry names it, its requests a second over the source's window and the share of them that failed (0 to 1).</summary>
+public sealed record RouteReading(string Method, string Route, double PerSecond, double ErrorRate);
 
 /// <summary>What a pillar sends to the other pillars and receives from them, in messages a second over <paramref name="WindowSeconds"/>. A side nobody measures is null.</summary>
 public sealed record PillarFlowReading(double? Sent, double? Received, int WindowSeconds);

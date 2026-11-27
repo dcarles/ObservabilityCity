@@ -279,7 +279,8 @@ public sealed class FakeSource(
             // A function runs two jobs. With errors on, its first job fails its last run; with the app down, its jobs are overdue.
             var jobs = node.Kind != NodeKind.Function ? null : FakeJobs(node, now, fx.Any(e => e.Kind == FakeEffectKind.Errors), down);
             result[node.Id] = new NodeReading(now, !down, current, healthy, load, rps, errors, p99, cpu, memory, utilisation, throttled, queueDepth, oldest, deadLetters, tenantReadings,
-                App: node.Kind == NodeKind.Function ? AppState.Running : null, Jobs: jobs, Regions: RegionsOf(p.Regions, down ? 0 : current, cpu, memory));
+                App: node.Kind == NodeKind.Function ? AppState.Running : null, Jobs: jobs, Regions: RegionsOf(p.Regions, down ? 0 : current, cpu, memory),
+                Routes: node.Kind == NodeKind.Api && !down ? FakeRoutes(node, rps, errors) : null);
         }
 
         // What each pillar with messaging sends and receives, as a broker would report it: the traffic of the services that publish and of the workers that read, over a five minute window
@@ -292,6 +293,23 @@ public sealed class FakeSource(
         }
 
         return Task.FromResult<IReadOnlyDictionary<string, NodeReading>>(result);
+    }
+
+    /// <summary>
+    /// The calls an API serves, as span metrics would report them: a fixed set of routes for the service (the same on every run), each with its part of the requests, mostly reads
+    /// and a few writes, and failures a little likelier on writes. The parts add up to the API's rate.
+    /// </summary>
+    private static List<RouteReading> FakeRoutes(RegistryNode node, double rps, double errors)
+    {
+        var name = (node.Service ?? node.Id[(node.Id.IndexOf('.') + 1)..]).ToLowerInvariant();
+        (string Method, string Route, double Weight)[] shape =
+        [
+            ("GET", $"{name}/{{id}}", 38), ("GET", name, 22), ("GET", $"{name}/{{id}}/status", 12), ("POST", name, 14), ("PUT", $"{name}/{{id}}", 8), ("DELETE", $"{name}/{{id}}", 2), ("PATCH", $"{name}/{{id}}/flags", 4),
+        ];
+        // each service leans a little differently, but always the same way
+        var lean = shape.Select((r, i) => r.Weight * (0.75 + 0.5 * (((StableHash(node.Id) & 0x7fffffff) >> i) % 7) / 6.0)).ToArray();
+        var total = lean.Sum();
+        return shape.Select((r, i) => new RouteReading(r.Method, r.Route, rps * lean[i] / total, Math.Clamp(errors * (r.Method == "GET" ? 0.8 : 1.6), 0, 1))).ToList();
     }
 
     /// <summary>
