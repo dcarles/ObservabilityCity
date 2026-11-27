@@ -45,5 +45,7 @@
   "engine": null,
   "backlogCountAmber": null,
   "backlogCountRed": null,
-  "serviceCode": null
+  "serviceCode": null,
+  "routes": null,
+  "methods": null
 }

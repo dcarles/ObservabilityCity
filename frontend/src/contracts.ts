@@ -521,6 +521,13 @@ export interface components {
             subscriptions: components["schemas"]["SubscriptionSnapshot"][];
             schedules?: components["schemas"]["ScheduleSnapshot"][] | null;
         };
+        MethodSnapshot: {
+            method: string;
+            /** Format: double */
+            perSecond: number;
+            /** Format: double */
+            share: number;
+        };
         /** @enum {string} */
         NodeKind: "Api" | "Worker" | "Database" | "Cache" | "Function" | "Gateway" | "Broker" | "Egress";
         NodeSnapshot: {
@@ -597,6 +604,8 @@ export interface components {
             /** Format: double */
             backlogCountRed?: number | null;
             serviceCode?: string | null;
+            routes?: components["schemas"]["RouteSnapshot"][] | null;
+            methods?: components["schemas"]["MethodSnapshot"][] | null;
         };
         OffscreenLink: {
             nodeId: string;
@@ -666,6 +675,14 @@ export interface components {
         ResourceLink: {
             name: string;
             url: string;
+        };
+        RouteSnapshot: {
+            method: string;
+            route: string;
+            /** Format: double */
+            perSecond: number;
+            /** Format: double */
+            errorRate: number;
         };
         ScheduleSnapshot: {
             system: string;

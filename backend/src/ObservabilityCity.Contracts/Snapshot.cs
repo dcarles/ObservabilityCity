@@ -137,7 +137,9 @@ public sealed record NodeSnapshot(
     DatabaseEngineSnapshot? Engine = null,
     double? BacklogCountAmber = null,
     double? BacklogCountRed = null,
-    string? ServiceCode = null);
+    string? ServiceCode = null,
+    IReadOnlyList<RouteSnapshot>? Routes = null,
+    IReadOnlyList<MethodSnapshot>? Methods = null);
 
 /// <summary>
 /// What a database runs on, from town.yaml databaseEngines: Id as pillar files write it, Name as shown (Cosmos DB), Type the id of its family (document)
@@ -187,6 +189,15 @@ public sealed record JobSnapshot(string Name, string? Region, JobStatus Status, 
 /// own, each null when nothing reports it. Share is the part of the service's requests the region took (0 to 1, null when nothing measures it); Skewed marks the region that takes more than the environment allows (scope.regions.skew) while another region runs instances. The building's own numbers are those of its worst region, the one with the highest CPU or memory.
 /// </summary>
 public sealed record RegionSnapshot(string Region, string Label, int? Instances, double? Cpu, double? Memory, double? Share = null, bool Skewed = false);
+
+/// <summary>
+/// One call an API serves, when the environment measures them (routesQuery): the HTTP method and the route as the telemetry names it (the template, not the address), its requests
+/// a second over the window and the share of them that failed (0 to 1). A system's Routes are its busiest ones, highest rate first.
+/// </summary>
+public sealed record RouteSnapshot(string Method, string Route, double PerSecond, double ErrorRate);
+
+/// <summary>How an API's requests divide by HTTP method (GET, POST, PUT...): the requests a second of each and its share of all of them (0 to 1). Worked out from every route the source returned, not only the busiest ones. Highest rate first.</summary>
+public sealed record MethodSnapshot(string Method, double PerSecond, double Share);
 
 /// <summary>What one town system sends to an API, in requests per second.</summary>
 public sealed record InboundLinkSnapshot(string From, double RequestsPerSecond);

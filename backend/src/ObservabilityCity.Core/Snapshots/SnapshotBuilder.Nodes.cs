@@ -77,7 +77,8 @@ public sealed partial class SnapshotBuilder
 
         return new NodeSnapshot(n.Id, n.Name, n.Kind, n.Service, n.External, health, r.InstancesTotal, r.InstancesHealthy,
             r.Load, r.Cpu, r.Memory, utilisation, throttled, r.QueueDepth, r.OldestMessageSeconds, r.DeadLetters, r.RequestsPerSecond, r.ErrorRate, r.P99Ms, n.SlaP99Ms, n.ErrorAmber, n.ErrorRed,
-            n.ResourceAmber, n.ResourceRed, n.ThrottleAmber, n.ThrottleRed, n.BacklogAmber, n.BacklogRed, n.Calls, n.GatewayCalls, r.At, tenants, absent, quiet, ServiceCode: n.ShownServiceCode)
+            n.ResourceAmber, n.ResourceRed, n.ThrottleAmber, n.ThrottleRed, n.BacklogAmber, n.BacklogRed, n.Calls, n.GatewayCalls, r.At, tenants, absent, quiet, ServiceCode: n.ShownServiceCode,
+            Routes: RouteSummary.TopRoutes(r.Routes), Methods: RouteSummary.ByMethod(r.Routes))
         {
             // an API's traffic is its measured total less what town systems send: the rest is outside, whichever building it is
             OutsideRequestsPerSecond = split?.Outside,
@@ -180,6 +181,7 @@ public sealed partial class SnapshotBuilder
         {
             RequestsPerSecond = Gone(Signals.Requests) ? 0 : r.RequestsPerSecond,
             Calls = Gone(Signals.Requests) ? null : r.Calls,
+            Routes = Gone(Signals.Requests) ? null : r.Routes,
             ErrorRate = Gone(Signals.Errors) ? 0 : r.ErrorRate,
             P99Ms = Gone(Signals.Latency) ? 0 : r.P99Ms,
             InstancesTotal = Gone(Signals.Instances) ? 0 : r.InstancesTotal,

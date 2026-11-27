@@ -436,6 +436,25 @@ The callers' calls are counted over the whole `shareWindow`, so the town compare
 - Below `minCalls` observed calls to an API the share is too noisy: the last good share stands and the inspector marks it "estimated". There is no setting for a share; every number is measured.
 - Without a `traffic` block nothing is measured: each API's rate is shared evenly between the systems that declare a call to it (and the outside, when it is marked `external` or an outside caller reaches it).
 
+#### The calls an API serves (top calls and methods)
+
+An API's drawer can list its busiest calls and say how its requests divide by HTTP method (GET 78% · POST 18% · PUT 4%), and hovering an island's sign lists the busiest calls of the island and the same split for all its APIs. The numbers come from your unsampled span metrics: give the `loganalytics` source a `routesQuery` (and a `routesRangeQuery` for the history rebuild, the same query with `at = bin(TimeGenerated, {window})` and no time filter) that returns one row for each telemetry name, method and route with the columns `role`, `method`, `route`, `calls` and, if you have them, `errors`:
+
+```
+AppMetrics
+| where TimeGenerated > ago({window}) and AppRoleName in ({roles})
+| where Name == "<your calls metric>" and tostring(Properties["<span kind>"]) == "<server value>"
+| summarize calls = sum(Sum), errors = sumif(Sum, toint(Properties["<status>"]) >= 500) by role = AppRoleName, method = tostring(Properties["<method>"]), route = tostring(Properties["<route>"])
+| order by role asc, calls desc
+| extend rank = row_number(1, role != prev(role))
+| where rank <= 30
+```
+
+- The route should be the template your telemetry names (`customers/{customerId}`), not the address: an address with ids in it gives a different route for every customer and a list that says nothing. Check a sample of the query's rows before you rely on it.
+- Keep the busiest routes of each role in the query (the top 30 above). The list shows five; the method split is worked out from every row the query returns, so cutting the query to a handful of routes makes the split a little short.
+- Only APIs show the list. A rate is the calls over the window divided by its seconds; the failed share is `errors` over `calls`.
+- Without a `routesQuery` nothing is measured and nothing is shown. The demo towns make their routes up.
+
 ### Logs tab: failed and slow requests, warnings, exceptions
 
 A system's inspector has a Logs tab. In a live town it is empty of everything until you write a `logs:` block in the environment file (see `logs` in [config-reference.md](config-reference.md)); without it the tab says logs are not set up. With it, opening the tab sends one query for that system's telemetry name over the last `window` (4 hours by default) to the source you name: one whose kind can read logs (with the Azure adapter, a `loganalytics` source). Nothing is polled, nothing is stored, and the tab never changes a building's colour: health comes from your unsampled metrics.

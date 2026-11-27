@@ -62,5 +62,7 @@
   "engine": null,
   "backlogCountAmber": 100,
   "backlogCountRed": 1000,
-  "serviceCode": null
+  "serviceCode": null,
+  "routes": null,
+  "methods": null
 }

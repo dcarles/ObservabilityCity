@@ -79,7 +79,9 @@
           "engine": null,
           "backlogCountAmber": null,
           "backlogCountRed": null,
-          "serviceCode": null
+          "serviceCode": null,
+          "routes": null,
+          "methods": null
         },
         {
           "id": "hub.partner-gateway",
@@ -128,7 +130,9 @@
           "engine": null,
           "backlogCountAmber": null,
           "backlogCountRed": null,
-          "serviceCode": null
+          "serviceCode": null,
+          "routes": null,
+          "methods": null
         },
         {
           "id": "hub.event-broker",
@@ -177,7 +181,9 @@
           "engine": null,
           "backlogCountAmber": null,
           "backlogCountRed": null,
-          "serviceCode": null
+          "serviceCode": null,
+          "routes": null,
+          "methods": null
         },
         {
           "id": "hub.task-broker",
@@ -226,7 +232,9 @@
           "engine": null,
           "backlogCountAmber": null,
           "backlogCountRed": null,
-          "serviceCode": null
+          "serviceCode": null,
+          "routes": null,
+          "methods": null
         },
         {
           "id": "hub.egress",
@@ -275,7 +283,9 @@
           "engine": null,
           "backlogCountAmber": null,
           "backlogCountRed": null,
-          "serviceCode": null
+          "serviceCode": null,
+          "routes": null,
+          "methods": null
         },
         {
           "id": "hub.customer-db",
@@ -324,7 +334,9 @@
           "engine": null,
           "backlogCountAmber": null,
           "backlogCountRed": null,
-          "serviceCode": null
+          "serviceCode": null,
+          "routes": null,
+          "methods": null
         },
         {
           "id": "hub.reference-db",
@@ -373,7 +385,9 @@
           "engine": null,
           "backlogCountAmber": null,
           "backlogCountRed": null,
-          "serviceCode": null
+          "serviceCode": null,
+          "routes": null,
+          "methods": null
         }
       ],
       "assets": [],
@@ -456,7 +470,66 @@
           "engine": null,
           "backlogCountAmber": null,
           "backlogCountRed": null,
-          "serviceCode": null
+          "serviceCode": null,
+          "routes": [
+            {
+              "method": "GET",
+              "route": "orders/{id}",
+              "perSecond": 13.372434017595307,
+              "errorRate": 0.0016
+            },
+            {
+              "method": "GET",
+              "route": "orders",
+              "perSecond": 6.193548387096774,
+              "errorRate": 0.0016
+            },
+            {
+              "method": "POST",
+              "route": "orders",
+              "perSecond": 4.926686217008798,
+              "errorRate": 0.0032000000000000006
+            },
+            {
+              "method": "GET",
+              "route": "orders/{id}/status",
+              "perSecond": 3.941348973607038,
+              "errorRate": 0.0016
+            },
+            {
+              "method": "PUT",
+              "route": "orders/{id}",
+              "perSecond": 2.252199413489736,
+              "errorRate": 0.0032
+            }
+          ],
+          "methods": [
+            {
+              "method": "GET",
+              "perSecond": 23.507331378299117,
+              "share": 0.7346041055718475
+            },
+            {
+              "method": "POST",
+              "perSecond": 4.926686217008798,
+              "share": 0.15395894428152496
+            },
+            {
+              "method": "PUT",
+              "perSecond": 2.252199413489736,
+              "share": 0.07038123167155426
+            },
+            {
+              "method": "PATCH",
+              "perSecond": 0.8445747800586509,
+              "share": 0.02639296187683285
+            },
+            {
+              "method": "DELETE",
+              "perSecond": 0.46920821114369504,
+              "share": 0.014662756598240474
+            }
+          ]
         },
         {
           "id": "ord.orders-worker",
@@ -507,7 +580,9 @@
           "engine": null,
           "backlogCountAmber": null,
           "backlogCountRed": null,
-          "serviceCode": null
+          "serviceCode": null,
+          "routes": null,
+          "methods": null
         },
         {
           "id": "ord.orders-db",
@@ -556,7 +631,9 @@
           "engine": null,
           "backlogCountAmber": null,
           "backlogCountRed": null,
-          "serviceCode": null
+          "serviceCode": null,
+          "routes": null,
+          "methods": null
         }
       ],
       "assets": [],
@@ -643,7 +720,66 @@
           "engine": null,
           "backlogCountAmber": null,
           "backlogCountRed": null,
-          "serviceCode": null
+          "serviceCode": null,
+          "routes": [
+            {
+              "method": "GET",
+              "route": "payments/{id}",
+              "perSecond": 9.280868385345997,
+              "errorRate": 0.0016
+            },
+            {
+              "method": "GET",
+              "route": "payments",
+              "perSecond": 5.373134328358209,
+              "errorRate": 0.0016
+            },
+            {
+              "method": "POST",
+              "route": "payments",
+              "perSecond": 3.4192672998643148,
+              "errorRate": 0.0032
+            },
+            {
+              "method": "GET",
+              "route": "payments/{id}/status",
+              "perSecond": 2.9308005427408412,
+              "errorRate": 0.0016
+            },
+            {
+              "method": "PUT",
+              "route": "payments/{id}",
+              "perSecond": 1.9538670284938942,
+              "errorRate": 0.0032
+            }
+          ],
+          "methods": [
+            {
+              "method": "GET",
+              "perSecond": 17.584803256445046,
+              "share": 0.7327001356852102
+            },
+            {
+              "method": "POST",
+              "perSecond": 3.4192672998643148,
+              "share": 0.14246947082767977
+            },
+            {
+              "method": "PUT",
+              "perSecond": 1.9538670284938942,
+              "share": 0.0814111261872456
+            },
+            {
+              "method": "PATCH",
+              "perSecond": 0.6512890094979648,
+              "share": 0.027137042062415198
+            },
+            {
+              "method": "DELETE",
+              "perSecond": 0.39077340569877883,
+              "share": 0.016282225237449117
+            }
+          ]
         },
         {
           "id": "pay.payments-worker",
@@ -694,7 +830,9 @@
           "engine": null,
           "backlogCountAmber": null,
           "backlogCountRed": null,
-          "serviceCode": null
+          "serviceCode": null,
+          "routes": null,
+          "methods": null
         },
         {
           "id": "pay.payments-db",
@@ -743,7 +881,9 @@
           "engine": null,
           "backlogCountAmber": null,
           "backlogCountRed": null,
-          "serviceCode": null
+          "serviceCode": null,
+          "routes": null,
+          "methods": null
         }
       ],
       "assets": [],
@@ -837,7 +977,66 @@
           "engine": null,
           "backlogCountAmber": null,
           "backlogCountRed": null,
-          "serviceCode": null
+          "serviceCode": null,
+          "routes": [
+            {
+              "method": "GET",
+              "route": "stock/{id}",
+              "perSecond": 5.927576601671309,
+              "errorRate": 0.0016
+            },
+            {
+              "method": "GET",
+              "route": "stock",
+              "perSecond": 3.6768802228412256,
+              "errorRate": 0.0016
+            },
+            {
+              "method": "POST",
+              "route": "stock",
+              "perSecond": 2.3398328690807797,
+              "errorRate": 0.0032
+            },
+            {
+              "method": "GET",
+              "route": "stock/{id}/status",
+              "perSecond": 2.0055710306406684,
+              "errorRate": 0.0016
+            },
+            {
+              "method": "PUT",
+              "route": "stock/{id}",
+              "perSecond": 1.3370473537604457,
+              "errorRate": 0.0032
+            }
+          ],
+          "methods": [
+            {
+              "method": "GET",
+              "perSecond": 11.610027855153204,
+              "share": 0.7256267409470752
+            },
+            {
+              "method": "POST",
+              "perSecond": 2.3398328690807797,
+              "share": 0.14623955431754873
+            },
+            {
+              "method": "PUT",
+              "perSecond": 1.3370473537604457,
+              "share": 0.08356545961002786
+            },
+            {
+              "method": "PATCH",
+              "perSecond": 0.4456824512534819,
+              "share": 0.027855153203342618
+            },
+            {
+              "method": "DELETE",
+              "perSecond": 0.26740947075208915,
+              "share": 0.016713091922005572
+            }
+          ]
         },
         {
           "id": "stk.stock-worker",
@@ -888,7 +1087,9 @@
           "engine": null,
           "backlogCountAmber": null,
           "backlogCountRed": null,
-          "serviceCode": null
+          "serviceCode": null,
+          "routes": null,
+          "methods": null
         },
         {
           "id": "stk.stock-db",
@@ -937,7 +1138,9 @@
           "engine": null,
           "backlogCountAmber": null,
           "backlogCountRed": null,
-          "serviceCode": null
+          "serviceCode": null,
+          "routes": null,
+          "methods": null
         }
       ],
       "assets": [],
@@ -997,7 +1200,66 @@
         "engine": null,
         "backlogCountAmber": null,
         "backlogCountRed": null,
-        "serviceCode": null
+        "serviceCode": null,
+        "routes": [
+          {
+            "method": "GET",
+            "route": "card-network/{id}",
+            "perSecond": 4.640434192672998,
+            "errorRate": 0.0016
+          },
+          {
+            "method": "GET",
+            "route": "card-network",
+            "perSecond": 2.6865671641791047,
+            "errorRate": 0.0016
+          },
+          {
+            "method": "POST",
+            "route": "card-network",
+            "perSecond": 1.7096336499321574,
+            "errorRate": 0.0032
+          },
+          {
+            "method": "GET",
+            "route": "card-network/{id}/status",
+            "perSecond": 1.4654002713704206,
+            "errorRate": 0.0016
+          },
+          {
+            "method": "PUT",
+            "route": "card-network/{id}",
+            "perSecond": 0.9769335142469471,
+            "errorRate": 0.0032
+          }
+        ],
+        "methods": [
+          {
+            "method": "GET",
+            "perSecond": 8.792401628222523,
+            "share": 0.7327001356852102
+          },
+          {
+            "method": "POST",
+            "perSecond": 1.7096336499321574,
+            "share": 0.14246947082767977
+          },
+          {
+            "method": "PUT",
+            "perSecond": 0.9769335142469471,
+            "share": 0.0814111261872456
+          },
+          {
+            "method": "PATCH",
+            "perSecond": 0.3256445047489824,
+            "share": 0.027137042062415198
+          },
+          {
+            "method": "DELETE",
+            "perSecond": 0.19538670284938942,
+            "share": 0.016282225237449117
+          }
+        ]
       },
       "calledBy": [
         "pay.payments-api"

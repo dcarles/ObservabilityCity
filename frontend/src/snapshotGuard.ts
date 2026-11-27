@@ -301,6 +301,15 @@ function checkNode(n: unknown, groupId: string, ids: Set<string>, problems: stri
   out.engine = isObject(n.engine) && ['id', 'name', 'type', 'typeName'].every((k) => typeof (n.engine as Record<string, unknown>)[k] === 'string' && (n.engine as Record<string, unknown>)[k] !== '')
     ? { id: n.engine.id, name: n.engine.name, type: n.engine.type, typeName: n.engine.typeName, partLabel: typeof n.engine.partLabel === 'string' && n.engine.partLabel !== '' ? n.engine.partLabel : null }
     : null
+  // the calls an API serves and how its requests divide by method, when the environment measures them; null otherwise, and an entry with no name or no rate cannot be shown
+  out.routes = Array.isArray(n.routes)
+    ? n.routes.filter(isObject).filter((r) => typeof r.method === 'string' && r.method !== '' && typeof r.route === 'string' && r.route !== '' && isFiniteNumber(r.perSecond) && r.perSecond >= 0)
+      .map((r) => ({ method: r.method as string, route: r.route as string, perSecond: r.perSecond as number, errorRate: isFiniteNumber(r.errorRate) ? Math.min(1, Math.max(0, r.errorRate)) : 0 }))
+    : null
+  out.methods = Array.isArray(n.methods)
+    ? n.methods.filter(isObject).filter((m) => typeof m.method === 'string' && m.method !== '' && isFiniteNumber(m.perSecond) && m.perSecond >= 0)
+      .map((m) => ({ method: m.method as string, perSecond: m.perSecond as number, share: isFiniteNumber(m.share) ? Math.min(1, Math.max(0, m.share)) : 0 }))
+    : null
   // null: nothing says whether the app runs; a job or region list is only there for a function or a service in two regions
   out.app = APP_STATES.includes(n.app as string) ? n.app : null
   const optionalNumber = (v: unknown) => (isFiniteNumber(v) ? v : null)

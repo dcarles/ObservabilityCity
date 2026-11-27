@@ -84,7 +84,9 @@
           "engine": null,
           "backlogCountAmber": null,
           "backlogCountRed": null,
-          "serviceCode": null
+          "serviceCode": null,
+          "routes": null,
+          "methods": null
         },
         {
           "id": "hub.broker",
@@ -133,7 +135,9 @@
           "engine": null,
           "backlogCountAmber": null,
           "backlogCountRed": null,
-          "serviceCode": null
+          "serviceCode": null,
+          "routes": null,
+          "methods": null
         }
       ],
       "assets": [],
@@ -219,7 +223,66 @@
           "engine": null,
           "backlogCountAmber": null,
           "backlogCountRed": null,
-          "serviceCode": null
+          "serviceCode": null,
+          "routes": [
+            {
+              "method": "GET",
+              "route": "orders/{id}",
+              "perSecond": 13.372434017595307,
+              "errorRate": 0.0016
+            },
+            {
+              "method": "GET",
+              "route": "orders",
+              "perSecond": 6.193548387096774,
+              "errorRate": 0.0016
+            },
+            {
+              "method": "POST",
+              "route": "orders",
+              "perSecond": 4.926686217008798,
+              "errorRate": 0.0032000000000000006
+            },
+            {
+              "method": "GET",
+              "route": "orders/{id}/status",
+              "perSecond": 3.941348973607038,
+              "errorRate": 0.0016
+            },
+            {
+              "method": "PUT",
+              "route": "orders/{id}",
+              "perSecond": 2.252199413489736,
+              "errorRate": 0.0032
+            }
+          ],
+          "methods": [
+            {
+              "method": "GET",
+              "perSecond": 23.507331378299117,
+              "share": 0.7346041055718475
+            },
+            {
+              "method": "POST",
+              "perSecond": 4.926686217008798,
+              "share": 0.15395894428152496
+            },
+            {
+              "method": "PUT",
+              "perSecond": 2.252199413489736,
+              "share": 0.07038123167155426
+            },
+            {
+              "method": "PATCH",
+              "perSecond": 0.8445747800586509,
+              "share": 0.02639296187683285
+            },
+            {
+              "method": "DELETE",
+              "perSecond": 0.46920821114369504,
+              "share": 0.014662756598240474
+            }
+          ]
         },
         {
           "id": "ord.orders-worker",
@@ -270,7 +333,9 @@
           "engine": null,
           "backlogCountAmber": null,
           "backlogCountRed": null,
-          "serviceCode": null
+          "serviceCode": null,
+          "routes": null,
+          "methods": null
         },
         {
           "id": "ord.orders-db",
@@ -319,7 +384,9 @@
           "engine": null,
           "backlogCountAmber": null,
           "backlogCountRed": null,
-          "serviceCode": null
+          "serviceCode": null,
+          "routes": null,
+          "methods": null
         }
       ],
       "assets": [],
@@ -414,7 +481,66 @@
           "engine": null,
           "backlogCountAmber": null,
           "backlogCountRed": null,
-          "serviceCode": null
+          "serviceCode": null,
+          "routes": [
+            {
+              "method": "GET",
+              "route": "billing/{id}",
+              "perSecond": 8.532224532224532,
+              "errorRate": 0.0016
+            },
+            {
+              "method": "GET",
+              "route": "billing",
+              "perSecond": 4.9397089397089395,
+              "errorRate": 0.0016
+            },
+            {
+              "method": "GET",
+              "route": "billing/{id}/status",
+              "perSecond": 3.5925155925155923,
+              "errorRate": 0.0016
+            },
+            {
+              "method": "POST",
+              "route": "billing",
+              "perSecond": 3.4927234927234925,
+              "errorRate": 0.0032
+            },
+            {
+              "method": "PUT",
+              "route": "billing/{id}",
+              "perSecond": 1.7962577962577961,
+              "errorRate": 0.0032
+            }
+          ],
+          "methods": [
+            {
+              "method": "GET",
+              "perSecond": 17.064449064449065,
+              "share": 0.7110187110187112
+            },
+            {
+              "method": "POST",
+              "perSecond": 3.4927234927234925,
+              "share": 0.14553014553014554
+            },
+            {
+              "method": "PUT",
+              "perSecond": 1.7962577962577961,
+              "share": 0.07484407484407485
+            },
+            {
+              "method": "PATCH",
+              "perSecond": 1.1975051975051973,
+              "share": 0.0498960498960499
+            },
+            {
+              "method": "DELETE",
+              "perSecond": 0.44906444906444903,
+              "share": 0.018711018711018712
+            }
+          ]
         },
         {
           "id": "bil.billing-worker",
@@ -465,7 +591,9 @@
           "engine": null,
           "backlogCountAmber": null,
           "backlogCountRed": null,
-          "serviceCode": null
+          "serviceCode": null,
+          "routes": null,
+          "methods": null
         },
         {
           "id": "bil.billing-db",
@@ -514,7 +642,9 @@
           "engine": null,
           "backlogCountAmber": null,
           "backlogCountRed": null,
-          "serviceCode": null
+          "serviceCode": null,
+          "routes": null,
+          "methods": null
         }
       ],
       "assets": [],
@@ -605,7 +735,9 @@
           "engine": null,
           "backlogCountAmber": null,
           "backlogCountRed": null,
-          "serviceCode": null
+          "serviceCode": null,
+          "routes": null,
+          "methods": null
         },
         {
           "id": "shp.shipping-db",
@@ -654,7 +786,9 @@
           "engine": null,
           "backlogCountAmber": null,
           "backlogCountRed": null,
-          "serviceCode": null
+          "serviceCode": null,
+          "routes": null,
+          "methods": null
         }
       ],
       "assets": [],

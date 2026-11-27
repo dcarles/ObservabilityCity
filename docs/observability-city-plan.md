@@ -51,6 +51,7 @@ Each signal has exactly one visual meaning, and it reads the same in every theme
 | Incident | Weather over the island it belongs to: light cloud for sev 4, overcast for sev 3, rain for sev 2, a storm with lightning for sev 1. The rest of the town stays sunny |
 | Cloud health report | A red "!" above a building whose resource the cloud provider reports as degraded or unavailable |
 | Outside callers | An airport whose planes land at the rate of outside traffic, with an arrivals board. Taxis carry the requests from the terminal into the town. Hovering it shows the arrivals and the traffic inside the town; a click zooms to it |
+| Request origin and destination | Point at a car for a card with where it came from and where it goes (short names `group.service`, or `outside`), with its road drawn and both buildings ringed; click to keep it. Close up, the nearest cars carry a small `from → to` sign. Nothing is written on cars from the air |
 | Third parties | Vendor islands outside the ring road. A call leaves the island's back gate, goes round the ring road and down the vendor's own road |
 | Who calls whom | The dependency overlay: dashed arcs between islands, as thick as the traffic between them (a layer, off until shown) |
 | Lost & found | An optional island, id `lost-found`, with boxes and bins by its gate, for systems you declare that no team owns. It always stands last |

@@ -86,7 +86,9 @@
           "engine": null,
           "backlogCountAmber": null,
           "backlogCountRed": null,
-          "serviceCode": null
+          "serviceCode": null,
+          "routes": null,
+          "methods": null
         },
         {
           "id": "hub.service-bus",
@@ -135,7 +137,9 @@
           "engine": null,
           "backlogCountAmber": null,
           "backlogCountRed": null,
-          "serviceCode": null
+          "serviceCode": null,
+          "routes": null,
+          "methods": null
         },
         {
           "id": "hub.egress",
@@ -184,7 +188,9 @@
           "engine": null,
           "backlogCountAmber": null,
           "backlogCountRed": null,
-          "serviceCode": null
+          "serviceCode": null,
+          "routes": null,
+          "methods": null
         },
         {
           "id": "hub.customer-db",
@@ -233,7 +239,9 @@
           "engine": null,
           "backlogCountAmber": null,
           "backlogCountRed": null,
-          "serviceCode": null
+          "serviceCode": null,
+          "routes": null,
+          "methods": null
         }
       ],
       "assets": [],
@@ -315,7 +323,66 @@
           "engine": null,
           "backlogCountAmber": null,
           "backlogCountRed": null,
-          "serviceCode": null
+          "serviceCode": null,
+          "routes": [
+            {
+              "method": "GET",
+              "route": "orders/{id}",
+              "perSecond": 11.259259259259258,
+              "errorRate": 0.0016
+            },
+            {
+              "method": "GET",
+              "route": "orders",
+              "perSecond": 5.9259259259259265,
+              "errorRate": 0.0016
+            },
+            {
+              "method": "POST",
+              "route": "orders",
+              "perSecond": 5.27946127946128,
+              "errorRate": 0.0032
+            },
+            {
+              "method": "GET",
+              "route": "orders/{id}/status",
+              "perSecond": 4.202020202020202,
+              "errorRate": 0.0016
+            },
+            {
+              "method": "PUT",
+              "route": "orders/{id}",
+              "perSecond": 3.2323232323232323,
+              "errorRate": 0.0032
+            }
+          ],
+          "methods": [
+            {
+              "method": "GET",
+              "perSecond": 21.387205387205384,
+              "share": 0.6683501683501682
+            },
+            {
+              "method": "POST",
+              "perSecond": 5.27946127946128,
+              "share": 0.164983164983165
+            },
+            {
+              "method": "PUT",
+              "perSecond": 3.2323232323232323,
+              "share": 0.10101010101010101
+            },
+            {
+              "method": "PATCH",
+              "perSecond": 1.292929292929293,
+              "share": 0.04040404040404041
+            },
+            {
+              "method": "DELETE",
+              "perSecond": 0.8080808080808081,
+              "share": 0.025252525252525252
+            }
+          ]
         },
         {
           "id": "ful.orders-worker",
@@ -366,7 +433,9 @@
           "engine": null,
           "backlogCountAmber": null,
           "backlogCountRed": null,
-          "serviceCode": null
+          "serviceCode": null,
+          "routes": null,
+          "methods": null
         },
         {
           "id": "ful.orders-db",
@@ -415,7 +484,9 @@
           "engine": null,
           "backlogCountAmber": null,
           "backlogCountRed": null,
-          "serviceCode": null
+          "serviceCode": null,
+          "routes": null,
+          "methods": null
         }
       ],
       "assets": [],
@@ -501,7 +572,9 @@
           "engine": null,
           "backlogCountAmber": null,
           "backlogCountRed": null,
-          "serviceCode": null
+          "serviceCode": null,
+          "routes": null,
+          "methods": null
         },
         {
           "id": "wrk.batch-db",
@@ -550,7 +623,9 @@
           "engine": null,
           "backlogCountAmber": null,
           "backlogCountRed": null,
-          "serviceCode": null
+          "serviceCode": null,
+          "routes": null,
+          "methods": null
         }
       ],
       "assets": [],
@@ -625,7 +700,66 @@
           "engine": null,
           "backlogCountAmber": null,
           "backlogCountRed": null,
-          "serviceCode": null
+          "serviceCode": null,
+          "routes": [
+            {
+              "method": "GET",
+              "route": "catalog/{id}",
+              "perSecond": 7.6998123827392115,
+              "errorRate": 0.0016
+            },
+            {
+              "method": "GET",
+              "route": "catalog",
+              "perSecond": 5.943714821763602,
+              "errorRate": 0.0016
+            },
+            {
+              "method": "POST",
+              "route": "catalog",
+              "perSecond": 4.097560975609755,
+              "errorRate": 0.0032
+            },
+            {
+              "method": "GET",
+              "route": "catalog/{id}/status",
+              "perSecond": 2.7016885553470917,
+              "errorRate": 0.0016
+            },
+            {
+              "method": "PUT",
+              "route": "catalog/{id}",
+              "perSecond": 1.9812382739212004,
+              "errorRate": 0.0032
+            }
+          ],
+          "methods": [
+            {
+              "method": "GET",
+              "perSecond": 16.345215759849907,
+              "share": 0.6810506566604128
+            },
+            {
+              "method": "POST",
+              "perSecond": 4.097560975609755,
+              "share": 0.17073170731707313
+            },
+            {
+              "method": "PUT",
+              "perSecond": 1.9812382739212004,
+              "share": 0.08255159474671668
+            },
+            {
+              "method": "PATCH",
+              "perSecond": 0.9906191369606002,
+              "share": 0.04127579737335834
+            },
+            {
+              "method": "DELETE",
+              "perSecond": 0.5853658536585366,
+              "share": 0.024390243902439022
+            }
+          ]
         },
         {
           "id": "nom.catalog-cache",
@@ -674,7 +808,9 @@
           "engine": null,
           "backlogCountAmber": null,
           "backlogCountRed": null,
-          "serviceCode": null
+          "serviceCode": null,
+          "routes": null,
+          "methods": null
         }
       ],
       "assets": [],
@@ -775,7 +911,9 @@
           "engine": null,
           "backlogCountAmber": null,
           "backlogCountRed": null,
-          "serviceCode": null
+          "serviceCode": null,
+          "routes": null,
+          "methods": null
         }
       ],
       "assets": [],
@@ -852,7 +990,66 @@
           "engine": null,
           "backlogCountAmber": null,
           "backlogCountRed": null,
-          "serviceCode": null
+          "serviceCode": null,
+          "routes": [
+            {
+              "method": "GET",
+              "route": "feed/{id}",
+              "perSecond": 5.37524557956778,
+              "errorRate": 0.0016
+            },
+            {
+              "method": "GET",
+              "route": "feed",
+              "perSecond": 3.1119842829076623,
+              "errorRate": 0.0016
+            },
+            {
+              "method": "POST",
+              "route": "feed",
+              "perSecond": 2.6404715127701377,
+              "errorRate": 0.0031999999999999997
+            },
+            {
+              "method": "PUT",
+              "route": "feed/{id}",
+              "perSecond": 1.7603143418467586,
+              "errorRate": 0.0032
+            },
+            {
+              "method": "GET",
+              "route": "feed/{id}/status",
+              "perSecond": 1.6974459724950886,
+              "errorRate": 0.0016000000000000003
+            }
+          ],
+          "methods": [
+            {
+              "method": "GET",
+              "perSecond": 10.18467583497053,
+              "share": 0.6365422396856582
+            },
+            {
+              "method": "POST",
+              "perSecond": 2.6404715127701377,
+              "share": 0.1650294695481336
+            },
+            {
+              "method": "PUT",
+              "perSecond": 1.7603143418467586,
+              "share": 0.11001964636542241
+            },
+            {
+              "method": "PATCH",
+              "perSecond": 0.9430255402750491,
+              "share": 0.05893909626719057
+            },
+            {
+              "method": "DELETE",
+              "perSecond": 0.4715127701375246,
+              "share": 0.029469548133595286
+            }
+          ]
         },
         {
           "id": "leg.feed-worker",
@@ -903,7 +1100,9 @@
           "engine": null,
           "backlogCountAmber": null,
           "backlogCountRed": null,
-          "serviceCode": null
+          "serviceCode": null,
+          "routes": null,
+          "methods": null
         },
         {
           "id": "leg.feed-db",
@@ -952,7 +1151,9 @@
           "engine": null,
           "backlogCountAmber": null,
           "backlogCountRed": null,
-          "serviceCode": null
+          "serviceCode": null,
+          "routes": null,
+          "methods": null
         }
       ],
       "assets": [],
@@ -1055,7 +1256,9 @@
           "engine": null,
           "backlogCountAmber": null,
           "backlogCountRed": null,
-          "serviceCode": null
+          "serviceCode": null,
+          "routes": null,
+          "methods": null
         }
       ],
       "assets": [],
@@ -1111,7 +1314,66 @@
         "engine": null,
         "backlogCountAmber": null,
         "backlogCountRed": null,
-        "serviceCode": null
+        "serviceCode": null,
+        "routes": [
+          {
+            "method": "GET",
+            "route": "shared-credit/{id}",
+            "perSecond": 37.87859424920128,
+            "errorRate": 0.0016
+          },
+          {
+            "method": "GET",
+            "route": "shared-credit",
+            "perSecond": 23.616613418530353,
+            "errorRate": 0.0015999999999999999
+          },
+          {
+            "method": "POST",
+            "route": "shared-credit",
+            "perSecond": 10.73482428115016,
+            "errorRate": 0.0032
+          },
+          {
+            "method": "GET",
+            "route": "shared-credit/{id}/status",
+            "perSecond": 10.121405750798722,
+            "errorRate": 0.0016
+          },
+          {
+            "method": "PUT",
+            "route": "shared-credit/{id}",
+            "perSecond": 7.974440894568691,
+            "errorRate": 0.0032
+          }
+        ],
+        "methods": [
+          {
+            "method": "GET",
+            "perSecond": 71.61661341853036,
+            "share": 0.7460063897763578
+          },
+          {
+            "method": "POST",
+            "perSecond": 10.73482428115016,
+            "share": 0.11182108626198083
+          },
+          {
+            "method": "PUT",
+            "perSecond": 7.974440894568691,
+            "share": 0.08306709265175719
+          },
+          {
+            "method": "PATCH",
+            "perSecond": 3.9872204472843453,
+            "share": 0.04153354632587859
+          },
+          {
+            "method": "DELETE",
+            "perSecond": 1.6869009584664538,
+            "share": 0.01757188498402556
+          }
+        ]
       },
       "calledBy": [
         "ful.orders-api",
@@ -1170,7 +1432,66 @@
         "engine": null,
         "backlogCountAmber": null,
         "backlogCountRed": null,
-        "serviceCode": null
+        "serviceCode": null,
+        "routes": [
+          {
+            "method": "GET",
+            "route": "shared-identity/{id}",
+            "perSecond": 35.2,
+            "errorRate": 0.0016
+          },
+          {
+            "method": "GET",
+            "route": "shared-identity",
+            "perSecond": 18.52631578947369,
+            "errorRate": 0.0016
+          },
+          {
+            "method": "GET",
+            "route": "shared-identity/{id}/status",
+            "perSecond": 13.13684210526316,
+            "errorRate": 0.0016
+          },
+          {
+            "method": "POST",
+            "route": "shared-identity",
+            "perSecond": 12.96842105263158,
+            "errorRate": 0.0032
+          },
+          {
+            "method": "PUT",
+            "route": "shared-identity/{id}",
+            "perSecond": 8.757894736842106,
+            "errorRate": 0.0032
+          }
+        ],
+        "methods": [
+          {
+            "method": "GET",
+            "perSecond": 66.86315789473684,
+            "share": 0.6964912280701755
+          },
+          {
+            "method": "POST",
+            "perSecond": 12.96842105263158,
+            "share": 0.13508771929824562
+          },
+          {
+            "method": "PUT",
+            "perSecond": 8.757894736842106,
+            "share": 0.0912280701754386
+          },
+          {
+            "method": "PATCH",
+            "perSecond": 5.052631578947369,
+            "share": 0.052631578947368425
+          },
+          {
+            "method": "DELETE",
+            "perSecond": 2.3578947368421055,
+            "share": 0.024561403508771933
+          }
+        ]
       },
       "calledBy": [
         "nom.catalog-api"
@@ -1228,7 +1549,66 @@
         "engine": null,
         "backlogCountAmber": null,
         "backlogCountRed": null,
-        "serviceCode": null
+        "serviceCode": null,
+        "routes": [
+          {
+            "method": "GET",
+            "route": "shared-reports/{id}",
+            "perSecond": 40.608534322820034,
+            "errorRate": 0.0015999999999999999
+          },
+          {
+            "method": "GET",
+            "route": "shared-reports",
+            "perSecond": 19.591836734693878,
+            "errorRate": 0.0016000000000000003
+          },
+          {
+            "method": "POST",
+            "route": "shared-reports",
+            "perSecond": 11.22077922077922,
+            "errorRate": 0.0032
+          },
+          {
+            "method": "GET",
+            "route": "shared-reports/{id}/status",
+            "perSecond": 9.617810760667902,
+            "errorRate": 0.0016
+          },
+          {
+            "method": "PUT",
+            "route": "shared-reports/{id}",
+            "perSecond": 8.549165120593692,
+            "errorRate": 0.0032
+          }
+        ],
+        "methods": [
+          {
+            "method": "GET",
+            "perSecond": 69.81818181818181,
+            "share": 0.7272727272727273
+          },
+          {
+            "method": "POST",
+            "perSecond": 11.22077922077922,
+            "share": 0.11688311688311688
+          },
+          {
+            "method": "PUT",
+            "perSecond": 8.549165120593692,
+            "share": 0.08905380333951764
+          },
+          {
+            "method": "PATCH",
+            "perSecond": 3.918367346938775,
+            "share": 0.04081632653061225
+          },
+          {
+            "method": "DELETE",
+            "perSecond": 2.4935064935064934,
+            "share": 0.025974025974025976
+          }
+        ]
       },
       "calledBy": [
         "ful.orders-worker"

@@ -207,6 +207,12 @@ button.chip.clickable:focus-visible { outline: 2px solid var(--accent); }
 #inspector h4 small { text-transform: none; letter-spacing: 0; font-weight: 400; margin-left: 6px; }
 #inspector .row { display: flex; justify-content: space-between; gap: 12px; padding: 2px 0; }
 #inspector .row span:first-child { opacity: 0.65; }
+#inspector .calls .row, #inspector .methods .row { font-size: 12px; }
+#inspector .calls .row span:first-child, #inspector .methods .row span:first-child { opacity: 1; overflow-wrap: anywhere; }
+#inspector .method { display: inline-block; min-width: 3.4em; margin-right: 4px; padding: 0 5px; border-radius: 5px; font-size: 10.5px; font-weight: 700; text-align: center; color: #fff; background: #6b7686; }
+#inspector .method.m-get { background: #2f7de1; } #inspector .method.m-post { background: #2e9e63; } #inspector .method.m-put { background: #d98a1d; } #inspector .method.m-patch { background: #8a63d2; } #inspector .method.m-delete { background: #cf4b4b; }
+#inspector .method-bar { height: 4px; margin: 1px 0 5px; border-radius: 2px; background: rgba(120, 130, 150, 0.2); }
+#inspector .method-bar i { display: block; height: 100%; border-radius: 2px; background: #6b7686; opacity: 0.75; }
 #inspector .row.part { padding-left: 14px; font-size: 12px; }
 #inspector .why { margin: 0 0 10px; padding-left: 18px; }
 #inspector .why li { margin: 3px 0; }
@@ -464,3 +470,17 @@ body.loading-data #notices, body.loading-data #unknown-hosts { display: none !im
 #state-list .pier-lines { padding: 2px 12px 8px; font-size: 13px; line-height: 1.5; }
 #state-list .subhead { display: flex; padding: 8px 12px 4px; border-top: 1px solid var(--line); margin-top: 2px; padding-top: 8px; font-size: 12px; opacity: 0.85; }
 #tooltip .pierline { font-size: 12px; opacity: 0.85; }
+
+/* Car signs: a card for the car under the pointer, and small "from → to" signs on the nearest cars when the camera is close. */
+#car-signs { position: fixed; inset: 0; z-index: 4; pointer-events: none; overflow: hidden; }
+#car-card { position: absolute; padding: 8px 11px; font-size: 12px; line-height: 1.45; min-width: 210px; background: rgba(20, 30, 45, 0.92); color: #fff; border-radius: 10px; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3); }
+#car-card[hidden] { display: none; }
+#car-card .car-ends { font-size: 13px; font-weight: 700; margin-bottom: 3px; }
+#car-card .car-ends .from { color: #8fc2ff; } #car-card .car-ends .to { color: #8be0a9; }
+#car-card .row { display: flex; justify-content: space-between; gap: 14px; }
+#car-card .row span:first-child { opacity: 0.6; }
+#car-card .bad { color: #ff8a80; } #car-card .ok { color: #8be0a9; }
+#car-card .hint { margin-top: 4px; font-size: 11px; opacity: 0.6; }
+.car-sign { position: absolute; left: 0; top: 0; padding: 1px 6px; font-size: 11px; font-weight: 700; white-space: nowrap; background: rgba(20, 30, 45, 0.88); color: #fff; border: 1px solid rgba(255, 255, 255, 0.35); border-radius: 6px; }
+.car-sign.bad { border-color: #ff8a80; }
+body.wall #car-signs, body.event-playing #car-signs { display: none; }

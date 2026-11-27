@@ -5,6 +5,7 @@ import type { GroupSnapshot, NodeSnapshot, ScopeResource, Snapshot, SystemDetail
 import { escapeHtml } from './picker'
 import { scopeParams, type Scope } from './scope'
 import { partLabel, partLines, tenantListOrder, tenantFigures, yardSummary, type TenantView } from './tenants'
+import { callLines, methodLines } from './routesModel'
 import { regionFigures, regionOptions, validChoice, WORST, type RegionChoice } from './regions'
 import { cloudHealthRows, dismissEvent, eventOfNode } from './healthEvents'
 import { brokerNames } from './hubSystems'
@@ -250,6 +251,7 @@ export class Inspector {
       ${this.jobs(n, group)}
       ${this.queues(n)}
       ${this.regions(n)}
+      ${this.calls(n)}
       ${tenants}
       ${this.openIn(n)}
       ${this.apiButton(n)}
@@ -285,6 +287,17 @@ export class Inspector {
       : ''
     const cut = open && t.more && t.more.cut > 0 ? `<div class="fine">${t.more.cut} of the quietest kinds are not listed.</div>` : ''
     return `<div class="types" data-types-for="${escapeHtml(r.name)}"><div class="row types-total"><span>Kinds of message</span><span>${escapeHtml(t.total)}</span></div>${rows}${cut}${toggle}</div>`
+  }
+
+  /** An API's busiest calls (method, route, requests a second, failed share) and how its requests divide by method. Nothing when the environment does not measure them. */
+  private calls(n: NodeSnapshot): string {
+    const calls = callLines(n)
+    if (calls.length === 0) return ''
+    const methods = methodLines(n)
+    return `<h4>Top calls <small>over the last window</small></h4>
+      <div class="calls">${calls.map((c) => `<div class="row call" data-call="${escapeHtml(`${c.method} ${c.route}`)}"><span><b class="method m-${escapeHtml(c.method.toLowerCase())}">${escapeHtml(c.method)}</b> ${escapeHtml(c.route)}</span><span class="${c.tone}">${escapeHtml(c.rate)}${c.errors ? ` · ${escapeHtml(c.errors)}` : ''}</span></div>`).join('')}</div>
+      ${methods.length === 0 ? '' : `<h4>Methods</h4>
+      <div class="methods">${methods.map((m) => `<div class="row method-row" data-method="${escapeHtml(m.method)}"><span><b class="method m-${escapeHtml(m.method.toLowerCase())}">${escapeHtml(m.method)}</b></span><span>${escapeHtml(m.share)} · ${escapeHtml(m.rate)}</span></div><div class="method-bar"><i style="width:${m.percent}%"></i></div>`).join('')}</div>`}`
   }
 
   /** A function building's scheduled jobs, one row for each job in each region. Nothing for a building without jobs. */

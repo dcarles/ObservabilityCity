@@ -1647,6 +1647,27 @@
           }
         }
       },
+      "MethodSnapshot": {
+        "required": [
+          "method",
+          "perSecond",
+          "share"
+        ],
+        "type": "object",
+        "properties": {
+          "method": {
+            "type": "string"
+          },
+          "perSecond": {
+            "type": "number",
+            "format": "double"
+          },
+          "share": {
+            "type": "number",
+            "format": "double"
+          }
+        }
+      },
       "NodeKind": {
         "enum": [
           "Api",
@@ -1903,6 +1924,20 @@
           "serviceCode": {
             "type": "string",
             "nullable": true
+          },
+          "routes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RouteSnapshot"
+            },
+            "nullable": true
+          },
+          "methods": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MethodSnapshot"
+            },
+            "nullable": true
           }
         }
       },
@@ -2131,6 +2166,31 @@
           },
           "url": {
             "type": "string"
+          }
+        }
+      },
+      "RouteSnapshot": {
+        "required": [
+          "method",
+          "route",
+          "perSecond",
+          "errorRate"
+        ],
+        "type": "object",
+        "properties": {
+          "method": {
+            "type": "string"
+          },
+          "route": {
+            "type": "string"
+          },
+          "perSecond": {
+            "type": "number",
+            "format": "double"
+          },
+          "errorRate": {
+            "type": "number",
+            "format": "double"
           }
         }
       },
